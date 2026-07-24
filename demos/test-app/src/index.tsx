@@ -111,6 +111,22 @@ const canisterEchoedAttributesRawEl = document.getElementById(
   "canisterEchoedAttributesRaw",
 ) as HTMLPreElement;
 
+// Push-notifications section (see index.html "Push Notifications" block).
+const iiCanisterIdPushEl = document.getElementById(
+  "iiCanisterIdPush",
+) as HTMLInputElement;
+const pushNotifyBtn = document.getElementById(
+  "pushNotifyBtn",
+) as HTMLButtonElement;
+const pushTitleEl = document.getElementById(
+  "pushTitle",
+) as HTMLInputElement;
+const pushMessageEl = document.getElementById(
+  "pushMessage",
+) as HTMLInputElement;
+const pushUrlEl = document.getElementById("pushUrl") as HTMLInputElement;
+const pushStatusEl = document.getElementById("pushStatus") as HTMLDivElement;
+
 let iiProtocolTestWindow: Window | undefined;
 
 // The identity set by the authentication
@@ -162,6 +178,25 @@ const idlFactory = ({ IDL }: { IDL: any }) => {
     ),
     whoami: IDL.Func([], [IDL.Principal], ["query"]),
     caller_attributes: IDL.Func([], [CallerAttributes], []),
+  });
+};
+
+// Hand-rolled IDL for the six II push methods, mirroring the six entries
+// added on the .did file in this same PR. Kept local (no import from
+// src/frontend/) so the test-app stays a standalone workspace.
+// The dApp only calls `notify_user` — subscribe/consent live on II
+// itself now, so we hand-declare the smallest IDL that exercises the
+// end-to-end push flow.
+const iiPushIdlFactory = ({ IDL }: { IDL: any }) => {
+  const PushAlert = IDL.Record({
+    hostname: IDL.Text,
+    title: IDL.Text,
+    body: IDL.Text,
+    url: IDL.Opt(IDL.Text),
+  });
+  const OkErr = IDL.Variant({ Ok: IDL.Null, Err: IDL.Text });
+  return IDL.Service({
+    notify_user: IDL.Func([IDL.Principal, PushAlert], [OkErr], []),
   });
 };
 
@@ -580,6 +615,56 @@ whoamiBtn.addEventListener("click", async () => {
     .catch((err) => {
       console.error("Failed to fetch whoami", err);
     });
+});
+
+// ---- Push notifications ---------------------------------------------
+//
+// Under Option A the dApp doesn't own the SW / subscribe / VAPID
+// flow — that all lives on II's own frontend now. The dApp's job is
+// just to fire `notify_user` as its per-anchor-per-origin principal;
+// II fans the encrypted push out to every device where the user has
+// enabled II push notifications for their anchor.
+
+async function makeIiActor(): Promise<any> {
+  if (!delegationIdentity) {
+    throw new Error("Sign in first");
+  }
+  const raw = iiCanisterIdPushEl.value.trim();
+  if (!raw) {
+    throw new Error("Set the II canister ID");
+  }
+  const canisterId = Principal.fromText(raw);
+  const agent = await HttpAgent.create({
+    host: hostUrlEl.value,
+    identity: delegationIdentity,
+    shouldFetchRootKey: true,
+  });
+  return Actor.createActor(iiPushIdlFactory, { agent, canisterId });
+}
+
+function setPushStatus(msg: string, kind: "ok" | "err") {
+  pushStatusEl.textContent = msg;
+  pushStatusEl.style.color = kind === "ok" ? "#1b5e20" : "#b71c1c";
+}
+
+pushNotifyBtn.addEventListener("click", async () => {
+  try {
+    if (!delegationIdentity) throw new Error("Sign in first");
+    const iiActor = await makeIiActor();
+    const title = pushTitleEl.value.trim() || "Hello from test-app";
+    const message = pushMessageEl.value.trim() || "Push notifications work!";
+    const url = pushUrlEl.value.trim() || window.location.href;
+    const res = await iiActor.notify_user(delegationIdentity.getPrincipal(), {
+      hostname: window.location.host,
+      title,
+      body: message,
+      url: [url],
+    });
+    if ("Err" in res) throw new Error(res.Err);
+    setPushStatus("notify_user Ok — watch the OS tray", "ok");
+  } catch (err) {
+    setPushStatus(`notify_user failed: ${(err as Error).message}`, "err");
+  }
 });
 
 const showError = (err: string) => {

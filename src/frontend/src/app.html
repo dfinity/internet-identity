@@ -3,6 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <link rel="shortcut icon" href="%sveltekit.assets%/favicon.svg" />
+    <!-- iOS Safari uses this instead of the manifest for the home-screen
+         icon. SVG is honoured since iOS 16.4; older iOS falls back to
+         a rendered screenshot. -->
+    <link rel="apple-touch-icon" href="%sveltekit.assets%/favicon.svg" />
+    <link rel="manifest" href="%sveltekit.assets%/manifest.json" />
+    <meta name="theme-color" content="#5c5c5d" />
     <title>Internet Identity</title>
     <meta
       name="viewport"

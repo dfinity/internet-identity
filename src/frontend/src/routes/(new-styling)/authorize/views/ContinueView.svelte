@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
+  import { onMount, type Snippet } from "svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { HelpCircleIcon, PlusIcon, PencilIcon } from "@lucide/svelte";
   import { handleError } from "$lib/components/utils/error";
@@ -572,7 +572,9 @@
     {@render header()}
   {:else}
     <AuthorizeHeader origin={displayOrigin} />
-    <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
+    <h1
+      class="text-text-primary mb-2 max-w-full min-w-0 self-start text-2xl font-medium break-words"
+    >
       {$t`Continue to ${dappName}`}
     </h1>
     <p class="text-text-secondary mb-6 self-start text-sm">
@@ -624,7 +626,7 @@
     </Tooltip>
   </div>
   {#if $READ_ONLY_MODE}
-    <div class="border-border-tertiary mt-4 border-t pt-4">
+    <div class="border-border-tertiary mt-4 min-w-0 border-t pt-4">
       <AccessLevelSelector
         bind:accessLevel
         disabled={isAuthenticatingDefault}

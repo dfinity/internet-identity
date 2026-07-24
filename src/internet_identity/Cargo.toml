@@ -20,8 +20,14 @@ rsa.workspace = true
 minicbor = { workspace = true, features = ["std", "derive"] }
 
 # DNSSEC verifier deps
-p256.workspace = true
+p256 = { workspace = true, features = ["ecdh"] }
 ed25519-dalek.workspace = true
+
+# Push notifications PoC — RFC 8291 Web Push payload encryption.
+# ECDH is done by p256 (ecdh feature above); HKDF derives the content
+# encryption key + nonce; AES-128-GCM encrypts the payload.
+hkdf = { version = "0.12", default-features = false }
+aes-gcm = { version = "0.10", default-features = false, features = ["aes", "alloc"] }
 
 # Captcha deps
 lodepng = "*"

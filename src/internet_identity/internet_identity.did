@@ -9,6 +9,18 @@ type SessionKey = PublicKey;
 type FrontendHostname = text;
 type Timestamp = nat64;
 
+// Push notifications PoC (RFC 8291). `hostname` and `title` are what the
+// Service Worker renders in the OS notification banner; `body` is the
+// message text; `url` is an optional deep-link the SW opens on click.
+// The whole record is CBOR-encoded, then RFC 8291-encrypted; single-record
+// AES-GCM caps the encrypted payload at ~3 KiB.
+type PushAlert = record {
+    hostname : text;
+    title : text;
+    body : text;
+    url : opt text;
+};
+
 type HeaderField = record {
     text;
     text;
@@ -1950,4 +1962,75 @@ service : (opt InternetIdentityInit) -> {
 
     // Looks up identity number when called with a recovery phrase
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
+
+    // -----------------------------------------------------------------
+    // Push notifications PoC (RFC 8291). Design lives in
+    // `docs/push-notifications-poc.md`. All four subscribe/unsubscribe/
+    // consent methods are authenticated as the identity; notify_user is
+    // called by a dApp on the user's behalf and identifies the target
+    // anchor via the in-app principal (looked up through PRINCIPAL_INDEX).
+    // -----------------------------------------------------------------
+
+    // Register a Web Push subscription for `anchor_number` on this
+    // device. Called from II's own frontend (Settings → Enable
+    // notifications on this device); authenticated as the anchor. Row
+    // is keyed by (anchor, sha256(endpoint)), so multiple devices per
+    // anchor are supported and notify_user fans out to all of them.
+    push_subscribe_device : (
+        anchor_number : UserNumber,
+        endpoint : text,
+        p256dh : blob,
+        auth : blob,
+    ) -> (variant { Ok; Err : text });
+
+    // Remove one of `anchor_number`'s subscriptions. `endpoint` picks
+    // which device row to remove — the anchor may have several.
+    push_unsubscribe_device : (
+        anchor_number : UserNumber,
+        endpoint : text,
+    ) -> (variant { Ok; Err : text });
+
+    // Grant `origin` permission to send push notifications for this
+    // identity. Also writes the reverse index so `notify_user` can find
+    // the anchor from the dApp's per-origin principal.
+    push_grant_consent : (
+        anchor_number : UserNumber,
+        origin : FrontendHostname,
+    ) -> (variant { Ok; Err : text });
+
+    // Revoke a previously-granted consent. Subscription rows are kept
+    // intact — a subsequent grant does not require re-subscribing.
+    push_revoke_consent : (
+        anchor_number : UserNumber,
+        origin : FrontendHostname,
+    ) -> (variant { Ok; Err : text });
+
+    // List every origin `anchor_number` has granted push-notification
+    // consent to. Backs the Settings UI's permissions list. Returns an
+    // empty vec for an unauthorized caller or an anchor with no consents.
+    push_list_consented_origins : (anchor_number : UserNumber) -> (vec text) query;
+
+    // Debug helper: return each device's push-relay endpoint URL
+    // registered for `anchor_number`. Useful when the "Enable on this
+    // device" button looked like it succeeded but no notifications
+    // arrive — checking this tells us whether the phone's subscribe
+    // round-trip actually completed. Endpoint URLs are not secret;
+    // keys are omitted.
+    push_debug_list_devices : (anchor_number : UserNumber) -> (vec text) query;
+
+    // Called by a dApp on the user's behalf: encrypt + fan out a push
+    // notification to every device the target identity has subscribed with
+    // consent for the caller's origin. Returns in milliseconds — outcalls
+    // to the relay are detached via `ic_cdk::spawn` and their success is
+    // observed by the browser, not by the caller. Rate-limited per anchor
+    // (see `canister_inspect_message`).
+    notify_user : (
+        in_app_principal : principal,
+        alert : PushAlert,
+    ) -> (variant { Ok; Err : text });
+
+    // Return the VAPID public key (65-byte uncompressed SEC1 P-256 point)
+    // the frontend passes as `applicationServerKey` to
+    // `pushManager.subscribe()`. Same key used to sign the per-push JWT.
+    push_vapid_public_key : () -> (blob);
 };

@@ -67,6 +67,7 @@ mod mcp;
 mod mcp_registration;
 
 mod openid;
+mod push;
 mod session_delegation;
 mod single_flight_cache;
 mod state;
@@ -788,6 +789,141 @@ fn get_mcp_registration_delegation(
 #[update]
 fn mcp_register_v2(session_key: SessionKey) -> Result<McpRegistrationV2, String> {
     mcp_registration::register_v2(session_key)
+}
+
+// ---- Push notifications PoC (RFC 8291) -------------------------------------
+//
+// Design lives in `docs/push-notifications-poc.md`. Handlers all follow the
+// same shape: authenticate as the identity (identity-scoped operations), then
+// delegate to [`push::api`]. `notify_user` is a dApp-facing method — it
+// authorises via the reverse principal-index rather than the anchor, and
+// stubs the outcall for Phase 5+.
+
+#[derive(candid::CandidType, candid::Deserialize, Debug, Clone)]
+pub struct PushAlert {
+    pub hostname: String,
+    pub title: String,
+    pub body: String,
+    pub url: Option<String>,
+}
+
+/// Register a Web Push subscription for `anchor_number` on this device.
+/// Called from II's own frontend (`/manage → Settings → Enable
+/// notifications on this device`); the caller is authenticated as the
+/// anchor's raw principal.
+///
+/// Multiple devices per anchor are supported — the row is keyed by
+/// `(anchor, sha256(endpoint))`, so a phone-and-laptop setup gets two
+/// rows and `notify_user` fans out to both.
+#[update]
+fn push_subscribe_device(
+    anchor_number: AnchorNumber,
+    endpoint: String,
+    p256dh: ByteBuf,
+    auth: ByteBuf,
+) -> Result<(), String> {
+    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
+    push::api::subscribe_device(anchor_number, endpoint, p256dh.into_vec(), auth.into_vec())
+}
+
+/// Remove a browser's subscription for `anchor_number`. The `endpoint`
+/// identifies which of the anchor's registered devices to remove — an
+/// anchor can have several (phone, laptop, tablet).
+#[update]
+fn push_unsubscribe_device(anchor_number: AnchorNumber, endpoint: String) -> Result<(), String> {
+    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
+    push::api::unsubscribe_device(anchor_number, endpoint)
+}
+
+#[update]
+fn push_grant_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> Result<(), String> {
+    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
+    push::api::grant_consent(anchor_number, origin)
+}
+
+#[update]
+fn push_revoke_consent(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+) -> Result<(), String> {
+    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
+    push::api::revoke_consent(anchor_number, origin)
+}
+
+/// List `anchor_number`'s consented dApp origins for the Settings UI. Read
+/// by the Settings UI. Returns an empty vec for an unauthorized caller or an
+/// anchor with no consents, matching [`mcp_get_config`]'s "no-op default on
+/// auth failure" shape for queries.
+#[query]
+fn push_list_consented_origins(anchor_number: AnchorNumber) -> Vec<FrontendHostname> {
+    if check_session_authorization(anchor_number).is_err() {
+        return Vec::new();
+    }
+    push::api::list_consented_origins(anchor_number)
+}
+
+/// Debug helper: return each device's push-relay endpoint URL registered
+/// for `anchor_number`. Useful when the "Enable on this device" button
+/// looked like it succeeded but no notifications arrive — checking this
+/// tells us whether the phone's subscribe round-trip actually completed.
+/// Endpoint URLs are not secret; keys are omitted.
+#[query]
+fn push_debug_list_devices(anchor_number: AnchorNumber) -> Vec<String> {
+    if check_session_authorization(anchor_number).is_err() {
+        return Vec::new();
+    }
+    push::api::debug_list_devices(anchor_number)
+}
+
+/// Send an encrypted push notification to `in_app_principal`'s subscribed
+/// browser SW, if the caller's origin has consent. Returns in ms — the
+/// outcall to the relay is detached via `ic_cdk::spawn` (see
+/// [`push::api::notify_user`]).
+///
+/// Called by dApps on behalf of the user. No `check_authz_and_record_activity`
+/// here: the dApp doesn't authenticate as the anchor, it authenticates as
+/// its own per-anchor-per-origin principal (`in_app_principal`). We verify
+/// authorization by requiring that `caller()` matches the `in_app_principal`
+/// argument — a dApp can only send pushes on behalf of principals it can
+/// prove it *is*.
+#[update]
+async fn notify_user(in_app_principal: Principal, alert: PushAlert) -> Result<(), String> {
+    if caller() != in_app_principal {
+        return Err("caller must be the in_app_principal".to_string());
+    }
+    let entropy = random_salt().await;
+    push::api::notify_user(
+        in_app_principal,
+        push::api::PushAlert {
+            hostname: alert.hostname,
+            title: alert.title,
+            body: alert.body,
+            url: alert.url,
+        },
+        entropy,
+    )
+    .await
+}
+
+/// Return the VAPID public key (65-byte uncompressed SEC1 P-256 point)
+/// the frontend passes as `applicationServerKey` to
+/// `pushManager.subscribe()`. This is the same key used to sign the
+/// per-push JWT in [`notify_user`]; the relay verifies both against the
+/// browser's baked-in copy.
+///
+/// An `#[update]` because the first call after install lazily generates
+/// the key via `raw_rand` and persists it. On the cached path it still
+/// costs one consensus round — negligible since the FE only reads this
+/// once per device-subscribe.
+#[update]
+async fn push_vapid_public_key() -> ByteBuf {
+    match push::vapid::get_or_init_signing_key().await {
+        Ok(sk) => ByteBuf::from(push::vapid::public_key_uncompressed(&sk).to_vec()),
+        Err(e) => {
+            ic_cdk::println!("push_vapid_public_key: init failed: {e}");
+            ByteBuf::from(Vec::new())
+        }
+    }
 }
 
 #[query]

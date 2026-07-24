@@ -121,6 +121,10 @@ use crate::storage::storable::anchor_application_config::AnchorApplicationConfig
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
+use crate::storage::storable::push_consent::StorablePushConsent;
+use crate::storage::storable::push_endpoint_hash::StorableEndpointSha256;
+use crate::storage::storable::push_sender_info::StorablePushSenderInfo;
+use crate::storage::storable::push_subscription::StorablePushSubscription;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use internet_identity_interface::internet_identity::types::*;
 use storable::anchor::StorableAnchor;
@@ -208,6 +212,13 @@ const MCP_GRANT_MEMORY_INDEX: u8 = 29u8;
 // const DEPRECATED_MCP_REGISTRATION_URL_MEMORY_INDEX: u8 = 30u8;
 const MCP_REGISTRATION_MEMORY_INDEX: u8 = 31u8;
 
+// Push notifications PoC — three maps used by the RFC 8291 delivery flow
+// (docs/push-notifications-poc.md). All three are additive: the PoC never
+// touches an existing map's schema.
+const PUSH_SUBSCRIPTIONS_MEMORY_INDEX: u8 = 31u8;
+const PUSH_CONSENT_MEMORY_INDEX: u8 = 32u8;
+const PUSH_PRINCIPAL_INDEX_MEMORY_INDEX: u8 = 33u8;
+
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
 const PERSISTENT_STATE_MEMORY_ID: MemoryId = MemoryId::new(PERSISTENT_STATE_MEMORY_INDEX);
@@ -281,6 +292,22 @@ const MCP_REGISTRATION_MEMORY_ID: MemoryId = MemoryId::new(MCP_REGISTRATION_MEMO
 /// of the identity's devices. Kept in its own map so it never touches anchor
 /// serialization.
 const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
+
+/// Device subscriptions: `(anchor, endpoint_sha256) -> StorablePushSubscription`.
+/// One row per browser that ran `pushManager.subscribe()`. Idempotent — the
+/// same browser re-subscribing overwrites in place.
+const PUSH_SUBSCRIPTIONS_MEMORY_ID: MemoryId = MemoryId::new(PUSH_SUBSCRIPTIONS_MEMORY_INDEX);
+
+/// Per-`(anchor, origin)` consent grants. Presence of the key means "the
+/// user has said this dApp may send them push notifications on this
+/// identity"; revoking removes the entry.
+const PUSH_CONSENT_MEMORY_ID: MemoryId = MemoryId::new(PUSH_CONSENT_MEMORY_INDEX);
+
+/// Reverse index used by `notify_user`: `in_app_principal -> anchor`. The
+/// dApp only knows its per-origin principal for the user, not the anchor,
+/// so this lets us find the subscriptions/consent rows to look up.
+/// Written at `push_grant_consent` time, cleared on `push_revoke_consent`.
+const PUSH_PRINCIPAL_INDEX_MEMORY_ID: MemoryId = MemoryId::new(PUSH_PRINCIPAL_INDEX_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -441,6 +468,31 @@ pub struct Storage<M: Memory> {
     mcp_config_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Per-anchor trusted-MCP-server config. See [`MCP_CONFIG_MEMORY_ID`].
     mcp_config_memory: StableBTreeMap<StorableAnchorNumber, StorableMcpConfig, ManagedMemory<M>>,
+
+    // ---- Push notifications PoC ----------------------------------------
+    push_subscriptions_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// See [`PUSH_SUBSCRIPTIONS_MEMORY_ID`]. Keyed by `(anchor, endpoint_hash)`
+    /// so a user can register multiple devices (one per II PWA install)
+    /// under a single anchor. `notify_user` fans out to every row for
+    /// the target anchor.
+    pub(crate) push_subscriptions_memory: StableBTreeMap<
+        (StorableAnchorNumber, StorableEndpointSha256),
+        StorablePushSubscription,
+        ManagedMemory<M>,
+    >,
+
+    push_consent_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// See [`PUSH_CONSENT_MEMORY_ID`].
+    pub(crate) push_consent_memory: StableBTreeMap<
+        (StorableAnchorNumber, StorableOriginSha256),
+        StorablePushConsent,
+        ManagedMemory<M>,
+    >,
+
+    push_principal_index_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// See [`PUSH_PRINCIPAL_INDEX_MEMORY_ID`].
+    pub(crate) push_principal_index_memory:
+        StableBTreeMap<Principal, StorablePushSenderInfo, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -530,6 +582,9 @@ impl<M: Memory + Clone> Storage<M> {
         let mcp_registration_memory = memory_manager.get(MCP_REGISTRATION_MEMORY_ID);
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
+        let push_subscriptions_memory = memory_manager.get(PUSH_SUBSCRIPTIONS_MEMORY_ID);
+        let push_consent_memory = memory_manager.get(PUSH_CONSENT_MEMORY_ID);
+        let push_principal_index_memory = memory_manager.get(PUSH_PRINCIPAL_INDEX_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -644,6 +699,17 @@ impl<M: Memory + Clone> Storage<M> {
             openid_jwks_cache_memory: StableBTreeMap::init(openid_jwks_cache_memory),
             mcp_config_memory_wrapper: MemoryWrapper::new(mcp_config_memory.clone()),
             mcp_config_memory: StableBTreeMap::init(mcp_config_memory),
+
+            push_subscriptions_memory_wrapper: MemoryWrapper::new(
+                push_subscriptions_memory.clone(),
+            ),
+            push_subscriptions_memory: StableBTreeMap::init(push_subscriptions_memory),
+            push_consent_memory_wrapper: MemoryWrapper::new(push_consent_memory.clone()),
+            push_consent_memory: StableBTreeMap::init(push_consent_memory),
+            push_principal_index_memory_wrapper: MemoryWrapper::new(
+                push_principal_index_memory.clone(),
+            ),
+            push_principal_index_memory: StableBTreeMap::init(push_principal_index_memory),
         }
     }
 
@@ -2449,6 +2515,18 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "mcp_config_memory".to_string(),
                 self.mcp_config_memory_wrapper.size(),
+            ),
+            (
+                "push_subscriptions_memory".to_string(),
+                self.push_subscriptions_memory_wrapper.size(),
+            ),
+            (
+                "push_consent_memory".to_string(),
+                self.push_consent_memory_wrapper.size(),
+            ),
+            (
+                "push_principal_index_memory".to_string(),
+                self.push_principal_index_memory_wrapper.size(),
             ),
         ])
     }
