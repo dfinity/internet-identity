@@ -13,10 +13,10 @@
 </script>
 
 <!--
-  Shown after the user confirms (and has authenticated) while the server's
-  session key is fetched and registered with the backend — i.e. between
-  "Allow access" and the terminal screen. Gives the otherwise-blank gap a
-  loading state, like the /authorize redirect screen.
+  Shown after the user confirms (and has authenticated) while the registration
+  delegation is minted — i.e. between "Allow access" and the tab being handed
+  to the trusted server. Gives the otherwise-blank gap a loading state, like
+  the /authorize redirect screen.
 -->
 <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
   <AuthPanel>

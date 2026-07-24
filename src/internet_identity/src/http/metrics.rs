@@ -70,6 +70,16 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             storage.get_total_application_count() as f64,
             "Number of total applications registered in this canister.",
         )?;
+        w.encode_gauge(
+            "internet_identity_mcp_session_count",
+            storage.mcp_grant_count() as f64,
+            "Number of MCP session grants stored (live grants plus not-yet-removed expired residue).",
+        )?;
+        w.encode_gauge(
+            "internet_identity_mcp_live_session_count",
+            storage.count_live_mcp_grants(time()) as f64,
+            "Number of live (non-expired) MCP session grants: the currently-authorized MCP sessions. Computed by scanning the grant map at scrape time (O(n) in stored grants).",
+        )?;
         if let Some(registration_rates) = storage.registration_rates.registration_rates() {
             w.gauge_vec(
                 "internet_identity_registrations_per_second",

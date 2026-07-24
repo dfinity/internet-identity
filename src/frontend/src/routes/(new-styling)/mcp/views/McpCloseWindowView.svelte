@@ -5,19 +5,19 @@
   import { onMount } from "svelte";
 
   interface Props {
-    /** Whether the tab is being redirected back to the agent — true when the
-     *  trusted server returned a `finish_url`. When false this is the resting
-     *  screen and there's nothing to redirect to. */
+    /** Whether the tab is being handed to the trusted server (to redeem the
+     *  registration delegation and finish the flow). When false this is the
+     *  resting screen and there's nothing to redirect to. */
     redirecting: boolean;
   }
 
   const { redirecting }: Props = $props();
 
-  // A successful redirect replaces the document (and unmounts this view) within
+  // A successful hand-off replaces the document (and unmounts this view) within
   // a moment. If we're still mounted after a few seconds the navigation never
-  // took — a `finish_url` that doesn't replace the document (204/attachment) or
-  // a bfcache back-navigation to this restored page — so reveal a way out
-  // rather than leaving the user on a "Redirecting…" message that never ends.
+  // took — a server endpoint that doesn't replace the document, or a bfcache
+  // back-navigation to this restored page — so reveal a way out rather than
+  // leaving the user on a "Redirecting…" message that never ends.
   let redirectStalled = $state(false);
   onMount(() => {
     if (!redirecting) {
@@ -29,12 +29,11 @@
 </script>
 
 <!--
-  Centered, card-less success page shown once the MCP server's session key has
-  been registered with the backend. When the trusted server returned a
-  `finish_url` the tab is being sent back to the agent to finish the flow, so we
-  say a redirect is underway (with a fallback hint if it stalls); otherwise
-  there's nothing to redirect to and this is the resting screen, so we just
-  confirm the sign-in.
+  Centered, card-less success page shown once the registration delegation has
+  been minted. The tab is then handed to the server's declared callback —
+  where the server redeems the delegation and finishes the flow — so we say a
+  redirect is underway (with a fallback hint if it stalls); when there's nothing
+  to redirect to this is the resting screen, so we just confirm the sign-in.
 -->
 <div class="flex flex-col items-center gap-5 px-6 text-center">
   <FeaturedIcon size="lg" variant="success">
@@ -46,7 +45,7 @@
   <div class="flex flex-col items-center gap-1">
     <p class="text-text-tertiary text-base">
       {#if redirecting}
-        {$t`Redirecting back to the agent…`}
+        {$t`Taking you to the server to finish connecting…`}
       {:else}
         {$t`You can return to your agent.`}
       {/if}

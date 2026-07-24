@@ -236,6 +236,69 @@ fn should_write_and_update_openid_credential_lookup() {
     );
 }
 
+/// The SSO stable-id index is reconciled from the anchors' stored credentials
+/// on every `write()`: a credential carrying a `stable_id` gets an entry, and
+/// removing or moving that credential removes or moves the entry — no orphans.
+/// Mirrors `should_write_and_update_openid_credential_lookup`.
+#[test]
+fn should_write_and_update_sso_stable_id_index() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    let sso_domain = "acme.example";
+    let iss = "https://example.com";
+    let primary_client = "example-aud";
+    let stable_id = "oid-stable-42";
+
+    // A credential that carries a `stable_id` (a non-`sub` primary credential).
+    // An SSO credential always carries its discovery `sso_domain` too; the index
+    // key is scoped by it.
+    let mut bridged = openid_credential(0);
+    bridged.stable_id = Some(stable_id.to_string());
+    bridged.sso_domain = Some(sso_domain.to_string());
+    // A second credential on the same anchor without a `stable_id` — it must
+    // never appear in the SSO stable-id index.
+    let plain = openid_credential(1);
+
+    let mut anchor_a = storage.allocate_anchor(0).unwrap();
+    anchor_a.add_openid_credential(bridged.clone()).unwrap();
+    anchor_a.add_openid_credential(plain.clone()).unwrap();
+    storage.write(anchor_a.clone()).unwrap();
+
+    // The bridged credential is indexed; the plain one is not.
+    assert_eq!(
+        storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, primary_client, stable_id),
+        Some(anchor_a.anchor_number())
+    );
+    assert_eq!(
+        storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, primary_client, "no-such-oid"),
+        None
+    );
+    // The same (iss, primary_client, stable_id) discovered through a different
+    // domain does not resolve to this entry — the domain is part of the key.
+    assert_eq!(
+        storage.lookup_anchor_by_sso_stable_id("attacker.example", iss, primary_client, stable_id),
+        None
+    );
+
+    // Remove the bridged credential -> its index entry self-cleans on write.
+    anchor_a.remove_openid_credential(&bridged.key()).unwrap();
+    storage.write(anchor_a.clone()).unwrap();
+    assert_eq!(
+        storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, primary_client, stable_id),
+        None
+    );
+
+    // Move the bridged credential to a second anchor -> the entry follows it.
+    let mut anchor_b = storage.allocate_anchor(0).unwrap();
+    anchor_b.add_openid_credential(bridged.clone()).unwrap();
+    storage.write(anchor_b.clone()).unwrap();
+    assert_eq!(
+        storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, primary_client, stable_id),
+        Some(anchor_b.anchor_number())
+    );
+}
+
 #[test]
 fn should_write_and_update_device_credential_lookup() {
     let memory = VectorMemory::default();
@@ -561,6 +624,7 @@ fn openid_credential(n: u8) -> OpenIdCredential {
         metadata: HashMap::default(),
         sso_domain: None,
         sso_name: None,
+        stable_id: None,
     }
 }
 fn sample_persistent_state() -> PersistentState {
@@ -2099,6 +2163,7 @@ mod migrate_sso_credentials_batch_tests {
                 metadata: HashMap::new(),
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             })
             .unwrap();
         let anchor_number = anchor.anchor_number();

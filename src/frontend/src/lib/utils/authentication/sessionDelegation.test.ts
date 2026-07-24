@@ -20,6 +20,7 @@ const makeSignedDelegation = (pubkey: Uint8Array, expiration: bigint) => ({
       pubkey: Array.from(pubkey),
       expiration,
       targets: [] as [],
+      permissions: [] as [],
     },
     signature: Array.from(new Uint8Array(64)),
   },

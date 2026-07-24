@@ -2,25 +2,81 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import type { Authenticated } from "$lib/stores/authentication.store";
-import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
+import { DelegationChain } from "@icp-sdk/core/identity";
+import { toHex } from "$lib/utils/utils";
 import { mcpAuthorize } from "./utils";
 
 const IDENTITY_NUMBER = BigInt(42);
 const MCP_ORIGIN = "https://mcp.id.ai";
-const CALLBACK = `${MCP_ORIGIN}/callback`;
+/** The trusted server's declared connect callback (exact-matched by the caller
+ *  against the server's /.well-known/ii-auth-callbacks allow-list): where the
+ *  caller delivers the registration delegation. */
+const CALLBACK = `${MCP_ORIGIN}/mcp/connect`;
+const STATE = "opaque-state";
 const TTL_SECONDS = 3600;
-/** The server's session public key, returned by the mocked key-request fetch. */
-const SERVER_PUBKEY = toBase64URL(new Uint8Array(32).fill(7));
+
+/** The MCP server's per-connect registration public key `X` (DER), from the
+ *  link. The browser-signed final hop targets it — the canister never sees it. */
+const REGISTRATION_KEY = new Uint8Array(44).fill(9);
+/** `P_reg`'s DER public key, returned by the mocked prepare call — the chain's
+ *  public key, and what makes the server's redemption `caller() == P_reg`. */
+const USER_KEY = new Uint8Array(62).fill(3);
 
 const expirationNanos = (): bigint =>
   BigInt(Date.now() + 60 * 60 * 1000) * BigInt(1_000_000);
 
-/** Fake actor recording the exact candid arguments the flow sends. */
-const makeActor = () => ({
-  mcp_register: vi
-    .fn()
-    .mockResolvedValue({ Ok: { expiration: expirationNanos() } }),
-});
+/** Fake actor recording the exact candid arguments the flow sends. `prepare`
+ *  returns `P_reg`'s key + an expiration; `get` echoes back a well-formed
+ *  signed delegation for whatever key was requested (the browser-generated
+ *  `Y`, unknown to the test up front) — the chain is only assembled and
+ *  serialized on the frontend, never verified, so the signature needn't be
+ *  real. */
+const makeActor = () => {
+  const expiration = expirationNanos();
+  return {
+    expiration,
+    prepare_mcp_registration_delegation: vi
+      .fn()
+      .mockResolvedValue({ Ok: { user_key: USER_KEY, expiration } }),
+    get_mcp_registration_delegation: vi.fn(
+      (
+        _anchor: bigint,
+        requestedKey: Uint8Array,
+        _userKey: Uint8Array,
+        _expiration: bigint,
+      ): Promise<
+        | {
+            Ok: {
+              delegation: {
+                pubkey: number[];
+                expiration: bigint;
+                targets: never[];
+                permissions: never[];
+              };
+              signature: number[];
+            };
+          }
+        | { Err: string }
+      > =>
+        Promise.resolve({
+          Ok: {
+            delegation: {
+              pubkey: Array.from(requestedKey),
+              expiration,
+              targets: [],
+              permissions: [],
+            },
+            signature: Array.from(new Uint8Array(64).fill(1)),
+          },
+        }),
+    ),
+  };
+};
+
+/** The browser-generated registration key `Y` the flow sent to `prepare` —
+ *  readable only after the flow ran. */
+const browserKeyOf = (actor: ReturnType<typeof makeActor>): Uint8Array =>
+  actor.prepare_mcp_registration_delegation.mock.calls[0][1] as Uint8Array;
 
 const authorize = (
   actor: ReturnType<typeof makeActor>,
@@ -34,33 +90,15 @@ const authorize = (
     ttlSeconds: TTL_SECONDS,
     accessLevel,
     callback: CALLBACK,
-    state: "opaque-state",
+    state: STATE,
+    registrationKey: REGISTRATION_KEY,
   });
 
-/** Mocks the two callback requests of the connect flow: the key request (no
- *  `expiration` in the body) answers with `keyBody`; the completion
- *  notification (carries `expiration`) just succeeds. The canister arguments
- *  to `mcp_register` — and the returned `finish_url` — are what's under test. */
-const stubFetch = (keyBody: Record<string, unknown>): void => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn((_url: string, init?: RequestInit) => {
-      const body = JSON.parse((init?.body as string) ?? "{}") as {
-        expiration?: string;
-      };
-      const response =
-        body.expiration !== undefined
-          ? new Response("{}", { status: 200 })
-          : new Response(JSON.stringify(keyBody), { status: 200 });
-      return Promise.resolve(response);
-    }),
-  );
-};
-
 beforeEach(() => {
-  // Default stand-in server: answers the key request with its pubkey and no
-  // `finish_url`. Tests exercising `finish_url` re-stub with one included.
-  stubFetch({ public_key: SERVER_PUBKEY });
+  // The v2 connect makes no network calls of its own — delivery is by
+  // navigation. Stub fetch so any accidental call is observable (and asserted
+  // against below), rather than hitting the real network.
+  vi.stubGlobal("fetch", vi.fn());
 });
 
 afterEach(() => {
@@ -68,308 +106,167 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("mcpAuthorize access-level wiring", () => {
-  it("registers the session queries-only when read-only", async () => {
+describe("mcpAuthorize registration-delegation minting", () => {
+  it("prepares the delegation for the server's key with the chosen TTL and read-only", async () => {
     const actor = makeActor();
     await authorize(actor, "read-only");
 
-    // The session key comes from the trusted server's callback (not the link),
-    // and read-only is persisted on the grant via the permissions argument.
-    expect(actor.mcp_register).toHaveBeenCalledWith(
+    // Minted for the identity and a browser-generated ephemeral key Y, with
+    // the user-chosen grant TTL and the read-only access level (recorded on
+    // the registration entry, never into the signature).
+    expect(actor.prepare_mcp_registration_delegation).toHaveBeenCalledWith(
       IDENTITY_NUMBER,
-      fromBase64URL(SERVER_PUBKEY),
-      BigInt(TTL_SECONDS) * BigInt(1_000_000_000),
+      expect.any(Uint8Array),
       [{ queries: null }],
+      [BigInt(TTL_SECONDS) * BigInt(1_000_000_000)],
     );
   });
 
-  it("registers full access explicitly (never relies on the backend default)", async () => {
+  it("never sends the link's key X to the canister", async () => {
+    // The canister-signed hop must be inert to a transport-level observer:
+    // it targets the browser-held Y, never the (attacker-craftable) link's X.
+    const actor = makeActor();
+    await authorize(actor, "read-only");
+
+    const browserKey = browserKeyOf(actor);
+    expect(browserKey.length).toBeGreaterThan(0);
+    expect(toHex(browserKey)).not.toBe(toHex(REGISTRATION_KEY));
+    const [, getKey] = actor.get_mcp_registration_delegation.mock.calls[0];
+    expect(toHex(getKey)).toBe(toHex(browserKey));
+  });
+
+  it("generates a fresh Y per connect attempt", async () => {
+    const first = makeActor();
+    await authorize(first, "read-only");
+    const second = makeActor();
+    await authorize(second, "read-only");
+    expect(toHex(browserKeyOf(first))).not.toBe(toHex(browserKeyOf(second)));
+  });
+
+  it("passes full access explicitly (never relies on the backend default)", async () => {
     const actor = makeActor();
     await authorize(actor, "full-access");
 
-    expect(actor.mcp_register).toHaveBeenCalledWith(
+    expect(actor.prepare_mcp_registration_delegation).toHaveBeenCalledWith(
       IDENTITY_NUMBER,
-      fromBase64URL(SERVER_PUBKEY),
-      BigInt(TTL_SECONDS) * BigInt(1_000_000_000),
+      expect.any(Uint8Array),
       [{ all: null }],
+      [BigInt(TTL_SECONDS) * BigInt(1_000_000_000)],
     );
   });
-});
 
-describe("mcpAuthorize completion notification", () => {
-  /** The body of the completion POST (the callback fetch that carries
-   *  `expiration`), parsed from the recorded fetch calls. */
-  const completionBody = (): { expiration: string; permissions: string } => {
-    const call = vi
-      .mocked(fetch)
-      .mock.calls.find(([, init]) =>
-        ((init?.body as string) ?? "").includes("expiration"),
-      );
-    if (call === undefined) throw new Error("no completion POST was sent");
-    return JSON.parse(call[1]?.body as string);
-  };
+  it("fetches the certified delegation by handing back the user_key prepare returned", async () => {
+    const actor = makeActor();
+    await authorize(actor, "read-only");
 
-  it("reports the access level so the server learns read-only up front", async () => {
+    // `get` recovers the seed from `user_key` (no consent params), so it is
+    // called with the browser key Y, the user_key prepare returned, and the
+    // expiration.
+    expect(actor.get_mcp_registration_delegation).toHaveBeenCalledWith(
+      IDENTITY_NUMBER,
+      browserKeyOf(actor),
+      USER_KEY,
+      actor.expiration,
+    );
+  });
+
+  it("makes no network request of its own (delivery is by navigation)", async () => {
     await authorize(makeActor(), "read-only");
-    expect(completionBody().permissions).toBe("queries");
-  });
-
-  it("reports full access as `all`", async () => {
-    await authorize(makeActor(), "full-access");
-    expect(completionBody().permissions).toBe("all");
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 });
 
-describe("mcpAuthorize finish_url handling", () => {
-  it("resolves undefined when the server sends no finish_url", async () => {
-    await expect(authorize(makeActor(), "read-only")).resolves.toBeUndefined();
+describe("mcpAuthorize delivery URL", () => {
+  it("targets the declared callback and carries the state echo", async () => {
+    const url = await authorize(makeActor(), "read-only");
+
+    expect(url.startsWith(`${CALLBACK}#`)).toBe(true);
+    const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
+    expect(fragment.get("state")).toBe(STATE);
   });
 
-  it("treats a null or empty finish_url as absent (common optional serializations)", async () => {
-    // serde `Option::None`, Go string zero-values, and Python `None` all
-    // serialize an omitted optional as null (or ""): those connects must
-    // succeed without a redirect, not hard-fail.
-    for (const finish_url of [null, ""]) {
-      const actor = makeActor();
-      stubFetch({ public_key: SERVER_PUBKEY, finish_url });
-      await expect(authorize(actor, "read-only")).resolves.toBeUndefined();
-      expect(actor.mcp_register).toHaveBeenCalledOnce();
+  it("delivers only the delegation and state — no consent params", async () => {
+    // The server passes nothing but its session key to mcp_register_v2; the
+    // canister recovers the whole consent from the entry. So the fragment
+    // carries only the chain and the state echo — no anchor, permissions, or
+    // ttl (checked for both access levels, since neither should surface).
+    for (const level of ["read-only", "full-access"] as const) {
+      const url = await authorize(makeActor(), level);
+      const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
+      expect([...fragment.keys()].sort()).toEqual(["delegation", "state"]);
+      // Belt-and-suspenders: the anchor number appears as no param value (the
+      // delegation blob is hex and may contain the digits incidentally, so
+      // check values, not substrings).
+      for (const value of fragment.values()) {
+        expect(value).not.toBe(IDENTITY_NUMBER.toString());
+      }
     }
   });
 
-  it("returns the finish_url when it is on the callback's origin", async () => {
-    // The finish redirect lets the server complete a flow of its own (e.g.
-    // hand an OAuth code to an MCP client) after the session is registered.
-    const finishUrl = `${MCP_ORIGIN}/oauth/finish?sid=abc123`;
-    stubFetch({ public_key: SERVER_PUBKEY, finish_url: finishUrl });
+  it("marks a full-access connect as such to prepare (never in the fragment)", async () => {
     const actor = makeActor();
+    await authorize(actor, "full-access");
 
-    await expect(authorize(actor, "read-only")).resolves.toBe(finishUrl);
-    // The session was registered and the completion notification still sent
-    // (key request + completion = two callback fetches) before any navigation.
-    expect(actor.mcp_register).toHaveBeenCalledOnce();
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
-  });
-
-  it("rejects a cross-origin finish_url before registering anything", async () => {
-    // II only ever navigates to the trusted origin: a finish_url elsewhere
-    // fails the connect — and fails it up front, so no session materializes.
-    stubFetch({
-      public_key: SERVER_PUBKEY,
-      finish_url: "https://evil.example.com/finish",
-    });
-    const actor = makeActor();
-
-    await expect(authorize(actor, "read-only")).rejects.toThrow(
-      /not on the server's own origin/,
+    // The access level reaches the canister via prepare, not the fragment.
+    expect(actor.prepare_mcp_registration_delegation).toHaveBeenCalledWith(
+      IDENTITY_NUMBER,
+      expect.any(Uint8Array),
+      [{ all: null }],
+      [BigInt(TTL_SECONDS) * BigInt(1_000_000_000)],
     );
-    expect(actor.mcp_register).not.toHaveBeenCalled();
   });
 
-  it("rejects a plain-http finish_url on the same host", async () => {
-    // Origin comparison includes the scheme: the same host over http is a
-    // different origin than the https callback. This pins the https-only
-    // invariant against refactors that would compare hostnames instead.
-    stubFetch({
-      public_key: SERVER_PUBKEY,
-      finish_url: `http://${new URL(MCP_ORIGIN).host}/finish`,
-    });
+  it("carries a reconstructable two-hop P_reg -> Y -> X chain", async () => {
     const actor = makeActor();
+    const url = await authorize(actor, "read-only");
 
-    await expect(authorize(actor, "read-only")).rejects.toThrow(
-      /not on the server's own origin/,
+    const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
+    const delegation = fragment.get("delegation");
+    if (delegation === null) throw new Error("no delegation in the fragment");
+
+    // The server round-trips the chain out of the fragment exactly like this.
+    const chain = DelegationChain.fromJSON(JSON.parse(delegation));
+    // Its public key is P_reg's DER key, so the redemption is caller() == P_reg.
+    expect(toHex(new Uint8Array(chain.publicKey))).toBe(toHex(USER_KEY));
+    expect(chain.delegations).toHaveLength(2);
+    const [canisterHop, browserHop] = chain.delegations;
+    // Hop 1 (canister-signed) targets the browser-held Y...
+    expect(toHex(new Uint8Array(canisterHop.delegation.pubkey))).toBe(
+      toHex(browserKeyOf(actor)),
     );
-    expect(actor.mcp_register).not.toHaveBeenCalled();
-  });
-
-  it("rejects a scheme with no comparable origin (javascript:)", async () => {
-    // javascript:/data: URLs parse but have an opaque ("null") origin, which
-    // can never equal the https callback's origin.
-    stubFetch({
-      public_key: SERVER_PUBKEY,
-      finish_url: "javascript:alert(1)",
-    });
-    const actor = makeActor();
-
-    await expect(authorize(actor, "read-only")).rejects.toThrow(
-      /not on the server's own origin/,
+    // ...hop 2 (browser-signed) targets the server's X, expiring no later
+    // than the canister hop.
+    expect(toHex(new Uint8Array(browserHop.delegation.pubkey))).toBe(
+      toHex(REGISTRATION_KEY),
     );
-    expect(actor.mcp_register).not.toHaveBeenCalled();
-  });
-
-  it("rejects a malformed finish_url before registering anything", async () => {
-    // Relative paths included: finish_url must be an absolute URL.
-    stubFetch({ public_key: SERVER_PUBKEY, finish_url: "/oauth/finish" });
-    const actor = makeActor();
-
-    await expect(authorize(actor, "read-only")).rejects.toThrow(
-      /not a valid URL/,
-    );
-    expect(actor.mcp_register).not.toHaveBeenCalled();
-  });
-
-  it("rejects a non-string finish_url before registering anything", async () => {
-    // Present but not a string (e.g. a number or object) is a misbehaving
-    // server, not an omitted optional — fail the connect up front.
-    for (const finish_url of [42, { url: "https://mcp.id.ai" }, true]) {
-      const actor = makeActor();
-      stubFetch({ public_key: SERVER_PUBKEY, finish_url });
-      await expect(authorize(actor, "read-only")).rejects.toThrow(
-        /not a string/,
-      );
-      expect(actor.mcp_register).not.toHaveBeenCalled();
-    }
+    expect(
+      browserHop.delegation.expiration <= canisterHop.delegation.expiration,
+    ).toBe(true);
   });
 });
 
 describe("mcpAuthorize failure paths", () => {
-  it("rejects a key response without a usable public_key, registering nothing", async () => {
-    // Missing key and non-string key are both a misbehaving (or wrong) server;
-    // the connect must abort before anything binds to the identity.
-    for (const keyBody of [
-      {},
-      { public_key: 42 },
-      { public_key: null },
-    ] as Record<string, unknown>[]) {
-      const actor = makeActor();
-      stubFetch(keyBody);
-      await expect(authorize(actor, "read-only")).rejects.toThrow(
-        /missing `public_key`/,
-      );
-      expect(actor.mcp_register).not.toHaveBeenCalled();
-    }
-  });
-
-  it("propagates an mcp_register refusal and sends no completion POST", async () => {
-    // A backend refusal (untrusted config, key bound to another identity, ...)
-    // fails the connect: the error surfaces to the caller, and the server must
-    // NOT be told the session is live — no completion POST follows the key
-    // request.
+  it("propagates a prepare refusal and never fetches the delegation", async () => {
     const actor = makeActor();
-    actor.mcp_register.mockResolvedValue({
-      Err: "MCP is not enabled for this identity",
+    actor.prepare_mcp_registration_delegation.mockResolvedValue({
+      Err: "MCP registration failed: 2vxsx-fae could not be authenticated.",
     });
 
     await expect(authorize(actor, "full-access")).rejects.toThrow(
-      /not enabled for this identity/,
+      /could not be authenticated/,
     );
-    // Exactly one callback fetch: the key request. No completion.
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    // Aborted before the certified delegation is even fetched.
+    expect(actor.get_mcp_registration_delegation).not.toHaveBeenCalled();
   });
 
-  it("still resolves (best effort) when the completion POST fails", async () => {
-    // The completion notification is advisory: the session is already
-    // registered, so a network failure on the POST must not fail the connect —
-    // and a finish_url from the key response must still be handed back for
-    // navigation.
-    const finishUrl = `${MCP_ORIGIN}/oauth/finish?sid=xyz`;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn((_url: string, init?: RequestInit) => {
-        const body = JSON.parse((init?.body as string) ?? "{}") as {
-          expiration?: string;
-        };
-        // Key request succeeds; completion POST dies on the network.
-        return body.expiration === undefined
-          ? Promise.resolve(
-              new Response(
-                JSON.stringify({
-                  public_key: SERVER_PUBKEY,
-                  finish_url: finishUrl,
-                }),
-                { status: 200 },
-              ),
-            )
-          : Promise.reject(new TypeError("network down"));
-      }),
-    );
+  it("propagates a get refusal", async () => {
     const actor = makeActor();
-
-    await expect(authorize(actor, "read-only")).resolves.toBe(finishUrl);
-    expect(actor.mcp_register).toHaveBeenCalledOnce();
-    // Both fetches were attempted: key request + the failed completion.
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe("callback fetch hardening", () => {
-  it("issues both callback requests with redirect: error and credentials: omit", async () => {
-    // A 307/308 from the server must not silently re-POST the single-use
-    // `state` (key request) or the completion payload to a redirected origin,
-    // and no ambient credentials ride these cross-origin calls.
-    stubFetch({
-      public_key: SERVER_PUBKEY,
-      finish_url: `${MCP_ORIGIN}/oauth/finish`,
+    actor.get_mcp_registration_delegation.mockResolvedValue({
+      Err: "MCP registration failed: no such delegation.",
     });
-    await authorize(makeActor(), "read-only");
-
-    const calls = vi.mocked(fetch).mock.calls;
-    expect(calls.length).toBeGreaterThanOrEqual(2); // key request + completion
-    for (const [, init] of calls) {
-      expect(init).toMatchObject({ redirect: "error", credentials: "omit" });
-    }
-  });
-});
-
-// Two properties the server-side H3 mitigation ("Consent-Bound Completion")
-// relies on from the II frontend. They hold today; these tests pin them so a
-// future refactor of the connect flow can't silently regress them.
-//   P1  — the key request is issued exactly once per connect and never
-//         auto-retried (a single-use connect-state means a retry would either
-//         brick the user or reopen the attacker race; recovery is a fresh
-//         connect, not a retry).
-//   P2  — finish_url (which carries the server's one-time finish_secret) is
-//         never written to a log/telemetry sink by the frontend.
-describe("H3 preconditions the fix depends on", () => {
-  /** Callback POSTs that are key requests (no `expiration` in the body), as
-   *  opposed to the completion notification (which carries `expiration`). */
-  const keyRequestCount = (): number =>
-    vi.mocked(fetch).mock.calls.filter(([, init]) => {
-      const body = JSON.parse((init?.body as string) ?? "{}") as {
-        expiration?: string;
-      };
-      return body.expiration === undefined;
-    }).length;
-
-  it("P1: issues exactly one key request per connect", async () => {
-    await authorize(makeActor(), "read-only");
-    expect(keyRequestCount()).toBe(1);
-  });
-
-  it("P1: does not retry the key request (or register) when the server rejects it", async () => {
-    // A rejected key request aborts the connect; there is no retry loop, and
-    // nothing is registered — the only recovery is a fresh /oauth/authorize
-    // (new connect-state), never a retry of the same one.
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() => Promise.resolve(new Response("", { status: 403 }))),
-    );
-    const actor = makeActor();
 
     await expect(authorize(actor, "read-only")).rejects.toThrow(
-      /rejected the connect request/,
+      /no such delegation/,
     );
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
-    expect(actor.mcp_register).not.toHaveBeenCalled();
-  });
-
-  it("P2: never writes finish_url (which carries finish_secret) to the console", async () => {
-    const SECRET = "fs-DO-NOT-LOG-9f83k2";
-    stubFetch({
-      public_key: SERVER_PUBKEY,
-      finish_url: `${MCP_ORIGIN}/oauth/finish?fs=${SECRET}`,
-    });
-    const methods = ["log", "info", "warn", "error", "debug"] as const;
-    const spies = methods.map((m) =>
-      vi.spyOn(console, m).mockImplementation(() => undefined),
-    );
-
-    // Returns the finish_url to the caller (which navigates to it) — but must
-    // not emit it to any console sink along the way.
-    await expect(authorize(makeActor(), "read-only")).resolves.toContain(
-      SECRET,
-    );
-    const logged = spies.flatMap((s) => s.mock.calls.flat()).join(" ");
-    expect(logged).not.toContain(SECRET);
   });
 });

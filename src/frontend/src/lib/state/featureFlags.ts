@@ -158,13 +158,19 @@ export const EMAIL_RECOVERY_SETUP = createFeatureFlagStore(
 /// delegations the server later obtains, while its standing delegation stays
 /// full access.) Kept OFF by default — including on id.ai / beta.id.ai —
 /// because a queries-only delegation carries `permissions = "queries"` in its
-/// canister-signed message, and no released agent stack (`ic-agent` /
-/// `ic-transport-types` / `@icp-sdk/core`) round-trips that field yet: the
-/// field is dropped when the delegation is re-serialized into the request
-/// envelope, so the replica recomputes a different hash and canister-signature
-/// verification fails ("sig not found in the signature tree"). With the flag
-/// off, these two flows send full access. Flip this on once the agent stack
-/// preserves the delegation `permissions` field.
+/// canister-signed message, and a relying party's agent must round-trip that
+/// field or the replica recomputes a different hash and canister-signature
+/// verification fails ("sig not found in the signature tree"). II itself now
+/// preserves the field end-to-end, and `@icp-sdk/core` (>= 6) *can* represent
+/// it on a `Delegation` instance — but `permissions` is a non-standard ICRC-34
+/// extension, so a JS relying party's own signer/client must also know to
+/// read it out of the delegation result and pass it through; a dapp whose
+/// signer only handles the standard pubkey/expiration/targets fields still
+/// drops it and fails closed, same as the Rust agent stack (`ic-agent` /
+/// `ic-transport-types`), which does not preserve it at all yet. With the
+/// flag off, these two flows send full access. Flip this on once relying
+/// parties can reasonably be expected to forward the delegation `permissions`
+/// field, regardless of agent language.
 export const READ_ONLY_MODE = createFeatureFlagStore("READ_ONLY_MODE", false);
 
 export default {

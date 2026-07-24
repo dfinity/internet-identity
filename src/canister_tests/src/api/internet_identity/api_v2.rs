@@ -478,27 +478,63 @@ fn permissions_arg(read_only: Option<bool>) -> Option<Permissions> {
     })
 }
 
-pub fn mcp_register(
+pub fn prepare_mcp_registration_delegation(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    identity_number: IdentityNumber,
-    session_key: SessionKey,
-    grant_ttl_ns: u64,
+    anchor_number: AnchorNumber,
+    registration_key: SessionKey,
     read_only: Option<bool>,
-) -> Result<Result<McpRegistration, String>, RejectResponse> {
+    max_ttl: Option<u64>,
+) -> Result<Result<PrepareMcpRegistrationDelegation, String>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "mcp_register",
+        "prepare_mcp_registration_delegation",
         (
-            identity_number,
-            session_key,
-            grant_ttl_ns,
+            anchor_number,
+            registration_key,
             permissions_arg(read_only),
+            max_ttl,
         ),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_mcp_registration_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+    registration_key: SessionKey,
+    user_key: UserKey,
+    expiration: Timestamp,
+) -> Result<Result<SignedDelegation, String>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_mcp_registration_delegation",
+        (anchor_number, registration_key, user_key, expiration),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_register_v2(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    session_key: SessionKey,
+) -> Result<Result<McpRegistrationV2, String>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "mcp_register_v2",
+        (session_key,),
     )
     .map(|(x,)| x)
 }

@@ -27,11 +27,11 @@ test.describe("session delegation — multiple accounts without re-auth", () => 
     const credentialPromise = authPage.waitForEvent("dialog").catch(() => null);
 
     await authPage
-      .getByRole("switch", { name: "Enable multiple accounts" })
+      .getByRole("switch", { name: "Show all options" })
       .setChecked(true);
 
     await expect(
-      authPage.getByRole("switch", { name: "Enable multiple accounts" }),
+      authPage.getByRole("switch", { name: "Show all options" }),
     ).toBeChecked();
 
     await expect(
@@ -96,7 +96,7 @@ test.describe("session delegation — multiple accounts without re-auth", () => 
       const authPage = await authPagePromise;
 
       await expect(
-        authPage.getByRole("switch", { name: "Enable multiple accounts" }),
+        authPage.getByRole("switch", { name: "Show all options" }),
       ).toBeHidden();
     } finally {
       await freshPage.close();
