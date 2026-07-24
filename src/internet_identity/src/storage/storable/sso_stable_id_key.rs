@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 
 /// Fixed-length lookup key for the SSO stable-id index:
-/// `SHA-256(sso_domain, iss, primary_client_id, stable_id) -> AnchorNumber`.
+/// `SHA-256(sso_domain, iss, ii_client_id, stable_id) -> AnchorNumber`.
 ///
 /// The index is only ever probed by exact match, so the key needs to be
 /// *distinguishing*, not *readable*. Storing the 32-byte digest instead of the
@@ -12,7 +12,7 @@ use std::borrow::Cow;
 /// unbounded key growth from a long domain, issuer, or claim value — and folds
 /// `sso_domain` into the key so a login discovered through one domain can never
 /// resolve to an entry established through another (the domain-scoping that
-/// makes cross-domain injection into a foreign `(iss, primary_client_id)`
+/// makes cross-domain injection into a foreign `(iss, ii_client_id)`
 /// namespace impossible).
 ///
 /// Each field is length-prefixed before hashing so distinct field boundaries
@@ -23,9 +23,9 @@ use std::borrow::Cow;
 pub struct StorableSsoStableIdKey([u8; 32]);
 
 impl StorableSsoStableIdKey {
-    pub fn new(sso_domain: &str, iss: &str, primary_client_id: &str, stable_id: &str) -> Self {
+    pub fn new(sso_domain: &str, iss: &str, ii_client_id: &str, stable_id: &str) -> Self {
         let mut hasher = Sha256::new();
-        for field in [sso_domain, iss, primary_client_id, stable_id] {
+        for field in [sso_domain, iss, ii_client_id, stable_id] {
             hasher.update((field.len() as u64).to_be_bytes());
             hasher.update(field.as_bytes());
         }
@@ -70,7 +70,7 @@ mod tests {
     }
 
     #[test]
-    fn different_primary_client_ids_produce_distinct_keys() {
+    fn different_ii_client_ids_produce_distinct_keys() {
         let a = StorableSsoStableIdKey::new("acme.example", "iss", "client-a", "oid-1");
         let b = StorableSsoStableIdKey::new("acme.example", "iss", "client-b", "oid-1");
         assert_ne!(a, b);

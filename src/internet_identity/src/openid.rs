@@ -37,7 +37,7 @@ pub use crate::single_flight_cache::Cached;
 pub use sso_bundle::{
     get_sso_attr_bundle_signature, prepare_sso_attr_bundle, read_certified_sso_bundle,
 };
-pub use sso_gating::{resolve_primary_identity, verify_sso_for_registration, verify_sso_jwt};
+pub use sso_gating::{resolve_ii_client_identity, verify_sso_for_registration, verify_sso_jwt};
 
 pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
@@ -106,12 +106,12 @@ pub struct OpenIdCredential {
     /// domains aren't required to publish a `name`.
     pub sso_name: Option<String>,
     /// Cross-client-stable identifier (the `oid` claim value) for a non-`sub`
-    /// SSO org, stamped only on the anchor's primary-keyed credential at SSO
+    /// SSO org, stamped only on the anchor's II-client-keyed credential at SSO
     /// write time. Drives the storage-maintained SSO stable-id index: the
     /// index entry `(iss, aud, stable_id) -> anchor` is reconciled from this
     /// field on every anchor `write()`, so it self-cleans when the credential
     /// is removed or moved. `None` for `sub` orgs, direct providers, and any
-    /// non-primary credential. Storage-internal only — deliberately absent
+    /// non-II-client credential. Storage-internal only — deliberately absent
     /// from the candid `OpenIdCredentialData` so the `oid` never crosses the
     /// candid boundary.
     pub stable_id: Option<String>,
@@ -533,8 +533,11 @@ fn salt() -> [u8; 32] {
 
 /// How long a certified SSO attribute bundle is accepted after it is minted
 /// (`sso_bundle.rs`) — the bundle acceptance window, not a session or delegation
-/// lifetime.
-pub const SSO_ATTR_BUNDLE_TTL_NS: u64 = 10 * MINUTE_NS;
+/// lifetime. Both the mint and the expiry check use II's own IC time, so the
+/// window needn't budget for client clock skew: 5 minutes covers the
+/// post-prepare ceremony (IdP 2FA/redirect, `sso_get_delegation`, the dapp's
+/// attribute call).
+pub const SSO_ATTR_BUNDLE_TTL_NS: u64 = 5 * MINUTE_NS;
 
 #[cfg(test)]
 mod tests {

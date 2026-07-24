@@ -2379,7 +2379,7 @@ mod sso_gating {
     }
 
     /// A non-`sub` (`oid`) org whose token is MISSING the configured stable-id
-    /// claim cannot resolve a primary identity: `resolve_primary_identity`
+    /// claim cannot resolve a primary identity: `resolve_ii_client_identity`
     /// returns `JwtVerificationFailed` (the token clears the gate but carries no
     /// `oid`, so `stable_id` is `None`). Registration maps that to
     /// `InvalidAuthnMethod` and stores nothing; `sso_prepare_delegation`
@@ -2404,7 +2404,7 @@ mod sso_gating {
             "missing stable-id claim must be rejected at registration, got {reg:?}"
         );
 
-        // Delegation: `resolve_primary_identity` surfaces `JwtVerificationFailed`.
+        // Delegation: `resolve_ii_client_identity` surfaces `JwtVerificationFailed`.
         let session_key = ByteBuf::from("dapp session key");
         let deleg = drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(

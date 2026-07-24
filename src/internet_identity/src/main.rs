@@ -1706,7 +1706,7 @@ mod openid_api {
         )
     }
 
-    /// SSO sign-in: verify the JWT, enforce the per-app gate, resolve the primary
+    /// SSO sign-in: verify the JWT, enforce the per-app gate, resolve the II-client
     /// identity, and mint the openid delegation plus a certified SSO attribute bundle.
     #[update]
     async fn sso_prepare_delegation(
@@ -1728,7 +1728,7 @@ mod openid_api {
             Err(err) => return OpenIdResult::Err(err.into()),
         };
 
-        let identity = match openid::resolve_primary_identity(&verification) {
+        let identity = match openid::resolve_ii_client_identity(&verification) {
             Ok(identity) => identity,
             Err(err) => return OpenIdResult::Err(err),
         };
@@ -1739,7 +1739,7 @@ mod openid_api {
                 state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
                     .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
-            // Refresh the primary credential's metadata from the token; never adds a per-app credential.
+            // Refresh the II-client credential's metadata from the token; never adds a per-app credential.
             let mut anchor = state::anchor(anchor_number);
             update_openid_credential(&mut anchor, identity.credential.clone())
                 .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
@@ -1765,6 +1765,11 @@ mod openid_api {
                 state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
                     .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
             if anchor_number != still_anchor_number {
+                // The credential re-associated to a different anchor during the
+                // `.await` (a concurrent account change). Deliberately reported
+                // as the same coarse error as "no anchor": the client has no
+                // distinct recovery, and we don't surface backend
+                // state-transition detail on the wire.
                 return Err(OpenIdDelegationError::NoSuchAnchor);
             }
 
@@ -1777,10 +1782,7 @@ mod openid_api {
         }
         .await;
 
-        match prepared {
-            Ok(response) => OpenIdResult::Ok(response),
-            Err(err) => OpenIdResult::Err(err),
-        }
+        prepared.into()
     }
 
     /// Fetch the delegation and SSO attribute bundle signature prepared by `sso_prepare_delegation`.
@@ -1803,8 +1805,8 @@ mod openid_api {
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
             Err(err) => return OpenIdResult::Err(err.into()),
         };
-        // Query context: `resolve_primary_identity` only reads the stable-id index.
-        let identity = match openid::resolve_primary_identity(&verification) {
+        // Query context: `resolve_ii_client_identity` only reads the stable-id index.
+        let identity = match openid::resolve_ii_client_identity(&verification) {
             Ok(identity) => identity,
             Err(err) => return OpenIdResult::Err(err),
         };
@@ -1832,9 +1834,10 @@ mod openid_api {
             Ok(signature) => signature,
             Err(err) => return OpenIdResult::Err(err),
         };
+        let sso_attr_bundle_signature = ByteBuf::from(sso_attr_bundle_signature);
         OpenIdResult::Ok(SsoGetDelegationResponse {
             signed_delegation,
-            sso_attr_bundle_signature: ByteBuf::from(sso_attr_bundle_signature),
+            sso_attr_bundle_signature,
         })
     }
 }

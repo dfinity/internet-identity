@@ -37,7 +37,7 @@ pub struct StorableOpenIdCredential {
     #[n(6)]
     pub sso_name: Option<String>,
     /// Cross-client-stable identifier (the `oid` claim value) for a non-`sub`
-    /// SSO org, stamped only on the primary-keyed credential at SSO write time.
+    /// SSO org, stamped only on the II-client-keyed credential at SSO write time.
     /// Backs the SSO stable-id index, which `write()` reconciles from the
     /// stored credentials — remove or move the credential and the index entry
     /// follows. Additive CBOR field: credentials written before it existed

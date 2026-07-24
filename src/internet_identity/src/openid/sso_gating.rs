@@ -1,15 +1,16 @@
-//! Per-app SSO gating. An org has one *primary* OIDC client — the one a user's
-//! anchor is keyed on — plus optional *per-app* clients, one per gated dapp.
+//! Per-app SSO gating. An org registers Internet Identity as one OIDC client
+//! (the *II client*) — the one a user's anchor is keyed on — plus optional
+//! *per-app* clients, one per gated dapp.
 //!
 //! The problem: a gated dapp signs in against its own per-app client, so the
 //! token's identity (`aud`, and for pairwise orgs like Entra the `sub`) is
-//! scoped to that client, not the primary one the anchor is keyed on. A gated
+//! scoped to that client, not the II client the anchor is keyed on. A gated
 //! login therefore can't be matched to the anchor directly.
 //!
 //! This file bridges the two: (a) it verifies the SSO JWT against the client the
-//! origin resolves to (the gate), then (b) maps the login to the primary
+//! origin resolves to (the gate), then (b) maps the login to the II-client
 //! identity via the storage-maintained SSO stable-id index — keyed on the
-//! primary credential's cross-client-stable `stable_id`, which the anchor
+//! II-client credential's cross-client-stable `stable_id`, which the anchor
 //! `write()` reconciles into the index.
 
 use super::{sso, verify, Cached, OpenIDJWTVerificationError, OpenIdCredential};
@@ -17,12 +18,12 @@ use crate::state;
 use internet_identity_interface::internet_identity::types::openid::OpenIdDelegationError;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, IdRegFinishError};
 
-/// A verified SSO login. `credential.aud` is the resolved (per-app or primary)
-/// client; `primary_client_id` is always the primary, on which identity is keyed.
+/// A verified SSO login. `credential.aud` is the resolved (per-app or II)
+/// client; `ii_client_id` is always the II client, on which identity is keyed.
 #[derive(Debug)]
 pub struct VerifiedSsoLogin {
     pub credential: OpenIdCredential,
-    pub primary_client_id: String,
+    pub ii_client_id: String,
     pub stable_identifier_claim: String,
     /// The cross-client-stable identifier; `None` when the claim is `sub`.
     pub stable_id: Option<String>,
@@ -30,9 +31,9 @@ pub struct VerifiedSsoLogin {
 
 impl VerifiedSsoLogin {
     /// The login used a per-app client (its `sub` is scoped to that client and
-    /// must be bridged via the stable-id index), not the org's primary client.
+    /// must be bridged via the stable-id index), not the org's II client.
     fn is_gated(&self) -> bool {
-        self.credential.aud != self.primary_client_id
+        self.credential.aud != self.ii_client_id
     }
 }
 
@@ -84,40 +85,40 @@ pub fn verify_sso_jwt(
     Ok(Cached::Ready(VerifiedSsoLogin {
         stable_id: credential.stable_id.clone(),
         credential,
-        primary_client_id: discovery_config.client_id,
+        ii_client_id: discovery_config.client_id,
         stable_identifier_claim: discovery_config.stable_identifier_claim,
     }))
 }
 
-pub struct SsoPrimaryIdentity {
-    /// Primary-keyed credential to store: `aud` is the primary client. For a
+pub struct SsoResolvedIdentity {
+    /// II-client-keyed credential to store: `aud` is the II client. For a
     /// non-`sub` org it carries `stable_id = Some(oid)` so the anchor `write()`
     /// (re)establishes the SSO stable-id index entry; the gated resolve below
-    /// sets the same value so re-writing the primary credential leaves the
+    /// sets the same value so re-writing the II-client credential leaves the
     /// index unchanged.
     pub credential: OpenIdCredential,
 }
 
-/// Resolve a verified SSO login to the primary identity. Reads only (safe from a
-/// query context): a gated non-`sub` login is resolved through the
+/// Resolve a verified SSO login to the II-client identity. Reads only (safe from
+/// a query context): a gated non-`sub` login is resolved through the
 /// storage-maintained stable-id index. `Err(NoSuchAnchor)`: a non-`sub` gated
 /// login whose stable id has no index entry — either the user never signed in
-/// normally, or the primary credential was removed (the index self-cleans on
+/// normally, or the II-client credential was removed (the index self-cleans on
 /// `write()`), so this fails safe. The caller persists `credential` through the
 /// normal anchor `write()`, which reconciles the index.
-pub fn resolve_primary_identity(
+pub fn resolve_ii_client_identity(
     verification: &VerifiedSsoLogin,
-) -> Result<SsoPrimaryIdentity, OpenIdDelegationError> {
+) -> Result<SsoResolvedIdentity, OpenIdDelegationError> {
     let is_sub = verification.stable_identifier_claim == sso::DEFAULT_STABLE_IDENTIFIER_CLAIM;
     if is_sub {
         // `sub` orgs key identity on the token `sub` directly; no bridging.
         let credential = OpenIdCredential {
-            aud: verification.primary_client_id.clone(),
+            aud: verification.ii_client_id.clone(),
             sub: verification.credential.sub.clone(),
             stable_id: None,
             ..verification.credential.clone()
         };
-        return Ok(SsoPrimaryIdentity { credential });
+        return Ok(SsoResolvedIdentity { credential });
     }
 
     let stable_id = verification
@@ -125,9 +126,9 @@ pub fn resolve_primary_identity(
         .clone()
         .ok_or(OpenIdDelegationError::JwtVerificationFailed)?;
 
-    let primary_sub = if verification.is_gated() {
+    let ii_client_sub = if verification.is_gated() {
         // Scope the lookup to the domain the login was discovered through, so a
-        // gated login can only ever resolve to a primary identity established
+        // gated login can only ever resolve to an II-client identity established
         // through that same domain (an SSO credential always carries it).
         let sso_domain = verification
             .credential
@@ -138,15 +139,15 @@ pub fn resolve_primary_identity(
             storage.lookup_anchor_by_sso_stable_id(
                 sso_domain,
                 &verification.credential.iss,
-                &verification.primary_client_id,
+                &verification.ii_client_id,
                 &stable_id,
             )
         })
         .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
-        primary_sub_on_anchor(
+        ii_client_sub_on_anchor(
             anchor_number,
             &verification.credential.iss,
-            &verification.primary_client_id,
+            &verification.ii_client_id,
         )
         .ok_or(OpenIdDelegationError::NoSuchAnchor)?
     } else {
@@ -154,36 +155,36 @@ pub fn resolve_primary_identity(
     };
 
     let credential = OpenIdCredential {
-        aud: verification.primary_client_id.clone(),
-        sub: primary_sub,
+        aud: verification.ii_client_id.clone(),
+        sub: ii_client_sub,
         stable_id: Some(stable_id),
         ..verification.credential.clone()
     };
-    Ok(SsoPrimaryIdentity { credential })
+    Ok(SsoResolvedIdentity { credential })
 }
 
-/// Load `anchor_number` and return the `sub` of its primary-keyed OpenID
-/// credential for `(iss, primary_client_id)`, if present. `None` when the
+/// Load `anchor_number` and return the `sub` of its II-client-keyed OpenID
+/// credential for `(iss, ii_client_id)`, if present. `None` when the
 /// anchor is gone or no longer carries that credential — the index pointed
 /// here but the credential has since been removed, so the gated login fails
 /// safe.
-fn primary_sub_on_anchor(
+fn ii_client_sub_on_anchor(
     anchor_number: AnchorNumber,
     iss: &str,
-    primary_client_id: &str,
+    ii_client_id: &str,
 ) -> Option<String> {
     state::storage_borrow(|storage| {
         let anchor = storage.read(anchor_number).ok()?;
         anchor
             .openid_credentials()
             .iter()
-            .find(|cred| cred.iss == iss && cred.aud == primary_client_id)
+            .find(|cred| cred.iss == iss && cred.aud == ii_client_id)
             .map(|cred| cred.sub.clone())
     })
 }
 
-/// Verify an SSO JWT for registration, returning the primary-keyed credential to
-/// store — a first gated login registers under the primary client, never a
+/// Verify an SSO JWT for registration, returning the II-client-keyed credential to
+/// store — a first gated login registers under the II client, never a
 /// per-app one. Fails safe: a non-`sub` per-app token with no bridge yet returns
 /// an error and stores nothing.
 pub fn verify_sso_for_registration(
@@ -192,13 +193,13 @@ pub fn verify_sso_for_registration(
     discovery_domain: &str,
     origin: &str,
 ) -> Result<Cached<OpenIdCredential>, IdRegFinishError> {
-    let verification = match verify_sso_jwt(jwt, salt, discovery_domain, origin) {
+    let verification_outcome = match verify_sso_jwt(jwt, salt, discovery_domain, origin) {
         Ok(Cached::Pending) => return Ok(Cached::Pending),
         Ok(Cached::Ready(verification)) => verification,
         Err(err) => return Err(err.into()),
     };
-    match resolve_primary_identity(&verification) {
-        // The resolved credential carries `stable_id` for a non-`sub` primary
+    match resolve_ii_client_identity(&verification_outcome) {
+        // The resolved credential carries `stable_id` for a non-`sub` II-client
         // login; the registration `write()` reconciles the stable-id index.
         Ok(identity) => Ok(Cached::Ready(identity.credential)),
         Err(OpenIdDelegationError::NoSuchAnchor) => Err(IdRegFinishError::SsoNormalLoginRequired),
@@ -285,7 +286,7 @@ mod tests {
         claim: &str,
         sub: &str,
         stable_id: Option<&str>,
-        primary_client_id: &str,
+        ii_client_id: &str,
     ) -> VerifiedSsoLogin {
         VerifiedSsoLogin {
             credential: OpenIdCredential {
@@ -294,7 +295,7 @@ mod tests {
                 aud: if gated {
                     "per-app".to_string()
                 } else {
-                    primary_client_id.to_string()
+                    ii_client_id.to_string()
                 },
                 last_usage_timestamp: None,
                 metadata: HashMap::new(),
@@ -302,7 +303,7 @@ mod tests {
                 sso_name: None,
                 stable_id: None,
             },
-            primary_client_id: primary_client_id.to_string(),
+            ii_client_id: ii_client_id.to_string(),
             stable_identifier_claim: claim.to_string(),
             stable_id: stable_id.map(str::to_string),
         }
@@ -339,9 +340,9 @@ mod tests {
     }
 
     #[test]
-    fn resolve_primary_identity_sub_uses_token_sub() {
+    fn resolve_ii_client_identity_sub_uses_token_sub() {
         let v = sso_verification(true, "sub", "sub-123", None);
-        let identity = resolve_primary_identity(&v).expect("sub resolves directly");
+        let identity = resolve_ii_client_identity(&v).expect("sub resolves directly");
         assert_eq!(identity.credential.sub, "sub-123");
         assert_eq!(identity.credential.aud, "primary");
         // `sub` orgs never bridge, so the primary credential carries no stable id.
@@ -349,19 +350,19 @@ mod tests {
     }
 
     #[test]
-    fn resolve_primary_identity_non_sub_gated_needs_normal_login_first() {
+    fn resolve_ii_client_identity_non_sub_gated_needs_normal_login_first() {
         init_test_storage();
         let gated = sso_verification(true, "oid", "per-app-sub", Some("oid-1"));
         // No primary credential stored yet: the index has no entry, fail safe.
         assert!(matches!(
-            resolve_primary_identity(&gated),
+            resolve_ii_client_identity(&gated),
             Err(OpenIdDelegationError::NoSuchAnchor)
         ));
 
         // A normal (non-gated) primary login resolves to a credential stamped
         // with the stable id; persisting it populates the index.
         let primary = sso_verification(false, "oid", "primary-sub", Some("oid-1"));
-        let identity = resolve_primary_identity(&primary).expect("primary login resolves");
+        let identity = resolve_ii_client_identity(&primary).expect("primary login resolves");
         assert_eq!(identity.credential.sub, "primary-sub");
         assert_eq!(identity.credential.aud, "primary");
         assert_eq!(identity.credential.stable_id, Some("oid-1".to_string()));
@@ -370,7 +371,7 @@ mod tests {
 
         // Now the gated login resolves to the primary sub via the index.
         let identity =
-            resolve_primary_identity(&gated).expect("gated resolves after index populated");
+            resolve_ii_client_identity(&gated).expect("gated resolves after index populated");
         assert_eq!(identity.credential.sub, "primary-sub");
         assert_eq!(identity.credential.aud, "primary");
         // The gated resolve keeps the stable id so re-writing the primary
@@ -381,7 +382,7 @@ mod tests {
         // login fails safe again. This is the cleanup this redesign delivers.
         remove_credential(anchor_number, &key);
         assert!(matches!(
-            resolve_primary_identity(&gated),
+            resolve_ii_client_identity(&gated),
             Err(OpenIdDelegationError::NoSuchAnchor)
         ));
     }
@@ -394,20 +395,20 @@ mod tests {
             sso_verification_with_client(false, "oid", "primary-sub-a", Some("oid-9"), "client-a");
         let primary_b =
             sso_verification_with_client(false, "oid", "primary-sub-b", Some("oid-9"), "client-b");
-        store_primary_credential(resolve_primary_identity(&primary_a).unwrap().credential);
-        store_primary_credential(resolve_primary_identity(&primary_b).unwrap().credential);
+        store_primary_credential(resolve_ii_client_identity(&primary_a).unwrap().credential);
+        store_primary_credential(resolve_ii_client_identity(&primary_b).unwrap().credential);
 
         let gated_a =
             sso_verification_with_client(true, "oid", "pairwise-a", Some("oid-9"), "client-a");
         let gated_b =
             sso_verification_with_client(true, "oid", "pairwise-b", Some("oid-9"), "client-b");
         assert_eq!(
-            resolve_primary_identity(&gated_a).unwrap().credential.sub,
+            resolve_ii_client_identity(&gated_a).unwrap().credential.sub,
             "primary-sub-a",
             "client-a gated login must resolve to client-a's primary sub"
         );
         assert_eq!(
-            resolve_primary_identity(&gated_b).unwrap().credential.sub,
+            resolve_ii_client_identity(&gated_b).unwrap().credential.sub,
             "primary-sub-b",
             "client-b gated login must resolve to client-b's primary sub (no clobber)"
         );
@@ -418,7 +419,7 @@ mod tests {
         init_test_storage();
         // A primary identity established through the org's real domain.
         let primary = sso_verification(false, "oid", "primary-sub", Some("oid-9"));
-        store_primary_credential(resolve_primary_identity(&primary).unwrap().credential);
+        store_primary_credential(resolve_ii_client_identity(&primary).unwrap().credential);
 
         // A gated login carrying the same (iss, primary_client, stable_id) but
         // discovered through a *different* domain must not resolve to that
@@ -427,14 +428,14 @@ mod tests {
         let mut gated_other_domain = sso_verification(true, "oid", "pairwise", Some("oid-9"));
         gated_other_domain.credential.sso_domain = Some("attacker.example".to_string());
         assert!(matches!(
-            resolve_primary_identity(&gated_other_domain),
+            resolve_ii_client_identity(&gated_other_domain),
             Err(OpenIdDelegationError::NoSuchAnchor)
         ));
 
         // The same login through the correct domain still resolves.
         let gated_same_domain = sso_verification(true, "oid", "pairwise", Some("oid-9"));
         assert_eq!(
-            resolve_primary_identity(&gated_same_domain)
+            resolve_ii_client_identity(&gated_same_domain)
                 .unwrap()
                 .credential
                 .sub,

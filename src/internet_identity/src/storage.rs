@@ -285,7 +285,7 @@ const MCP_REGISTRATION_MEMORY_ID: MemoryId = MemoryId::new(MCP_REGISTRATION_MEMO
 const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
 
 /// SSO stable-id bridge:
-/// `SHA-256(sso_domain, iss, primary_client_id, stable_id) -> AnchorNumber`.
+/// `SHA-256(sso_domain, iss, ii_client_id, stable_id) -> AnchorNumber`.
 const SSO_STABLE_ID_INDEX_MEMORY_ID: MemoryId = MemoryId::new(SSO_STABLE_ID_INDEX_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
@@ -450,7 +450,7 @@ pub struct Storage<M: Memory> {
 
     sso_stable_id_index_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// SSO stable-id lookup index:
-    /// `SHA-256(sso_domain, iss, primary_client_id, stable_id) ->
+    /// `SHA-256(sso_domain, iss, ii_client_id, stable_id) ->
     /// AnchorNumber`. Storage-maintained — [`Storage::write`] reconciles it
     /// from the anchors' stored OpenID credentials on every write, so it
     /// self-cleans when a credential is removed or moved. Mirrors
@@ -981,7 +981,7 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Reconcile the SSO stable-id index against `anchor_number`'s stored
     /// credentials. Mirrors [`Storage::sync_anchor_with_openid_credential_index`]:
-    /// derive the `(sso_domain, iss, primary_client_id, stable_id)` keyset from each
+    /// derive the `(sso_domain, iss, ii_client_id, stable_id)` keyset from each
     /// credential that carries a `stable_id`, diff previous vs current, and
     /// apply only the delta — `remove` the entries that disappeared, `insert`
     /// the new ones pointing at this anchor. Because the keyset is derived from
@@ -1314,7 +1314,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Resolve a non-`sub` SSO stable id to the anchor that carries the matching
-    /// primary credential, or `None` if no anchor does (never linked, or the
+    /// II-client credential, or `None` if no anchor does (never linked, or the
     /// credential has since been removed — the index self-cleans on `write()`,
     /// so a stale `Some` can't linger). Mirrors
     /// [`Storage::lookup_anchor_with_openid_credential`].
@@ -1322,7 +1322,7 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         sso_domain: &str,
         iss: &str,
-        primary_client_id: &str,
+        ii_client_id: &str,
         stable_id: &str,
     ) -> Option<AnchorNumber> {
         let anchor_numbers: Vec<AnchorNumber> = self
@@ -1330,7 +1330,7 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&StorableSsoStableIdKey::new(
                 sso_domain,
                 iss,
-                primary_client_id,
+                ii_client_id,
                 stable_id,
             ))
             .map(Into::into)?;

@@ -115,6 +115,18 @@ pub enum OpenIdResult<T, E> {
     Err(E),
 }
 
+/// Map a settled `Result` onto an `OpenIdResult`. Callers that have already
+/// handled the `Pending` retry signal upstream can collapse the final
+/// `Ok`/`Err` match into `result.into()`.
+impl<T, E> From<Result<T, E>> for OpenIdResult<T, E> {
+    fn from(result: Result<T, E>) -> Self {
+        match result {
+            Ok(value) => OpenIdResult::Ok(value),
+            Err(err) => OpenIdResult::Err(err),
+        }
+    }
+}
+
 pub type OpenIdCredentialKey = (Iss, Sub, Aud);
 pub type Iss = String;
 pub type Sub = String;

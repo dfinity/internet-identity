@@ -114,8 +114,8 @@ pub(super) struct SsoProvider {
     pub stable_identifier_claim: Option<String>,
 }
 
-/// Maximum length of a configured stable-identifier claim value.
-const MAX_STABLE_IDENTIFIER_LENGTH: usize = 255;
+/// Maximum size, in bytes, of a configured stable-identifier claim value.
+const MAX_STABLE_IDENTIFIER_BYTES: usize = 255;
 
 /// Extract a string claim from raw JWT claim bytes; `None` if absent or non-string.
 fn extract_string_claim(claims_bytes: &[u8], claim: &str) -> Option<String> {
@@ -139,12 +139,12 @@ pub(super) fn verify_and_build(
     salt: &[u8; 32],
 ) -> Result<OpenIdCredential, OpenIDJWTVerificationError> {
     // Decode JWT and decode claims
-    let validation_item = Decoder::new()
+    let jwt_under_validation = Decoder::new()
         .decode_compact_serialization(jwt.as_bytes(), None)
         .map_err(|_| {
             OpenIDJWTVerificationError::GenericError("Unable to decode JWT".to_string())
         })?;
-    let claims: Claims = serde_json::from_slice(validation_item.claims()).map_err(|_| {
+    let claims: Claims = serde_json::from_slice(jwt_under_validation.claims()).map_err(|_| {
         OpenIDJWTVerificationError::GenericError(
             "Unable to decode claims or expected claims are missing".to_string(),
         )
@@ -155,23 +155,23 @@ pub(super) fn verify_and_build(
     // from the JWT claims; a concrete issuer has no placeholders and passes
     // through unchanged, so SSO and Google/Apple share this code path.
     let issuer_placeholders = get_issuer_placeholders(&descriptor.issuer);
-    let issuer_claims = get_all_claims(validation_item.claims(), issuer_placeholders);
+    let issuer_claims = get_all_claims(jwt_under_validation.claims(), issuer_placeholders);
     let effective_issuer = replace_issuer_placeholders(&descriptor.issuer, &issuer_claims);
 
     verify_claims(&effective_issuer, &descriptor.client_id, &claims, salt)?;
 
-    // Pull the SSO stable-id claim before `verify` consumes `validation_item`;
+    // Pull the SSO stable-id claim before `verify` consumes `jwt_under_validation`;
     // its value is only used below, once verification has succeeded.
     let sso_stable_id = match &descriptor.sso {
         Some(SsoProvider {
             stable_identifier_claim: Some(claim),
             ..
-        }) => extract_string_claim(validation_item.claims(), claim),
+        }) => extract_string_claim(jwt_under_validation.claims(), claim),
         _ => None,
     };
 
     // Verify JWT signature against the matching key.
-    let kid = validation_item
+    let kid = jwt_under_validation
         .kid()
         .ok_or(OpenIDJWTVerificationError::GenericError(
             "JWT is missing kid".to_string(),
@@ -182,7 +182,7 @@ pub(super) fn verify_and_build(
         .ok_or(OpenIDJWTVerificationError::GenericError(format!(
             "Certificate not found for {kid}"
         )))?;
-    validation_item
+    jwt_under_validation
         .verify(&JwsVerifierFn::from(verify_signature), cert)
         .map_err(|_| OpenIDJWTVerificationError::GenericError("Invalid signature".to_string()))?;
 
@@ -230,7 +230,7 @@ pub(super) fn verify_and_build(
             // add/register paths get it — and its length cap — from here.
             if sso_stable_id
                 .as_ref()
-                .is_some_and(|v| v.len() > MAX_STABLE_IDENTIFIER_LENGTH)
+                .is_some_and(|v| v.len() > MAX_STABLE_IDENTIFIER_BYTES)
             {
                 return Err(OpenIDJWTVerificationError::GenericError(
                     "stable identifier claim too long".to_string(),

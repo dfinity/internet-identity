@@ -590,7 +590,12 @@ impl Anchor {
                 continue;
             };
 
-            // List `sso:<domain>` rows only for a session that can certify that exact domain.
+            // List `sso:<domain>` rows only for a session that can certify that
+            // exact domain. A credential for a different SSO domain (an anchor
+            // can hold several) simply isn't listed for this session — skipped,
+            // not an error: listing is best-effort and non-blocking by design,
+            // so a requested-but-unavailable attribute is just absent from the
+            // result, never a failure of the sign-in flow.
             if let AttributeScope::Sso { domain } = &scope {
                 if sso_session_domain.as_deref() != Some(domain) {
                     continue;
