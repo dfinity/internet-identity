@@ -74,24 +74,16 @@ fi
 resolve_staging_config
 print_deployment_summary
 
-REPO="dfinity/internet-identity"
-WORKFLOW_FILE="canister-tests.yml"
-
 # -------------------------
 # Fetch CI artifacts FIRST, before asking the user any interactive questions.
 # Failing fast here avoids wasting the user's time on prompts when the
 # underlying CI run doesn't exist or isn't green.
+#
+# `ensure_github_auth` (deploy-common.bash) verifies the gh CLI is present +
+# authenticated and sets AUTH_HEADER; REPO / WORKFLOW_FILE are shared
+# constants from the same file.
 # -------------------------
-if ! command -v gh >/dev/null 2>&1; then
-    echo "Error: gh CLI not found. Install and authenticate to access private workflows." >&2
-    exit 1
-fi
-GITHUB_TOKEN="$(gh auth token)"
-if [ -z "$GITHUB_TOKEN" ]; then
-    echo "Error: gh CLI is not authenticated or token unavailable." >&2
-    exit 1
-fi
-AUTH_HEADER="Authorization: token $GITHUB_TOKEN"
+ensure_github_auth
 
 # -------------------------
 # Set up the artifact temp dir early — both code paths below write into
@@ -180,144 +172,10 @@ if [ -z "$BRANCH" ] || [ "$BRANCH" = "null" ]; then
 fi
 echo "  PR #$PR_NUMBER → branch '$BRANCH'"
 
-echo "Fetching workflow runs for branch '$BRANCH'..."
-# `canister-tests.yml` only triggers on `push` for `main` and release tags;
-# every other branch goes through the `pull_request` event. Filtering the
-# API call by `event=push` therefore returns nothing for PR branches —
-# leave the event open and let the jq filter below pick the right
-# workflow by path, regardless of trigger.
-RUN_ID=$(curl -sf -H "$AUTH_HEADER" \
-    "https://api.github.com/repos/$REPO/actions/runs?branch=$BRANCH&per_page=100" \
-    | jq -r --arg WF "$WORKFLOW_FILE" '
-        [.workflow_runs[]
-            | select(.path == (".github/workflows/" + $WF))
-        ]
-        | sort_by(.run_number)
-        | reverse
-        | .[0].id
-    ' || true)
-
-if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
-    echo "Error: No canister-tests.yml workflow run found for branch '$BRANCH'" >&2
-    exit 1
-fi
-echo "  Workflow run: $RUN_ID"
-
-# Collect all jobs for this run so we can validate each required build before
-# we start asking the user anything.
-echo "Fetching jobs for workflow run $RUN_ID..."
-JOBS_JSON='{"jobs":[]}'
-PAGE=1
-while true; do
-    PAGE_JSON=$(curl -sf -H "$AUTH_HEADER" \
-        "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100&page=$PAGE")
-    PAGE_COUNT=$(echo "$PAGE_JSON" | jq '.jobs | length')
-    if [ "$PAGE_COUNT" -eq 0 ]; then
-        break
-    fi
-    JOBS_JSON=$(jq -s '{ jobs: (.[0].jobs + .[1].jobs) }' \
-        <(echo "$JOBS_JSON") <(echo "$PAGE_JSON"))
-    if [ "$PAGE_COUNT" -lt 100 ]; then
-        break
-    fi
-    PAGE=$((PAGE + 1))
-done
-
-# Build the list of (artifact_name, canister_id, job_pattern, job_filter)
-# for the selected ends. job_pattern/job_filter are substrings matched
-# against the job name (resilient to matrix reordering / display-name
-# changes).
-ARTIFACTS=()
-if [ "$DEPLOY_BE" = true ]; then
-    ARTIFACTS+=("internet_identity_backend.wasm.gz:$BE_ID:docker-build-internet_identity:internet_identity_backend.wasm.gz")
-fi
-if [ "$DEPLOY_FE" = true ]; then
-    ARTIFACTS+=("internet_identity_frontend.wasm.gz:$FE_ID:docker-build-internet_identity_frontend:docker-build-internet_identity_frontend")
-fi
-
-# Validate each required job succeeded AND fetch the artifact URL for each,
-# failing fast on any problem before we prompt the user.
-echo ""
-echo "Validating CI artifacts..."
-
-declare -A ARTIFACT_URL_BY_NAME=()
-for tuple in "${ARTIFACTS[@]}"; do
-    ARTIFACT_NAME="${tuple%%:*}"
-    rest="${tuple#*:}"
-    # canister_id is the second field — skip it here, it's used later.
-    rest="${rest#*:}"
-    JOB_PATTERN="${rest%%:*}"
-    JOB_FILTER="${rest#*:}"
-
-    MATCHING_JOBS=$(echo "$JOBS_JSON" | jq -c \
-        --arg PAT "$JOB_PATTERN" --arg FIL "$JOB_FILTER" '
-        .jobs | map(select(.name | contains($PAT) and contains($FIL)))
-    ')
-    MATCH_COUNT=$(echo "$MATCHING_JOBS" | jq 'length')
-
-    if [ "$MATCH_COUNT" -eq 0 ]; then
-        echo "Error: No job matching '$JOB_PATTERN' + '$JOB_FILTER' found." >&2
-        echo "Available jobs:" >&2
-        echo "$JOBS_JSON" | jq -r '.jobs[] | "  - \(.name) (\(.status)/\(.conclusion))"' >&2
-        exit 1
-    fi
-    if [ "$MATCH_COUNT" -gt 1 ]; then
-        echo "Error: Multiple jobs match '$JOB_PATTERN' + '$JOB_FILTER':" >&2
-        echo "$MATCHING_JOBS" | jq -r '.[] | "  - \(.name) (\(.status)/\(.conclusion))"' >&2
-        exit 1
-    fi
-
-    JOB_NAME=$(echo "$MATCHING_JOBS" | jq -r '.[0].name')
-    JOB_STATE=$(echo "$MATCHING_JOBS" | jq -r '.[0].status')
-    JOB_CONCLUSION=$(echo "$MATCHING_JOBS" | jq -r '.[0].conclusion')
-
-    if [ "$JOB_STATE" = "queued" ] || [ "$JOB_STATE" = "in_progress" ]; then
-        echo "Error: Required job '$JOB_NAME' has not completed yet (status: $JOB_STATE)" >&2
-        exit 1
-    fi
-    if [ "$JOB_CONCLUSION" != "success" ]; then
-        echo "Error: Required job '$JOB_NAME' did not succeed (conclusion: $JOB_CONCLUSION)" >&2
-        exit 1
-    fi
-
-    ARTIFACT_URL=$(curl -sf -H "$AUTH_HEADER" \
-        "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts?per_page=100" \
-        | jq -r --arg ART "$ARTIFACT_NAME" '
-            .artifacts[] | select(.name == $ART) | .archive_download_url
-        ')
-    if [ -z "$ARTIFACT_URL" ] || [ "$ARTIFACT_URL" = "null" ]; then
-        echo "Error: Artifact '$ARTIFACT_NAME' not found on run $RUN_ID" >&2
-        exit 1
-    fi
-
-    ARTIFACT_URL_BY_NAME["$ARTIFACT_NAME"]="$ARTIFACT_URL"
-    echo "  OK — '$JOB_NAME' succeeded; artifact '$ARTIFACT_NAME' available."
-done
-
-# -------------------------
-# Download + extract each artifact into $ARTIFACT_DIR (set up earlier
-# alongside its EXIT-trap cleanup). The CI artifact names collide with
-# the names `scripts/build` produces locally, so extracting in the repo
-# root would clobber the developer's working-tree wasms — keep them
-# isolated in the temp dir.
-# -------------------------
-echo ""
-echo "Downloading CI artifacts to $ARTIFACT_DIR..."
-for tuple in "${ARTIFACTS[@]}"; do
-    ARTIFACT_NAME="${tuple%%:*}"
-    ARTIFACT_URL="${ARTIFACT_URL_BY_NAME[$ARTIFACT_NAME]}"
-    ZIP_FILE="$ARTIFACT_DIR/$ARTIFACT_NAME.zip"
-
-    echo "  Downloading $ARTIFACT_NAME..."
-    curl -sfL -H "$AUTH_HEADER" -o "$ZIP_FILE" "$ARTIFACT_URL"
-    unzip -o "$ZIP_FILE" -d "$ARTIFACT_DIR" >/dev/null
-    if [ ! -f "$ARTIFACT_DIR/$ARTIFACT_NAME" ]; then
-        echo "Error: Extracted file not found: $ARTIFACT_DIR/$ARTIFACT_NAME" >&2
-        exit 1
-    fi
-    echo "  Extracted: $ARTIFACT_DIR/$ARTIFACT_NAME"
-    RUN_ID_BY_ARTIFACT["$ARTIFACT_NAME"]="$RUN_ID"
-done
+# Resolve the newest canister-tests.yml run for this PR's head branch and
+# download its wasm.gz artifacts into $ARTIFACT_DIR (sets RUN_ID and
+# RUN_ID_BY_ARTIFACT). See deploy-common.bash.
+resolve_and_download_ci_artifacts "$BRANCH"
 
 fi  # end of `if [ "$IS_RECONFIGURE" = true ]; ... else ... fi`
 

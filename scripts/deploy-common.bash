@@ -37,6 +37,12 @@
 readonly PROXY_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
 readonly IC_NETWORK="ic"
 
+# Repo + CI workflow the "deploy from CI artifacts" flow pulls from. Shared
+# by deploy-pr-to-beta (a PR's head branch), deploy-main-to-beta (the `main`
+# branch) and find_artifact_by_hash (--reconfigure).
+readonly REPO="dfinity/internet-identity"
+readonly WORKFLOW_FILE="canister-tests.yml"
+
 # Default DoH allowlist for the email-recovery flow — single source
 # of truth in `default-doh-domains.bash`, shared with
 # `make-upgrade-proposal`. See that file for the audit notes.
@@ -853,6 +859,196 @@ opt opt record {
       max_cache_age_secs = opt (3600 : nat64);
     }
 EOF
+}
+
+# -------------------------
+# GitHub CI artifact resolution
+#
+# Shared by deploy-pr-to-beta (a PR's head branch) and deploy-main-to-beta
+# (the `main` branch): once a branch name is in hand the resolution is
+# identical — only how the branch is derived differs.
+# -------------------------
+
+# Verify the gh CLI is installed + authenticated and set AUTH_HEADER for
+# the GitHub REST calls the CI-artifact flow makes. Exits (rather than
+# returns) on failure — there's nothing the caller can do to recover, and
+# every caller would just `|| exit 1` anyway.
+ensure_github_auth() {
+    if ! command -v gh >/dev/null 2>&1; then
+        echo "Error: gh CLI not found. Install and authenticate to access private workflows." >&2
+        exit 1
+    fi
+    local token
+    token="$(gh auth token)"
+    if [ -z "$token" ]; then
+        echo "Error: gh CLI is not authenticated or token unavailable." >&2
+        exit 1
+    fi
+    AUTH_HEADER="Authorization: token $token"
+}
+
+# Given a git branch name, find the newest canister-tests.yml run for it,
+# verify the build job(s) for the selected end(s) succeeded, then download +
+# extract their wasm.gz artifacts into $ARTIFACT_DIR. The CI artifact names
+# collide with the names `scripts/build` produces locally, so callers extract
+# into an isolated temp dir rather than the repo root.
+#
+# Requires (set by the caller before the call):
+#   AUTH_HEADER            : from ensure_github_auth
+#   ARTIFACT_DIR           : existing temp dir to extract into
+#   DEPLOY_FE / DEPLOY_BE  : which ends to fetch
+#   BE_ID / FE_ID          : canister ids (only used to tag the artifact tuples)
+#   RUN_ID_BY_ARTIFACT     : a `declare -A` associative array, populated here
+#
+# Sets (read by the caller's deploy + log lines):
+#   RUN_ID                       : the resolved workflow run id
+#   RUN_ID_BY_ARTIFACT[<name>]   : run id each artifact came from (= RUN_ID)
+#
+# Exits (non-zero, with a diagnostic) on any resolution / validation /
+# download failure.
+resolve_and_download_ci_artifacts() {
+    local branch="$1"
+
+    echo ""
+    echo "Fetching workflow runs for branch '$branch'..."
+    # `canister-tests.yml` only triggers on `push` for `main` and release tags;
+    # every other branch goes through the `pull_request` event. Filtering the
+    # API call by event would therefore miss one of those cases, so we leave the
+    # event open and let the jq filter below pick the right workflow by path,
+    # regardless of trigger.
+    RUN_ID=$(curl -sf -H "$AUTH_HEADER" \
+        "https://api.github.com/repos/$REPO/actions/runs?branch=$branch&per_page=100" \
+        | jq -r --arg WF "$WORKFLOW_FILE" '
+            [.workflow_runs[]
+                | select(.path == (".github/workflows/" + $WF))
+            ]
+            | sort_by(.run_number)
+            | reverse
+            | .[0].id
+        ' || true)
+
+    if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+        echo "Error: No $WORKFLOW_FILE workflow run found for branch '$branch'" >&2
+        exit 1
+    fi
+    echo "  Workflow run: $RUN_ID"
+
+    # Collect all jobs for this run so we can validate each required build
+    # before we start asking the user anything.
+    echo "Fetching jobs for workflow run $RUN_ID..."
+    local jobs_json='{"jobs":[]}'
+    local page=1
+    local page_json page_count
+    while true; do
+        page_json=$(curl -sf -H "$AUTH_HEADER" \
+            "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100&page=$page")
+        page_count=$(echo "$page_json" | jq '.jobs | length')
+        if [ "$page_count" -eq 0 ]; then
+            break
+        fi
+        jobs_json=$(jq -s '{ jobs: (.[0].jobs + .[1].jobs) }' \
+            <(echo "$jobs_json") <(echo "$page_json"))
+        if [ "$page_count" -lt 100 ]; then
+            break
+        fi
+        page=$((page + 1))
+    done
+
+    # Build the list of (artifact_name, canister_id, job_pattern, job_filter)
+    # for the selected ends. job_pattern/job_filter are substrings matched
+    # against the job name (resilient to matrix reordering / display-name
+    # changes).
+    local artifacts=()
+    if [ "$DEPLOY_BE" = true ]; then
+        artifacts+=("internet_identity_backend.wasm.gz:$BE_ID:docker-build-internet_identity:internet_identity_backend.wasm.gz")
+    fi
+    if [ "$DEPLOY_FE" = true ]; then
+        artifacts+=("internet_identity_frontend.wasm.gz:$FE_ID:docker-build-internet_identity_frontend:docker-build-internet_identity_frontend")
+    fi
+
+    # Validate each required job succeeded AND fetch the artifact URL for each,
+    # failing fast on any problem before we prompt the user.
+    echo ""
+    echo "Validating CI artifacts..."
+    local -A artifact_url_by_name=()
+    local tuple
+    for tuple in "${artifacts[@]}"; do
+        local artifact_name rest job_pattern job_filter
+        artifact_name="${tuple%%:*}"
+        rest="${tuple#*:}"
+        # canister_id is the second field — skip it here, it's used later.
+        rest="${rest#*:}"
+        job_pattern="${rest%%:*}"
+        job_filter="${rest#*:}"
+
+        local matching_jobs match_count
+        matching_jobs=$(echo "$jobs_json" | jq -c \
+            --arg PAT "$job_pattern" --arg FIL "$job_filter" '
+            .jobs | map(select(.name | contains($PAT) and contains($FIL)))
+        ')
+        match_count=$(echo "$matching_jobs" | jq 'length')
+
+        if [ "$match_count" -eq 0 ]; then
+            echo "Error: No job matching '$job_pattern' + '$job_filter' found." >&2
+            echo "Available jobs:" >&2
+            echo "$jobs_json" | jq -r '.jobs[] | "  - \(.name) (\(.status)/\(.conclusion))"' >&2
+            exit 1
+        fi
+        if [ "$match_count" -gt 1 ]; then
+            echo "Error: Multiple jobs match '$job_pattern' + '$job_filter':" >&2
+            echo "$matching_jobs" | jq -r '.[] | "  - \(.name) (\(.status)/\(.conclusion))"' >&2
+            exit 1
+        fi
+
+        local job_name job_state job_conclusion
+        job_name=$(echo "$matching_jobs" | jq -r '.[0].name')
+        job_state=$(echo "$matching_jobs" | jq -r '.[0].status')
+        job_conclusion=$(echo "$matching_jobs" | jq -r '.[0].conclusion')
+
+        if [ "$job_state" = "queued" ] || [ "$job_state" = "in_progress" ]; then
+            echo "Error: Required job '$job_name' has not completed yet (status: $job_state)" >&2
+            exit 1
+        fi
+        if [ "$job_conclusion" != "success" ]; then
+            echo "Error: Required job '$job_name' did not succeed (conclusion: $job_conclusion)" >&2
+            exit 1
+        fi
+
+        local artifact_url
+        artifact_url=$(curl -sf -H "$AUTH_HEADER" \
+            "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts?per_page=100" \
+            | jq -r --arg ART "$artifact_name" '
+                .artifacts[] | select(.name == $ART) | .archive_download_url
+            ')
+        if [ -z "$artifact_url" ] || [ "$artifact_url" = "null" ]; then
+            echo "Error: Artifact '$artifact_name' not found on run $RUN_ID" >&2
+            exit 1
+        fi
+
+        artifact_url_by_name["$artifact_name"]="$artifact_url"
+        echo "  OK — '$job_name' succeeded; artifact '$artifact_name' available."
+    done
+
+    # Download + extract each artifact into $ARTIFACT_DIR (set up by the caller
+    # alongside its EXIT-trap cleanup).
+    echo ""
+    echo "Downloading CI artifacts to $ARTIFACT_DIR..."
+    for tuple in "${artifacts[@]}"; do
+        local artifact_name artifact_url zip_file
+        artifact_name="${tuple%%:*}"
+        artifact_url="${artifact_url_by_name[$artifact_name]}"
+        zip_file="$ARTIFACT_DIR/$artifact_name.zip"
+
+        echo "  Downloading $artifact_name..."
+        curl -sfL -H "$AUTH_HEADER" -o "$zip_file" "$artifact_url"
+        unzip -o "$zip_file" -d "$ARTIFACT_DIR" >/dev/null
+        if [ ! -f "$ARTIFACT_DIR/$artifact_name" ]; then
+            echo "Error: Extracted file not found: $ARTIFACT_DIR/$artifact_name" >&2
+            exit 1
+        fi
+        echo "  Extracted: $ARTIFACT_DIR/$artifact_name"
+        RUN_ID_BY_ARTIFACT["$artifact_name"]="$RUN_ID"
+    done
 }
 
 # -------------------------
