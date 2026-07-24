@@ -85,9 +85,6 @@ msgstr "<0>Integraties met Google, Apple en Microsoft:</0> Hoewel passkeys steed
 msgid "<0>Learn more</0> about passkeys"
 msgstr "<0>Meer informatie</0> over passkeys"
 
-msgid "<0>Never</0> enter a code from another source."
-msgstr "Voer <0>nooit</0> een code van een andere bron in."
-
 msgid "<0>No more identity numbers:</0> As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined."
 msgstr "<0>Geen identiteitsnummers meer:</0> Zoals hierboven uitgelegd, betekenen vindbare passkeys dat u geen identiteitsnummer meer hoeft te onthouden of op te slaan. Inloggen is nu eenvoudiger en overzichtelijker."
 
@@ -130,6 +127,9 @@ msgstr "Geactiveerd"
 msgid "Active"
 msgstr "Actief"
 
+msgid "Add a new identity"
+msgstr "Een nieuwe identiteit toevoegen"
+
 msgid "Add a passkey"
 msgstr "Voeg een passkey toe"
 
@@ -141,9 +141,6 @@ msgstr "Voeg toegangsmethode toe"
 
 msgid "Add another account"
 msgstr "Voeg een ander account toe"
-
-msgid "Add another identity"
-msgstr "Voeg een andere identiteit toe"
 
 msgid "Add another method or sign in via recovery to remove"
 msgstr "Voeg een andere methode toe of log in via herstel om te verwijderen"
@@ -169,11 +166,17 @@ msgstr "Beheer de manieren waarop u kunt inloggen met uw identiteit."
 msgid "Advanced identity management"
 msgstr "Geavanceerd identiteitsbeheer"
 
+msgid "AI assistants on this device can ask to sign you in to apps."
+msgstr "AI-assistenten op dit apparaat kunnen vragen om u aan te melden bij apps."
+
 msgid "Allow access"
 msgstr "Toegang verlenen"
 
 msgid "Allow CLI access"
 msgstr "CLI-toegang verlenen"
+
+msgid "Allow MCP access"
+msgstr "MCP-toegang toestaan"
 
 msgid "Allow to access this info"
 msgstr "Toegang tot deze informatie toestaan"
@@ -214,6 +217,9 @@ msgstr "Authenticatie succesvol"
 msgid "Authorize new device"
 msgstr "Autoriseer nieuw apparaat"
 
+msgid "Back"
+msgstr "Terug"
+
 msgid "Back to sign-in options"
 msgstr "Terug naar inlogopties"
 
@@ -222,6 +228,9 @@ msgstr "Voordat u doorgaat"
 
 msgid "Body"
 msgstr "Berichttekst"
+
+msgid "Both are on the <0>{host}</0> domain."
+msgstr "Beide bevinden zich op het domein <0>{host}</0>."
 
 msgid "Browser opened"
 msgstr "Browser geopend"
@@ -319,6 +328,9 @@ msgstr "Bevestig uw inlogpoging"
 msgid "Confirmation code"
 msgstr "Bevestigingscode"
 
+msgid "Confirmed"
+msgstr "Bevestigd"
+
 msgid "Confirming..."
 msgstr "Bevestigen..."
 
@@ -373,11 +385,11 @@ msgstr "SSO-instellingen van {domainInput} konden niet worden geladen. Vraag uw 
 msgid "Create account"
 msgstr "Account aanmaken"
 
+msgid "Create an Identity"
+msgstr "Een identiteit aanmaken"
+
 msgid "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
 msgstr "Maak een identiteit aan met een passkey, via biometrie of een beveiligingssleutel. Uw gegevens verlaten nooit uw apparaat."
-
-msgid "Create another identity"
-msgstr "Een andere identiteit aanmaken"
 
 msgid "Create identity"
 msgstr "Identiteit aanmaken"
@@ -385,14 +397,14 @@ msgstr "Identiteit aanmaken"
 msgid "Create new identity"
 msgstr "Nieuwe identiteit aanmaken"
 
+msgid "Create one in seconds."
+msgstr "Maak er een aan in enkele seconden."
+
 msgid "Create passkey"
 msgstr "Passkey aanmaken"
 
 msgid "Create your Identity"
 msgstr "Maak uw Identiteit aan"
-
-msgid "Create your private, passwordless identity."
-msgstr "Maak uw privé, wachtwoordloze identiteit aan."
 
 msgid "Created {0}"
 msgstr "Gemaakt {0}"
@@ -472,11 +484,20 @@ msgstr "CLI-toegang inschakelen"
 msgid "Enable CLI access for this device, then try again."
 msgstr "Schakel CLI-toegang in voor dit apparaat en probeer het opnieuw."
 
+msgid "Enable MCP access"
+msgstr "MCP-toegang inschakelen"
+
+msgid "Enable MCP access for this device, then try again."
+msgstr "Schakel MCP-toegang in voor dit apparaat en probeer het opnieuw."
+
 msgid "Enable multiple accounts"
 msgstr "Meerdere accounts inschakelen"
 
 msgid "Enabled"
 msgstr "Ingeschakeld"
+
+msgid "Enabling this lets AI assistants on this device ask to sign you in to apps using your identity."
+msgstr "Als u dit inschakelt, kunnen AI-assistenten op dit apparaat vragen om u aan te melden bij apps met uw identiteit."
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr "Voer een naam in voor uw identiteit om de upgrade te voltooien. Eenmaal ingesteld, kan deze later niet meer worden gewijzigd."
@@ -489,6 +510,9 @@ msgstr "Voer elk woord in de juiste volgorde in:"
 
 msgid "Enter recovery phrase"
 msgstr "Voer herstelzin in"
+
+msgid "Enter the code"
+msgstr "Voer de code in"
 
 msgid "Enter your company domain"
 msgstr "Voer uw bedrijfsdomein in"
@@ -523,6 +547,9 @@ msgstr "Voorbeeld: gebruiker A logt in op Internet Identity met hun Google-accou
 
 msgid "For security, Internet Identity blocks command-line tools from signing in to apps using your identity."
 msgstr "Om veiligheidsredenen blokkeert Internet Identity opdrachtregelprogramma's om in te loggen bij apps met uw identiteit."
+
+msgid "For security, Internet Identity blocks MCP clients from signing in to apps using your identity."
+msgstr "Om veiligheidsredenen blokkeert Internet Identity MCP-clients om aan te melden bij apps met uw identiteit."
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in. Quick, safe, and hassle-free."
 msgstr "Vergeet het onthouden van ingewikkelde gebruikersnamen en wachtwoorden. Met passkeys kiest u gewoon uw naam om in te loggen. Snel, veilig en probleemloos."
@@ -575,6 +602,12 @@ msgstr "Verborgen e-mailadres"
 msgid "Hide all"
 msgstr "Alles verbergen"
 
+msgid "Hold for a few seconds. Release to cancel."
+msgstr "Houd enkele seconden ingedrukt. Loslaten om te annuleren."
+
+msgid "Hold to confirm"
+msgstr "Ingedrukt houden om te bevestigen"
+
 msgid "Home"
 msgstr "Home"
 
@@ -598,6 +631,9 @@ msgstr "Ik ben verantwoordelijk voor mijn herstelzin en deze kan niet worden opg
 
 msgid "I have written it down"
 msgstr "Ik heb het opgeschreven"
+
+msgid "I understand the risks."
+msgstr "Ik begrijp de risico's."
 
 msgid "I'm using the official ICP CLI and I trust this device."
 msgstr "Ik gebruik de officiële ICP CLI en vertrouw dit apparaat."
@@ -632,6 +668,8 @@ msgstr "Identiteit verwijderd"
 msgid "Identity upgraded."
 msgstr "Identiteit geüpgraded."
 
+msgid "If this keeps happening, copy these details and include them in a <0>support request</0>."
+msgstr "Als dit blijft gebeuren, kopieer dan deze gegevens en voeg ze toe aan een <0>ondersteuningsverzoek</0>."
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "Als u <0>{domain}</0> beheert, kost het inschakelen van DNSSEC bij uw domeinregistrar doorgaans slechts een paar klikken. Zodra dit is doorgevoerd, werkt dit adres automatisch. Er is geen verdere actie van ons vereist."
@@ -702,6 +740,9 @@ msgstr "Ongeldige aanvraag"
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Wordt mijn Face ID of vingerafdruk opgeslagen in Internet Identity?"
 
+msgid "It can send messages or move funds on your behalf."
+msgstr "Het kan berichten versturen of geld overmaken namens u."
+
 msgid "It looks like you're trying to sign in from a social app. Follow these steps to continue:"
 msgstr "Het lijkt erop dat u probeert in te loggen vanuit een social app. Volg deze stappen om door te gaan:"
 
@@ -750,11 +791,20 @@ msgstr "Legacy"
 msgid "Legacy identity"
 msgstr "Verouderde identiteit"
 
+msgid "Let {mcpServer} act as {accountScope}"
+msgstr "Laat {mcpServer} optreden als {accountScope}"
+
+msgid "Let AI assistants on this device sign in to apps using your identity."
+msgstr "Sta AI-assistenten op dit apparaat toe om aan te melden bij apps met uw identiteit."
+
 msgid "Let command-line tools on this device sign in to apps using your identity."
 msgstr "Sta opdrachtregelprogramma's op dit apparaat toe om in te loggen bij apps met uw identiteit."
 
 msgid "Let's get started"
 msgstr "Laten we beginnen"
+
+msgid "Like any AI, it can hallucinate and make mistakes."
+msgstr "Zoals elke AI kan het hallucineren en fouten maken."
 
 msgid "Limit reached"
 msgstr "Limiet bereikt"
@@ -810,6 +860,12 @@ msgstr "Maximale lengte is 32 tekens."
 msgid "Maximum length is 64 characters."
 msgstr "Maximale lengte is 64 tekens."
 
+msgid "MCP access"
+msgstr "MCP-toegang"
+
+msgid "MCP access not enabled"
+msgstr "MCP-toegang niet ingeschakeld"
+
 msgid "More information about multiple accounts"
 msgstr "Meer informatie over meerdere accounts"
 
@@ -836,9 +892,6 @@ msgstr "Geef uw identiteit een naam"
 
 msgid "Name:"
 msgstr "Naam:"
-
-msgid "New to Internet Identity?"
-msgstr "Nieuw bij Internet Identity?"
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Er worden geen gegevens gedeeld met Google, Microsoft of Apple over op welke applicaties u inlogt met Internet Identity."
@@ -876,9 +929,6 @@ msgstr "Een of meer woorden zijn onjuist of staan verkeerd."
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "Schakel dit alleen in voor de officiële <0>ICP CLI</0>. Als u niet zeker weet, installeer het opnieuw vanaf de <1>officiële bron</1>."
 
-msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
-msgstr "Voer de code van dat apparaat alleen in als u dit proces <0>zelf</0> hebt gestart."
-
 msgid "Open in browser"
 msgstr "Openen in browser"
 
@@ -887,6 +937,12 @@ msgstr "Openen in browser om door te gaan"
 
 msgid "Open in mail app"
 msgstr "Openen in mail-app"
+
+msgid "Open Internet Identity in a new tab to manage your access methods and recovery options."
+msgstr "Open Internet Identity in een nieuw tabblad om uw toegangsmethoden en herstelopties te beheren."
+
+msgid "Open manage"
+msgstr "Beheer openen"
 
 msgid "Open menu"
 msgstr "Menu openen"
@@ -938,6 +994,9 @@ msgstr "Kies hieronder een herstelmethode om opnieuw in te loggen."
 
 msgid "Pick something recognizable, like your name"
 msgstr "Kies iets herkenbaars, zoals uw naam"
+
+msgid "Please confirm"
+msgstr "Bevestig dit"
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Ga terug naar uw <0>bestaande apparaat</0> en kies <1>Opnieuw beginnen</1> om het opnieuw te proberen."
@@ -1059,6 +1118,9 @@ msgstr "Terug naar app"
 msgid "Return to application"
 msgstr "Terug naar applicatie"
 
+msgid "Return to your MCP client and try again. You can close this window."
+msgstr "Ga terug naar uw MCP-client en probeer het opnieuw. U kunt dit venster sluiten."
+
 msgid "Review permissions"
 msgstr "Machtigingen bekijken"
 
@@ -1101,14 +1163,14 @@ msgstr "Sessie verlopen"
 msgid "Set as default sign-in"
 msgstr "Instellen als standaard inlogmethode"
 
-msgid "Set up a new identity."
-msgstr "Stel een nieuwe identiteit in."
-
 msgid "Set up recovery email"
 msgstr "Herstel-e-mailadres instellen"
 
 msgid "Set up recovery phrase"
 msgstr "Herstelzin instellen"
+
+msgid "Set up your private, passwordless identity."
+msgstr "Stel uw privé, wachtwoordloze identiteit in."
 
 msgid "Settings"
 msgstr "Instellingen"
@@ -1128,26 +1190,17 @@ msgstr "Log opnieuw in om verder te gaan waar u gebleven was."
 msgid "Sign in by sending a signed email from your inbox."
 msgstr "Log in door een ondertekende e-mail vanuit uw inbox te versturen."
 
-msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
-msgstr "Meld u aan of maak een identiteit aan om toegang te krijgen tot apps zonder wachtwoorden of het delen van persoonlijke gegevens."
-
 msgid "Sign in there."
 msgstr "Log daar in."
 
 msgid "Sign in to Internet Identity"
 msgstr "Inloggen bij Internet Identity"
 
-msgid "Sign in to manage your identity"
-msgstr "Meld u aan om uw identiteit te beheren"
-
 msgid "Sign in using familiar methods"
 msgstr "Inloggen met vertrouwde methoden"
 
 msgid "Sign in with {name}"
 msgstr "Inloggen met {name}"
-
-msgid "Sign in with a passkey or familiar provider."
-msgstr "Log in met een passkey of een bekende provider."
 
 msgid "Sign in with another identity"
 msgstr "Inloggen met een andere identiteit"
@@ -1246,8 +1299,11 @@ msgstr "SSO-aanmelding voor {domainInput} is mislukt. Probeer het opnieuw."
 msgid "Start over"
 msgstr "Opnieuw beginnen"
 
-msgid "Still have an identity number?"
-msgstr "Heeft u nog een identiteitsnummer?"
+msgid "Start the connection again from your MCP client. You can close this window."
+msgstr "Start de verbinding opnieuw vanaf uw MCP-client. U kunt dit venster sluiten."
+
+msgid "Step 2 of 2"
+msgstr "Stap 2 van 2"
 
 msgid "Still using an identity number?"
 msgstr "Gebruikt u nog een identiteitsnummer?"
@@ -1290,7 +1346,6 @@ msgstr "Toegangsmethode succesvol gewisseld"
 
 msgid "Support"
 msgstr "Ondersteuning"
-
 
 msgid "Switch"
 msgstr "Wisselen"
@@ -1355,6 +1410,9 @@ msgstr "De e-mail moet rechtstreeks afkomstig zijn van het bovenstaande adres. A
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "De integratie met Google, Microsoft en Apple maakt gebruik van een standaard authenticatieprotocol genaamd OpenID. Dit is hetzelfde protocol dat andere applicaties gebruiken om in te loggen met Google."
 
+msgid "The MCP client couldn't finish connecting."
+msgstr "De MCP-client kon de verbinding niet voltooien."
+
 msgid "The most reliable backup. Stored entirely by you, on paper. It does not depend on any account, service, or provider, and only you can use, lose, or replace it."
 msgstr "De meest betrouwbare back-up. Volledig door u bewaard, op papier. Het is niet afhankelijk van enig account, service of provider, en alleen u kunt het gebruiken, verliezen of vervangen."
 
@@ -1364,11 +1422,11 @@ msgstr "De zin is correct ingevoerd, maar hoort bij een ander product dan Intern
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Er was een probleem bij het verbinden met de applicatie. Probeer een andere browser; als het probleem aanhoudt, neem dan contact op met de ontwikkelaar."
 
-msgid "This {providerName} account is already connected to an Internet Identity."
-msgstr "Dit {providerName}-account is al gekoppeld aan een Internet Identity."
+msgid "This {resolvedProviderName} account is already connected to an Internet Identity."
+msgstr "Dit {resolvedProviderName}-account is al verbonden met een Internet Identity."
 
-msgid "This {providerName} account isn't connected to an Internet Identity yet."
-msgstr "Dit {providerName}-account is nog niet gekoppeld aan een Internet Identity."
+msgid "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
+msgstr "Dit {resolvedProviderName}-account is nog niet verbonden met een Internet Identity."
 
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "Dit account is al gekoppeld aan uw identiteit. Uw actieve toegangsmethode wordt hierop overgeschakeld."
@@ -1378,6 +1436,9 @@ msgstr "Deze app is overgegaan naar de nieuwe Internet Identity"
 
 msgid "This browser is not supported."
 msgstr "Deze browser wordt niet ondersteund."
+
+msgid "This connection link is missing information or has been changed."
+msgstr "Deze verbindingslink mist informatie of is gewijzigd."
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Deze identiteit is al geüpgraded naar de nieuwe ervaring."
@@ -1418,17 +1479,14 @@ msgstr "Aan"
 msgid "To accept email from a domain we either need DNSSEC at its apex (so we can cryptographically validate the DKIM key your provider uses) or for the domain to be on our list of known mailbox providers."
 msgstr "Om e-mail van een domein te kunnen accepteren hebben we DNSSEC op het hoofddomein nodig (zodat we de DKIM-sleutel van uw provider cryptografisch kunnen valideren), of moet het domein op onze lijst van bekende e-mailproviders staan."
 
+msgid "to allow MCP access to {0}"
+msgstr "om MCP-toegang tot {0} toe te staan"
+
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "Om te bevestigen dat u het bent, voert u onderstaande code in op uw <0>bestaande apparaat</0>."
 
 msgid "to continue to {dappName}"
 msgstr "om door te gaan naar {dappName}"
-
-msgid "to continue with <0>{application}</0>"
-msgstr "om door te gaan met <0>{application}</0>"
-
-msgid "to continue with this app"
-msgstr "om door te gaan met deze app"
 
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
 msgstr "Maak een passkey aan om uw identiteit te beveiligen en toekomstig inloggen te vereenvoudigen."
@@ -1447,6 +1505,9 @@ msgstr "Opnieuw proberen"
 
 msgid "Type each word in the correct order:"
 msgstr "Typ elk woord in de juiste volgorde:"
+
+msgid "Type the 6-digit code shown on the new device."
+msgstr "Voer de 6-cijferige code in die op het nieuwe apparaat wordt weergegeven."
 
 msgid "Type the characters exactly as shown below"
 msgstr "Typ de tekens exact zoals hieronder weergegeven"
@@ -1511,9 +1572,6 @@ msgstr "Upgrade"
 msgid "Upgrade again"
 msgstr "Upgrade opnieuw"
 
-msgid "Upgrade completed successfully"
-msgstr "Upgrade succesvol voltooid"
-
 msgid "Upgrade identity"
 msgstr "Identiteit upgraden"
 
@@ -1529,8 +1587,11 @@ msgstr "Identiteit aan het upgraden..."
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 msgstr "Gebruik een apparaat dat uw identiteit al bevat om de URL te scannen of te openen. Dit koppelt uw identiteit aan dit apparaat."
 
-msgid "Use a passkey, Face ID, or a popular provider"
-msgstr "Gebruik een passkey, Face ID of een populaire provider"
+msgid "Use a different method"
+msgstr "Een andere methode gebruiken"
+
+msgid "Use a passkey or familiar provider."
+msgstr "Gebruik een passkey of een vertrouwde provider."
 
 msgid "Use existing identity"
 msgstr "Bestaande identiteit gebruiken"
@@ -1577,8 +1638,8 @@ msgstr "Wachten op uw nieuwe apparaat"
 msgid "Waiting to receive…"
 msgstr "Wachten op ontvangst…"
 
-msgid "Want to create a new identity?"
-msgstr "Wilt u een nieuwe identiteit aanmaken?"
+msgid "Want a new identity?"
+msgstr "Wilt u een nieuwe identiteit?"
 
 msgid "We can't verify mail from <0>{domain}</0> yet. Try a different address. Gmail, iCloud, Outlook, Fastmail, and Proton all work."
 msgstr "We kunnen e-mail van <0>{domain}</0> nog niet verifiëren. Probeer een ander adres. Gmail, iCloud, Outlook, Fastmail en Proton werken allemaal."
@@ -1679,6 +1740,9 @@ msgstr "U kunt uw herstelzin op elk moment opnieuw instellen. Dit houdt uw ident
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
 msgstr "U kunt deze nu gebruiken om te herstellen, maar controleer of u hem correct heeft opgeslagen zodat u er later op kunt vertrouwen."
 
+msgid "You control both devices."
+msgstr "U beheert beide apparaten."
+
 msgid "You have reached the maximum number of passkeys"
 msgstr "U heeft het maximum aantal passkeys bereikt"
 
@@ -1691,14 +1755,14 @@ msgstr "U hoeft uw identiteitsnummer niet meer te onthouden en kunt in plaats da
 msgid "You signed up before with a different access method."
 msgstr "U heeft zich eerder aangemeld met een andere toegangsmethode."
 
-msgid "You unlinked this {providerName} account from your identity."
-msgstr "U heeft dit {providerName}-account losgekoppeld van uw identiteit."
+msgid "You unlinked this {resolvedProviderName} account from your identity."
+msgstr "U heeft dit {resolvedProviderName}-account losgekoppeld van uw identiteit."
+
+msgid "You're about to authorize a new device."
+msgstr "U staat op het punt een nieuw apparaat te autoriseren."
 
 msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
 msgstr "U staat op het punt uw herstelzin te zien, die Internet Identity niet opslaat en die dus niet kan worden opgehaald als deze verloren gaat, dus bewaar deze veilig offline."
-
-msgid "You're about to sign in on a <0>new device</0>."
-msgstr "U staat op het punt in te loggen op een <0>nieuw apparaat</0>."
 
 msgid "You're about to sign in."
 msgstr "U staat op het punt in te loggen."
@@ -1718,8 +1782,14 @@ msgstr "U bent ingelogd"
 msgid "You're signing in as <0>{name}</0>."
 msgstr "U logt in als <0>{name}</0>."
 
-msgid "You've never used this {providerName} account with Internet Identity."
-msgstr "U heeft dit {providerName}-account nooit gebruikt met Internet Identity."
+msgid "You've never used this {resolvedProviderName} account with Internet Identity."
+msgstr "U heeft dit {resolvedProviderName}-account nog nooit gebruikt met Internet Identity."
+
+msgid "your {0} account"
+msgstr "uw {0}-account"
+
+msgid "your account on {app}"
+msgstr "uw account op {app}"
 
 msgid "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
 msgstr "Uw passkeys en herstelzin zijn niet beïnvloed. U kunt op elk moment opnieuw een herstel-e-mailadres toevoegen."

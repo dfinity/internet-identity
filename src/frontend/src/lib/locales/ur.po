@@ -85,9 +85,6 @@ msgstr "<0>Google، Apple اور Microsoft کے انضمام:</0> اگرچہ Pas
 msgid "<0>Learn more</0> about passkeys"
 msgstr "<0>مزید جانیں</0> پاس کیز کے بارے میں"
 
-msgid "<0>Never</0> enter a code from another source."
-msgstr "<0>کبھی بھی</0> کسی دوسرے ذریعے سے کوڈ درج نہ کریں۔"
-
 msgid "<0>No more identity numbers:</0> As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined."
 msgstr "<0>شناختی نمبر کی ضرورت نہیں:</0> جیسا کہ اوپر بیان کیا گیا ہے، قابلِ دریافت Passkeys کا مطلب ہے کہ آپ کو اب شناختی نمبر یاد رکھنے یا محفوظ کرنے کی ضرورت نہیں۔ لاگ اِن کرنا اب آسان اور زیادہ سلیس ہو گیا ہے۔"
 
@@ -130,6 +127,9 @@ msgstr "فعال ہو گیا"
 msgid "Active"
 msgstr "فعال"
 
+msgid "Add a new identity"
+msgstr "نئی شناخت شامل کریں"
+
 msgid "Add a passkey"
 msgstr "پاس کی شامل کریں"
 
@@ -141,9 +141,6 @@ msgstr "رسائی کا طریقہ شامل کریں"
 
 msgid "Add another account"
 msgstr "ایک اور اکاؤنٹ شامل کریں"
-
-msgid "Add another identity"
-msgstr "ایک اور شناخت شامل کریں"
 
 msgid "Add another method or sign in via recovery to remove"
 msgstr "ہٹانے کے لیے کوئی اور طریقہ شامل کریں یا ریکوری کے ذریعے سائن اِن کریں"
@@ -169,11 +166,17 @@ msgstr "اپنی شناخت کے ذریعے سائن اِن کرنے کے طری
 msgid "Advanced identity management"
 msgstr "جدید شناختی نظم و نسق"
 
+msgid "AI assistants on this device can ask to sign you in to apps."
+msgstr "اس ڈیوائس پر AI اسسٹنٹ آپ کو ایپس میں سائن ان کرنے کی درخواست کر سکتے ہیں۔"
+
 msgid "Allow access"
 msgstr "رسائی کی اجازت دیں"
 
 msgid "Allow CLI access"
 msgstr "CLI رسائی کی اجازت دیں"
+
+msgid "Allow MCP access"
+msgstr "MCP رسائی کی اجازت دیں"
 
 msgid "Allow to access this info"
 msgstr "اس معلومات تک رسائی کی اجازت دیں"
@@ -214,6 +217,9 @@ msgstr "تصدیق کامیاب رہی"
 msgid "Authorize new device"
 msgstr "نئے آلے کی توثیق کریں"
 
+msgid "Back"
+msgstr "واپس"
+
 msgid "Back to sign-in options"
 msgstr "سائن اِن کے آپشنز پر واپس جائیں"
 
@@ -222,6 +228,9 @@ msgstr "آگے بڑھنے سے پہلے"
 
 msgid "Body"
 msgstr "متن"
+
+msgid "Both are on the <0>{host}</0> domain."
+msgstr "دونوں <0>{host}</0> ڈومین پر ہیں۔"
 
 msgid "Browser opened"
 msgstr "براؤزر کھول دیا گیا"
@@ -319,6 +328,9 @@ msgstr "اپنے سائن اِن کی تصدیق کریں"
 msgid "Confirmation code"
 msgstr "تصدیقی کوڈ"
 
+msgid "Confirmed"
+msgstr "تصدیق ہو گئی"
+
 msgid "Confirming..."
 msgstr "تصدیق کی جا رہی ہے..."
 
@@ -373,11 +385,11 @@ msgstr "{domainInput} سے SSO سیٹنگز لوڈ نہیں ہو سکیں۔ اپ
 msgid "Create account"
 msgstr "اکاؤنٹ بنائیں"
 
+msgid "Create an Identity"
+msgstr "شناخت بنائیں"
+
 msgid "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
 msgstr "بایومیٹرکس یا سیکیورٹی کلید استعمال کرتے ہوئے پاس کی کے ساتھ اپنی شناخت بنائیں۔ آپ کا ڈیٹا کبھی بھی آپ کے آلے سے باہر نہیں جاتا۔"
-
-msgid "Create another identity"
-msgstr "ایک اور شناخت بنائیں"
 
 msgid "Create identity"
 msgstr "شناخت بنائیں"
@@ -385,14 +397,14 @@ msgstr "شناخت بنائیں"
 msgid "Create new identity"
 msgstr "نئی شناخت بنائیں"
 
+msgid "Create one in seconds."
+msgstr "چند سیکنڈوں میں بنائیں۔"
+
 msgid "Create passkey"
 msgstr "پاس کی بنائیں"
 
 msgid "Create your Identity"
 msgstr "اپنی شناخت بنائیں"
-
-msgid "Create your private, passwordless identity."
-msgstr "اپنی نجی، بغیر پاس ورڈ شناخت بنائیں۔"
 
 msgid "Created {0}"
 msgstr "{0} کو تخلیق کیا گیا"
@@ -472,11 +484,20 @@ msgstr "CLI رسائی فعال کریں"
 msgid "Enable CLI access for this device, then try again."
 msgstr "اس آلے کے لیے CLI رسائی فعال کریں، پھر دوبارہ کوشش کریں۔"
 
+msgid "Enable MCP access"
+msgstr "MCP رسائی فعال کریں"
+
+msgid "Enable MCP access for this device, then try again."
+msgstr "اس ڈیوائس کے لیے MCP رسائی فعال کریں، پھر دوبارہ کوشش کریں۔"
+
 msgid "Enable multiple accounts"
 msgstr "متعدد اکاؤنٹس فعال کریں"
 
 msgid "Enabled"
 msgstr "فعال"
+
+msgid "Enabling this lets AI assistants on this device ask to sign you in to apps using your identity."
+msgstr "اسے فعال کرنے سے اس ڈیوائس پر AI اسسٹنٹ آپ کی شناخت استعمال کر کے ایپس میں سائن ان کرنے کی درخواست کر سکتے ہیں۔"
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr "اپ گریڈ مکمل کرنے کے لیے اپنی شناخت کا ایک نام درج کریں۔ ایک بار سیٹ ہو جانے کے بعد، اسے بعد میں تبدیل نہیں کیا جا سکتا۔"
@@ -489,6 +510,9 @@ msgstr "ہر لفظ درست ترتیب میں درج کریں:"
 
 msgid "Enter recovery phrase"
 msgstr "ریکوری فریز درج کریں"
+
+msgid "Enter the code"
+msgstr "کوڈ درج کریں"
 
 msgid "Enter your company domain"
 msgstr "اپنی کمپنی کا ڈومین درج کریں"
@@ -523,6 +547,9 @@ msgstr "مثال کے طور پر، صارف A اپنی Google اکاؤنٹ “A
 
 msgid "For security, Internet Identity blocks command-line tools from signing in to apps using your identity."
 msgstr "سیکیورٹی کے لیے، Internet Identity کمانڈ لائن ٹولز کو آپ کی شناخت استعمال کرکے ایپس میں سائن اِن کرنے سے روکتا ہے۔"
+
+msgid "For security, Internet Identity blocks MCP clients from signing in to apps using your identity."
+msgstr "سیکیورٹی کے لیے، Internet Identity، MCP کلائنٹس کو آپ کی شناخت استعمال کر کے ایپس میں سائن ان کرنے سے روکتا ہے۔"
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in. Quick, safe, and hassle-free."
 msgstr "پیچیدہ یوزرنیم اور پاس ورڈز یاد رکھنا بھول جائیں۔ Passkeys کے ساتھ، آپ لاگ اِن کرنے کے لیے بس اپنا نام منتخب کرتے ہیں۔ تیز، محفوظ، اور بے جھنجھٹ۔"
@@ -575,6 +602,12 @@ msgstr "پوشیدہ ای میل"
 msgid "Hide all"
 msgstr "سب چھپائیں"
 
+msgid "Hold for a few seconds. Release to cancel."
+msgstr "چند سیکنڈ تھامے رہیں۔ منسوخ کرنے کے لیے چھوڑ دیں۔"
+
+msgid "Hold to confirm"
+msgstr "تصدیق کے لیے تھامے رہیں"
+
 msgid "Home"
 msgstr "ہوم"
 
@@ -598,6 +631,9 @@ msgstr "میں اپنی ریکوری فریز کا خود ذمہ دار ہوں،
 
 msgid "I have written it down"
 msgstr "میں نے اسے لکھ لیا ہے"
+
+msgid "I understand the risks."
+msgstr "میں خطرات سمجھتا/سمجھتی ہوں۔"
 
 msgid "I'm using the official ICP CLI and I trust this device."
 msgstr "میں سرکاری ICP CLI استعمال کر رہا/رہی ہوں اور اس آلے پر بھروسہ کرتا/کرتی ہوں۔"
@@ -632,6 +668,8 @@ msgstr "شناخت ہٹا دی گئی"
 msgid "Identity upgraded."
 msgstr "شناخت اپ گریڈ ہو گئی۔"
 
+msgid "If this keeps happening, copy these details and include them in a <0>support request</0>."
+msgstr "اگر یہ بار بار ہو، تو یہ تفصیلات کاپی کریں اور <0>سپورٹ درخواست</0> میں شامل کریں۔"
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "اگر آپ <0>{domain}</0> کا انتظام کرتے ہیں، تو اپنے ڈومین رجسٹرار پر DNSSEC فعال کرنا عام طور پر چند کلکس میں ہو جاتا ہے۔ ایک بار پھیل جانے کے بعد، یہ پتہ خود بخود کام کرے گا۔ ہماری طرف سے کوئی مزید کارروائی کی ضرورت نہیں۔"
@@ -702,6 +740,9 @@ msgstr "غلط درخواست"
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "کیا میری چہرے کی شناخت یا فنگر پرنٹ Internet Identity میں محفوظ ہوتا ہے؟"
 
+msgid "It can send messages or move funds on your behalf."
+msgstr "یہ آپ کی جانب سے پیغامات بھیج سکتا ہے یا رقوم منتقل کر سکتا ہے۔"
+
 msgid "It looks like you're trying to sign in from a social app. Follow these steps to continue:"
 msgstr "ایسا لگتا ہے کہ آپ سوشل ایپ سے سائن اِن کرنے کی کوشش کر رہے ہیں۔ جاری رکھنے کے لیے ان اقدامات پر عمل کریں:"
 
@@ -750,11 +791,20 @@ msgstr "پرانی"
 msgid "Legacy identity"
 msgstr "پرانی شناخت"
 
+msgid "Let {mcpServer} act as {accountScope}"
+msgstr "{mcpServer} کو {accountScope} کے طور پر کام کرنے دیں"
+
+msgid "Let AI assistants on this device sign in to apps using your identity."
+msgstr "اس ڈیوائس پر AI اسسٹنٹ کو آپ کی شناخت استعمال کر کے ایپس میں سائن ان کرنے دیں۔"
+
 msgid "Let command-line tools on this device sign in to apps using your identity."
 msgstr "اس آلے پر موجود کمانڈ لائن ٹولز کو آپ کی شناخت استعمال کرکے ایپس میں سائن اِن کرنے کی اجازت دیں۔"
 
 msgid "Let's get started"
 msgstr "آئیے شروع کرتے ہیں"
+
+msgid "Like any AI, it can hallucinate and make mistakes."
+msgstr "کسی بھی AI کی طرح، یہ غلط فہمیوں کا شکار ہو سکتا ہے اور غلطیاں کر سکتا ہے۔"
 
 msgid "Limit reached"
 msgstr "حد مکمل ہو گئی"
@@ -810,6 +860,12 @@ msgstr "زیادہ سے زیادہ لمبائی 32 حروف ہے۔"
 msgid "Maximum length is 64 characters."
 msgstr "زیادہ سے زیادہ لمبائی 64 حروف ہے۔"
 
+msgid "MCP access"
+msgstr "MCP رسائی"
+
+msgid "MCP access not enabled"
+msgstr "MCP رسائی فعال نہیں ہے"
+
 msgid "More information about multiple accounts"
 msgstr "متعدد اکاؤنٹس کے بارے میں مزید معلومات"
 
@@ -836,9 +892,6 @@ msgstr "اپنی شناخت کا نام رکھیں"
 
 msgid "Name:"
 msgstr "نام:"
-
-msgid "New to Internet Identity?"
-msgstr "کیا آپ Internet Identity پر نئے ہیں؟"
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Google، Microsoft یا Apple کے ساتھ یہ معلومات شیئر نہیں کی جاتیں کہ آپ Internet Identity کے ذریعے کن ایپلیکیشنز میں لاگ اِن کرتے ہیں۔"
@@ -876,9 +929,6 @@ msgstr "ایک یا زیادہ الفاظ غلط ہیں یا ترتیب درست
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "یہ صرف سرکاری <0>ICP CLI</0> کے لیے فعال کریں۔ اگر آپ کو یقین نہیں، تو اسے <1>سرکاری ذریعے</1> سے دوبارہ انسٹال کریں۔"
 
-msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
-msgstr "صرف اسی صورت میں اس ڈیوائس سے کوڈ داخل کریں جب آپ نے یہ عمل <0>خود</0> شروع کیا ہو۔"
-
 msgid "Open in browser"
 msgstr "براؤزر میں کھولیں"
 
@@ -887,6 +937,12 @@ msgstr "جاری رکھنے کے لیے براؤزر میں کھولیں"
 
 msgid "Open in mail app"
 msgstr "میل ایپ میں کھولیں"
+
+msgid "Open Internet Identity in a new tab to manage your access methods and recovery options."
+msgstr "اپنے رسائی کے طریقوں اور ریکوری اختیارات کا انتظام کرنے کے لیے Internet Identity کو نئی ٹیب میں کھولیں۔"
+
+msgid "Open manage"
+msgstr "انتظام کھولیں"
 
 msgid "Open menu"
 msgstr "مینو کھولیں"
@@ -938,6 +994,9 @@ msgstr "دوبارہ سائن اِن کرنے کے لیے نیچے سے ریکو
 
 msgid "Pick something recognizable, like your name"
 msgstr "ایسی چیز منتخب کریں جسے پہچانا جا سکے، جیسے آپ کا نام"
+
+msgid "Please confirm"
+msgstr "براہ کرم تصدیق کریں"
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "براہِ کرم اپنے <0>موجودہ ڈیوائس</0> پر واپس جائیں اور دوبارہ کوشش کرنے کے لیے <1>دوبارہ شروع کریں</1> منتخب کریں۔"
@@ -1059,6 +1118,9 @@ msgstr "ایپ پر واپس جائیں"
 msgid "Return to application"
 msgstr "ایپلی کیشن پر واپس جائیں"
 
+msgid "Return to your MCP client and try again. You can close this window."
+msgstr "اپنے MCP کلائنٹ پر واپس جائیں اور دوبارہ کوشش کریں۔ آپ یہ ونڈو بند کر سکتے ہیں۔"
+
 msgid "Review permissions"
 msgstr "اجازتوں کا جائزہ لیں"
 
@@ -1101,14 +1163,14 @@ msgstr "سیشن کا وقت ختم ہو گیا"
 msgid "Set as default sign-in"
 msgstr "ڈیفالٹ سائن اِن کے طور پر سیٹ کریں"
 
-msgid "Set up a new identity."
-msgstr "ایک نئی شناخت ترتیب دیں۔"
-
 msgid "Set up recovery email"
 msgstr "ریکوری ای میل ترتیب دیں"
 
 msgid "Set up recovery phrase"
 msgstr "ریکوری فریز ترتیب دیں"
+
+msgid "Set up your private, passwordless identity."
+msgstr "اپنی نجی، پاس ورڈ کے بغیر شناخت ترتیب دیں۔"
 
 msgid "Settings"
 msgstr "ترتیبات"
@@ -1128,26 +1190,17 @@ msgstr "جہاں آپ نے چھوڑا تھا وہاں سے جاری رکھنے �
 msgid "Sign in by sending a signed email from your inbox."
 msgstr "اپنے ان باکس سے دستخط شدہ ای میل بھیج کر سائن اِن کریں۔"
 
-msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
-msgstr "ایپس تک بغیر پاس ورڈ یا ذاتی ڈیٹا شیئر کیے رسائی کے لیے سائن اِن کریں یا شناخت بنائیں۔"
-
 msgid "Sign in there."
 msgstr "وہاں سائن اِن کریں۔"
 
 msgid "Sign in to Internet Identity"
 msgstr "Internet Identity میں سائن اِن کریں"
 
-msgid "Sign in to manage your identity"
-msgstr "اپنی شناخت کا انتظام کرنے کے لیے سائن اِن کریں"
-
 msgid "Sign in using familiar methods"
 msgstr "مانوس طریقوں سے سائن اِن کریں"
 
 msgid "Sign in with {name}"
 msgstr "{name} سے سائن اِن کریں"
-
-msgid "Sign in with a passkey or familiar provider."
-msgstr "پاس کی یا جانے پہچانے فراہم کنندہ سے سائن اِن کریں۔"
 
 msgid "Sign in with another identity"
 msgstr "دوسری شناخت کے ساتھ سائن اِن کریں"
@@ -1246,8 +1299,11 @@ msgstr "{domainInput} کے لیے SSO سائن اِن ناکام ہو گیا۔ �
 msgid "Start over"
 msgstr "دوبارہ شروع کریں"
 
-msgid "Still have an identity number?"
-msgstr "کیا آپ کے پاس ابھی بھی شناختی نمبر ہے؟"
+msgid "Start the connection again from your MCP client. You can close this window."
+msgstr "اپنے MCP کلائنٹ سے دوبارہ کنکشن شروع کریں۔ آپ یہ ونڈو بند کر سکتے ہیں۔"
+
+msgid "Step 2 of 2"
+msgstr "مرحلہ ۲ از ۲"
 
 msgid "Still using an identity number?"
 msgstr "کیا ابھی بھی شناختی نمبر استعمال کر رہے ہیں؟"
@@ -1290,7 +1346,6 @@ msgstr "رسائی کا طریقہ کامیابی سے تبدیل ہو گیا"
 
 msgid "Support"
 msgstr "مدد"
-
 
 msgid "Switch"
 msgstr "سوئچ کریں"
@@ -1355,6 +1410,9 @@ msgstr "ای میل براہ راست اوپر دیے گئے پتے سے آنی 
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "Google، Microsoft اور Apple کے ساتھ انٹیگریشن ایک معیاری تصدیقی پروٹوکول استعمال کرتی ہے جسے OpenID کہا جاتا ہے۔ یہی وہی پروٹوکول ہے جسے دیگر ایپلیکیشنز Google کے ساتھ لاگ اِن کے لیے استعمال کرتی ہیں۔"
 
+msgid "The MCP client couldn't finish connecting."
+msgstr "MCP کلائنٹ اتصال مکمل نہیں کر سکا۔"
+
 msgid "The most reliable backup. Stored entirely by you, on paper. It does not depend on any account, service, or provider, and only you can use, lose, or replace it."
 msgstr "سب سے قابلِ اعتماد بیک اپ۔ مکمل طور پر آپ کے ذریعے، کاغذ پر محفوظ۔ یہ کسی بھی اکاؤنٹ، سروس، یا فراہم کنندہ پر منحصر نہیں، اور صرف آپ ہی اسے استعمال، کھو، یا تبدیل کر سکتے ہیں۔"
 
@@ -1364,11 +1422,11 @@ msgstr "فریز درست درج کی گئی ہے، لیکن یہ Internet Ident
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "ایپلیکیشن کے ساتھ منسلک ہونے میں مسئلہ پیش آیا۔ دوسرا براؤزر آزمائیں؛ اگر مسئلہ برقرار رہے تو ڈویلپر سے رابطہ کریں۔"
 
-msgid "This {providerName} account is already connected to an Internet Identity."
-msgstr "یہ {providerName} اکاؤنٹ پہلے سے ایک Internet Identity سے منسلک ہے۔"
+msgid "This {resolvedProviderName} account is already connected to an Internet Identity."
+msgstr "یہ {resolvedProviderName} اکاؤنٹ پہلے سے ایک Internet Identity سے منسلک ہے۔"
 
-msgid "This {providerName} account isn't connected to an Internet Identity yet."
-msgstr "یہ {providerName} اکاؤنٹ ابھی تک کسی Internet Identity سے منسلک نہیں ہے۔"
+msgid "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
+msgstr "یہ {resolvedProviderName} اکاؤنٹ ابھی تک کسی Internet Identity سے منسلک نہیں ہے۔"
 
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "یہ اکاؤنٹ پہلے سے آپ کی شناخت سے منسلک ہے۔ آپ کا فعال رسائی طریقہ اس پر تبدیل کر دیا جائے گا۔"
@@ -1378,6 +1436,9 @@ msgstr "یہ ایپ نئی Internet Identity پر منتقل ہو گئی ہے"
 
 msgid "This browser is not supported."
 msgstr "یہ براؤزر معاون نہیں ہے۔"
+
+msgid "This connection link is missing information or has been changed."
+msgstr "اس کنکشن لنک میں معلومات غائب ہیں یا اسے تبدیل کر دیا گیا ہے۔"
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "یہ شناخت پہلے ہی نئے تجربے پر اپ گریڈ ہو چکی ہے۔"
@@ -1418,17 +1479,14 @@ msgstr "بہ"
 msgid "To accept email from a domain we either need DNSSEC at its apex (so we can cryptographically validate the DKIM key your provider uses) or for the domain to be on our list of known mailbox providers."
 msgstr "کسی ڈومین سے ای میل قبول کرنے کے لیے ہمیں یا تو اس کی بنیاد پر DNSSEC کی ضرورت ہے (تاکہ ہم آپ کے فراہم کنندہ کے استعمال کردہ DKIM کلید کو کرپٹوگرافک طریقے سے تصدیق کر سکیں) یا ڈومین کا ہمارے معروف میل باکس فراہم کنندگان کی فہرست میں ہونا ضروری ہے۔"
 
+msgid "to allow MCP access to {0}"
+msgstr "{0} تک MCP رسائی کی اجازت دینے کے لیے"
+
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "یہ تصدیق کرنے کے لیے کہ یہ آپ ہیں، اپنی <0>موجودہ ڈیوائس</0> پر نیچے دیا گیا کوڈ درج کریں۔"
 
 msgid "to continue to {dappName}"
 msgstr "{dappName} پر جاری رکھنے کے لیے"
-
-msgid "to continue with <0>{application}</0>"
-msgstr "<0>{application}</0> کے ساتھ جاری رکھنے کے لیے"
-
-msgid "to continue with this app"
-msgstr "اس ایپ کے ساتھ جاری رکھنے کے لیے"
 
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
 msgstr "جاری رکھنے کے لیے، اپنی شناخت کو محفوظ بنانے اور مستقبل کے سائن اِن کو آسان بنانے کے لیے ایک پاس کی بنائیں۔"
@@ -1447,6 +1505,9 @@ msgstr "دوبارہ کوشش کریں"
 
 msgid "Type each word in the correct order:"
 msgstr "ہر لفظ درست ترتیب میں درج کریں:"
+
+msgid "Type the 6-digit code shown on the new device."
+msgstr "نئے ڈیوائس پر دکھایا گیا ۶ ہندسوں کا کوڈ ٹائپ کریں۔"
 
 msgid "Type the characters exactly as shown below"
 msgstr "حروف کو بالکل ویسے ہی ٹائپ کریں جیسے نیچے دکھائے گئے ہیں"
@@ -1511,9 +1572,6 @@ msgstr "اپ گریڈ کریں"
 msgid "Upgrade again"
 msgstr "دوبارہ اپ گریڈ کریں"
 
-msgid "Upgrade completed successfully"
-msgstr "اپ گریڈ کامیابی سے مکمل ہو گیا"
-
 msgid "Upgrade identity"
 msgstr "شناخت اپ گریڈ کریں"
 
@@ -1529,8 +1587,11 @@ msgstr "شناخت اپ گریڈ کی جا رہی ہے..."
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 msgstr "یو آر ایل کو سکین کرنے یا کھولنے کے لیے ایسا آلہ استعمال کریں جس میں پہلے سے آپ کی شناخت موجود ہو۔ اس سے آپ کی شناخت اس آلے کے ساتھ منسلک ہو جائے گی۔"
 
-msgid "Use a passkey, Face ID, or a popular provider"
-msgstr "پاس کی، Face ID، یا ایک مقبول فراہم کنندہ استعمال کریں"
+msgid "Use a different method"
+msgstr "کوئی اور طریقہ استعمال کریں"
+
+msgid "Use a passkey or familiar provider."
+msgstr "Passkey یا مانوس فراہم کنندہ استعمال کریں۔"
 
 msgid "Use existing identity"
 msgstr "موجودہ شناخت استعمال کریں"
@@ -1577,8 +1638,8 @@ msgstr "آپ کے نئے آلے کا انتظار ہے"
 msgid "Waiting to receive…"
 msgstr "موصول ہونے کا انتظار ہے…"
 
-msgid "Want to create a new identity?"
-msgstr "کیا آپ ایک نئی شناخت بنانا چاہتے ہیں؟"
+msgid "Want a new identity?"
+msgstr "نئی شناخت چاہیے؟"
 
 msgid "We can't verify mail from <0>{domain}</0> yet. Try a different address. Gmail, iCloud, Outlook, Fastmail, and Proton all work."
 msgstr "ہم ابھی <0>{domain}</0> سے میل کی تصدیق نہیں کر سکتے۔ کوئی اور پتہ آزمائیں۔ Gmail، iCloud، Outlook، Fastmail، اور Proton سب کام کرتے ہیں۔"
@@ -1679,6 +1740,9 @@ msgstr "آپ کسی بھی وقت اپنا ریکوری فریز ری سیٹ ک�
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
 msgstr "آپ اسے ابھی بازیافت کے لیے استعمال کر سکتے ہیں، لیکن تصدیق کریں کہ آپ نے اسے درست طریقے سے محفوظ کیا ہے تاکہ آپ بعد میں اس پر انحصار کر سکیں۔"
 
+msgid "You control both devices."
+msgstr "آپ دونوں ڈیوائسز کو کنٹرول کرتے ہیں۔"
+
 msgid "You have reached the maximum number of passkeys"
 msgstr "آپ پاس کیز کی زیادہ سے زیادہ تعداد تک پہنچ چکے ہیں"
 
@@ -1691,14 +1755,14 @@ msgstr "اب آپ کو اپنا شناختی نمبر یاد رکھنے کی ض�
 msgid "You signed up before with a different access method."
 msgstr "آپ نے پہلے ایک مختلف رسائی طریقے سے سائن اَپ کیا تھا۔"
 
-msgid "You unlinked this {providerName} account from your identity."
-msgstr "آپ نے یہ {providerName} اکاؤنٹ اپنی شناخت سے ان لنک کر دیا۔"
+msgid "You unlinked this {resolvedProviderName} account from your identity."
+msgstr "آپ نے یہ {resolvedProviderName} اکاؤنٹ اپنی شناخت سے غیر منسلک کر دیا۔"
+
+msgid "You're about to authorize a new device."
+msgstr "آپ ایک نئے ڈیوائس کو اجازت دینے والے ہیں۔"
 
 msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
 msgstr "آپ اب اپنی ریکوری فریز دیکھنے والے ہیں۔ Internet Identity اسے محفوظ نہیں رکھتی، اس لیے اگر یہ گم ہو جائے تو دوبارہ حاصل نہیں کی جا سکتی۔ لہٰذا اسے آف لائن محفوظ رکھیں"
-
-msgid "You're about to sign in on a <0>new device</0>."
-msgstr "آپ ایک <0>نئی ڈیوائس</0> پر سائن اِن کرنے والے ہیں۔"
 
 msgid "You're about to sign in."
 msgstr "آپ سائن اِن کرنے والے ہیں۔"
@@ -1718,8 +1782,14 @@ msgstr "آپ سائن اِن ہیں"
 msgid "You're signing in as <0>{name}</0>."
 msgstr "آپ بطور <0>{name}</0> سائن اِن کر رہے ہیں۔"
 
-msgid "You've never used this {providerName} account with Internet Identity."
-msgstr "آپ نے یہ {providerName} اکاؤنٹ کبھی بھی Internet Identity کے ساتھ استعمال نہیں کیا۔"
+msgid "You've never used this {resolvedProviderName} account with Internet Identity."
+msgstr "آپ نے Internet Identity کے ساتھ یہ {resolvedProviderName} اکاؤنٹ کبھی استعمال نہیں کیا۔"
+
+msgid "your {0} account"
+msgstr "آپ کا {0} اکاؤنٹ"
+
+msgid "your account on {app}"
+msgstr "{app} پر آپ کا اکاؤنٹ"
 
 msgid "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
 msgstr "آپ کی Passkeys اور ریکوری فریز متاثر نہیں ہوتیں۔ آپ کسی بھی وقت دوبارہ ریکوری ای میل شامل کر سکتے ہیں۔"
