@@ -304,16 +304,41 @@ describe("UrlTransport.establishChannel", () => {
     await expect(new UrlTransport().establishChannel()).rejects.toThrow();
   });
 
-  it("rejects a non-http(s) callback before any navigation or fetch", async () => {
+  it.each([
+    "javascript:alert(1)",
+    "data:text/html,x",
+    "http://evil.example/cb", // plain http on a remote host is not a secure context
+  ])(
+    "rejects a non-secure-context callback (%s) before any navigation or fetch",
+    async (callback) => {
+      const params = new URLSearchParams({
+        message: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "m" }),
+        callback,
+        state: "state-123",
+      });
+      installLocation(`#${params.toString()}`);
+
+      await expect(new UrlTransport().establishChannel()).rejects.toThrow();
+      expect(assignMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("allows an http callback on loopback", async () => {
+    const callback = "http://localhost:8080/callback";
     const params = new URLSearchParams({
-      message: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "m" }),
-      callback: "javascript:alert(1)",
+      message: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "icrc25_supported_standards",
+      }),
+      callback,
       state: "state-123",
     });
     installLocation(`#${params.toString()}`);
+    stubAllowList([callback]);
 
-    await expect(new UrlTransport().establishChannel()).rejects.toThrow();
-    expect(assignMock).not.toHaveBeenCalled();
+    const channel = await new UrlTransport().establishChannel();
+    expect(channel.origin).toBe("http://localhost:8080");
   });
 
   const STORAGE_KEY = "ii-icrc167-url-flow";
