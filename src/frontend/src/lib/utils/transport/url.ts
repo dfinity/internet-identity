@@ -80,25 +80,24 @@ const abortedBatchError = (id: string | number): JsonResponse => ({
  *  race falls through to the other transports. */
 export class UrlTransportUnsupportedError extends Error {}
 
+/** Whether `host` is a loopback host, per the secure-context definition:
+ *  `localhost`, `*.localhost`, the `127.0.0.0/8` range, or `[::1]`. */
+const isLoopbackHost = (host: string): boolean =>
+  host === "localhost" ||
+  host.endsWith(".localhost") ||
+  host === "[::1]" ||
+  /^127(?:\.\d{1,3}){3}$/.test(host);
+
 /**
- * Whether a callback URL is allowed as a top-level navigation target: `https`,
- * or `http` only on a loopback host (a secure context). Everything else — a
- * `javascript:`/`data:` scheme, or plain `http` on a non-loopback host — is
- * rejected.
+ * Whether the callback URL is a *secure context*, mirroring how browsers
+ * decide it: `https`, or `http` only on a loopback host. Everything else — a
+ * `javascript:`/`data:` scheme, or plain `http` on a remote host — is not a
+ * secure context and is rejected as a redirect target.
+ * @see https://w3c.github.io/webappsec-secure-contexts/
  */
-const isAllowedCallbackUrl = (url: URL): boolean => {
-  if (url.protocol === "https:") {
-    return true;
-  }
-  if (url.protocol === "http:") {
-    return (
-      url.hostname === "localhost" ||
-      url.hostname === "127.0.0.1" ||
-      url.hostname === "[::1]"
-    );
-  }
-  return false;
-};
+const isSecureContextUrl = (url: URL): boolean =>
+  url.protocol === "https:" ||
+  (url.protocol === "http:" && isLoopbackHost(url.hostname));
 
 interface UrlRequest {
   /** The JSON-RPC request(s). An array is an ICRC-25 batch, answered in one redirect. */
@@ -139,11 +138,11 @@ const readUrlRequest = (): UrlRequest | undefined => {
   }
 
   // The callback becomes a top-level navigation target, so constrain it up
-  // front: it must be a secure-context URL — https, or http only on loopback —
-  // never a `javascript:`/`data:` scheme (which would execute in this origin)
-  // and never plain http on a remote host, and it must not carry a fragment
-  // (the transport appends the response fragment). It is further constrained to
-  // the relying party's declared allow-list before any delivery (see
+  // front: it must be a secure-context URL (https, or http on loopback) — never
+  // a `javascript:`/`data:` scheme (which would execute in this origin) and
+  // never plain http on a remote host — and it must not carry a fragment (the
+  // transport appends the response fragment). It is further constrained to the
+  // relying party's declared allow-list before any delivery (see
   // UrlTransport.establishChannel).
   let callbackUrl: URL;
   try {
@@ -151,8 +150,10 @@ const readUrlRequest = (): UrlRequest | undefined => {
   } catch {
     throw new Error("ICRC-167 callback is not a valid URL");
   }
-  if (!isAllowedCallbackUrl(callbackUrl)) {
-    throw new Error("ICRC-167 callback must be https (or http on loopback)");
+  if (!isSecureContextUrl(callbackUrl)) {
+    throw new Error(
+      "ICRC-167 callback must be a secure context (https, or http on loopback)",
+    );
   }
   if (callbackUrl.hash !== "") {
     throw new Error("ICRC-167 callback must not contain a fragment");
@@ -420,7 +421,7 @@ export class UrlChannel implements Channel {
     // callback was validated when read (and against the allow-list), so this
     // only ever navigates to a secure-context URL — https, or http on loopback.
     const deliveryUrl = new URL(this.#callback);
-    if (!isAllowedCallbackUrl(deliveryUrl)) {
+    if (!isSecureContextUrl(deliveryUrl)) {
       throw new Error("Refusing to deliver to a non-secure-context callback");
     }
     deliveryUrl.hash = fragment.toString();
