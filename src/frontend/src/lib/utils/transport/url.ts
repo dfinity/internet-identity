@@ -140,10 +140,10 @@ const readUrlRequest = (): UrlRequest | undefined => {
   // The callback becomes a top-level navigation target, so constrain it up
   // front: it must be a secure-context URL (https, or http on loopback) — never
   // a `javascript:`/`data:` scheme (which would execute in this origin) and
-  // never plain http on a remote host — and it must not carry a fragment (the
-  // transport appends the response fragment). It is further constrained to the
-  // relying party's declared allow-list before any delivery (see
-  // UrlTransport.establishChannel).
+  // never plain http on a remote host — and it must be protocol + host + path
+  // only: no query and no fragment (the transport appends its own response
+  // fragment). It is further constrained to the relying party's declared
+  // allow-list before any delivery (see UrlTransport.establishChannel).
   let callbackUrl: URL;
   try {
     callbackUrl = new URL(callback);
@@ -155,8 +155,10 @@ const readUrlRequest = (): UrlRequest | undefined => {
       "ICRC-167 callback must be a secure context (https, or http on loopback)",
     );
   }
-  if (callbackUrl.hash !== "") {
-    throw new Error("ICRC-167 callback must not contain a fragment");
+  if (callbackUrl.search !== "" || callbackUrl.hash !== "") {
+    throw new Error(
+      "ICRC-167 callback must not contain query parameters or a fragment",
+    );
   }
 
   let parsed: unknown;
