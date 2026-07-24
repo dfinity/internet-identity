@@ -219,7 +219,7 @@ mod tests {
     const PER_APP_CLIENT: &str = "0oaPAYROLL";
     const GATED_ORIGIN: &str = "https://payroll.com";
 
-    /// Discovery config whose primary client is `TEST_AUD`, matching `VALID_JWT`'s `aud`.
+    /// Discovery config whose II client is `TEST_AUD`, matching `VALID_JWT`'s `aud`.
     fn sso_gate_config(
         app_clients: Vec<sso::AppClient>,
         gate_all_apps: bool,
@@ -278,7 +278,7 @@ mod tests {
         sub: &str,
         stable_id: Option<&str>,
     ) -> VerifiedSsoLogin {
-        sso_verification_with_client(gated, claim, sub, stable_id, "primary")
+        sso_verification_with_client(gated, claim, sub, stable_id, "ii-client")
     }
 
     fn sso_verification_with_client(
@@ -316,10 +316,10 @@ mod tests {
         ));
     }
 
-    /// Persist a resolved primary-keyed credential on a fresh anchor exactly as
+    /// Persist a resolved II-client-keyed credential on a fresh anchor exactly as
     /// the production write path does (allocate → add → `write()`), so the
     /// anchor `write()` reconciles the SSO stable-id index. Returns the anchor.
-    fn store_primary_credential(credential: OpenIdCredential) -> AnchorNumber {
+    fn store_ii_client_credential(credential: OpenIdCredential) -> AnchorNumber {
         crate::state::storage_borrow_mut(|storage| {
             let mut anchor = storage.allocate_anchor(0).unwrap();
             anchor.add_openid_credential(credential).unwrap();
@@ -344,8 +344,8 @@ mod tests {
         let v = sso_verification(true, "sub", "sub-123", None);
         let identity = resolve_ii_client_identity(&v).expect("sub resolves directly");
         assert_eq!(identity.credential.sub, "sub-123");
-        assert_eq!(identity.credential.aud, "primary");
-        // `sub` orgs never bridge, so the primary credential carries no stable id.
+        assert_eq!(identity.credential.aud, "ii-client");
+        // `sub` orgs never bridge, so the II-client credential carries no stable id.
         assert_eq!(identity.credential.stable_id, None);
     }
 
@@ -353,32 +353,33 @@ mod tests {
     fn resolve_ii_client_identity_non_sub_gated_needs_normal_login_first() {
         init_test_storage();
         let gated = sso_verification(true, "oid", "per-app-sub", Some("oid-1"));
-        // No primary credential stored yet: the index has no entry, fail safe.
+        // No II-client credential stored yet: the index has no entry, fail safe.
         assert!(matches!(
             resolve_ii_client_identity(&gated),
             Err(OpenIdDelegationError::NoSuchAnchor)
         ));
 
-        // A normal (non-gated) primary login resolves to a credential stamped
+        // A normal (non-gated) II-client login resolves to a credential stamped
         // with the stable id; persisting it populates the index.
-        let primary = sso_verification(false, "oid", "primary-sub", Some("oid-1"));
-        let identity = resolve_ii_client_identity(&primary).expect("primary login resolves");
-        assert_eq!(identity.credential.sub, "primary-sub");
-        assert_eq!(identity.credential.aud, "primary");
+        let ii_client_login = sso_verification(false, "oid", "ii-client-sub", Some("oid-1"));
+        let identity =
+            resolve_ii_client_identity(&ii_client_login).expect("II-client login resolves");
+        assert_eq!(identity.credential.sub, "ii-client-sub");
+        assert_eq!(identity.credential.aud, "ii-client");
         assert_eq!(identity.credential.stable_id, Some("oid-1".to_string()));
         let key = identity.credential.key();
-        let anchor_number = store_primary_credential(identity.credential);
+        let anchor_number = store_ii_client_credential(identity.credential);
 
-        // Now the gated login resolves to the primary sub via the index.
+        // Now the gated login resolves to the II-client sub via the index.
         let identity =
             resolve_ii_client_identity(&gated).expect("gated resolves after index populated");
-        assert_eq!(identity.credential.sub, "primary-sub");
-        assert_eq!(identity.credential.aud, "primary");
-        // The gated resolve keeps the stable id so re-writing the primary
+        assert_eq!(identity.credential.sub, "ii-client-sub");
+        assert_eq!(identity.credential.aud, "ii-client");
+        // The gated resolve keeps the stable id so re-writing the II-client
         // credential leaves the index entry in place.
         assert_eq!(identity.credential.stable_id, Some("oid-1".to_string()));
 
-        // Removing the primary credential self-cleans the index: the gated
+        // Removing the II-client credential self-cleans the index: the gated
         // login fails safe again. This is the cleanup this redesign delivers.
         remove_credential(anchor_number, &key);
         assert!(matches!(
@@ -388,15 +389,33 @@ mod tests {
     }
 
     #[test]
-    fn sso_stable_id_index_is_scoped_per_primary_client() {
+    fn sso_stable_id_index_is_scoped_per_ii_client() {
         init_test_storage();
-        // Same stable id (oid-9) under two distinct primary clients.
-        let primary_a =
-            sso_verification_with_client(false, "oid", "primary-sub-a", Some("oid-9"), "client-a");
-        let primary_b =
-            sso_verification_with_client(false, "oid", "primary-sub-b", Some("oid-9"), "client-b");
-        store_primary_credential(resolve_ii_client_identity(&primary_a).unwrap().credential);
-        store_primary_credential(resolve_ii_client_identity(&primary_b).unwrap().credential);
+        // Same stable id (oid-9) under two distinct II clients.
+        let ii_client_login_a = sso_verification_with_client(
+            false,
+            "oid",
+            "ii-client-sub-a",
+            Some("oid-9"),
+            "client-a",
+        );
+        let ii_client_login_b = sso_verification_with_client(
+            false,
+            "oid",
+            "ii-client-sub-b",
+            Some("oid-9"),
+            "client-b",
+        );
+        store_ii_client_credential(
+            resolve_ii_client_identity(&ii_client_login_a)
+                .unwrap()
+                .credential,
+        );
+        store_ii_client_credential(
+            resolve_ii_client_identity(&ii_client_login_b)
+                .unwrap()
+                .credential,
+        );
 
         let gated_a =
             sso_verification_with_client(true, "oid", "pairwise-a", Some("oid-9"), "client-a");
@@ -404,24 +423,28 @@ mod tests {
             sso_verification_with_client(true, "oid", "pairwise-b", Some("oid-9"), "client-b");
         assert_eq!(
             resolve_ii_client_identity(&gated_a).unwrap().credential.sub,
-            "primary-sub-a",
-            "client-a gated login must resolve to client-a's primary sub"
+            "ii-client-sub-a",
+            "client-a gated login must resolve to client-a's II-client sub"
         );
         assert_eq!(
             resolve_ii_client_identity(&gated_b).unwrap().credential.sub,
-            "primary-sub-b",
-            "client-b gated login must resolve to client-b's primary sub (no clobber)"
+            "ii-client-sub-b",
+            "client-b gated login must resolve to client-b's II-client sub (no clobber)"
         );
     }
 
     #[test]
     fn sso_stable_id_index_is_scoped_per_discovery_domain() {
         init_test_storage();
-        // A primary identity established through the org's real domain.
-        let primary = sso_verification(false, "oid", "primary-sub", Some("oid-9"));
-        store_primary_credential(resolve_ii_client_identity(&primary).unwrap().credential);
+        // An II-client identity established through the org's real domain.
+        let ii_client_login = sso_verification(false, "oid", "ii-client-sub", Some("oid-9"));
+        store_ii_client_credential(
+            resolve_ii_client_identity(&ii_client_login)
+                .unwrap()
+                .credential,
+        );
 
-        // A gated login carrying the same (iss, primary_client, stable_id) but
+        // A gated login carrying the same (iss, ii_client_id, stable_id) but
         // discovered through a *different* domain must not resolve to that
         // identity — the domain is part of the index key, so cross-domain
         // injection into a foreign namespace fails safe.
@@ -439,7 +462,7 @@ mod tests {
                 .unwrap()
                 .credential
                 .sub,
-            "primary-sub"
+            "ii-client-sub"
         );
     }
 }

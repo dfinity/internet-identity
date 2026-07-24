@@ -60,7 +60,7 @@ mod tests {
         let key = StorableSsoStableIdKey::new(
             "acme.example",
             "https://login.microsoftonline.com/tenant/v2.0",
-            "primary-client",
+            "ii-client",
             "entra-oid-0001",
         );
         let bytes = key.to_bytes();

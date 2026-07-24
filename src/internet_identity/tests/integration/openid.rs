@@ -1486,12 +1486,12 @@ mod sso_gating {
 
     const GATE_DOMAIN: &str = "gate.example.org";
     const GATE_ISSUER: &str = "https://idp.gate.example.org";
-    const PRIMARY_CLIENT: &str = "primary-client-id";
+    const II_CLIENT: &str = "ii-client-id";
     const PER_APP_CLIENT: &str = "per-app-client-id";
     const GATED_ORIGIN: &str = "https://payroll.example";
     const UNGATED_ORIGIN: &str = "https://public.example";
-    const PRIMARY_SUB: &str = "sso-primary-sub-0001";
-    /// Pairwise (per-client) sub for the gated login; differs from the primary
+    const II_CLIENT_SUB: &str = "sso-ii-client-sub-0001";
+    /// Pairwise (per-client) sub for the gated login; differs from the II-client
     /// sub, bridged via the `oid` stable-id index.
     const PER_APP_SUB: &str = "entra-pairwise-sub-0002";
     const STABLE_OID: &str = "entra-oid-stable-0003";
@@ -1598,7 +1598,7 @@ mod sso_gating {
     /// Assemble the well-known (`app_clients` map JSON, gate flag, stable claim).
     fn well_known(app_clients_json: &str, gate_all_apps: bool, stable_claim: &str) -> String {
         format!(
-            r#"{{"client_id":"{PRIMARY_CLIENT}","openid_configuration":"{GATE_ISSUER}/.well-known/openid-configuration","name":"Gate","app_clients":{app_clients_json},"gate_all_apps":{gate_all_apps},"stable_identifier_claim":"{stable_claim}"}}"#
+            r#"{{"client_id":"{II_CLIENT}","openid_configuration":"{GATE_ISSUER}/.well-known/openid-configuration","name":"Gate","app_clients":{app_clients_json},"gate_all_apps":{gate_all_apps},"stable_identifier_claim":"{stable_claim}"}}"#
         )
     }
 
@@ -1632,13 +1632,13 @@ mod sso_gating {
         )
     }
 
-    /// Register an anchor with the test passkey and link its primary SSO
+    /// Register an anchor with the test passkey and link its II-client SSO
     /// credential, warming the discovery cache with `responses`.
-    fn register_with_primary_credential(
+    fn register_with_ii_client_credential(
         env: &PocketIc,
         canister_id: Principal,
         responses: &[(String, String)],
-        primary_jwt: &str,
+        ii_client_jwt: &str,
     ) -> u64 {
         let identity_number =
             create_identity_with_authn_method(env, canister_id, &test_authn_method());
@@ -1649,13 +1649,13 @@ mod sso_gating {
                 canister_id,
                 test_principal(),
                 identity_number,
-                primary_jwt,
+                ii_client_jwt,
                 &test_salt(),
                 Some(GATE_DOMAIN),
             )
             .unwrap()
         })
-        .expect("primary SSO credential add failed");
+        .expect("II-client SSO credential add failed");
         // Initialize the salt so `prepare_icrc3_attributes`'s SSO-session seed
         // computation has a salt to hash against; otherwise it traps with
         // "Salt is not set".
@@ -1674,17 +1674,17 @@ mod sso_gating {
         let env = env();
         let canister_id = install(&env);
 
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
 
         let identity_number =
-            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+            register_with_ii_client_credential(&env, canister_id, &responses, &ii_client_jwt);
 
         let session_key = ByteBuf::from("dapp session key");
 
         // Gated login: per-app token at the gated origin passes the gate.
-        let (gated_jwt, _) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
+        let (gated_jwt, _) = token(PER_APP_CLIENT, II_CLIENT_SUB, &[]);
         let gated = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -1700,13 +1700,13 @@ mod sso_gating {
         }));
         assert_eq!(gated.anchor_number, identity_number);
 
-        // Ungated login: primary token at an unlisted origin resolves via the primary client.
+        // Ungated login: II-client token at an unlisted origin resolves via the II client.
         let ungated = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
                 canister_id,
                 test_principal(),
-                &primary_jwt,
+                &ii_client_jwt,
                 &test_salt(),
                 &session_key,
                 GATE_DOMAIN,
@@ -1756,20 +1756,20 @@ mod sso_gating {
         let env = env();
         let canister_id = install(&env);
 
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
-        register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+        register_with_ii_client_credential(&env, canister_id, &responses, &ii_client_jwt);
 
         let session_key = ByteBuf::from("dapp session key");
 
-        // Present the primary token at the gated origin: the gate refuses.
+        // Present the II-client token at the gated origin: the gate refuses.
         let result = drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
                 canister_id,
                 test_principal(),
-                &primary_jwt,
+                &ii_client_jwt,
                 &test_salt(),
                 &session_key,
                 GATE_DOMAIN,
@@ -1791,11 +1791,11 @@ mod sso_gating {
         let env = env();
         let canister_id = install(&env);
 
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
         let identity_number =
-            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+            register_with_ii_client_credential(&env, canister_id, &responses, &ii_client_jwt);
 
         let sso_attr = format!("sso:{GATE_DOMAIN}:email");
         let request = |origin: &str| PrepareIcrc3AttributeRequest {
@@ -1829,7 +1829,7 @@ mod sso_gating {
         // SSO session -> certified. The SSO context rides in the certified
         // bundle attached as `sender_info` (signer = this canister).
         let session_key = ByteBuf::from("dapp session key");
-        let (gated_jwt, _) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
+        let (gated_jwt, _) = token(PER_APP_CLIENT, II_CLIENT_SUB, &[]);
         let gated = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -1881,11 +1881,11 @@ mod sso_gating {
         let env = env();
         let canister_id = install(&env);
 
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         // Gate everything: only the listed origin is servable.
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, true, "sub"), jwks);
-        register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+        register_with_ii_client_credential(&env, canister_id, &responses, &ii_client_jwt);
 
         let session_key = ByteBuf::from("dapp session key");
         let result = drive_sso_until_ready(&env, &responses, || {
@@ -1893,7 +1893,7 @@ mod sso_gating {
                 &env,
                 canister_id,
                 test_principal(),
-                &primary_jwt,
+                &ii_client_jwt,
                 &test_salt(),
                 &session_key,
                 GATE_DOMAIN,
@@ -1909,9 +1909,9 @@ mod sso_gating {
     }
 
     /// Entra-style org that was configured as `sub` when the anchor was created
-    /// (so its primary credential carries no stable id), then switches to `oid`.
+    /// (so its II-client credential carries no stable id), then switches to `oid`.
     /// The pre-`oid` anchor SELF-HEALS on a normal sign-in: `openid_prepare_delegation`
-    /// stamps the `oid` onto the stored primary credential and the write reconciles
+    /// stamps the `oid` onto the stored II-client credential and the write reconciles
     /// the stable-id index, so a subsequent gated login resolves — no re-registration.
     #[test]
     fn entra_oid_pre_oid_anchor_self_heals_on_normal_login() -> Result<(), RejectResponse> {
@@ -1920,14 +1920,14 @@ mod sso_gating {
 
         // A real Entra token always carries `oid`; II just ignores it while the
         // org is configured as `sub`.
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[("oid", STABLE_OID)]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[("oid", STABLE_OID)]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
 
-        // Phase 1 — org is still `sub`: registering the primary credential stores
+        // Phase 1 — org is still `sub`: registering the II-client credential stores
         // it WITHOUT a stable id (the pre-`oid` state); the index stays empty.
         let responses_sub = responses(well_known(&app_clients, false, "sub"), jwks.clone());
         let identity_number =
-            register_with_primary_credential(&env, canister_id, &responses_sub, &primary_jwt);
+            register_with_ii_client_credential(&env, canister_id, &responses_sub, &ii_client_jwt);
 
         // Org switches to `oid`. Upgrading clears the in-memory discovery cache so
         // the next fetch picks up the new config.
@@ -1935,7 +1935,7 @@ mod sso_gating {
         let responses_oid = responses(well_known(&app_clients, false, "oid"), jwks);
 
         let session_key = ByteBuf::from("dapp session key");
-        // Pairwise per-app token: its sub differs from the primary credential's.
+        // Pairwise per-app token: its sub differs from the II-client credential's.
         let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
 
         // Pre-`oid` anchor: the index has no entry yet, so the first gated login
@@ -1959,14 +1959,14 @@ mod sso_gating {
         );
 
         // A normal sign-in through `openid_prepare_delegation` stamps the `oid`
-        // onto the stored primary credential; the write reconciles the
-        // (iss, primary_client, oid) -> anchor entry — the anchor self-heals.
+        // onto the stored II-client credential; the write reconciles the
+        // (iss, ii_client_id, oid) -> anchor entry — the anchor self-heals.
         let normal = expect_ready(drive_sso_until_ready(&env, &responses_oid, || {
             api::openid_prepare_delegation_with_discovery(
                 &env,
                 canister_id,
                 test_principal(),
-                &primary_jwt,
+                &ii_client_jwt,
                 &test_salt(),
                 &session_key,
                 Some(GATE_DOMAIN),
@@ -1975,7 +1975,7 @@ mod sso_gating {
         }));
         assert_eq!(normal.anchor_number, identity_number);
 
-        // The gated login now bridges (iss, oid) -> primary sub and resolves.
+        // The gated login now bridges (iss, oid) -> II-client sub and resolves.
         let resolved = expect_ready(drive_sso_until_ready(&env, &responses_oid, || {
             api::sso_prepare_delegation(
                 &env,
@@ -1996,25 +1996,25 @@ mod sso_gating {
         Ok(())
     }
 
-    /// Removing the primary OpenID credential self-cleans the stable-id index:
+    /// Removing the II-client OpenID credential self-cleans the stable-id index:
     /// a later gated login fails safe with `NoSuchAnchor`. This is the cleanup
     /// the redesign delivers (scenario (b)) — the insert-only bridge left an
     /// orphan that would keep resolving.
     #[test]
-    fn removing_primary_credential_unlinks_gated_login() -> Result<(), RejectResponse> {
+    fn removing_ii_client_credential_unlinks_gated_login() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install(&env);
 
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[("oid", STABLE_OID)]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[("oid", STABLE_OID)]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "oid"), jwks);
         let identity_number =
-            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+            register_with_ii_client_credential(&env, canister_id, &responses, &ii_client_jwt);
 
         let session_key = ByteBuf::from("dapp session key");
         let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
 
-        // Registration stamped the primary credential, so the gated login
+        // Registration stamped the II-client credential, so the gated login
         // already resolves via the stable-id index.
         let resolved = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
@@ -2031,15 +2031,15 @@ mod sso_gating {
         }));
         assert_eq!(resolved.anchor_number, identity_number);
 
-        // Remove the primary credential. The anchor `write()` self-cleans the
+        // Remove the II-client credential. The anchor `write()` self-cleans the
         // stable-id index entry for this `oid`.
         let key: OpenIdCredentialKey = (
             GATE_ISSUER.to_string(),
-            PRIMARY_SUB.to_string(),
-            PRIMARY_CLIENT.to_string(),
+            II_CLIENT_SUB.to_string(),
+            II_CLIENT.to_string(),
         );
         api::openid_credential_remove(&env, canister_id, test_principal(), identity_number, &key)?
-            .expect("primary credential removal");
+            .expect("II-client credential removal");
 
         // The gated login now fails safe: no orphaned index entry lingers.
         let after = drive_sso_until_ready(&env, &responses, || {
@@ -2057,27 +2057,27 @@ mod sso_gating {
         });
         assert!(
             matches!(after, Err(OpenIdDelegationError::NoSuchAnchor)),
-            "gated login must fail safe after the primary credential is removed, got {after:?}"
+            "gated login must fail safe after the II-client credential is removed, got {after:?}"
         );
         Ok(())
     }
 
     /// A credential moved from anchor A to anchor B re-points the gated login:
-    /// once the primary credential is removed from A and normally logged into B,
+    /// once the II-client credential is removed from A and normally logged into B,
     /// the same `oid`'s gated login resolves to B (scenario (c)).
     #[test]
     fn credential_move_repoints_gated_login() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install(&env);
 
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[("oid", STABLE_OID)]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[("oid", STABLE_OID)]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "oid"), jwks);
 
-        // Anchor A: registration stamps the primary credential -> the index
+        // Anchor A: registration stamps the II-client credential -> the index
         // points at A.
         let anchor_a =
-            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+            register_with_ii_client_credential(&env, canister_id, &responses, &ii_client_jwt);
         let session_key = ByteBuf::from("dapp session key");
         let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
         let resolved_a = expect_ready(drive_sso_until_ready(&env, &responses, || {
@@ -2098,21 +2098,21 @@ mod sso_gating {
         // Anchor B: a second identity with a distinct passkey principal.
         let anchor_b = create_identity_with_authn_method(&env, canister_id, &test_authn_method_b());
 
-        // Move: unlink the primary credential from A ...
+        // Move: unlink the II-client credential from A ...
         let key: OpenIdCredentialKey = (
             GATE_ISSUER.to_string(),
-            PRIMARY_SUB.to_string(),
-            PRIMARY_CLIENT.to_string(),
+            II_CLIENT_SUB.to_string(),
+            II_CLIENT.to_string(),
         );
         api::openid_credential_remove(&env, canister_id, test_principal(), anchor_a, &key)?
-            .expect("remove primary credential from A");
+            .expect("remove II-client credential from A");
 
         // ... link it to B (token bound to B's principal). The add stamps the
-        // primary credential, re-pointing the index at B.
-        let (primary_jwt_b, _) = token_for(
+        // II-client credential, re-pointing the index at B.
+        let (ii_client_jwt_b, _) = token_for(
             &test_principal_b(),
-            PRIMARY_CLIENT,
-            PRIMARY_SUB,
+            II_CLIENT,
+            II_CLIENT_SUB,
             &[("oid", STABLE_OID)],
         );
         drive_sso_until_ready(&env, &responses, || {
@@ -2121,13 +2121,13 @@ mod sso_gating {
                 canister_id,
                 test_principal_b(),
                 anchor_b,
-                &primary_jwt_b,
+                &ii_client_jwt_b,
                 &test_salt(),
                 Some(GATE_DOMAIN),
             )
             .unwrap()
         })
-        .expect("link primary credential to B");
+        .expect("link II-client credential to B");
 
         // The gated login (same `oid`) now resolves to anchor B.
         let resolved_b = expect_ready(drive_sso_until_ready(&env, &responses, || {
@@ -2158,22 +2158,22 @@ mod sso_gating {
         let env = env();
         let canister_id = install(&env);
 
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[("oid", STABLE_OID)]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[("oid", STABLE_OID)]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "oid"), jwks);
         let identity_number =
-            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+            register_with_ii_client_credential(&env, canister_id, &responses, &ii_client_jwt);
 
         let session_key = ByteBuf::from("dapp session key");
         let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
 
-        // Registration stamped the primary credential, so the stable-id index
+        // Registration stamped the II-client credential, so the stable-id index
         // already points at the anchor.
 
         // Upgrade the canister; the stable index survives.
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-        // The gated login resolves via the persisted index, no fresh primary
+        // The gated login resolves via the persisted index, no fresh II-client
         // login needed.
         let resolved = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
@@ -2196,16 +2196,16 @@ mod sso_gating {
     }
 
     /// `get_sso_discovery` reports the per-origin `resolved_client_id`: the
-    /// per-app client for a listed origin, the primary for an unlisted one.
+    /// per-app client for a listed origin, the II client for an unlisted one.
     #[test]
     fn get_sso_discovery_reports_resolved_client_id() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install(&env);
 
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
-        register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+        register_with_ii_client_credential(&env, canister_id, &responses, &ii_client_jwt);
 
         let resolved = |origin: Option<&str>| match api::get_sso_discovery_for_origin(
             &env,
@@ -2224,15 +2224,15 @@ mod sso_gating {
             resolved(Some(GATED_ORIGIN)).resolved_client_id,
             Some(PER_APP_CLIENT.to_string())
         );
-        // Unlisted origin -> primary client.
+        // Unlisted origin -> II client.
         assert_eq!(
             resolved(Some(UNGATED_ORIGIN)).resolved_client_id,
-            Some(PRIMARY_CLIENT.to_string())
+            Some(II_CLIENT.to_string())
         );
-        // No origin -> primary client.
+        // No origin -> II client.
         assert_eq!(
             resolved(None).resolved_client_id,
-            Some(PRIMARY_CLIENT.to_string())
+            Some(II_CLIENT.to_string())
         );
         Ok(())
     }
@@ -2297,16 +2297,16 @@ mod sso_gating {
     }
 
     /// A `sub`-based org's first gated login registers directly, storing the
-    /// primary-keyed credential; both a gated and an ungated login then resolve
+    /// II-client-keyed credential; both a gated and an ungated login then resolve
     /// to that anchor.
     #[test]
     fn sub_org_first_gated_login_registers_directly() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install(&env);
 
-        // `sub` org: the gated per-app token shares the primary credential's sub.
-        let (gated_jwt, jwks) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
-        let (primary_jwt, _) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        // `sub` org: the gated per-app token shares the II-client credential's sub.
+        let (gated_jwt, jwks) = token(PER_APP_CLIENT, II_CLIENT_SUB, &[]);
+        let (ii_client_jwt, _) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
 
@@ -2334,13 +2334,13 @@ mod sso_gating {
         }));
         assert_eq!(gated.anchor_number, identity_number);
 
-        // The ungated login resolves to the same anchor: the stored credential is primary-keyed.
+        // The ungated login resolves to the same anchor: the stored credential is II-client-keyed.
         let ungated = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
                 canister_id,
                 test_principal(),
-                &primary_jwt,
+                &ii_client_jwt,
                 &test_salt(),
                 &session_key,
                 GATE_DOMAIN,
@@ -2350,7 +2350,7 @@ mod sso_gating {
         }));
         assert_eq!(
             ungated.anchor_number, identity_number,
-            "gate-registered credential must be primary-keyed (ungated login resolves to it)"
+            "gate-registered credential must be II-client-keyed (ungated login resolves to it)"
         );
         Ok(())
     }
@@ -2379,7 +2379,7 @@ mod sso_gating {
     }
 
     /// A non-`sub` (`oid`) org whose token is MISSING the configured stable-id
-    /// claim cannot resolve a primary identity: `resolve_ii_client_identity`
+    /// claim cannot resolve an II-client identity: `resolve_ii_client_identity`
     /// returns `JwtVerificationFailed` (the token clears the gate but carries no
     /// `oid`, so `stable_id` is `None`). Registration maps that to
     /// `InvalidAuthnMethod` and stores nothing; `sso_prepare_delegation`
@@ -2528,8 +2528,8 @@ mod sso_gating {
         let env = env();
         let canister_id = install(&env);
 
-        let (gated_jwt, jwks) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
-        let (primary_jwt, _) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let (gated_jwt, jwks) = token(PER_APP_CLIENT, II_CLIENT_SUB, &[]);
+        let (ii_client_jwt, _) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         // `gate_all_apps` on: only the listed GATED_ORIGIN is allowed.
         let responses = responses(well_known(&app_clients, true, "sub"), jwks);
@@ -2539,7 +2539,7 @@ mod sso_gating {
         sync_time(&env, TEST_TIME_MS);
         warm_gate_caches(&env, canister_id, &responses, &gated_jwt, GATED_ORIGIN);
 
-        let result = register_via_sso_gate(&env, canister_id, &primary_jwt, UNGATED_ORIGIN);
+        let result = register_via_sso_gate(&env, canister_id, &ii_client_jwt, UNGATED_ORIGIN);
         assert!(
             matches!(result, Err(IdRegFinishError::InvalidAuthnMethod(_))),
             "gate_all_apps must deny registration from an unlisted origin, got {result:?}"
@@ -2553,18 +2553,18 @@ mod sso_gating {
     // not here; these tests assert the canister-observable checks (signer, expiry,
     // bundle.origin == serving origin, bundle-absent/unauthorized).
 
-    /// Prepare a primary anchor + a gated SSO bundle for `GATED_ORIGIN`. Returns
+    /// Prepare an II-client anchor + a gated SSO bundle for `GATED_ORIGIN`. Returns
     /// `(identity_number, bundle_message)`.
     fn gated_bundle(
         env: &PocketIc,
         canister_id: Principal,
         responses: &[(String, String)],
-        primary_jwt: &str,
+        ii_client_jwt: &str,
     ) -> (u64, Vec<u8>) {
         let identity_number =
-            register_with_primary_credential(env, canister_id, responses, primary_jwt);
+            register_with_ii_client_credential(env, canister_id, responses, ii_client_jwt);
         let session_key = ByteBuf::from("dapp session key");
-        let (gated_jwt, _) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
+        let (gated_jwt, _) = token(PER_APP_CLIENT, II_CLIENT_SUB, &[]);
         let gated = expect_ready(drive_sso_until_ready(env, responses, || {
             api::sso_prepare_delegation(
                 env,
@@ -2604,10 +2604,10 @@ mod sso_gating {
     fn cross_identity_or_forged_signer_bundle_gets_no_sso_cert() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install(&env);
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
-        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &primary_jwt);
+        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &ii_client_jwt);
 
         let session_principal = test_principal();
 
@@ -2655,10 +2655,10 @@ mod sso_gating {
     fn expired_bundle_gets_no_sso_cert() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install(&env);
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
-        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &primary_jwt);
+        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &ii_client_jwt);
 
         // Fresh bundle certifies now.
         let fresh = api::prepare_icrc3_attributes_with_bundle(
@@ -2705,15 +2705,15 @@ mod sso_gating {
 
         let env = env();
         let canister_id = install(&env);
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         // Gate the mapped (canonical) origin the ceremony binds to.
         let app_clients = format!(r#"{{"{REMAP_MAPPED}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
         let identity_number =
-            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+            register_with_ii_client_credential(&env, canister_id, &responses, &ii_client_jwt);
 
         let session_key = ByteBuf::from("remap session key");
-        let (gated_jwt, _) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
+        let (gated_jwt, _) = token(PER_APP_CLIENT, II_CLIENT_SUB, &[]);
         let gated = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -2790,10 +2790,10 @@ mod sso_gating {
         let canister_id = install(&env);
         // `gate_all_apps` off so the ungated origin is also servable and the
         // anchor owns the SSO domain credential.
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
-        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &primary_jwt);
+        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &ii_client_jwt);
 
         // Valid bundle for GATED_ORIGIN, but the call serves a different origin:
         // the origin filter drops it.
@@ -2821,10 +2821,10 @@ mod sso_gating {
     fn list_available_attributes_gates_sso_rows_on_bundle() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install(&env);
-        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
-        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &primary_jwt);
+        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &ii_client_jwt);
 
         let request = || ListAvailableAttributesRequest {
             identity_number,
