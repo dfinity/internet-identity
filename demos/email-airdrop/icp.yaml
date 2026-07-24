@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://github.com/dfinity/icp-cli/raw/refs/tags/v0.2.7/docs/schemas/icp-yaml-schema.json
+
+canisters:
+  # A single Motoko canister that:
+  #   - serves the rules landing page (GET /) and exposes the email webhook
+  #     (POST /?secret=...) via the HTTP gateway, and
+  #   - airdrops 1 ICP to eligible senders, with a waitlist for top-ups.
+  - name: airdrop
+    recipe:
+      type: "@dfinity/motoko@v4.0.0"
+      configuration:
+        main: main.mo
