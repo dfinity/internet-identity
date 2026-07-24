@@ -1,0 +1,6 @@
+# Build artifacts
+.mops/
+*.wasm
+*.wasm.gz
+frontend/node_modules/
+frontend/dist/

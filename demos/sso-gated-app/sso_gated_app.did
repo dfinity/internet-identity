@@ -1,0 +1,58 @@
+type Session = 
+ record {
+   email: opt text;
+   name: opt text;
+   sso: opt text;
+   verifiedAtNs: nat;
+ };
+type Result_1 = 
+ variant {
+   err: Error;
+   ok;
+ };
+type Result = 
+ variant {
+   err: AccessError;
+   ok: text;
+ };
+type Error = 
+ variant {
+   AmbiguousAttribute: record {
+                         field: text;
+                         sources: vec text;
+                       };
+   FrontendOriginMismatch: record {
+                             expected: vec text;
+                             got: text;
+                           };
+   FrontendOriginsNotConfigured;
+   MalformedCandid;
+   MissingField: text;
+   MixedSsoSources: record {
+                      otherKeys: vec text;
+                      ssoKeys: vec text;
+                    };
+   NoAttributes;
+   Stale: record {ageNs: nat;};
+   UnknownNonce;
+   UntrustedSsoSource: record {domain: text;};
+ };
+type AccessError = 
+ variant {
+   NotAuthenticated;
+   SsoRequired;
+ };
+service : {
+  _internet_identity_sign_in_finish: () -> (Result_1);
+  _internet_identity_sign_in_start: () -> (blob);
+  /// The gated resource. Returns the secret only to a caller whose
+  /// verified session carries a trusted SSO domain; everyone else is
+  /// refused with a reason.
+  getProtectedResource: () -> (Result) query;
+  /// Debug helper: what this canister recorded for the caller (if
+  /// anything). Handy for seeing why `getProtectedResource` allowed or
+  /// refused a given identity.
+  sessionInfo: () -> (opt Session) query;
+  /// Debug helper: the caller's principal as seen by this canister.
+  whoami: () -> (principal) query;
+}

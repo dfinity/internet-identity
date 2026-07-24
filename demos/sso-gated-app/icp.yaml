@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://github.com/dfinity/icp-cli/raw/refs/tags/v0.2.7/docs/schemas/icp-yaml-schema.json
+#
+# Standalone deployment for the SSO-gated test app. Deploy against a
+# replica that already hosts the Internet Identity instance whose
+# bundles you want to trust (local, testnet, or mainnet), then set
+# `trusted_attribute_signers` to that II canister's principal.
+
+canisters:
+  - name: sso_gated_app
+    build:
+      steps:
+        - type: script
+          commands:
+            - "./build.sh"
+            - 'cp sso_gated_app.wasm.gz "$ICP_WASM_OUTPUT_PATH"'
+    settings:
+      environment_variables:
+        # The II canister principal whose signature the IC must have
+        # verified on the attribute bundle. Set to the `beta.id.ai` II
+        # canister (a mainnet canister running the role-enforcement
+        # build), so the app — also on mainnet — can verify its
+        # signatures and the enforcement feature is actually exercised.
+        trusted_attribute_signers: "fgte5-ciaaa-aaaad-aaatq-cai"
+
+        # "Trusted domains": the exact origin(s) allowed to appear in
+        # the bundle's `implicit:origin`. Matched verbatim (scheme +
+        # host), comma-separated. This is where the app frontend is
+        # served from — the current Cloudflare tunnel. Quick-tunnels get
+        # a new random name each run; update this if yours changes.
+        frontend_origins: "https://generators-analyzed-loaded-graduated.trycloudflare.com"
+
+        # Org SSO domain(s) accepted for `sso:<domain>:*` keys.
+        # REQUIRED for SSO enforcement: if unset, every SSO bundle is
+        # rejected as #UntrustedSsoSource.
+        trusted_sso_domains: "dfinity.org"

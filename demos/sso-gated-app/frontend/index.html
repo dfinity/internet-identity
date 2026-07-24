@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SSO-gated test app</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 40rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+      }
+      label {
+        display: block;
+        margin: 0.5rem 0 0.15rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 0.4rem;
+        box-sizing: border-box;
+        font-family: monospace;
+      }
+      .row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        margin-top: 1rem;
+      }
+      button {
+        padding: 0.6rem 1rem;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+      pre {
+        background: #f4f4f5;
+        padding: 1rem;
+        border-radius: 6px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        min-height: 3rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>SSO-gated test app</h1>
+    <p>
+      Signs in through your org's Internet Identity SSO, requests the
+      <code>sso:&lt;domain&gt;</code> membership attribute, and calls a resource
+      that only members with a certified SSO attribute may reach.
+    </p>
+
+    <label for="iiUrl">Internet Identity URL (identity provider)</label>
+    <input id="iiUrl" type="text" value="https://id.ai" />
+
+    <label for="signerCanisterId">II canister id (trusted signer)</label>
+    <input
+      id="signerCanisterId"
+      type="text"
+      value="rdmx6-jaaaa-aaaaa-aaadq-cai"
+    />
+
+    <label for="appCanisterId">This app's canister id</label>
+    <input id="appCanisterId" type="text" value="" />
+
+    <label for="host">Replica host</label>
+    <input id="host" type="text" value="https://icp-api.io" />
+
+    <label for="ssoDomain">SSO domain</label>
+    <input id="ssoDomain" type="text" value="dfinity.org" />
+
+    <div class="row">
+      <input id="fetchRootKey" type="checkbox" />
+      <label for="fetchRootKey" style="margin: 0">
+        Fetch root key (check only against a local replica)
+      </label>
+    </div>
+
+    <div class="row">
+      <button id="signInBtn">Sign in with SSO &amp; verify</button>
+      <button id="callBtn">Call protected resource</button>
+    </div>
+
+    <h2>Result</h2>
+    <pre id="output">Not signed in.</pre>
+
+    <script type="module" src="/src/index.ts"></script>
+  </body>
+</html>
