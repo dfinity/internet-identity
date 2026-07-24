@@ -5,7 +5,7 @@ use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::internet_identity::types::{
     self, CredentialId, DeviceKeyWithAnchor, IdentityNumber, OpenIdCredentialKey,
 };
-use pocket_ic::common::rest::RawEffectivePrincipal;
+use pocket_ic::common::rest::{RawEffectivePrincipal, RawSenderInfo};
 use pocket_ic::{
     call_candid, call_candid_as, query_candid, query_candid_as, PocketIc, RejectResponse,
 };
@@ -383,8 +383,83 @@ pub fn get_sso_discovery(
     env: &PocketIc,
     canister_id: CanisterId,
     domain: &str,
-) -> Result<types::SsoDiscoveryState, RejectResponse> {
-    query_candid(env, canister_id, "get_sso_discovery", (domain,)).map(|(x,)| x)
+) -> Result<types::SsoDiscoveryStatus, RejectResponse> {
+    get_sso_discovery_for_origin(env, canister_id, domain, None)
+}
+
+/// Like [`get_sso_discovery`] but supplies the target dapp origin so the
+/// resolved config reports the per-origin `resolved_client_id`.
+pub fn get_sso_discovery_for_origin(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    domain: &str,
+    origin: Option<&str>,
+) -> Result<types::SsoDiscoveryStatus, RejectResponse> {
+    let request = types::GetSsoDiscoveryStatusRequest {
+        org_domain: domain.to_string(),
+        target_app_origin: origin.map(str::to_string),
+    };
+    query_candid(env, canister_id, "get_sso_discovery_status", (request,)).map(|(x,)| x)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn sso_prepare_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    jwt: &str,
+    salt: &[u8; 32],
+    session_key: &types::SessionKey,
+    discovery_domain: &str,
+    origin: &str,
+) -> Result<
+    types::OpenIdResult<types::SsoPrepareDelegationResponse, types::OpenIdDelegationError>,
+    RejectResponse,
+> {
+    let request = types::SsoPrepareDelegationRequest {
+        jwt: jwt.to_string(),
+        salt: *salt,
+        session_key: session_key.clone(),
+        org_domain: discovery_domain.to_string(),
+        target_app_origin: origin.to_string(),
+    };
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "sso_prepare_delegation",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn sso_get_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    jwt: &str,
+    salt: &[u8; 32],
+    session_key: &types::SessionKey,
+    expiration: &types::Timestamp,
+    discovery_domain: &str,
+    origin: &str,
+    sso_attr_bundle: &[u8],
+) -> Result<
+    types::OpenIdResult<types::SsoGetDelegationResponse, types::OpenIdDelegationError>,
+    RejectResponse,
+> {
+    let request = types::SsoGetDelegationRequest {
+        jwt: jwt.to_string(),
+        salt: *salt,
+        session_key: session_key.clone(),
+        expiration: *expiration,
+        org_domain: discovery_domain.to_string(),
+        target_app_origin: origin.to_string(),
+        sso_attr_bundle: serde_bytes::ByteBuf::from(sso_attr_bundle.to_vec()),
+    };
+    query_candid_as(env, canister_id, sender, "sso_get_delegation", (request,)).map(|(x,)| x)
 }
 
 /// Collapse an [`OpenIdResult`](types::OpenIdResult) to a plain `Result` for
@@ -627,6 +702,42 @@ pub fn get_icrc3_attributes(
     query_candid_as(env, canister_id, sender, "get_icrc3_attributes", (request,)).map(|(x,)| x)
 }
 
+/// Like [`prepare_icrc3_attributes`], but attaches a `sender_info` (SSO
+/// attribute bundle `info` + `signer`) to the call.
+///
+/// PocketIC does not verify the `sender_info` canister signature, so only the
+/// canister-observable checks (signer, expiry, origin) are exercised here.
+#[allow(clippy::too_many_arguments)]
+pub fn prepare_icrc3_attributes_with_bundle(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: types::attributes::PrepareIcrc3AttributeRequest,
+    bundle_info: &[u8],
+    signer: Principal,
+) -> Result<
+    Result<
+        types::attributes::PrepareIcrc3AttributeResponse,
+        types::attributes::PrepareIcrc3AttributeError,
+    >,
+    RejectResponse,
+> {
+    let payload = candid::encode_one(request).expect("encode PrepareIcrc3AttributeRequest");
+    let sender_info = RawSenderInfo {
+        info: bundle_info.to_vec(),
+        signer: signer.as_slice().to_vec(),
+    };
+    let bytes = env.update_call_with_sender_info(
+        canister_id,
+        sender,
+        "prepare_icrc3_attributes",
+        payload,
+        sender_info,
+    )?;
+    let (result,) = candid::decode_args(&bytes).expect("decode prepare_icrc3_attributes response");
+    Ok(result)
+}
+
 pub type ListAvailableAttributesResult =
     Result<Vec<(String, Vec<u8>)>, types::attributes::ListAvailableAttributesError>;
 
@@ -644,6 +755,33 @@ pub fn list_available_attributes(
         (request,),
     )
     .map(|(x,)| x)
+}
+
+/// Like [`list_available_attributes`], but attaches a `sender_info` (SSO
+/// attribute bundle `info` + `signer`) to the query. See
+/// [`prepare_icrc3_attributes_with_bundle`] for the PocketIC signature caveat.
+pub fn list_available_attributes_with_bundle(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: types::attributes::ListAvailableAttributesRequest,
+    bundle_info: &[u8],
+    signer: Principal,
+) -> Result<ListAvailableAttributesResult, RejectResponse> {
+    let payload = candid::encode_one(request).expect("encode ListAvailableAttributesRequest");
+    let sender_info = RawSenderInfo {
+        info: bundle_info.to_vec(),
+        signer: signer.as_slice().to_vec(),
+    };
+    let bytes = env.query_call_with_sender_info(
+        canister_id,
+        sender,
+        "list_available_attributes",
+        payload,
+        sender_info,
+    )?;
+    let (result,) = candid::decode_args(&bytes).expect("decode list_available_attributes response");
+    Ok(result)
 }
 
 // --- Email recovery ---

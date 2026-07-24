@@ -49,6 +49,9 @@ futures = { version = "0.3", default-features = false, features = ["alloc"] }
 
 # All IC deps
 candid.workspace = true
+# Separate `ic0 1.1` for the `msg_caller_info_*` system API; it has no `links`
+# key, so it coexists with the `ic0 0.23` pulled in transitively by `ic-cdk`.
+ic0 = "1.1"
 ic-cdk = { workspace = true, features = ["transform-closure"] }
 ic-cdk-macros.workspace = true
 ic-cdk-timers.workspace = true

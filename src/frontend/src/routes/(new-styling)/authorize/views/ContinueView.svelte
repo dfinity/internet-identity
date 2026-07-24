@@ -252,7 +252,10 @@
       }
 
       if (!$isAuthenticatedStore) {
-        await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
+        await authLastUsedFlow.authenticate(
+          $lastUsedIdentitiesStore.selected!,
+          effectiveOrigin,
+        );
       }
       const { identityNumber, actor } = $authenticationStore!;
       const accountNumberPromise =
@@ -280,7 +283,10 @@
     isAuthenticatingDefault = true;
     try {
       if (!$isAuthenticatedStore) {
-        await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
+        await authLastUsedFlow.authenticate(
+          $lastUsedIdentitiesStore.selected!,
+          effectiveOrigin,
+        );
       }
       onAuthorize(
         Promise.resolve(accountNumber),
@@ -333,7 +339,10 @@
       }
 
       if (!$isAuthenticatedStore) {
-        await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
+        await authLastUsedFlow.authenticate(
+          $lastUsedIdentitiesStore.selected!,
+          effectiveOrigin,
+        );
       }
       const { identityNumber, actor } = $authenticationStore!;
       await loadAccountsViaActor(actor, identityNumber);
@@ -350,7 +359,10 @@
       // create_account is not in the session-delegation scope, so it needs a
       // full-auth identity even when the screen was loaded ceremony-free.
       if (!$isAuthenticatedStore) {
-        await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
+        await authLastUsedFlow.authenticate(
+          $lastUsedIdentitiesStore.selected!,
+          effectiveOrigin,
+        );
       }
       const authenticated = $authenticationStore;
       if (authenticated === undefined) {
@@ -402,6 +414,7 @@
         if (!$isAuthenticatedStore) {
           await authLastUsedFlow.authenticate(
             $lastUsedIdentitiesStore.selected!,
+            effectiveOrigin,
           );
         }
         const authenticated = $authenticationStore;
@@ -450,6 +463,7 @@
         if (!$isAuthenticatedStore) {
           await authLastUsedFlow.authenticate(
             $lastUsedIdentitiesStore.selected!,
+            effectiveOrigin,
           );
         }
         const authenticated = $authenticationStore;

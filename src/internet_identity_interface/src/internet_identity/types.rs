@@ -300,20 +300,12 @@ pub struct InternetIdentityInit {
     pub related_origins: Option<Vec<String>>,
     pub new_flow_origins: Option<Vec<String>>,
     pub openid_configs: Option<Vec<OpenIdConfig>>,
-    /// Allowlist of domains that may be registered as discoverable SSO
-    /// providers via `add_discoverable_oidc_config`. When `Some`, this list
-    /// fully replaces the built-in defaults; when `None`, falls back to
-    /// `dfinity.org` (production) or `beta.dfinity.org` (everything else)
-    /// keyed off `is_production`.
-    pub sso_discoverable_domains: Option<Vec<String>>,
-    /// Deploy flag that opens the SSO discovery domain gate to *any* domain.
-    /// When `Some(true)`, `sso_discoverable_domains` (and its built-in
-    /// `is_production` defaults) no longer restrict which domains may be
-    /// discovered as SSO providers — every domain is accepted. `None` /
-    /// `Some(false)` leave the allowlist in force. The strict-`https` posture
-    /// is unaffected: a domain must still be on the explicit
-    /// `sso_discoverable_domains` list to serve discovery over plain `http`.
-    pub sso_allow_any_domain: Option<bool>,
+    /// Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
+    /// loopback hosts (`localhost` / `127.0.0.1`) so e2e tests can point at local
+    /// mock IdPs served over plain `http`. `None` / `Some(false)` (the default)
+    /// require `https` for every discovery host. Never enable in production —
+    /// non-loopback hosts always require `https` regardless of this flag.
+    pub sso_allow_insecure_discovery: Option<bool>,
     /// One-shot backfill of the `sso_domain` / `sso_name` fields on stored
     /// `OpenIdCredential`s (see `docs/ongoing/openid-sso-prod-readiness.md`
     /// §8.6). When `Some`, a batched timer-driven migration stamps every
@@ -504,6 +496,7 @@ pub struct DiscoverableOidcConfig {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SsoDiscovery {
     pub discovery_domain: String,
+    /// The org's primary OIDC client.
     pub client_id: String,
     pub issuer: String,
     pub authorization_endpoint: String,
@@ -511,20 +504,30 @@ pub struct SsoDiscovery {
     /// Human-readable SSO label, if the domain published one in its
     /// `ii-openid-configuration`.
     pub name: Option<String>,
+    /// Client the frontend runs the ceremony against for the requested origin;
+    /// `None` when the origin is denied.
+    pub resolved_client_id: Option<String>,
 }
 
-/// State of a domain's SSO discovery, read by `get_sso_discovery`. A failed
-/// fetch isn't a distinct state — it reads as `Pending` and the frontend times
-/// out — so the states are: resolved, in flight, or not allowed.
+/// Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
+/// failed fetch isn't a distinct status — it reads as `Pending` and the frontend
+/// times out — so the statuses are: resolved, or in flight.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum SsoDiscoveryState {
+pub enum SsoDiscoveryStatus {
     /// Discovery completed; the resolved configuration.
     Resolved(SsoDiscovery),
     /// Discovery is in flight (or not yet started) — drive it with
     /// `discover_sso` and poll again.
     Pending,
-    /// The domain is not on the canister's `sso_discoverable_domains` allowlist.
-    NotAllowed,
+}
+
+/// Request for `get_sso_discovery_status`.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetSsoDiscoveryStatusRequest {
+    /// The org's SSO discovery domain.
+    pub org_domain: String,
+    /// The gated dapp origin, when resolving which per-app client serves it.
+    pub target_app_origin: Option<FrontendHostname>,
 }
 
 pub enum AuthorizationKey {

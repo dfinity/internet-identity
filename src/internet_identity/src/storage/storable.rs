@@ -24,5 +24,6 @@ pub mod openid_jwks;
 pub mod passkey_credential;
 pub mod recovery_key;
 pub mod special_device_migration;
+pub mod sso_stable_id_key;
 pub mod storable_persistent_state;
 pub mod verified_email;

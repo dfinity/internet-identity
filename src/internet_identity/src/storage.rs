@@ -136,6 +136,7 @@ use storable::mcp_registration::StorableMcpRegistration;
 use storable::openid_credential::StorableOpenIdCredential;
 use storable::openid_credential_key::StorableOpenIdCredentialKey;
 use storable::openid_jwks::StorableJwks;
+use storable::sso_stable_id_key::StorableSsoStableIdKey;
 use storable::storable_persistent_state::StorablePersistentState;
 
 pub mod anchor;
@@ -207,6 +208,7 @@ const MCP_GRANT_MEMORY_INDEX: u8 = 29u8;
 // region is abandoned rather than migrated, matching the retired MCP indexes above.
 // const DEPRECATED_MCP_REGISTRATION_URL_MEMORY_INDEX: u8 = 30u8;
 const MCP_REGISTRATION_MEMORY_INDEX: u8 = 31u8;
+const SSO_STABLE_ID_INDEX_MEMORY_INDEX: u8 = 32u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -281,6 +283,10 @@ const MCP_REGISTRATION_MEMORY_ID: MemoryId = MemoryId::new(MCP_REGISTRATION_MEMO
 /// of the identity's devices. Kept in its own map so it never touches anchor
 /// serialization.
 const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
+
+/// SSO stable-id bridge:
+/// `SHA-256(sso_domain, iss, ii_client_id, stable_id) -> AnchorNumber`.
+const SSO_STABLE_ID_INDEX_MEMORY_ID: MemoryId = MemoryId::new(SSO_STABLE_ID_INDEX_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -441,6 +447,17 @@ pub struct Storage<M: Memory> {
     mcp_config_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Per-anchor trusted-MCP-server config. See [`MCP_CONFIG_MEMORY_ID`].
     mcp_config_memory: StableBTreeMap<StorableAnchorNumber, StorableMcpConfig, ManagedMemory<M>>,
+
+    sso_stable_id_index_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// SSO stable-id lookup index:
+    /// `SHA-256(sso_domain, iss, ii_client_id, stable_id) ->
+    /// AnchorNumber`. Storage-maintained — [`Storage::write`] reconciles it
+    /// from the anchors' stored OpenID credentials on every write, so it
+    /// self-cleans when a credential is removed or moved. Mirrors
+    /// [`Storage::lookup_anchor_with_openid_credential`]'s value type. See
+    /// [`SSO_STABLE_ID_INDEX_MEMORY_ID`].
+    sso_stable_id_index_memory:
+        StableBTreeMap<StorableSsoStableIdKey, StorableAnchorNumberList, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -530,6 +547,7 @@ impl<M: Memory + Clone> Storage<M> {
         let mcp_registration_memory = memory_manager.get(MCP_REGISTRATION_MEMORY_ID);
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
+        let sso_stable_id_index_memory = memory_manager.get(SSO_STABLE_ID_INDEX_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -644,6 +662,10 @@ impl<M: Memory + Clone> Storage<M> {
             openid_jwks_cache_memory: StableBTreeMap::init(openid_jwks_cache_memory),
             mcp_config_memory_wrapper: MemoryWrapper::new(mcp_config_memory.clone()),
             mcp_config_memory: StableBTreeMap::init(mcp_config_memory),
+            sso_stable_id_index_memory_wrapper: MemoryWrapper::new(
+                sso_stable_id_index_memory.clone(),
+            ),
+            sso_stable_id_index_memory: StableBTreeMap::init(sso_stable_id_index_memory),
         }
     }
 
@@ -845,7 +867,14 @@ impl<M: Memory + Clone> Storage<M> {
         // reverse-lookup index — verified emails are addressable only
         // via the owning anchor.
 
-        // Right now, this is the only index that needs to be updated based on `StorableAnchor`.
+        // The SSO stable-id index is derived from the same credentials; sync it
+        // first (with clones) since the openid-credential sync below consumes
+        // the vecs.
+        self.sync_anchor_with_sso_stable_id_index(
+            anchor_number,
+            previous_openid_credentials.clone(),
+            storable_anchor.openid_credentials.clone(),
+        );
         self.sync_anchor_with_openid_credential_index(
             anchor_number,
             previous_openid_credentials,
@@ -948,6 +977,54 @@ impl<M: Memory + Clone> Storage<M> {
             self.lookup_anchor_with_openid_credential_memory
                 .insert(key, vec![anchor_number].into());
         });
+    }
+
+    /// Reconcile the SSO stable-id index against `anchor_number`'s stored
+    /// credentials. Mirrors [`Storage::sync_anchor_with_openid_credential_index`]:
+    /// derive the `(sso_domain, iss, ii_client_id, stable_id)` keyset from each
+    /// credential that carries a `stable_id`, diff previous vs current, and
+    /// apply only the delta — `remove` the entries that disappeared, `insert`
+    /// the new ones pointing at this anchor. Because the keyset is derived from
+    /// the stored credentials, removing or moving an SSO credential removes or
+    /// moves its index entry too; there are no orphans.
+    fn sync_anchor_with_sso_stable_id_index(
+        &mut self,
+        anchor_number: AnchorNumber,
+        previous: Vec<StorableOpenIdCredential>,
+        current: Vec<StorableOpenIdCredential>,
+    ) {
+        fn keys(credentials: Vec<StorableOpenIdCredential>) -> BTreeSet<StorableSsoStableIdKey> {
+            credentials
+                .into_iter()
+                .filter_map(|cred| {
+                    // Both are set together on an SSO non-`sub` credential; a
+                    // `stable_id` without an `sso_domain` can't be domain-scoped,
+                    // so it isn't indexed.
+                    let stable_id = cred.stable_id?;
+                    let sso_domain = cred.sso_domain?;
+                    Some(StorableSsoStableIdKey::new(
+                        &sso_domain,
+                        &cred.iss,
+                        &cred.aud,
+                        &stable_id,
+                    ))
+                })
+                .collect()
+        }
+
+        let previous_set = keys(previous);
+        let current_set = keys(current);
+
+        previous_set.difference(&current_set).for_each(|key| {
+            self.sso_stable_id_index_memory.remove(key);
+        });
+        current_set
+            .difference(&previous_set)
+            .cloned()
+            .for_each(|key| {
+                self.sso_stable_id_index_memory
+                    .insert(key, vec![anchor_number].into());
+            });
     }
 
     pub fn lookup_anchor_with_openid_credential(
@@ -1234,6 +1311,30 @@ impl<M: Memory + Clone> Storage<M> {
     /// previous value), so it syncs across the identity's devices.
     pub fn write_mcp_config(&mut self, anchor_number: AnchorNumber, config: StorableMcpConfig) {
         self.mcp_config_memory.insert(anchor_number, config);
+    }
+
+    /// Resolve a non-`sub` SSO stable id to the anchor that carries the matching
+    /// II-client credential, or `None` if no anchor does (never linked, or the
+    /// credential has since been removed — the index self-cleans on `write()`,
+    /// so a stale `Some` can't linger). Mirrors
+    /// [`Storage::lookup_anchor_with_openid_credential`].
+    pub fn lookup_anchor_by_sso_stable_id(
+        &self,
+        sso_domain: &str,
+        iss: &str,
+        ii_client_id: &str,
+        stable_id: &str,
+    ) -> Option<AnchorNumber> {
+        let anchor_numbers: Vec<AnchorNumber> = self
+            .sso_stable_id_index_memory
+            .get(&StorableSsoStableIdKey::new(
+                sso_domain,
+                iss,
+                ii_client_id,
+                stable_id,
+            ))
+            .map(Into::into)?;
+        anchor_numbers.first().copied()
     }
 
     /// Resolve the verified `From:` of an inbound recovery email to
@@ -2449,6 +2550,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "mcp_config_memory".to_string(),
                 self.mcp_config_memory_wrapper.size(),
+            ),
+            (
+                "sso_stable_id_index_memory".to_string(),
+                self.sso_stable_id_index_memory_wrapper.size(),
             ),
         ])
     }

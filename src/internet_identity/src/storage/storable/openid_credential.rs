@@ -36,6 +36,16 @@ pub struct StorableOpenIdCredential {
     /// a `name`.
     #[n(6)]
     pub sso_name: Option<String>,
+    /// Cross-client-stable identifier (the `oid` claim value) for a non-`sub`
+    /// SSO org, stamped only on the II-client-keyed credential at SSO write time.
+    /// Backs the SSO stable-id index, which `write()` reconciles from the
+    /// stored credentials — remove or move the credential and the index entry
+    /// follows. Additive CBOR field: credentials written before it existed
+    /// decode as `None`, so no migration is needed — same pattern as
+    /// `sso_domain` / `sso_name` above. Storage-internal: never surfaced in
+    /// the candid `OpenIdCredentialData`.
+    #[n(7)]
+    pub stable_id: Option<String>,
 }
 
 impl StorableOpenIdCredential {
@@ -76,6 +86,7 @@ impl From<StorableOpenIdCredential> for OpenIdCredential {
                 .collect(),
             sso_domain: value.sso_domain,
             sso_name: value.sso_name,
+            stable_id: value.stable_id,
         }
     }
 }
@@ -94,6 +105,7 @@ impl From<OpenIdCredential> for StorableOpenIdCredential {
                 .collect(),
             sso_domain: value.sso_domain,
             sso_name: value.sso_name,
+            stable_id: value.stable_id,
         }
     }
 }
@@ -114,12 +126,15 @@ mod tests {
             metadata: HashMap::new(),
             sso_domain,
             sso_name,
+            stable_id: None,
         }
     }
 
     #[test]
     fn should_roundtrip_through_storable() {
-        let credential = credential(Some("acme.com".to_string()), Some("Acme Corp".to_string()));
+        let mut credential =
+            credential(Some("acme.com".to_string()), Some("Acme Corp".to_string()));
+        credential.stable_id = Some("acme-oid-0001".to_string());
         let decoded = StorableOpenIdCredential::from_bytes(credential.to_bytes());
         assert_eq!(decoded.iss, credential.iss);
         assert_eq!(decoded.sub, credential.sub);
@@ -130,11 +145,12 @@ mod tests {
         );
         assert_eq!(decoded.sso_domain, Some("acme.com".to_string()));
         assert_eq!(decoded.sso_name, Some("Acme Corp".to_string()));
+        assert_eq!(decoded.stable_id, Some("acme-oid-0001".to_string()));
     }
 
-    /// Credentials written before the `sso_domain` / `sso_name` fields
-    /// existed are CBOR maps without keys 5 and 6 — they must decode with
-    /// both fields `None`.
+    /// Credentials written before the `sso_domain` / `sso_name` / `stable_id`
+    /// fields existed are CBOR maps without keys 5, 6 and 7 — they must decode
+    /// with all three `None`.
     #[test]
     fn should_decode_credential_without_sso_fields() {
         // Encode the pre-`sso_domain` shape: a CBOR map with keys 0..=4 only.
@@ -154,6 +170,7 @@ mod tests {
         assert_eq!(decoded.last_usage_timestamp, Some(42));
         assert_eq!(decoded.sso_domain, None);
         assert_eq!(decoded.sso_name, None);
+        assert_eq!(decoded.stable_id, None);
     }
 
     /// Rollback safety: bytes written by the new encoder (with keys 5 and 6
