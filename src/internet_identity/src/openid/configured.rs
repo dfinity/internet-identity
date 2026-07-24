@@ -8,7 +8,7 @@
 //! [`super::sso`]); the JWK read ([`super::jwks`]) is the only place the two
 //! diverge.
 
-use super::verify::{Descriptor, Stamp};
+use super::verify::Descriptor;
 use super::OpenIdCredential;
 use super::{get_all_claims, get_issuer_placeholders, replace_issuer_placeholders, AudClaim};
 use identity_jose::jwk::Jwk;
@@ -80,7 +80,7 @@ pub(super) fn resolve(
                     Descriptor {
                         issuer: provider.issuer.clone(),
                         client_id: provider.client_id.clone(),
-                        stamp: Stamp::Direct,
+                        sso: None,
                     },
                     provider.issuer.clone(),
                 ))

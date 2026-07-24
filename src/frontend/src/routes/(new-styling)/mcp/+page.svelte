@@ -157,6 +157,68 @@
     }
   });
 
+  // Auto-advance the untrusted screen once the user trusts this server. The
+  // "Manage trusted server" button hands the session to a Settings tab where the
+  // user sets the trusted server; when they come back to this tab, re-read the
+  // synced config and — if this server's origin is now trusted — move straight
+  // to the connect screen, so they don't have to restart the connect ("then try
+  // again" happens for them). Same unblock as switching to an identity that
+  // already trusts the server. Re-checking when the tab regains focus/visibility
+  // (rather than polling) is enough: the trusted server is set in another tab, so
+  // regaining focus here is exactly the moment the synced config may have
+  // changed. The read reuses the actor the untrusted screen already holds
+  // (reaching it authenticated the identity); minting still waits for an explicit
+  // "Allow access" on the connect screen.
+  $effect(() => {
+    if (phase.kind !== "untrusted" || mcpServer === undefined) {
+      return;
+    }
+    const server = mcpServer;
+    let checking = false;
+    const recheck = (): void => {
+      if (checking || document.visibilityState !== "visible") {
+        return;
+      }
+      const authenticated = get(authenticationStore);
+      if (authenticated === undefined) {
+        return;
+      }
+      const identityNumber = authenticated.identityNumber;
+      checking = true;
+      void (async () => {
+        try {
+          const config = await readMcpConfig(
+            authenticated.actor,
+            identityNumber,
+          );
+          // Only act if the user is still on the untrusted screen for the same
+          // identity this config was read (and signed) as: a late resolve mustn't
+          // yank them off a screen they've since moved to (navigated away), and —
+          // since the untrusted screen is reachable again for a different identity
+          // after a switch — applying a stale read must not unblock the wrong one.
+          if (
+            phase.kind === "untrusted" &&
+            get(authenticationStore)?.identityNumber === identityNumber &&
+            isOriginTrusted(config, server.origin)
+          ) {
+            phase = { kind: "authorize" };
+          }
+        } catch {
+          // Couldn't read the config (e.g. a transient error or an expired
+          // session): leave the user on the untrusted screen to retry manually.
+        } finally {
+          checking = false;
+        }
+      })();
+    };
+    document.addEventListener("visibilitychange", recheck);
+    window.addEventListener("focus", recheck);
+    return () => {
+      document.removeEventListener("visibilitychange", recheck);
+      window.removeEventListener("focus", recheck);
+    };
+  });
+
   // Invoked by the reused account picker once it has authenticated the selected
   // identity and resolved the chosen account. Connecting mints a short-lived
   // registration delegation for the server's per-connect key (rooted at a

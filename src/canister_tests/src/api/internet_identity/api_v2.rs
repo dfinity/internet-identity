@@ -478,31 +478,6 @@ fn permissions_arg(read_only: Option<bool>) -> Option<Permissions> {
     })
 }
 
-pub fn mcp_register(
-    env: &PocketIc,
-    canister_id: CanisterId,
-    sender: Principal,
-    identity_number: IdentityNumber,
-    session_key: SessionKey,
-    grant_ttl_ns: u64,
-    read_only: Option<bool>,
-) -> Result<Result<McpRegistration, String>, RejectResponse> {
-    call_candid_as(
-        env,
-        canister_id,
-        RawEffectivePrincipal::None,
-        sender,
-        "mcp_register",
-        (
-            identity_number,
-            session_key,
-            grant_ttl_ns,
-            permissions_arg(read_only),
-        ),
-    )
-    .map(|(x,)| x)
-}
-
 pub fn prepare_mcp_registration_delegation(
     env: &PocketIc,
     canister_id: CanisterId,

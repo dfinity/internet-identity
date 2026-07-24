@@ -15,7 +15,7 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { toBase64URL } from "../../../src/lib/utils/utils";
 import { AUTH_CALLBACKS_PATH } from "../../../src/lib/utils/authCallbacks";
-import { II_URL } from "../utils";
+import { holdToConfirm, II_URL } from "../utils";
 import { DEFAULT_HOST } from "./identity";
 
 /** What the MCP server stand-in does on its next redemption. */
@@ -381,11 +381,9 @@ export const test = base.extend<{ mcp: McpFixture }>({
       }
       await page.locator('a[href="/manage/settings"]').click();
       await page.waitForURL(`${II_URL}/manage/settings`);
-      // The URL box only appears once the master toggle is on; the remove button
-      // appears once the trusted server is saved to the canister.
-      await page.getByRole("switch", { name: "Trusted MCP server" }).check();
+      await page.getByRole("switch", { name: "AI access" }).click();
       await page.getByLabel("MCP server URL").fill(`${MCP_SERVER_ORIGIN}/mcp`);
-      await page.getByRole("button", { name: "Trust this server" }).click();
+      await holdToConfirm(page, "Hold to continue");
       await page
         .getByRole("button", { name: "Remove this server" })
         .waitFor({ state: "visible" });

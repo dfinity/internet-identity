@@ -152,8 +152,11 @@
       isAuthenticating = true;
       if ($authenticationStore?.identityNumber !== identityNumber) {
         sessionStore.reset();
+        // Pass the effective origin so an SSO identity redeems through the gate
+        // path. Undefined before the dapp request arrives → plain OpenID path.
         await authLastUsedFlow.authenticate(
           $lastUsedIdentitiesStore.identities[`${identityNumber}`],
+          $authorizationStore?.effectiveOrigin,
         );
       }
       lastUsedIdentitiesStore.selectIdentity(identityNumber);
@@ -229,7 +232,6 @@
         .get_default_account(identityNumber, origin)
         .then(throwCanisterError)
         .then((account) => account.account_number[0]);
-      // 1-click SSO flow: no access-level toggle, always full access.
       authorizationStore.authorize(
         Promise.resolve(accountNumber),
         "full-access",

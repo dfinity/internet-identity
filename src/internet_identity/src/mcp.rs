@@ -98,12 +98,13 @@ fn default_account_number(
     default_account(anchor_number, origin).account_number
 }
 
-/// `mcp_register`: register the trusted MCP server's session key for
-/// `anchor_number`, granting its self-authenticating principal access to the
-/// server-facing `mcp_*` methods until the grant expires. The caller must
-/// already be authorized for `anchor_number` (checked by the canister
-/// method); the key itself comes from the trusted server's callback, fetched
-/// by the II frontend after user consent — never from the connect link.
+/// Register the trusted MCP server's session key for `anchor_number`, granting
+/// its self-authenticating principal access to the server-facing `mcp_*`
+/// methods until the grant expires. Internal grant-binding shared by the
+/// connect path: [`crate::mcp_registration::register_v2`] calls it once it has
+/// recovered the consent (anchor, read-only choice, grant lifetime) for the
+/// redeeming registration principal, so the anchor and consent here are
+/// recovered server-side, never taken from the connecting server.
 ///
 /// `grant_ttl_ns` is clamped to [10 min, 30 days]. `read_only` restricts every
 /// per-app delegation this session mints to query calls (chosen at connect,

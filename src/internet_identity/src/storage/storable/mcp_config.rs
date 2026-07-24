@@ -34,7 +34,7 @@ pub struct StorableMcpConfig {
     /// when no session is registered. The grant map is keyed by principal, so
     /// this forward pointer is what lets a config change revoke the active
     /// session in O(1) — and what enforces at most one session per identity:
-    /// `mcp_register` replaces the previous grant through it.
+    /// `mcp_register_v2` replaces the previous grant through it.
     #[cbor(n(2), with = "minicbor::bytes")]
     pub session_principal: Option<Vec<u8>>,
     /// Raw principal bytes of the anchor's current in-flight registration

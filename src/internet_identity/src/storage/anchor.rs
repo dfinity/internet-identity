@@ -164,6 +164,9 @@ impl From<OpenIdCredentialData> for OpenIdCredential {
             metadata: openid_credential.metadata,
             sso_domain: openid_credential.sso_domain,
             sso_name: openid_credential.sso_name,
+            // The candid `OpenIdCredentialData` deliberately has no `stable_id`;
+            // the SSO write path sets it explicitly on the primary credential.
+            stable_id: None,
         }
     }
 }

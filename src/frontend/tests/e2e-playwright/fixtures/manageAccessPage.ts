@@ -213,6 +213,18 @@ class AddDialog {
     // confirmation view. The virtual authenticator fulfils the prompt.
   }
 
+  async openid(
+    issuerName: string,
+    signIn: (popup: Page) => Promise<void>,
+  ): Promise<void> {
+    const popupPromise = this.#dialog.page().context().waitForEvent("page");
+    await this.#dialog.getByRole("button", { name: issuerName }).click();
+    const popup = await popupPromise;
+    const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
+    await signIn(popup);
+    await closePromise;
+  }
+
   async assertPasskeyUnavailable(): Promise<void> {
     await expect(
       this.#dialog.getByRole("button", { name: "Continue with passkey" }),
@@ -224,7 +236,7 @@ class AddDialog {
   }
 }
 
-class ManageAccessPage {
+export class ManageAccessPage {
   readonly #page: Page;
 
   constructor(page: Page) {
