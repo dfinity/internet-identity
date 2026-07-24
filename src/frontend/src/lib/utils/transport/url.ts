@@ -51,6 +51,13 @@ import {
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import type { PublicKey } from "@icp-sdk/core/agent";
 import { matchDeclaredCallback } from "$lib/utils/authCallbacks";
+import {
+  createStore,
+  get as idbGet,
+  set as idbSet,
+  delMany as idbDelMany,
+  entries as idbEntries,
+} from "idb-keyval";
 
 /** Hash-fragment parameter carrying the JSON-RPC request (in) / response (out). */
 const MESSAGE_PARAM = "message";
@@ -208,34 +215,14 @@ const isDelegationRequest = (request: JsonRequest): boolean =>
   request.id !== undefined &&
   DelegationParamsCodec.safeParse(request.params).success;
 
-// The ephemeral key is generated extractable so it can be persisted (as JWK)
-// across an II-internal redirect and reconstructed on the return load.
-type EphemeralJwk = { privateJwk: JsonWebKey; publicJwk: JsonWebKey };
-
+// The ephemeral key is generated NON-extractable: it must survive an II-internal
+// redirect (e.g. an OpenID/SSO hop), but its private key must never be readable
+// back out of storage. So the key pair itself is kept as a non-extractable
+// `CryptoKeyPair` in IndexedDB (which stores it by structured clone, without
+// exposing the private bits), and only its id is journaled in sessionStorage —
+// mirroring how II persists its session keys (stores/session-delegation.store).
 const createEphemeralIdentity = (): Promise<ECDSAKeyIdentity> =>
-  ECDSAKeyIdentity.generate({ extractable: true });
-
-const exportEphemeral = async (
-  identity: ECDSAKeyIdentity,
-): Promise<EphemeralJwk> => {
-  const keyPair = identity.getKeyPair();
-  return {
-    privateJwk: await crypto.subtle.exportKey("jwk", keyPair.privateKey),
-    publicJwk: await crypto.subtle.exportKey("jwk", keyPair.publicKey),
-  };
-};
-
-const importEphemeral = async ({
-  privateJwk,
-  publicJwk,
-}: EphemeralJwk): Promise<ECDSAKeyIdentity> => {
-  const algorithm = { name: "ECDSA", namedCurve: "P-256" } as const;
-  const [privateKey, publicKey] = await Promise.all([
-    crypto.subtle.importKey("jwk", privateJwk, algorithm, true, ["sign"]),
-    crypto.subtle.importKey("jwk", publicJwk, algorithm, true, ["verify"]),
-  ]);
-  return ECDSAKeyIdentity.fromKeyPair({ privateKey, publicKey });
-};
+  ECDSAKeyIdentity.generate({ extractable: false });
 
 /**
  * Builds the interceptor for one `icrc34_delegation` request against a given
@@ -462,9 +449,11 @@ interface PersistedFlow {
   // Original requests as received from the RP (`publicKey` still the RP session
   // key); the ephemeral rewrite is re-derived on resume.
   requests: JsonRequest[];
-  // Ephemeral key material per delegation request id, so the second hop can
-  // still be signed after the redirect.
-  ephemeralKeys: Record<string, EphemeralJwk>;
+  // IndexedDB id of the ephemeral key per delegation request id, so the second
+  // hop can still be signed after the redirect. Only the id lives here (in
+  // sessionStorage); the key pair itself is a non-extractable CryptoKeyPair in
+  // the IndexedDB store below.
+  ephemeralKeyIds: Record<string, string>;
   // Responses already collected (finalized), keyed by request id, so a batch
   // that redirects again mid-flow resumes with its progress intact and does not
   // re-run already-answered handlers. Today's 1-click flows redirect only once,
@@ -477,8 +466,68 @@ const storeFlow = (flow: PersistedFlow): void => {
   sessionStorage.setItem(FLOW_STORAGE_KEY, JSON.stringify(flow));
 };
 
-const deleteStoredFlow = (): void => {
+// Dedicated IndexedDB store for the transport's single-use ephemeral
+// intermediate keys. The private key is kept here as a non-extractable
+// CryptoKeyPair (never in the sessionStorage flow journal, which holds only the
+// key id), so it cannot be read back out even by script with storage access.
+const EPHEMERAL_KEY_STORE = createStore("ii-icrc167-ephemeral-keys", "keys");
+
+interface StoredEphemeralKey {
+  keyPair: CryptoKeyPair;
+  // Epoch ms after which an abandoned-flow orphan is swept. Matches the flow
+  // timeout, so a key never outlives the flow it belongs to.
+  expiresAt: number;
+}
+
+const storeEphemeralKey = (
+  keyId: string,
+  keyPair: CryptoKeyPair,
+): Promise<void> =>
+  idbSet(
+    keyId,
+    { keyPair, expiresAt: Date.now() + FLOW_TIMEOUT_MS },
+    EPHEMERAL_KEY_STORE,
+  );
+
+const loadEphemeralIdentity = async (
+  keyId: string,
+): Promise<ECDSAKeyIdentity | undefined> => {
+  const stored = await idbGet<StoredEphemeralKey>(keyId, EPHEMERAL_KEY_STORE);
+  return stored === undefined
+    ? undefined
+    : ECDSAKeyIdentity.fromKeyPair(stored.keyPair);
+};
+
+// Best-effort removal of a completed/abandoned flow's ephemeral keys. Fire and
+// forget: on delivery the page navigates away, so the deletes may not land —
+// `sweepExpiredEphemeralKeys` reclaims any that don't on the next fresh flow.
+const deleteEphemeralKeys = (keyIds: string[]): void => {
+  if (keyIds.length > 0) {
+    void idbDelMany(keyIds, EPHEMERAL_KEY_STORE);
+  }
+};
+
+// Delete a flow's ephemeral keys and its sessionStorage entry together. Reads
+// the flow first to learn its key ids, then removes both.
+const deleteFlow = (): void => {
+  const flow = readStoredFlow();
   sessionStorage.removeItem(FLOW_STORAGE_KEY);
+  if (flow !== undefined) {
+    deleteEphemeralKeys(Object.values(flow.ephemeralKeyIds));
+  }
+};
+
+// Sweep orphaned ephemeral keys — those whose flow navigated away before its
+// own cleanup landed, or expired. Bounded by `expiresAt` so a concurrent tab's
+// still-live keys are left untouched.
+const sweepExpiredEphemeralKeys = async (): Promise<void> => {
+  const now = Date.now();
+  const stale = (
+    await idbEntries<string, StoredEphemeralKey>(EPHEMERAL_KEY_STORE)
+  )
+    .filter(([, value]) => value.expiresAt <= now)
+    .map(([keyId]) => keyId);
+  deleteEphemeralKeys(stale);
 };
 
 /** Merges the latest collected responses into the stored flow, so a redirect
@@ -500,11 +549,13 @@ const readStoredFlow = (): PersistedFlow | undefined => {
   try {
     flow = JSON.parse(json) as PersistedFlow;
   } catch {
-    deleteStoredFlow();
+    sessionStorage.removeItem(FLOW_STORAGE_KEY);
     return undefined;
   }
   if (Date.now() > flow.timestamp + FLOW_TIMEOUT_MS) {
-    deleteStoredFlow();
+    // The flow is abandoned; its ephemeral keys are reclaimed by
+    // sweepExpiredEphemeralKeys (they carry the same timeout).
+    sessionStorage.removeItem(FLOW_STORAGE_KEY);
     return undefined;
   }
   return flow;
@@ -536,10 +587,14 @@ export class UrlTransport implements Transport {
     const origin = new URL(request.callback).origin;
     await matchDeclaredCallback(origin, request.callback);
 
-    // Build the interceptors, generating an ephemeral key per delegation
-    // request, and remember the key material so the flow can resume after an
-    // II-internal redirect.
-    const ephemeralKeys: Record<string, EphemeralJwk> = {};
+    // Reclaim any ephemeral keys orphaned by an earlier abandoned flow before
+    // minting new ones, so the store does not grow without bound.
+    await sweepExpiredEphemeralKeys();
+
+    // Build the interceptors, generating a non-extractable ephemeral key per
+    // delegation request. The key pair is kept in IndexedDB; only its id is
+    // journaled, so the flow can resume after an II-internal redirect.
+    const ephemeralKeyIds: Record<string, string> = {};
     const interceptors: DelegationInterceptor[] = [];
     for (const jsonRequest of request.requests) {
       if (!isDelegationRequest(jsonRequest)) {
@@ -547,7 +602,9 @@ export class UrlTransport implements Transport {
         continue;
       }
       const ephemeral = await createEphemeralIdentity();
-      ephemeralKeys[String(jsonRequest.id)] = await exportEphemeral(ephemeral);
+      const keyId = crypto.randomUUID();
+      await storeEphemeralKey(keyId, ephemeral.getKeyPair());
+      ephemeralKeyIds[String(jsonRequest.id)] = keyId;
       interceptors.push(buildDelegationInterceptor(jsonRequest, ephemeral));
     }
 
@@ -558,7 +615,7 @@ export class UrlTransport implements Transport {
       batch: request.batch,
       timestamp: Date.now(),
       requests: request.requests,
-      ephemeralKeys,
+      ephemeralKeyIds,
       responses: {},
     });
 
@@ -569,7 +626,7 @@ export class UrlTransport implements Transport {
       batch: request.batch,
       interceptors,
       onResponsesChanged: persistResponses,
-      onDelivered: deleteStoredFlow,
+      onDelivered: deleteFlow,
     });
   }
 
@@ -578,13 +635,23 @@ export class UrlTransport implements Transport {
     // II's own origin-scoped sessionStorage — so it is not re-fetched here.
     const interceptors = await Promise.all(
       flow.requests.map(async (jsonRequest) => {
-        const keys =
+        const keyId =
           jsonRequest.id !== undefined
-            ? flow.ephemeralKeys[String(jsonRequest.id)]
+            ? flow.ephemeralKeyIds[String(jsonRequest.id)]
             : undefined;
-        return keys !== undefined
-          ? buildDelegationInterceptor(jsonRequest, await importEphemeral(keys))
-          : passthrough(jsonRequest);
+        if (keyId === undefined) {
+          return passthrough(jsonRequest);
+        }
+        const ephemeral = await loadEphemeralIdentity(keyId);
+        if (ephemeral === undefined) {
+          // The key was swept or cleared: the intermediate hop can no longer be
+          // signed, so the flow cannot be completed safely. Fail rather than
+          // fall back to a non-intercepted delegation.
+          throw new Error(
+            "ICRC-167 flow cannot resume: ephemeral key is no longer available",
+          );
+        }
+        return buildDelegationInterceptor(jsonRequest, ephemeral);
       }),
     );
 
@@ -596,7 +663,7 @@ export class UrlTransport implements Transport {
       interceptors,
       responses: flow.responses,
       onResponsesChanged: persistResponses,
-      onDelivered: deleteStoredFlow,
+      onDelivered: deleteFlow,
     });
   }
 }

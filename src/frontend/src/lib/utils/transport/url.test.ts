@@ -1,4 +1,18 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  vi,
+} from "vitest";
+import { IDBFactory } from "fake-indexeddb";
+import {
+  createStore,
+  clear as idbClear,
+  entries as idbEntries,
+} from "idb-keyval";
 import { DelegationChain, Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import type { JsonRequest, JsonResponse } from "./utils";
 import { DelegationParamsCodec, DelegationResultSchema } from "./utils";
@@ -9,6 +23,9 @@ import {
   UrlTransportUnsupportedError,
   type DelegationInterceptor,
 } from "./url";
+
+// Same store the transport keeps its ephemeral keys in — inspected/reset here.
+const EPHEMERAL_KEY_STORE = createStore("ii-icrc167-ephemeral-keys", "keys");
 
 const CALLBACK = "https://relying-party.example/callback";
 const ORIGIN = "https://relying-party.example";
@@ -135,8 +152,13 @@ const installLocation = (hash: string): void => {
   });
 };
 
-beforeEach(() => {
+beforeAll(() => {
+  global.indexedDB = new IDBFactory();
+});
+
+beforeEach(async () => {
   sessionStorage.clear();
+  await idbClear(EPHEMERAL_KEY_STORE);
   vi.spyOn(window.history, "replaceState").mockImplementation(() => undefined);
 });
 
@@ -428,6 +450,28 @@ describe("UrlTransport.establishChannel", () => {
     ).toBe(true);
   });
 
+  it("journals only the ephemeral key id — the key pair stays non-extractable in IndexedDB, never in sessionStorage", async () => {
+    const rp = Ed25519KeyIdentity.generate();
+    installLocation(hashFor(delegationRequest(rp)));
+    stubAllowList([CALLBACK]);
+    await new UrlTransport().establishChannel();
+
+    // The journaled flow references the key by id and carries no key material.
+    const flowJson = sessionStorage.getItem(STORAGE_KEY) ?? "";
+    const flow = JSON.parse(flowJson) as {
+      ephemeralKeyIds: Record<string, string>;
+    };
+    expect(Object.values(flow.ephemeralKeyIds)).toHaveLength(1);
+    expect(flowJson).not.toMatch(/[Jj]wk|privateKey|"d":/);
+
+    // The key pair itself is a single non-extractable CryptoKeyPair in IndexedDB.
+    const entries = await idbEntries<string, { keyPair: CryptoKeyPair }>(
+      EPHEMERAL_KEY_STORE,
+    );
+    expect(entries).toHaveLength(1);
+    expect(entries[0][1].keyPair.privateKey.extractable).toBe(false);
+  });
+
   it("resumes a partially-answered batch, re-emitting only the unanswered request", async () => {
     const batch: JsonRequest[] = [
       { jsonrpc: "2.0", id: 1, method: "a" },
@@ -464,7 +508,7 @@ describe("UrlTransport.establishChannel", () => {
         batch: false,
         timestamp: 0, // long expired
         requests: [{ jsonrpc: "2.0", id: 1, method: "m" }],
-        ephemeralKeys: {},
+        ephemeralKeyIds: {},
         responses: {},
       }),
     );
