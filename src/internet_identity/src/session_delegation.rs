@@ -62,7 +62,8 @@ pub async fn prepare_session_delegation(
     let seed = session_delegation_seed(anchor_number);
 
     state::signature_map_mut(|sigs| {
-        add_delegation_signature(sigs, session_key, &seed, expiration);
+        // Unrestricted: session delegations have no read-only option.
+        add_delegation_signature(sigs, session_key, &seed, expiration, None);
     });
     update_root_hash();
 
@@ -103,6 +104,7 @@ pub fn get_session_delegation(
                     pubkey: session_key,
                     expiration,
                     targets: None,
+                    permissions: None,
                 },
                 signature: ByteBuf::from(signature),
             }),
@@ -188,7 +190,7 @@ mod tests {
 
         let session_seed = session_delegation_seed(anchor_number);
 
-        let email_seed = crate::email_recovery::smtp::calculate_email_recovery_seed(
+        let email_seed = crate::email_inbound::smtp::calculate_email_recovery_seed(
             "user@example.com",
             anchor_number,
         );

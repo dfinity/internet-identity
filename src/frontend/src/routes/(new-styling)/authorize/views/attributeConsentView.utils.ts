@@ -58,12 +58,21 @@ export const groupId = (group: MergedGroup): string => {
 //
 // =============================================================================
 
-type Scope = string | undefined;
+/** Discriminator inside a bucket. Encodes the option's source (scope)
+ *  AND its displayed value so multiple unscoped verified-email rows that
+ *  share the same wire key (e.g. two `("email", <addr>)` rows for two
+ *  different addresses) become two distinct options instead of collapsing
+ *  into one. For OIDC-scoped rows the scope is already a unique
+ *  discriminator; including the value is harmless. */
+type OptionKey = string;
+
+const optionKey = (option: AvailableAttribute): OptionKey =>
+  `${extractScope(option.key) ?? ""}|${option.displayValue.toLowerCase()}`;
 
 type Bucket = {
   name: string;
   omitScope: boolean;
-  options: Map<Scope, MergedOption>;
+  options: Map<OptionKey, MergedOption>;
 };
 
 /** Phase 1. Build one bucket per request identity:
@@ -88,8 +97,8 @@ const bucketize = (groups: AttributeGroup[]): Bucket[] => {
       byId.set(id, bucket);
     }
     for (const option of group.options) {
-      const scope = extractScope(option.key);
-      const existing = bucket.options.get(scope);
+      const key = optionKey(option);
+      const existing = bucket.options.get(key);
       if (existing !== undefined) {
         const isDuplicate = existing.originals.some(
           (og) => og.key === option.key && og.omitScope === option.omitScope,
@@ -97,24 +106,24 @@ const bucketize = (groups: AttributeGroup[]): Bucket[] => {
         if (!isDuplicate) existing.originals.push(option);
         continue;
       }
-      bucket.options.set(scope, { display: option, originals: [option] });
+      bucket.options.set(key, { display: option, originals: [option] });
     }
   }
   return [...byId.values()];
 };
 
 /** Find the verified_email option (and its bucket) that pairs with an
- *  email row's `(omitScope, scope)`. Linear scan: handful of buckets in
- *  practice, and inlining keeps phase 2 readable. */
+ *  email row's `(omitScope, optionKey)`. Linear scan: handful of buckets
+ *  in practice, and inlining keeps phase 2 readable. */
 const findVerifiedFor = (
   buckets: Bucket[],
   omitScope: boolean,
-  scope: Scope,
+  key: OptionKey,
 ): { bucket: Bucket; option: MergedOption } | undefined => {
   for (const bucket of buckets) {
     if (bucket.name !== "verified_email") continue;
     if (bucket.omitScope !== omitScope) continue;
-    const option = bucket.options.get(scope);
+    const option = bucket.options.get(key);
     if (option !== undefined) return { bucket, option };
   }
   return undefined;
@@ -145,15 +154,15 @@ const findVerifiedFor = (
 const mergeEmailWithVerifiedEmail = (buckets: Bucket[]): Bucket[] => {
   for (const bucket of buckets) {
     if (bucket.name !== "email") continue;
-    const merged = new Map<Scope, MergedOption>();
-    for (const [scope, emailOpt] of bucket.options) {
-      const match = findVerifiedFor(buckets, bucket.omitScope, scope);
+    const merged = new Map<OptionKey, MergedOption>();
+    for (const [key, emailOpt] of bucket.options) {
+      const match = findVerifiedFor(buckets, bucket.omitScope, key);
       if (match === undefined) continue;
-      merged.set(scope, {
+      merged.set(key, {
         display: match.option.display,
         originals: [...match.option.originals, ...emailOpt.originals],
       });
-      match.bucket.options.delete(scope);
+      match.bucket.options.delete(key);
     }
     if (merged.size > 0) bucket.options = merged;
   }
@@ -174,8 +183,8 @@ const collapseIdenticalUnscopedValues = (buckets: Bucket[]): Bucket[] => {
     const options = [...bucket.options.values()];
     const firstValue = options[0].display.displayValue;
     if (!options.every((o) => o.display.displayValue === firstValue)) continue;
-    const [firstScope] = bucket.options.keys();
-    bucket.options = new Map([[firstScope, options[0]]]);
+    const [firstKey] = bucket.options.keys();
+    bucket.options = new Map([[firstKey, options[0]]]);
   }
   return buckets;
 };

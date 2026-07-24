@@ -39,7 +39,7 @@
 //! The DoH pipeline surfaces a `Vec<DkimCheck>` to the FE so a UI can
 //! render "which step failed". The DNSSEC pipeline doesn't need that
 //! granularity (its failure is wrapped into a single
-//! `EmailRecoveryError`). To keep one source of truth for *what the
+//! `EmailChallengeError`). To keep one source of truth for *what the
 //! trail looks like for each check*, the umbrellas build and return
 //! the trail themselves; the DoH path appends it to its accumulator,
 //! the DNSSEC path discards.

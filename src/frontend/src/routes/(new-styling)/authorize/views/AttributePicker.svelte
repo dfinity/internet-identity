@@ -1,6 +1,11 @@
 <script lang="ts">
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
-  import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "@lucide/svelte";
+  import {
+    CheckIcon,
+    ChevronDownIcon,
+    ChevronUpIcon,
+    PlusIcon,
+  } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
 
   /** One row in the picker. `value` is the user-visible string. The
@@ -29,6 +34,9 @@
      *  "wraps?" against the same col 2 width the actual grid layout will
      *  give it — independent of this row's own label length. */
     maxLabelWidth: number;
+    /** When set, the dropdown shows an "Add another email" CTA at the
+     *  bottom and the chevron stays available even for a single option. */
+    onVerifyNew?: () => void;
   }
 
   const {
@@ -39,7 +47,10 @@
     onCheck,
     onSelect,
     maxLabelWidth,
+    onVerifyNew,
   }: Props = $props();
+
+  const expandable = $derived(options.length > 1 || onVerifyNew !== undefined);
 
   let isOpen = $state(false);
 
@@ -82,7 +93,7 @@
    *  chevron button stays focusable for keyboard users; the row click is a
    *  mouse-only convenience for a larger hit target. */
   const handleRowClick = (e: MouseEvent): void => {
-    if (options.length <= 1) return;
+    if (!expandable) return;
     const target = e.target as HTMLElement | null;
     if (target?.closest("button, input, label") !== null) return;
     isOpen = !isOpen;
@@ -111,7 +122,7 @@
       >{label}</span
     >
     <span class="text-sm font-medium">{options[selectedIndex].value}</span>
-    {#if options.length > 1}
+    {#if expandable}
       <span class="ms-auto size-6 shrink-0"></span>
     {/if}
   </div>
@@ -124,7 +135,7 @@
   <div
     class={[
       "col-span-full row-start-1 grid grid-cols-subgrid items-center gap-x-3",
-      options.length > 1 && "hover:bg-bg-primary_hover cursor-pointer",
+      expandable && "hover:bg-bg-primary_hover cursor-pointer",
     ]}
     onclick={handleRowClick}
   >
@@ -154,14 +165,14 @@
       <span
         class={[
           "text-text-primary col-start-3 row-start-1 my-3 min-w-0 overflow-hidden text-sm font-medium text-ellipsis whitespace-nowrap",
-          options.length <= 1 && "col-span-2 me-3",
+          !expandable && "col-span-2 me-3",
         ]}
       >
         {options[selectedIndex].value}
       </span>
     {/if}
 
-    {#if options.length > 1}
+    {#if expandable}
       {#if isOpen}
         <button
           onclick={() => (isOpen = false)}
@@ -192,43 +203,58 @@
     {/if}
   </div>
 
-  {#if isOpen && options.length > 1}
+  {#if isOpen && expandable}
     <div
-      class="border-border-secondary group/list col-span-full row-start-2 flex flex-col border-t"
-      role="listbox"
-      aria-label={label}
+      class="border-border-secondary col-span-full row-start-2 flex flex-col border-t"
     >
-      {#each options as option, index (option.id)}
+      <div class="group/list flex flex-col" role="listbox" aria-label={label}>
+        {#each options as option, index (option.id)}
+          <button
+            onclick={() => {
+              onSelect(index);
+              isOpen = false;
+            }}
+            class={[
+              "flex flex-row items-center gap-3 p-3 text-start",
+              index === selectedIndex
+                ? "bg-bg-active hover:bg-bg-active! group-hover/list:bg-transparent"
+                : "hover:bg-bg-primary_hover",
+            ]}
+            role="option"
+            aria-selected={index === selectedIndex}
+          >
+            <span class="text-text-primary text-sm font-medium">
+              {option.value}
+            </span>
+            {#if option.providerLabel !== undefined}
+              <span class="text-text-tertiary text-sm">
+                {option.providerLabel}
+              </span>
+            {/if}
+            {#if index === selectedIndex}
+              <CheckIcon
+                class="text-fg-tertiary ms-auto me-1 size-4 shrink-0"
+                aria-hidden="true"
+              />
+            {/if}
+          </button>
+        {/each}
+      </div>
+      {#if onVerifyNew !== undefined}
         <button
           onclick={() => {
-            onSelect(index);
             isOpen = false;
+            onVerifyNew();
           }}
-          class={[
-            "flex flex-row items-center gap-3 p-3 text-start",
-            index === selectedIndex
-              ? "bg-bg-active hover:bg-bg-active! group-hover/list:bg-transparent"
-              : "hover:bg-bg-primary_hover",
-          ]}
-          role="option"
-          aria-selected={index === selectedIndex}
+          class="border-border-tertiary text-text-primary hover:bg-bg-primary_hover flex flex-row items-center gap-3 border-t p-3 text-start text-sm font-medium"
         >
-          <span class="text-text-primary text-sm font-medium">
-            {option.value}
-          </span>
-          {#if option.providerLabel !== undefined}
-            <span class="text-text-tertiary text-sm">
-              {option.providerLabel}
-            </span>
-          {/if}
-          {#if index === selectedIndex}
-            <CheckIcon
-              class="text-fg-tertiary ms-auto me-1 size-4 shrink-0"
-              aria-hidden="true"
-            />
-          {/if}
+          <PlusIcon
+            class="text-fg-secondary size-4 shrink-0"
+            aria-hidden="true"
+          />
+          {$t`Add another email`}
         </button>
-      {/each}
+      {/if}
     </div>
   {/if}
 </div>

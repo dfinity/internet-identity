@@ -140,7 +140,7 @@ pub fn check_authorization(
     // stamps a delegation whose user_key is `der(canister_sig_key(seed))`
     // with `seed = H(salt || "email-recovery" || lowercase(address) ||
     // anchor)`. Re-derive the same principal for each bound credential
-    // and compare. See `crate::email_recovery::smtp::calculate_email_recovery_seed`.
+    // and compare. See `crate::email_inbound::smtp::calculate_email_recovery_seed`.
     //
     // If the canister salt hasn't been initialised yet, no recovery
     // delegation could have been stamped (the stamper awaits
@@ -151,7 +151,7 @@ pub fn check_authorization(
     let salt_initialised = state::storage_borrow(|storage| storage.salt().is_some());
     if salt_initialised {
         for credential in &anchor.email_recovery {
-            let seed = crate::email_recovery::smtp::calculate_email_recovery_seed(
+            let seed = crate::email_inbound::smtp::calculate_email_recovery_seed(
                 &credential.address,
                 anchor_number,
             );

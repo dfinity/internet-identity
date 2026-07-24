@@ -28,8 +28,8 @@
   import RemoveEmailRecovery from "./components/RemoveEmailRecovery.svelte";
   import { SetupEmailRecoveryWizard } from "$lib/components/wizards/setupEmailRecovery";
   import type {
-    EmailRecoveryDnsInput,
-    EmailRecoverySubmitDkimLeafArg,
+    EmailChallengeDnsInput,
+    EmailChallengeSubmitDkimLeafArg,
   } from "$lib/generated/internet_identity_types";
   import { EMAIL_RECOVERY_SETUP } from "$lib/state/featureFlags";
   import { recoveryAuthnMethodData } from "$lib/utils/authnMethodData";
@@ -67,6 +67,10 @@
    * the next route load to re-fetch.
    */
   let emailRecovery = $derived(data.identityInfo.email_recovery[0]?.[0]);
+
+  let verifiedAddresses = $derived(
+    (data.identityInfo.verified_emails[0] ?? []).map((e) => e.address),
+  );
 
   let recoveryPhraseData = $derived(
     data.identityInfo.authn_methods.find(
@@ -265,13 +269,16 @@
   // -------------------------------------------------------------
 
   /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
-  const prepareAddEmail = (input: EmailRecoveryDnsInput) =>
+  const prepareAddEmail = (input: EmailChallengeDnsInput) =>
     $authenticatedStore.actor
       .email_recovery_credential_prepare_add(
         $authenticatedStore.identityNumber,
         input,
       )
       .then(throwCanisterError);
+
+  // Stick with the `email_recovery_*` aliases so the FE bundle works
+  // against both the pre-rename and post-rename BE during a deploy.
 
   /** Anonymous wrapper around `email_recovery_status` (query). */
   const statusEmailRecovery = (nonce: string) =>
@@ -285,7 +292,7 @@
    *  rejects on a call-level error, otherwise resolves void (poll for the
    *  verdict). */
   const submitEmailDkimLeaf = async (
-    arg: EmailRecoverySubmitDkimLeafArg,
+    arg: EmailChallengeSubmitDkimLeafArg,
   ): Promise<void> => {
     await throwCanisterError(
       await anonymousActor.email_recovery_submit_dkim_leaf(arg),
@@ -517,6 +524,7 @@
       diagnostics={diagnosticsEmailRecovery}
       submitDkimLeaf={submitEmailDkimLeaf}
       resolveViaDoh={resolveEmailViaDoh}
+      {verifiedAddresses}
       onSuccess={handleEmailWizardSuccess}
     />
   </Dialog>

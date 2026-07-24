@@ -27,10 +27,10 @@ import {
           ).toBeVisible();
           // Create new identity and continue to app
           await authPage
-            .getByRole("button", { name: "Sign up", exact: true })
+            .getByRole("button", { name: "Create", exact: true })
             .click();
           await authPage
-            .getByRole("button", { name: "Sign up with passkey" })
+            .getByRole("button", { name: "Create with passkey" })
             .click();
           await authPage.getByLabel("Identity name").fill("Test");
           await authPage

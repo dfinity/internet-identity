@@ -102,7 +102,7 @@ export const initGlobals = async () => {
   anonymousAgent = HttpAgent.createSync(agentOptions);
   // Fetch subnet keys to speed up queries during authentication,
   // this avoids having to fetch them later on user interaction.
-  void anonymousAgent.fetchSubnetKeys(canisterId);
+  void anonymousAgent.fetchSubnetKeys({ canisterId });
   anonymousActor = Actor.createActor<_SERVICE>(internetIdentityIDL, {
     agent: anonymousAgent,
     canisterId,
@@ -119,8 +119,3 @@ export const getPrimaryOrigin = () =>
 // `undefined` when the operator didn't configure this flag.
 export const getConfiguredFeatureFlag = (name: string): boolean | undefined =>
   frontendCanisterConfig.feature_flags[0]?.find(([key]) => key === name)?.[1];
-
-// Origin of the trusted MCP server configured via the canister deploy args, or
-// `undefined` when unset (in which case the `/mcp` delegation flow is disabled).
-export const getMcpServerOrigin = (): string | undefined =>
-  frontendCanisterConfig.mcp_server_origin[0];

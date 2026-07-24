@@ -18,7 +18,7 @@
  *   authoritative selector (the one in the email itself) and
  *   resolves `<selector>._domainkey.<domain>` end-to-end via
  *   DNSSEC, following CNAMEs. Returns `{ hops, extraChains }`
- *   suitable for `email_recovery_submit_dkim_leaf`. For the
+ *   suitable for `email_challenge_submit_dkim_leaf`. For the
  *   Gmail-style same-zone case `hops` has one TXT and
  *   `extraChains` is empty; for the Proton/Tutanota-style
  *   cross-zone CNAME case `hops` is `[CNAME, …, TXT]` and

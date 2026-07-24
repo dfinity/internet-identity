@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
-  EmailRecoveryDiagnostics,
-  EmailRecoveryError,
-  EmailRecoveryStatus,
+  EmailChallengeDiagnostics,
+  EmailChallengeError,
+  EmailChallengeStatus,
 } from "$lib/generated/internet_identity_types";
 import { Funnel } from "$lib/utils/analytics/Funnel";
 import { CanisterError } from "$lib/utils/utils";
@@ -34,17 +34,17 @@ const NONCE = "nonce-123";
 const DOMAIN = "example.com";
 
 // Status shorthands.
-const PENDING: EmailRecoveryStatus = { Pending: null };
-const RESOLVING: EmailRecoveryStatus = { ResolvingDoh: null };
-const NEED_LEAF: EmailRecoveryStatus = {
+const PENDING: EmailChallengeStatus = { Pending: null };
+const RESOLVING: EmailChallengeStatus = { ResolvingDoh: null };
+const NEED_LEAF: EmailChallengeStatus = {
   NeedDkimLeaf: { selector: "sel" },
 };
-const REG_OK: EmailRecoveryStatus = { RegistrationSucceeded: null };
-const failed = (reason: EmailRecoveryError): EmailRecoveryStatus => ({
+const REG_OK: EmailChallengeStatus = { RegistrationSucceeded: null };
+const failed = (reason: EmailChallengeError): EmailChallengeStatus => ({
   Failed: reason,
 });
 
-const canisterErr = (reason: EmailRecoveryError) => new CanisterError(reason);
+const canisterErr = (reason: EmailChallengeError) => new CanisterError(reason);
 const transportErr = () => new Error("network down");
 
 interface Harness {
@@ -59,14 +59,14 @@ interface Harness {
 }
 
 /**
- * Build a harness. `statuses` is the queue `email_recovery_status` returns,
+ * Build a harness. `statuses` is the queue `email_challenge_status` returns,
  * one per poll tick; once drained it keeps yielding the last entry so a loop
  * that should have terminated on its own can't run dry. `isActive` stays true
  * (every happy-path test terminates by returning out of the loop), unless a
  * test overrides it to exercise the cooperative-stop path.
  */
 const harness = (
-  statuses: EmailRecoveryStatus[],
+  statuses: EmailChallengeStatus[],
   overrides: Partial<EmailRecoveryPollDeps<typeof TestEvents>> = {},
 ): Harness => {
   const funnel = new Funnel<typeof TestEvents>("test");
@@ -74,7 +74,7 @@ const harness = (
   vi.spyOn(funnel, "close");
 
   const queue = [...statuses];
-  const statusFn = vi.fn((): Promise<EmailRecoveryStatus> => {
+  const statusFn = vi.fn((): Promise<EmailChallengeStatus> => {
     const next = queue.length > 1 ? queue.shift() : queue[0];
     return Promise.resolve(next ?? PENDING);
   });
@@ -91,7 +91,7 @@ const harness = (
     submitDkimLeaf,
     resolveViaDoh,
     diagnostics: vi.fn(
-      (): Promise<[] | [EmailRecoveryDiagnostics]> => Promise.resolve([]),
+      (): Promise<[] | [EmailChallengeDiagnostics]> => Promise.resolve([]),
     ),
     funnel,
     events: {
@@ -100,7 +100,7 @@ const harness = (
       failed: TestEvents.failed,
       unsupportedDomain: TestEvents.unsupportedDomain,
     },
-    handleSuccess: (s: EmailRecoveryStatus) =>
+    handleSuccess: (s: EmailChallengeStatus) =>
       "RegistrationSucceeded" in s || "RecoveryReady" in s,
     isActive: () => true,
     setPolling,
@@ -151,7 +151,7 @@ describe("runEmailRecoveryPoll", () => {
   });
 
   it("stops as soon as handleSuccess accepts the status", async () => {
-    const recoveryReady: EmailRecoveryStatus = {
+    const recoveryReady: EmailChallengeStatus = {
       RecoveryReady: {
         user_key: new Uint8Array(),
         expiration: BigInt(0),
@@ -302,7 +302,7 @@ describe("runEmailRecoveryPoll", () => {
 
   it("rides out transient status-poll failures below the threshold", async () => {
     let calls = 0;
-    const statusFn = vi.fn((): Promise<EmailRecoveryStatus> => {
+    const statusFn = vi.fn((): Promise<EmailChallengeStatus> => {
       calls += 1;
       return calls <= 3
         ? Promise.reject(transportErr())
@@ -318,7 +318,7 @@ describe("runEmailRecoveryPoll", () => {
 
   it("gives up with a retryable failure after MAX consecutive poll errors", async () => {
     const statusFn = vi.fn(
-      (): Promise<EmailRecoveryStatus> => Promise.reject(transportErr()),
+      (): Promise<EmailChallengeStatus> => Promise.reject(transportErr()),
     );
     const h = harness([REG_OK], { status: statusFn });
     await run(h.deps);

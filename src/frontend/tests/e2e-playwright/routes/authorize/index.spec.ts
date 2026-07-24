@@ -16,12 +16,8 @@ const DEFAULT_USER_NAME = "John Doe";
 test("Authorize by registering a new passkey", async ({ page }) => {
   await authorize(page, async (authPage) => {
     await addVirtualAuthenticator(authPage);
-    await authPage
-      .getByRole("button", { name: "Sign up", exact: true })
-      .click();
-    await authPage
-      .getByRole("button", { name: "Sign up with passkey" })
-      .click();
+    await authPage.getByRole("button", { name: "Create", exact: true }).click();
+    await authPage.getByRole("button", { name: "Create with passkey" }).click();
     await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
     await authPage.getByRole("button", { name: "Create identity" }).click();
     await authPage
@@ -40,6 +36,12 @@ test("Authorize by signing in with an existing passkey", async ({
     await authPage
       .getByRole("button", { name: "Sign in with passkey" })
       .click();
+    // The read-only feature is flagged off, so the access-level selector is
+    // hidden and authorizations are full access (a queries-only delegation
+    // would fail closed in every current agent — see the READ_ONLY_MODE flag).
+    await expect(
+      authPage.getByRole("radio", { name: "Actions & questions" }),
+    ).toHaveCount(0);
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
       .click();
@@ -74,15 +76,15 @@ test("Authorize by signing in from another device", async ({
     );
 
     const principal = await authorize(page, async (authPage) => {
-      // Switch to current device and start "Continue from another device" flow to get link
+      // Switch to current device and start "Continue from another device" flow to get link.
+      // The cancel→QR auto-transition was removed; use the explicit
+      // "URL | QR Code" CTA on the "Add identity from another device" row.
       await addVirtualAuthenticator(authPage);
-      await authPage
-        .getByRole("button", { name: "Sign in with passkey" })
-        .click();
+      await authPage.getByRole("button", { name: "URL | QR Code" }).click();
       await authPage
         .getByRole("heading", {
           level: 1,
-          name: "Can't find your identity?",
+          name: "Add identity from another device",
         })
         .waitFor();
       const linkToPair = `https://${await authPage.getByLabel("Pairing link").innerText()}`;
@@ -111,6 +113,9 @@ test("Authorize by signing in from another device", async ({
         .getByRole("heading", { level: 1, name: "Authorize new device" })
         .waitFor();
       await holdToConfirm(otherDevicePage);
+      await otherDevicePage
+        .getByRole("heading", { level: 1, name: "Enter the code" })
+        .waitFor();
       for (let i = 0; i < confirmationCodeArray.length; i++) {
         const code = confirmationCodeArray[i];
         await otherDevicePage.getByLabel(`Code input ${i}`).fill(code);
@@ -267,10 +272,10 @@ test("Authorize with ICRC-29", async ({ page }) => {
     async (authPage) => {
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
-        .getByRole("button", { name: "Sign up with passkey" })
+        .getByRole("button", { name: "Create with passkey" })
         .click();
       await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
       await authPage.getByRole("button", { name: "Create identity" }).click();
@@ -292,10 +297,10 @@ test("App logo doesn't appear when app is not known", async ({ page }) => {
       await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();
 
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
-        .getByRole("button", { name: "Sign up with passkey" })
+        .getByRole("button", { name: "Create with passkey" })
         .click();
       await authPage.getByLabel("Identity name").fill("John Doe");
       await authPage.getByRole("button", { name: "Create identity" }).click();

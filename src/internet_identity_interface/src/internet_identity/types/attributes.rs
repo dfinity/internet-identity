@@ -192,11 +192,9 @@ fn validate_openid_credential_issuer_identifier(issuer: &str) -> Result<(), Stri
 }
 
 /// Format-only validation for the `<domain>` component of an `sso:<domain>`
-/// attribute scope. Intentionally not coupled to the SSO canary allowlist
-/// (`allowed_discovery_domains()` in the canister): a credential whose SSO
-/// domain is no longer allowed should still be parseable, and the scope
-/// parser has no access to canister runtime state anyway. A scope that does
-/// not match any registered SSO provider simply yields no attributes.
+/// attribute scope. Intentionally not coupled to the canister's SSO discovery
+/// validation: the scope parser has no access to canister runtime state, and a
+/// scope that doesn't match any credential simply yields no attributes.
 ///
 /// Colons are permitted so that `host:port` discovery domains (e.g. the
 /// e2e test domain `localhost:11107`) round-trip through the
@@ -239,8 +237,8 @@ impl TryFrom<&str> for AttributeScope {
     /// Parses an attribute scope string by splitting on the first `':'`.
     ///
     /// Supported forms:
-    /// - `openid:<issuer>`  (e.g. `openid:https://accounts.google.com`)
-    /// - `sso:<domain>`     (e.g. `sso:dfinity.org`)
+    /// - `openid:<issuer>`     (e.g. `openid:https://accounts.google.com`)
+    /// - `sso:<domain>`        (e.g. `sso:dfinity.org`)
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut parts = value.splitn(2, ':');
 
@@ -282,8 +280,8 @@ impl TryFrom<&str> for AttributeScope {
                 // SSO domains are DNS hostnames — normalize to lowercase so
                 // `sso:DFINITY.ORG:email` and `sso:dfinity.org:email` match
                 // the same credential. This also aligns with
-                // `openid::generic::is_allowed_discovery_domain`, which
-                // already compares case-insensitively.
+                // `openid::sso::validate_discovery_domain`, which already
+                // treats the domain case-insensitively.
                 let domain = domain.to_ascii_lowercase();
 
                 Ok(AttributeScope::Sso { domain })
@@ -889,12 +887,13 @@ impl TryFrom<ListAvailableAttributesRequest> for ValidatedListAvailableAttribute
                         Err(e) => problems.push(e),
                     }
                 }
-                if !problems.is_empty() {
-                    return Err(ListAvailableAttributesError::ValidationError { problems });
-                }
                 Some(parsed)
             }
         };
+
+        if !problems.is_empty() {
+            return Err(ListAvailableAttributesError::ValidationError { problems });
+        }
 
         Ok(ValidatedListAvailableAttributesRequest {
             identity_number: request.identity_number,
@@ -1279,6 +1278,26 @@ mod tests {
                 domain: "dfinity.org".to_string(),
             };
             pretty_assert_eq!(sso.to_string(), "sso:dfinity.org");
+        }
+
+        #[test]
+        fn test_attribute_scope_round_trip() {
+            // Display → try_from should round-trip cleanly for each
+            // variant. Guards against drift between the formatter and
+            // the parser when one is updated without the other.
+            for scope in [
+                AttributeScope::OpenId {
+                    issuer: "https://accounts.google.com".to_string(),
+                },
+                AttributeScope::Sso {
+                    domain: "dfinity.org".to_string(),
+                },
+            ] {
+                let rendered = scope.to_string();
+                let parsed =
+                    AttributeScope::try_from(rendered.as_str()).expect("round-trip must parse");
+                pretty_assert_eq!(parsed, scope, "round-trip failed for {}", rendered);
+            }
         }
 
         #[test]

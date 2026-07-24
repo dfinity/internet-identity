@@ -20,10 +20,10 @@ test.describe("AuthWizardView heading and subtitle", () => {
 
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
-        .getByRole("button", { name: "Sign up with passkey" })
+        .getByRole("button", { name: "Create with passkey" })
         .click();
       await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
       await authPage.getByRole("button", { name: "Create identity" }).click();
@@ -38,11 +38,11 @@ test.describe("AuthWizardView heading and subtitle", () => {
   }) => {
     await authorize(page, async (authPage) => {
       await expect(
-        authPage.getByRole("button", { name: "Sign up", exact: true }),
+        authPage.getByRole("button", { name: "Create", exact: true }),
       ).toBeVisible();
 
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await expect(authPage.getByRole("dialog")).toBeVisible();
 
@@ -63,10 +63,10 @@ test.describe("AuthWizardView heading and subtitle", () => {
 
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
-        .getByRole("button", { name: "Sign up with passkey" })
+        .getByRole("button", { name: "Create with passkey" })
         .click();
       await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
       await authPage.getByRole("button", { name: "Create identity" }).click();
@@ -151,10 +151,10 @@ test.describe("IdentityNotConnectedDialog at /authorize", () => {
 
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
-        .getByRole("button", { name: "Sign up with passkey" })
+        .getByRole("button", { name: "Create with passkey" })
         .click();
       await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
       await authPage.getByRole("button", { name: "Create identity" }).click();
@@ -305,7 +305,7 @@ test.describe("IdentityAlreadyLinkedDialog at /authorize (sign-up path)", () => 
 
     await authorize(page, async (authPage) => {
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await expect(authPage.getByRole("dialog")).toBeVisible();
 
@@ -364,7 +364,7 @@ test.describe("IdentityAlreadyLinkedDialog at /authorize (sign-up path)", () => 
 
     await authorize(page, async (authPage) => {
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
 
       await authPage.context().clearCookies();
@@ -395,12 +395,12 @@ test.describe("IdentityAlreadyLinkedDialog at /authorize (sign-up path)", () => 
       // The sign-up modal (parent dialog) is still visible; user can
       // proceed with passkey sign-up instead of auto-signing-in.
       await expect(
-        authPage.getByRole("button", { name: "Sign up with passkey" }),
+        authPage.getByRole("button", { name: "Create with passkey" }),
       ).toBeVisible();
 
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Sign up with passkey" })
+        .getByRole("button", { name: "Create with passkey" })
         .click();
       await authPage.getByLabel("Identity name").fill("New User");
       await authPage.getByRole("button", { name: "Create identity" }).click();

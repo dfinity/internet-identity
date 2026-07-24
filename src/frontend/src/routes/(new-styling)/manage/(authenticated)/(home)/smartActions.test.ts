@@ -36,6 +36,7 @@ const baseIdentityInfo: IdentityInfo = {
   metadata: [],
   name: [],
   email_recovery: [],
+  verified_emails: [],
   created_at: [],
   authn_method_registration: [],
   openid_credentials: [],

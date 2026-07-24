@@ -129,7 +129,7 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
       .fill(emailRecovery.fromAddress);
     await setupDialog.getByRole("button", { name: "Continue" }).click();
 
-    // The wizard is now polling email_recovery_status. Pull the
+    // The wizard is now polling email_challenge_status. Pull the
     // canister-issued nonce off the rendered token block, sign an
     // email with the matching subject, submit it via smtp_request.
     await expect(
@@ -146,13 +146,18 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
       subject: setupNonce,
     });
 
-    // On RegistrationSucceeded the wizard fires `onSuccess` which the
-    // host translates into a toast + closing the dialog. Assert the
-    // dialog goes away and the active recovery-email card now shows
-    // the bound address (the inactive card variant doesn't). Use
-    // exact-text match because the address also appears as a
-    // substring inside the success toast's description.
-    await expect(setupDialog).toBeHidden({ timeout: STATUS_POLL_TIMEOUT });
+    // On RegistrationSucceeded the wizard parks on the shared
+    // SuccessView ("Email address verified" + Done button). Clicking Done fires
+    // the host's `onSuccess` which surfaces a toast and closes the
+    // dialog. The address also shows on the active recovery-email card
+    // (the inactive card variant doesn't). Use exact-text match because
+    // the address also appears as a substring inside the success toast's
+    // description.
+    await expect(
+      setupDialog.getByRole("heading", { name: "Email address verified" }),
+    ).toBeVisible({ timeout: STATUS_POLL_TIMEOUT });
+    await setupDialog.getByRole("button", { name: "Done" }).click();
+    await expect(setupDialog).toBeHidden();
     await expect(
       page.getByText(emailRecovery.fromAddress, { exact: true }),
     ).toBeVisible();

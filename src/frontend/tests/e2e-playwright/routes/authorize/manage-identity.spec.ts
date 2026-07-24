@@ -65,7 +65,7 @@ test.describe("Manage your Internet Identity from authorize popover", () => {
       managePage.getByRole("heading", { name: "Welcome" }),
     ).toBeVisible({ timeout: 10_000 });
     await expect(
-      managePage.getByRole("dialog", { name: "Sign in" }),
+      managePage.getByRole("dialog", { name: "Add existing identity" }),
     ).toBeHidden();
   });
 

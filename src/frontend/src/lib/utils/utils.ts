@@ -285,6 +285,21 @@ export const throwCanisterError = <
   return response.Ok as Promise<S>;
 };
 
+/** Sibling of {@link throwCanisterError} for methods whose candid error is a
+ *  plain `text` (e.g. the `mcp_*` family) rather than a variant record —
+ *  {@link CanisterError} wraps variants, so it doesn't fit those. Unwraps `Ok`
+ *  and throws the `Err` string as an `Error`. Transport/replica failures
+ *  reject the call itself, so a catch can still distinguish them from
+ *  canister-reported errors. */
+export const throwTextCanisterError = <T>(
+  response: { Ok: T } | { Err: string },
+): T => {
+  if ("Err" in response) {
+    throw new Error(response.Err);
+  }
+  return response.Ok;
+};
+
 // Helper that normalizes ArrayBuffer-like inputs.
 // Given a Uint8Array or an ArrayBuffer, always return an ArrayBuffer corresponding
 // exactly to the view's bytes (respects byteOffset/byteLength for typed arrays).
@@ -371,6 +386,14 @@ export const transformSignedDelegation = (
       Uint8Array.from(signed_delegation.delegation.pubkey),
       signed_delegation.delegation.expiration,
       undefined,
+      // The candid `permissions : opt text` (`[] | [string]`, e.g.
+      // `["queries"]` for a read-only delegation) maps 1:1 onto the agent
+      // library's `permissions?: string`. Indexing the opt tuple at [0]
+      // yields `string | undefined`. Carrying it here is required for
+      // restricted delegations to verify: the canister signature covers
+      // this field, so dropping it makes the replica recompute a different
+      // hash and reject the delegation.
+      signed_delegation.delegation.permissions[0],
     ),
     signature: Uint8Array.from(
       signed_delegation.signature,

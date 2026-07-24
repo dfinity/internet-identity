@@ -37,9 +37,6 @@ msgstr "{displayName} اکاؤنٹ"
 msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
 msgstr "{domainInput} نے /.well-known/ii-openid-configuration شائع نہیں کیا (HTTP {0})۔"
 
-msgid "{domainInput} took too long to respond. Try again in a moment."
-msgstr "{domainInput} کو جواب دینے میں بہت زیادہ وقت لگا۔ تھوڑی دیر بعد دوبارہ کوشش کریں۔"
-
 msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 msgstr "{domainInput} کی /.well-known/ii-openid-configuration درست شکل میں نہیں ہے۔"
 

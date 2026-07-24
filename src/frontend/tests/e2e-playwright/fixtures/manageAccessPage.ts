@@ -209,12 +209,20 @@ class AddDialog {
     await this.#dialog
       .getByRole("button", { name: "Continue with passkey" })
       .click();
-    await expect(
-      this.#dialog.getByRole("heading", {
-        name: /Add a passkey|Add another passkey/,
-      }),
-    ).toBeVisible();
-    await this.#dialog.getByRole("button", { name: "Create passkey" }).click();
+    // The chooser triggers WebAuthn `create()` directly — no intermediate
+    // confirmation view. The virtual authenticator fulfils the prompt.
+  }
+
+  async openid(
+    issuerName: string,
+    signIn: (popup: Page) => Promise<void>,
+  ): Promise<void> {
+    const popupPromise = this.#dialog.page().context().waitForEvent("page");
+    await this.#dialog.getByRole("button", { name: issuerName }).click();
+    const popup = await popupPromise;
+    const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
+    await signIn(popup);
+    await closePromise;
   }
 
   async assertPasskeyUnavailable(): Promise<void> {
@@ -228,7 +236,7 @@ class AddDialog {
   }
 }
 
-class ManageAccessPage {
+export class ManageAccessPage {
   readonly #page: Page;
 
   constructor(page: Page) {

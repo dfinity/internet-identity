@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { initAnalytics } from "$lib/utils/analytics/analytics";
-  import { frontendCanisterConfig, getPrimaryOrigin } from "$lib/globals";
+  import { getPrimaryOrigin } from "$lib/globals";
   import { onMount } from "svelte";
   import { page } from "$app/state";
 
@@ -23,8 +22,6 @@
       window.location.pathname !== "/self-service" &&
       // Don't redirect if we're visiting webauthn iframe used for migration
       window.location.pathname !== "/iframe/webauthn" &&
-      // Don't redirect if we're visiting callback used for OpenID flows
-      window.location.pathname !== "/callback" &&
       // Don't redirect if we're visiting new authorize flow
       // TODO: Implement redirect with pending ICRC-29 state
       window.location.pathname !== "/authorize"
@@ -61,9 +58,6 @@
       childList: true,
       subtree: true,
     });
-
-    // Initialize analytics
-    initAnalytics(frontendCanisterConfig.analytics_config[0]?.[0]);
   });
 </script>
 

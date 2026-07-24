@@ -37,9 +37,6 @@ msgstr "{displayName} account"
 msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
 msgstr "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
 
-msgid "{domainInput} took too long to respond. Try again in a moment."
-msgstr "{domainInput} took too long to respond. Try again in a moment."
-
 msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 msgstr "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 

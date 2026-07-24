@@ -23,19 +23,23 @@ mod api_v2;
 pub mod attributes;
 pub mod dnssec;
 pub mod doh;
+pub mod email_challenge;
 pub mod email_recovery;
 pub mod icrc3;
 pub mod openid;
 pub mod smtp;
 pub mod vc_mvp;
+pub mod verified_email;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
 pub use crate::internet_identity::types::dnssec::*;
 pub use crate::internet_identity::types::doh::*;
+pub use crate::internet_identity::types::email_challenge::*;
 pub use crate::internet_identity::types::email_recovery::*;
 pub use crate::internet_identity::types::openid::*;
 pub use crate::internet_identity::types::smtp::*;
+pub use crate::internet_identity::types::verified_email::*;
 pub use api_v2::*;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -135,11 +139,33 @@ pub struct ChallengeAttempt {
     pub key: ChallengeKey,
 }
 
+/// The delegation permissions a caller requests, mirroring the ICP protocol's
+/// request-delegation `permissions` values. Passed as an optional argument to
+/// `prepare_account_delegation` / `get_account_delegation` / `mcp_set_access`;
+/// an omitted argument means `All` (unrestricted), preserving the pre-feature
+/// behavior and matching the interface spec's default for an absent
+/// `permissions` field.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, CandidType, Deserialize)]
+pub enum Permissions {
+    /// Queries-only: the issued delegation carries `permissions = "queries"`,
+    /// so the IC rejects update calls authenticated through it.
+    #[serde(rename = "queries")]
+    Queries,
+    /// Unrestricted, update-capable: the issued delegation carries no
+    /// `permissions` field (the protocol's `"all"` default).
+    #[serde(rename = "all")]
+    All,
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct Delegation {
     pub pubkey: PublicKey,
     pub expiration: Timestamp,
     pub targets: Option<Vec<Principal>>,
+    /// Restricts the kinds of calls the delegation permits: `"queries"`
+    /// restricts the sender to query calls (the IC rejects update calls
+    /// authenticated through such a delegation). `None` means unrestricted.
+    pub permissions: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -243,12 +269,6 @@ pub struct InternetIdentityFrontendArgs {
     /// own init callback, and `?feature_flag_*` URL params take precedence.
     /// Names that don't match a known frontend flag are ignored by the frontend.
     pub feature_flags: Option<Vec<(String, bool)>>,
-    /// Origin of the trusted MCP server, e.g. "https://mcp.id.ai" (no trailing
-    /// slash). The `/mcp` delegation flow delivers the delegation to this origin
-    /// (and only this origin — it's added to the `form-action` CSP and the
-    /// `/mcp` page rejects callbacks on any other origin). When unset, the
-    /// `/mcp` flow is disabled.
-    pub mcp_server_origin: Option<String>,
 }
 
 /// Config fields that are synchronized between the frontend and backend.
@@ -280,12 +300,12 @@ pub struct InternetIdentityInit {
     pub related_origins: Option<Vec<String>>,
     pub new_flow_origins: Option<Vec<String>>,
     pub openid_configs: Option<Vec<OpenIdConfig>>,
-    /// Allowlist of domains that may be registered as discoverable SSO
-    /// providers via `add_discoverable_oidc_config`. When `Some`, this list
-    /// fully replaces the built-in defaults; when `None`, falls back to
-    /// `dfinity.org` (production) or `beta.dfinity.org` (everything else)
-    /// keyed off `is_production`.
-    pub sso_discoverable_domains: Option<Vec<String>>,
+    /// Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
+    /// loopback hosts (`localhost` / `127.0.0.1`) so e2e tests can point at local
+    /// mock IdPs served over plain `http`. `None` / `Some(false)` (the default)
+    /// require `https` for every discovery host. Never enable in production —
+    /// non-loopback hosts always require `https` regardless of this flag.
+    pub sso_allow_insecure_discovery: Option<bool>,
     /// One-shot backfill of the `sso_domain` / `sso_name` fields on stored
     /// `OpenIdCredential`s (see `docs/ongoing/openid-sso-prod-readiness.md`
     /// §8.6). When `Some`, a batched timer-driven migration stamps every
@@ -324,10 +344,8 @@ pub struct InternetIdentityInit {
 
 /// One entry of the `sso_credential_migration` backfill (see
 /// `InternetIdentityInit::sso_credential_migration`). Maps the `(iss, aud)`
-/// pair of stored SSO credentials to the discovery domain (and optional
-/// human-readable name) they were registered through. Field names match the
-/// `discovered_oidc_configs` query output so the deployer can transcribe its
-/// result field-for-field before submitting the upgrade proposal.
+/// pair of a stored SSO credential to the discovery domain and optional
+/// human-readable name it resolves to.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SsoCredentialMigrationEntry {
     pub discovery_domain: String,
@@ -471,15 +489,45 @@ pub struct DiscoverableOidcConfig {
     pub discovery_domain: String,
 }
 
-/// Resolved SSO provider state returned by the `discovered_oidc_configs` query.
-/// Any field other than `discovery_domain` is `None` until the two-hop discovery
-/// completes for that domain.
+/// Fully resolved SSO discovery result returned by `discover_sso` /
+/// `discover_sso_query`. Carries everything the frontend needs to build the
+/// authorization request: the canister resolves it from the domain's two-hop
+/// discovery documents.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct OidcConfig {
+pub struct SsoDiscovery {
     pub discovery_domain: String,
-    pub client_id: Option<String>,
-    pub openid_configuration: Option<String>,
-    pub issuer: Option<String>,
+    /// The org's primary OIDC client.
+    pub client_id: String,
+    pub issuer: String,
+    pub authorization_endpoint: String,
+    pub scopes: Vec<String>,
+    /// Human-readable SSO label, if the domain published one in its
+    /// `ii-openid-configuration`.
+    pub name: Option<String>,
+    /// Client the frontend runs the ceremony against for the requested origin;
+    /// `None` when the origin is denied.
+    pub resolved_client_id: Option<String>,
+}
+
+/// Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
+/// failed fetch isn't a distinct status — it reads as `Pending` and the frontend
+/// times out — so the statuses are: resolved, or in flight.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SsoDiscoveryStatus {
+    /// Discovery completed; the resolved configuration.
+    Resolved(SsoDiscovery),
+    /// Discovery is in flight (or not yet started) — drive it with
+    /// `discover_sso` and poll again.
+    Pending,
+}
+
+/// Request for `get_sso_discovery_status`.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetSsoDiscoveryStatusRequest {
+    /// The org's SSO discovery domain.
+    pub org_domain: String,
+    /// The gated dapp origin, when resolving which per-app client serves it.
+    pub target_app_origin: Option<FrontendHostname>,
 }
 
 pub enum AuthorizationKey {
@@ -571,6 +619,24 @@ pub struct PrepareAccountDelegation {
     pub expiration: Timestamp,
 }
 
+/// Result of `mcp_prepare_delegation`. The matching `mcp_get_delegation` must
+/// use the *same* account, so we return the resolved `account_number` for the
+/// server to thread back. When preparing, the MCP server may name an account
+/// explicitly (one of the anchor's accounts at `target_origin`) or leave it
+/// unset to use the anchor's default there; either way `account_number`
+/// reports the one actually used. (Accounts are per-origin, so this is an
+/// account at `target_origin` — the app being acted on; no account is chosen
+/// when connecting the MCP server.) Returning it also keeps `get` from
+/// independently re-resolving the *mutable* default and, if it changed in
+/// between, looking under a different account's seed and returning
+/// `NoSuchDelegation`.
+#[derive(CandidType, Deserialize)]
+pub struct McpPrepareDelegation {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+    pub account_number: Option<AccountNumber>,
+}
+
 #[derive(CandidType, Debug, Deserialize)]
 pub enum AccountDelegationError {
     Unauthorized(Principal),
@@ -594,6 +660,54 @@ pub enum SessionDelegationError {
     InternalCanisterError(String),
     Unauthorized(Principal),
     NoSuchDelegation,
+}
+
+/// The identity's synced trusted-MCP-server configuration: a master toggle and
+/// the single MCP server URL the user trusts. Persisted on-chain (keyed by
+/// anchor) so it follows the identity across all of its devices — unlike the
+/// device-local CLI-access toggle. Read by the Settings UI and by the `/mcp`
+/// connect flow, which verifies the connecting origin against it at connect
+/// time. `url` is kept verbatim so Settings can display/re-probe a path-based
+/// endpoint like `https://host/mcp`; trust matching is by origin.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Default)]
+pub struct McpConfig {
+    pub enabled: bool,
+    pub url: Option<String>,
+}
+
+/// Result of the internal MCP grant-binding (`mcp::register`): the expiration
+/// (nanoseconds since the epoch) of the MCP session grant just registered. The
+/// connect flow's `mcp_register_v2` invokes that helper and surfaces the same
+/// expiration to the server as `McpRegistrationV2`. Every server-facing
+/// `mcp_*` call returns `Unauthorized` once that expiry passes; the server
+/// reconnects through a new consent flow.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct McpRegistration {
+    pub expiration: Timestamp,
+}
+
+/// Result of `prepare_mcp_registration_delegation`: the canister-signature
+/// public key the registration delegation chain is rooted at (`P_reg`; the
+/// canister-signed hop delegates to the browser-held registration key `Y`),
+/// and the (short) expiration of that delegation. The frontend fetches the
+/// signed delegation with `get_mcp_registration_delegation`, extends the chain
+/// browser-side to the MCP server's key, and delivers it to the server, which
+/// redeems it via `mcp_register_v2`.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareMcpRegistrationDelegation {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+}
+
+/// Result of `mcp_register_v2`: the expiration (ns since epoch) of the MCP
+/// session grant just registered, plus the access level the user chose at
+/// connect (`queries` = read-only, `all` = full). The server reads `permissions`
+/// to learn the read-only state up front — with the v2 flow there is no
+/// completion POST carrying it.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct McpRegistrationV2 {
+    pub expiration: Timestamp,
+    pub permissions: Permissions,
 }
 
 #[derive(CandidType, Debug, Deserialize)]

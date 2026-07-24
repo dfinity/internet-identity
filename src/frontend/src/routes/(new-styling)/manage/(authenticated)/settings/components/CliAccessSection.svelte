@@ -40,7 +40,7 @@
 </script>
 
 <section
-  class="border-border-secondary bg-bg-secondary flex flex-row items-start gap-4 rounded-xl border p-5"
+  class="border-border-secondary bg-bg-secondary flex flex-row items-start gap-3 rounded-xl border p-4 sm:gap-4 sm:p-5"
 >
   <span
     class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-10 shrink-0 items-center justify-center rounded-lg border"
@@ -49,14 +49,16 @@
     <TerminalIcon class="size-5" />
   </span>
 
-  <div class="flex flex-1 flex-col gap-1">
-    <div class="flex min-h-[1.5rem] flex-row items-center gap-2">
+  <div class="flex min-w-0 flex-1 flex-col gap-1">
+    <div
+      class="flex min-h-[1.5rem] flex-row flex-wrap items-center gap-x-2 gap-y-1"
+    >
       <h3 id={titleId} class="text-text-primary text-base font-semibold">
         {$t`CLI access`}
       </h3>
       {#if enabled}
         <Badge color="success" size="sm" dot>
-          {$t`Enabled`}
+          {$t`Enabled on this device`}
         </Badge>
       {/if}
     </div>

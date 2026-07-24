@@ -12,7 +12,7 @@
 <h2
   class="text-text-primary mb-1.5 self-center text-center text-[28px] leading-[1.1] font-medium tracking-tight"
 >
-  {$t`Sign up`}
+  {$t`Create new identity`}
 </h2>
 
 <p

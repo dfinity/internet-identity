@@ -1,6 +1,7 @@
 import {
   authenticateWithJWT,
   authenticateWithPasskey,
+  authenticateWithSso,
 } from "$lib/utils/authentication";
 import { canisterId } from "$lib/globals";
 import { authenticationStore } from "$lib/stores/authentication.store";
@@ -40,7 +41,11 @@ export class AuthLastUsedFlow {
     });
   }
 
-  authenticate = async (lastUsedIdentity: LastUsedIdentity): Promise<void> => {
+  /** Re-authenticate a stored last-used identity; `dappOrigin` routes an SSO identity through the gate path. */
+  authenticate = async (
+    lastUsedIdentity: LastUsedIdentity,
+    dappOrigin?: string,
+  ): Promise<void> => {
     this.authenticatingIdentity = lastUsedIdentity.identityNumber;
     try {
       if ("passkey" in lastUsedIdentity.authMethod) {
@@ -108,14 +113,10 @@ export class AuthLastUsedFlow {
         authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsOpenID);
       } else if ("sso" in lastUsedIdentity.authMethod) {
         this.systemOverlay = true;
-        // SSO providers aren't in the static `openid_configs` list — the
-        // canister only knows the discovery domain. Re-run the FE-side
-        // two-hop chain so the request config is rebuilt from a fresh
-        // provider discovery doc. No `add_discoverable_oidc_config` call
-        // here: the only way to have a stored `sso` LastUsedIdentity is
-        // to have completed an initial sign-up that already registered
-        // the domain canister-side, and the canister persists those
-        // registrations across upgrades.
+        // SSO providers aren't in the static `openid_configs` list — only
+        // the discovery domain is known. Re-resolve the SSO config via the
+        // canister so the request config is rebuilt from a fresh provider
+        // discovery doc.
         //
         // Calling `requestWithPopup` directly (rather than `requestJWT`)
         // with a `Promise<RequestConfig>` so the popup opens synchronously
@@ -124,13 +125,15 @@ export class AuthLastUsedFlow {
         // discovery before `window.open` would let Safari block the popup.
         const { domain, loginHint } = lastUsedIdentity.authMethod.sso;
         const jwt = await requestWithPopup(
-          discoverSsoConfig(domain).then((ssoResult) => ({
-            clientId: ssoResult.clientId,
-            authURL: ssoResult.discovery.authorization_endpoint,
-            authScope: selectAuthScopes(
-              ssoResult.discovery.scopes_supported,
-            ).join(" "),
-          })),
+          discoverSsoConfig(domain, undefined, dappOrigin).then(
+            (ssoResult) => ({
+              clientId: ssoResult.resolvedClientId,
+              authURL: ssoResult.discovery.authorization_endpoint,
+              authScope: selectAuthScopes(
+                ssoResult.discovery.scopes_supported,
+              ).join(" "),
+            }),
+          ),
           {
             nonce: get(sessionStore).nonce,
             mediation: "optional",
@@ -139,16 +142,27 @@ export class AuthLastUsedFlow {
         );
         const { iss, sub } = decodeJWT(jwt);
         this.systemOverlay = false;
-        const { identity, identityNumber } = await authenticateWithJWT({
-          canisterId,
-          session: get(sessionStore),
-          jwt,
-        });
+        const { identity, identityNumber } =
+          dappOrigin !== undefined
+            ? await authenticateWithSso({
+                canisterId,
+                session: get(sessionStore),
+                jwt,
+                discoveryDomain: domain,
+                origin: dappOrigin,
+              })
+            : await authenticateWithJWT({
+                canisterId,
+                session: get(sessionStore),
+                jwt,
+                discoveryDomain: domain,
+              });
         await authenticationStore.set({
           identity,
           identityNumber,
           authMethod: { openid: { iss, sub } },
         });
+        // Re-record the original entry so it stays SSO-tagged; the session's `authMethod` has no `sso` variant.
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
         authenticationV2Funnel.addProperties({ provider: "SSO" });
         authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsOpenID);

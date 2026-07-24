@@ -37,9 +37,6 @@ msgstr "Аккаунт {displayName}"
 msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
 msgstr "Домен {domainInput} не опубликовал /.well-known/ii-openid-configuration (HTTP {0})."
 
-msgid "{domainInput} took too long to respond. Try again in a moment."
-msgstr "{domainInput} слишком долго не отвечал. Попробуйте снова через некоторое время."
-
 msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 msgstr "Файл /.well-known/ii-openid-configuration домена {domainInput} имеет неверный формат."
 

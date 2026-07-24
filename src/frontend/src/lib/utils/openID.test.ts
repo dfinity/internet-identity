@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
+  CallbackPopupClosedError,
+  createRedirectURL,
   findConfig,
   issuerMatches,
   extractIssuerTemplateClaims,
@@ -10,7 +12,6 @@ import {
 } from "./openID";
 import { OpenIdConfig } from "$lib/generated/internet_identity_types";
 import { backendCanisterConfig } from "$lib/globals";
-import { CallbackPopupClosedError } from "../../routes/(new-styling)/callback/utils";
 
 vi.mock("$lib/globals", () => ({
   backendCanisterConfig: {
@@ -357,13 +358,11 @@ describe("selectAuthScopes", () => {
 
 describe("extractIdTokenFromCallback", () => {
   const STATE = "expected-state";
-  const callback = (fragment: string) =>
-    `https://example.id.ai/callback${fragment.length > 0 ? `#${fragment}` : ""}`;
 
   it("returns the id_token when state matches and no error is present", () => {
     expect(
       extractIdTokenFromCallback(
-        callback(`state=${STATE}&id_token=eyJhbGciOi.test.token`),
+        { id_token: "eyJhbGciOi.test.token", state: STATE },
         STATE,
       ),
     ).toBe("eyJhbGciOi.test.token");
@@ -375,9 +374,12 @@ describe("extractIdTokenFromCallback", () => {
     let thrown: unknown;
     try {
       extractIdTokenFromCallback(
-        callback(
-          `state=${STATE}&error=unsupported_response_type&error_description=The+response+type+is+not+supported+by+the+authorization+server.+Configured+response+types%3A+%5Bcode%5D`,
-        ),
+        {
+          state: STATE,
+          error: "unsupported_response_type",
+          error_description:
+            "The response type is not supported by the authorization server. Configured response types: [code]",
+        },
         STATE,
       );
     } catch (e) {
@@ -397,7 +399,25 @@ describe("extractIdTokenFromCallback", () => {
     let thrown: unknown;
     try {
       extractIdTokenFromCallback(
-        callback(`state=${STATE}&error=access_denied`),
+        { state: STATE, error: "access_denied" },
+        STATE,
+      );
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(OAuthProviderError);
+    const err = thrown as OAuthProviderError;
+    expect(err.error).toBe("access_denied");
+    expect(err.errorDescription).toBeUndefined();
+  });
+
+  it("normalizes a null error_description to undefined", () => {
+    // The canister serializes an absent error_description as JSON null
+    // rather than omitting the key, so the parsed payload carries null.
+    let thrown: unknown;
+    try {
+      extractIdTokenFromCallback(
+        { state: STATE, error: "access_denied", error_description: null },
         STATE,
       );
     } catch (e) {
@@ -411,12 +431,12 @@ describe("extractIdTokenFromCallback", () => {
 
   it("checks state before surfacing a provider error", () => {
     // Guards against a forged callback: an attacker who can inject a
-    // fragment with a legitimate-looking provider error shouldn't be
+    // payload with a legitimate-looking provider error shouldn't be
     // able to influence user-facing messaging without passing the CSRF
     // check first.
     expect(() =>
       extractIdTokenFromCallback(
-        callback(`state=attacker-state&error=unsupported_response_type`),
+        { state: "attacker-state", error: "unsupported_response_type" },
         STATE,
       ),
     ).toThrow("Invalid state");
@@ -424,8 +444,32 @@ describe("extractIdTokenFromCallback", () => {
 
   it("throws 'Invalid state' when state is missing", () => {
     expect(() =>
+      extractIdTokenFromCallback({ id_token: "eyJhbGciOi.test.token" }, STATE),
+    ).toThrow("Invalid state");
+  });
+
+  it("throws 'Invalid state' when the payload is not an object", () => {
+    // The payload crosses a BroadcastChannel / sessionStorage JSON
+    // round-trip, so any shape can arrive — including a bare URL string
+    // rather than the expected object.
+    expect(() =>
       extractIdTokenFromCallback(
-        callback(`id_token=eyJhbGciOi.test.token`),
+        `https://example.id.ai/callback#state=${STATE}&id_token=abc`,
+        STATE,
+      ),
+    ).toThrow("Invalid state");
+    expect(() => extractIdTokenFromCallback(undefined, STATE)).toThrow(
+      "Invalid state",
+    );
+    expect(() => extractIdTokenFromCallback(null, STATE)).toThrow(
+      "Invalid state",
+    );
+  });
+
+  it("throws 'Invalid state' when state is not a string", () => {
+    expect(() =>
+      extractIdTokenFromCallback(
+        { id_token: "eyJhbGciOi.test.token", state: [STATE] },
         STATE,
       ),
     ).toThrow("Invalid state");
@@ -433,12 +477,39 @@ describe("extractIdTokenFromCallback", () => {
 
   it("throws 'No token received' when the provider omits both id_token and error", () => {
     // Fallback for a spec-violating provider (e.g. pure auth-code flow
-    // with no error in the fragment — we'd see `code=...` but no
-    // `id_token=...`). The callback will still have state for our
-    // CSRF guard to pass.
+    // with no token in the POST body — we'd see `code` but no
+    // `id_token`). The payload will still have state for our CSRF
+    // guard to pass.
     expect(() =>
-      extractIdTokenFromCallback(callback(`state=${STATE}&code=abc123`), STATE),
+      extractIdTokenFromCallback({ state: STATE, code: "abc123" }, STATE),
     ).toThrow("No token received");
+  });
+
+  it("throws 'No token received' when id_token is not a string", () => {
+    expect(() =>
+      extractIdTokenFromCallback({ state: STATE, id_token: 42 }, STATE),
+    ).toThrow("No token received");
+  });
+});
+
+describe("createRedirectURL", () => {
+  it("requests the form_post response mode", () => {
+    const url = createRedirectURL(
+      {
+        clientId: "test-client",
+        authURL: "https://idp.example.com/authorize",
+        authScope: "openid profile email",
+      },
+      { nonce: "test-nonce" },
+    );
+    expect(url.searchParams.get("response_mode")).toBe("form_post");
+    expect(url.searchParams.get("response_type")).toBe("code id_token");
+    expect(url.searchParams.get("client_id")).toBe("test-client");
+    expect(url.searchParams.get("nonce")).toBe("test-nonce");
+    expect(url.searchParams.get("state")).not.toBeNull();
+    const redirectUri = url.searchParams.get("redirect_uri");
+    expect(redirectUri).not.toBeNull();
+    expect(new URL(redirectUri ?? "").pathname).toBe("/callback");
   });
 });
 

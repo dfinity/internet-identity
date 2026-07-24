@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Dialog from "$lib/components/ui/Dialog.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { AddAccessMethodFlow } from "$lib/flows/addAccessMethodFlow.svelte.js";
   import type {
@@ -7,7 +8,6 @@
     OpenIdConfig,
   } from "$lib/generated/internet_identity_types";
   import AddAccessMethod from "$lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte";
-  import AddPasskey from "$lib/components/wizards/addAccessMethod/views/AddPasskey.svelte";
   import SignInWithSso from "$lib/components/wizards/auth/views/SignInWithSso.svelte";
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
   import { isOpenIdCancelError } from "$lib/utils/openID";
@@ -19,7 +19,6 @@
     onPasskeyRegistered: (credential: AuthnMethodData) => void;
     onOtherDeviceRegistered: () => void;
     onError: (error: unknown) => void;
-    isUsingPasskeys?: boolean;
     openIdCredentials?: OpenIdCredential[];
     maxPasskeysReached?: boolean;
     identityName?: string;
@@ -30,7 +29,6 @@
     onPasskeyRegistered,
     onOtherDeviceRegistered,
     onError,
-    isUsingPasskeys,
     openIdCredentials,
     maxPasskeysReached,
     identityName,
@@ -77,24 +75,14 @@
   };
 </script>
 
-{#if isContinueOnAnotherDeviceVisible}
-  <ConfirmAccessMethodWizard
-    onConfirm={handleOtherDeviceRegistered}
-    {onError}
-  />
-{:else if addAccessMethodFlow.view === "chooseMethod"}
+{#if addAccessMethodFlow.view === "chooseMethod"}
   <AddAccessMethod
-    continueWithPasskey={addAccessMethodFlow.continueWithPasskey}
+    createPasskey={handleCreatePasskey}
+    continueOnAnotherDevice={() => (isContinueOnAnotherDeviceVisible = true)}
     linkOpenIdAccount={handleContinueWithOpenId}
     signInWithSso={addAccessMethodFlow.signInWithSso}
     {maxPasskeysReached}
     {openIdCredentials}
-  />
-{:else if addAccessMethodFlow.view === "addPasskey"}
-  <AddPasskey
-    createPasskey={handleCreatePasskey}
-    continueOnAnotherDevice={() => (isContinueOnAnotherDeviceVisible = true)}
-    {isUsingPasskeys}
   />
 {:else if addAccessMethodFlow.view === "signInWithSso"}
   <SignInWithSso
@@ -102,6 +90,19 @@
     goBack={addAccessMethodFlow.chooseMethod}
     {openIdCredentials}
   />
+{/if}
+
+<!-- Cross-device pairing is layered on top of the chooser as its own modal,
+     leaving the chooser mounted underneath. Closing it (X / Esc / backdrop)
+     only flips this flag back, returning the user to the "Add access method"
+     chooser rather than tearing down the whole (parent) dialog. -->
+{#if isContinueOnAnotherDeviceVisible}
+  <Dialog onClose={() => (isContinueOnAnotherDeviceVisible = false)}>
+    <ConfirmAccessMethodWizard
+      onConfirm={handleOtherDeviceRegistered}
+      {onError}
+    />
+  </Dialog>
 {/if}
 
 {#if addAccessMethodFlow.isSystemOverlayVisible}

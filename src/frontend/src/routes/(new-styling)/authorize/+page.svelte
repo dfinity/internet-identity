@@ -5,12 +5,16 @@
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { authorizedStore } from "$lib/stores/authorization.store";
   import { isAuthenticatedStore } from "$lib/stores/authentication.store";
-  import { establishedChannelStore } from "$lib/stores/channelStore";
+  import {
+    channelStore,
+    establishedChannelStore,
+  } from "$lib/stores/channelStore";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { t } from "$lib/stores/locale.store";
   import { onMount } from "svelte";
+  import { get } from "svelte/store";
   import { GUIDED_UPGRADE, MIN_GUIDED_UPGRADE } from "$lib/state/featureFlags";
   import { MigrationWizard } from "$lib/components/wizards/migration";
   import { XIcon } from "@lucide/svelte";
@@ -22,6 +26,7 @@
   import RedirectAnimationView from "./views/RedirectAnimationView.svelte";
   import UpgradeSuccessView from "./views/UpgradeSuccessView.svelte";
   import ContinueView from "./views/ContinueView.svelte";
+  import type { AccessLevel } from "$lib/utils/accessLevel";
   import AuthWizardView from "./views/AuthWizardView.svelte";
   import AttributeConsentView from "./views/AttributeConsentView.svelte";
   import {
@@ -34,23 +39,50 @@
   import {
     authorizationContextStore,
     authorizationStore,
+    requestedMaxTimeToLiveStore,
   } from "$lib/stores/authorization.store";
-  import { decodeJWT, findConfig, selectAuthScopes } from "$lib/utils/openID";
+  import {
+    decodeJWT,
+    findConfig,
+    isOpenIdCancelError,
+    selectAuthScopes,
+  } from "$lib/utils/openID";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
   import {
     DirectOpenIdEvents,
     directOpenIdFunnel,
   } from "$lib/utils/analytics/DirectOpenIdFunnel";
-  import { createRedirectURL } from "$lib/utils/openID";
+  import {
+    createRedirectURL,
+    extractIdTokenFromCallback,
+  } from "$lib/utils/openID";
   import { sessionStore } from "$lib/stores/session.store";
-  import { anonymousActor } from "$lib/globals";
-  import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
+  import {
+    discoverSsoConfig,
+    type SsoDiscoveryResult,
+  } from "$lib/utils/ssoDiscovery";
+  import { SsoNormalLoginRequiredError } from "$lib/utils/authentication/jwt";
+  import SsoNormalLoginRequired from "$lib/components/wizards/auth/views/SsoNormalLoginRequired.svelte";
+  import { waitForStore } from "$lib/utils/utils";
+  import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 
   const { data }: PageProps = $props();
 
   // --- Local state ---
   let upgradeSuccess = $state(false);
   let openIdResumeProcessing = $state(false);
+  // Set when a 1-click SSO redemption hits the normal-login-required fail-safe.
+  // Holds everything the dialog needs to run one normal (primary-client)
+  // sign-in, then replay the stashed gated JWT and authorize.
+  let ssoNormalLogin = $state<{
+    name: string;
+    discovery: SsoDiscoveryResult;
+    jwt: string;
+    config: OpenIdConfig;
+    domain: string;
+    origin: string;
+  }>();
+  let ssoNormalLoginBusy = $state(false);
 
   // --- Upgrade panel state ---
   let isUpgradeCollapsed = $state(
@@ -88,8 +120,62 @@
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     return Promise.resolve();
   };
-  const handleAuthorize = (accountNumber: Promise<bigint | undefined>) => {
-    authorizationStore.authorize(accountNumber);
+
+  // Dialog primary action for the 1-click normal-login fail-safe: run one normal
+  // (primary-client) sign-in to bridge the identity, replay the stashed gated JWT
+  // (no fresh ceremony), then authorize and redirect to the app.
+  const handleSsoNormalLoginContinue = async () => {
+    if (ssoNormalLogin === undefined) {
+      return;
+    }
+    const { discovery, jwt, config, domain, origin } = ssoNormalLogin;
+    ssoNormalLoginBusy = true;
+    try {
+      const authFlow = new AuthFlow();
+      const primaryResult: SsoDiscoveryResult = {
+        ...discovery,
+        resolvedClientId: discovery.clientId,
+      };
+      const normal = await authFlow.continueWithSso(primaryResult, "both");
+      if (normal?.type === "signUp") {
+        await authFlow.completeSsoRegistration(
+          normal.name ??
+            normal.email?.split("@")[0] ??
+            discovery.name ??
+            domain,
+        );
+      }
+      const replay = await authFlow.continueWithOpenId(
+        config,
+        jwt,
+        "signin",
+        domain,
+        { origin },
+      );
+      if (replay?.type !== "signIn") {
+        throw new Error("Gated SSO sign-in did not resolve after normal login");
+      }
+      authorizationStore.setFlow({ type: "1-click-sso", domain });
+      authorizationStore.authorize(Promise.resolve(undefined), "full-access");
+    } catch (e) {
+      ssoNormalLoginBusy = false;
+      if (isOpenIdCancelError(e)) {
+        return;
+      }
+      ssoNormalLogin = undefined;
+      handleError(e);
+    }
+  };
+
+  const handleSsoNormalLoginCancel = () => {
+    ssoNormalLogin = undefined;
+  };
+  const handleAuthorize = (
+    accountNumber: Promise<bigint | undefined>,
+    accessLevel: AccessLevel,
+    maxTimeToLive?: bigint,
+  ) => {
+    authorizationStore.authorize(accountNumber, accessLevel, maxTimeToLive);
   };
 
   const handleAttributeConsent = (consent: AttributeConsent) => {
@@ -131,22 +217,57 @@
   };
 
   /**
-   * 1-click SSO equivalent of {@link initiateOpenId}: register the
-   * discovery domain with the canister, run two-hop discovery, then
-   * redirect through the same OpenID-redirect machinery as the direct
-   * flow. Distinct from the wizard `SignInWithSso` path only in that it
-   * has nothing to debounce or validate UI-side — the URL has already
-   * committed to a domain that's on the allowlist (gated in `+page.ts`).
+   * Resolve once the dapp's effective origin is known. Pending `?sso=`/`?openid=`
+   * flows don't have it until the dapp's authorize request arrives; times out so
+   * a non-conforming dapp can't hang the flow.
    */
-  const initiateSso = async (domain: string) => {
-    await anonymousActor.add_discoverable_oidc_config({
-      discovery_domain: domain,
+  const waitForEffectiveOrigin = (
+    timeoutMs = 15_000,
+  ): Promise<string | undefined> =>
+    new Promise((resolve) => {
+      const current = get(authorizationStore)?.effectiveOrigin;
+      if (current !== undefined) {
+        resolve(current);
+        return;
+      }
+      let settled = false;
+      const finish = (value: string | undefined) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        unsubscribe();
+        resolve(value);
+      };
+      const timer = setTimeout(() => finish(undefined), timeoutMs);
+      const unsubscribe = authorizationStore.subscribe((context) => {
+        if (context?.effectiveOrigin !== undefined) {
+          finish(context.effectiveOrigin);
+        }
+      });
     });
-    const result = await discoverSsoConfig(domain);
-    // Stash the SSO discovery domain so `resumeOpenId` knows the
-    // returning JWT belongs to a 1-click SSO flow rather than a 1-click
-    // OpenID one. The flow type drives which auto-approve allowlist the
-    // attribute consent handler bypasses.
+
+  /**
+   * 1-click SSO equivalent of {@link initiateOpenId}: resolve the discovery
+   * domain via the canister, then redirect through the same OpenID-redirect
+   * machinery as the direct flow. Distinct from the wizard `SignInWithSso`
+   * path only in that it has nothing to debounce or validate UI-side — the URL
+   * has already committed to a domain that's on the allowlist (gated in
+   * `+page.ts`).
+   */
+  const initiateSso = async (domain: string, derivationOrigin?: string) => {
+    // `appOrigin` only selects which client to run against — the server
+    // re-validates in the gate, so a wrong value can deny but never bypass.
+    // Remap to canonical (as the delegation path does) so it keys the origin the
+    // gate will.
+    const appOrigin = remapToLegacyDomain(
+      derivationOrigin ??
+        (await waitForStore(channelStore, (ch) => ch?.origin)),
+    );
+    const result = await discoverSsoConfig(domain, undefined, appOrigin);
+    // Stash the SSO discovery domain so `resumeOpenId` knows the returning JWT
+    // belongs to a 1-click SSO flow rather than a 1-click OpenID one. The flow
+    // type drives which auto-approve allowlist the attribute consent handler
+    // bypasses.
     sessionStorage.setItem("ii-sso-1-click-domain", domain);
     const syntheticConfig: OpenIdConfig = {
       auth_uri: result.discovery.authorization_endpoint,
@@ -157,7 +278,8 @@
       email_verification: [],
       issuer: result.discovery.issuer,
       auth_scope: selectAuthScopes(result.discovery.scopes_supported),
-      client_id: result.clientId,
+      // The per-app client for a gated dapp, else the primary.
+      client_id: result.resolvedClientId,
       seed_jwks: [],
     };
     initiateOpenId(syntheticConfig);
@@ -165,25 +287,43 @@
 
   /** Process the OpenID callback and authorize. */
   const resumeOpenId = async () => {
-    const searchParams = new URLSearchParams(window.location.hash.slice(1));
+    // The canister's POST /callback landing page stashes the payload here
+    // before navigating to `/authorize?flow=openid-resume` in the same-tab
+    // flow. Single-use: remove it before anything else can throw.
+    const storedPayload = sessionStorage.getItem("ii-openid-callback-data");
+    sessionStorage.removeItem("ii-openid-callback-data");
     window.history.replaceState(
       undefined,
       "",
       window.location.origin + "/authorize",
     );
-    const redirectState = searchParams.get("state");
-    const jwt = searchParams.get("id_token");
     const openIdAuthorizeState = sessionStorage.getItem(
       "ii-openid-authorize-state",
     );
-    if (
-      openIdAuthorizeState === null ||
-      redirectState !== openIdAuthorizeState ||
-      jwt === null
-    ) {
+    // The callback landing page routes on this marker (present = resume
+    // in-app, absent = deliver to the opener); popups inherit a copy of
+    // sessionStorage in Chrome, so a stale marker would misroute a later
+    // popup sign-in from this tab.
+    sessionStorage.removeItem("ii-openid-authorize-state");
+    if (storedPayload === null || openIdAuthorizeState === null) {
       return;
     }
-    const authFlow = new AuthFlow({ trackLastUsed: false });
+    let jwt: string;
+    try {
+      jwt = extractIdTokenFromCallback(
+        JSON.parse(storedPayload),
+        openIdAuthorizeState,
+      );
+    } catch {
+      // A state mismatch, an IdP error report or a missing token is not
+      // recoverable here; fall back to the regular flow so the user can
+      // start sign-in again.
+      return;
+    }
+    // Track the last-used identity: a 1-click sign-up (or a sign-in on a
+    // device with no local entry yet) must land in localStorage so the
+    // identity shows up when the user later visits II directly.
+    const authFlow = new AuthFlow();
     const { iss, aud, ...metadata } = decodeJWT(jwt);
     // The marker is set by `initiateSso` for the `?sso=<domain>` path.
     // If present, treat the returning JWT as a 1-click SSO flow so the
@@ -192,15 +332,24 @@
     // marker can't leak into a subsequent direct-OpenID round-trip.
     const ssoDomain = sessionStorage.getItem("ii-sso-1-click-domain");
     sessionStorage.removeItem("ii-sso-1-click-domain");
+    // Show the redirect animation now so the wait below doesn't flash the wizard.
+    openIdResumeProcessing = true;
+    // Redeem through the origin-bound gate path so the session certifies
+    // `sso:<domain>` attributes.
+    let sso: { origin: string } | undefined;
+    if (ssoDomain !== null) {
+      const dappOrigin = await waitForEffectiveOrigin();
+      if (dappOrigin !== undefined) {
+        sso = { origin: dappOrigin };
+      }
+    }
     let config: OpenIdConfig | undefined;
     if (ssoDomain !== null) {
-      // SSO sign-in: there's no matching `openid_configs` entry to look
-      // up because the provider is registered as a `DiscoverableOidcConfig`
-      // on the canister, not a direct `OpenIdConfig`. Build a synthetic
-      // config from the JWT itself — `continueWithOpenId` only needs
-      // `name` (for analytics) and `client_id` / `issuer` here since
-      // the JWT is already in hand and the canister side picks the
-      // matching `DiscoverableProvider` by `(iss, aud)`.
+      // SSO sign-in: there's no matching `openid_configs` entry, so build a
+      // synthetic config from the JWT itself. `continueWithOpenId` only needs
+      // `name` (for analytics) and `client_id` / `issuer` here since the JWT is
+      // already in hand; `ssoDomain` is passed through so the canister verifies
+      // it against the SSO discovery for that domain.
       config = {
         auth_uri: "",
         jwks_uri: "",
@@ -231,18 +380,66 @@
         issuer: config.issuer,
       });
     }
-    openIdResumeProcessing = true;
 
     directOpenIdFunnel.addProperties({ openid_issuer: config.issuer });
     directOpenIdFunnel.trigger(DirectOpenIdEvents.CallbackFromOpenId);
-    const authFlowResult = await authFlow.continueWithOpenId(config, jwt);
+    const authFlowResult = await authFlow.continueWithOpenId(
+      config,
+      jwt,
+      undefined,
+      ssoDomain ?? undefined,
+      sso,
+    );
     const { name, email } = decodeJWT(jwt);
     if (authFlowResult?.type === "signUp") {
-      await authFlow.completeOpenIdRegistration(
-        name ?? email?.split("@")[0] ?? $t`${config.name} user`,
-      );
+      // AuthFlow owns last-used persistence (via `trackLastUsed`): sign-up is
+      // recorded by `completeOpenIdRegistration` here, and the sign-in case is
+      // already recorded inside `continueWithOpenId` (the JWT was supplied, so
+      // there's no interactive disambiguation to defer the write for).
+      try {
+        await authFlow.completeOpenIdRegistration(
+          name ?? email?.split("@")[0] ?? $t`${config.name} user`,
+        );
+      } catch (e) {
+        // A non-`sub` gated org can't register from the per-app token: the
+        // identity must sign in normally (primary client) first to bridge its
+        // stable id. Hand off to the wizard's "sign in normally first" CTA,
+        // seeded with the resolved gated result. `sub` orgs never hit this —
+        // they register in one trip.
+        if (
+          e instanceof SsoNormalLoginRequiredError &&
+          ssoDomain !== null &&
+          sso !== undefined
+        ) {
+          const dappOrigin = await waitForEffectiveOrigin();
+          const appOrigin =
+            dappOrigin !== undefined
+              ? remapToLegacyDomain(dappOrigin)
+              : undefined;
+          // Re-resolve to get the org's display name + primary client for the
+          // dialog. The gated JWT (`jwt`), its synthetic `config`, and the exact
+          // `origin` used at redemption are stashed for the silent replay.
+          const discovery = await discoverSsoConfig(
+            ssoDomain,
+            undefined,
+            appOrigin,
+          );
+          ssoNormalLogin = {
+            name: discovery.name ?? ssoDomain,
+            discovery,
+            jwt,
+            config,
+            domain: ssoDomain,
+            origin: sso.origin,
+          };
+          openIdResumeProcessing = false;
+          return;
+        }
+        throw e;
+      }
     }
-    authorizationStore.authorize(Promise.resolve(undefined));
+    // 1-click OpenID flow: no access-level toggle, always full access.
+    authorizationStore.authorize(Promise.resolve(undefined), "full-access");
     directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToApp);
   };
 
@@ -252,7 +449,7 @@
     } else if (data.flow === "sso-init") {
       // Discovery + redirect runs async; the page renders nothing while
       // it's in flight (mirrors the openid-init render branch).
-      initiateSso(data.domain).catch(handleError);
+      initiateSso(data.domain, data.derivationOrigin).catch(handleError);
     } else if (data.flow === "openid-resume") {
       // resumeOpenId sets the flow once the JWT (and thus the issuer)
       // has been decoded.
@@ -387,6 +584,10 @@
 {:else if upgradeSuccess && $isAuthenticatedStore}
   <!-- Migration wizard completed — show success countdown before authorizing. -->
   {@render panelWrapper(upgradeSuccessContent)}
+{:else if ssoNormalLogin !== undefined}
+  <!-- 1-click SSO hit the normal-login-required fail-safe — show the one-step
+       "First sign-in with X" dialog instead of proceeding. -->
+  {@render panelWrapper(ssoNormalLoginContent)}
 {:else if selectedIdentity !== undefined}
   <!-- Returning user with a selected identity — show account selection. -->
   {@render panelWrapper(continueContent)}
@@ -397,11 +598,13 @@
 
 {#snippet attributeConsentContent()}
   {#if $attributeConsentStore !== undefined}
-    <AttributeConsentView
-      context={$attributeConsentStore}
-      variant={data.flow === "openid-resume" ? "openid" : "normal"}
-      onConsent={handleAttributeConsent}
-    />
+    {#key $attributeConsentStore}
+      <AttributeConsentView
+        context={$attributeConsentStore}
+        variant={data.flow === "openid-resume" ? "openid" : "normal"}
+        onConsent={handleAttributeConsent}
+      />
+    {/key}
   {/if}
 {/snippet}
 
@@ -412,6 +615,8 @@
 {#snippet continueContent()}
   <ContinueView
     effectiveOrigin={$authorizationContextStore.effectiveOrigin}
+    displayOrigin={$establishedChannelStore.origin}
+    requestedMaxTimeToLive={$requestedMaxTimeToLiveStore}
     onAuthorize={handleAuthorize}
   />
 {/snippet}
@@ -423,4 +628,15 @@
     onError={handleError}
     mode="signin"
   />
+{/snippet}
+
+{#snippet ssoNormalLoginContent()}
+  {#if ssoNormalLogin !== undefined}
+    <SsoNormalLoginRequired
+      name={ssoNormalLogin.name}
+      onContinue={handleSsoNormalLoginContinue}
+      onCancel={handleSsoNormalLoginCancel}
+      loading={ssoNormalLoginBusy}
+    />
+  {/if}
 {/snippet}

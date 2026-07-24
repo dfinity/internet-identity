@@ -5,11 +5,145 @@ import type {
 import { backendCanisterConfig } from "$lib/globals";
 import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
-import {
-  CallbackPopupClosedError,
-  REDIRECT_CALLBACK_PATH,
-  redirectInPopup,
-} from "../../routes/(new-styling)/callback/utils";
+import { z } from "zod";
+const BROADCAST_CHANNEL = "redirect_callback";
+const REDIRECT_CALLBACK_PATH = "/callback";
+
+export class CallbackPopupClosedError extends Error {}
+
+/**
+ * Payload the canister's POST /callback landing page delivers to the
+ * frontend — via `BroadcastChannel` in the popup flow, via the
+ * `ii-openid-callback-data` sessionStorage entry in the same-tab flow.
+ * Carries either the token or the IdP's RFC 6749 error report, plus the
+ * CSRF `state` in both cases.
+ *
+ * The canister serializes an absent `error_description` as JSON `null`
+ * rather than omitting the key, so the schema accepts `null` and normalizes
+ * it to `undefined`.
+ */
+const CallbackPayloadSchema = z.union([
+  z.object({ id_token: z.string(), state: z.string() }),
+  z.object({
+    error: z.string(),
+    error_description: z
+      .string()
+      .nullish()
+      .transform((value) => value ?? undefined),
+    state: z.string(),
+  }),
+]);
+export type CallbackPayload = z.infer<typeof CallbackPayloadSchema>;
+
+/**
+ * Lenient per-field view of the payload for {@link extractIdTokenFromCallback},
+ * which must read `state` for its CSRF check even on an otherwise-malformed
+ * payload. Each field independently falls back to `undefined` when absent or
+ * not a string, and a non-object input falls back to an empty record, so
+ * `.parse` never throws.
+ */
+const CallbackFieldsSchema = z
+  .object({
+    state: z.string().optional().catch(undefined),
+    id_token: z.string().optional().catch(undefined),
+    error: z.string().optional().catch(undefined),
+    error_description: z.string().nullish().catch(undefined),
+  })
+  .catch({});
+
+/**
+ * Whether a value posted on the callback channel (or parsed from the
+ * sessionStorage entry) is a {@link CallbackPayload}.
+ */
+const isCallbackPayload = (value: unknown): boolean =>
+  CallbackPayloadSchema.safeParse(value).success;
+
+/**
+ * Open a popup that round-trips through an OAuth provider and resolves with
+ * the callback payload delivered by the canister's POST /callback page.
+ *
+ * Accepts either:
+ * - A `string` URL: navigated to immediately. Used by the synchronous flows
+ *   where the redirect URL is known at click time.
+ * - A `Promise<string>`: the popup is opened to `about:blank` first
+ *   (synchronously, to consume the user-activation token before any
+ *   `await` — Safari blocks `window.open` after an awaited Promise),
+ *   then navigated once the URL resolves. Used for flows that need an
+ *   async step (e.g. SSO two-hop discovery) before the redirect URL is
+ *   known. If the promise rejects, the popup is closed and the outer
+ *   promise rejects with the same error.
+ *
+ * The payload is resolved as `unknown`: it crosses a BroadcastChannel, so
+ * the consumer (`extractIdTokenFromCallback`) revalidates its shape along
+ * with the CSRF state check.
+ */
+const redirectInPopup = (url: string | Promise<string>): Promise<unknown> => {
+  const width = 500;
+  const height = 600;
+  const left = (window.innerWidth - width) / 2 + window.screenX;
+  const top = (window.innerHeight - height) / 2 + window.screenY;
+  // For deferred URLs, open about:blank synchronously so we don't lose
+  // the user-activation token — same-origin (inherited), so we can later
+  // navigate via `redirectWindow.location.href = ...` even though we'll
+  // end up on a cross-origin IdP.
+  const initialUrl = typeof url === "string" ? url : "about:blank";
+  const redirectWindow = window.open(
+    initialUrl,
+    "_blank",
+    `width=${width},height=${height},left=${left},top=${top}`,
+  );
+  if (redirectWindow === null) {
+    throw new CallbackPopupClosedError();
+  }
+
+  return new Promise<unknown>((resolve, reject) => {
+    const cleanup = () => {
+      clearInterval(closeInterval);
+      channel.close();
+      redirectWindow?.close();
+      window.focus();
+    };
+    // Periodically check if popup was closed by the user.
+    // We can't listen for close events due to cross-origin restrictions,
+    // so we poll every 500ms to detect closure. The interval balances
+    // responsiveness with resource consumption.
+    const closeInterval = setInterval(() => {
+      if (redirectWindow.closed === true) {
+        cleanup();
+        reject(new CallbackPopupClosedError());
+      }
+    }, 500);
+    // Listen to the popup, we expect a message with the payload of the
+    // callback, after receiving it we can close the popup and resolve the
+    // promise.
+    const channel = new BroadcastChannel(BROADCAST_CHANNEL);
+    channel.addEventListener("message", (event) => {
+      const data: unknown = event.data;
+      if (!isCallbackPayload(data)) {
+        return;
+      }
+      cleanup();
+      resolve(data);
+    });
+
+    if (typeof url !== "string") {
+      url.then(
+        (resolvedUrl) => {
+          // The user may have closed the popup or the close-poller may have
+          // already rejected during the await — `closed` covers both.
+          if (redirectWindow.closed) {
+            return;
+          }
+          redirectWindow.location.href = resolvedUrl;
+        },
+        (error: unknown) => {
+          cleanup();
+          reject(error);
+        },
+      );
+    }
+  });
+};
 
 export interface RequestConfig {
   // OAuth client ID
@@ -94,8 +228,8 @@ export const isOpenIdCancelError = (error: unknown) => {
 };
 
 /**
- * Raised when an OAuth provider redirects back to II with an `error` (and
- * optional `error_description`) in the callback fragment — per RFC 6749
+ * Raised when an OAuth provider reports an `error` (and optional
+ * `error_description`) through the callback — per RFC 6749
  * §4.1.2.1 / 4.2.2.1. Typical causes are the SSO app being misconfigured:
  *   • `unsupported_response_type` — the Okta/Auth0/etc. app doesn't allow
  *     the hybrid flow we request (`response_type=id_token code`).
@@ -137,7 +271,11 @@ export const createRedirectURL = (
   // Even though we only need an id token, we're still asking for a code
   // because some identity providers (AppleID) will throw an error otherwise.
   authURL.searchParams.set("response_type", "code id_token");
-  authURL.searchParams.set("response_mode", "fragment");
+  // The IdP POSTs the response to the canister's /callback handler, which
+  // returns certified HTML that delivers the payload to the frontend. Unlike
+  // `fragment`, `form_post` works across Okta/Auth0/Apple and never puts the
+  // id_token in a URL.
+  authURL.searchParams.set("response_mode", "form_post");
   authURL.searchParams.set("client_id", config.clientId);
   authURL.searchParams.set("redirect_uri", redirectURL.href);
   authURL.searchParams.set("scope", config.authScope);
@@ -157,38 +295,35 @@ export const createRedirectURL = (
 };
 
 /**
- * Parse the OAuth authorize callback URL and extract the `id_token`.
+ * Validate the callback payload delivered by the canister's POST /callback
+ * landing page and extract the `id_token`.
  *
- * Exported so `requestWithPopup` and tests can share a single source of
- * truth for how a callback fragment is interpreted. Throws:
- *   - `Error("Invalid state")` if the callback's `state` doesn't match
+ * Exported so `requestWithPopup`, `resumeOpenId` and tests can share a
+ * single source of truth for how a callback payload is interpreted. The
+ * payload arrives as `unknown` (it crosses a BroadcastChannel or a
+ * sessionStorage JSON round-trip), so the shape is revalidated here. Throws:
+ *   - `Error("Invalid state")` if the payload's `state` doesn't match
  *     `expectedState` (CSRF guard).
- *   - `OAuthProviderError` if the callback carries an `error=...`
- *     fragment (RFC 6749 §4.1.2.1 / 4.2.2.1) — checked BEFORE the
- *     `id_token` null-check so a misconfigured SSO app surfaces its
- *     own message instead of a generic "No token received" that looks
- *     like a bug in II.
+ *   - `OAuthProviderError` if the payload carries an `error` field
+ *     (RFC 6749 §4.1.2.1 / 4.2.2.1) — checked BEFORE the `id_token`
+ *     check so a misconfigured SSO app surfaces its own message instead
+ *     of a generic "No token received" that looks like a bug in II.
  *   - `Error("No token received")` if neither `id_token` nor `error`
- *     was in the fragment (fallback for spec-violating providers).
+ *     is present (fallback for spec-violating providers).
  */
 export const extractIdTokenFromCallback = (
-  callback: string,
+  callback: unknown,
   expectedState: string,
 ): string => {
-  const callbackURL = new URL(callback);
-  const searchParams = new URLSearchParams(callbackURL.hash.slice(1));
-  if (searchParams.get("state") !== expectedState) {
+  const { state, id_token, error, error_description } =
+    CallbackFieldsSchema.parse(callback);
+  if (state !== expectedState) {
     throw new Error("Invalid state");
   }
-  const error = searchParams.get("error");
-  if (error !== null) {
-    throw new OAuthProviderError(
-      error,
-      searchParams.get("error_description") ?? undefined,
-    );
+  if (error !== undefined) {
+    throw new OAuthProviderError(error, error_description ?? undefined);
   }
-  const id_token = searchParams.get("id_token");
-  if (id_token === null) {
+  if (id_token === undefined) {
     throw new Error("No token received");
   }
   return id_token;

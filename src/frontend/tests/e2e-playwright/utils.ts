@@ -186,9 +186,10 @@ export const addPasskeyCurrentDevice = async (
   dummyAuth: DummyAuthFn,
 ): Promise<void> => {
   await page.getByRole("button", { name: "Add new" }).click();
-  await page.getByRole("button", { name: "Continue with passkey" }).click();
+  // The chooser triggers WebAuthn `create()` directly — arm the dummy
+  // authenticator before the click so the upcoming prompt is satisfied.
   dummyAuth(page);
-  await page.getByRole("button", { name: "Create Passkey" }).click();
+  await page.getByRole("button", { name: "Continue with passkey" }).click();
 };
 
 export const renamePasskey = async (
@@ -288,13 +289,13 @@ export const openIiTab = async (page: Page): Promise<Page> => {
 // and mobile contexts) — the component's listener fires on any synthetic
 // event. The controller releases itself at the 2500ms duration, so no
 // matching mouseup is needed.
-export const holdToConfirm = async (page: Page): Promise<void> => {
-  await page
-    .getByRole("button", { name: "Hold to confirm" })
-    .dispatchEvent("mousedown");
-  await page
-    .getByRole("heading", { level: 1, name: "Enter the code" })
-    .waitFor();
+export const holdToConfirm = async (
+  page: Page,
+  name = "Hold to confirm",
+): Promise<void> => {
+  const button = page.getByRole("button", { name });
+  await expect(button).toBeEnabled();
+  await button.dispatchEvent("mousedown");
 };
 
 /**

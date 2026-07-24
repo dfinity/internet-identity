@@ -284,6 +284,21 @@ impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
         Lookup::StartFill(self.claim(key, now), value)
     }
 
+    /// Read-only servable value for `key`, without claiming a fill, touching
+    /// the LRU clock, or sweeping — safe to call from a query context, which
+    /// cannot spawn the outcall a fill needs. Serves whatever is still alive
+    /// (fresh or stale); a dead entry (past `evict_at`) reads as absent.
+    /// Returns `None` when nothing is servable, so the caller signals "retry
+    /// through an update path" rather than driving a fill it cannot run.
+    fn peek_value(&self, key: &K, now: u64) -> Option<V> {
+        let e = self.entries.get(key)?;
+        if e.evict_at > now {
+            e.value.clone()
+        } else {
+            None
+        }
+    }
+
     /// Apply the outcome of the fill identified by `token`. `Ok` stores fresh
     /// and resets backoff; `Err` keeps any prior value for stale-serving and
     /// parks a backoff cooldown. A no-op if the marker is no longer ours (a
@@ -549,6 +564,26 @@ where
             value.map_or(Cached::Pending, Cached::Ready)
         }
     }
+}
+
+/// Read the value for `key` without ever spawning a fill or mutating the cache
+/// — the query-safe counterpart to [`get`]. Returns `Ready(v)` for any value
+/// still servable (fresh or stale), else `Pending`. A query cannot drive a fill
+/// forward, so a `Pending` here means the caller should re-issue through an
+/// update path (which *can* fill) rather than poll the query again.
+pub fn peek<K, V, E>(
+    cache: &'static LocalKey<RefCell<SingleFlightCache<K, V, E>>>,
+    key: &K,
+) -> Cached<V>
+where
+    K: Ord + Clone + 'static,
+    V: Clone + 'static,
+    E: 'static,
+{
+    let now = now();
+    cache
+        .with_borrow(|c| c.peek_value(key, now))
+        .map_or(Cached::Pending, Cached::Ready)
 }
 
 /// Snapshot the cache's state for external observability (metrics). Read-only
