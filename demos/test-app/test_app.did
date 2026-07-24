@@ -18,7 +18,7 @@ type AlternativeOriginsMode = variant {
     CertifiedContent;
     UncertifiedContent;
     Redirect: record { location: text; };
-}
+};
 
 type CallerAttributes = record {
     /// Canister that signed the attributes attached to the caller's

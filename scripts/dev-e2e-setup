@@ -314,7 +314,7 @@ EOF
   # URL transport accepts a redirect back to it. Its own gateway origins are
   # derived in-canister from its id, so only the custom e2e domain is passed.
   cat > "$TEST_APP_ARGS_FILE" <<EOF
-(opt record { auth_callbacks = vec { "https://nice-name.com/callback.html" } })
+(opt record { auth_callbacks = vec { "https://nice-name.com/callback" } })
 EOF
 
   # FE args depend on the II canister ID, which we only know after create_canisters.

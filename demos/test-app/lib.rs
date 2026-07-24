@@ -11,7 +11,7 @@ use AlternativeOriginsMode::UncertifiedContent;
 const ALTERNATIVE_ORIGINS_PATH: &str = "/.well-known/ii-alternative-origins";
 const EVIL_ALTERNATIVE_ORIGINS_PATH: &str = "/.well-known/evil-alternative-origins";
 // ICRC-167 URL transport auth-callback allow-list. Points at this app's redirect
-// callback page (`/callback.html`), so II's URL transport accepts delivering a
+// callback page (`/callback`), so II's URL transport accepts delivering a
 // response back to it.
 const AUTH_CALLBACKS_PATH: &str = "/.well-known/ii-auth-callbacks";
 const EMPTY_ALTERNATIVE_ORIGINS: &str = r#"{"alternativeOrigins":[]}"#;
@@ -229,7 +229,7 @@ fn init_assets(alternative_origins: String, extra_auth_callbacks: Vec<String>) {
     });
 
     // ICRC-167 URL transport auth-callback allow-list, declaring this app's
-    // redirect callback page (`/callback.html`) so II's URL transport accepts a
+    // redirect callback page (`/callback`) so II's URL transport accepts a
     // redirect back to it. Covers this canister's own gateway origins (derived
     // from its id, so the deployed canister works without configuration) plus
     // any extra origins supplied at install (e.g. the e2e `nice-name.com`).
@@ -238,7 +238,7 @@ fn init_assets(alternative_origins: String, extra_auth_callbacks: Vec<String>) {
     let canister_id = api::canister_self();
     let mut callbacks: Vec<String> = ["icp0.io", "ic0.app", "icp.net"]
         .iter()
-        .map(|domain| format!("https://{canister_id}.{domain}/callback.html"))
+        .map(|domain| format!("https://{canister_id}.{domain}/callback"))
         .collect();
     callbacks.extend(extra_auth_callbacks);
     let callbacks_json = callbacks

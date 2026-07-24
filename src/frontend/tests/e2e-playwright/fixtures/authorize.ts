@@ -7,6 +7,13 @@ export type AuthorizeConfig = {
   testAppURL: string;
   internetIdentityURL: string;
   protocol: "legacy" | "icrc25";
+  /**
+   * Sign-in transport the test app uses. Defaults to `"window"` (the popup /
+   * postMessage flow). `"redirect"` drives the ICRC-167 single-tab redirect
+   * flow: clicking "Sign In" navigates the same tab to the callback page and on
+   * to II, and the response is delivered back by navigation (no popup).
+   */
+  transport?: "window" | "redirect";
 } & (
   | { protocol: "legacy" }
   | {
@@ -127,6 +134,23 @@ export const test = base.extend<{
     }
 
     await expect(testAppPage.locator("#principal")).toBeHidden();
+
+    if ((authorizeConfig.transport ?? "window") === "redirect") {
+      // Redirect flow: clicking "Sign In" navigates THIS tab to /callback.html
+      // → II /authorize. The authenticate interaction runs on the same page,
+      // and II delivers the response back by navigation — no popup.
+      await testAppPage.locator("#transport").selectOption("redirect");
+      await testAppPage.getByRole("button", { name: "Sign In" }).click();
+
+      await use(new AuthorizePage(testAppPage));
+
+      // On the return load the homepage renders the principal.
+      await expect(testAppPage.locator("#principal")).toBeVisible({
+        timeout: 15_000,
+      });
+      return;
+    }
+
     const authPagePromise = testAppPage.context().waitForEvent("page");
     await testAppPage.getByRole("button", { name: "Sign In" }).click();
     const authPage = await authPagePromise;
@@ -136,10 +160,17 @@ export const test = base.extend<{
 
     await closePromise;
   },
-  authorizedPrincipal: async ({ page }, use) => {
+  authorizedPrincipal: async ({ page, authorizeConfig }, use) => {
     const [testAppPage, authPage] = page.context().pages();
     if (authPage !== undefined) {
       await authPage.waitForEvent("close", { timeout: 15_000 });
+    }
+    // The redirect flow renders the principal only after navigating back to the
+    // test app, so wait for it before reading (window flow already has it).
+    if (authorizeConfig?.transport === "redirect") {
+      await expect(testAppPage.locator("#principal")).toBeVisible({
+        timeout: 15_000,
+      });
     }
 
     const principal = await testAppPage.locator("#principal").textContent();
@@ -171,10 +202,17 @@ export const test = base.extend<{
       ),
     );
   },
-  authorizedIcrc3Attributes: async ({ page }, use) => {
+  authorizedIcrc3Attributes: async ({ page, authorizeConfig }, use) => {
     const [testAppPage, authPage] = page.context().pages();
     if (authPage !== undefined) {
       await authPage.waitForEvent("close", { timeout: 15_000 });
+    }
+    // The redirect flow renders results only after navigating back to the test
+    // app, so wait for the return (principal visible) before reading.
+    if (authorizeConfig?.transport === "redirect") {
+      await expect(testAppPage.locator("#principal")).toBeVisible({
+        timeout: 15_000,
+      });
     }
 
     // Tests that bypass the test_app entirely (e.g. the channel-error

@@ -1,15 +1,17 @@
 /**
  * Shared, transport-agnostic codec for the redirect sign-in flow.
  *
- * The homepage serialises its inputs into the `/callback.html` URL's query;
+ * The homepage serialises its inputs into the `/callback` URL's query;
  * the callback page runs the ICRC-167 redirect flow and serialises the results
  * back into the homepage URL's hash. Keeping the encode/decode here (rather
  * than in either page) means the callback page stays a generic driver — it
  * never hardcodes which fields exist.
  */
 
-/** The dedicated callback route (a separate Vite entry / canister asset). */
-export const CALLBACK_PATH = "/callback.html";
+/** The dedicated callback route. Built as the `callback.html` Vite entry, but
+ *  the canister serves it at the extensionless `/callback` (asset_util strips
+ *  the `.html`), so that's the path — and thus the ICRC-167 callback URL. */
+export const CALLBACK_PATH = "/callback";
 
 /** Inputs the homepage collects and hands to the callback page. */
 export interface RedirectInputs {
