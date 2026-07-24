@@ -118,6 +118,25 @@ const readUrlRequest = (): UrlRequest | undefined => {
     throw new Error("ICRC-167 request is missing a callback or state");
   }
 
+  // The callback becomes a top-level navigation target, so constrain it up
+  // front: it must be a well-formed http(s) URL — never a `javascript:` /
+  // `data:` scheme (which would execute in this origin) — and must not carry a
+  // fragment (the transport appends the response fragment). It is further
+  // constrained to the relying party's declared allow-list before any delivery
+  // (see UrlTransport.establishChannel).
+  let callbackUrl: URL;
+  try {
+    callbackUrl = new URL(callback);
+  } catch {
+    throw new Error("ICRC-167 callback is not a valid URL");
+  }
+  if (callbackUrl.protocol !== "https:" && callbackUrl.protocol !== "http:") {
+    throw new Error("ICRC-167 callback must be an http(s) URL");
+  }
+  if (callbackUrl.hash !== "") {
+    throw new Error("ICRC-167 callback must not contain a fragment");
+  }
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(message);
@@ -137,7 +156,7 @@ const readUrlRequest = (): UrlRequest | undefined => {
     return result.data;
   });
 
-  return { requests, batch, callback, state };
+  return { requests, batch, callback: callbackUrl.href, state };
 };
 
 export interface DelegationInterceptor {
@@ -375,9 +394,19 @@ export class UrlChannel implements Channel {
     fragment.set(MESSAGE_PARAM, JSON.stringify(message));
     fragment.set(STATE_PARAM, this.#state);
 
+    // Build the delivery URL with the URL constructor rather than string
+    // concatenation, and re-assert the scheme at the navigation sink: the
+    // callback was validated when read (and against the allow-list), so this
+    // only ever navigates to an http(s) URL — never a `javascript:`/`data:` one.
+    const deliveryUrl = new URL(this.#callback);
+    if (deliveryUrl.protocol !== "https:" && deliveryUrl.protocol !== "http:") {
+      throw new Error("Refusing to deliver to a non-http(s) callback");
+    }
+    deliveryUrl.hash = fragment.toString();
+
     this.#delivered = true;
     this.#onDelivered();
-    window.location.assign(`${this.#callback}#${fragment.toString()}`);
+    window.location.assign(deliveryUrl.href);
   }
 
   close(): Promise<void> {

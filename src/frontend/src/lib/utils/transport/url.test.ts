@@ -304,6 +304,18 @@ describe("UrlTransport.establishChannel", () => {
     await expect(new UrlTransport().establishChannel()).rejects.toThrow();
   });
 
+  it("rejects a non-http(s) callback before any navigation or fetch", async () => {
+    const params = new URLSearchParams({
+      message: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "m" }),
+      callback: "javascript:alert(1)",
+      state: "state-123",
+    });
+    installLocation(`#${params.toString()}`);
+
+    await expect(new UrlTransport().establishChannel()).rejects.toThrow();
+    expect(assignMock).not.toHaveBeenCalled();
+  });
+
   const STORAGE_KEY = "ii-icrc167-url-flow";
   const messageFrom = (): unknown =>
     JSON.parse(
