@@ -191,17 +191,27 @@ fn fixup_html(html: &str) -> String {
     )
 }
 
+/// Optional install/upgrade argument.
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct InitArg {
+    /// Extra callback URLs to add to the ICRC-167 auth-callback allow-list, on
+    /// top of this canister's own gateway origins. Used to declare a custom
+    /// domain the canister is also served under (e.g. the e2e `nice-name.com`).
+    pub auth_callbacks: Vec<String>,
+}
+
 #[init]
-pub fn init() {
-    init_assets(EMPTY_ALTERNATIVE_ORIGINS.to_string());
+pub fn init(arg: Option<InitArg>) {
+    let extra_auth_callbacks = arg.map(|arg| arg.auth_callbacks).unwrap_or_default();
+    init_assets(EMPTY_ALTERNATIVE_ORIGINS.to_string(), extra_auth_callbacks);
 }
 #[post_upgrade]
-fn post_upgrade() {
-    init()
+fn post_upgrade(arg: Option<InitArg>) {
+    init(arg)
 }
 
 /// Collect all the assets from the dist folder.
-fn init_assets(alternative_origins: String) {
+fn init_assets(alternative_origins: String, extra_auth_callbacks: Vec<String>) {
     let mut assets = collect_assets(&ASSET_DIR, Some(fixup_html));
     assets.push(Asset {
         url_path: ALTERNATIVE_ORIGINS_PATH.to_string(),
@@ -218,19 +228,27 @@ fn init_assets(alternative_origins: String) {
         content_type: ContentType::JSON,
     });
 
-    // ICRC-167 URL transport auth-callback allow-list. Declares this app's
-    // redirect callback page for the origins the test app is served under — the
-    // e2e host (`nice-name.com`) and the canister's own `icp0.io` origin — so
-    // II's URL transport accepts a redirect back to it. Certified like any other
-    // asset, so the HTTP gateway serves it and II's cross-origin fetch (CORS is
-    // allowed by `static_headers`) sees the current declaration.
+    // ICRC-167 URL transport auth-callback allow-list, declaring this app's
+    // redirect callback page (`/callback.html`) so II's URL transport accepts a
+    // redirect back to it. Covers this canister's own gateway origins (derived
+    // from its id, so the deployed canister works without configuration) plus
+    // any extra origins supplied at install (e.g. the e2e `nice-name.com`).
+    // Certified like any other asset, so the HTTP gateway serves it and II's
+    // cross-origin fetch (CORS allowed by `static_headers`) sees it.
     let canister_id = api::canister_self();
-    let auth_callbacks = format!(
-        r#"{{"callbacks":["https://nice-name.com/callback.html","https://{canister_id}.icp0.io/callback.html"]}}"#
-    );
+    let mut callbacks: Vec<String> = ["icp0.io", "ic0.app", "icp.net"]
+        .iter()
+        .map(|domain| format!("https://{canister_id}.{domain}/callback.html"))
+        .collect();
+    callbacks.extend(extra_auth_callbacks);
+    let callbacks_json = callbacks
+        .iter()
+        .map(|callback| format!("\"{callback}\""))
+        .collect::<Vec<_>>()
+        .join(",");
     assets.push(Asset {
         url_path: AUTH_CALLBACKS_PATH.to_string(),
-        content: auth_callbacks.into_bytes(),
+        content: format!(r#"{{"callbacks":[{callbacks_json}]}}"#).into_bytes(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::JSON,
     });
