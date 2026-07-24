@@ -625,6 +625,29 @@
       {$t`with your Internet Identity`}
     </p>
   {/if}
+  {#if isMultipleAccountsEnabled}
+    <!-- Session: how long the sign-in lasts before the user must sign in
+         again, capped at the duration the app requested (see `ceilingSeconds`).
+         Revealed alongside the account choices when "all choices" is on. -->
+    <div class="border-border-tertiary mb-6 flex flex-col border-t pt-4">
+      <span class="text-text-primary mb-0.5 text-base font-medium">
+        {$t`Session duration`}
+      </span>
+      <div class="flex flex-row items-center justify-between gap-2">
+        <span class="text-text-tertiary text-base">
+          {$t`until you have to sign in again`}
+        </span>
+        <SessionDurationSelect
+          maxSeconds={ceilingSeconds}
+          bind:value={selectedTtlSeconds}
+          disabled={isAuthenticatingDefault}
+        />
+      </div>
+    </div>
+    <span class="text-text-primary mb-3 self-start text-base font-medium">
+      {$t`Available accounts`}
+    </span>
+  {/if}
   <div class="grid">
     <!-- Nested if/else conditions breaks transitions, so they've been flattened here-->
     {#if isMultipleAccountsEnabled && accounts !== undefined}
@@ -641,23 +664,6 @@
       {@render continueDefault()}
     {/if}
   </div>
-  <!-- Session: how long the sign-in lasts before the user must sign in again.
-       Capped at the duration the app requested (see `ceilingSeconds`). -->
-  <div class="border-border-tertiary mb-6 flex flex-col border-t pt-4">
-    <span class="text-text-primary mb-0.5 text-base font-medium">
-      {$t`Session`}
-    </span>
-    <div class="flex flex-row items-center justify-between gap-2">
-      <span class="text-text-tertiary text-base">
-        {$t`Time until you have to sign in again:`}
-      </span>
-      <SessionDurationSelect
-        maxSeconds={ceilingSeconds}
-        bind:value={selectedTtlSeconds}
-        disabled={isAuthenticatingDefault}
-      />
-    </div>
-  </div>
   <div class="flex flex-row items-center">
     <!-- Intentionally we use onclick here instead of onchange to make sure it's a user gesture-->
     <Toggle
@@ -665,13 +671,13 @@
       onclick={isMultipleAccountsEnabled
         ? undefined
         : handleEnableMultipleAccounts}
-      label={$t`Enable multiple accounts`}
+      label={$t`Enable all choices`}
       size="sm"
       disabled={isAuthenticatingDefault}
     />
     <Tooltip
-      label={$t`Multiple accounts`}
-      description={$t`By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo).`}
+      label={$t`All choices`}
+      description={$t`By enabling this, you can choose how long your session lasts before signing in again and create more than one account for a single app (e.g. work, personal, or demo).`}
       direction="up"
       align="end"
       offset="0rem"
@@ -679,7 +685,7 @@
     >
       <button
         class="btn btn-tertiary btn-sm btn-icon ms-auto !cursor-default !rounded-full"
-        aria-label={$t`More information about multiple accounts`}
+        aria-label={$t`More information about all choices`}
       >
         <HelpCircleIcon class="size-5" />
       </button>
