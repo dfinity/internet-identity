@@ -326,17 +326,21 @@ describe("UrlTransport.establishChannel", () => {
   it.each([
     "https://relying-party.example/callback?next=/home", // query
     "https://relying-party.example/callback#frag", // fragment
-  ])("rejects a callback with query or fragment (%s)", async (callback) => {
-    const params = new URLSearchParams({
-      message: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "m" }),
-      callback,
-      state: "state-123",
-    });
-    installLocation(`#${params.toString()}`);
+    "https://user:pass@relying-party.example/callback", // credentials
+  ])(
+    "rejects a callback that is not protocol + host + path only (%s)",
+    async (callback) => {
+      const params = new URLSearchParams({
+        message: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "m" }),
+        callback,
+        state: "state-123",
+      });
+      installLocation(`#${params.toString()}`);
 
-    await expect(new UrlTransport().establishChannel()).rejects.toThrow();
-    expect(assignMock).not.toHaveBeenCalled();
-  });
+      await expect(new UrlTransport().establishChannel()).rejects.toThrow();
+      expect(assignMock).not.toHaveBeenCalled();
+    },
+  );
 
   it("allows an http callback on loopback", async () => {
     const callback = "http://localhost:8080/callback";

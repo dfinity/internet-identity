@@ -155,9 +155,15 @@ const readUrlRequest = (): UrlRequest | undefined => {
       "ICRC-167 callback must be a secure context (https, or http on loopback)",
     );
   }
-  if (callbackUrl.search !== "" || callbackUrl.hash !== "") {
+  // Protocol + host + path only (like an OpenID redirect_uri): rebuild that
+  // canonical form and require the URL to equal it, so anything extra — a
+  // query, a fragment, or embedded credentials — makes them differ and is
+  // rejected. (Compared against the normalized `href`, not the raw input, so a
+  // dropped default port or lowercased host is not a false rejection.)
+  const canonical = `${callbackUrl.protocol}//${callbackUrl.host}${callbackUrl.pathname}`;
+  if (callbackUrl.href !== canonical) {
     throw new Error(
-      "ICRC-167 callback must not contain query parameters or a fragment",
+      "ICRC-167 callback must be protocol + host + path only (no query, fragment, or credentials)",
     );
   }
 
