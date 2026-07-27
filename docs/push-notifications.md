@@ -107,11 +107,14 @@ Read this first; the sections after it just add detail.
   on, their browser hands II the keys needed to deliver to that device; when
   they sign into a dApp and opt in, II records that the dApp is allowed. So II
   keeps two small per-user facts: *which devices* and *which apps are allowed*.
-- **II seals every message.** It encrypts (using device key-pair generated during subscription. Standard web-push api.) the text so only the user's own
-  device can read it (Google/Apple/Mozilla just forward sealed bytes, the browser makes sure to decrypt it), and it
-  signs the request so those push services trust that it really came from II (VAPID JWT which is per audience and can be cached so that we don't have to generate it every time).
+- **II seals every message.** It encrypts the text with the device's own key
+  (created when the device subscribed, using standard Web Push encryption) so
+  only that device can read it — Google/Apple/Mozilla just forward the sealed
+  bytes and the browser decrypts them. It also signs each request so those push
+  services trust it really came from II (a VAPID token, cached per push service
+  so II needn't re-sign every time).
 - **Big sends are streamed, not dumped.** To notify 10,000 users, the dApp uses
-  a small helper **library** that feeds II the list in bite-size batches at a
+  a small helper **library** that feeds II the list in bite-sized batches at a
   pace II can handle. II refuses more than it can take (so nobody can flood
   it), and the library slows down when asked. The big list lives with the
   dApp — **II stores almost nothing per send**, which matters because storage
@@ -177,7 +180,7 @@ around.
 > Two separate safeguards — one on each side — keep this safe and smooth.*
 
 A campaign of any size is delivered as a series of **bounded chunks** — a chunk
-is just a bite-size batch of targets (≤ ~1000 targets, ≤ 2 MB per call). This is deliberate: II must never be asked to hold a
+is just a bite-sized batch of targets (≤ ~1000 targets, ≤ 2 MB per call). This is deliberate: II must never be asked to hold a
 whole campaign, because that is the storage that scales with volume. Two
 independent control layers make this safe and smooth — and they must not be
 confused:
@@ -289,7 +292,7 @@ service : {
     chunk_id : blob,             // per-chunk idempotency (short-lived heap dedup)
     delivery : PushDelivery,     // shared across the chunk (urgency / ttl / topic)
     default_alert : opt PushAlert, // shared alert for recipients that don't override
-    recipients : vec PushRecipient,
+    recipients : vec PushRecipient
   ) -> (PushResult);
 }
 ```
@@ -563,10 +566,11 @@ The app may set `alert.url` to send the user to a specific page rather than
 the origin root. `/notify` honors it under two constraints, both enforced
 client-side:
 
-- **The target's origin must equal the sender's origin.** The sender origin
-  is `alert.hostname`, which the backend forces to the consented origin and a
-  dApp cannot spoof. So a notification can deep-link anywhere within the
-  sender's own site (`https://app.com/thread/42`) but never to another
+- **The target's origin must equal the sender's origin.** The sender origin is
+  **II-derived**, not a field on `PushAlert`: the backend forces it to this
+  sender's consented origin and stamps it into the delivered payload, so a dApp
+  cannot set or spoof it. A notification can therefore deep-link anywhere within
+  the sender's own site (`https://app.com/thread/42`) but never to another
   origin — not `evil.com`, and not another consented dApp.
 - **The sender origin must be in the anchor's consent list** (session-delegation
   check). A hand-crafted `/notify?origin=…&to=…` therefore also fails closed.
@@ -610,8 +614,9 @@ Caveats:
 
 - **Origin pinning** — a sender can only target anchors that consented to
   *its* origin; cross-dApp targeting is impossible even with leaked principals.
-- **Attribution** — II forces `alert.hostname` to the consented origin; a
-  dApp cannot spoof who sent a notification.
+- **Attribution** — the sender origin shown on the notification is II-derived,
+  not dApp-supplied: II forces it to the consented origin and stamps it into the
+  payload, so a dApp cannot spoof who sent a notification.
 - **Content is dApp-controlled (Display mode)** — `title`/`body` are free-form,
   delivered under II's service worker. Attribution is shown and lengths are
   capped, but a compromised dApp could send misleading text within its own
