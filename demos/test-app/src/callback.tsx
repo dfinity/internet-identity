@@ -44,7 +44,9 @@ const run = async (): Promise<void> => {
     decodeInputs(window.location.search),
   );
 
-  const results: RedirectResults = {};
+  // Echo the (journaled) inputs back so the homepage can restore its form; the
+  // window navigated away, so it lost them.
+  const results: RedirectResults = { inputs };
   try {
     const maxTimeToLive =
       inputs.maxTimeToLive !== undefined

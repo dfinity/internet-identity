@@ -355,57 +355,19 @@ const fromBase64 = (value: string): Uint8Array =>
   // @ts-ignore Uint8Array.fromBase64 is supported in all target browsers
   Uint8Array.fromBase64(value);
 
-// The redirect transport navigates the tab away and back, so the homepage form
-// is reset to its defaults on the return leg. Snapshot the form to sessionStorage
-// before navigating and restore it on load, so the inputs come back as the user
-// left them. (The window flow keeps its opener, so it never loses them.)
-const FORM_STATE_KEY = "test-app-form-state";
-type FormControl =
-  | HTMLInputElement
-  | HTMLSelectElement
-  | HTMLTextAreaElement;
-
-const formControls = (): FormControl[] =>
-  Array.from(
-    document.querySelectorAll<FormControl>(
-      "input[id], select[id], textarea[id]",
-    ),
-  );
-
-const isToggle = (el: FormControl): el is HTMLInputElement =>
-  el instanceof HTMLInputElement &&
-  (el.type === "checkbox" || el.type === "radio");
-
-const saveFormState = (): void => {
-  const state: Record<string, string | boolean> = {};
-  for (const el of formControls()) {
-    state[el.id] = isToggle(el) ? el.checked : el.value;
-  }
-  sessionStorage.setItem(FORM_STATE_KEY, JSON.stringify(state));
-};
-
-const restoreFormState = (): void => {
-  const raw = sessionStorage.getItem(FORM_STATE_KEY);
-  if (raw === null) {
-    return;
-  }
-  let state: Record<string, string | boolean>;
-  try {
-    state = JSON.parse(raw) as Record<string, string | boolean>;
-  } catch {
-    return;
-  }
-  for (const el of formControls()) {
-    const value = state[el.id];
-    if (value === undefined) {
-      continue;
-    }
-    if (isToggle(el)) {
-      el.checked = value === true;
-    } else {
-      el.value = String(value);
-    }
-  }
+// The redirect transport navigates the tab away and back, resetting the homepage
+// form to its defaults on the return leg. The inputs travel with the flow: the
+// homepage puts them in the callback query, the callback journals them via
+// `memoize` (so they survive II's own redirect) and hands them back in the
+// result hash. Restore the form from those returned inputs.
+const restoreInputs = (inputs: RedirectInputs): void => {
+  iiUrlEl.value = inputs.iiUrl;
+  derivationOriginEl.value = inputs.derivationOrigin ?? "";
+  maxTimeToLiveEl.value = inputs.maxTimeToLive ?? "";
+  useIcrc3AttributesEl.checked = inputs.requestAttributes;
+  requestAttributesEl.value = inputs.attributeKeys.join("\n");
+  icrc3NonceEl.value = inputs.nonce ?? "";
+  transportEl.value = "redirect";
 };
 
 // On the return leg of a redirect sign-in, the callback page hands results back
@@ -422,6 +384,11 @@ const renderRedirectResultIfPresent = async () => {
     "",
     window.location.pathname + window.location.search,
   );
+  // Put the form back the way the user left it, from the inputs the callback
+  // journaled and handed back — even on error, so the failed attempt is visible.
+  if (results.inputs !== undefined) {
+    restoreInputs(results.inputs);
+  }
   if (results.error !== undefined) {
     showError(results.error);
     return;
@@ -444,7 +411,6 @@ const renderRedirectResultIfPresent = async () => {
 };
 
 const init = async () => {
-  restoreFormState();
   await renderRedirectResultIfPresent();
   const userAgentElement = document.getElementById("userAgent") as HTMLElement;
   userAgentElement.innerText = navigator.userAgent;
@@ -475,7 +441,6 @@ const init = async () => {
             ? icrc3NonceEl.value.trim()
             : undefined,
       };
-      saveFormState();
       window.location.assign(`${CALLBACK_PATH}?${encodeInputs(inputs)}`);
       return;
     }

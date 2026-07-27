@@ -68,6 +68,10 @@ export interface RedirectResults {
   attributes?: { data: string; signature: string };
   /** Error message when the flow failed. */
   error?: string;
+  /** The flow inputs, echoed back so the homepage can restore its form. The
+   *  callback journals them via `memoize`, so they survive II's own redirect and
+   *  are still available to hand back on the return leg. */
+  inputs?: RedirectInputs;
 }
 
 /** Marks a homepage load as the return leg of a redirect flow. */
@@ -82,6 +86,9 @@ export const encodeResults = (results: RedirectResults): string => {
   if (results.attributes !== undefined) {
     params.set("attributes", JSON.stringify(results.attributes));
   }
+  if (results.inputs !== undefined) {
+    params.set("inputs", JSON.stringify(results.inputs));
+  }
   return params.toString();
 };
 
@@ -93,11 +100,14 @@ export const decodeResults = (hash: string): RedirectResults | undefined => {
     return undefined;
   }
   const attributes = params.get("attributes");
+  const inputs = params.get("inputs");
   return {
     error: params.get("error") ?? undefined,
     attributes:
       attributes !== null
         ? (JSON.parse(attributes) as RedirectResults["attributes"])
         : undefined,
+    inputs:
+      inputs !== null ? (JSON.parse(inputs) as RedirectInputs) : undefined,
   };
 };
