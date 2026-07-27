@@ -15,7 +15,7 @@ use internet_identity_interface::internet_identity::types::openid::{
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
     OpenIdEmailVerificationScheme, PublicKey, SessionKey, SignedDelegation, SsoDiscovery,
-    SsoDiscoveryState, Timestamp, UserKey,
+    SsoDiscoveryStatus, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
@@ -29,9 +29,15 @@ pub(crate) use configured::{clear_for_test, setup_for_test};
 mod jwks;
 mod provider;
 mod sso;
+mod sso_bundle;
+mod sso_gating;
 mod verify;
 
 pub use crate::single_flight_cache::Cached;
+pub use sso_bundle::{
+    get_sso_attr_bundle_signature, prepare_sso_attr_bundle, read_certified_sso_bundle,
+};
+pub use sso_gating::{resolve_ii_client_identity, verify_sso_for_registration, verify_sso_jwt};
 
 pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
@@ -99,6 +105,16 @@ pub struct OpenIdCredential {
     /// `ii-openid-configuration`. May be `None` even for SSO credentials —
     /// domains aren't required to publish a `name`.
     pub sso_name: Option<String>,
+    /// Cross-client-stable identifier (the `oid` claim value) for a non-`sub`
+    /// SSO org, stamped only on the anchor's II-client-keyed credential at SSO
+    /// write time. Drives the storage-maintained SSO stable-id index: the
+    /// index entry `(iss, aud, stable_id) -> anchor` is reconciled from this
+    /// field on every anchor `write()`, so it self-cleans when the credential
+    /// is removed or moved. `None` for `sub` orgs, direct providers, and any
+    /// non-II-client credential. Storage-internal only — deliberately absent
+    /// from the candid `OpenIdCredentialData` so the `oid` never crosses the
+    /// candid boundary.
+    pub stable_id: Option<String>,
 }
 
 impl OpenIdCredential {
@@ -301,10 +317,9 @@ pub fn setup(configs: Vec<OpenIdConfig>) {
 /// Canonicalize an untrusted SSO discovery domain received as a canister-call
 /// argument: trim surrounding whitespace and lowercase ASCII. Domains are
 /// case-insensitive (DNS), but the value is stamped onto the credential as
-/// `sso_domain` and used as the equality key for `sso:<domain>` scope routing
-/// and the allowlist gate, so it must be canonical the moment it crosses the
-/// trust boundary. Every endpoint taking a `discovery_domain` runs this before
-/// any further use, matching the `sso_discoverable_domains` config setter.
+/// `sso_domain` and used as the equality key for `sso:<domain>` scope routing,
+/// so it must be canonical the moment it crosses the trust boundary. Every
+/// endpoint taking a `discovery_domain` runs this before any further use.
 pub fn canonical_discovery_domain(domain: &str) -> String {
     domain.trim().to_ascii_lowercase()
 }
@@ -327,35 +342,45 @@ pub fn prefetch_sso(domain: Option<&str>) {
 }
 
 /// Drive the SSO discovery fetch for `domain` (the discovery cache only). The
-/// sign-in initiation poll calls this from an update when [`get_sso_discovery`]
+/// sign-in initiation poll calls this from an update when [`get_sso_discovery_status`]
 /// reads `Pending`. A no-op for a disallowed domain (the query reports
 /// `NotAllowed`).
 pub fn discover_sso(domain: &str) {
     sso::drive_discovery(domain);
 }
 
-/// Read the state of `domain`'s SSO discovery: the resolved config, still
-/// pending, or not on the allowlist.
-pub fn get_sso_discovery(domain: &str) -> SsoDiscoveryState {
-    if sso::validate_allowed_discovery_domain(domain).is_err() {
-        return SsoDiscoveryState::NotAllowed;
-    }
+/// Read the status of `domain`'s SSO discovery: the resolved config, or still
+/// pending.
+///
+/// With `origin`, `resolved_client_id` is that origin's client, or `None` when
+/// the origin is gated out.
+pub fn get_sso_discovery_status(domain: &str, origin: Option<&str>) -> SsoDiscoveryStatus {
+    // Peek-only: `Pending` until the fill (driven by `prefetch_sso`) resolves.
+    // A malformed domain never resolves (the fill rejects non-bare-authorities),
+    // so it simply reads `Pending` until the frontend times out.
     match sso::peek_discovery(domain) {
-        Cached::Ready(cfg) => SsoDiscoveryState::Resolved(SsoDiscovery {
-            discovery_domain: domain.to_ascii_lowercase(),
-            client_id: cfg.client_id,
-            issuer: cfg.issuer,
-            authorization_endpoint: cfg.authorization_endpoint,
-            scopes: cfg.scopes,
-            name: cfg.name,
-        }),
-        Cached::Pending => SsoDiscoveryState::Pending,
+        Cached::Ready(discovery_config) => {
+            let resolved_client_id = match origin {
+                None => Some(discovery_config.client_id.clone()),
+                Some(origin) => discovery_config.resolve_client_for_origin(origin).ok(),
+            };
+            SsoDiscoveryStatus::Resolved(SsoDiscovery {
+                discovery_domain: domain.to_ascii_lowercase(),
+                client_id: discovery_config.client_id,
+                issuer: discovery_config.issuer,
+                authorization_endpoint: discovery_config.authorization_endpoint,
+                scopes: discovery_config.scopes,
+                name: discovery_config.name,
+                resolved_client_id,
+            })
+        }
+        Cached::Pending => SsoDiscoveryStatus::Pending,
     }
 }
 
 /// Decode a JWT's issuer, audience, and raw claims bytes. Rejects an empty
 /// audience.
-fn decode_iss_aud_claims(
+pub(super) fn decode_iss_aud_claims(
     jwt: &str,
 ) -> Result<(String, AudClaim, Vec<u8>), OpenIDJWTVerificationError> {
     let validation_item = Decoder::new()
@@ -469,7 +494,7 @@ pub(super) fn replace_issuer_placeholders(
 /// * `(iss, sub, aud)`: The key of the `OpenIdCredential` to derive the `Hash` from
 /// * `anchor_number`: The anchor number the credential is assigned to
 #[allow(clippy::cast_possible_truncation)]
-fn calculate_delegation_seed(
+pub(super) fn calculate_delegation_seed(
     (iss, sub, aud): &OpenIdCredentialKey,
     anchor_number: AnchorNumber,
 ) -> Hash {
@@ -506,12 +531,20 @@ fn salt() -> [u8; 32] {
     [0; 32]
 }
 
+/// How long a certified SSO attribute bundle is accepted after it is minted
+/// (`sso_bundle.rs`) — the bundle acceptance window, not a session or delegation
+/// lifetime. Both the mint and the expiry check use II's own IC time, so the
+/// window needn't budget for client clock skew: 5 minutes covers the
+/// post-prepare ceremony (IdP 2FA/redirect, `sso_get_delegation`, the dapp's
+/// attribute call).
+pub const SSO_ATTR_BUNDLE_TTL_NS: u64 = 5 * MINUTE_NS;
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use internet_identity_interface::internet_identity::types::OpenIdConfig;
 
-    const TEST_AUD: &str =
+    pub(crate) const TEST_AUD: &str =
         "45431994619-cbbfgtn7o0pp0dpfcg2l66bc4rcg7qbu.apps.googleusercontent.com";
 
     fn google_config() -> OpenIdConfig {
@@ -529,7 +562,7 @@ mod tests {
         }
     }
 
-    fn test_certs() -> Vec<identity_jose::jwk::Jwk> {
+    pub(crate) fn test_certs() -> Vec<identity_jose::jwk::Jwk> {
         #[derive(serde::Deserialize)]
         struct Certs {
             keys: Vec<identity_jose::jwk::Jwk>,
@@ -542,9 +575,9 @@ mod tests {
     // Real Google-signed JWT (matches `test_certs`); nonce bound to the fixed
     // test caller + `test_salt()`. Expired in real time, valid against the
     // verify module's test clock.
-    const VALID_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImRkMTI1ZDVmNDYyZmJjNjAxNGFlZGFiODFkZGYzYmNlZGFiNzA4NDciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0NTQzMTk5NDYxOS1jYmJmZ3RuN28wcHAwZHBmY2cybDY2YmM0cmNnN3FidS5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsImF1ZCI6IjQ1NDMxOTk0NjE5LWNiYmZndG43bzBwcDBkcGZjZzJsNjZiYzRyY2c3cWJ1LmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29tIiwic3ViIjoiMTE1MTYwNzE2MzM4ODEzMDA2OTAyIiwiaGQiOiJkZmluaXR5Lm9yZyIsImVtYWlsIjoidGhvbWFzLmdsYWRkaW5lc0BkZmluaXR5Lm9yZyIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJub25jZSI6ImV0aURhTEdjUmRtNS1yY3FlMFpRVWVNZ3BmcDR2OVRPT1lVUGJoUng3bkkiLCJuYmYiOjE3MzY3OTM4MDIsIm5hbWUiOiJUaG9tYXMgR2xhZGRpbmVzIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0lTTWxja0M1RjZxaGlOWnpfREZtWGp5OTY4LXlPaEhPTjR4TGhRdXVNSDNuQlBXQT1zOTYtYyIsImdpdmVuX25hbWUiOiJUaG9tYXMiLCJmYW1pbHlfbmFtZSI6IkdsYWRkaW5lcyIsImlhdCI6MTczNjc5NDEwMiwiZXhwIjoxNzM2Nzk3NzAyLCJqdGkiOiIwMWM1NmYyMGM1MzFkNDhhYjU0ZDMwY2I4ZmRiNzU0MmM0ZjdmNjg4In0.f47b0HNskm-85sT5XtoRzORnfobK2nzVFG8jTH6eS_qAyu0ojNDqVsBtGN4A7HdjDDCOIMSu-R5e413xuGJIWLadKrLwXmguRFo3SzLrXeja-A-rP-axJsb5QUJZx1mwYd1vUNzLB9bQojU3Na6Hdvq09bMtTwaYdCn8Q9v3RErN-5VUxELmSbSXbf10A-IsS7jtzPjxHV6ueq687Ppeww6Q7AGGFB4t9H8qcDbI1unSdugX3-MfMWJLzVHbVxDgfAcLem1c2iAspvv_D5aPLeJF5HLRR2zg-Jil1BFTOoEPAAPFr1MEsvDMWSTt5jLyuMrnS4jiMGudGGPV4DDDww";
+    pub(crate) const VALID_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImRkMTI1ZDVmNDYyZmJjNjAxNGFlZGFiODFkZGYzYmNlZGFiNzA4NDciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0NTQzMTk5NDYxOS1jYmJmZ3RuN28wcHAwZHBmY2cybDY2YmM0cmNnN3FidS5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsImF1ZCI6IjQ1NDMxOTk0NjE5LWNiYmZndG43bzBwcDBkcGZjZzJsNjZiYzRyY2c3cWJ1LmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29tIiwic3ViIjoiMTE1MTYwNzE2MzM4ODEzMDA2OTAyIiwiaGQiOiJkZmluaXR5Lm9yZyIsImVtYWlsIjoidGhvbWFzLmdsYWRkaW5lc0BkZmluaXR5Lm9yZyIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJub25jZSI6ImV0aURhTEdjUmRtNS1yY3FlMFpRVWVNZ3BmcDR2OVRPT1lVUGJoUng3bkkiLCJuYmYiOjE3MzY3OTM4MDIsIm5hbWUiOiJUaG9tYXMgR2xhZGRpbmVzIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0lTTWxja0M1RjZxaGlOWnpfREZtWGp5OTY4LXlPaEhPTjR4TGhRdXVNSDNuQlBXQT1zOTYtYyIsImdpdmVuX25hbWUiOiJUaG9tYXMiLCJmYW1pbHlfbmFtZSI6IkdsYWRkaW5lcyIsImlhdCI6MTczNjc5NDEwMiwiZXhwIjoxNzM2Nzk3NzAyLCJqdGkiOiIwMWM1NmYyMGM1MzFkNDhhYjU0ZDMwY2I4ZmRiNzU0MmM0ZjdmNjg4In0.f47b0HNskm-85sT5XtoRzORnfobK2nzVFG8jTH6eS_qAyu0ojNDqVsBtGN4A7HdjDDCOIMSu-R5e413xuGJIWLadKrLwXmguRFo3SzLrXeja-A-rP-axJsb5QUJZx1mwYd1vUNzLB9bQojU3Na6Hdvq09bMtTwaYdCn8Q9v3RErN-5VUxELmSbSXbf10A-IsS7jtzPjxHV6ueq687Ppeww6Q7AGGFB4t9H8qcDbI1unSdugX3-MfMWJLzVHbVxDgfAcLem1c2iAspvv_D5aPLeJF5HLRR2zg-Jil1BFTOoEPAAPFr1MEsvDMWSTt5jLyuMrnS4jiMGudGGPV4DDDww";
 
-    fn test_salt() -> [u8; 32] {
+    pub(crate) fn test_salt() -> [u8; 32] {
         [
             143, 79, 158, 224, 218, 125, 157, 169, 98, 43, 205, 227, 243, 123, 173, 255, 132, 83,
             81, 139, 161, 18, 224, 243, 4, 129, 26, 123, 229, 242, 200, 189,
@@ -572,7 +605,7 @@ mod tests {
         // Untrusted canister-call args: a mixed-case / padded domain that
         // passes the case-insensitive allowlist gate must be canonicalized so
         // the stamped `sso:<domain>` scope matches the allowlisted value, and
-        // so the discovery endpoints (`discover_sso` / `get_sso_discovery`) gate
+        // so the discovery endpoints (`discover_sso` / `get_sso_discovery_status`) gate
         // on the same canonical form as the JWT endpoints.
         assert_eq!(canonical_discovery_domain("  Example.ORG  "), "example.org");
         assert_eq!(canonical_discovery_domain("example.org"), "example.org");

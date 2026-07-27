@@ -17,6 +17,7 @@ import {
   authorizationStore,
   authorizedStore,
 } from "$lib/stores/authorization.store";
+import { getMetadataString } from "$lib/utils/openID";
 import { retryFor, throwCanisterError, waitForStore } from "$lib/utils/utils";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
@@ -283,6 +284,7 @@ type ConsentPipeline = {
   groups: AttributeGroup[];
   recoveryAddresses: string[];
   verifiedAddresses: string[];
+  openidAddresses: string[];
 };
 
 /**
@@ -330,11 +332,12 @@ const resolveConsentPipeline = async (params: {
             })
             .then(throwCanisterError)
         : Promise.resolve([]);
+    const identityInfoPromise = authenticated.actor
+      .identity_info(authenticated.identityNumber)
+      .then(throwCanisterError);
     const [available, identityInfo] = await Promise.all([
       availablePromise,
-      authenticated.actor
-        .identity_info(authenticated.identityNumber)
-        .then(throwCanisterError),
+      identityInfoPromise,
     ]);
     const recoveryAddresses = (identityInfo.email_recovery[0] ?? []).map(
       (c: { address: string }) => c.address,
@@ -342,6 +345,9 @@ const resolveConsentPipeline = async (params: {
     const verifiedAddresses = (identityInfo.verified_emails[0] ?? []).map(
       (e: { address: string }) => e.address,
     );
+    const openidAddresses = (identityInfo.openid_credentials[0] ?? [])
+      .map((c) => getMetadataString(c.metadata, "email"))
+      .filter((e): e is string => e !== undefined);
 
     return {
       accountNumberPromise,
@@ -352,6 +358,7 @@ const resolveConsentPipeline = async (params: {
       groups: resolveAttributeGroups(requestedKeys, available),
       recoveryAddresses,
       verifiedAddresses,
+      openidAddresses,
     };
   } catch (error) {
     console.error(error);
@@ -524,10 +531,10 @@ export const handleIcrc3OneClickOpenIdAttributes =
   };
 
 /**
- * SSO equivalent of {@link handleIcrc3OneClickOpenIdAttributes}. When the
- * user signed in via the `?sso=<domain>` 1-click entry and every requested
- * key is in that domain's auto-approve allowlist, certify and send without
- * showing the consent UI.
+ * SSO equivalent of {@link handleIcrc3OneClickOpenIdAttributes}. When the app
+ * requested SSO sign-in via the `?sso=<domain>` 1-click entry and every
+ * requested key is in that domain's auto-approve allowlist, certify and send
+ * without showing the consent UI.
  */
 export const handleIcrc3OneClickSsoAttributes =
   (channel: Channel, onError: (error: ChannelError) => void) =>
@@ -549,18 +556,17 @@ export const handleIcrc3OneClickSsoAttributes =
       return;
     }
 
-    const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
-    if (flow.type !== "1-click-sso") {
-      return;
-    }
-    const ssoDomain = flow.domain;
-    if (!requestedKeys.every((key) => isOneClickSsoKey(key, ssoDomain))) {
-      return;
-    }
-
     try {
-      const { accountNumberPromise } = await waitForStore(authorizedStore);
+      const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
+      // Auto-approve only the `?sso=<domain>` 1-click entry, not the manual wizard or a passkey/OpenID session.
+      if (flow.type !== "1-click-sso") {
+        return;
+      }
+      if (!requestedKeys.every((key) => isOneClickSsoKey(key, flow.domain))) {
+        return;
+      }
       const authenticated = await waitForStore(authenticationStore);
+      const { accountNumberPromise } = await waitForStore(authorizedStore);
 
       const validationResult = await validateDerivationOrigin({
         requestOrigin: channel.origin,
@@ -644,9 +650,7 @@ export const handleIcrc3ConsentAttributes =
 
     await serializeConsentRequest(async () => {
       try {
-        // Wait for the flow — set eagerly by the authorize page — so we can
-        // bail out as soon as we know one of the 1-click handlers will
-        // take this request.
+        // Bail out as soon as we know one of the 1-click handlers will take this request.
         const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
         const oneClickHandlerWillHandle =
           requestedKeys.length > 0 &&
@@ -689,6 +693,7 @@ export const handleIcrc3ConsentAttributes =
               requestedKeys,
               recoveryAddresses: pipeline?.recoveryAddresses ?? [],
               verifiedAddresses: pipeline?.verifiedAddresses ?? [],
+              openidAddresses: pipeline?.openidAddresses ?? [],
             })),
           );
 

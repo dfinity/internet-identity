@@ -1,5 +1,6 @@
 <script lang="ts">
   import { establishedChannelStore } from "$lib/stores/channelStore";
+  import { authorizationStore } from "$lib/stores/authorization.store";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { AuthWizard } from "$lib/components/wizards/auth";
@@ -29,7 +30,13 @@
   );
 </script>
 
-<AuthWizard {onSignIn} {onSignUp} {onError} bind:mode>
+<AuthWizard
+  {onSignIn}
+  {onSignUp}
+  {onError}
+  bind:mode
+  ssoOrigin={$authorizationStore?.effectiveOrigin}
+>
   <AuthorizeHeader origin={$establishedChannelStore.origin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
     {mode === "signup"

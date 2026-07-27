@@ -23,9 +23,15 @@
     verifiedEmails: VerifiedEmail[];
     capacity: number;
     recoveryAddresses?: string[];
+    openidAddresses?: string[];
   }
 
-  const { verifiedEmails, capacity, recoveryAddresses = [] }: Props = $props();
+  const {
+    verifiedEmails,
+    capacity,
+    recoveryAddresses = [],
+    openidAddresses = [],
+  }: Props = $props();
 
   let showAddWizard = $state(false);
   let removingAddress = $state<string | undefined>(undefined);
@@ -217,6 +223,7 @@
       resolveViaDoh={resolveEmailViaDoh}
       {recoveryAddresses}
       verifiedAddresses={verifiedEmails.map((e) => e.address)}
+      {openidAddresses}
       onSuccess={handleAddSuccess}
     />
   </Dialog>

@@ -192,11 +192,9 @@ fn validate_openid_credential_issuer_identifier(issuer: &str) -> Result<(), Stri
 }
 
 /// Format-only validation for the `<domain>` component of an `sso:<domain>`
-/// attribute scope. Intentionally not coupled to the SSO canary allowlist
-/// (`allowed_discovery_domains()` in the canister): a credential whose SSO
-/// domain is no longer allowed should still be parseable, and the scope
-/// parser has no access to canister runtime state anyway. A scope that does
-/// not match any registered SSO provider simply yields no attributes.
+/// attribute scope. Intentionally not coupled to the canister's SSO discovery
+/// validation: the scope parser has no access to canister runtime state, and a
+/// scope that doesn't match any credential simply yields no attributes.
 ///
 /// Colons are permitted so that `host:port` discovery domains (e.g. the
 /// e2e test domain `localhost:11107`) round-trip through the
@@ -282,8 +280,8 @@ impl TryFrom<&str> for AttributeScope {
                 // SSO domains are DNS hostnames — normalize to lowercase so
                 // `sso:DFINITY.ORG:email` and `sso:dfinity.org:email` match
                 // the same credential. This also aligns with
-                // `openid::sso::validate_allowed_discovery_domain`, which
-                // already compares case-insensitively.
+                // `openid::sso::validate_discovery_domain`, which already
+                // treats the domain case-insensitively.
                 let domain = domain.to_ascii_lowercase();
 
                 Ok(AttributeScope::Sso { domain })
@@ -889,12 +887,13 @@ impl TryFrom<ListAvailableAttributesRequest> for ValidatedListAvailableAttribute
                         Err(e) => problems.push(e),
                     }
                 }
-                if !problems.is_empty() {
-                    return Err(ListAvailableAttributesError::ValidationError { problems });
-                }
                 Some(parsed)
             }
         };
+
+        if !problems.is_empty() {
+            return Err(ListAvailableAttributesError::ValidationError { problems });
+        }
 
         Ok(ValidatedListAvailableAttributesRequest {
             identity_number: request.identity_number,

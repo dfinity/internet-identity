@@ -425,10 +425,11 @@ enum RecipientFlow {
     Recovery,
 }
 
-/// Look up the `Subject:` header and find a `II-Recovery-…` nonce
-/// inside it. Case-insensitive on both the header name and the
-/// nonce prefix; matches up to the first whitespace, comma, or
-/// newline after the prefix.
+/// Look up the `Subject:` header and extract the `II-Recovery-…` /
+/// `II-Verify-…` nonce it carries. Case-insensitive on the header
+/// name and the nonce prefix. The **entire** (trimmed) Subject must
+/// be the token — see [`find_nonce_with_prefix`] for why we no longer
+/// accept the token as a substring.
 ///
 /// Returns the nonce in **canonical** form (the prefix as the
 /// canister emits it, plus the suffix lowercased), so the caller
@@ -436,9 +437,17 @@ enum RecipientFlow {
 fn extract_nonce_from_subject(
     message: &internet_identity_interface::internet_identity::types::smtp::SmtpMessage,
 ) -> Option<String> {
+    // Read the *last* `Subject` instance — the one DKIM's
+    // `build_header_hash_input` covers (RFC 6376 §5.4 picks bottom-up
+    // when a name repeats). `validate_header_occurrences` already
+    // rejects any message with more than one `Subject` before we get
+    // here, so today there is at most one; reading bottom-up keeps this
+    // helper reading the *signed* header even if that input guard is
+    // ever relaxed, closing the read-vs-verify divergence at the source.
     let subject = message
         .headers
         .iter()
+        .rev()
         .find(|h| h.name.eq_ignore_ascii_case("Subject"))?;
     find_nonce_in(&subject.value)
 }
@@ -447,33 +456,47 @@ fn extract_nonce_from_subject(
 /// header value — extracted into its own function so the unit
 /// tests can drive it without a full `SmtpMessage`.
 ///
-/// Scans for either the recovery prefix (`II-Recovery-…`) or the
-/// verified-email prefix (`II-Verify-…`). Whichever prefix matches
-/// first wins; the returned nonce keeps that prefix and the pending
-/// map's `PendingKind` ultimately determines the flow. A forged
-/// prefix without a matching pending entry simply drops at the
-/// lookup step.
+/// Tries the recovery prefix (`II-Recovery-…`) first, then the
+/// verified-email prefix (`II-Verify-…`); whichever matches wins, the
+/// returned nonce keeps that prefix, and the pending map's
+/// `PendingKind` ultimately determines the flow. A forged prefix
+/// without a matching pending entry simply drops at the lookup step.
 fn find_nonce_in(haystack: &str) -> Option<String> {
     find_nonce_with_prefix(haystack, super::NONCE_PREFIX)
         .or_else(|| find_nonce_with_prefix(haystack, super::VERIFIED_EMAIL_NONCE_PREFIX))
 }
 
+/// Match `haystack` against `{prefix}{hex}` **exactly** (after trimming
+/// surrounding whitespace), case-insensitive throughout (the whole
+/// trimmed Subject is lowercased before matching, so both the prefix
+/// and the hex suffix are compared case-insensitively).
+///
+/// This is deliberately an exact match, not a substring search. The
+/// nonce lives in the DKIM-signed `Subject`, and DKIM only proves *the
+/// domain emitted this Subject* — not *the mailbox owner authorised
+/// this recovery*. A vacation responder / auto-reply that echoes
+/// `Re: II-Recovery-<hex>` is a domain-signed message bearing the
+/// nonce, but the `Re:` (or `Fwd:`, `Auto-Reply:`, …) prefix it
+/// prepends lands *inside* the signed Subject, so a replaying attacker
+/// can't strip it without breaking the signature. Requiring the whole
+/// Subject to be the bare token turns every such echo into a
+/// non-match, closing the one-`Subject` variant of the attack. A
+/// genuine recovery email — composed fresh with the token as its
+/// Subject — is unaffected.
 fn find_nonce_with_prefix(haystack: &str, prefix: &str) -> Option<String> {
-    // Case-insensitive search: the user might paste the prefix in
-    // a different case from the canister's canonical form (some
-    // mail clients title-case Subject content). We match on the
-    // lowercased haystack but return the canister's canonical
-    // prefix + the suffix bytes from the original, lowercased.
-    let lower = haystack.to_ascii_lowercase();
-    let prefix_lower = prefix.to_ascii_lowercase();
-    let start = lower.find(&prefix_lower)?;
-    let after_prefix = start + prefix.len();
-    let suffix_chars = haystack[after_prefix..].chars();
-    let suffix: String = suffix_chars
-        .take_while(|c| c.is_ascii_hexdigit())
-        .collect::<String>()
-        .to_ascii_lowercase();
-    if suffix.len() != super::NONCE_SUFFIX_BYTES * 2 {
+    // Case-insensitive throughout: some mail clients title-case
+    // Subject content, so a user pasting the token may change its
+    // case. We lowercase the whole trimmed Subject before matching —
+    // so the prefix match and the hex suffix are both case-insensitive
+    // — then return the canister's canonical prefix + the lowercased
+    // hex suffix.
+    let lower = haystack.trim().to_ascii_lowercase();
+    let suffix = lower.strip_prefix(&prefix.to_ascii_lowercase())?;
+    // The suffix must be exactly the nonce's hex run and nothing else:
+    // right length, all hex digits, no trailing bytes.
+    if suffix.len() != super::NONCE_SUFFIX_BYTES * 2
+        || !suffix.bytes().all(|b| b.is_ascii_hexdigit())
+    {
         return None;
     }
     Some(format!("{prefix}{suffix}"))
@@ -954,10 +977,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn extract_nonce_finds_canister_format() {
+    fn extract_nonce_requires_exact_subject() {
         let nonce = format!("{}{}", super::super::NONCE_PREFIX, "0123456789abcdef");
-        let subject = format!("Hello world {nonce} please verify");
-        assert_eq!(find_nonce_in(&subject), Some(nonce));
+        // The bare token is accepted, and surrounding whitespace is
+        // trimmed (a fresh recovery email whose Subject is the token).
+        assert_eq!(find_nonce_in(&nonce), Some(nonce.clone()));
+        assert_eq!(find_nonce_in(&format!("  {nonce}\t")), Some(nonce.clone()));
+
+        // Anything *around* the token is rejected. A vacation-responder
+        // reply that prepends `Re:`/`Fwd:` signs that prefix into the
+        // DKIM-covered Subject, so a replaying attacker can't strip it —
+        // requiring an exact match turns the echo into a non-match.
+        assert_eq!(find_nonce_in(&format!("Re: {nonce}")), None);
+        assert_eq!(find_nonce_in(&format!("Fwd: {nonce}")), None);
+        assert_eq!(find_nonce_in(&format!("Automatic reply: {nonce}")), None);
+        assert_eq!(find_nonce_in(&format!("{nonce} please verify")), None);
+        assert_eq!(find_nonce_in(&format!("hello {nonce}")), None);
+
+        // The same exact-match rule governs the verified-email prefix,
+        // so guard that flow against the identical echo regression: the
+        // bare `II-Verify-` token matches, a `Re:`-prefixed echo does not.
+        let verify = format!(
+            "{}{}",
+            super::super::VERIFIED_EMAIL_NONCE_PREFIX,
+            "0123456789abcdef"
+        );
+        assert_eq!(find_nonce_in(&verify), Some(verify.clone()));
+        assert_eq!(find_nonce_in(&format!("Re: {verify}")), None);
     }
 
     #[test]

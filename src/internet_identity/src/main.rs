@@ -30,7 +30,8 @@ use internet_identity_interface::internet_identity::types::attributes::{
 };
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
-    OpenIdPrepareDelegationResponse, OpenIdResult,
+    OpenIdPrepareDelegationResponse, OpenIdResult, SsoGetDelegationResponse,
+    SsoPrepareDelegationResponse,
 };
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, GetIdAliasRequest, IdAliasCredentials, PrepareIdAliasError,
@@ -853,8 +854,7 @@ fn config() -> InternetIdentityInit {
         related_origins: persistent_state.related_origins.clone(),
         new_flow_origins: persistent_state.new_flow_origins.clone(),
         openid_configs: persistent_state.openid_configs.clone(),
-        sso_discoverable_domains: persistent_state.sso_discoverable_domains.clone(),
-        sso_allow_any_domain: persistent_state.sso_allow_any_domain,
+        sso_allow_insecure_discovery: persistent_state.sso_allow_insecure_discovery,
         // One-shot upgrade arg driving the SSO credential backfill; not
         // persisted as config, so there is nothing to report back here.
         sso_credential_migration: None,
@@ -967,23 +967,9 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.openid_configs = Some(openid_configs);
             })
         }
-        if let Some(sso_discoverable_domains) = arg.sso_discoverable_domains {
-            // Canonicalize at the boundary: trim whitespace and lowercase
-            // ASCII so allowlist lookups (case-insensitive on the canister
-            // via `eq_ignore_ascii_case`) and the value shipped through
-            // `/.config.did.bin` to the frontend (compared via case-
-            // sensitive `Set.has`) agree byte-for-byte.
-            let sso_discoverable_domains = sso_discoverable_domains
-                .into_iter()
-                .map(|domain| domain.trim().to_ascii_lowercase())
-                .collect();
+        if let Some(sso_allow_insecure_discovery) = arg.sso_allow_insecure_discovery {
             state::persistent_state_mut(|persistent_state| {
-                persistent_state.sso_discoverable_domains = Some(sso_discoverable_domains);
-            })
-        }
-        if let Some(sso_allow_any_domain) = arg.sso_allow_any_domain {
-            state::persistent_state_mut(|persistent_state| {
-                persistent_state.sso_allow_any_domain = Some(sso_allow_any_domain);
+                persistent_state.sso_allow_insecure_discovery = Some(sso_allow_insecure_discovery);
             })
         }
         if let Some(entries) = arg.sso_credential_migration {
@@ -1484,7 +1470,8 @@ mod openid_api {
     use crate::{
         state, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
         OpenIdDelegationError, OpenIdPrepareDelegationResponse, OpenIdResult, SessionKey,
-        Timestamp,
+        SsoGetDelegationRequest, SsoGetDelegationResponse, SsoPrepareDelegationRequest,
+        SsoPrepareDelegationResponse, Timestamp,
     };
     use ic_cdk::caller;
     use ic_cdk_macros::{query, update};
@@ -1492,6 +1479,7 @@ mod openid_api {
         CreateIdentityData, IdRegFinishError, IdRegFinishResult, OpenIDRegFinishArg,
         SignedDelegation,
     };
+    use serde_bytes::ByteBuf;
 
     impl From<IdentityUpdateError> for OpenIdCredentialAddError {
         fn from(_: IdentityUpdateError) -> Self {
@@ -1511,19 +1499,37 @@ mod openid_api {
         // Canonicalize the untrusted discovery domain at the boundary so both
         // verification and the credential stored from `arg` see the same value.
         arg.discovery_domain = openid::canonical_discovery_domain_opt(arg.discovery_domain);
-        // Verify the JWT (driving the SSO discovery/JWKS fetches it may need)
-        // up front: a cold or evicted cache surfaces as the `Pending` retry arm
-        // instead of a terminal registration error. The verified credential is
-        // then handed to the shared flow so it isn't re-verified.
-        let verified =
-            match registration::registration_flow_v2::verify_openid_for_registration(&arg) {
+        // Verify the JWT up front (driving any SSO discovery/JWKS fetches): a
+        // cold or evicted cache surfaces as the `Pending` retry arm instead of a
+        // terminal error, and the verified credential is then handed to the
+        // shared flow so it isn't re-verified. A gated SSO login (discovery
+        // domain + origin) goes through the SSO gate; everything else (a direct
+        // provider or an ungated SSO login) through the plain OpenID verify —
+        // mirroring the `sso_`/`openid_prepare_delegation` split on the auth side.
+        let credential = match (arg.discovery_domain.as_deref(), arg.origin.as_deref()) {
+            (Some(domain), Some(origin)) => {
+                openid::prefetch_sso(Some(domain));
+                match openid::verify_sso_for_registration(&arg.jwt, &arg.salt, domain, origin) {
+                    Ok(openid::Cached::Ready(credential)) => credential,
+                    Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+                    Err(err) => return OpenIdResult::Err(err),
+                }
+            }
+            _ => match registration::registration_flow_v2::verify_openid_for_registration(&arg) {
+                Ok(openid::Cached::Ready(credential)) => credential,
                 Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
-                Ok(openid::Cached::Ready(verified)) => verified,
                 Err(err) => return OpenIdResult::Err(err),
-            };
+            },
+        };
+        // Config issuer for the authorization key / operation log: the
+        // configured provider's (template) issuer, or the concrete JWT issuer for
+        // an SSO credential, which carries its own `sso_domain` for scope routing.
+        let config_iss = credential
+            .config_issuer()
+            .unwrap_or_else(|| credential.iss.clone());
         match registration::registration_flow_v2::identity_registration_finish(
             CreateIdentityData::OpenID(arg),
-            Some(verified),
+            Some((credential, config_iss)),
         ) {
             Ok(result) => OpenIdResult::Ok(result),
             Err(err) => OpenIdResult::Err(err),
@@ -1598,7 +1604,9 @@ mod openid_api {
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
             Err(err) => return OpenIdResult::Err(err.into()),
         };
-
+        // The verified credential already carries the SSO stable identifier, so
+        // the anchor write below reconciles the stable-id index — an existing
+        // anchor self-heals on a normal sign-in.
         let prepared: Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> = async {
             let anchor_number = state::storage_borrow(|storage| {
                 storage.lookup_anchor_with_openid_credential(&openid_credential.key())
@@ -1676,20 +1684,161 @@ mod openid_api {
     }
 
     /// Drive the two-hop SSO discovery fetch for `domain`. The frontend calls
-    /// this when `get_sso_discovery` reads `Pending`, then keeps polling the
-    /// query until it returns `Resolved`.
+    /// this when `get_sso_discovery_status` reads `Pending`, then keeps polling
+    /// the query until it returns `Resolved`.
     #[update]
     fn discover_sso(domain: String) {
         openid::discover_sso(&openid::canonical_discovery_domain(&domain))
     }
 
-    /// Read the state of `domain`'s SSO discovery: `Resolved` with the config,
-    /// `Pending` while the fetch is in flight, or `NotAllowed`.
+    /// Read the status of `org_domain`'s SSO discovery: `Resolved` with the
+    /// config, or `Pending` while the fetch is in flight.
+    ///
+    /// With `target_app_origin`, the resolved `resolved_client_id` is the client
+    /// that origin must use.
     #[query]
-    fn get_sso_discovery(
-        domain: String,
-    ) -> internet_identity_interface::internet_identity::types::SsoDiscoveryState {
-        openid::get_sso_discovery(&openid::canonical_discovery_domain(&domain))
+    fn get_sso_discovery_status(
+        request: internet_identity_interface::internet_identity::types::GetSsoDiscoveryStatusRequest,
+    ) -> internet_identity_interface::internet_identity::types::SsoDiscoveryStatus {
+        openid::get_sso_discovery_status(
+            &openid::canonical_discovery_domain(&request.org_domain),
+            request.target_app_origin.as_deref(),
+        )
+    }
+
+    /// SSO sign-in: verify the JWT, enforce the per-app gate, resolve the II-client
+    /// identity, and mint the openid delegation plus a certified SSO attribute bundle.
+    #[update]
+    async fn sso_prepare_delegation(
+        request: SsoPrepareDelegationRequest,
+    ) -> OpenIdResult<SsoPrepareDelegationResponse, OpenIdDelegationError> {
+        let SsoPrepareDelegationRequest {
+            jwt,
+            salt,
+            session_key,
+            org_domain,
+            target_app_origin: origin,
+        } = request;
+        let discovery_domain = openid::canonical_discovery_domain(&org_domain);
+        openid::prefetch_sso(Some(&discovery_domain));
+
+        let verification = match openid::verify_sso_jwt(&jwt, &salt, &discovery_domain, &origin) {
+            Ok(openid::Cached::Ready(v)) => v,
+            Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
+
+        let identity = match openid::resolve_ii_client_identity(&verification) {
+            Ok(identity) => identity,
+            Err(err) => return OpenIdResult::Err(err),
+        };
+
+        let prepared: Result<SsoPrepareDelegationResponse, OpenIdDelegationError> = async {
+            let key = identity.credential.key();
+            let anchor_number =
+                state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
+                    .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+
+            // Refresh the II-client credential's metadata from the token; never adds a per-app credential.
+            let mut anchor = state::anchor(anchor_number);
+            update_openid_credential(&mut anchor, identity.credential.clone())
+                .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
+            state::storage_borrow_mut(|storage| storage.write(anchor))
+                .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
+
+            let (user_key, expiration) = identity
+                .credential
+                .prepare_jwt_delegation(session_key, anchor_number)
+                .await;
+
+            let (sso_attr_bundle, _bundle_expiration) = openid::prepare_sso_attr_bundle(
+                &identity.credential.iss,
+                &identity.credential.sub,
+                &identity.credential.aud,
+                anchor_number,
+                &discovery_domain,
+                &origin,
+            );
+
+            // The association could change during the `.await`.
+            let still_anchor_number =
+                state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
+                    .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            if anchor_number != still_anchor_number {
+                // The credential re-associated to a different anchor during the
+                // `.await` (a concurrent account change). Deliberately reported
+                // as the same coarse error as "no anchor": the client has no
+                // distinct recovery, and we don't surface backend
+                // state-transition detail on the wire.
+                return Err(OpenIdDelegationError::NoSuchAnchor);
+            }
+
+            Ok(SsoPrepareDelegationResponse {
+                user_key,
+                expiration,
+                anchor_number,
+                sso_attr_bundle: ByteBuf::from(sso_attr_bundle),
+            })
+        }
+        .await;
+
+        prepared.into()
+    }
+
+    /// Fetch the delegation and SSO attribute bundle signature prepared by `sso_prepare_delegation`.
+    #[query]
+    fn sso_get_delegation(
+        request: SsoGetDelegationRequest,
+    ) -> OpenIdResult<SsoGetDelegationResponse, OpenIdDelegationError> {
+        let SsoGetDelegationRequest {
+            jwt,
+            salt,
+            session_key,
+            expiration,
+            org_domain,
+            target_app_origin: origin,
+            sso_attr_bundle,
+        } = request;
+        let discovery_domain = openid::canonical_discovery_domain(&org_domain);
+        let verification = match openid::verify_sso_jwt(&jwt, &salt, &discovery_domain, &origin) {
+            Ok(openid::Cached::Ready(v)) => v,
+            Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
+        // Query context: `resolve_ii_client_identity` only reads the stable-id index.
+        let identity = match openid::resolve_ii_client_identity(&verification) {
+            Ok(identity) => identity,
+            Err(err) => return OpenIdResult::Err(err),
+        };
+        let key = identity.credential.key();
+        let Some(anchor_number) =
+            state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
+        else {
+            return OpenIdResult::Err(OpenIdDelegationError::NoSuchAnchor);
+        };
+        let signed_delegation =
+            match identity
+                .credential
+                .get_jwt_delegation(session_key, expiration, anchor_number)
+            {
+                Ok(signed) => signed,
+                Err(err) => return OpenIdResult::Err(err),
+            };
+        let sso_attr_bundle_signature = match openid::get_sso_attr_bundle_signature(
+            &identity.credential.iss,
+            &identity.credential.sub,
+            &identity.credential.aud,
+            anchor_number,
+            &sso_attr_bundle,
+        ) {
+            Ok(signature) => signature,
+            Err(err) => return OpenIdResult::Err(err),
+        };
+        let sso_attr_bundle_signature = ByteBuf::from(sso_attr_bundle_signature);
+        OpenIdResult::Ok(SsoGetDelegationResponse {
+            signed_delegation,
+            sso_attr_bundle_signature,
+        })
     }
 }
 
@@ -2196,6 +2345,10 @@ mod attribute_sharing {
             nonce,
         } = request.try_into()?;
 
+        // SSO session iff a certified bundle for this origin is attached; gates `sso:<domain>` attributes.
+        let sso_session_domain = openid::read_certified_sso_bundle()
+            .filter(|bundle| bundle.origin == origin)
+            .map(|bundle| bundle.sso_domain);
         let (anchor, _) =
             check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
                 PrepareIcrc3AttributeError::AuthorizationError(principal)
@@ -2215,6 +2368,7 @@ mod attribute_sharing {
             unmapped_origin,
             issued_at_timestamp_ns,
             account,
+            sso_session_domain,
         )?;
 
         Ok(PrepareIcrc3AttributeResponse { message })
@@ -2253,12 +2407,15 @@ mod attribute_sharing {
             attributes,
         } = request.try_into()?;
 
+        // Gate `sso:<domain>` rows by the certified bundle; the bundle is the trusted source of the SSO domain.
+        let sso_session_domain =
+            openid::read_certified_sso_bundle().map(|bundle| bundle.sso_domain);
         let (anchor, _) =
             check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
                 ListAvailableAttributesError::AuthorizationError(principal)
             })?;
 
-        Ok(anchor.list_available_attributes(attributes))
+        Ok(anchor.list_available_attributes(attributes, sso_session_domain))
     }
 }
 
