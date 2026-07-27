@@ -1,11 +1,13 @@
 /**
  * Shared, transport-agnostic codec for the redirect sign-in flow.
  *
- * The homepage serialises its inputs into the `/callback` URL's query;
- * the callback page runs the ICRC-167 redirect flow and serialises the results
- * back into the homepage URL's hash. Keeping the encode/decode here (rather
- * than in either page) means the callback page stays a generic driver — it
- * never hardcodes which fields exist.
+ * The homepage snapshots its whole sign-in form into the `/callback` URL's
+ * query; the callback derives the flow inputs from that snapshot, runs the
+ * ICRC-167 redirect flow, and serialises the results — including the snapshot,
+ * echoed back — into the homepage URL's hash. Carrying the raw snapshot (rather
+ * than a hand-picked set of fields) lets the homepage restore every option the
+ * user set, and keeps the callback a generic driver: it reads only the few
+ * fields it needs to drive the flow and passes the rest through untouched.
  */
 
 /** The dedicated callback route. Built as the `callback.html` Vite entry, but
@@ -13,7 +15,13 @@
  *  the `.html`), so that's the path — and thus the ICRC-167 callback URL. */
 export const CALLBACK_PATH = "/callback";
 
-/** Inputs the homepage collects and hands to the callback page. */
+/** A raw snapshot of the sign-in form: control id → text value, or checked state
+ *  for a checkbox/radio. The homepage decides which controls go in and how to
+ *  restore them; the codec treats it as opaque except for deriving the flow
+ *  inputs below. */
+export type FormSnapshot = Record<string, string | boolean>;
+
+/** The flow inputs the callback needs, derived from the form snapshot. */
 export interface RedirectInputs {
   /** Identity provider (II) URL. */
   iiUrl: string;
@@ -29,35 +37,41 @@ export interface RedirectInputs {
   nonce?: string;
 }
 
-export const encodeInputs = (inputs: RedirectInputs): string => {
+const text = (form: FormSnapshot, id: string): string => {
+  const value = form[id];
+  return typeof value === "string" ? value : "";
+};
+
+/** Derives the flow inputs from the form snapshot, by the homepage control ids. */
+export const inputsFromSnapshot = (form: FormSnapshot): RedirectInputs => {
+  const derivationOrigin = text(form, "derivationOrigin");
+  const maxTtlRaw = text(form, "maxTimeToLive");
+  const maxTtl = maxTtlRaw !== "" ? BigInt(maxTtlRaw) : BigInt(0);
+  const nonce = text(form, "icrc3Nonce").trim();
+  return {
+    iiUrl: text(form, "iiUrl"),
+    derivationOrigin: derivationOrigin !== "" ? derivationOrigin : undefined,
+    maxTimeToLive: maxTtl > BigInt(0) ? maxTtl.toString() : undefined,
+    requestAttributes: form.useIcrc3Attributes === true,
+    attributeKeys: text(form, "requestAttributes")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+    nonce: nonce !== "" ? nonce : undefined,
+  };
+};
+
+const SNAPSHOT_PARAM = "form";
+
+export const encodeSnapshot = (form: FormSnapshot): string => {
   const params = new URLSearchParams();
-  params.set("iiUrl", inputs.iiUrl);
-  params.set("requestAttributes", String(inputs.requestAttributes));
-  params.set("attributeKeys", JSON.stringify(inputs.attributeKeys));
-  if (inputs.derivationOrigin !== undefined) {
-    params.set("derivationOrigin", inputs.derivationOrigin);
-  }
-  if (inputs.maxTimeToLive !== undefined) {
-    params.set("maxTimeToLive", inputs.maxTimeToLive);
-  }
-  if (inputs.nonce !== undefined) {
-    params.set("nonce", inputs.nonce);
-  }
+  params.set(SNAPSHOT_PARAM, JSON.stringify(form));
   return params.toString();
 };
 
-export const decodeInputs = (search: string): RedirectInputs => {
-  const params = new URLSearchParams(search);
-  const attributeKeys = params.get("attributeKeys");
-  return {
-    iiUrl: params.get("iiUrl") ?? "",
-    derivationOrigin: params.get("derivationOrigin") ?? undefined,
-    maxTimeToLive: params.get("maxTimeToLive") ?? undefined,
-    requestAttributes: params.get("requestAttributes") === "true",
-    attributeKeys:
-      attributeKeys !== null ? (JSON.parse(attributeKeys) as string[]) : [],
-    nonce: params.get("nonce") ?? undefined,
-  };
+export const decodeSnapshot = (search: string): FormSnapshot => {
+  const raw = new URLSearchParams(search).get(SNAPSHOT_PARAM);
+  return raw !== null ? (JSON.parse(raw) as FormSnapshot) : {};
 };
 
 /** Results the callback page hands back to the homepage. The delegation itself
@@ -68,10 +82,10 @@ export interface RedirectResults {
   attributes?: { data: string; signature: string };
   /** Error message when the flow failed. */
   error?: string;
-  /** The flow inputs, echoed back so the homepage can restore its form. The
-   *  callback journals them via `memoize`, so they survive II's own redirect and
-   *  are still available to hand back on the return leg. */
-  inputs?: RedirectInputs;
+  /** The form snapshot, echoed back so the homepage restores every option. The
+   *  callback journals it via `memoize`, so it survives II's own redirect and is
+   *  still available to hand back on the return leg. */
+  form?: FormSnapshot;
 }
 
 /** Marks a homepage load as the return leg of a redirect flow. */
@@ -86,8 +100,8 @@ export const encodeResults = (results: RedirectResults): string => {
   if (results.attributes !== undefined) {
     params.set("attributes", JSON.stringify(results.attributes));
   }
-  if (results.inputs !== undefined) {
-    params.set("inputs", JSON.stringify(results.inputs));
+  if (results.form !== undefined) {
+    params.set("form", JSON.stringify(results.form));
   }
   return params.toString();
 };
@@ -100,14 +114,13 @@ export const decodeResults = (hash: string): RedirectResults | undefined => {
     return undefined;
   }
   const attributes = params.get("attributes");
-  const inputs = params.get("inputs");
+  const form = params.get("form");
   return {
     error: params.get("error") ?? undefined,
     attributes:
       attributes !== null
         ? (JSON.parse(attributes) as RedirectResults["attributes"])
         : undefined,
-    inputs:
-      inputs !== null ? (JSON.parse(inputs) as RedirectInputs) : undefined,
+    form: form !== null ? (JSON.parse(form) as FormSnapshot) : undefined,
   };
 };

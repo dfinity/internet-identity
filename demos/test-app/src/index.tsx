@@ -26,8 +26,8 @@ import { AuthClient } from "@icp-sdk/auth/client";
 import {
   CALLBACK_PATH,
   decodeResults,
-  encodeInputs,
-  type RedirectInputs,
+  encodeSnapshot,
+  type FormSnapshot,
 } from "./redirectFlow";
 
 import "./main.css";
@@ -356,18 +356,43 @@ const fromBase64 = (value: string): Uint8Array =>
   Uint8Array.fromBase64(value);
 
 // The redirect transport navigates the tab away and back, resetting the homepage
-// form to its defaults on the return leg. The inputs travel with the flow: the
-// homepage puts them in the callback query, the callback journals them via
-// `memoize` (so they survive II's own redirect) and hands them back in the
-// result hash. Restore the form from those returned inputs.
-const restoreInputs = (inputs: RedirectInputs): void => {
-  iiUrlEl.value = inputs.iiUrl;
-  derivationOriginEl.value = inputs.derivationOrigin ?? "";
-  maxTimeToLiveEl.value = inputs.maxTimeToLive ?? "";
-  useIcrc3AttributesEl.checked = inputs.requestAttributes;
-  requestAttributesEl.value = inputs.attributeKeys.join("\n");
-  icrc3NonceEl.value = inputs.nonce ?? "";
-  transportEl.value = "redirect";
+// form to its defaults on the return leg. The full form is carried with the
+// flow: the homepage snapshots every sign-in control into the callback query,
+// the callback journals it via `memoize` (so it survives II's own redirect) and
+// hands it back in the result hash, and the homepage restores it here.
+type FormControl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+
+const formControls = (): FormControl[] =>
+  Array.from(
+    document.querySelectorAll<FormControl>(
+      "input[id], select[id], textarea[id]",
+    ),
+  );
+
+const isToggle = (el: FormControl): el is HTMLInputElement =>
+  el instanceof HTMLInputElement &&
+  (el.type === "checkbox" || el.type === "radio");
+
+const serializeForm = (): FormSnapshot => {
+  const form: FormSnapshot = {};
+  for (const el of formControls()) {
+    form[el.id] = isToggle(el) ? el.checked : el.value;
+  }
+  return form;
+};
+
+const restoreForm = (form: FormSnapshot): void => {
+  for (const el of formControls()) {
+    const value = form[el.id];
+    if (value === undefined) {
+      continue;
+    }
+    if (isToggle(el)) {
+      el.checked = value === true;
+    } else {
+      el.value = String(value);
+    }
+  }
 };
 
 // On the return leg of a redirect sign-in, the callback page hands results back
@@ -384,10 +409,10 @@ const renderRedirectResultIfPresent = async () => {
     "",
     window.location.pathname + window.location.search,
   );
-  // Put the form back the way the user left it, from the inputs the callback
+  // Put the form back the way the user left it, from the snapshot the callback
   // journaled and handed back — even on error, so the failed attempt is visible.
-  if (results.inputs !== undefined) {
-    restoreInputs(results.inputs);
+  if (results.form !== undefined) {
+    restoreForm(results.form);
   }
   if (results.error !== undefined) {
     showError(results.error);
@@ -423,25 +448,11 @@ const init = async () => {
     // ICRC-167 flow on load and returns the results here (see below). Nothing
     // else on this page runs — the tab navigates away.
     if (transportEl.value === "redirect") {
-      const maxTtl = BigInt(maxTimeToLiveEl.value || "0");
-      const inputs: RedirectInputs = {
-        iiUrl: iiUrlEl.value,
-        derivationOrigin:
-          derivationOriginEl.value !== ""
-            ? derivationOriginEl.value
-            : undefined,
-        maxTimeToLive: maxTtl > BigInt(0) ? maxTtl.toString() : undefined,
-        requestAttributes: useIcrc3AttributesEl.checked,
-        attributeKeys: requestAttributesEl.value
-          .split("\n")
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0),
-        nonce:
-          icrc3NonceEl.value.trim() !== ""
-            ? icrc3NonceEl.value.trim()
-            : undefined,
-      };
-      window.location.assign(`${CALLBACK_PATH}?${encodeInputs(inputs)}`);
+      // Hand the whole form to the callback, which derives the flow inputs from
+      // it. Nothing else on this page runs — the tab navigates away.
+      window.location.assign(
+        `${CALLBACK_PATH}?${encodeSnapshot(serializeForm())}`,
+      );
       return;
     }
 

@@ -10,8 +10,9 @@
  */
 import { AuthClient } from "@icp-sdk/auth/client";
 import {
-  decodeInputs,
+  decodeSnapshot,
   encodeResults,
+  inputsFromSnapshot,
   type RedirectResults,
 } from "./redirectFlow";
 
@@ -24,29 +25,31 @@ const fromBase64 = (value: string): Uint8Array =>
   Uint8Array.fromBase64(value);
 
 const run = async (): Promise<void> => {
-  const query = new URLSearchParams(window.location.search);
-
-  // `identityProvider` / `derivationOrigin` are only used on the FIRST
-  // (initiating) load: the return load only replays journaled responses, and
-  // the transport keys its journal by the callback URL — not these — so it is
-  // fine that the query (and thus these) are gone on the return load.
+  // Decode the form snapshot from the query synchronously, for the AuthClient
+  // constructor. `identityProvider` / `derivationOrigin` are only used on the
+  // FIRST (initiating) load; on the return load the query is gone, so these fall
+  // back to defaults and the signer/AuthClient journals restore the real values.
+  const queryInputs = inputsFromSnapshot(
+    decodeSnapshot(window.location.search),
+  );
   const authClient = new AuthClient({
     transport: "redirect",
-    identityProvider: query.get("iiUrl") ?? undefined,
-    derivationOrigin: query.get("derivationOrigin") ?? undefined,
+    identityProvider: queryInputs.iiUrl !== "" ? queryInputs.iiUrl : undefined,
+    derivationOrigin: queryInputs.derivationOrigin,
     idleOptions: { disableIdle: true },
   });
 
-  // Carry the flow inputs across the redirect: read them from the query on the
-  // first load, replay the same values on the return load (query stripped). Run
-  // it first so the call order is stable across loads.
-  const inputs = await authClient.memoize(() =>
-    decodeInputs(window.location.search),
+  // Journal the whole form snapshot so it stays stable across the redirect and
+  // can be echoed back to restore the homepage form. Run it first so the call
+  // order is stable across loads. The flow inputs are derived from it.
+  const form = await authClient.memoize(() =>
+    decodeSnapshot(window.location.search),
   );
+  const inputs = inputsFromSnapshot(form);
 
-  // Echo the (journaled) inputs back so the homepage can restore its form; the
-  // window navigated away, so it lost them.
-  const results: RedirectResults = { inputs };
+  // Echo the (journaled) snapshot back so the homepage can restore every option;
+  // the window navigated away, so it lost them.
+  const results: RedirectResults = { form };
   try {
     const maxTimeToLive =
       inputs.maxTimeToLive !== undefined
