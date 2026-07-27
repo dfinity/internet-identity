@@ -1,12 +1,13 @@
 <script lang="ts">
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import McpHero from "../components/McpHero.svelte";
-  import Select from "$lib/components/ui/Select.svelte";
+  import SessionDurationSelect from "$lib/components/ui/SessionDurationSelect.svelte";
+  import { MAX_SESSION_DURATION_SECONDS } from "$lib/utils/sessionDuration";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import AccessLevelSelector from "$lib/components/ui/AccessLevelSelector.svelte";
   import type { AccessLevel } from "$lib/utils/accessLevel";
   import { accessLevelStore } from "$lib/stores/access-level.store";
-  import { ChevronDownIcon, InfoIcon } from "@lucide/svelte";
+  import { InfoIcon } from "@lucide/svelte";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -61,54 +62,9 @@
   );
   let isAuthorizing = $state(false);
 
-  const MINUTE = 60;
-  const HOUR = 60 * MINUTE;
-  const DAY = 24 * HOUR;
-  const WEEK = 7 * DAY;
-  // The session durations the picker offers, each with its label, spanning the
-  // allowed range: 10 minutes (the shortest, also the request's floor) to 30
-  // days (the longest, the backend's grant cap). `$derived` so the labels
-  // re-translate when the locale changes.
-  const presets = $derived([
-    { value: 10 * MINUTE, label: $t`10 minutes` },
-    { value: HOUR, label: $t`1 hour` },
-    { value: 8 * HOUR, label: $t`8 hours` },
-    { value: DAY, label: $t`1 day` },
-    { value: WEEK, label: $t`1 week` },
-    { value: 30 * DAY, label: $t`30 days` },
-  ]);
-
-  // Compact label for an off-preset duration: the request can ask for any number
-  // of seconds within [10 min, 30 days], so the selected value isn't always one
-  // of the presets (e.g. a 2-hour request shows "2h").
-  const formatTtl = (seconds: number): string => {
-    const parts: string[] = [];
-    const d = Math.floor(seconds / DAY);
-    const h = Math.floor((seconds % DAY) / HOUR);
-    const m = Math.floor((seconds % HOUR) / MINUTE);
-    const s = seconds % MINUTE;
-    if (d > 0) parts.push(`${d}d`);
-    if (h > 0) parts.push(`${h}h`);
-    if (m > 0) parts.push(`${m}m`);
-    if (s > 0) parts.push(`${s}s`);
-    return parts.length > 0 ? parts.join(" ") : "0s";
-  };
-
   // Honor the exact requested duration (already clamped to the cap); the user can
-  // still override it with one of the presets before connecting.
+  // still override it — up to the 30-day maximum — before connecting.
   let selectedTtlSeconds = $state(requestedTtlSeconds);
-  const options = $derived(
-    presets.map((preset) => ({
-      ...preset,
-      selected: preset.value === selectedTtlSeconds,
-    })),
-  );
-  // The trigger shows the selected preset's label, or the compact format when the
-  // selection is an off-preset (honoured) duration.
-  const selectedLabel = $derived(
-    presets.find((preset) => preset.value === selectedTtlSeconds)?.label ??
-      formatTtl(selectedTtlSeconds),
-  );
 
   const handleAllowAccess = async (): Promise<void> => {
     const selected = $lastUsedIdentitiesStore.selected;
@@ -167,23 +123,13 @@
         <span class="text-text-tertiary text-base">
           {$t`Time until you have to reconnect:`}
         </span>
-        <Select
-          {options}
-          onChange={(value) => (selectedTtlSeconds = value)}
-          align="end"
-        >
-          <!-- Disabled while connecting: a disabled button dispatches no click,
-               so the Select can't open once the user has committed to "Allow
-               access". -->
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm shrink-0 gap-2"
-            disabled={isAuthorizing}
-          >
-            <span>{selectedLabel}</span>
-            <ChevronDownIcon class="size-4" />
-          </button>
-        </Select>
+        <!-- The connect flow lets the user pick any duration up to the 30-day
+             maximum, defaulting to the requested value. -->
+        <SessionDurationSelect
+          maxSeconds={MAX_SESSION_DURATION_SECONDS}
+          bind:value={selectedTtlSeconds}
+          disabled={isAuthorizing}
+        />
       </div>
     </div>
 

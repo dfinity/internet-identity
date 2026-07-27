@@ -39,6 +39,7 @@
   import {
     authorizationContextStore,
     authorizationStore,
+    requestedMaxTimeToLiveStore,
   } from "$lib/stores/authorization.store";
   import {
     decodeJWT,
@@ -172,8 +173,9 @@
   const handleAuthorize = (
     accountNumber: Promise<bigint | undefined>,
     accessLevel: AccessLevel,
+    maxTimeToLive?: bigint,
   ) => {
-    authorizationStore.authorize(accountNumber, accessLevel);
+    authorizationStore.authorize(accountNumber, accessLevel, maxTimeToLive);
   };
 
   const handleAttributeConsent = (consent: AttributeConsent) => {
@@ -614,6 +616,7 @@
   <ContinueView
     effectiveOrigin={$authorizationContextStore.effectiveOrigin}
     displayOrigin={$establishedChannelStore.origin}
+    requestedMaxTimeToLive={$requestedMaxTimeToLiveStore}
     onAuthorize={handleAuthorize}
   />
 {/snippet}

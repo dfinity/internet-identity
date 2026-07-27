@@ -39,6 +39,11 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import SessionDurationSelect from "$lib/components/ui/SessionDurationSelect.svelte";
+  import {
+    sessionDurationCeilingSeconds,
+    sessionDurationToNanos,
+  } from "$lib/utils/sessionDuration";
 
   interface Props {
     effectiveOrigin: string;
@@ -52,11 +57,18 @@
      *  ("Questions only" vs "Actions & questions"): "read-only" restricts the
      *  session delegation to query calls, so the app can read on the user's
      *  behalf but cannot change state (the Internet Computer rejects update
-     *  calls authenticated through it). */
+     *  calls authenticated through it). `maxTimeToLive` is the session duration
+     *  the user picked (nanoseconds), at most the app's requested value. */
     onAuthorize: (
       accountNumber: Promise<bigint | undefined>,
       accessLevel: AccessLevel,
+      maxTimeToLive: bigint,
     ) => void;
+    /** The session duration the app requested (`maxTimeToLive`, nanoseconds), or
+     *  `undefined` when it didn't specify one. It's the ceiling the user picks
+     *  under; when absent the picker allows up to the 30-day maximum (the
+     *  backend's default and cap). */
+    requestedMaxTimeToLive?: bigint;
     /** Replaces the default authorize header (app tile + "Continue to <app>"),
      *  letting /mcp render its own connect consent above the same picker. */
     header?: Snippet;
@@ -68,12 +80,24 @@
     effectiveOrigin,
     displayOrigin,
     onAuthorize,
+    requestedMaxTimeToLive,
     header,
     continueLabel,
   }: Props = $props();
 
   type PRIMARY_ACCOUNT_NUMBER = undefined;
   const MAX_ACCOUNTS = 5;
+
+  // The largest duration the picker offers: the app's requested value, capped
+  // at the 30-day maximum, or the maximum itself when the app didn't request
+  // one. Defaulting the selection to it means a plain "Continue" grants exactly
+  // what the app asked for (as before this picker existed); the user can shorten
+  // it first.
+  const ceilingSeconds = sessionDurationCeilingSeconds(requestedMaxTimeToLive);
+  let selectedTtlSeconds = $state(ceilingSeconds);
+  const selectedMaxTimeToLive = $derived(
+    sessionDurationToNanos(selectedTtlSeconds),
+  );
 
   // Browser-local, per-anchor persistence for the multi-accounts toggle.
   // Per-anchor (not per-dapp) because the toggle is a mental-mode switch:
@@ -241,7 +265,11 @@
               .then(throwCanisterError)
               .then((account) => account.account_number[0])
           : Promise.resolve(defaultAccountNumber);
-      onAuthorize(accountNumberPromise, effectiveAccessLevel);
+      onAuthorize(
+        accountNumberPromise,
+        effectiveAccessLevel,
+        selectedMaxTimeToLive,
+      );
     } catch (error) {
       handleError(error);
     } finally {
@@ -260,7 +288,11 @@
           effectiveOrigin,
         );
       }
-      onAuthorize(Promise.resolve(accountNumber), effectiveAccessLevel);
+      onAuthorize(
+        Promise.resolve(accountNumber),
+        effectiveAccessLevel,
+        selectedMaxTimeToLive,
+      );
     } catch (error) {
       handleError(error);
     } finally {
@@ -593,6 +625,29 @@
       {$t`with your Internet Identity`}
     </p>
   {/if}
+  {#if isMultipleAccountsEnabled}
+    <!-- Session: how long the sign-in lasts before the user must sign in
+         again, capped at the duration the app requested (see `ceilingSeconds`).
+         Revealed alongside the account choices when "all options" is on. -->
+    <div class="border-border-tertiary mb-6 flex flex-col border-t pt-4">
+      <span class="text-text-primary mb-0.5 text-base font-medium">
+        {$t`Session duration`}
+      </span>
+      <div class="flex flex-row items-center justify-between gap-2">
+        <span class="text-text-tertiary text-base">
+          {$t`until you have to sign in again`}
+        </span>
+        <SessionDurationSelect
+          maxSeconds={ceilingSeconds}
+          bind:value={selectedTtlSeconds}
+          disabled={isAuthenticatingDefault}
+        />
+      </div>
+    </div>
+    <span class="text-text-primary mb-3 self-start text-base font-medium">
+      {$t`Available accounts`}
+    </span>
+  {/if}
   <div class="grid">
     <!-- Nested if/else conditions breaks transitions, so they've been flattened here-->
     {#if isMultipleAccountsEnabled && accounts !== undefined}
@@ -609,7 +664,6 @@
       {@render continueDefault()}
     {/if}
   </div>
-  <div class="border-border-tertiary mb-6 border-t"></div>
   <div class="flex flex-row items-center">
     <!-- Intentionally we use onclick here instead of onchange to make sure it's a user gesture-->
     <Toggle
@@ -617,13 +671,13 @@
       onclick={isMultipleAccountsEnabled
         ? undefined
         : handleEnableMultipleAccounts}
-      label={$t`Enable multiple accounts`}
+      label={$t`Show all options`}
       size="sm"
       disabled={isAuthenticatingDefault}
     />
     <Tooltip
-      label={$t`Multiple accounts`}
-      description={$t`By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo).`}
+      label={$t`All options`}
+      description={$t`By showing all options, you can choose how long your session lasts before signing in again and create more than one account for a single app (e.g. work, personal, or demo).`}
       direction="up"
       align="end"
       offset="0rem"
@@ -631,7 +685,7 @@
     >
       <button
         class="btn btn-tertiary btn-sm btn-icon ms-auto !cursor-default !rounded-full"
-        aria-label={$t`More information about multiple accounts`}
+        aria-label={$t`More information about all options`}
       >
         <HelpCircleIcon class="size-5" />
       </button>
