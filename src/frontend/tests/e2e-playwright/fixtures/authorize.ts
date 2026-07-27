@@ -51,6 +51,19 @@ export const test = base.extend<{
   authorizedAttributes: Record<string, string> | undefined;
   authorizedIcrc3Attributes: { data: string; signature: string } | undefined;
   /**
+   * The delegation chain the test app received, parsed from its `#delegation`
+   * view (pubkeys and publicKey are hex). Lets a spec assert the chain's shape
+   * — e.g. the redirect flow's two-hop intermediate-key structure. Waits for
+   * the redirect return before reading, like {@link authorizedPrincipal};
+   * `undefined` when the page has no delegation.
+   */
+  authorizedDelegation:
+    | {
+        delegations: { delegation: { pubkey: string } }[];
+        publicKey: string;
+      }
+    | undefined;
+  /**
    * The II backend canister id, discovered by visiting the II URL in a
    * throwaway page and reading `<body data-canister-id>` (the II
    * frontend canister rewrites the served HTML to embed the backend
@@ -244,6 +257,26 @@ export const test = base.extend<{
     }
 
     await use(JSON.parse(icrc3Attributes));
+  },
+  authorizedDelegation: async ({ page, authorizeConfig }, use) => {
+    const [testAppPage, authPage] = page.context().pages();
+    if (authPage !== undefined) {
+      await authPage.waitForEvent("close", { timeout: 15_000 });
+    }
+    // The redirect flow renders the delegation only after navigating back to
+    // the test app, so wait for the return (principal visible) before reading.
+    if (authorizeConfig?.transport === "redirect") {
+      await expect(testAppPage.locator("#principal")).toBeVisible({
+        timeout: 15_000,
+      });
+    }
+
+    const delegation = await testAppPage.locator("#delegation").innerText();
+    if (delegation === "") {
+      return use(undefined);
+    }
+
+    await use(JSON.parse(delegation));
   },
   iiBackendCanisterId: async ({ browser }, use) => {
     // The II frontend canister rewrites every served HTML to embed

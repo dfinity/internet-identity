@@ -35,6 +35,24 @@ const decodeIcrc3TextEntries = (base64Data: string): Record<string, string> => {
 };
 
 test.describe("Authorize over the redirect transport", () => {
+  // Every redirect flow must hand back the two-hop intermediate-key chain
+  // (canister → intermediate → RP session key), never a one-hop chain signed
+  // directly to the RP key: what the canister certifies transits the IC and
+  // must be inert on its own, so the RP key is only ever reached via the second
+  // hop assembled in the browser.
+  test.afterEach(({ authorizedDelegation }) => {
+    expect(authorizedDelegation).toBeDefined();
+    if (authorizedDelegation === undefined) {
+      return;
+    }
+    const { delegations, publicKey } = authorizedDelegation;
+    expect(delegations).toHaveLength(2);
+    // The outer hop delegates to the RP session key (the chain's public key);
+    // the certified inner hop targets the intermediate key, not the RP key.
+    expect(delegations[1].delegation.pubkey).toBe(publicKey);
+    expect(delegations[0].delegation.pubkey).not.toBe(publicKey);
+  });
+
   test.describe("passkey sign-up", () => {
     test.use({
       authorizeConfig: { protocol: "icrc25", transport: "redirect" },
