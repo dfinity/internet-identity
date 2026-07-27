@@ -164,18 +164,14 @@ test.describe("Authorize over the redirect transport", () => {
     });
 
     // The signed attributes are delivered back to the test app over the same
-    // redirect as the delegation (batched into one response).
+    // redirect as the delegation (batched into one response). Like the 1-click
+    // OpenID flow, sign-in auto-returns — no "Continue" step to click through.
     test("returns the requested attributes", async ({
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-      // The redirect flow surfaces II's authorize screen (no opener to close);
-      // continue through it to deliver the response back to the test app.
-      await authorizePage.page
-        .getByRole("button", { name: "Continue", exact: true })
-        .click();
     });
   });
 });
