@@ -47,7 +47,9 @@ records consent (no second prompt).
 
 ### What happens when a notification is sent?
 
-7. The dApp's backend/frontend calls `notify_user` (later, a batch endpoint).
+7. The dApp's backend tells II to notify the user. At any real scale this runs
+   through the dApp's client library and the chunked `push_send` endpoint (see
+   below); the PoC has a simpler one-shot `notify_user` for a single recipient.
 8. The notification arrives on every device the user enabled — **even with the
    tab closed / browser not running** (on Android). It shows the dApp's origin
    as the source and the dApp's title/body as the text.
@@ -67,7 +69,11 @@ records consent (no second prompt).
 Built today (PoC on `feat/push-notifications-poc`):
 
 - Device subscribe/unsubscribe, `/authorize` opt-in, per-dApp consent.
-- Single `notify_user(principal, alert)` update call.
+- Single `notify_user(principal, alert)` update call — a one-shot for one
+  recipient. It does **not** answer scale; the design supersedes it with the
+  chunked `push_send` + client library described under "Proposed" below, and
+  everything in this doc about throughput, cost, and delivery assumes that
+  path, not this call.
 - RFC 8291 payload encryption + RFC 8292 VAPID JWT signing, both in-canister.
 - VAPID private key generated via `raw_rand` and persisted in stable memory.
   This is not the ideal custody model, and we do it only because the ideal
