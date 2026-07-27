@@ -135,30 +135,43 @@ export const test = base.extend<{
 
     await expect(testAppPage.locator("#principal")).toBeHidden();
 
-    if ((authorizeConfig.transport ?? "window") === "redirect") {
-      // Redirect flow: clicking "Sign In" navigates THIS tab to /callback.html
-      // → II /authorize. The authenticate interaction runs on the same page,
-      // and II delivers the response back by navigation — no popup.
-      await testAppPage.locator("#transport").selectOption("redirect");
-      await testAppPage.getByRole("button", { name: "Sign In" }).click();
+    const transport = authorizeConfig.transport ?? "window";
+    switch (transport) {
+      case "redirect": {
+        // Redirect flow: clicking "Sign In" navigates THIS tab to /callback → II
+        // /authorize. The authenticate interaction runs on the same page, and II
+        // delivers the response back by navigation — no popup.
+        await testAppPage.locator("#transport").selectOption("redirect");
+        await testAppPage.getByRole("button", { name: "Sign In" }).click();
 
-      await use(new AuthorizePage(testAppPage));
+        await use(new AuthorizePage(testAppPage));
 
-      // On the return load the homepage renders the principal.
-      await expect(testAppPage.locator("#principal")).toBeVisible({
-        timeout: 15_000,
-      });
-      return;
+        // On the return load the homepage renders the principal.
+        await expect(testAppPage.locator("#principal")).toBeVisible({
+          timeout: 15_000,
+        });
+        break;
+      }
+      case "window": {
+        // Window flow: clicking "Sign In" opens II in a new tab; the response
+        // comes back over postMessage and the tab closes.
+        const authPagePromise = testAppPage.context().waitForEvent("page");
+        await testAppPage.getByRole("button", { name: "Sign In" }).click();
+        const authPage = await authPagePromise;
+        const closePromise = authPage.waitForEvent("close", {
+          timeout: 15_000,
+        });
+
+        await use(new AuthorizePage(authPage));
+
+        await closePromise;
+        break;
+      }
+      default: {
+        transport satisfies never;
+        throw new Error(`Unhandled transport: ${String(transport)}`);
+      }
     }
-
-    const authPagePromise = testAppPage.context().waitForEvent("page");
-    await testAppPage.getByRole("button", { name: "Sign In" }).click();
-    const authPage = await authPagePromise;
-    const closePromise = authPage.waitForEvent("close", { timeout: 15_000 });
-
-    await use(new AuthorizePage(authPage));
-
-    await closePromise;
   },
   authorizedPrincipal: async ({ page, authorizeConfig }, use) => {
     const [testAppPage, authPage] = page.context().pages();
