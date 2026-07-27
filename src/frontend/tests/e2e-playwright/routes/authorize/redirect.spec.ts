@@ -45,12 +45,18 @@ test.describe("Authorize over the redirect transport", () => {
     if (authorizedDelegation === undefined) {
       return;
     }
-    const { delegations, publicKey } = authorizedDelegation;
+    // The chain runs root (user identity) → intermediate key → RP session key.
+    // Two hops, never one: a one-hop chain would be the canister signing
+    // directly to the RP key, but what the canister certifies transits the IC
+    // and must be inert on its own.
+    const { delegations } = authorizedDelegation;
     expect(delegations).toHaveLength(2);
-    // The outer hop delegates to the RP session key (the chain's public key);
-    // the certified inner hop targets the intermediate key, not the RP key.
-    expect(delegations[1].delegation.pubkey).toBe(publicKey);
-    expect(delegations[0].delegation.pubkey).not.toBe(publicKey);
+    // The canister-certified inner hop (delegations[0]) targets the intermediate
+    // key; the RP session key is only the chain's leaf (delegations[1]), reached
+    // via the second, browser-signed hop — so the two hops target distinct keys.
+    expect(delegations[0].delegation.pubkey).not.toBe(
+      delegations[1].delegation.pubkey,
+    );
   });
 
   test.describe("passkey sign-up", () => {
