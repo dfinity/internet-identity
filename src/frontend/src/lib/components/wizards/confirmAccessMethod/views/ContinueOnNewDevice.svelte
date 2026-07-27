@@ -25,7 +25,7 @@
 <div class="mt-4 flex flex-col gap-8">
   <div>
     <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
-      {$t`Continue on another device`}
+      {$t`Add this identity to another device`}
     </h1>
     <p
       class="text-text-tertiary text-base font-medium text-balance sm:text-center"

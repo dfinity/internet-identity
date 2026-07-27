@@ -252,6 +252,16 @@ export class CanisterError<T extends Record<string, unknown>> extends Error {
   ): UnionToIntersection<T>[S] {
     return this.#value[type as keyof T] as UnionToIntersection<T>[S];
   }
+
+  /**
+   * The full wrapped candid error value — the whole `{ Variant: payload }`
+   * object, not just one variant's payload like `value(type)`. Lets a
+   * caught canister error be routed by the same value-based helpers that
+   * handle the equivalent `Err`-shaped response field.
+   */
+  get raw(): T {
+    return this.#value;
+  }
 }
 
 export const isCanisterError = <T extends Record<string, unknown>>(
@@ -273,6 +283,21 @@ export const throwCanisterError = <
     throw new CanisterError(response.Err);
   }
   return response.Ok as Promise<S>;
+};
+
+/** Sibling of {@link throwCanisterError} for methods whose candid error is a
+ *  plain `text` (e.g. the `mcp_*` family) rather than a variant record —
+ *  {@link CanisterError} wraps variants, so it doesn't fit those. Unwraps `Ok`
+ *  and throws the `Err` string as an `Error`. Transport/replica failures
+ *  reject the call itself, so a catch can still distinguish them from
+ *  canister-reported errors. */
+export const throwTextCanisterError = <T>(
+  response: { Ok: T } | { Err: string },
+): T => {
+  if ("Err" in response) {
+    throw new Error(response.Err);
+  }
+  return response.Ok;
 };
 
 // Helper that normalizes ArrayBuffer-like inputs.
@@ -361,6 +386,14 @@ export const transformSignedDelegation = (
       Uint8Array.from(signed_delegation.delegation.pubkey),
       signed_delegation.delegation.expiration,
       undefined,
+      // The candid `permissions : opt text` (`[] | [string]`, e.g.
+      // `["queries"]` for a read-only delegation) maps 1:1 onto the agent
+      // library's `permissions?: string`. Indexing the opt tuple at [0]
+      // yields `string | undefined`. Carrying it here is required for
+      // restricted delegations to verify: the canister signature covers
+      // this field, so dropping it makes the replica recompute a different
+      // hash and reject the delegation.
+      signed_delegation.delegation.permissions[0],
     ),
     signature: Uint8Array.from(
       signed_delegation.signature,

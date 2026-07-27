@@ -124,8 +124,8 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                         .into_iter()
                         .map(|(header_name, header_value)| {
                             // Modify the IC-Certificate header to make certification invalid
-                            // Note: we cannot simply drop the header because then the local replica (dfx 0.15 and later)
-                            // will skip the certification check altogether.
+                            // Note: we cannot simply drop the header because the local replica
+                            // skips the certification check altogether when the header is absent.
                             if header_name == "IC-Certificate" {
                                 (header_name, OUTDATED_INVALID_CERTIFICATE_HEADER.to_string())
                             } else {

@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Create the canister pair (backend + frontend) for a new II staging
+# environment, mirroring Staging A/B/C.
+#
+# A staging environment is nothing more than two empty canisters on the IC
+# mainnet — a backend and a frontend — created on, and controlled by, the
+# legacy staging wallet, now reinstalled as the icp-cli *proxy* canister
+# (cvthj-wyaaa-aaaad-aaaaq-cai). `icp canister create --proxy` routes the
+# create_canister call through the proxy, so the new canisters land on the
+# proxy's subnet and inherit it as controller — which is exactly what lets
+# the deploy-*-to-beta scripts install into them later via `--proxy`.
+#
+# This script performs only the one-time *creation* step. Wiring the two
+# printed ids into scripts/deploy-common.bash (the staging_be_id /
+# staging_fe_id case tables + a -sd/--staging-d flag) is what makes the new
+# environment selectable, exactly like -sa/-sb/-sc. The script prints the
+# precise edits to make at the end.
+#
+# Usage:
+#   ./scripts/create-staging [NAME]     # NAME defaults to the next unused staging letter
+#   ./scripts/create-staging --dry-run  # print the icp commands, create nothing
+#
+# Requires: `icp` (icp-cli) on PATH, with the identity that controls the
+# proxy canister selected (the same identity used to deploy to staging).
+# Creating canisters spends cycles held by the proxy.
+
+readonly PROXY_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
+readonly IC_NETWORK="ic"
+# Cycles to fund each new canister with. icp-cli's own default is 2T; II
+# staging canisters are data-heavy, so fund a little more headroom. Override
+# with CREATE_CYCLES=... in the environment. Accepts k/m/b/t suffixes.
+CREATE_CYCLES="${CREATE_CYCLES:-5t}"
+
+NAME=""
+DRY_RUN=false
+positional_count=0
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run) DRY_RUN=true ;;
+        -h|--help) sed -n '4,28p' "$0"; exit 0 ;;
+        -*) echo "Unknown option: $arg" >&2; exit 1 ;;
+        *)  NAME="$arg"; positional_count=$((positional_count + 1)) ;;
+    esac
+done
+
+if [ "$positional_count" -gt 1 ]; then
+    echo "Error: expected at most one NAME argument, got $positional_count." >&2
+    exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEPLOY_COMMON="$SCRIPT_DIR/deploy-common.bash"
+
+# Single-letter labels already present as `x) echo "..." ;;` arms in
+# deploy-common.bash's staging_be_id() table — i.e. the staging environments
+# that already exist. Printed one per line.
+taken_staging_letters() {
+    [ -f "$DEPLOY_COMMON" ] || return 0
+    sed -n '/^staging_be_id()/,/^}/p' "$DEPLOY_COMMON" \
+        | sed -nE 's/^[[:space:]]*([a-z])\).*/\1/p'
+}
+
+# The next unused staging letter: one past the highest letter currently wired
+# into staging_be_id() (a→b→…). This is the default when no NAME is given, so
+# repeated runs propose d, e, f, … instead of always the same letter.
+next_staging_name() {
+    if [ ! -f "$DEPLOY_COMMON" ]; then
+        echo "Error: cannot find $DEPLOY_COMMON to determine the next staging letter." >&2
+        echo "       Pass an explicit NAME, e.g. \`$0 e\`." >&2
+        return 1
+    fi
+    local last
+    last="$(taken_staging_letters | sort | tail -n1)"
+    if [ -z "$last" ]; then echo "a"; return 0; fi
+    # Advance one letter (a→b … y→z; z maps to itself, signalling exhaustion).
+    local next
+    next="$(printf '%s' "$last" | tr 'a-y' 'b-z')"
+    if [ "$next" = "$last" ]; then
+        echo "Error: staging letters a-z all appear taken in staging_be_id()." >&2
+        return 1
+    fi
+    echo "$next"
+}
+
+# Default to the next unused staging letter; normalize to the lowercase
+# single-letter convention deploy-common.bash uses (a/b/c → -sa/-sb/-sc).
+# Rejecting anything else keeps the printed wiring instructions (-s$NAME,
+# "$NAME) ..." case arms) consistent with what those scripts actually match.
+if [ -z "$NAME" ]; then
+    NAME="$(next_staging_name)" || exit 1
+fi
+NAME="$(printf '%s' "$NAME" | tr '[:upper:]' '[:lower:]')"
+if ! [[ "$NAME" =~ ^[a-z]$ ]]; then
+    echo "Error: NAME must be a single letter a-z (got '$NAME')." >&2
+    echo "       Staging environments are selected as -sa/-sb/-sc/-sd, etc." >&2
+    exit 1
+fi
+
+if [ "$DRY_RUN" = false ] && ! command -v icp >/dev/null 2>&1; then
+    echo "Error: \`icp\` (icp-cli) not on PATH." >&2
+    echo "       Install it and select an identity that controls $PROXY_CANISTER_ID." >&2
+    exit 1
+fi
+
+# A projectless working directory for the icp invocations. icp-cli loads the
+# whole `icp.yaml` project whenever it runs inside one — and that load fails
+# here because II's frontend canister declares an `init_args.path`
+# (.icp/cache/init-args/...) that only exists after a build/render. Creating
+# two empty canisters has nothing to do with the II project, so we run from a
+# scratch dir with no `icp.yaml` in any ancestor: the documented "outside of a
+# project context" form (`icp canister create -n ic --detached`).
+WORKDIR=""
+cleanup() { [ -n "$WORKDIR" ] && [ -d "$WORKDIR" ] && rm -rf "$WORKDIR"; return 0; }
+trap cleanup EXIT
+if [ "$DRY_RUN" = false ]; then
+    WORKDIR="$(mktemp -d -t ii-create-staging.XXXXXX)"
+fi
+
+# Create one detached canister via the proxy and echo its id on stdout
+# (-q makes icp print only the id). All chatter goes to stderr so the id
+# is cleanly capturable with $(...).
+create_one() {
+    local label="$1"
+    local cmd=(
+        icp canister create --detached
+            -n "$IC_NETWORK"
+            --proxy "$PROXY_CANISTER_ID"
+            --cycles "$CREATE_CYCLES"
+            -q
+    )
+    if [ "$DRY_RUN" = true ]; then
+        printf '[dry-run] %s →\n  ' "$label" >&2
+        printf '%q ' "${cmd[@]}" >&2; echo >&2
+        return 0
+    fi
+    echo "Creating $label on $IC_NETWORK via proxy $PROXY_CANISTER_ID (${CREATE_CYCLES} cycles) ..." >&2
+    # Run from the projectless scratch dir so no `icp.yaml` is loaded.
+    ( cd "$WORKDIR" && "${cmd[@]}" )
+}
+
+UPPER="$(echo "$NAME" | tr '[:lower:]' '[:upper:]')"
+
+BE_ID="$(create_one "Staging-$UPPER backend")"
+FE_ID="$(create_one "Staging-$UPPER frontend")"
+
+if [ "$DRY_RUN" = true ]; then
+    exit 0
+fi
+
+# `icp ... -q` is expected to print exactly the new canister id. Guard against
+# it returning empty / a non-id (e.g. a future output-format change) despite a
+# zero exit — otherwise we'd happily print wiring instructions with blank ids
+# that are trivial to paste into deploy-common.bash by mistake. Canister ids
+# are dash-separated base32 groups ending in a 3-char check group, e.g.
+# fgte5-ciaaa-aaaad-aaatq-cai.
+for pair in "backend:$BE_ID" "frontend:$FE_ID"; do
+    role="${pair%%:*}"
+    id="${pair#*:}"
+    if ! [[ "$id" =~ ^([a-z0-9]{5}-)+[a-z0-9]{3}$ ]]; then
+        echo "Error: \`icp canister create\` did not return a valid canister id for the $role" >&2
+        echo "       (got: '$id'). A canister may have been created without its id being" >&2
+        echo "       captured — check the proxy's controlled canisters before re-running." >&2
+        echo "       Refusing to print wiring instructions with a bad id." >&2
+        exit 1
+    fi
+done
+
+cat >&2 <<EOF
+
+Created Staging-$UPPER:
+  backend : $BE_ID
+  frontend: $FE_ID
+
+To rely on it like -sa/-sb/-sc, wire these into scripts/deploy-common.bash:
+
+  staging_be_id()  →  $NAME) echo "$BE_ID" ;;
+  staging_fe_id()  →  $NAME) echo "$FE_ID" ;;
+
+and add the flag to parse_common_args (-s$NAME / --staging-$NAME, plus "$NAME"
+in the --staging value validation) and the "$NAME" case in resolve_staging_config.
+
+Then deploy as usual, e.g.:
+  ./scripts/deploy-pr-to-beta -s$NAME -fe -be <PR_NUMBER>
+EOF

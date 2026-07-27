@@ -33,12 +33,24 @@ export interface HttpResponse {
 }
 export interface InternetIdentityFrontendInit {
   'fetch_root_key' : [] | [boolean],
+  /**
+   * Origins of apps to feature on the dashboard home. Each origin is resolved
+   * against the bundled dapps catalogue to render name, description and logo.
+   */
+  'featured_dashboard_apps' : [] | [Array<string>],
   'backend_canister_id' : Principal,
   'analytics_config' : [] | [[] | [AnalyticsConfig]],
   'related_origins' : [] | [Array<string>],
   'backend_origin' : string,
   'dev_csp' : [] | [boolean],
   'dummy_auth' : [] | [[] | [DummyAuthConfig]],
+  /**
+   * Frontend feature flag overrides keyed by flag name, e.g.
+   * record { "EMAIL_RECOVERY"; true }. Sets the deployment-level baseline for
+   * each flag; localStorage, the flag's init callback and ?feature_flag_* URL
+   * params still take precedence. Unknown flag names are ignored.
+   */
+  'feature_flags' : [] | [Array<[string, boolean]>],
 }
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
@@ -50,6 +62,7 @@ export type StreamingStrategy = {
 export type Token = {};
 export interface _SERVICE {
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
+  'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

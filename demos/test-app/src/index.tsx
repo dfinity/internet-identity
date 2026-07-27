@@ -572,7 +572,6 @@ whoamiBtn.addEventListener("click", async () => {
 
   whoAmIResponseEl.innerText = "Loading...";
 
-  // Similar to the sample project on dfx new:
   actor
     .whoami()
     .then((principal: any) => {

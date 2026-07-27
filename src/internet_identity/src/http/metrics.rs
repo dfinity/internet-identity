@@ -70,6 +70,16 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             storage.get_total_application_count() as f64,
             "Number of total applications registered in this canister.",
         )?;
+        w.encode_gauge(
+            "internet_identity_mcp_session_count",
+            storage.mcp_grant_count() as f64,
+            "Number of MCP session grants stored (live grants plus not-yet-removed expired residue).",
+        )?;
+        w.encode_gauge(
+            "internet_identity_mcp_live_session_count",
+            storage.count_live_mcp_grants(time()) as f64,
+            "Number of live (non-expired) MCP session grants: the currently-authorized MCP sessions. Computed by scanning the grant map at scrape time (O(n) in stored grants).",
+        )?;
         if let Some(registration_rates) = storage.registration_rates.registration_rates() {
             w.gauge_vec(
                 "internet_identity_registrations_per_second",
@@ -218,6 +228,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
     })?;
 
     event_metrics(w)?;
+    encode_doh_cache_metrics(w)?;
     Ok(())
 }
 
@@ -361,6 +372,50 @@ fn persistent_state_metrics(
         }
         Ok(())
     })?;
+    Ok(())
+}
+
+/// Expose the DoH single-flight cache's state so it is observable from
+/// outside the canister (entry counts by category, in-flight fills, the
+/// configured cap, and the running count of internal-invariant violations —
+/// which should always read zero).
+fn encode_doh_cache_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
+    let stats = crate::doh::cache_stats();
+    w.encode_gauge(
+        "internet_identity_doh_cache_entries",
+        stats.entries as f64,
+        "Number of live entries in the DoH single-flight cache.",
+    )?;
+    w.encode_gauge(
+        "internet_identity_doh_cache_fresh_entries",
+        stats.fresh_entries as f64,
+        "DoH cache entries currently within their freshness window.",
+    )?;
+    w.encode_gauge(
+        "internet_identity_doh_cache_valued_entries",
+        stats.valued_entries as f64,
+        "DoH cache entries holding a servable value (excludes failure markers).",
+    )?;
+    w.encode_gauge(
+        "internet_identity_doh_cache_backing_off_entries",
+        stats.backing_off_entries as f64,
+        "DoH cache entries currently parked in failure backoff.",
+    )?;
+    w.encode_gauge(
+        "internet_identity_doh_cache_in_flight",
+        stats.in_flight as f64,
+        "In-flight DoH cache fills (single-flight markers).",
+    )?;
+    w.encode_gauge(
+        "internet_identity_doh_cache_max_entries",
+        stats.max_entries as f64,
+        "Configured hard cap on DoH cache entries.",
+    )?;
+    w.encode_gauge(
+        "internet_identity_doh_cache_inconsistencies",
+        stats.inconsistencies as f64,
+        "Observed internal-invariant violations in the DoH cache; should always be 0.",
+    )?;
     Ok(())
 }
 

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPTS_DIR/../.."
+
+current_rust_version=$(sed -n 's/^channel[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' ./rust-toolchain.toml)
+echo "current rust version '$current_rust_version'"
+
+auth_header=()
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+  auth_header=(-H "Authorization: Bearer $GITHUB_TOKEN")
+fi
+release_data=$(curl --silent "${auth_header[@]}" -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/rust-lang/rust/releases/latest)
+latest_rust_version=$(echo -n "$release_data" | jq -cMr .tag_name)
+
+if [ -z "$latest_rust_version" ] || [ "$latest_rust_version" = "null" ]; then
+  echo "expected a rust version, got '$latest_rust_version'" >&2
+  echo "data received from API:" >&2
+  echo "$release_data" >&2
+  exit 1
+fi
+
+echo "latest rust version '$latest_rust_version'"
+
+if [ "$current_rust_version" != "$latest_rust_version" ]; then
+  echo "rust toolchain needs an update"
+  sed -i -e "s/$current_rust_version/$latest_rust_version/g" ./rust-toolchain.toml
+  cat ./rust-toolchain.toml
+else
+  echo "already up to date"
+fi

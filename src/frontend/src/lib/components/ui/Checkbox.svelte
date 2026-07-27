@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { HTMLInputAttributes } from "svelte/elements";
+  import type { HTMLInputAttributes, ClassValue } from "svelte/elements";
   import { CheckIcon, MinusIcon } from "@lucide/svelte";
 
   type Size = "sm" | "md";
@@ -9,6 +9,9 @@
     indeterminate?: boolean;
     label?: string;
     hint?: string;
+    /** Overrides the label's size-derived font class (e.g. `text-sm`), so the
+     *  label can be a different size than the box without a class conflict. */
+    labelClass?: ClassValue;
   };
 
   let {
@@ -18,6 +21,7 @@
     indeterminate,
     label,
     hint,
+    labelClass,
     ...props
   }: Props = $props();
 </script>
@@ -72,7 +76,7 @@
         <p
           class={[
             "text-text-secondary font-medium select-none",
-            { sm: "text-sm", md: "text-base" }[size],
+            labelClass ?? { sm: "text-sm", md: "text-base" }[size],
           ]}
         >
           {label}

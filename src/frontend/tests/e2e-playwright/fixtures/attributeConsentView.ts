@@ -4,11 +4,11 @@ import { expect, Locator, Page, test as base } from "@playwright/test";
  *  II authorize window so specs don't hand-roll role queries every time. */
 export class AttributeConsentView {
   // `AttributeConsentView.svelte` renders a different heading depending on
-  // the flow variant: "Review Permissions" for OpenID 1-click and "Allow to
+  // the flow variant: "Review permissions" for OpenID 1-click and "Allow to
   // access this info" for the regular authorize flow. Match either so tests
   // don't need to know which variant they triggered.
   static readonly HEADING_RE =
-    /^(Review Permissions|Allow to access this info)$/;
+    /^(Review permissions|Allow to access this info)$/;
 
   readonly #page: Page;
 
@@ -66,7 +66,7 @@ export class AttributeConsentView {
   }
 
   async denyAll(): Promise<void> {
-    await this.#page.getByRole("button", { name: "Deny All" }).click();
+    await this.#page.getByRole("button", { name: "Deny all" }).click();
   }
 
   async continue(): Promise<void> {

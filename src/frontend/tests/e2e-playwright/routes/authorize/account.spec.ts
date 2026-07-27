@@ -17,7 +17,7 @@ test("Create another account and authorize with primary", async ({
   const principal = await authorize(page, async (authPage) => {
     await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
-      .getByRole("switch", { name: "Enable multiple accounts" })
+      .getByRole("switch", { name: "Show all options" })
       .setChecked(true);
     await authPage.getByRole("button", { name: "Add another account" }).click();
     await authPage.getByLabel("Account name").fill("Work account");
@@ -44,7 +44,7 @@ test("Create another account and authorize with it", async ({
   const principal = await authorize(page, async (authPage) => {
     await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
-      .getByRole("switch", { name: "Enable multiple accounts" })
+      .getByRole("switch", { name: "Show all options" })
       .setChecked(true);
     await authPage.getByRole("button", { name: "Add another account" }).click();
     await authPage.getByLabel("Account name").fill("Social account");
@@ -71,7 +71,7 @@ test("Create another account, make it default and authorize with it", async ({
   const principal = await authorize(page, async (authPage) => {
     await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
-      .getByRole("switch", { name: "Enable multiple accounts" })
+      .getByRole("switch", { name: "Show all options" })
       .setChecked(true);
     await authPage.getByRole("button", { name: "Add another account" }).click();
     await authPage.getByLabel("Account name").fill("Test account");
@@ -85,8 +85,12 @@ test("Create another account, make it default and authorize with it", async ({
   });
   const secondaryPrincipal = await authorize(page, async (authPage) => {
     await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+    // The multi-accounts toggle persists per-anchor in localStorage from
+    // the previous step, so the multi-accounts list is shown on return
+    // visits. Click the new default ("Test account") explicitly — same
+    // outcome as the plain "Continue" path under toggle-off.
     await authPage
-      .getByRole("button", { name: "Continue", exact: true })
+      .getByRole("button", { name: "Continue with Test account" })
       .click();
   });
   expect(principal).toEqual(primaryPrincipal);
@@ -108,7 +112,7 @@ test("Rename primary account and authorize with it", async ({
   const principal = await authorize(page, async (authPage) => {
     await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
-      .getByRole("switch", { name: "Enable multiple accounts" })
+      .getByRole("switch", { name: "Show all options" })
       .setChecked(true);
     await authPage
       .getByRole("button", { name: "Edit My Test Dapp account" })
@@ -137,7 +141,7 @@ test("Rename secondary account and authorize with it", async ({
   const principal = await authorize(page, async (authPage) => {
     await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
-      .getByRole("switch", { name: "Enable multiple accounts" })
+      .getByRole("switch", { name: "Show all options" })
       .setChecked(true);
     await authPage.getByRole("button", { name: "Add another account" }).click();
     await authPage.getByLabel("Account name").fill("Test account");
@@ -149,7 +153,7 @@ test("Rename secondary account and authorize with it", async ({
   const secondaryPrincipal = await authorize(page, async (authPage) => {
     await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
-      .getByRole("switch", { name: "Enable multiple accounts" })
+      .getByRole("switch", { name: "Show all options" })
       .setChecked(true);
     await authPage.getByRole("button", { name: "Edit Test account" }).click();
     await authPage.getByLabel("Account name").fill("Renamed account");
@@ -170,7 +174,7 @@ test("Can't create more than 5 accounts", async ({
   await authorize(page, async (authPage) => {
     await signInWithIdentity(authPage, identities[0].identityNumber);
     await authPage
-      .getByRole("switch", { name: "Enable multiple accounts" })
+      .getByRole("switch", { name: "Show all options" })
       .setChecked(true);
     for (let i = 1; i <= 4; i++) {
       await authPage

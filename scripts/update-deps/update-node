@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPTS_DIR/../.."
+
+current_node_version=$(cat ./.node-version)
+echo "current node version '$current_node_version'"
+
+latest_node_version=$(curl -sSL https://nodejs.org/download/release/index.json \
+  | jq -cMr --arg prefix "v${current_node_version%%.*}" \
+  '[.[] | select(.lts) | select(.version | startswith($prefix))] | sort_by(.date) | .[-1] | .version | sub("^v"; "")')
+
+if [ -z "$latest_node_version" ] || [ "$latest_node_version" = "null" ]; then
+  echo "expected a node version, got '$latest_node_version'" >&2
+  exit 1
+fi
+
+echo "latest node version '$latest_node_version'"
+
+if [ "$current_node_version" != "$latest_node_version" ]; then
+  echo "node needs an update"
+  echo "$latest_node_version" > ./.node-version
+  echo "$latest_node_version" > ./.nvmrc
+  cat ./.node-version
+else
+  echo "already up to date"
+fi

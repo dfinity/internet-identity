@@ -81,9 +81,9 @@
       </h1>
       <TextFade
         texts={[
-          $t`Real Privacy`,
-          $t`Full Ownership`,
-          $t`Seamless Access`,
+          $t`Real privacy`,
+          $t`Full ownership`,
+          $t`Seamless access`,
           "Internet Identity",
         ]}
         duration={500}
@@ -127,7 +127,7 @@
       <LandingCard
         header={$t`Password-free`}
         subheader={$t`Discoverable passkeys`}
-        description={$t`Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free.`}
+        description={$t`Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in. Quick, safe, and hassle-free.`}
       >
         <PasswordFreeIllustration
           class={[
@@ -252,8 +252,8 @@
           <Trans>
             When you create a passkey, your device makes two matching keys. One
             stays safely on your device, and the other goes to the app or
-            service. They work together to confirm it's you — without ever
-            sharing your personal info or a password.
+            service. They work together to confirm it's you (without ever
+            sharing your personal info or a password).
           </Trans>
         </p>
         <p>
@@ -278,7 +278,7 @@
         <p>
           <Trans>
             Internet Identity is as secure as the authentication methods it uses
-            — like Google, Apple, Microsoft, or Passkeys. That means it's built
+            (like Google, Apple, Microsoft, or Passkeys). That means it's built
             on state-of-the-art security. When you choose Passkeys, access is
             protected by your device's unlock method (Face ID or fingerprint),
             making it as simple as unlocking your phone.
@@ -297,7 +297,7 @@
             with apps or websites. Instead, it creates a unique pseudonym for
             you in each app. Every app gets a different one, so they can’t track
             you across services. All of this happens automatically in the
-            background — you don't need to manage anything.
+            background. You don't need to manage anything.
           </Trans>
         </p>
       </details>
@@ -311,8 +311,8 @@
           <Trans>
             Unlike many Web3 auth systems that require manual signing for every
             action, Internet Identity creates authenticated sessions per
-            application. This delivers both security and convenience—no repeated
-            signing—while still giving each session its own identity.
+            application. This delivers both security and convenience (no
+            repeated signing) while still giving each session its own identity.
           </Trans>
         </p>
       </details>
@@ -371,7 +371,7 @@
           <li>
             <Trans>
               <span class="text-text-primary font-semibold">
-                Completely Redesigned Interface:
+                Completely redesigned interface:
               </span>
               We've given Internet Identity a fresh, modern look and feel. The new
               design is intuitive and easier to navigate, ensuring a smoother user
@@ -381,7 +381,7 @@
           <li>
             <Trans>
               <span class="text-text-primary font-semibold">
-                No More Identity Numbers:
+                No more identity numbers:
               </span>
               As explained above, discoverable passkeys mean you no longer need to
               remember or store an identity number. Logging in is now simpler and
@@ -391,7 +391,7 @@
           <li>
             <Trans>
               <span class="text-text-primary font-semibold">
-                Seamless Passkey Integration:
+                Seamless passkey integration:
               </span>
               We continue to embrace passkeys as the future of secure authentication.
               Internet Identity 2.0 leverages the latest passkey standards for enhanced
@@ -401,7 +401,7 @@
           <li>
             <Trans>
               <span class="text-text-primary font-semibold">
-                Google, Apple and Microsoft Integrations:
+                Google, Apple and Microsoft integrations:
               </span>
               While passkeys are becoming more mature, they are not yet mainstream
               for everyone. We've observed a 50% drop-off rate in our registration

@@ -196,7 +196,7 @@ msgid "COCA_COLA"
 msgstr "可口可乐"
 ```
 
-> Means "tasty and happy" — brilliant localization that sounds like "Coca-Cola".
+> Means "tasty and happy": brilliant localization that sounds like "Coca-Cola".
 
 > ⚠️ **NOTE**  
 > It's recommended to not use explicit IDs where possible, see more on this topic

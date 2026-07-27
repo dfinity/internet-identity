@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-    🔗 <a href="https://id.ai">https://id.ai</a> • 📜 <a href="https://internetcomputer.org/docs/current/references/ii-spec">Specification</a> <br/> ― <br/>📚 <a href="https://forum.dfinity.org/c/internet-identity/32">Forum</a> • 🚑 <a href="https://github.com/dfinity/internet-identity/issues/new">Report an Issue</a> • 📞 <a href="https://discord.internetcomputer.org">Discord</a>
+    <a href="https://id.ai">https://id.ai</a> • <a href="https://internetcomputer.org/docs/current/references/ii-spec">Specification</a><br/><br/><a href="https://forum.dfinity.org/c/internet-identity/32">Forum</a> • <a href="https://github.com/dfinity/internet-identity/issues/new">Report an Issue</a> • <a href="https://discord.internetcomputer.org">Discord</a>
 </p>
 
 ---
@@ -75,7 +75,7 @@ Internet Identity is an authentication service for the [Internet Computer][ic]. 
 
 Internet Identity consists of two canisters: a **backend canister** that manages user data and authentication logic, and a stateless **frontend canister** that serves the web application assets.
 
-> 💡 The backend interface is specified by the [internet_identity.did](./src/internet_identity/internet_identity.did) [candid] interface. The backend canister code is located in [`src/internet_identity`](./src/internet_identity), and the frontend application code is located in [`src/frontend`](./src/frontend).
+> Note: The backend interface is specified by the [internet_identity.did](./src/internet_identity/internet_identity.did) [candid] interface. The backend canister code is located in [`src/internet_identity`](./src/internet_identity), and the frontend application code is located in [`src/frontend`](./src/frontend).
 
 The Internet Identity authentication service works indirectly by issuing "delegations" on the user's behalf; basically attestations signed with some private cryptographic material owned by the user. The private cryptographic material never leaves the user's device. The Internet Identity frontend application uses the [WebAuthn] API to first create the private cryptographic material, and then the [WebAuthn] API is used again to sign delegations.
 
@@ -95,7 +95,7 @@ The [`Dockerfile`](./Dockerfile) specifies build instructions for Internet Ident
 
 We recommend using the [`docker-build`](./scripts/docker-build) script. It extracts the Wasm module from the final scratch container.
 
-> 💡 You can find instructions for building the code without Docker in the [HACKING] document.
+> Note: You can find instructions for building the code without Docker in the [HACKING] document.
 
 ### Integration with Internet Identity
 
@@ -125,11 +125,11 @@ The easiest way to address this is to reinstall the canister (thus wiping stable
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on how to get started. For development setup and build instructions, refer to [HACKING.md](./HACKING.md).
+We welcome contributions. Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on how to get started. For development setup and build instructions, refer to [HACKING.md](./HACKING.md).
 
 ## Getting Help
 
-We're here to help! Here are some ways you can reach out for help if you get stuck:
+We're here to help. Here are some ways you can reach out for help if you get stuck:
 
 - [Internet Identity Bug Tracker](https://github.com/dfinity/internet-identity/issues): Create a new ticket if you encounter a bug using Internet Identity, or if an issue arises when you try to build the code.
 - [DFINITY Forum](https://forum.dfinity.org/c/internet-identity/32): The forum is a great place to look for information and to ask for help.

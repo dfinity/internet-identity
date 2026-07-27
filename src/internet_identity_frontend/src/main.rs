@@ -6,7 +6,10 @@ use flate2::read::GzDecoder;
 use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetRouter};
 use ic_cdk::{init, post_upgrade};
 use ic_cdk_macros::query;
-use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
+use ic_cdk_macros::update;
+use ic_http_certification::{
+    HeaderField, HttpCertificationTree, HttpRequest, HttpResponse, Method, StatusCode,
+};
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::InternetIdentityFrontendArgs;
 use serde_json::json;
@@ -14,9 +17,22 @@ use sha2::Digest;
 use std::io::Read;
 use std::{cell::RefCell, rc::Rc};
 
+mod callback;
+
+/// Subset of the init args needed to build response headers at request time.
+/// Asset headers are built once during certification with the args in hand;
+/// dynamically rendered responses (the POST /callback translator) construct
+/// their headers per request, so these args are retained here.
+#[derive(Default)]
+struct HeaderConfig {
+    related_origins: Option<Vec<String>>,
+    dev_csp: bool,
+}
+
 thread_local! {
     static HTTP_TREE: Rc<RefCell<HttpCertificationTree>> = Default::default();
     static ASSET_ROUTER: RefCell<AssetRouter<'static>> = RefCell::new(AssetRouter::with_tree(HTTP_TREE.with(|tree| tree.clone())));
+    static HEADER_CONFIG: RefCell<HeaderConfig> = RefCell::new(HeaderConfig::default());
 }
 
 static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
@@ -37,6 +53,13 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
     let static_assets = get_static_assets(&args);
     let related_origins = args.related_origins.as_ref();
     let dev_csp = args.dev_csp.unwrap_or(false);
+
+    HEADER_CONFIG.with_borrow_mut(|config| {
+        *config = HeaderConfig {
+            related_origins: args.related_origins.clone(),
+            dev_csp,
+        };
+    });
 
     // Extract integrity hashes for inline scripts from HTML files
     let integrity_hashes = static_assets
@@ -84,6 +107,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                             integrity_hashes.clone(),
                             related_origins,
                             dev_csp,
+                            None,
                             vec![(
                                 "cache-control".to_string(),
                                 NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
@@ -121,6 +145,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                             integrity_hashes.clone(),
                             related_origins,
                             dev_csp,
+                            None,
                             vec![headers],
                         ),
                         fallback_for: vec![],
@@ -142,10 +167,31 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
     });
 }
 
+/// Headers for dynamically rendered responses, built from the retained
+/// [`HeaderConfig`] so they match the headers certified onto static assets.
+/// Pass `content_security_policy_override` to replace the SPA-wide policy for
+/// a response that needs its own (no inline-script integrity hashes are used
+/// here); pass `None` to inherit the SPA-wide policy.
+pub(crate) fn dynamic_response_headers(
+    content_security_policy_override: Option<String>,
+    additional_headers: Vec<HeaderField>,
+) -> Vec<HeaderField> {
+    HEADER_CONFIG.with_borrow(|config| {
+        get_asset_headers(
+            vec![],
+            config.related_origins.as_ref(),
+            config.dev_csp,
+            content_security_policy_override,
+            additional_headers,
+        )
+    })
+}
+
 fn get_asset_headers(
     integrity_hashes: Vec<String>,
     related_origins: Option<&Vec<String>>,
     dev_csp: bool,
+    content_security_policy_override: Option<String>,
     additional_headers: Vec<HeaderField>,
 ) -> Vec<HeaderField> {
     let credentials_allowlist = if let Some(related_origins) = related_origins {
@@ -175,10 +221,15 @@ fn get_asset_headers(
         // Reduces risk of drive-by downloads and serves as defense against MIME confusion attacks
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
         // Content-Security-Policy (CSP)
-        // Comprehensive policy to prevent XSS attacks and data injection
+        // Comprehensive policy to prevent XSS attacks and data injection. A
+        // caller may override it for a response that needs its own policy
+        // (e.g. the callback landing page pins a single inline-script hash);
+        // otherwise the SPA-wide policy is computed from the integrity hashes.
         (
             "Content-Security-Policy".to_string(),
-            get_content_security_policy(integrity_hashes, related_origins, dev_csp),
+            content_security_policy_override.unwrap_or_else(|| {
+                get_content_security_policy(integrity_hashes, related_origins, dev_csp)
+            }),
         ),
         // Strict-Transport-Security (HSTS)
         // Forces browsers to use HTTPS for all future requests to this domain
@@ -260,8 +311,19 @@ fn get_asset_headers(
 /// base-uri 'none':
 ///   Prevents injection of <base> tags that could redirect relative URLs
 ///
-/// form-action 'none':
-///   Prevents forms from being submitted anywhere (II doesn't use forms)
+/// form-action 'self' http://127.0.0.1:*:
+///   The CLI authorize flow (`/cli`) delivers the delegation to the CLI's
+///   loopback callback via a top-level form POST (a top-level navigation
+///   avoids Chrome's Local Network Access permission prompt that a `fetch`
+///   would trigger). Submissions are restricted to same origin and the http
+///   127.0.0.1 loopback the `/cli` callback parser accepts. CSP's host-source
+///   grammar can't express IPv6 literals — `http://[::1]:*` is rejected as an
+///   invalid source and silently ignored by the browser — so IPv6 loopback
+///   isn't allowlistable here; the `/cli` parser only accepts 127.0.0.1 to
+///   match. `localhost` is also excluded (it can resolve off-loopback) — so a
+///   form can never post to a remote origin. The policy is never broadened to
+///   `https:` for any route: the `/mcp` connect flow talks to the MCP server
+///   via `fetch` (covered by `connect-src`), not form posts.
 ///
 /// style-src 'self' 'unsafe-inline':
 ///   Allow stylesheets from same origin and inline styles
@@ -321,13 +383,17 @@ fn get_content_security_policy(
         "'self'".to_string()
     };
 
+    // `form-action` is same-origin + http loopback (the latter for the /cli
+    // flow) on every asset; no route needs cross-origin form posts.
+    let form_action = "'self' http://127.0.0.1:*";
+
     let csp = format!(
         "default-src 'none';\
          connect-src {connect_src};\
          img-src 'self' data: https://*.googleusercontent.com;\
          script-src {script_src};\
          base-uri 'none';\
-         form-action 'none';\
+         form-action {form_action};\
          style-src 'self' 'unsafe-inline';\
          style-src-elem 'self' 'unsafe-inline';\
          font-src 'self';\
@@ -385,6 +451,24 @@ fn get_static_assets(config: &InternetIdentityFrontendArgs) -> Vec<AssetUtilAsse
             .into_bytes(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::OCTETSTREAM,
+    });
+
+    // Advertises the II backend canister principal so external SMTP
+    // infrastructure can discover it from a well-known path on the II domain.
+    assets.push(AssetUtilAsset {
+        url_path: "/.well-known/ic-smtp-canister-id".to_string(),
+        content: config.backend_canister_id.to_text().into_bytes(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::TXT,
+    });
+
+    // Advertise where the CLI authorize flow lives so the ICP CLI can
+    // discover it from a well-known path on the II domain.
+    assets.push(AssetUtilAsset {
+        url_path: "/.well-known/cli-auth-config".to_string(),
+        content: json!({ "path": "/cli" }).to_string().into_bytes(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::JSON,
     });
 
     // Add .well-known/webauthn for passkey sharing if related_origins is configured
@@ -446,6 +530,18 @@ fn extract_inline_scripts(content: String) -> Vec<String> {
 
 #[query]
 fn http_request(request: HttpRequest) -> HttpResponse {
+    if request.method() == Method::POST {
+        if callback::is_callback_post(&request) {
+            // Query responses can't certify dynamically rendered content;
+            // upgrade the IdP's form_post callback to update mode so the
+            // response is certified via consensus.
+            return HttpResponse::builder()
+                .with_status_code(StatusCode::OK)
+                .with_upgrade(true)
+                .build();
+        }
+        return method_not_allowed();
+    }
     ASSET_ROUTER.with_borrow(|asset_router| {
         if let Ok(response) = asset_router.serve_asset(
             &ic_cdk::api::data_certificate().expect("No data certificate available"),
@@ -456,6 +552,23 @@ fn http_request(request: HttpRequest) -> HttpResponse {
             ic_cdk::trap("Failed to serve asset");
         }
     })
+}
+
+#[update]
+fn http_request_update(request: HttpRequest) -> HttpResponse {
+    if callback::is_callback_post(&request) {
+        return callback::handle_form_post_callback(request.body());
+    }
+    method_not_allowed()
+}
+
+fn method_not_allowed() -> HttpResponse<'static> {
+    HttpResponse::builder()
+        .with_status_code(StatusCode::METHOD_NOT_ALLOWED)
+        // Only reached for non-/callback resources, which serve GET assets
+        // (POST is handled on /callback alone, via the query→update upgrade).
+        .with_headers(vec![("Allow".to_string(), "GET".to_string())])
+        .build()
 }
 
 // Order dependent: do not move above any exposed canister method!
@@ -498,20 +611,36 @@ mod tests {
             "dev CSP should not include upgrade-insecure-requests, got: {dev_csp}"
         );
 
-        // Prod CSP: disallow http: in connect-src and include upgrade-insecure-requests
+        // Prod CSP: disallow http: in connect-src and include
+        // upgrade-insecure-requests. The trailing `;` pins the WHOLE
+        // directive: the fetch-based /mcp connect flow relies on connect-src
+        // being exactly self + https, and a bare substring check would let any
+        // extra scheme-source (ws:, http:, ...) slip in unnoticed.
         let prod_csp = get_content_security_policy(Vec::new(), None, false);
 
         assert!(
-            prod_csp.contains("connect-src 'self' https:"),
-            "prod CSP should allow https: in connect-src, got: {prod_csp}"
-        );
-        assert!(
-            !prod_csp.contains("connect-src 'self' https: http:"),
-            "prod CSP should not allow http: in connect-src, got: {prod_csp}"
+            prod_csp.contains("connect-src 'self' https:;"),
+            "prod CSP connect-src should be exactly 'self' https:, got: {prod_csp}"
         );
         assert!(
             prod_csp.contains("upgrade-insecure-requests;"),
             "prod CSP should include upgrade-insecure-requests, got: {prod_csp}"
         );
+    }
+
+    #[test]
+    fn csp_form_action_stays_tight_on_every_asset() {
+        // form-action is same-origin + http loopback everywhere — in prod AND
+        // dev CSP: the /mcp connect flow talks to the MCP server via fetch
+        // (connect-src), so no route needs — or gets — cross-origin form
+        // posts. The trailing `;` pins the whole directive, so a broadening
+        // (e.g. re-adding https: for a form POST) fails in either mode.
+        for dev_csp in [false, true] {
+            let csp = get_content_security_policy(Vec::new(), None, dev_csp);
+            assert!(
+                csp.contains("form-action 'self' http://127.0.0.1:*;"),
+                "form-action should be self + loopback only (dev_csp={dev_csp}), got: {csp}"
+            );
+        }
     }
 }

@@ -67,11 +67,6 @@ pub const QUORUM_THRESHOLD: usize = 3;
 /// flow's expected duration.
 pub const DEFAULT_CACHE_AGE_SECS: u64 = 3600;
 
-/// Hard cap on `DohConfig.max_cache_age_secs`. Stale keys can break
-/// recovery for users mid-flow when a provider rotates; the cap keeps
-/// "stuck cache" from being the failure mode.
-pub const MAX_CACHE_AGE_SECS: u64 = 24 * 3600;
-
 /// All the ways the DoH path can fail. The verifier collapses these
 /// into a single fail-reason variant up the call stack; the granular
 /// shape is for diagnostics and tests.
@@ -86,6 +81,15 @@ pub enum DohError {
     /// Outcalls succeeded but the responses didn't reach the quorum
     /// threshold of identical TXT bytes.
     QuorumFailed { agreeing: usize, total: usize },
+    /// Quorum of providers authoritatively reported no record at this
+    /// name (DNS `RCODE=NXDOMAIN` or an empty answer section). Distinct
+    /// from `QuorumFailed` / `AllProvidersFailed` so the caller can
+    /// distinguish "this record doesn't exist" — a valid DNS state — from
+    /// "we couldn't reach a verdict on what this record is". DMARC, for
+    /// example, treats a missing `_dmarc` TXT as "no policy published"
+    /// and falls back to strict alignment (design §6.3); a transient
+    /// outage should NOT take the same fallback — it should fail.
+    NoAnswer,
     /// A single response was received but failed to parse as a DNS
     /// message with a valid TXT record. (Reported during quorum
     /// counting; not a top-level failure unless every response is
@@ -150,11 +154,6 @@ mod tests {
         // 3-of-5 is a strict majority. If we accidentally relax to
         // 2-of-5, two split-bucket factions could each claim "quorum".
         assert!(QUORUM_THRESHOLD * 2 > PROVIDERS.len());
-    }
-
-    #[test]
-    fn cache_age_cap_is_one_day() {
-        assert_eq!(MAX_CACHE_AGE_SECS, 86_400);
     }
 
     #[test]

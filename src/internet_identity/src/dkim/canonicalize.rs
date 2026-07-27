@@ -54,7 +54,20 @@ fn relaxed_header_value(value: &str) -> String {
     // before the first non-WSP byte (handles step 5's "WSP after colon"
     // case since the colon is consumed by the caller); strip trailing
     // WSP at the end.
-    let bytes = value.as_bytes();
+    // FIXME(gateway): defensively strip any trailing CR/LF the SMTP
+    // gateway leaks into header values. Per RFC 5322 §2.2 the CRLF that
+    // terminates a header line is structural framing, not field-body —
+    // the gateway should be stripping it during parsing and the value
+    // we receive should never end with `\r` or `\n`. Today's beta
+    // gateway leaves it attached (e.g. `Subject` arrives as
+    // " II-Recovery-…\r\n"), which makes our DKIM hash input end with
+    // `…\r\n\r\n` instead of `…\r\n` and breaks every signature with
+    // SignatureInvalid. Once the gateway parser is corrected this
+    // workaround can be removed and `is_wsp` left at its RFC-strict
+    // SP/HTAB definition. See https://github.com/dfinity/internet-identity/pull/3934
+    // for the debug-log query that surfaced the problem.
+    let trimmed = value.trim_end_matches(['\r', '\n']);
+    let bytes = trimmed.as_bytes();
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
     let mut i = 0;
     let mut last_was_sp = true; // true so leading WSP is dropped (step 5)
@@ -79,7 +92,8 @@ fn relaxed_header_value(value: &str) -> String {
         i += 1;
     }
     // Step 4: strip trailing WSP. Above loop already collapses runs to
-    // a single SP, so at most one trailing SP can exist now.
+    // a single SP, so at most one trailing SP can exist now. (Trailing
+    // CR/LF was already removed at the top of the function.)
     if out.last() == Some(&b' ') {
         out.pop();
     }
@@ -127,13 +141,17 @@ pub fn relaxed_body(body: &[u8]) -> Vec<u8> {
     }
 
     if lines.is_empty() {
-        // RFC 6376 §3.4.3 (cited by §3.4.4): "a completely empty or
-        // missing body is canonicalized as a single 'CRLF'; that is,
-        // the canonicalized length will be 2 octets". Same rule for
-        // both simple and relaxed body canonicalization. Returning
-        // Vec::new() here would make `bh=` checks fail for valid
-        // signatures over empty-body messages.
-        return b"\r\n".to_vec();
+        // RFC 6376 §3.4.4: relaxed canonicalisation of a completely
+        // empty or missing body is the zero-length ("null") input — its
+        // body hash is SHA-256("") = 47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=.
+        // This DIFFERS from §3.4.3 simple, which canonicalises an empty
+        // body to a single CRLF (SHA-256("\r\n") =
+        // frcCV1k9oG9oKj3dpUqdJg1PxRT2RSN/XKdLCPjaYaY=). Returning
+        // b"\r\n" here would compute the *simple* hash and make `bh=`
+        // fail for every relaxed-signed empty-body message — the common
+        // case for minimal MTAs and mail clients that send a literally
+        // empty body (e.g. Apple Mail). `simple_body` keeps the CRLF.
+        return Vec::new();
     }
 
     // Join with CRLF terminators; the algorithm guarantees a single
@@ -223,6 +241,49 @@ mod tests {
         assert_eq!(s(&h), "x-note:first second\r\n");
     }
 
+    // The beta SMTP gateway currently leaves the structural line
+    // terminator attached to each header value (e.g. delivers the
+    // Subject as " II-Recovery-…\r\n" instead of " II-Recovery-…").
+    // Per RFC 5322 §2.2 the CRLF is framing, not field-body, and a
+    // strictly RFC-correct canonicalizer wouldn't see it. Until the
+    // gateway parser is fixed we tolerate the trailing terminator so
+    // DKIM verification doesn't fail with a misleading SignatureInvalid
+    // on every well-formed inbound message.
+    #[test]
+    fn relaxed_header_strips_trailing_line_terminator() {
+        let h = relaxed_header("Subject", " II-Recovery-deadbeef\r\n");
+        assert_eq!(s(&h), "subject:II-Recovery-deadbeef\r\n");
+    }
+
+    #[test]
+    fn relaxed_header_strips_trailing_terminator_with_wsp() {
+        let h = relaxed_header("Subject", " hello \t\r\n");
+        assert_eq!(s(&h), "subject:hello\r\n");
+    }
+
+    #[test]
+    fn relaxed_header_strips_bare_trailing_lf() {
+        let h = relaxed_header("Subject", " hello\n");
+        assert_eq!(s(&h), "subject:hello\r\n");
+    }
+
+    #[test]
+    fn relaxed_header_folded_value_with_trailing_terminator() {
+        // The DKIM-Signature value from a Gmail-signed message: folded
+        // multi-line, with the structural CRLF still attached at the
+        // end. The unfold step must still handle the internal CRLF+WSP
+        // boundaries, and the trailing CRLF must not leak into the
+        // canonical form.
+        let h = relaxed_header(
+            "DKIM-Signature",
+            " v=1; a=rsa-sha256;\r\n        d=gmail.com; s=20251104;\r\n        b=AAAA\r\n",
+        );
+        assert_eq!(
+            s(&h),
+            "dkim-signature:v=1; a=rsa-sha256; d=gmail.com; s=20251104; b=AAAA\r\n",
+        );
+    }
+
     #[test]
     fn relaxed_header_empty_value() {
         let h = relaxed_header("X-Empty", "");
@@ -238,12 +299,14 @@ mod tests {
     // --- Body tests ---
 
     #[test]
-    fn relaxed_body_empty_canonicalizes_to_crlf() {
-        // RFC 6376 §3.4.3: a completely empty body is canonicalized
-        // as a single CRLF (2 octets). This rule applies to both
-        // simple and relaxed canonicalization; without it, valid
-        // DKIM signatures over empty bodies would fail bh= checks.
-        assert_eq!(relaxed_body(b""), b"\r\n");
+    fn relaxed_body_empty_canonicalizes_to_null_input() {
+        // RFC 6376 §3.4.4: a completely empty or missing body is
+        // canonicalized to the zero-length ("null") input under the
+        // *relaxed* algorithm — NOT a single CRLF. (The CRLF rule is
+        // §3.4.3 simple, handled by `simple_body`.) Returning b"\r\n"
+        // here computes the simple body hash and breaks bh= for every
+        // relaxed-signed empty-body message.
+        assert_eq!(relaxed_body(b""), b"");
     }
 
     #[test]
@@ -294,13 +357,33 @@ mod tests {
     }
 
     #[test]
-    fn relaxed_body_only_whitespace_canonicalizes_to_crlf() {
+    fn relaxed_body_only_whitespace_canonicalizes_to_null_input() {
         // The whole body is one WSP-only line. After per-line WSP
         // stripping it's the empty line, which then gets dropped by
         // the trailing-empty-lines clause. Result: the body is
-        // effectively empty, which RFC 6376 §3.4.3 canonicalises to
-        // a single CRLF.
+        // effectively empty, which RFC 6376 §3.4.4 (relaxed)
+        // canonicalises to the zero-length input.
         let body = b"   \r\n";
-        assert_eq!(relaxed_body(body), b"\r\n");
+        assert_eq!(relaxed_body(body), b"");
+    }
+
+    #[test]
+    fn relaxed_body_empty_matches_rfc_6376_bh_constant() {
+        // End-to-end anchor: the SHA-256 of the relaxed-canonicalised
+        // empty body, base64-encoded, must equal the constant RFC 6376
+        // §3.4.4 publishes for an empty body. A regression here means a
+        // relaxed-signed empty-body message would fail the bh= check —
+        // exactly the Apple Mail / minimal-MTA report this test guards.
+        use base64::engine::general_purpose::STANDARD as BASE64;
+        use base64::Engine;
+        use sha2::{Digest, Sha256};
+
+        let canonical = relaxed_body(b"");
+        let bh = BASE64.encode(Sha256::digest(&canonical));
+        assert_eq!(bh, "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=");
+
+        // And it must NOT collide with the §3.4.3 simple constant, which
+        // is what the old (buggy) b"\r\n" canonical form produced.
+        assert_ne!(bh, "frcCV1k9oG9oKj3dpUqdJg1PxRT2RSN/XKdLCPjaYaY=");
     }
 }

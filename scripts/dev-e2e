@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Interactive e2e dev loop. Wraps scripts/dev-e2e-setup, then:
+#   - watches src/internet_identity{,_frontend} and src/frontend, rebuilds and
+#     upgrades the affected canister on change;
+#   - opens `npx playwright test --ui` for clicking through tests.
+# On Ctrl+C, tears the whole stack down via scripts/dev-e2e-setup --teardown.
+#
+# If you only need the environment up (no watcher, no UI) — e.g. you're an AI
+# agent driving Playwright yourself — run scripts/dev-e2e-setup directly.
+
+set -euo pipefail
+
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+WATCHER_PID=""
+
+cleanup() {
+  local rc=$?
+  echo
+  if [[ -n "$WATCHER_PID" ]]; then
+    kill -TERM "$WATCHER_PID" 2>/dev/null || true
+    # Watcher's children are short-lived (cargo, icp); give them a moment to
+    # exit cleanly before tearing down the stack underneath them.
+    wait "$WATCHER_PID" 2>/dev/null || true
+  fi
+  "$SCRIPTS_DIR/dev-e2e-setup" --teardown || true
+  exit "$rc"
+}
+trap cleanup EXIT INT TERM
+
+"$SCRIPTS_DIR/dev-e2e-setup"
+
+# Pull the canister id and rendered args out of state so the watcher upgrades
+# with exactly the same arguments the setup installed with.
+# shellcheck source=/dev/null
+source ".icp/cache/dev-e2e/state"
+
+printf '\033[1;36m>>\033[0m %s\n' "Starting watcher (BE + FE canister + frontend assets)"
+DEV_E2E_II_ARGS_FILE="$PWD/.icp/cache/dev-e2e/ii-init-args.did" \
+DEV_E2E_FE_ARGS_FILE="$PWD/.icp/cache/dev-e2e/fe-init-args.did" \
+DEV_E2E_LOG_FILE="$PWD/.icp/cache/dev-e2e/logs/watcher.log" \
+  node "$SCRIPTS_DIR/dev-e2e-watch.mjs" &
+WATCHER_PID=$!
+
+printf '\033[1;36m>>\033[0m %s\n' "Opening Playwright UI"
+echo
+npx playwright test --ui --project=desktop

@@ -1,10 +1,10 @@
 import { type Readable, derived, writable } from "svelte/store";
-import { DelegationIdentity } from "@icp-sdk/core/identity";
 import {
   Actor,
   ActorSubclass,
   HttpAgent,
   HttpAgentOptions,
+  type Identity,
 } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
@@ -15,7 +15,8 @@ export interface Authenticated {
   identityNumber: bigint;
   nonce: string;
   salt: Uint8Array;
-  identity: DelegationIdentity;
+  // An SSO gate session is an `AttributesIdentity` wrapping the delegation; otherwise a `DelegationIdentity`.
+  identity: Identity;
   agent: HttpAgent;
   actor: ActorSubclass<_SERVICE>;
   authMethod:
@@ -25,14 +26,20 @@ export interface Authenticated {
     | { emailRecovery: { principal: Principal } };
 }
 
+// `agent`/`actor` are created once in `init()` and shared by the store;
+// `salt`/`nonce` are derived inside `set()` from `identity.getPrincipal()`.
+// Callers never supply any of the four, so flows yield this shape.
+export type AuthenticationResult = Omit<
+  Authenticated,
+  "agent" | "actor" | "salt" | "nonce"
+>;
+
 type AuthenticationStore = Readable<Authenticated | undefined> & {
   init: (params: {
     canisterId: Principal;
     agentOptions: HttpAgentOptions;
   }) => void;
-  set: (
-    value: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
-  ) => Promise<void>;
+  set: (value: AuthenticationResult) => Promise<void>;
   reset: () => void;
 };
 
@@ -46,7 +53,7 @@ export const authenticationStore: AuthenticationStore = {
     const agent = HttpAgent.createSync(agentOptions);
     // Fetch subnet keys to speed up queries during authentication,
     // this avoids having to fetch them later on user interaction.
-    void agent.fetchSubnetKeys(canisterId);
+    void agent.fetchSubnetKeys({ canisterId });
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
       canisterId,

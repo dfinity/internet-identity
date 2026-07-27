@@ -57,6 +57,18 @@
       ((wrapperRef?.firstElementChild ?? undefined) as HTMLElement | undefined),
   );
 
+  // CSS length parser — supports the units we actually pass in (px, rem, em).
+  // Falls back to 0 for anything we can't resolve.
+  const toPx = (value: string): number => {
+    const n = parseFloat(value);
+    if (Number.isNaN(n)) return 0;
+    if (value.endsWith("rem") || value.endsWith("em")) {
+      const rootSize = getComputedStyle(document.documentElement).fontSize;
+      return n * (rootSize !== "" ? parseFloat(rootSize) : 16);
+    }
+    return n;
+  };
+
   $effect(() => {
     if (!isTooltipVisible) {
       return;
@@ -72,39 +84,107 @@
         const inlineAlign = getInlineAlign(align);
         const anchorRect = anchorRef.getBoundingClientRect();
         const tooltipRect = tooltipRef.getBoundingClientRect();
+        const distancePx = toPx(distance);
+        const offsetPx = toPx(offset);
 
         tooltipRef.style.inset = "auto";
         tooltipRef.style.right = "auto";
         tooltipRef.style.bottom = "auto";
 
-        tooltipRef.style.top = {
-          up: `calc(${anchorRect.top - tooltipRect.height}px - ${distance})`,
-          right: {
-            start: `calc(${anchorRect.top}px - ${offset})`,
-            center: `${anchorRect.top + anchorRect.height * 0.5 - tooltipRect.height * 0.5}px`,
-            end: `calc(${anchorRect.bottom - tooltipRect.height}px + ${offset})`,
-          }[align],
-          down: `calc(${anchorRect.bottom}px + ${distance})`,
-          left: {
-            start: `calc(${anchorRect.top}px - ${offset})`,
-            center: `${anchorRect.top + anchorRect.height * 0.5 - tooltipRect.height * 0.5}px`,
-            end: `calc(${anchorRect.bottom - tooltipRect.height}px + ${offset})`,
-          }[align],
-        }[direction];
-        tooltipRef.style.left = {
-          up: {
-            start: `calc(${anchorRect.left}px - ${offset})`,
-            center: `${anchorRect.left + anchorRect.width * 0.5 - tooltipRect.width * 0.5}px`,
-            end: `calc(${anchorRect.right - tooltipRect.width}px + ${offset})`,
-          }[inlineAlign],
-          right: `calc(${anchorRect.right}px + ${distance})`,
-          down: {
-            start: `calc(${anchorRect.left}px - ${offset})`,
-            center: `${anchorRect.left + anchorRect.width * 0.5 - tooltipRect.width * 0.5}px`,
-            end: `calc(${anchorRect.right - tooltipRect.width}px + ${offset})`,
-          }[inlineAlign],
-          left: `calc(${anchorRect.left - tooltipRect.width}px - ${distance})`,
-        }[direction];
+        // Compute (top, left) for a given side direction.
+        const computeTop = (dir: Direction): number => {
+          switch (dir) {
+            case "up":
+              return anchorRect.top - tooltipRect.height - distancePx;
+            case "down":
+              return anchorRect.bottom + distancePx;
+            case "right":
+            case "left":
+              return align === "start"
+                ? anchorRect.top - offsetPx
+                : align === "end"
+                  ? anchorRect.bottom - tooltipRect.height + offsetPx
+                  : anchorRect.top +
+                    anchorRect.height * 0.5 -
+                    tooltipRect.height * 0.5;
+          }
+        };
+        const computeLeft = (dir: Direction): number => {
+          switch (dir) {
+            case "right":
+              return anchorRect.right + distancePx;
+            case "left":
+              return anchorRect.left - tooltipRect.width - distancePx;
+            case "up":
+            case "down":
+              return inlineAlign === "start"
+                ? anchorRect.left - offsetPx
+                : inlineAlign === "end"
+                  ? anchorRect.right - tooltipRect.width + offsetPx
+                  : anchorRect.left +
+                    anchorRect.width * 0.5 -
+                    tooltipRect.width * 0.5;
+          }
+        };
+
+        // Score how far a candidate position lies outside the viewport
+        // (lower is better; 0 means fully visible).
+        const margin = 4;
+        const overflow = (top: number, left: number): number =>
+          Math.max(0, margin - left) +
+          Math.max(0, left + tooltipRect.width - (window.innerWidth - margin)) +
+          Math.max(0, margin - top) +
+          Math.max(0, top + tooltipRect.height - (window.innerHeight - margin));
+
+        // Try the requested direction first, then flip to the opposite side,
+        // then fall back to the perpendicular axis.
+        const opposite: Record<Direction, Direction> = {
+          up: "down",
+          down: "up",
+          left: "right",
+          right: "left",
+        };
+        const perpendicular: Record<Direction, Direction[]> = {
+          up: ["right", "left"],
+          down: ["right", "left"],
+          left: ["down", "up"],
+          right: ["down", "up"],
+        };
+        const order: Direction[] = [
+          direction,
+          opposite[direction],
+          ...perpendicular[direction],
+        ];
+
+        let bestTop = computeTop(direction);
+        let bestLeft = computeLeft(direction);
+        let bestScore = overflow(bestTop, bestLeft);
+        for (let i = 1; i < order.length && bestScore > 0; i++) {
+          const candTop = computeTop(order[i]);
+          const candLeft = computeLeft(order[i]);
+          const candScore = overflow(candTop, candLeft);
+          if (candScore < bestScore) {
+            bestTop = candTop;
+            bestLeft = candLeft;
+            bestScore = candScore;
+          }
+        }
+
+        // If even the best candidate clips, clamp into the viewport so the
+        // tooltip is fully visible even when no anchored placement fits.
+        if (bestScore > 0) {
+          bestLeft = Math.max(
+            margin,
+            Math.min(bestLeft, window.innerWidth - tooltipRect.width - margin),
+          );
+          bestTop = Math.max(
+            margin,
+            Math.min(bestTop, window.innerHeight - tooltipRect.height - margin),
+          );
+        }
+
+        tooltipRef.style.top = `${bestTop}px`;
+        tooltipRef.style.left = `${bestLeft}px`;
       }
       if (tracking) {
         requestAnimationFrame(track);

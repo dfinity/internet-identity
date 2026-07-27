@@ -1,10 +1,21 @@
+<script lang="ts" module>
+  import { getContext } from "svelte";
+
+  export const isInsideDialog = (): boolean => getContext("inDialog") === true;
+</script>
+
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, setContext } from "svelte";
   import { scale, fly } from "svelte/transition";
   import type { ClassValue, HTMLAttributes } from "svelte/elements";
   import { XIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { onNavigate } from "$app/navigation";
+
+  const nested = getContext("inDialog") === true;
+  setContext("inDialog", true);
+
+  type DialogWidth = "normal" | "wider" | "extra";
 
   type Props = HTMLAttributes<HTMLDialogElement> & {
     onClose?: () => void;
@@ -12,6 +23,14 @@
     showCloseButton?: boolean;
     backdrop?: boolean;
     contentClass?: ClassValue | null;
+    /** Desktop (sm+) width preset. Applied to both the positioning `<dialog>`
+     *  and the inner card so they stay in sync. */
+    width?: DialogWidth;
+    /** Render children inline instead of inside a `<dialog>` — used by
+     *  consumers that need to opt out of dialog chrome when nested inside
+     *  another `<Dialog>`. Default false: nested dialogs still stack
+     *  natively, which is what most callers want. */
+    passthrough?: boolean;
   };
 
   const {
@@ -22,8 +41,15 @@
     showCloseButton = onClose !== undefined,
     backdrop = true,
     contentClass,
+    width = "normal",
+    passthrough = false,
     ...props
   }: Props = $props();
+
+  // Desktop width presets. Mobile is always full-width (bottom sheet).
+  const widthClass = $derived(
+    { normal: "sm:w-100", wider: "sm:w-110", extra: "sm:w-135" }[width],
+  );
 
   let dialogRef = $state<HTMLDialogElement | null>();
 
@@ -50,6 +76,11 @@
 
   onNavigate((navigation) => {
     if (navigation.to?.url.pathname === navigation.from?.url.pathname) return;
+    // Nested Dialogs render as a passthrough with no <dialog> element, so
+    // the outro that resolves `resolveNavigation` never fires — leaving
+    // SvelteKit waiting forever. Only the outermost Dialog should pause
+    // navigation; the ancestor handles the outro for the whole stack.
+    if (nested) return;
     isOpen = false;
     return new Promise<void>((resolve) => {
       resolveNavigation = resolve;
@@ -106,6 +137,11 @@
     dialogRef?.showModal();
     dialogRef?.setAttribute("data-visible", "true");
 
+    // Only the outermost dialog owns the global keyboard-overlay state; a
+    // nested (passthrough) dialog has no <dialog> of its own, and its unmount
+    // cleanup would otherwise flip the ancestor's overlay handling back off.
+    if (nested) return;
+
     // Keep the dialog above the software keyboard when it opens:
     // - Most browsers: the VirtualKeyboard API handles this natively.
     // - Safari/iOS: no API, so we measure the keyboard height ourselves
@@ -121,7 +157,9 @@
   On both layouts, spacer elements push the content above the software
   keyboard and safe-area insets.
 -->
-{#if isOpen}
+{#if passthrough}
+  {@render children?.()}
+{:else if isOpen}
   <dialog
     bind:this={dialogRef}
     oncancel={onCancel}
@@ -130,8 +168,9 @@
       // Base: transparent overlay container, touch-none so only the
       // scrollable content area (touch-pan-y) responds to gestures.
       "fixed flex min-h-max max-w-full touch-none flex-col bg-transparent outline-none",
-      // Dialog (sm+): centered with fixed width
-      "sm:m-auto sm:w-100",
+      // Dialog (sm+): centered with the selected width preset
+      "sm:m-auto",
+      widthClass,
       // Bottom sheet (mobile): pinned to bottom, full width
       "max-sm:top-auto max-sm:bottom-0 max-sm:w-full",
       // Backdrop: fades in via data-visible attribute
@@ -149,7 +188,8 @@
         // Base: card surface with clipped overflow
         "bg-bg-primary_alt border-border-secondary relative flex flex-col overflow-hidden",
         // Dialog (sm+): centered card with border and full rounding
-        "min-h-max sm:m-auto sm:w-100 sm:rounded-2xl dark:sm:border",
+        "min-h-max sm:m-auto sm:rounded-2xl dark:sm:border",
+        widthClass,
         // Bottom sheet (mobile): full width, only top corners rounded
         "w-full rounded-t-2xl",
         className,

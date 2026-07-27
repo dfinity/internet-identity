@@ -2,9 +2,9 @@
 
 This document explains how to build the Wasm module of the Internet Identity canister from scratch.
 
-> 💡 Binary releases are available on the [release page][releases].
+> Note: Binary releases are available on the [release page][releases].
 
-> 💡 The simplest way to build the code is to use the [Docker build][docker-build].
+> Note: The simplest way to build the code is to use the [Docker build][docker-build].
 
 The build requires the following dependencies:
 

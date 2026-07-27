@@ -114,11 +114,11 @@ class CreateRecoveryPhraseWizard {
 
   async retry(): Promise<void> {
     await expect(
-      this.#view.getByRole("heading", { name: "Something is wrong!" }),
+      this.#view.getByRole("heading", { name: "Something is wrong" }),
     ).toBeVisible();
     await this.#view.getByRole("button", { name: "Retry" }).click();
     await expect(
-      this.#view.getByRole("heading", { name: "Something is wrong!" }),
+      this.#view.getByRole("heading", { name: "Something is wrong" }),
     ).toBeHidden();
   }
 
@@ -161,9 +161,12 @@ class ManageRecoveryPage {
   async activate<T>(
     fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
   ): Promise<T> {
+    // Target the phrase card's button by its full aria-label: the recovery
+    // email card (shown when EMAIL_RECOVERY_SETUP is on, e.g. on id.ai) renders
+    // its own "Activate" button, so a bare "Activate" match is ambiguous.
     await this.#page
       .getByRole("main")
-      .getByRole("button", { name: "Activate" })
+      .getByRole("button", { name: "Activate recovery phrase" })
       .click();
     return this.#withWizard(fn);
   }

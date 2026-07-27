@@ -57,7 +57,13 @@ class RemovePasskeyDialog {
   }
 
   async confirm(): Promise<void> {
-    await this.locator.getByRole("button", { name: "Remove passkey" }).click();
+    await this.locator.getByRole("button", { name: "Remove" }).click();
+  }
+
+  async confirmSignOut(): Promise<void> {
+    await this.locator
+      .getByRole("button", { name: "Remove and sign out" })
+      .click();
   }
 
   async cancel(): Promise<void> {
@@ -66,6 +72,30 @@ class RemovePasskeyDialog {
 
   async assertSignOutWarningShown(): Promise<void> {
     await expect(this.locator).toHaveText(/you will be signed out/);
+  }
+}
+
+class SwitchAccessMethodDialog {
+  readonly #dialog: Locator;
+
+  constructor(dialog: Locator) {
+    this.#dialog = dialog;
+  }
+
+  get locator(): Locator {
+    return this.#dialog.filter({
+      has: this.#dialog
+        .page()
+        .getByRole("heading", { name: "Switch access method" }),
+    });
+  }
+
+  async confirm(): Promise<void> {
+    await this.locator.getByRole("button", { name: "Continue" }).click();
+  }
+
+  async cancel(): Promise<void> {
+    await this.locator.getByRole("button", { name: "Cancel" }).click();
   }
 }
 
@@ -117,7 +147,7 @@ class PasskeyItem {
     await this.#openMoreOptions();
     await expect(
       this.locator.getByRole("menu").getByRole("menuitem", { name: "Remove" }),
-    ).toBeHidden();
+    ).toBeDisabled();
   }
 
   async assertRemoveDisabled(): Promise<void> {
@@ -125,6 +155,42 @@ class PasskeyItem {
     await expect(
       this.locator.getByRole("menu").getByRole("menuitem", { name: "Remove" }),
     ).toBeDisabled();
+  }
+
+  async assertRemoveDisabledWithTooltip(tooltip: string): Promise<void> {
+    await this.#openMoreOptions();
+    const removeItem = this.locator
+      .getByRole("menu")
+      .getByRole("menuitem", { name: "Remove" });
+    await expect(removeItem).toBeDisabled();
+    await removeItem.hover({ force: true });
+    await expect(
+      this.locator.page().getByRole("tooltip").filter({ hasText: tooltip }),
+    ).toBeVisible();
+  }
+
+  async assertSwitchDisabled(): Promise<void> {
+    await this.#openMoreOptions();
+    await expect(
+      this.locator.getByRole("menu").getByRole("menuitem", { name: "Switch" }),
+    ).toBeDisabled();
+  }
+
+  async switch<T>(
+    fn: (dialog: SwitchAccessMethodDialog) => Promise<T>,
+  ): Promise<T> {
+    await this.#openMoreOptions();
+    await this.locator
+      .getByRole("menu")
+      .getByRole("menuitem", { name: "Switch" })
+      .click();
+    const dialog = new SwitchAccessMethodDialog(
+      this.locator.page().getByRole("dialog"),
+    );
+    await expect(dialog.locator).toBeVisible();
+    const value = await fn(dialog);
+    await expect(dialog.locator).toBeHidden();
+    return value;
   }
 
   async #openMoreOptions() {
@@ -143,12 +209,20 @@ class AddDialog {
     await this.#dialog
       .getByRole("button", { name: "Continue with passkey" })
       .click();
-    await expect(
-      this.#dialog.getByRole("heading", {
-        name: /Add a passkey|Add another passkey/,
-      }),
-    ).toBeVisible();
-    await this.#dialog.getByRole("button", { name: "Create passkey" }).click();
+    // The chooser triggers WebAuthn `create()` directly — no intermediate
+    // confirmation view. The virtual authenticator fulfils the prompt.
+  }
+
+  async openid(
+    issuerName: string,
+    signIn: (popup: Page) => Promise<void>,
+  ): Promise<void> {
+    const popupPromise = this.#dialog.page().context().waitForEvent("page");
+    await this.#dialog.getByRole("button", { name: issuerName }).click();
+    const popup = await popupPromise;
+    const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
+    await signIn(popup);
+    await closePromise;
   }
 
   async assertPasskeyUnavailable(): Promise<void> {
@@ -162,7 +236,7 @@ class AddDialog {
   }
 }
 
-class ManageAccessPage {
+export class ManageAccessPage {
   readonly #page: Page;
 
   constructor(page: Page) {

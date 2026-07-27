@@ -1,12 +1,13 @@
 mod analytics_config;
 mod archive_config;
 mod assigned_user_number_range;
+mod backend_origin;
 mod canister_creation_cycles_cost;
 mod captcha_config;
 mod enable_dapps_explorer;
 mod is_production;
 mod new_flow_origins;
-mod oidc_configs;
 mod openid_configs;
 mod register_rate_limit;
 mod related_origins;
+mod sso_discovery;

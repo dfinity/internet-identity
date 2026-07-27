@@ -17,7 +17,8 @@
 
   interface Props {
     linkOpenIdAccount: (config: OpenIdConfig) => Promise<"cancelled" | void>;
-    continueWithPasskey: () => void;
+    createPasskey: () => Promise<"cancelled" | void>;
+    continueOnAnotherDevice: () => void;
     signInWithSso: () => void;
     openIdCredentials?: OpenIdCredential[];
     maxPasskeysReached?: boolean;
@@ -25,7 +26,8 @@
 
   const {
     linkOpenIdAccount,
-    continueWithPasskey,
+    createPasskey,
+    continueOnAnotherDevice,
     signInWithSso,
     openIdCredentials = [],
     maxPasskeysReached,
@@ -33,6 +35,8 @@
 
   let authenticatingProviderId = $state<string>();
   let cancelledProviderId = $state<string>();
+  let isCreatingPasskey = $state(false);
+  let isPasskeyCancelled = $state(false);
 
   const isPasskeySupported = window.PublicKeyCredential !== undefined;
 
@@ -45,6 +49,18 @@
       cancelledProviderId = config.client_id;
       await waitFor(4000);
       cancelledProviderId = undefined;
+    }
+  };
+
+  const handleCreatePasskey = async () => {
+    isCreatingPasskey = true;
+    const result = await createPasskey();
+    isCreatingPasskey = false;
+
+    if (result === "cancelled") {
+      isPasskeyCancelled = true;
+      await waitFor(4000);
+      isPasskeyCancelled = false;
     }
   };
 
@@ -81,6 +97,30 @@
     />
   {/if}
   <div class="flex flex-col items-stretch gap-3">
+    <Tooltip
+      label={isPasskeyCancelled
+        ? $t`Interaction canceled. Please try again.`
+        : $t`You have reached the maximum number of passkeys`}
+      hidden={!isPasskeyCancelled && maxPasskeysReached !== true}
+      manual={isPasskeyCancelled}
+    >
+      <button
+        class="btn btn-primary btn-xl h-14"
+        onclick={handleCreatePasskey}
+        disabled={!isPasskeySupported ||
+          authenticatingProviderId !== undefined ||
+          isCreatingPasskey ||
+          maxPasskeysReached}
+      >
+        {#if isCreatingPasskey}
+          <ProgressRing />
+          <span>{$t`Creating passkey...`}</span>
+        {:else}
+          <PasskeyIcon />
+          <span>{$t`Continue with passkey`}</span>
+        {/if}
+      </button>
+    </Tooltip>
     <div class="flex flex-row flex-nowrap justify-stretch gap-3">
       {#each openIdProviders as provider (provider.issuer)}
         {@const name = provider.name}
@@ -94,7 +134,7 @@
             hidden={!hasCredential(provider.issuer)}
           >
             <button
-              class="btn btn-secondary btn-xl flex-1"
+              class="btn btn-secondary h-16 w-full flex-col gap-1.5 text-xs whitespace-normal"
               onclick={() => handleContinueWithOpenId(provider)}
               disabled={authenticatingProviderId !== undefined ||
                 hasCredential(provider.issuer)}
@@ -102,11 +142,14 @@
             >
               {#if authenticatingProviderId === provider.client_id}
                 <ProgressRing />
-              {:else if provider.logo}
-                <div class="size-6">
-                  <!-- eslint-disable-next-line svelte/no-at-html-tags -- provider.logo is a trusted SVG string sourced from the backend canister's openid_configs -->
-                  {@html provider.logo}
-                </div>
+              {:else}
+                {#if provider.logo}
+                  <div class="size-5">
+                    <!-- eslint-disable-next-line svelte/no-at-html-tags -- provider.logo is a trusted SVG string sourced from the backend canister's openid_configs -->
+                    {@html provider.logo}
+                  </div>
+                {/if}
+                <span>{name}</span>
               {/if}
             </button>
           </Tooltip>
@@ -114,33 +157,31 @@
       {/each}
       <!--
         SSO entry is always rendered alongside the named providers. The SSO
-        screen calls `add_discoverable_oidc_config` on submit; domains not on
-        the backend canary allowlist are rejected there.
+        screen resolves the domain via the canister; domains not on the backend
+        canary allowlist are rejected there.
       -->
       <button
-        class="btn btn-secondary btn-xl flex-1"
+        class="btn btn-secondary h-16 w-full flex-col gap-1.5 text-xs whitespace-normal"
         onclick={signInWithSso}
         disabled={authenticatingProviderId !== undefined}
         aria-label={$t`Continue with SSO`}
       >
-        <SsoIcon class="size-6" />
+        <SsoIcon class="size-5" />
+        <span>{$t`SSO`}</span>
       </button>
     </div>
-    <Tooltip
-      label={$t`You have reached the maximum number of passkeys`}
-      hidden={maxPasskeysReached !== true}
+  </div>
+  <div class="flex flex-row items-center justify-between gap-4">
+    <p class="text-text-tertiary text-sm">
+      {$t`Add this identity to another device`}
+    </p>
+    <button
+      onclick={continueOnAnotherDevice}
+      disabled={authenticatingProviderId !== undefined || isCreatingPasskey}
+      class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
     >
-      <button
-        class="btn btn-secondary btn-xl"
-        onclick={continueWithPasskey}
-        disabled={!isPasskeySupported ||
-          authenticatingProviderId !== undefined ||
-          maxPasskeysReached}
-      >
-        <PasskeyIcon />
-        <span>{$t`Continue with passkey`}</span>
-      </button>
-    </Tooltip>
+      {$t`URL | QR Code`}
+    </button>
   </div>
 </div>
 

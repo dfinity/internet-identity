@@ -396,9 +396,9 @@ dependencies = [
 
 [[package]]
 name = "candid"
-version = "0.10.17"
+version = "0.10.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eaac522d18020d5fbc8320ecb12a9b13b2137ae31133da2d42fa256a825507c4"
+checksum = "1347fd6b24f5ad23e4ab16d49551a03d396410dcb086e8f969c21efdf4b1dbd8"
 dependencies = [
  "anyhow",
  "binread",
@@ -419,9 +419,9 @@ dependencies = [
 
 [[package]]
 name = "candid_derive"
-version = "0.10.17"
+version = "0.10.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a1b4fddbd462182050989068d53604a91a3d0f117c3c8316c6818023df00add"
+checksum = "ad381629d2d2940899c3a784ccd4fe59e255b5714e7520f016f839f07d2236e7"
 dependencies = [
  "lazy_static",
  "proc-macro2",
@@ -1575,9 +1575,9 @@ dependencies = [
 
 [[package]]
 name = "ic-management-canister-types"
-version = "0.3.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95f3af3543f6d0cbdecd2dcdfd4737ada2bd42d935cc787eec22090c96492c76"
+checksum = "3149217e24186df3f13dc45eee14cdb3e5cad07d0b2b67bd53555c1c55462957"
 dependencies = [
  "candid",
  "serde",
@@ -1655,9 +1655,9 @@ dependencies = [
 
 [[package]]
 name = "ic-transport-types"
-version = "0.40.1"
+version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2e7706e55836e8104c98149ec0796d20d5213fef972ac01b544657d410f1883"
+checksum = "4a775244756a5d97ff19b08071a946a4b4896904e35deb036bf215e80f2e703d"
 dependencies = [
  "candid",
  "hex",
@@ -1668,7 +1668,7 @@ dependencies = [
  "serde_cbor",
  "serde_repr",
  "sha2 0.10.9",
- "thiserror 2.0.12",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1932,16 +1932,6 @@ name = "ipnet"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "187674a687eed5fe42285b40c6291f9a01517d415fad1c3cbc6a9f778af7fcd4"
-
-[[package]]
-name = "iri-string"
-version = "0.7.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbc5ebe9c3a1a7a5127f920a418f7585e9e758e911d0466ed004f393b0e380b2"
-dependencies = [
- "memchr",
- "serde",
-]
 
 [[package]]
 name = "is-terminal"
@@ -2412,9 +2402,9 @@ dependencies = [
 
 [[package]]
 name = "pocket-ic"
-version = "9.0.2"
+version = "15.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e523c23bda9dc26ae989aab647b8bd805b54c72a3f2f00d668830d8b490c9c8"
+checksum = "4fe796a5fbeb08244338f5eb30f2de91fa12152ea2b5176f9da20fecd20b1ced"
 dependencies = [
  "backoff",
  "base64 0.13.1",
@@ -2426,8 +2416,8 @@ dependencies = [
  "ic-transport-types",
  "reqwest",
  "schemars",
+ "semver",
  "serde",
- "serde_bytes",
  "serde_cbor",
  "serde_json",
  "sha2 0.10.9",
@@ -2435,7 +2425,7 @@ dependencies = [
  "strum 0.26.3",
  "strum_macros 0.26.4",
  "tempfile",
- "thiserror 2.0.12",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
  "tracing-appender",
@@ -2788,9 +2778,9 @@ checksum = "7a66a03ae7c801facd77a29370b4faec201768915ac14a721ba36f20bc9c209b"
 
 [[package]]
 name = "reqwest"
-version = "0.12.22"
+version = "0.12.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbc931937e6ca3a06e3b6c0aa7841849b160a90351d6ab467a8b9b9959767531"
+checksum = "eddd3ca559203180a307f12d114c268abf583f59b03cb906fd0b3ff8646c1147"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -3472,11 +3462,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.12"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "567b8a2dae586314f7be2a752ec7474332959c6460e02bde30d702a66d488708"
+checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
- "thiserror-impl 2.0.12",
+ "thiserror-impl 2.0.18",
 ]
 
 [[package]]
@@ -3492,9 +3482,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.12"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f7cf42b4507d8ea322120659672cf1b9dbb93f8f2d4ecfd6e51350ff5b17a1d"
+checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3647,20 +3637,20 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.6.6"
+version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adc82fd73de2a9722ac5da747f12383d2bfdb93591ee6c58486e0097890f05f2"
+checksum = "4cfcf7e2740e6fc6d4d688b4ef00650406bb94adf4731e43c096c3a19fe40840"
 dependencies = [
  "bitflags 2.6.0",
  "bytes",
  "futures-util",
  "http 1.1.0",
  "http-body",
- "iri-string",
  "pin-project-lite",
  "tower",
  "tower-layer",
  "tower-service",
+ "url",
 ]
 
 [[package]]

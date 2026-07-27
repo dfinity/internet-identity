@@ -85,14 +85,20 @@ pub struct IdentityInfo {
     pub metadata: HashMap<String, MetadataEntryV2>,
     pub name: Option<String>,
     pub created_at: Option<Timestamp>,
-    /// Email-recovery credentials bound to this anchor. Empty for
+    /// Email-recovery credentials bound to this anchor. `None` for
     /// anchors with no recovery email configured. The canister API
     /// currently caps the list at one entry — the FE picks the
     /// first to render the recovery-email card's active vs inactive
     /// state without round-tripping a separate query. Exposing it as
     /// a `vec` lets future multi-credential support land without a
     /// candid schema bump.
-    pub email_recovery: Vec<crate::internet_identity::types::EmailRecoveryCredential>,
+    pub email_recovery: Option<Vec<crate::internet_identity::types::EmailRecoveryCredential>>,
+    /// Verified emails bound to this anchor — a parallel anchor
+    /// primitive to `email_recovery`. `None` for anchors with no
+    /// verified emails configured. Capped server-side by
+    /// `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
+    pub verified_emails:
+        Option<Vec<crate::internet_identity::types::verified_email::VerifiedEmail>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -248,6 +254,12 @@ pub struct OpenIDRegFinishArg {
     pub jwt: String,
     pub salt: [u8; 32],
     pub name: String,
+    /// SSO discovery domain the JWT was obtained through, or `None` for a
+    /// direct provider (Google / Microsoft / Apple). Selects which JWK source
+    /// verifies the JWT.
+    pub discovery_domain: Option<String>,
+    /// Target dapp origin, set only for a first gated SSO login.
+    pub origin: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -257,10 +269,15 @@ pub struct IdRegFinishResult {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum IdRegFinishError {
-    UnexpectedCall { next_step: RegistrationFlowNextStep },
+    UnexpectedCall {
+        next_step: RegistrationFlowNextStep,
+    },
     NoRegistrationFlow,
     InvalidAuthnMethod(String),
     StorageError(String),
+    /// A gated SSO login for an org whose stable identifier isn't `sub`: the
+    /// user must first sign in through the org's primary client.
+    SsoNormalLoginRequired,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

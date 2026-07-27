@@ -6,6 +6,7 @@ import {
   TEST_APP_CANONICAL_URL,
   II_URL,
   addVirtualAuthenticator,
+  holdToConfirm,
 } from "../../utils";
 import { test } from "../../fixtures";
 import { SSO_OPENID_PORT } from "../../fixtures/sso";
@@ -15,10 +16,8 @@ const DEFAULT_USER_NAME = "John Doe";
 test("Authorize by registering a new passkey", async ({ page }) => {
   await authorize(page, async (authPage) => {
     await addVirtualAuthenticator(authPage);
-    await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
-      .click();
-    await authPage.getByRole("button", { name: "Create new identity" }).click();
+    await authPage.getByRole("button", { name: "Create", exact: true }).click();
+    await authPage.getByRole("button", { name: "Create with passkey" }).click();
     await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
     await authPage.getByRole("button", { name: "Create identity" }).click();
     await authPage
@@ -35,11 +34,14 @@ test("Authorize by signing in with an existing passkey", async ({
   await authorize(page, async (authPage) => {
     await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
+      .getByRole("button", { name: "Sign in with passkey" })
       .click();
-    await authPage
-      .getByRole("button", { name: "Use existing identity" })
-      .click();
+    // The read-only feature is flagged off, so the access-level selector is
+    // hidden and authorizations are full access (a queries-only delegation
+    // would fail closed in every current agent — see the READ_ONLY_MODE flag).
+    await expect(
+      authPage.getByRole("radio", { name: "Actions & questions" }),
+    ).toHaveCount(0);
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
       .click();
@@ -74,20 +76,15 @@ test("Authorize by signing in from another device", async ({
     );
 
     const principal = await authorize(page, async (authPage) => {
-      // Switch to current device and start "Continue from another device" flow to get link
+      // Switch to current device and start "Continue from another device" flow to get link.
+      // The cancel→QR auto-transition was removed; use the explicit
+      // "URL | QR Code" CTA on the "Add identity from another device" row.
       await addVirtualAuthenticator(authPage);
-      await authPage
-        .getByRole("button", { name: "Continue with Passkey" })
-        .click();
-      await authPage
-        .getByRole("button", {
-          name: "Use existing identity",
-        })
-        .click();
+      await authPage.getByRole("button", { name: "URL | QR Code" }).click();
       await authPage
         .getByRole("heading", {
           level: 1,
-          name: "Can't find your identity?",
+          name: "Add identity from another device",
         })
         .waitFor();
       const linkToPair = `https://${await authPage.getByLabel("Pairing link").innerText()}`;
@@ -115,6 +112,10 @@ test("Authorize by signing in from another device", async ({
       await otherDevicePage
         .getByRole("heading", { level: 1, name: "Authorize new device" })
         .waitFor();
+      await holdToConfirm(otherDevicePage);
+      await otherDevicePage
+        .getByRole("heading", { level: 1, name: "Enter the code" })
+        .waitFor();
       for (let i = 0; i < confirmationCodeArray.length; i++) {
         const code = confirmationCodeArray[i];
         await otherDevicePage.getByLabel(`Code input ${i}`).fill(code);
@@ -140,6 +141,12 @@ test("Authorize by signing in from another device", async ({
         .getByRole("heading", { level: 1, name: "Continue on your new device" })
         .waitFor({ state: "hidden" });
 
+      // After the wizard completes, the access page strips the ?activate=
+      // query via `goto`, which fires the layout's afterNavigate and resets
+      // isMobileSidebarOpen. Waiting for the settled URL avoids a race where
+      // the menu click would be undone by that reset.
+      await otherDevicePage.waitForURL(II_URL + "/manage/access");
+
       // Navigate to access methods
       const menuButton = otherDevicePage.getByRole("button", {
         name: "Open menu",
@@ -147,9 +154,7 @@ test("Authorize by signing in from another device", async ({
       if (await menuButton.isVisible()) {
         await menuButton.click();
       }
-      await otherDevicePage
-        .getByRole("link", { name: "Access and recovery" })
-        .click();
+      await otherDevicePage.getByRole("link", { name: "Access" }).click();
 
       // Verify we have two passkeys
       await expect(otherDevicePage.getByText("Unknown")).toHaveCount(2);
@@ -198,7 +203,18 @@ test.describe("Sign up with OpenID", () => {
       await signInWithOpenId(openIdPage, openIdUsers[0].id);
       await closePromise;
 
-      // Continue to dapp
+      // Fresh OIDC user surfaces IdentityNotConnectedDialog — confirm
+      // sign-up to land on ContinueView.
+      await authPage
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
+
+      // Continue to dapp — wait for the confirmation heading first so any
+      // dialog transition has fully resolved before clicking.
+      await expect(
+        authPage.getByRole("heading", { name: /^Continue to / }),
+      ).toBeVisible();
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
         .click();
@@ -227,10 +243,19 @@ test.describe("Sign up with SSO", () => {
     await authorize(page, async (authPage) => {
       // Pick SSO entry, type the discovery domain, wait for two-hop
       // discovery, then drive the IdP popup the same way as direct OpenID.
-      const ssoPage = await openSsoPopup(authPage);
+      // The /authorize picker renders with mode="signin", so the SSO
+      // button label is "Sign in with SSO" not the mode="both" default.
+      const ssoPage = await openSsoPopup(authPage, undefined, "signin");
       const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
       await signInWithOpenId(ssoPage, openIdUsers[0].id);
       await closePromise;
+
+      // Fresh SSO user surfaces IdentityNotConnectedDialog — confirm
+      // sign-up to land on ContinueView.
+      await authPage
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
 
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
@@ -247,10 +272,10 @@ test("Authorize with ICRC-29", async ({ page }) => {
     async (authPage) => {
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Continue with Passkey" })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
-        .getByRole("button", { name: "Create new identity" })
+        .getByRole("button", { name: "Create with passkey" })
         .click();
       await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
       await authPage.getByRole("button", { name: "Create identity" }).click();
@@ -272,10 +297,10 @@ test("App logo doesn't appear when app is not known", async ({ page }) => {
       await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();
 
       await authPage
-        .getByRole("button", { name: "Continue with Passkey" })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
-        .getByRole("button", { name: "Create new identity" })
+        .getByRole("button", { name: "Create with passkey" })
         .click();
       await authPage.getByLabel("Identity name").fill("John Doe");
       await authPage.getByRole("button", { name: "Create identity" }).click();

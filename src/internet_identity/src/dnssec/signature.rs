@@ -5,19 +5,30 @@
 //! the signature checks out under that key. Algorithm dispatch by the
 //! RRSIG's `algorithm` field happens in `verify_signature_for_alg`.
 //!
-//! Algorithm coverage matches the RFC 8624 §3.1 MUST set:
+//! Algorithm coverage is a deliberate *subset* of RFC 8624 §3.1's
+//! "Validation: MUST" column, plus Ed25519:
 //!
-//! - `ALG_RSA_SHA256` — RFC 5702. Used by the DNS root, `com.`, and
-//!   most legacy zones.
-//! - `ALG_ECDSA_P256_SHA256` — RFC 6605. Used by most TLDs and modern
-//!   zones (Cloudflare, Google, …).
-//! - `ALG_ED25519` — RFC 8080. Rare in production today but MUST per
-//!   RFC 8624; we cover it for completeness and forward compatibility.
+//! - `ALG_RSA_SHA256` (8) — RFC 5702. MUST-validate. Used by the DNS
+//!   root, `com.`, and most legacy zones.
+//! - `ALG_RSA_SHA512` (10) — RFC 5702. MUST-validate. Used by some
+//!   signed zones (e.g. `mailbox.org`) that publish RSA/SHA-512
+//!   signatures.
+//! - `ALG_ECDSA_P256_SHA256` (13) — RFC 6605. MUST-validate. Used by
+//!   most TLDs and modern zones (Cloudflare, Google, …).
+//! - `ALG_ED25519` (15) — RFC 8080. RECOMMENDED (not MUST) to validate
+//!   per RFC 8624; we cover it for forward compatibility.
 //!
-//! Anything outside this set returns `UnsupportedAlgorithm`. In
-//! particular RSA-SHA1 (`ALG_RSA_SHA1` in the IANA registry, numeric
-//! value 5) is explicitly *not* supported (RFC 8624 §3.1 lists it as
-//! MUST NOT for new deployments).
+//! We deliberately do *not* implement the SHA-1 family (algorithms 5
+//! and 7), even though RFC 8624 §3.1 still lists them as
+//! "Validation: MUST": SHA-1 is collision-broken and
+//! `draft-ietf-dnsop-rfc8624-bis` moves both to MUST NOT. A zone
+//! signed only with SHA-1 (or any other algorithm outside the set
+//! below) yields `UnsupportedAlgorithm`; the frontend treats that the
+//! same as an unsigned zone and falls through to the DoH path.
+//!
+//! The frontend mirrors this set in
+//! `src/frontend/src/lib/utils/dnssec/chain.ts` (it must only bundle
+//! RRSIGs this verifier can check) — keep the two in sync.
 
 use super::canonical::ds_digest_input;
 use super::types::DnssecError;
@@ -39,7 +50,7 @@ use rsa::pkcs1v15::VerifyingKey as RsaVerifyingKey;
 use rsa::signature::Verifier as RsaVerifierTrait;
 use rsa::traits::PublicKeyParts;
 use rsa::{BigUint, RsaPublicKey};
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha256, Sha512};
 
 // IANA DNSSEC algorithm numbers (RFC 8624 §3.1, registry maintained
 // by IANA at <https://www.iana.org/assignments/dns-sec-alg-numbers>).
@@ -49,6 +60,9 @@ use sha2::{Digest, Sha256};
 /// RFC 5702 — RSA with SHA-256. RFC 3110 public-key encoding,
 /// PKCS#1 v1.5 signature.
 const ALG_RSA_SHA256: u8 = 8;
+/// RFC 5702 — RSA with SHA-512. Same RFC 3110 key encoding and
+/// PKCS#1 v1.5 signature form as SHA-256, differing only in the hash.
+const ALG_RSA_SHA512: u8 = 10;
 /// RFC 6605 — ECDSA over the NIST P-256 curve with SHA-256.
 const ALG_ECDSA_P256_SHA256: u8 = 13;
 /// RFC 8080 — Ed25519 (Curve25519, EdDSA).
@@ -74,20 +88,62 @@ pub fn verify_signature_for_alg(
 
     match algorithm {
         ALG_RSA_SHA256 => verify_rsa_sha256(signed_data, signature, public_key),
+        ALG_RSA_SHA512 => verify_rsa_sha512(signed_data, signature, public_key),
         ALG_ECDSA_P256_SHA256 => verify_ecdsa_p256_sha256(signed_data, signature, public_key),
         ALG_ED25519 => verify_ed25519(signed_data, signature, public_key),
         other => Err(DnssecError::UnsupportedAlgorithm(other)),
     }
 }
 
-/// RFC 5702: signature is a PKCS#1 v1.5 RSA signature whose byte
-/// length equals the modulus byte length. The public key is encoded
-/// in RFC 3110 form (parsed by `parse_rfc3110_rsa_key` below).
+/// RFC 5702 — RSA with SHA-256. Thin wrapper over [`verify_rsa`]
+/// pinning the hash; the RFC 3110 key encoding and PKCS#1 v1.5
+/// signature form are identical across RSA hashes.
 fn verify_rsa_sha256(
     signed_data: &[u8],
     signature: &[u8],
     public_key: &[u8],
 ) -> Result<(), DnssecError> {
+    verify_rsa(
+        RsaVerifyingKey::<Sha256>::new,
+        signed_data,
+        signature,
+        public_key,
+    )
+}
+
+/// RFC 5702 — RSA with SHA-512. Identical to [`verify_rsa_sha256`]
+/// except for the digest the PKCS#1 v1.5 verifier is parameterised
+/// over.
+fn verify_rsa_sha512(
+    signed_data: &[u8],
+    signature: &[u8],
+    public_key: &[u8],
+) -> Result<(), DnssecError> {
+    verify_rsa(
+        RsaVerifyingKey::<Sha512>::new,
+        signed_data,
+        signature,
+        public_key,
+    )
+}
+
+/// Shared PKCS#1 v1.5 RSA verification body (RFC 5702). `make_key`
+/// builds the hash-specific verifying key from the parsed public key
+/// — the only part that differs between the SHA-256 and SHA-512
+/// algorithm numbers. The public key is encoded in RFC 3110 form
+/// (parsed by `parse_rfc3110_rsa_key` below); the signature is a
+/// PKCS#1 v1.5 RSA signature whose byte length equals the modulus
+/// byte length.
+fn verify_rsa<K, F>(
+    make_key: F,
+    signed_data: &[u8],
+    signature: &[u8],
+    public_key: &[u8],
+) -> Result<(), DnssecError>
+where
+    F: FnOnce(RsaPublicKey) -> K,
+    K: rsa::signature::Verifier<RsaSignature>,
+{
     let (e, n) = parse_rfc3110_rsa_key(public_key)?;
     let pk = RsaPublicKey::new(BigUint::from_bytes_be(n), BigUint::from_bytes_be(e))
         .map_err(|_| DnssecError::Malformed("invalid RSA public key"))?;
@@ -101,7 +157,7 @@ fn verify_rsa_sha256(
         ));
     }
 
-    let verifying_key = RsaVerifyingKey::<Sha256>::new(pk);
+    let verifying_key = make_key(pk);
     let sig = RsaSignature::try_from(signature)
         .map_err(|_| DnssecError::Malformed("invalid RSA signature encoding"))?;
     verifying_key
@@ -301,8 +357,11 @@ mod tests {
 
     #[test]
     fn unsupported_algorithm_returns_error() {
-        /// RSA-SHA1 — IANA algorithm 5, explicitly rejected per
-        /// RFC 8624 §3.1 ("MUST NOT" for new deployments).
+        // RSA-SHA1 — IANA algorithm 5. RFC 8624 §3.1 still lists the
+        // SHA-1 family as "Validation: MUST", but we deliberately
+        // don't implement it (collision-broken; rfc8624-bis moves it
+        // to MUST NOT), so it surfaces as `UnsupportedAlgorithm` and
+        // the caller falls through to the DoH path.
         const ALG_RSA_SHA1: u8 = 5;
         let dnskey = vec![0u8; DNSKEY_RDATA_HEADER_LEN]; // header only
         let signed = b"hello";
@@ -310,6 +369,22 @@ mod tests {
         assert_eq!(
             verify_signature_for_alg(ALG_RSA_SHA1, signed, &sig, &dnskey),
             Err(DnssecError::UnsupportedAlgorithm(ALG_RSA_SHA1))
+        );
+    }
+
+    #[test]
+    fn rsa_sha512_is_dispatched_not_rejected() {
+        // Algorithm 10 (RSA/SHA-512) must reach the RSA verifier, not
+        // the `UnsupportedAlgorithm` arm. With a header-only DNSKEY
+        // the public-key parse fails, so we get `Malformed` — the
+        // point is only that it is *not* `UnsupportedAlgorithm(10)`.
+        // End-to-end alg-10 verification is covered by the
+        // `mailbox.org` chain vector in `verify.rs`.
+        let dnskey = vec![0u8; DNSKEY_RDATA_HEADER_LEN]; // header only
+        let result = verify_signature_for_alg(ALG_RSA_SHA512, b"hello", &[0u8; 64], &dnskey);
+        assert!(
+            !matches!(result, Err(DnssecError::UnsupportedAlgorithm(_))),
+            "alg 10 should dispatch to the RSA verifier, got {result:?}"
         );
     }
 }

@@ -15,7 +15,12 @@ import { Funnel } from "./Funnel";
  *     [email-recovery-setup-need-dkim-leaf]     (DNSSEC path only)
  *       [email-recovery-setup-dkim-leaf-submitted]
  *     email-recovery-setup-succeeded
- *     | email-recovery-setup-failed   (with `reason = <variant>`)
+ *     | email-recovery-setup-failed   (with `reason = <variant>`, plus
+ *       `doh_reason = quorum_failed | all_providers_failed |
+ *       response_malformed` when the DoH path's
+ *       `DohFetchFailed` was the cause — lets the funnel be segmented by
+ *       *why* DoH failed, which is what bites non-DNSSEC providers like
+ *       Gmail)
  * end-email-recovery-setup           (CLOSE — terminal state, carries `duration-…`)
  *
  * The DoH path skips `need-dkim-leaf` / `dkim-leaf-submitted` — the

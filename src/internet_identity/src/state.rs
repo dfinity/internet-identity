@@ -111,14 +111,20 @@ pub struct PersistentState {
     pub captcha_config: CaptchaConfig,
     // Configuration for Related Origins Requests
     pub related_origins: Option<Vec<String>>,
+    // Origin of the II backend canister (e.g. "https://backend.id.ai", no
+    // trailing slash). Served — alongside the related origins — in the
+    // `.well-known/ic-domains` asset so the backend is reachable on its
+    // custom domain.
+    pub backend_origin: Option<String>,
     // Configuration for New Flow Origins
     pub new_flow_origins: Option<Vec<String>>,
     // Configurations for OpenID clients
     pub openid_configs: Option<Vec<OpenIdConfig>>,
-    // Allowlist of domains accepted by `add_discoverable_oidc_config`. `None`
-    // falls back to the built-in `is_production`-keyed defaults; `Some(vec)`
-    // replaces them entirely.
-    pub sso_discoverable_domains: Option<Vec<String>>,
+    // Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
+    // loopback hosts (localhost/127.0.0.1) so e2e can use http mock IdPs. `None`/
+    // `Some(false)` (the default) require https for every discovery host;
+    // non-loopback always requires https. See `sso::validate_discovery_domain`.
+    pub sso_allow_insecure_discovery: Option<bool>,
     // SSO provider configs managed via add_discoverable_oidc_config update call.
     pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     // Configuration for Web Analytics tool
@@ -131,6 +137,10 @@ pub struct PersistentState {
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
     pub dummy_auth: Option<DummyAuthConfig>,
+    /// Deploy flag for the legacy DNSSEC email-recovery path. `None`/`Some(false)`
+    /// => DoH-only; `Some(true)` re-enables it. Read via
+    /// `crate::email_recovery::dnssec_email_recovery_enabled`.
+    pub enable_dnssec_email_recovery: Option<bool>,
     /// DNSSEC verification config (trust anchors). Survives upgrades when an
     /// upgrade arg omits it. Consumed by the email-recovery DKIM/DMARC flow
     /// in later PRs and by any future feature that needs DNSSEC-verified
@@ -155,15 +165,17 @@ impl Default for PersistentState {
             active_authn_method_stats: ActivityStats::new(time),
             captcha_config: DEFAULT_CAPTCHA_CONFIG,
             related_origins: None,
+            backend_origin: None,
             new_flow_origins: None,
             openid_configs: None,
-            sso_discoverable_domains: None,
+            sso_allow_insecure_discovery: None,
             oidc_configs: None,
             analytics_config: None,
             event_stats_24h_start: None,
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
+            enable_dnssec_email_recovery: None,
             dnssec_config: None,
             doh_config: None,
         }

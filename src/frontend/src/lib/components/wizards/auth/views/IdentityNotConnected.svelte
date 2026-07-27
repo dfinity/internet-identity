@@ -1,0 +1,159 @@
+<script lang="ts">
+  import { t } from "$lib/stores/locale.store";
+  import {
+    ChevronDownIcon,
+    CircleAlertIcon,
+    UserIcon,
+    UserPlusIcon,
+  } from "@lucide/svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { findConfig } from "$lib/utils/openID";
+
+  interface Props {
+    issuer?: string;
+    providerName?: string;
+    userName?: string;
+    userEmail?: string;
+    onSignUp: () => void;
+    onRecover: () => void;
+    onCancel?: () => void;
+    loading?: boolean;
+  }
+
+  let {
+    issuer,
+    providerName: providerNameProp,
+    userName,
+    userEmail,
+    onSignUp,
+    onRecover,
+    onCancel,
+    loading = false,
+  }: Props = $props();
+
+  const config = $derived(
+    issuer === undefined ? undefined : findConfig(issuer, undefined, []),
+  );
+  const resolvedProviderName = $derived(config?.name ?? providerNameProp ?? "");
+  const resolvedProviderLogo = $derived(config?.logo);
+  const resolvedUserName = $derived(
+    userName ?? userEmail ?? resolvedProviderName,
+  );
+  const resolvedUserEmail = $derived(
+    userName !== undefined ? userEmail : undefined,
+  );
+</script>
+
+<div class="flex flex-col">
+  <div class="flex flex-col items-start">
+    <h2
+      class="text-text-primary text-[22px] leading-[26.4px] font-medium tracking-tight"
+    >
+      {$t`Create your Identity`}
+    </h2>
+    <p class="text-text-tertiary mt-2 max-w-80 text-sm leading-5">
+      {$t`This ${resolvedProviderName} account isn't connected to an Internet Identity yet.`}
+    </p>
+  </div>
+
+  <div class="mt-4 flex flex-col items-center py-5">
+    <span class="relative inline-block size-16 shrink-0">
+      <span
+        class="bg-bg-primary border-border-secondary text-fg-disabled flex size-16 items-center justify-center rounded-full border"
+      >
+        <UserIcon class="size-7" aria-hidden="true" />
+      </span>
+      {#if resolvedProviderLogo !== undefined}
+        <span
+          class="bg-bg-primary_alt border-border-secondary absolute -inset-e-1 -bottom-1 flex size-8 items-center justify-center rounded-full border"
+        >
+          <span class="size-5">
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -- logo is a trusted SVG string from openid_configs -->
+            {@html resolvedProviderLogo}
+          </span>
+        </span>
+      {/if}
+    </span>
+    <div class="mt-2 text-center">
+      <div class="text-text-primary text-base leading-tight font-semibold">
+        {resolvedUserName}
+      </div>
+      {#if resolvedUserEmail !== undefined}
+        <div class="text-text-tertiary mt-0.5 text-[13px]">
+          {resolvedUserEmail}
+        </div>
+      {/if}
+    </div>
+    <span
+      class="bg-bg-primary border-border-secondary text-text-tertiary mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold"
+    >
+      <CircleAlertIcon
+        class="text-fg-warning-primary size-3.5"
+        aria-hidden="true"
+      />
+      {$t`Not connected yet`}
+    </span>
+  </div>
+
+  <button
+    onclick={onSignUp}
+    disabled={loading}
+    class="btn btn-primary btn-lg mt-3 w-full gap-2"
+  >
+    {#if loading}
+      <ProgressRing class="size-4" />
+    {:else}
+      <UserPlusIcon class="size-4" aria-hidden="true" />
+    {/if}
+    {$t`Sign up`}
+  </button>
+
+  {#if onCancel !== undefined}
+    <button
+      onclick={onCancel}
+      disabled={loading}
+      class="text-text-tertiary hover:text-text-primary mt-3 self-center text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+    >
+      {$t`Use a different method`}
+    </button>
+  {/if}
+
+  <details
+    class="group bg-bg-secondary dark:bg-bg-primary border-border-secondary -mx-4 mt-4 -mb-4 border-t px-4 py-4 sm:-mx-6 sm:-mb-8 sm:px-6"
+  >
+    <summary
+      class="text-text-tertiary focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary flex cursor-pointer list-none items-center justify-between rounded-sm text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+    >
+      <span>{$t`Why am I seeing this?`}</span>
+      <ChevronDownIcon
+        class="size-4 transition-transform group-open:rotate-180"
+        aria-hidden="true"
+      />
+    </summary>
+    <div class="text-text-tertiary mt-3 text-sm leading-5">
+      <p>{$t`A few things could be going on:`}</p>
+      <ul class="mt-2 list-disc ps-4">
+        <li>
+          {$t`You've never used this ${resolvedProviderName} account with Internet Identity.`}
+        </li>
+        <li>
+          {$t`You signed up before with a different access method.`}
+        </li>
+        <li>
+          {$t`You unlinked this ${resolvedProviderName} account from your identity.`}
+        </li>
+      </ul>
+      <div
+        class="border-border-secondary mt-3 flex items-center justify-between border-t pt-2.5"
+      >
+        <span>{$t`Lost access to your identity?`}</span>
+        <button
+          onclick={onRecover}
+          class="text-text-primary font-semibold outline-0 hover:underline focus-visible:underline"
+        >
+          {$t`Recover`}
+        </button>
+      </div>
+    </div>
+  </details>
+</div>

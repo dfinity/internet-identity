@@ -3,7 +3,7 @@ use crate::anchor_management::post_operation_bookkeeping;
 use crate::{
     delegation::{
         add_delegation_signature, check_frontend_length, delegation_bookkeeping,
-        der_encode_canister_sig_key,
+        delegation_signature_msg_with_permissions, der_encode_canister_sig_key, DelegationAccess,
     },
     ii_domain::IIDomain,
     state::{self, storage_borrow, storage_borrow_mut},
@@ -17,9 +17,7 @@ use crate::{
     },
     update_root_hash,
 };
-use ic_canister_sig_creation::{
-    delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
-};
+use ic_canister_sig_creation::{signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN};
 use ic_cdk::{api::time, caller};
 use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity_interface::{
@@ -296,12 +294,18 @@ pub fn update_account_for_origin(
     }
 }
 
+// Threads both an optional absolute-expiration cap (for the MCP session grant)
+// and the delegation access level through to the signature; the parameter list
+// is wide but each argument is distinct and load-bearing.
+#[allow(clippy::too_many_arguments)]
 pub async fn prepare_account_delegation(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
+    max_expiration: Option<Timestamp>,
+    access: DelegationAccess,
     ii_domain: &Option<IIDomain>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
     state::ensure_salt_set().await;
@@ -322,11 +326,39 @@ pub async fn prepare_account_delegation(
         max_ttl.unwrap_or(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS),
         crate::delegation::MAX_EXPIRATION_PERIOD_NS,
     );
-    let expiration = time().saturating_add(session_duration_ns);
+    // `max_expiration` is an *absolute* cap (e.g. the MCP session grant's
+    // expiry): a relative TTL computed by the caller before the await above
+    // could drift past it by however much time the await spans. By the same
+    // token the cap itself can already have passed once the await resolves
+    // (the caller checked it *before* awaiting) — refuse rather than sign a
+    // delegation that is already expired on arrival, which would read as
+    // success while wasting a signature-map entry on an unusable delegation.
+    // For the MCP path this is exactly the session-over signal: the grant
+    // expired mid-call.
+    if max_expiration.is_some_and(|cap| cap <= time()) {
+        return Err(AccountDelegationError::Unauthorized(caller()));
+    }
+    let expiration = u64::min(
+        time().saturating_add(session_duration_ns),
+        max_expiration.unwrap_or(u64::MAX),
+    );
+    // The metrics duration is the delegation's *effective* lifetime: the
+    // absolute `max_expiration` cap can shorten it below the requested
+    // `session_duration_ns` (e.g. an MCP grant near expiry). With no cap the two
+    // are equal, so this matches the regular path exactly while keeping the
+    // recorded duration honest when the cap binds. `time()` is stable here (no
+    // await since it was read for `expiration`).
+    let effective_duration_ns = expiration.saturating_sub(time());
     let seed = account.calculate_seed();
 
     state::signature_map_mut(|sigs| {
-        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
+        add_delegation_signature(
+            sigs,
+            session_key,
+            seed.as_ref(),
+            expiration,
+            access.permissions(),
+        );
     });
     update_root_hash();
 
@@ -335,7 +367,7 @@ pub async fn prepare_account_delegation(
         storage.set_account_last_used(anchor_number, origin.clone(), account_number, time());
     });
 
-    delegation_bookkeeping(origin, ii_domain.clone(), session_duration_ns);
+    delegation_bookkeeping(origin, ii_domain.clone(), effective_duration_ns);
 
     Ok(PrepareAccountDelegation {
         user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
@@ -349,6 +381,7 @@ pub fn get_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
+    access: DelegationAccess,
 ) -> Result<SignedDelegation, AccountDelegationError> {
     check_frontend_length(origin);
 
@@ -363,10 +396,16 @@ pub fn get_account_delegation(
             .ok_or(AccountDelegationError::Unauthorized(caller()))?;
 
         state::assets_and_signatures(|certified_assets, sigs| {
+            let permissions = access.permissions();
             let inputs = CanisterSigInputs {
                 domain: DELEGATION_SIG_DOMAIN,
                 seed: &account.calculate_seed(),
-                message: &delegation_signature_msg(&session_key, expiration, None),
+                message: &delegation_signature_msg_with_permissions(
+                    &session_key,
+                    expiration,
+                    None,
+                    permissions,
+                ),
             };
             match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
                 Ok(signature) => Ok(SignedDelegation {
@@ -374,6 +413,7 @@ pub fn get_account_delegation(
                         pubkey: session_key,
                         expiration,
                         targets: None,
+                        permissions: permissions.map(str::to_string),
                     },
                     signature: ByteBuf::from(signature),
                 }),

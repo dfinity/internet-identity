@@ -2,11 +2,16 @@
   import type { LayoutProps } from "./$types";
   import { channelErrorStore, channelStore } from "$lib/stores/channelStore";
   import {
+    attributeConsentResultStore,
+    attributeConsentStore,
+  } from "$lib/stores/attributeConsent.store";
+  import {
     authorizationContextStore,
     authorizationStore,
     authorizedStore,
   } from "$lib/stores/authorization.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
   import { authenticationStore } from "$lib/stores/authentication.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
@@ -17,7 +22,10 @@
   import { analytics } from "$lib/utils/analytics/analytics";
   import { throwCanisterError } from "$lib/utils/utils";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import { ManageHandoffFlow } from "$lib/flows/manageHandoffFlow.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
+  import type { AuthMode } from "$lib/flows/authFlow.svelte";
+  import ManageHandoff from "$lib/components/ui/ManageHandoff.svelte";
   import ChannelError from "$lib/components/ui/ChannelError.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
@@ -100,12 +108,22 @@
     // OpenID/SSO 1-click flows gate on channel establishment
     return $channelStore !== undefined;
   });
+  // Attribute consent runs *after* authorize, so by the time the
+  // consent view paints, $authorizedStore is set and the
+  // base condition below would hide the identity switcher. Keep the
+  // header visible during the consent step so the user can switch
+  // identities or sign out before sharing data with the dapp.
+  const isAttributeConsenting = $derived(
+    $attributeConsentStore !== undefined &&
+      $attributeConsentResultStore === undefined,
+  );
   const showHeaderFooter = $derived(
     isReady &&
-      $authorizedStore === undefined &&
-      flow !== "openid-init" &&
-      flow !== "sso-init" &&
-      flow !== "openid-resume",
+      (isAttributeConsenting ||
+        ($authorizedStore === undefined &&
+          flow !== "openid-init" &&
+          flow !== "sso-init" &&
+          flow !== "openid-resume")),
   );
 
   // --- Identity switcher state ---
@@ -123,14 +141,22 @@
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
+  let authDialogMode = $state<AuthMode>("signin");
+  // Authenticates the selected identity (if needed) and hands the session to a
+  // new /manage tab — shared with the /mcp flow. Renders its own "You're signed
+  // in" confirmation + provider-overlay backdrop via <ManageHandoff> below.
+  const manageHandoff = new ManageHandoffFlow();
 
   const handleSignIn = async (identityNumber: bigint) => {
     try {
       isAuthenticating = true;
       if ($authenticationStore?.identityNumber !== identityNumber) {
         sessionStore.reset();
+        // Pass the effective origin so an SSO identity redeems through the gate
+        // path. Undefined before the dapp request arrives → plain OpenID path.
         await authLastUsedFlow.authenticate(
           $lastUsedIdentitiesStore.identities[`${identityNumber}`],
+          $authorizationStore?.effectiveOrigin,
         );
       }
       lastUsedIdentitiesStore.selectIdentity(identityNumber);
@@ -147,9 +173,6 @@
       duration: 4000,
     });
   };
-  const handleUpgrade = async (identityNumber: bigint) => {
-    await handleSignIn(identityNumber);
-  };
   const handleRemoveIdentity = (identityNumber: bigint) => {
     const isCurrent = selectedIdentity?.identityNumber === identityNumber;
     if (isCurrent) {
@@ -164,6 +187,7 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    void purgeSession(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
@@ -188,6 +212,18 @@
       });
     }
   };
+  const handleManageIdentity = async (): Promise<void> => {
+    isIdentityPopoverOpen = false;
+    if (selectedIdentity === undefined) return;
+    try {
+      isAuthenticating = true;
+      await manageHandoff.start("/manage", selectedIdentity);
+    } catch (error) {
+      handleError(error);
+    } finally {
+      isAuthenticating = false;
+    }
+  };
   const authorizeDefault = async () => {
     try {
       const { identityNumber, actor } = $authenticationStore!;
@@ -196,7 +232,10 @@
         .get_default_account(identityNumber, origin)
         .then(throwCanisterError)
         .then((account) => account.account_number[0]);
-      authorizationStore.authorize(Promise.resolve(accountNumber));
+      authorizationStore.authorize(
+        Promise.resolve(accountNumber),
+        "full-access",
+      );
     } catch (error) {
       handleError(error);
     }
@@ -262,11 +301,7 @@
                   isIdentityPopoverOpen = false;
                   isAuthDialogOpen = true;
                 }}
-                onManageIdentity={(): Promise<void> => {
-                  isIdentityPopoverOpen = false;
-                  window.open("/manage", "_blank");
-                  return Promise.resolve();
-                }}
+                onManageIdentity={handleManageIdentity}
                 onManageIdentities={() => {
                   isIdentityPopoverOpen = false;
                   isManageIdentitiesDialogOpen = true;
@@ -286,22 +321,28 @@
                   return;
                 }
                 isAuthDialogOpen = false;
+                authDialogMode = "signin";
               }}
             >
               <AuthWizard
                 onSignIn={handleSignIn}
                 onSignUp={handleSignUp}
-                onUpgrade={handleUpgrade}
                 onError={(error) => {
                   isAuthDialogOpen = false;
+                  isAuthenticating = false;
                   handleError(error);
                 }}
-                withinDialog
+                bind:mode={authDialogMode}
+                passkeyLabel={authDialogMode === "signin"
+                  ? $t`Select a passkey`
+                  : undefined}
               >
                 <h1
                   class="text-text-primary my-2 self-start text-2xl font-medium"
                 >
-                  {$t`Sign in`}
+                  {authDialogMode === "signup"
+                    ? $t`Create new identity`
+                    : $t`Add existing identity`}
                 </h1>
                 <p class="text-text-secondary mb-6 self-start text-sm">
                   {$t`Choose method to continue`}
@@ -329,4 +370,6 @@
       />
     </Dialog>
   {/if}
+
+  <ManageHandoff flow={manageHandoff} />
 {/if}

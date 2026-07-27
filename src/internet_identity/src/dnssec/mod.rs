@@ -17,12 +17,14 @@
 //!   canonical-form rules and signed-data construction live here.
 //! - RFC 4035 — Protocol modifications for DNSSEC; defines the
 //!   validation procedure we follow end-to-end.
-//! - RFC 5702 — RSA / SHA-256 in DNSSEC (algorithm 8).
+//! - RFC 5702 — RSA / SHA-256 (algorithm 8) and RSA / SHA-512
+//!   (algorithm 10) in DNSSEC.
 //! - RFC 6605 — ECDSA P-256 / SHA-256 in DNSSEC (algorithm 13).
 //! - RFC 8080 — Ed25519 in DNSSEC (algorithm 15).
-//! - RFC 8624 — Algorithm implementation requirements; defines the
-//!   MUST set `{8, 13, 15}` we accept and the MUST-NOT set (RSA-SHA1
-//!   etc.) we reject.
+//! - RFC 8624 — Algorithm implementation requirements. We accept
+//!   `{8, 10, 13}` (a subset of its "Validation: MUST" column) plus
+//!   `15` (RECOMMENDED), and deliberately omit the collision-broken
+//!   SHA-1 family (5, 7) — see [`signature`] for the rationale.
 //!
 //! ## Module layout
 //!
@@ -33,7 +35,7 @@
 //! - [`canonical`] — canonical-form serialisation (RFC 4034 §6.2,
 //!   §6.3) and signed-data assembly (RFC 4034 §3.1.8.1, §5.1.4).
 //! - [`signature`] — algorithm dispatch + signature checks for the
-//!   three MUST algorithms plus DS digest matching.
+//!   supported algorithms plus DS digest matching.
 //! - [`verify`] — top-level entry point implementing the four-step
 //!   algorithm in `docs/ongoing/email-recovery.md` §7.3.
 

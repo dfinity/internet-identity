@@ -1,5 +1,7 @@
 <script lang="ts">
   import {
+    AtSignIcon,
+    BriefcaseMedicalIcon,
     ChevronDownIcon,
     HouseIcon,
     KeyRoundIcon,
@@ -8,38 +10,40 @@
     LifeBuoyIcon,
     CodeIcon,
     LanguagesIcon,
-    InfoIcon,
+    SettingsIcon,
     UserIcon,
   } from "@lucide/svelte";
   import { page } from "$app/state";
-  import { afterNavigate, goto } from "$app/navigation";
+  import { afterNavigate, goto, replaceState } from "$app/navigation";
+  import { HANDOFF_HASH_KEY } from "$lib/utils/auth-handoff";
   import { onMount } from "svelte";
+  import { SvelteURLSearchParams } from "svelte/reactivity";
   import { analytics } from "$lib/utils/analytics/analytics";
   import {
     authenticatedStore,
     authenticationStore,
   } from "$lib/stores/authentication.store";
+  import { DelegationIdentity } from "@icp-sdk/core/identity";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
   import { sessionStore } from "$lib/stores/session.store";
   import { locales, localeStore, t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
-  import { getMetadataString } from "$lib/utils/openID";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
-  import { Trans } from "$lib/components/locale";
   import type { LayoutProps } from "./$types";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import Logo from "$lib/components/ui/Logo.svelte";
   import NavItem from "$lib/components/ui/NavItem.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
-  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import SignOutConfirmation from "$lib/components/ui/SignOutConfirmation.svelte";
   import ReauthPrompt from "$lib/components/ui/ReauthPrompt.svelte";
-  import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
+  import { AuthWizard } from "$lib/components/wizards/auth";
+  import type { AuthMode } from "$lib/flows/authFlow.svelte";
   import ChooseLanguage from "$lib/components/views/ChooseLanguage.svelte";
 
   // --- Props & state ---
@@ -55,8 +59,8 @@
   let isManageIdentitiesDialogOpen = $state(false);
   let isSignOutDialogOpen = $state(false);
   let isLanguageDialogOpen = $state(false);
-  let isRecoveryPhraseSetUpDismissed = $state(false);
   let isReauthDialogOpen = $state(false);
+  let authDialogMode = $state<AuthMode>("signin");
 
   // --- Derived ---
 
@@ -64,21 +68,6 @@
     Object.values($lastUsedIdentitiesStore.identities).sort(
       (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
     ),
-  );
-
-  let recoveryPhraseStatus: "missing" | "unverified" | "verified" = $derived.by(
-    () => {
-      const value = data.identityInfo.authn_methods.find(
-        (m) =>
-          "Recovery" in m.security_settings.purpose &&
-          getMetadataString(m.metadata, "usage") === "recovery_phrase",
-      );
-      return value === undefined
-        ? "missing"
-        : value.last_authentication[0] === undefined
-          ? "unverified"
-          : "verified";
-    },
   );
 
   // --- Sign in / sign up / upgrade ---
@@ -110,14 +99,6 @@
     });
   };
 
-  const handleUpgrade = async (identityNumber: bigint) => {
-    await handleSignIn(identityNumber);
-    toaster.success({
-      title: $t`Upgrade completed successfully`,
-      duration: 4000,
-    });
-  };
-
   // --- Sign out ---
 
   const handleSignOut = (): Promise<void> => {
@@ -127,14 +108,18 @@
   };
 
   const handleConfirmSignOut = () => {
+    // Rotate the ephemeral session so the signed-out session's key material
+    // doesn't linger in sessionStorage across the reload; sessionStorage
+    // survives window.location.replace.
+    sessionStore.reset();
     window.location.replace("/");
   };
 
   const handleConfirmSignOutAndRemove = () => {
-    const identity = $lastUsedIdentitiesStore.selected;
-    if (identity !== undefined) {
-      lastUsedIdentitiesStore.removeIdentity(identity.identityNumber);
-    }
+    const identityNumber = $authenticatedStore.identityNumber;
+    lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    void purgeSession(identityNumber);
+    sessionStore.reset();
     window.location.replace("/");
   };
 
@@ -144,6 +129,7 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    void purgeSession(identityNumber);
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
       const identityName =
@@ -224,6 +210,18 @@
 
   afterNavigate(() => {
     isMobileSidebarOpen = false;
+    // Sticky cleanup of the handoff nonce; the eager strip can be undone by SvelteKit's router re-syncing.
+    const hash = window.location.hash.slice(1);
+    if (hash.length === 0) return;
+    const params = new SvelteURLSearchParams(hash);
+    if (!params.has(HANDOFF_HASH_KEY)) return;
+    params.delete(HANDOFF_HASH_KEY);
+    const remaining = params.toString();
+    const cleanUrl =
+      window.location.pathname +
+      window.location.search +
+      (remaining.length > 0 ? `#${remaining}` : "");
+    replaceState(cleanUrl, page.state);
   });
 
   // Pre-fetch passkey credential ids
@@ -240,6 +238,11 @@
       return;
     }
     let earliest = Infinity;
+    // The management flow always uses a `DelegationIdentity`; the SSO gate's
+    // `AttributesIdentity` only appears in the dapp authorize flow.
+    if (!(authenticated.identity instanceof DelegationIdentity)) {
+      return;
+    }
     for (const { delegation } of authenticated.identity.getDelegation()
       .delegations) {
       const expiryMs = Number(delegation.expiration / BigInt(1_000_000));
@@ -256,72 +259,6 @@
     };
   });
 </script>
-
-{#snippet recoveryPhraseSetUp()}
-  {#if recoveryPhraseStatus === "missing"}
-    <div class="mb-4 grid size-16">
-      <!-- Progress ring is actually only 85% of the way to
-           make it more clear there's set-up work remaining -->
-      <ProgressRing
-        value={85}
-        strokeWidth={5}
-        class="col-start-1 row-start-1 size-16 text-blue-700 dark:text-blue-300"
-      />
-      <span
-        class="text-text-primary col-start-1 row-start-1 m-auto text-sm font-semibold"
-      >
-        90%
-      </span>
-    </div>
-    <h3 class="text-text-primary mb-1 text-sm font-semibold">
-      {$t`Complete set-up`}
-    </h3>
-    <p class="text-text-secondary mb-4 text-sm">
-      <Trans>
-        Activate your recovery phrase so that you can recover your identity at
-        any point.
-      </Trans>
-    </p>
-    <div class="flex flex-row gap-3">
-      <button
-        onclick={() => (isRecoveryPhraseSetUpDismissed = true)}
-        class="text-text-primary border-none text-sm font-semibold outline-none hover:underline focus-visible:underline"
-      >
-        {$t`Dismiss`}
-      </button>
-      <button
-        onclick={() => goto("/manage/recovery", { state: { activate: true } })}
-        class="text-text-primary border-none text-sm font-semibold outline-none hover:underline focus-visible:underline"
-      >
-        {$t`Activate`}
-      </button>
-    </div>
-  {:else if recoveryPhraseStatus === "unverified"}
-    <InfoIcon class="text-fg-secondary mb-3 size-5" />
-    <h3 class="text-text-primary mb-1 text-sm font-semibold">
-      {$t`Verify your recovery phrase`}
-    </h3>
-    <p class="text-text-secondary mb-4 text-sm">
-      <Trans>
-        Your recovery phrase is active, verify you saved it correctly.
-      </Trans>
-    </p>
-    <div class="flex flex-row gap-3">
-      <button
-        onclick={() => (isRecoveryPhraseSetUpDismissed = true)}
-        class="text-text-primary border-none text-sm font-semibold outline-none hover:underline focus-visible:underline"
-      >
-        {$t`Dismiss`}
-      </button>
-      <button
-        onclick={() => goto("/manage/recovery", { state: { verify: true } })}
-        class="text-text-primary border-none text-sm font-semibold outline-none hover:underline focus-visible:underline"
-      >
-        {$t`Verify`}
-      </button>
-    </div>
-  {/if}
-{/snippet}
 
 <!-- Layout -->
 <div class="bg-bg-primary_alt flex min-h-[100dvh] flex-row">
@@ -388,31 +325,43 @@
         <li class="contents">
           <NavItem
             href="/manage/access"
-            current={page.url.pathname === "/manage/access" ||
-              page.url.pathname === "/manage/recovery"}
+            current={page.url.pathname === "/manage/access"}
           >
             <KeyRoundIcon class="size-5 sm:max-md:mx-auto" />
-            <span class="sm:max-md:hidden">{$t`Access and recovery`}</span>
+            <span class="sm:max-md:hidden">{$t`Access`}</span>
+          </NavItem>
+        </li>
+        <li class="contents">
+          <NavItem
+            href="/manage/shareable-info"
+            current={page.url.pathname === "/manage/shareable-info"}
+          >
+            <AtSignIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Shareable info`}</span>
+          </NavItem>
+        </li>
+        <li class="contents">
+          <NavItem
+            href="/manage/recovery"
+            current={page.url.pathname === "/manage/recovery"}
+          >
+            <BriefcaseMedicalIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Recovery`}</span>
+          </NavItem>
+        </li>
+        <li class="contents">
+          <NavItem
+            href="/manage/settings"
+            current={page.url.pathname === "/manage/settings"}
+          >
+            <SettingsIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Settings`}</span>
           </NavItem>
         </li>
       </ul>
     </nav>
     <!-- Empty space between top and bottom content-->
     <div class="flex-1"></div>
-    <!-- Recovery phrase set-up guidance -->
-    <div
-      class={[
-        "mx-4 mt-24 mb-6",
-        "bg-bg-secondary rounded-xl p-4",
-        "sm:transition-all sm:transition-discrete sm:starting:scale-95 sm:starting:opacity-0",
-        "sm:max-md:hidden",
-        (recoveryPhraseStatus === "verified" ||
-          isRecoveryPhraseSetUpDismissed) &&
-          "hidden scale-90 opacity-0",
-      ]}
-    >
-      {@render recoveryPhraseSetUp()}
-    </div>
     <!-- Footer navigation -->
     <div class="mb-5 flex flex-col gap-0.5 px-4">
       <ul class="contents">
@@ -438,8 +387,13 @@
     </div>
     <div class="h-[env(safe-area-inset-bottom)]"></div>
   </aside>
-  <!-- Main content -->
-  <div class="relative flex flex-1 flex-col">
+  <!-- Main content. `min-w-0` so that a flex-row descendant whose
+       min-content (e.g. panel header with a `shrink-0` action button,
+       a wide unbreakable string) exceeds the viewport doesn't drag
+       this flex item — and the whole layout — into horizontal scroll
+       on narrow viewports. See the home page for the same defence
+       expressed via `grid-cols-[minmax(0,1fr)]`. -->
+  <div class="relative flex min-w-0 flex-1 flex-col">
     <div class="h-[env(safe-area-inset-top)]"></div>
     <!-- Header -->
     <header class="flex h-16 flex-row items-center px-4 sm:px-8 md:px-12">
@@ -452,16 +406,6 @@
         >
           <MenuIcon class="size-5" />
         </button>
-        <!-- Indicator that there's a message in the mobile menu
-             e.g. recovery phrase has not been set-up yet. -->
-        <div
-          class={[
-            "border-bg-primary_alt absolute end-2 top-2 size-2 rounded-full border-2 bg-blue-700 dark:bg-blue-300",
-            (recoveryPhraseStatus === "verified" ||
-              isRecoveryPhraseSetUpDismissed) &&
-              "hidden",
-          ]}
-        ></div>
       </div>
       <!-- Empty space between left and right content -->
       <div class="flex-1"></div>
@@ -533,21 +477,26 @@
         return;
       }
       isAuthDialogOpen = false;
+      authDialogMode = "signin";
     }}
   >
     <AuthWizard
       onSignIn={handleSignIn}
       onSignUp={handleSignUp}
-      onUpgrade={handleUpgrade}
       onError={(error) => {
         isAuthDialogOpen = false;
         isAuthenticating = false;
         handleError(error);
       }}
-      withinDialog
+      bind:mode={authDialogMode}
+      passkeyLabel={authDialogMode === "signin"
+        ? $t`Select a passkey`
+        : undefined}
     >
       <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-        {$t`Sign in`}
+        {authDialogMode === "signup"
+          ? $t`Create new identity`
+          : $t`Add existing identity`}
       </h1>
       <p class="text-text-secondary mb-6 self-start text-sm">
         {$t`Choose method to continue`}
@@ -579,14 +528,20 @@
   </Dialog>
 {/if}
 
-{#if isSignOutDialogOpen && $lastUsedIdentitiesStore.selected !== undefined}
-  <Dialog onClose={() => (isSignOutDialogOpen = false)}>
-    <SignOutConfirmation
-      identity={$lastUsedIdentitiesStore.selected}
-      onSignOut={handleConfirmSignOut}
-      onSignOutAndRemove={handleConfirmSignOutAndRemove}
-    />
-  </Dialog>
+{#if isSignOutDialogOpen}
+  {@const currentIdentity =
+    $lastUsedIdentitiesStore.identities[
+      $authenticatedStore.identityNumber.toString()
+    ]}
+  {#if currentIdentity !== undefined}
+    <Dialog onClose={() => (isSignOutDialogOpen = false)}>
+      <SignOutConfirmation
+        identity={currentIdentity}
+        onSignOut={handleConfirmSignOut}
+        onSignOutAndRemove={handleConfirmSignOutAndRemove}
+      />
+    </Dialog>
+  {/if}
 {/if}
 
 {#if isReauthDialogOpen}

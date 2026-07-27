@@ -38,8 +38,8 @@ pub struct DohConfig {
     pub allowed_domains: Vec<String>,
 
     /// Maximum age, in seconds, that the in-memory cache keeps a
-    /// fetched TXT record before re-fetching. Defaults to 1 hour
-    /// (3600) when omitted; capped at 24 hours by the verifier so a
-    /// stuck cache can't shadow a real key rotation indefinitely.
+    /// fetched TXT record fresh before re-fetching. Defaults to 1 hour
+    /// (3600) when omitted; otherwise the operator-chosen value is used
+    /// as-is.
     pub max_cache_age_secs: Option<u64>,
 }

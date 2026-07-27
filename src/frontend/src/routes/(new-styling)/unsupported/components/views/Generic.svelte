@@ -22,7 +22,7 @@
             <TriangleAlertIcon size="1.25rem" class="text-fg-warning-primary" />
           </FeaturedIcon>
           <h1 class="text-text-primary mb-3 text-start text-2xl font-medium">
-            {$t`Unsupported Browser`}
+            {$t`Unsupported browser`}
           </h1>
           <p class="text-text-primary mb-5 text-start">
             {$t`It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported.`}

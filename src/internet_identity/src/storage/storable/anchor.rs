@@ -2,6 +2,7 @@ use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCr
 use crate::storage::storable::openid_credential::StorableOpenIdCredential;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
+use crate::storage::storable::verified_email::StorableVerifiedEmail;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use minicbor::{Decode, Encode};
@@ -28,6 +29,9 @@ pub struct StorableAnchor {
     /// pattern as `passkey_credentials` / `recovery_keys` above.
     #[n(5)]
     pub email_recovery: Option<Vec<StorableEmailRecoveryCredential>>,
+    /// `Option` so pre-existing anchors decode cleanly.
+    #[n(6)]
+    pub verified_emails: Option<Vec<StorableVerifiedEmail>>,
 }
 
 impl Storable for StorableAnchor {

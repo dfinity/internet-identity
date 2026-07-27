@@ -27,11 +27,11 @@
 //! `crate::email_recovery` for the design.
 
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, test_authn_method,
+    create_identity_with_authn_method, sample_webauthn_authn_method, test_authn_method,
 };
 use canister_tests::{api::internet_identity as api, framework::*};
-use internet_identity_interface::internet_identity::types::email_recovery::{
-    EmailRecoveryDnsInput, EmailRecoveryError, EmailRecoveryStatus,
+use internet_identity_interface::internet_identity::types::email_challenge::{
+    EmailChallengeDnsInput, EmailChallengeError, EmailChallengeStatus, VerificationPath,
 };
 use internet_identity_interface::internet_identity::types::smtp::{
     SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage, SmtpRequest, SmtpResponse,
@@ -48,13 +48,17 @@ use std::time::Duration;
 // Fixtures
 // ===================================================================
 
-const TEST_DOMAIN: &str = "test.example.com";
-const TEST_ADDRESS: &str = "alice@test.example.com";
-const TEST_SELECTOR: &str = "test1";
-const TEST_BODY: &[u8] = b"Hello world.\r\nThis is a recovery email.\r\n";
+pub(crate) const TEST_DOMAIN: &str = "test.example.com";
+pub(crate) const TEST_ADDRESS: &str = "alice@test.example.com";
+// A second address in the *same* domain as `TEST_ADDRESS`, so two
+// concurrent verifications resolve the same DKIM FQDN and exercise the
+// in-flight cache dedup path. Used by the concurrency reproduction test.
+const TEST_ADDRESS_2: &str = "bob@test.example.com";
+pub(crate) const TEST_SELECTOR: &str = "test1";
+pub(crate) const TEST_BODY: &[u8] = b"Hello world.\r\nThis is a recovery email.\r\n";
 
-fn dns_input() -> EmailRecoveryDnsInput {
-    EmailRecoveryDnsInput {
+fn dns_input() -> EmailChallengeDnsInput {
+    EmailChallengeDnsInput {
         address: TEST_ADDRESS.into(),
         dns_proof: None,
     }
@@ -69,7 +73,7 @@ fn dns_input() -> EmailRecoveryDnsInput {
 /// entry so `mailbox_domains()` accepts `register@id.ai` /
 /// `recover@id.ai` envelopes (recipient acceptance reads from
 /// `related_origins`; see `email_recovery::mailbox_domains`).
-fn setup_canister(env: &PocketIc) -> candid::Principal {
+pub(crate) fn setup_canister(env: &PocketIc) -> candid::Principal {
     let args = InternetIdentityInit {
         doh_config: Some(Some(DohConfig {
             allowed_domains: vec![TEST_DOMAIN.into()],
@@ -82,10 +86,48 @@ fn setup_canister(env: &PocketIc) -> candid::Principal {
     install_ii_canister_with_arg_and_cycles(env, II_WASM.clone(), Some(args), 10_000_000_000_000)
 }
 
+/// Like [`setup_canister`] but also flips on the deploy flag that
+/// enables the legacy DNSSEC email-recovery path. The DNSSEC-path tests
+/// need it on; production (and [`setup_canister`]) default to off so the
+/// canister runs DoH-only.
+fn setup_canister_dnssec_enabled(env: &PocketIc) -> candid::Principal {
+    let args = InternetIdentityInit {
+        doh_config: Some(Some(DohConfig {
+            allowed_domains: vec![TEST_DOMAIN.into()],
+            max_cache_age_secs: Some(3600),
+        })),
+        related_origins: Some(vec!["https://id.ai".into()]),
+        canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(true),
+        ..Default::default()
+    };
+    install_ii_canister_with_arg_and_cycles(env, II_WASM.clone(), Some(args), 10_000_000_000_000)
+}
+
+/// Like [`setup_canister`] but explicitly sets the DNSSEC deploy flag to
+/// `false`. Behaviourally identical to the default, but makes the disabled
+/// state a test relies on explicit at the call site.
+fn setup_canister_dnssec_disabled(env: &PocketIc) -> candid::Principal {
+    let args = InternetIdentityInit {
+        doh_config: Some(Some(DohConfig {
+            allowed_domains: vec![TEST_DOMAIN.into()],
+            max_cache_age_secs: Some(3600),
+        })),
+        related_origins: Some(vec!["https://id.ai".into()]),
+        canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(false),
+        ..Default::default()
+    };
+    install_ii_canister_with_arg_and_cycles(env, II_WASM.clone(), Some(args), 10_000_000_000_000)
+}
+
 /// Create an identity and return `(identity_number, principal)`. The
 /// principal is needed for any caller-authenticated method calls
 /// (`prepare_add`, `credential_remove`).
-fn fresh_identity(env: &PocketIc, canister_id: candid::Principal) -> (u64, candid::Principal) {
+pub(crate) fn fresh_identity(
+    env: &PocketIc,
+    canister_id: candid::Principal,
+) -> (u64, candid::Principal) {
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(env, canister_id, &authn_method);
     (identity_number, authn_method.principal())
@@ -145,7 +187,7 @@ fn prepare_add_rejects_non_allowlisted_domain() {
     let canister_id = setup_canister(&env);
     let (id, p) = fresh_identity(&env, canister_id);
 
-    let bad_input = EmailRecoveryDnsInput {
+    let bad_input = EmailChallengeDnsInput {
         address: "bob@evil.com".into(),
         dns_proof: None,
     };
@@ -153,7 +195,7 @@ fn prepare_add_rejects_non_allowlisted_domain() {
         .expect("call failed")
         .expect_err("expected failure for non-allowlisted domain");
     match err {
-        EmailRecoveryError::DomainNotAllowlisted(d) => assert_eq!(d, "evil.com"),
+        EmailChallengeError::DomainNotAllowlisted(d) => assert_eq!(d, "evil.com"),
         other => panic!("expected DomainNotAllowlisted, got {other:?}"),
     }
 }
@@ -172,7 +214,7 @@ fn prepare_add_rejects_unauthorized_caller() {
             .expect("call failed")
             .expect_err("expected Unauthorized");
     match err {
-        EmailRecoveryError::Unauthorized(_) => {}
+        EmailChallengeError::Unauthorized(_) => {}
         other => panic!("expected Unauthorized, got {other:?}"),
     }
 }
@@ -185,9 +227,9 @@ fn status_returns_expired_for_unknown_nonce() {
     // resolve to Expired. This is the FE's signal to show "timed
     // out, please try again" — the canister deliberately doesn't
     // distinguish "never issued" from "evicted".
-    let status = api::email_recovery_status(&env, canister_id, "II-Recovery-deadbeefcafe1234")
+    let status = api::email_challenge_status(&env, canister_id, "II-Recovery-deadbeefcafe1234")
         .expect("call failed");
-    assert!(matches!(status, EmailRecoveryStatus::Expired));
+    assert!(matches!(status, EmailChallengeStatus::Expired));
 }
 
 #[test]
@@ -202,8 +244,8 @@ fn status_returns_pending_after_prepare_add() {
             .expect("prepare_add failed");
 
     let status =
-        api::email_recovery_status(&env, canister_id, &challenge.nonce).expect("call failed");
-    assert!(matches!(status, EmailRecoveryStatus::Pending));
+        api::email_challenge_status(&env, canister_id, &challenge.nonce).expect("call failed");
+    assert!(matches!(status, EmailChallengeStatus::Pending));
 }
 
 #[test]
@@ -225,8 +267,8 @@ fn status_flips_to_expired_after_ttl() {
     env.tick();
 
     let status =
-        api::email_recovery_status(&env, canister_id, &challenge.nonce).expect("call failed");
-    assert!(matches!(status, EmailRecoveryStatus::Expired));
+        api::email_challenge_status(&env, canister_id, &challenge.nonce).expect("call failed");
+    assert!(matches!(status, EmailChallengeStatus::Expired));
 }
 
 #[test]
@@ -243,16 +285,20 @@ fn smtp_request_silently_drops_email_with_no_nonce_in_subject() {
                 user: "alice".into(),
                 domain: TEST_DOMAIN.into(),
             },
-            to: SmtpAddress {
+            to: vec![SmtpAddress {
                 user: "register".into(),
                 domain: "id.ai".into(),
-            },
+            }],
         }),
         message: Some(SmtpMessage {
             headers: vec![
                 SmtpHeader {
                     name: "From".into(),
                     value: TEST_ADDRESS.into(),
+                },
+                SmtpHeader {
+                    name: "Date".into(),
+                    value: "Mon, 5 May 2026 12:00:00 +0000".into(),
                 },
                 SmtpHeader {
                     name: "To".into(),
@@ -266,6 +312,7 @@ fn smtp_request_silently_drops_email_with_no_nonce_in_subject() {
             body: ByteBuf::from(b"hello".to_vec()),
         }),
         gateway_flags: None,
+        message_id: None,
     };
     let resp = api::smtp_request(&env, canister_id, &request).expect("call failed");
     assert!(matches!(resp, SmtpResponse::Ok {}));
@@ -282,16 +329,20 @@ fn smtp_request_silently_drops_email_with_unknown_nonce() {
                 user: "alice".into(),
                 domain: TEST_DOMAIN.into(),
             },
-            to: SmtpAddress {
+            to: vec![SmtpAddress {
                 user: "register".into(),
                 domain: "id.ai".into(),
-            },
+            }],
         }),
         message: Some(SmtpMessage {
             headers: vec![
                 SmtpHeader {
                     name: "From".into(),
                     value: TEST_ADDRESS.into(),
+                },
+                SmtpHeader {
+                    name: "Date".into(),
+                    value: "Mon, 5 May 2026 12:00:00 +0000".into(),
                 },
                 SmtpHeader {
                     name: "To".into(),
@@ -307,30 +358,33 @@ fn smtp_request_silently_drops_email_with_unknown_nonce() {
             body: ByteBuf::from(b"hello".to_vec()),
         }),
         gateway_flags: None,
+        message_id: None,
     };
     let resp = api::smtp_request(&env, canister_id, &request).expect("call failed");
     assert!(matches!(resp, SmtpResponse::Ok {}));
 }
 
 #[test]
-fn smtp_request_drops_emails_addressed_to_other_recipients() {
+fn smtp_request_rejects_emails_addressed_to_unknown_recipients_with_550() {
     let env = env();
     let canister_id = setup_canister(&env);
 
-    // Recovery flow recipient is reserved (handled in a follow-up
-    // PR). Today the canister silently drops any non-`register`
-    // recipient — the gateway shouldn't be able to probe the
-    // canister for which mailboxes exist.
+    // The mailbox set this canister handles (`register@<d>` /
+    // `recover@<d>` for any `d` in `related_origins`) is part of the
+    // public Candid surface, so there's nothing to leak by surfacing
+    // an SMTP-level "no such user" — a sender targeting any other
+    // mailbox is a caller error and gets a 550 back so the off-chain
+    // gateway can bounce upstream.
     let request = SmtpRequest {
         envelope: Some(SmtpEnvelope {
             from: SmtpAddress {
                 user: "alice".into(),
                 domain: TEST_DOMAIN.into(),
             },
-            to: SmtpAddress {
-                user: "recover".into(),
+            to: vec![SmtpAddress {
+                user: "marketing".into(),
                 domain: "id.ai".into(),
-            },
+            }],
         }),
         message: Some(SmtpMessage {
             headers: vec![
@@ -339,8 +393,12 @@ fn smtp_request_drops_emails_addressed_to_other_recipients() {
                     value: TEST_ADDRESS.into(),
                 },
                 SmtpHeader {
+                    name: "Date".into(),
+                    value: "Mon, 5 May 2026 12:00:00 +0000".into(),
+                },
+                SmtpHeader {
                     name: "To".into(),
-                    value: "recover@id.ai".into(),
+                    value: "marketing@id.ai".into(),
                 },
                 SmtpHeader {
                     name: "Subject".into(),
@@ -350,9 +408,15 @@ fn smtp_request_drops_emails_addressed_to_other_recipients() {
             body: ByteBuf::from(b"hello".to_vec()),
         }),
         gateway_flags: None,
+        message_id: None,
     };
     let resp = api::smtp_request(&env, canister_id, &request).expect("call failed");
-    assert!(matches!(resp, SmtpResponse::Ok {}));
+    match resp {
+        SmtpResponse::Err(e) => {
+            assert_eq!(e.code, 550, "expected 550 for unknown recipient, got {e:?}");
+        }
+        SmtpResponse::Ok {} => panic!("expected 550 Err for unknown recipient, got Ok"),
+    }
 }
 
 #[test]
@@ -364,7 +428,7 @@ fn remove_credential_rejects_when_nothing_bound() {
     let err = api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
         .expect("call failed")
         .expect_err("expected AddressNotRegistered");
-    assert!(matches!(err, EmailRecoveryError::AddressNotRegistered));
+    assert!(matches!(err, EmailChallengeError::AddressNotRegistered));
 }
 
 // ===================================================================
@@ -396,12 +460,13 @@ fn dnssec_path_rejects_when_no_trust_anchors_configured() {
     use serde_bytes::ByteBuf;
 
     let env = env();
-    let canister_id = setup_canister(&env);
+    // DNSSEC path enabled, but no trust anchors configured.
+    let canister_id = setup_canister_dnssec_enabled(&env);
     let (id, p) = fresh_identity(&env, canister_id);
 
     // A minimal-but-shape-valid bundle. The canister rejects before
     // it even validates because no trust anchors are configured for
-    // this canister (we only set `doh_config` in `setup_canister`).
+    // this canister (we only set `doh_config`, not `dnssec_config`).
     let stub_rrsig = Rrsig {
         type_covered: 16,
         algorithm: 8,
@@ -442,7 +507,7 @@ fn dnssec_path_rejects_when_no_trust_anchors_configured() {
             }],
         }],
     };
-    let input = EmailRecoveryDnsInput {
+    let input = EmailChallengeDnsInput {
         address: TEST_ADDRESS.into(),
         dns_proof: Some(proof),
     };
@@ -454,7 +519,7 @@ fn dnssec_path_rejects_when_no_trust_anchors_configured() {
     // `DomainNotSupported`. The DoH allowlist isn't consulted at all
     // when `dns_proof` is supplied.
     match err {
-        EmailRecoveryError::DomainNotSupported(msg) => {
+        EmailChallengeError::DomainNotSupported(msg) => {
             assert!(
                 msg.contains("trust anchors"),
                 "expected trust-anchors message, got {msg:?}",
@@ -471,13 +536,13 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
     };
     use serde_bytes::ByteBuf;
 
-    // Even when the registered domain *is* on the DoH allowlist,
-    // supplying a `dns_proof` puts us on the DNSSEC path. This test
-    // confirms that by sending a malformed DNSSEC bundle and
-    // checking we get a DNSSEC error rather than the call falling
+    // With the DNSSEC path enabled, even when the registered domain *is*
+    // on the DoH allowlist, supplying a `dns_proof` puts us on the DNSSEC
+    // path. This test confirms that by sending a malformed DNSSEC bundle
+    // and checking we get a DNSSEC error rather than the call falling
     // through to the DoH happy path.
     let env = env();
-    let canister_id = setup_canister(&env);
+    let canister_id = setup_canister_dnssec_enabled(&env);
     let (id, p) = fresh_identity(&env, canister_id);
 
     let stub_rrsig = Rrsig {
@@ -520,7 +585,7 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
             }],
         }],
     };
-    let input = EmailRecoveryDnsInput {
+    let input = EmailChallengeDnsInput {
         // test.example.com IS on the allowlist — but the DNSSEC path
         // takes precedence.
         address: TEST_ADDRESS.into(),
@@ -534,9 +599,149 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
     // a `DohFetchFailed` or successful nonce — confirming the
     // canister never fell through to DoH.
     assert!(
-        matches!(err, EmailRecoveryError::DomainNotSupported(_)),
+        matches!(err, EmailChallengeError::DomainNotSupported(_)),
         "DNSSEC path should not fall through to DoH when dns_proof \
          is supplied; got {err:?}"
+    );
+}
+
+#[test]
+fn register_with_dnssec_disabled_and_non_allowlisted_email_fails() {
+    // Setup (register) flow with the DNSSEC path disabled: even when the
+    // caller supplies a DNSSEC proof, the canister drops it and falls
+    // through to the DoH allowlist. `example.com` is not on the allowlist
+    // (only `test.example.com` is), so the call fails with
+    // `DomainNotAllowlisted`.
+    let env = env();
+    let canister_id = setup_canister_dnssec_disabled(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC time fits in u32");
+    let proof = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        b"v=DKIM1; k=rsa; p=AAAA",
+        None,
+        now_secs,
+    )
+    .skeleton;
+    let input = EmailChallengeDnsInput {
+        address: "alice@example.com".into(),
+        dns_proof: Some(proof),
+    };
+    let err = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
+        .expect("call failed")
+        .expect_err("expected rejection");
+    match err {
+        EmailChallengeError::DomainNotAllowlisted(d) => assert_eq!(d, "example.com"),
+        other => panic!("expected DomainNotAllowlisted(example.com), got {other:?}"),
+    }
+}
+
+#[test]
+fn recovery_with_dnssec_disabled_and_non_allowlisted_email_fails() {
+    // Recovery (prepare_delegation) flow, same scenario: DNSSEC disabled +
+    // a supplied proof that gets dropped + a non-allowlisted domain →
+    // `DomainNotAllowlisted`. The allowlist gate runs before any
+    // address→anchor resolution, so an unbound address still surfaces the
+    // allowlist rejection.
+    let env = env();
+    let canister_id = setup_canister_dnssec_disabled(&env);
+
+    // Dummy session key — the call is rejected at the allowlist gate long
+    // before the key is used.
+    let session_key = ByteBuf::from(vec![0u8; 32]);
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC time fits in u32");
+    let proof = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        b"v=DKIM1; k=rsa; p=AAAA",
+        None,
+        now_secs,
+    )
+    .skeleton;
+    let input = EmailChallengeDnsInput {
+        address: "alice@example.com".into(),
+        dns_proof: Some(proof),
+    };
+    let err = api::email_recovery_prepare_delegation(&env, canister_id, input, session_key)
+        .expect("call failed")
+        .expect_err("expected rejection");
+    match err {
+        EmailChallengeError::DomainNotAllowlisted(d) => assert_eq!(d, "example.com"),
+        other => panic!("expected DomainNotAllowlisted(example.com), got {other:?}"),
+    }
+}
+
+#[test]
+fn register_with_dnssec_disabled_and_allowlisted_email_uses_doh() {
+    // Setup (register) flow with DNSSEC disabled and an allowlisted
+    // domain: the supplied proof is dropped and the DoH path accepts the
+    // allowlisted domain, so prepare_add issues a challenge.
+    let env = env();
+    let canister_id = setup_canister_dnssec_disabled(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC time fits in u32");
+    let proof = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        b"v=DKIM1; k=rsa; p=AAAA",
+        None,
+        now_secs,
+    )
+    .skeleton;
+    let input = EmailChallengeDnsInput {
+        address: TEST_ADDRESS.into(),
+        dns_proof: Some(proof),
+    };
+    let challenge = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
+        .expect("call failed")
+        .expect("prepare_add should succeed via DoH");
+    assert!(
+        challenge.nonce.starts_with("II-Recovery-"),
+        "unexpected nonce: {}",
+        challenge.nonce
+    );
+}
+
+#[test]
+fn recovery_with_dnssec_disabled_and_allowlisted_email_uses_doh() {
+    // Recovery (prepare_delegation) flow, same scenario: the proof is
+    // dropped and the allowlisted domain is accepted on the DoH path, so
+    // prepare_delegation issues a challenge.
+    let env = env();
+    let canister_id = setup_canister_dnssec_disabled(&env);
+
+    let session_key = ByteBuf::from(vec![0u8; 32]);
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC time fits in u32");
+    let proof = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        b"v=DKIM1; k=rsa; p=AAAA",
+        None,
+        now_secs,
+    )
+    .skeleton;
+    let input = EmailChallengeDnsInput {
+        address: TEST_ADDRESS.into(),
+        dns_proof: Some(proof),
+    };
+    let challenge = api::email_recovery_prepare_delegation(&env, canister_id, input, session_key)
+        .expect("call failed")
+        .expect("prepare_delegation should succeed via DoH");
+    assert!(
+        challenge.nonce.starts_with("II-Recovery-"),
+        "unexpected nonce: {}",
+        challenge.nonce
     );
 }
 
@@ -587,6 +792,7 @@ fn full_setup_flow_via_dnssec_path() {
         })),
         related_origins: Some(vec!["https://id.ai".into()]),
         canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(true),
         ..Default::default()
     };
     let canister_id = install_ii_canister_with_arg_and_cycles(
@@ -601,7 +807,7 @@ fn full_setup_flow_via_dnssec_path() {
     //    at root + the DMARC leaf. The DKIM leaf is *not* in the
     //    prepare bundle — its selector is unknown until the email
     //    arrives, so the FE walks it later via `submit_dkim_leaf`.
-    let input = EmailRecoveryDnsInput {
+    let input = EmailChallengeDnsInput {
         address: TEST_ADDRESS.into(),
         dns_proof: Some(DnsProofBundle {
             hops: chain.dmarc_leaf.clone().map_or(vec![], |l| vec![l]),
@@ -648,10 +854,10 @@ fn full_setup_flow_via_dnssec_path() {
     // 4. Status now reports `NeedDkimLeaf { selector }` — the
     //    canister read the selector from the email and is waiting
     //    for the FE to deliver the leaf.
-    let status = api::email_recovery_status(&env, canister_id, &challenge.nonce)
+    let status = api::email_challenge_status(&env, canister_id, &challenge.nonce)
         .expect("status call failed");
     let selector = match status {
-        EmailRecoveryStatus::NeedDkimLeaf { ref selector } => selector.clone(),
+        EmailChallengeStatus::NeedDkimLeaf { ref selector } => selector.clone(),
         other => panic!("expected NeedDkimLeaf, got {other:?}"),
     };
     assert_eq!(selector, TEST_SELECTOR);
@@ -660,27 +866,23 @@ fn full_setup_flow_via_dnssec_path() {
     //    the cached zone DNSKEY, runs the cryptographic signature
     //    check using the cached digest, checks DMARC + From: match,
     //    and binds the credential.
-    let submit_status = api::email_recovery_submit_dkim_leaf(
+    api::email_challenge_submit_dkim_leaf(
         &env,
         canister_id,
-        internet_identity_interface::internet_identity::types::email_recovery::EmailRecoverySubmitDkimLeafArg {
+        internet_identity_interface::internet_identity::types::email_challenge::EmailChallengeSubmitDkimLeafArg {
             nonce: challenge.nonce.clone(),
             hops: vec![chain.dkim_leaf.clone()],
             extra_chains: vec![],
         },
     )
     .expect("submit_dkim_leaf call failed")
-    .expect("submit_dkim_leaf should succeed");
-    assert!(
-        matches!(submit_status, EmailRecoveryStatus::RegistrationSucceeded),
-        "expected RegistrationSucceeded from submit_dkim_leaf, got {submit_status:?}",
-    );
+    .expect("submit_dkim_leaf should be accepted");
 
-    // 6. Polled status also reflects the success.
-    let status = api::email_recovery_status(&env, canister_id, &challenge.nonce)
+    // 6. The submit only accepts; the verdict is on the polled status.
+    let status = api::email_challenge_status(&env, canister_id, &challenge.nonce)
         .expect("status call failed");
     assert!(
-        matches!(status, EmailRecoveryStatus::RegistrationSucceeded),
+        matches!(status, EmailChallengeStatus::RegistrationSucceeded),
         "expected RegistrationSucceeded, got {status:?}",
     );
 
@@ -689,6 +891,177 @@ fn full_setup_flow_via_dnssec_path() {
     api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
         .expect("remove call failed")
         .expect("remove should succeed");
+}
+
+// ===================================================================
+// DNSSEC path: DoH fallback for an unsigned DKIM leaf
+// ===================================================================
+//
+// The DNSSEC path commits at prepare time based on the *apex* being
+// signed. But some providers publish the DKIM record as a CNAME into
+// an unsigned zone — `selector1._domainkey.outlook.com` is a signed
+// CNAME into the unsigned `outbound.protection.outlook.com`,
+// `live.com` likewise. The FE's DNSSEC hop-walk can't authenticate
+// that hop, so it submits an EMPTY `hops` set, asking the canister to
+// resolve the DKIM key over its own (allowlist-gated) DoH path using
+// the cached `partial_verification` crypto material instead of leaving
+// the entry stuck in `NeedDkimLeaf` until it expires.
+//
+// These tests reuse the same DNSSEC-signed `TEST_DOMAIN` fixture to
+// reach `NeedDkimLeaf`, then exercise the empty-hops fallback with the
+// domain on / off the DoH allowlist.
+
+/// Drive a DNSSEC-path setup flow up to the `NeedDkimLeaf` state.
+/// `allowed_domains` sets the DoH allowlist the subsequent empty-hops
+/// fallback will be gated on. Returns the canister + identity handles,
+/// the issued nonce, and the DKIM TXT the fallback's outcall expects
+/// to fetch (so the caller can fulfil the DoH fan-out).
+fn dnssec_flow_until_need_dkim_leaf(
+    env: &PocketIc,
+    allowed_domains: Vec<String>,
+) -> (candid::Principal, u64, candid::Principal, String, Vec<u8>) {
+    use internet_identity_interface::internet_identity::types::DnssecConfig;
+
+    let dkim = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let dkim_txt = dkim.public_txt_record();
+    let now_secs: u32 = (time(env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC initial time fits in u32");
+    // Skeleton bundle = chain + DMARC leaf (no DKIM leaf; its selector
+    // is unknown at prepare). `p=none` keeps DMARC alignment permissive.
+    let dmarc_txt = b"v=DMARC1; p=none;";
+    let chain = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        &dkim_txt,
+        Some(dmarc_txt),
+        now_secs,
+    );
+
+    let args = InternetIdentityInit {
+        doh_config: Some(Some(DohConfig {
+            allowed_domains,
+            max_cache_age_secs: Some(3600),
+        })),
+        dnssec_config: Some(Some(DnssecConfig {
+            root_anchors: vec![chain.anchor],
+        })),
+        related_origins: Some(vec!["https://id.ai".into()]),
+        canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(true),
+        ..Default::default()
+    };
+    let canister_id = install_ii_canister_with_arg_and_cycles(
+        env,
+        II_WASM.clone(),
+        Some(args),
+        10_000_000_000_000,
+    );
+    let (id, p) = fresh_identity(env, canister_id);
+
+    let input = EmailChallengeDnsInput {
+        address: TEST_ADDRESS.into(),
+        dns_proof: Some(DnsProofBundle {
+            hops: chain.dmarc_leaf.clone().map_or(vec![], |l| vec![l]),
+            ..chain.skeleton.clone()
+        }),
+    };
+    let challenge = api::email_recovery_credential_prepare_add(env, canister_id, p, id, input)
+        .expect("prepare_add call failed")
+        .expect("DNSSEC prepare_add should succeed");
+
+    let signed = dkim.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: time(env) / 1_000_000_000,
+    });
+    let raw_msg_id = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            pocket_ic::common::rest::RawEffectivePrincipal::None,
+            candid::Principal::anonymous(),
+            "smtp_request",
+            candid::encode_one(&signed.request).expect("encode SmtpRequest"),
+        )
+        .expect("submit_call");
+    // The DNSSEC path issues no outcalls at email-arrival time (chain +
+    // DMARC were anchored at prepare); a handful of ticks executes the
+    // message before we collect the response.
+    for _ in 0..30 {
+        env.tick();
+    }
+    let raw = env
+        .await_call_no_ticks(raw_msg_id)
+        .expect("await_call_no_ticks");
+    let resp: SmtpResponse = candid::decode_one(&raw).expect("decode SmtpResponse");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+
+    let status = api::email_challenge_status(env, canister_id, &challenge.nonce)
+        .expect("status call failed");
+    match status {
+        EmailChallengeStatus::NeedDkimLeaf { ref selector } => {
+            assert_eq!(selector, TEST_SELECTOR)
+        }
+        other => panic!("expected NeedDkimLeaf, got {other:?}"),
+    };
+
+    (canister_id, id, p, challenge.nonce, dkim_txt)
+}
+
+#[test]
+fn dnssec_path_falls_back_to_doh_when_leaf_is_unsigned() {
+    let env = env();
+    // Domain IS on the DoH allowlist, so the fallback can complete.
+    let (canister_id, id, p, nonce, dkim_txt) =
+        dnssec_flow_until_need_dkim_leaf(&env, vec![TEST_DOMAIN.into()]);
+
+    // The FE could not DNSSEC-resolve the leaf, so it drives the DoH path
+    // instead: `resolve_via_doh` flips the status from `NeedDkimLeaf` to
+    // `ResolvingDoh`, resolves the DKIM key over the cache (issuing the
+    // provider outcalls we answer here), and finishes off the stashed
+    // partial. The credential actually persists to the anchor (otherwise
+    // remove would return AddressNotRegistered).
+    let status = drive_doh_resolution(&env, canister_id, &nonce, &dkim_txt);
+    assert!(
+        matches!(status, EmailChallengeStatus::RegistrationSucceeded),
+        "expected RegistrationSucceeded, got {status:?}",
+    );
+    api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
+        .expect("remove call failed")
+        .expect("remove should succeed");
+}
+
+#[test]
+fn dnssec_path_doh_fallback_rejects_non_allowlisted_domain() {
+    let env = env();
+    // TEST_DOMAIN is DNSSEC-signed (so the DNSSEC path + NeedDkimLeaf
+    // are reached) but is NOT on the DoH allowlist.
+    let (canister_id, _id, _p, nonce, _dkim_txt) = dnssec_flow_until_need_dkim_leaf(&env, vec![]);
+
+    // DoH fallback. The allowlist gate rejects before any outcall (the
+    // synchronous gate in `fetch_txt`), so a single `resolve_via_doh` poll
+    // accepts (`Ok(())`) and writes the rejection to the polled status —
+    // surfaced below.
+    let result = api::email_challenge_resolve_via_doh(&env, canister_id, &nonce)
+        .expect("resolve_via_doh call failed");
+    assert!(
+        matches!(result, Ok(())),
+        "expected Ok(()) accept, got {result:?}",
+    );
+
+    // The pending entry is now terminally Failed — the user sees the
+    // unsupported-domain view instead of polling until Expired.
+    let status =
+        api::email_challenge_status(&env, canister_id, &nonce).expect("status call failed");
+    assert!(
+        matches!(
+            status,
+            EmailChallengeStatus::Failed(EmailChallengeError::DomainNotAllowlisted(_))
+        ),
+        "expected Failed(DomainNotAllowlisted), got {status:?}",
+    );
 }
 
 /// Drive PocketIC forward and panic if any DoH outcall is observed.
@@ -745,39 +1118,19 @@ fn full_setup_flow_binds_credential_to_anchor() {
         timestamp: now_secs,
     });
 
-    // 3. Submit smtp_request. The canister will issue DoH outcalls
-    //    for both the DKIM TXT and the DMARC TXT. Mock them in
-    //    parallel with `tick`s.
-    //
-    //    smtp_request is an update call that only returns once the
-    //    pipeline has fully run. We therefore submit it
-    //    asynchronously, then drive PocketIC forward — fulfilling
-    //    each outcall as it appears — and finally retrieve the
-    //    result.
+    // 3. Submit smtp_request — a synchronous accept that stashes the partial
+    //    and sets `ResolvingDoh` (no outcalls yet).
     let dkim_txt = signer.public_txt_record();
-    let raw_msg_id = env
-        .submit_call_with_effective_principal(
-            canister_id,
-            pocket_ic::common::rest::RawEffectivePrincipal::None,
-            candid::Principal::anonymous(),
-            "smtp_request",
-            candid::encode_one(&signed.request).expect("encode SmtpRequest"),
-        )
-        .expect("submit_call");
-
-    fulfill_doh_outcalls(&env, &dkim_txt);
-
-    let raw = env
-        .await_call_no_ticks(raw_msg_id)
-        .expect("await_call_no_ticks");
-    let resp: SmtpResponse = candid::decode_one(&raw).expect("decode SmtpResponse");
+    let resp = api::smtp_request(&env, canister_id, &signed.request).expect("smtp_request call");
     assert!(matches!(resp, SmtpResponse::Ok {}));
 
-    // 4. Status flips to RegistrationSucceeded.
-    let status = api::email_recovery_status(&env, canister_id, &challenge.nonce)
-        .expect("status call failed");
+    // 4. The FE drives the DoH resolution to terminal: each
+    //    `resolve_via_doh` poll fetches the DKIM key / DMARC policy over the
+    //    cache, and we answer the provider outcalls. Status flips to
+    //    RegistrationSucceeded.
+    let status = drive_doh_resolution(&env, canister_id, &challenge.nonce, &dkim_txt);
     assert!(
-        matches!(status, EmailRecoveryStatus::RegistrationSucceeded),
+        matches!(status, EmailChallengeStatus::RegistrationSucceeded),
         "expected RegistrationSucceeded, got {status:?}",
     );
 
@@ -789,46 +1142,557 @@ fn full_setup_flow_binds_credential_to_anchor() {
         .expect("remove should succeed");
 }
 
+#[test]
+fn resolve_via_doh_is_a_no_op_once_terminal() {
+    // The FE poll loop calls `resolve_via_doh` on every tick while the status
+    // is `ResolvingDoh`. A late tick can land after a concurrent poll has
+    // already finished verification, so the method must be idempotent: once
+    // the entry is terminal it accepts silently (`Ok(())`) without re-running
+    // the verification or disturbing the stamped verdict. This pins that the
+    // poll model is safe to over-call.
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let challenge =
+        api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+            .expect("prepare_add call failed")
+            .expect("prepare_add failed");
+
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let signed = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+    let dkim_txt = signer.public_txt_record();
+    let resp = api::smtp_request(&env, canister_id, &signed.request).expect("smtp_request call");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+
+    let status = drive_doh_resolution(&env, canister_id, &challenge.nonce, &dkim_txt);
+    assert!(
+        matches!(status, EmailChallengeStatus::RegistrationSucceeded),
+        "expected RegistrationSucceeded, got {status:?}",
+    );
+
+    // Extra polls after the terminal verdict are accepted silently and leave
+    // the status untouched — no re-verification, no NonceUnknown.
+    for _ in 0..3 {
+        api::email_challenge_resolve_via_doh(&env, canister_id, &challenge.nonce)
+            .expect("resolve_via_doh call failed")
+            .expect("a post-terminal poll must be a silent no-op");
+        let status =
+            api::email_challenge_status(&env, canister_id, &challenge.nonce).expect("status call");
+        assert!(
+            matches!(status, EmailChallengeStatus::RegistrationSucceeded),
+            "status must stay RegistrationSucceeded across extra polls, got {status:?}",
+        );
+    }
+
+    // The binding is intact and was applied exactly once: the first remove
+    // succeeds, a second reports nothing bound (the idempotent polls did not
+    // double-bind or corrupt the anchor).
+    api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
+        .expect("remove call failed")
+        .expect("remove should succeed");
+    let second_remove =
+        api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
+            .expect("second remove call failed");
+    assert!(
+        matches!(
+            second_remove,
+            Err(EmailChallengeError::AddressNotRegistered)
+        ),
+        "credential should have been bound exactly once, got {second_remove:?}",
+    );
+}
+
+// ===================================================================
+// DoH path: concurrent in-flight dedup — regression coverage
+// ===================================================================
+//
+// Guards the dedup invariant from #3987. When two verifications for
+// addresses in the *same* domain resolve the DKIM key while the DoH cache
+// is cold, they dedup onto a single outcall fan-out (`doh::cache`): the
+// first poll becomes the fetcher, the rest must reuse its result rather
+// than each firing their own five-provider fan-out.
+//
+// The original dedup parked waiters on a shared future the fetcher woke
+// when it published — on the single-threaded executor that ran the waiter
+// to completion inside the fetcher's call context, tripping `RefCell
+// already borrowed` and mis-routing replies. The single-flight cache is
+// now poll-based: `resolve_via_doh` reads the cache and returns `Ready` or
+// `Pending`, never blocking on or waking another call, so that hazard is
+// gone by construction. Dedup still must hold: a second poll for the same
+// FQDN sees the in-flight fetch and gets `Pending` (no second fan-out).
+//
+// This test pins that public-API behaviour with the interleaving made
+// explicit (and asserted) rather than left to a fixed tick count:
+//   1. Poll A (`resolve_via_doh`) and drive rounds — *without answering
+//      any outcall* — until its provider outcalls are pending; A owns the
+//      fetch.
+//   2. Poll B and confirm it dedups: no new outcalls appear, and its
+//      status stays `ResolvingDoh` (not terminal) until the fetch lands.
+//   3. Answer the single, deduped fan-out and drive both to terminal:
+//      both reach `RegistrationSucceeded` and their credentials are bound.
+#[test]
+fn concurrent_doh_dedup_for_same_domain_does_not_trap() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+
+    // Two identities with *distinct* passkeys. We can't call the shared
+    // `fresh_identity` helper twice here: it registers a fixed public
+    // key (`sample_webauthn_authn_method(0)`), and II rejects a second
+    // registration that reuses a public key.
+    let authn_a = sample_webauthn_authn_method(1);
+    let authn_b = sample_webauthn_authn_method(2);
+    let id_a = create_identity_with_authn_method(&env, canister_id, &authn_a);
+    let id_b = create_identity_with_authn_method(&env, canister_id, &authn_b);
+    let p_a = authn_a.principal();
+    let p_b = authn_b.principal();
+
+    // Two pending challenges, one per identity, both in TEST_DOMAIN.
+    let challenge_a = api::email_recovery_credential_prepare_add(
+        &env,
+        canister_id,
+        p_a,
+        id_a,
+        EmailChallengeDnsInput {
+            address: TEST_ADDRESS.into(),
+            dns_proof: None,
+        },
+    )
+    .expect("prepare_add A call failed")
+    .expect("prepare_add A failed");
+    let challenge_b = api::email_recovery_credential_prepare_add(
+        &env,
+        canister_id,
+        p_b,
+        id_b,
+        EmailChallengeDnsInput {
+            address: TEST_ADDRESS_2.into(),
+            dns_proof: None,
+        },
+    )
+    .expect("prepare_add B call failed")
+    .expect("prepare_add B failed");
+
+    // One signer (one selector + domain) → both emails resolve the
+    // *same* DKIM FQDN `test1._domainkey.test.example.com`, which is
+    // exactly what makes the two verifications dedup in the cache.
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let signed_a = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge_a.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+    let signed_b = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS_2,
+        to: "register@id.ai",
+        subject: &challenge_b.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+
+    // Both emails arrive. `smtp_request` is a synchronous accept that
+    // stashes each partial and sets `ResolvingDoh`; no outcalls yet.
+    let resp_a = api::smtp_request(&env, canister_id, &signed_a.request).expect("smtp_request A");
+    assert!(matches!(resp_a, SmtpResponse::Ok {}));
+    let resp_b = api::smtp_request(&env, canister_id, &signed_b.request).expect("smtp_request B");
+    assert!(matches!(resp_b, SmtpResponse::Ok {}));
+
+    // 1. A's first `resolve_via_doh` poll spawns the DKIM fetch; drive ticks
+    //    — *without answering any outcall* — until its provider fan-out is
+    //    pending. A now owns the in-flight fetch. Establishing the fetcher
+    //    first makes the dedup interleaving explicit: B is guaranteed to find
+    //    A's in-flight entry and dedup onto it.
+    api::email_challenge_resolve_via_doh(&env, canister_id, &challenge_a.nonce)
+        .expect("resolve_via_doh A call failed")
+        .expect("resolve_via_doh A should accept");
+    tick_until_doh_outcalls(&env, DOH_PROVIDER_URLS.len(), 60);
+
+    // 2. B's poll must dedup onto A's in-flight fetch: no *new* DoH outcalls
+    //    appear (still just A's fan-out), and B stays `ResolvingDoh` — not
+    //    terminal — because the key isn't cached yet. We must not answer an
+    //    outcall first: that would warm the cache and B would hit it instead
+    //    of deduping, leaving the path untested.
+    api::email_challenge_resolve_via_doh(&env, canister_id, &challenge_b.nonce)
+        .expect("resolve_via_doh B call failed")
+        .expect("resolve_via_doh B should accept");
+    for _ in 0..5 {
+        env.tick();
+    }
+    assert_eq!(
+        pending_doh_outcalls(&env),
+        DOH_PROVIDER_URLS.len(),
+        "B's poll must dedup onto the in-flight fetch, not issue its own DoH fan-out",
+    );
+    let status_b_inflight =
+        api::email_challenge_status(&env, canister_id, &challenge_b.nonce).expect("status B");
+    assert!(
+        matches!(status_b_inflight, EmailChallengeStatus::ResolvingDoh),
+        "the dedup poll must stay ResolvingDoh (joined A's fetch, no terminal \
+         status) before the fetch lands, got {status_b_inflight:?}",
+    );
+
+    // 3. Answer the single, deduped DKIM fan-out, then drive both A and B to
+    //    terminal — each fetches the shared (now-cached) records and verifies
+    //    off its own stashed partial. Both bind their credential end-to-end.
+    let dkim_txt = signer.public_txt_record();
+    answer_doh_outcalls(&env, &dkim_txt, 60);
+    for (label, nonce) in [("A", &challenge_a.nonce), ("B", &challenge_b.nonce)] {
+        let status = drive_doh_resolution(&env, canister_id, nonce, &dkim_txt);
+        assert!(
+            matches!(status, EmailChallengeStatus::RegistrationSucceeded),
+            "expected RegistrationSucceeded for request {label}, got {status:?}",
+        );
+    }
+}
+
+// ===================================================================
+// Tag-contract umbrella smoke tests.
+//
+// `dkim::tag_checks` exposes two umbrella functions
+// (`enforce_signature_header_tag_contract`,
+// `enforce_dns_record_tag_contract`) that both verification pipelines
+// route their tag enforcement through. Unit and property tests in
+// `dkim::tag_checks::tests` cover the umbrellas' verdict directly; the
+// two tests below close the loop by exercising each umbrella through
+// the canister's public API on the DoH path — submit a synthetic email
+// that triggers exactly the failure the umbrella is supposed to catch,
+// then assert the canister surfaces it on the polled status. If a
+// future refactor wires `smtp_request` past an umbrella (the bug class
+// that motivated the facade), these tests fail loudly at the
+// integration boundary.
+//
+// Both tests reuse the same DoH happy-path harness as
+// `full_setup_flow_binds_credential_to_anchor`: PocketIC environment,
+// real RSA-signed DKIM email, DoH outcalls fulfilled with a custom TXT.
+// Only the failure shape differs — they're deliberately tiny.
+// ===================================================================
+
+/// Drive the canister through one full DoH-path `smtp_request` using
+/// a caller-supplied builder. The builder gets the test signer, the
+/// challenge nonce, and the canister's `now_secs`, and returns the
+/// `(signed_email, dkim_txt)` pair: the SMTP request to submit, and
+/// the DKIM TXT the DoH mock should serve. Returns the polled
+/// `EmailChallengeStatus` after the pipeline runs.
+///
+/// Shared helper for the umbrella smoke tests below so each test body
+/// stays at "what's different about this scenario" granularity.
+fn run_doh_path_smoke(
+    build: impl FnOnce(&dkim_signer::TestSigner, &str, u64) -> (SignedEmail, Vec<u8>),
+) -> EmailChallengeStatus {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let challenge =
+        api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+            .expect("prepare_add call failed")
+            .expect("prepare_add failed");
+
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let (signed, dkim_txt) = build(&signer, &challenge.nonce, now_secs);
+
+    // `smtp_request` only stashes the partial and sets `ResolvingDoh` (or
+    // `Failed` if the signature-header umbrella rejects up front) — it issues
+    // no outcalls and returns synchronously.
+    let resp = api::smtp_request(&env, canister_id, &signed.request).expect("smtp_request call");
+    // Verification failures on the DoH path still return `Ok` to the
+    // gateway (the per-message error goes on the pending challenge);
+    // the gateway would otherwise be able to probe which nonces exist.
+    assert!(
+        matches!(resp, SmtpResponse::Ok {}),
+        "smtp_request must return Ok regardless of verification outcome, got {resp:?}"
+    );
+
+    // The FE drives the DoH resolution; a partial-build rejection is already
+    // terminal and returns straight through.
+    drive_doh_resolution(&env, canister_id, &challenge.nonce, &dkim_txt)
+}
+
+#[test]
+fn doh_path_signature_header_umbrella_rejects_future_dated_t() {
+    // Sign an email with `t=now + 10_000s` — well beyond the 60-second
+    // skew window in `dkim::tag_checks::CLOCK_SKEW_SECS`. The signature
+    // is otherwise structurally valid (correct `bh=`, correct crypto
+    // signature over a real RSA key) so the rejection has to come from
+    // `enforce_signature_header_tag_contract` short-circuiting at the
+    // `t=` check before body-hash or signature verification runs.
+    //
+    // Validates the *signature-header-only* umbrella is in the
+    // smtp_request → verify_email → verify_dkim call chain.
+    let status = run_doh_path_smoke(|signer, nonce, now_secs| {
+        let signed = signer.sign_email(SignedEmailParams {
+            from: TEST_ADDRESS,
+            to: "register@id.ai",
+            subject: nonce,
+            body: TEST_BODY,
+            timestamp: now_secs + 10_000,
+        });
+        // verify_dkim short-circuits before it parses the record, but
+        // the DoH mock still needs to satisfy the provider quorum so
+        // the canister can read past the fetch.
+        (signed, signer.public_txt_record())
+    });
+
+    match status {
+        EmailChallengeStatus::Failed(EmailChallengeError::EmailVerificationFailed(msg)) => {
+            assert!(
+                msg.contains("SignatureFutureDated"),
+                "expected SignatureFutureDated in failure message, got {msg:?}",
+            );
+        }
+        other => {
+            panic!("expected Failed(EmailVerificationFailed(SignatureFutureDated…)), got {other:?}")
+        }
+    }
+}
+
+#[test]
+fn doh_path_dns_record_umbrella_rejects_testing_mode_key() {
+    // Sign an email with valid timestamps and Subject coverage, then
+    // serve a DKIM TXT with `; t=y` appended. The signature-header-only
+    // umbrella accepts, `parse_dkim_txt` admits the record, and
+    // `enforce_dns_record_tag_contract` rejects on the `t=y`
+    // testing-mode check — *before* k= match, body hash, or signature
+    // verification. Validates the *DNS-record-aware* umbrella is in
+    // the call chain and that the canister-served DKIM TXT actually
+    // routes through it.
+    let status = run_doh_path_smoke(|signer, nonce, now_secs| {
+        let signed = signer.sign_email(SignedEmailParams {
+            from: TEST_ADDRESS,
+            to: "register@id.ai",
+            subject: nonce,
+            body: TEST_BODY,
+            timestamp: now_secs,
+        });
+        let mut txt = signer.public_txt_record();
+        txt.extend_from_slice(b"; t=y");
+        (signed, txt)
+    });
+
+    match status {
+        EmailChallengeStatus::Failed(EmailChallengeError::EmailVerificationFailed(msg)) => {
+            assert!(
+                msg.contains("TestingMode"),
+                "expected TestingMode in failure message, got {msg:?}",
+            );
+        }
+        other => panic!("expected Failed(EmailVerificationFailed(TestingMode…)), got {other:?}"),
+    }
+}
+
+// ===================================================================
+// email_challenge_diagnostics — the gateway message_id reaches the FE.
+// ===================================================================
+
+/// Happy path: the gateway sets `message_id` on the inbound
+/// `SmtpRequest`; the canister retains it on the pending challenge and
+/// surfaces it (verbatim) via `email_challenge_diagnostics`, alongside a
+/// public reason code + verification path. Confirms the new query + the
+/// `canister_tests` API wrapper end-to-end.
+#[test]
+fn diagnostics_surface_message_id_from_smtp_request() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let challenge =
+        api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+            .expect("prepare_add call failed")
+            .expect("prepare_add failed");
+
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let mut signed = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+    // The gateway attaches a per-message correlation id.
+    const GW_ID: &str = "<gw-test-id@gateway.example>";
+    signed.request.message_id = Some(GW_ID.into());
+
+    let dkim_txt = signer.public_txt_record();
+    let resp = api::smtp_request(&env, canister_id, &signed.request).expect("smtp_request call");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+    let status = drive_doh_resolution(&env, canister_id, &challenge.nonce, &dkim_txt);
+    assert!(
+        matches!(status, EmailChallengeStatus::RegistrationSucceeded),
+        "expected RegistrationSucceeded, got {status:?}",
+    );
+
+    let diag = api::email_challenge_diagnostics(&env, canister_id, &challenge.nonce)
+        .expect("diagnostics call failed")
+        .expect("diagnostics present for a live challenge");
+    assert_eq!(diag.message_id.as_deref(), Some(GW_ID));
+    assert_eq!(diag.reason_code, "Succeeded");
+    assert!(matches!(diag.verification_path, VerificationPath::Doh));
+}
+
+/// The core promise: a *verification failure* still retains the gateway
+/// `message_id` (the email reached the canister), so a user who reports
+/// "it didn't work" has a correlation id to hand to support. Uses the
+/// future-dated `t=` failure shape from the umbrella tests above.
+#[test]
+fn diagnostics_cover_the_failed_path_with_message_id() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let challenge =
+        api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+            .expect("prepare_add call failed")
+            .expect("prepare_add failed");
+
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let mut signed = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs + 10_000, // future-dated → verification fails
+    });
+    const GW_ID: &str = "<gw-failed-id@gateway.example>";
+    signed.request.message_id = Some(GW_ID.into());
+
+    // The future-dated `t=` is rejected by the signature-header umbrella when
+    // `smtp_request` builds the partial — terminally `Failed` right away, no
+    // DoH resolution needed.
+    let resp = api::smtp_request(&env, canister_id, &signed.request).expect("smtp_request call");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+
+    let status = api::email_challenge_status(&env, canister_id, &challenge.nonce)
+        .expect("status call failed");
+    assert!(
+        matches!(status, EmailChallengeStatus::Failed(_)),
+        "expected Failed, got {status:?}",
+    );
+
+    let diag = api::email_challenge_diagnostics(&env, canister_id, &challenge.nonce)
+        .expect("diagnostics call failed")
+        .expect("diagnostics present for a failed challenge");
+    assert_eq!(diag.message_id.as_deref(), Some(GW_ID));
+    assert_eq!(diag.reason_code, "Failed:EmailVerificationFailed");
+}
+
+/// An unknown/expired nonce yields `None`, mirroring how
+/// `email_challenge_status` collapses both to `Expired` — no oracle.
+#[test]
+fn diagnostics_returns_none_for_unknown_nonce() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let diag = api::email_challenge_diagnostics(&env, canister_id, "II-Recovery-deadbeefcafe1234")
+        .expect("diagnostics call failed");
+    assert!(diag.is_none());
+}
+
+/// The 5 provider URLs the DoH module fans out to. Order doesn't matter
+/// because the quorum just needs 3 of them to agree on the same body
+/// bytes. Shared by the outcall-fulfilling and outcall-counting helpers
+/// so they agree on what counts as a DoH outcall.
+const DOH_PROVIDER_URLS: [&str; 5] = [
+    "https://cloudflare-dns.com/dns-query",
+    "https://dns.google/dns-query",
+    "https://dns.quad9.net/dns-query",
+    "https://private.canadianshield.cira.ca/dns-query",
+    "https://public.dns.iij.jp/dns-query",
+];
+
+/// Count the DoH provider outcalls currently pending (unanswered). A
+/// dedup waiter's `yield_round` round-trips the management canister
+/// (`raw_rand`), which is not an HTTP outcall, so it never inflates this
+/// count — letting a test assert "the second request issued no fan-out
+/// of its own".
+fn pending_doh_outcalls(env: &PocketIc) -> usize {
+    env.get_canister_http()
+        .iter()
+        .filter(|r| DOH_PROVIDER_URLS.iter().any(|p| r.url.starts_with(p)))
+        .count()
+}
+
+/// Drive rounds — *without answering anything* — until at least `want`
+/// DoH outcalls are pending, or panic after `max_ticks`. Lets a test
+/// wait for a fetcher to fan out before acting, instead of guessing a
+/// fixed tick count.
+fn tick_until_doh_outcalls(env: &PocketIc, want: usize, max_ticks: u32) {
+    for _ in 0..max_ticks {
+        if pending_doh_outcalls(env) >= want {
+            return;
+        }
+        env.tick();
+    }
+    panic!(
+        "expected >= {want} pending DoH outcalls within {max_ticks} ticks, saw {}",
+        pending_doh_outcalls(env)
+    );
+}
+
 /// Drive PocketIC forward until each of the 5 DoH provider outcalls
 /// has been seen, fulfilling them with the supplied DKIM TXT bytes.
 /// DMARC outcalls are answered with NXDOMAIN (the verifier's "no
 /// DMARC record" path requires DKIM `d=` to equal From: domain — true
 /// in this test).
-fn fulfill_doh_outcalls(env: &PocketIc, dkim_txt: &[u8]) {
-    // The 5 provider URLs the DoH module fans out to. Order doesn't
-    // matter because the quorum just needs 3 of them to agree on the
-    // same body bytes.
-    let providers = [
-        "https://cloudflare-dns.com/dns-query",
-        "https://dns.google/dns-query",
-        "https://dns.quad9.net/dns-query",
-        "https://private.canadianshield.cira.ca/dns-query",
-        "https://public.dns.iij.jp/dns-query",
-    ];
-    // We wait for at most this many ticks before assuming the
-    // canister isn't going to issue any more outcalls. Each tick is
-    // a heartbeat; outcalls land within a few of them.
-    const MAX_TICKS: u32 = 60;
-    let mut ticks = 0;
-    let mut answered = std::collections::HashSet::new();
+/// Parse the queried name out of a wire-format DNS query body: skip the
+/// 12-byte header, then read length-prefixed labels until the root. Used to
+/// tell a DKIM lookup (`<selector>._domainkey.<domain>`) from a DMARC one
+/// (`_dmarc.<domain>`) so each provider outcall gets the right answer
+/// regardless of the order the cache fans them out in.
+fn doh_query_name(body: &[u8]) -> String {
+    let mut labels = Vec::new();
+    let mut i = 12;
+    while i < body.len() {
+        let len = body[i] as usize;
+        if len == 0 || i + 1 + len > body.len() {
+            break;
+        }
+        labels.push(String::from_utf8_lossy(&body[i + 1..i + 1 + len]).to_string());
+        i += 1 + len;
+    }
+    labels.join(".")
+}
 
-    while ticks < MAX_TICKS && answered.len() < providers.len() {
+/// Tick up to `max_ticks` times, answering each pending DoH provider outcall
+/// by its query name: a DKIM lookup with `dkim_txt`; a DMARC lookup
+/// (`_dmarc.…`) with an authoritative NXDOMAIN (status=200 + RCODE=3
+/// wire-format), which the verifier surfaces as `DohError::NoAnswer` and
+/// treats as "no DMARC published" — the strict-alignment fallback (DKIM `d=`
+/// == From: domain) is satisfied by our test setup. (A bare HTTP 404 would
+/// not work: `classify_upstream` collapses any upstream non-200 onto the
+/// upstream-error sentinel to defend against a counterfeit-NoAnswer, and the
+/// DMARC handler would then refuse to fall back.)
+///
+/// Answering by query name (rather than by fan-out ordering) lets this be
+/// called across several `resolve_via_doh` polls — DKIM resolves on one poll,
+/// DMARC on a later one — without mis-answering a DMARC query with DKIM bytes.
+fn answer_doh_outcalls(env: &PocketIc, dkim_txt: &[u8], max_ticks: u32) {
+    let mut answered = std::collections::HashSet::new();
+    for _ in 0..max_ticks {
         env.tick();
-        ticks += 1;
         for req in env.get_canister_http() {
-            if answered.contains(&req.request_id) {
+            if answered.contains(&req.request_id)
+                || !DOH_PROVIDER_URLS.iter().any(|p| req.url.starts_with(p))
+            {
                 continue;
             }
-            let body = if providers.iter().any(|p| req.url.starts_with(p)) {
-                // Synthesize a wire-format DNS response carrying the
-                // DKIM TXT. The canister's transform reduces the
-                // wire response down to TXT bytes, so what we emit
-                // here will be what `quorum::decide_quorum` sees.
-                fake_dkim_dns_response(dkim_txt)
+            let body = if doh_query_name(&req.body).starts_with("_dmarc.") {
+                fake_nxdomain_dns_response()
             } else {
-                continue;
+                fake_dkim_dns_response(dkim_txt)
             };
-            let response = MockCanisterHttpResponse {
+            env.mock_canister_http_response(MockCanisterHttpResponse {
                 subnet_id: req.subnet_id,
                 request_id: req.request_id,
                 response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
@@ -837,34 +1701,56 @@ fn fulfill_doh_outcalls(env: &PocketIc, dkim_txt: &[u8]) {
                     body,
                 }),
                 additional_responses: vec![],
-            };
-            env.mock_canister_http_response(response);
+            });
             answered.insert(req.request_id);
         }
     }
-    // After fulfilling DKIM outcalls, the canister will also fan out
-    // for DMARC. We answer all of those with a 404-equivalent (no
-    // record), which the verifier treats as "no DMARC published" —
-    // and the strict-alignment fallback (DKIM d= == From: domain) is
-    // satisfied by our test setup.
-    let dmarc_deadline = ticks + 60;
-    while ticks < dmarc_deadline {
-        env.tick();
-        ticks += 1;
-        for req in env.get_canister_http() {
-            let response = MockCanisterHttpResponse {
-                subnet_id: req.subnet_id,
-                request_id: req.request_id,
-                response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                    status: 404,
-                    headers: vec![],
-                    body: vec![],
-                }),
-                additional_responses: vec![],
-            };
-            env.mock_canister_http_response(response);
+}
+
+/// Drive a DoH resolution to its terminal status the way the FE does: poll
+/// `email_challenge_status`, and while it's `ResolvingDoh` (or `NeedDkimLeaf`,
+/// the DNSSEC fallback's starting point — the first `resolve_via_doh` flips
+/// it to `ResolvingDoh`) call `email_challenge_resolve_via_doh` and answer the
+/// provider outcalls the cache spawns. The DKIM key resolves on one poll and
+/// DMARC on the next, so several rounds run; capped so a wedge fails the test
+/// instead of hanging.
+pub(crate) fn drive_doh_resolution(
+    env: &PocketIc,
+    canister_id: candid::Principal,
+    nonce: &str,
+    dkim_txt: &[u8],
+) -> EmailChallengeStatus {
+    const MAX_ROUNDS: u32 = 12;
+    for _ in 0..MAX_ROUNDS {
+        let status =
+            api::email_challenge_status(env, canister_id, nonce).expect("status call failed");
+        if !matches!(
+            status,
+            EmailChallengeStatus::ResolvingDoh | EmailChallengeStatus::NeedDkimLeaf { .. }
+        ) {
+            return status;
         }
+        api::email_challenge_resolve_via_doh(env, canister_id, nonce)
+            .expect("resolve_via_doh call failed")
+            .expect("resolve_via_doh should accept");
+        answer_doh_outcalls(env, dkim_txt, 30);
     }
+    api::email_challenge_status(env, canister_id, nonce).expect("status call failed")
+}
+
+/// Build a wire-format DNS NXDOMAIN response (RCODE=3, ANCOUNT=0).
+/// The parser collapses RCODE=3 onto `ParseError::NoAnswer`, which
+/// the transform turns into `Outcome::NoAnswer` and the quorum
+/// surfaces as `DohError::NoAnswer` — the DMARC handler treats that
+/// as "no policy published" and falls back to strict alignment.
+fn fake_nxdomain_dns_response() -> Vec<u8> {
+    let mut out = Vec::new();
+    // Header: flags=0x8183 (QR + RD + RA + RCODE=3), QDCOUNT=1, ANCOUNT=0.
+    out.extend_from_slice(&[0, 0, 0x81, 0x83, 0, 1, 0, 0, 0, 0, 0, 0]);
+    // Question section — the verifier doesn't re-parse the QNAME, but
+    // a well-formed NXDOMAIN still carries the question echoed back.
+    out.extend_from_slice(b"\x07example\x03com\x00\x00\x10\x00\x01");
+    out
 }
 
 /// Build a wire-format DNS response carrying a single TXT answer
@@ -902,16 +1788,16 @@ fn fake_dkim_dns_response(txt: &[u8]) -> Vec<u8> {
 // Args structs
 // ===================================================================
 
-struct SignedEmailParams<'a> {
-    from: &'a str,
-    to: &'a str,
-    subject: &'a str,
-    body: &'a [u8],
-    timestamp: u64,
+pub(crate) struct SignedEmailParams<'a> {
+    pub from: &'a str,
+    pub to: &'a str,
+    pub subject: &'a str,
+    pub body: &'a [u8],
+    pub timestamp: u64,
 }
 
-struct SignedEmail {
-    request: SmtpRequest,
+pub(crate) struct SignedEmail {
+    pub request: SmtpRequest,
 }
 
 // ===================================================================
@@ -923,7 +1809,7 @@ struct SignedEmail {
 // integration test isn't fragile against module reorganisation in
 // the canister code.
 
-mod dkim_signer {
+pub(crate) mod dkim_signer {
     use rsa::pkcs8::EncodePublicKey;
     use rsa::{Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey};
     use sha2::{Digest, Sha256};
@@ -1031,10 +1917,10 @@ mod dkim_signer {
                         user: from_user.into(),
                         domain: from_domain.into(),
                     },
-                    to: SmtpAddress {
+                    to: vec![SmtpAddress {
                         user: to_user.into(),
                         domain: to_domain.into(),
-                    },
+                    }],
                 }),
                 message: Some(SmtpMessage {
                     headers: vec![
@@ -1066,6 +1952,7 @@ mod dkim_signer {
                     body: ByteBuf::from(params.body.to_vec()),
                 }),
                 gateway_flags: None,
+                message_id: None,
             };
 
             super::SignedEmail { request }

@@ -148,10 +148,10 @@ mod tests {
                     user: "alice".into(),
                     domain: "example.com".into(),
                 },
-                to: SmtpAddress {
+                to: vec![SmtpAddress {
                     user: "recover".into(),
                     domain: "id.ai".into(),
-                },
+                }],
             }),
             message: Some(SmtpMessage {
                 headers: vec![
@@ -167,6 +167,7 @@ mod tests {
                 body: ByteBuf::from(b"x".to_vec()),
             }),
             gateway_flags: None,
+            message_id: None,
         }
     }
 

@@ -2,6 +2,7 @@ import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
 import { createActorForCredential, II_URL } from "../../utils";
 import { DEFAULT_PASSKEY_NAME } from "../../fixtures/manageAccessPage";
+import { SSO_DISCOVERY_DOMAIN, SSO_OPENID_PORT } from "../../fixtures/sso";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { LEGACY_II_URL } from "$lib/config";
 
@@ -111,44 +112,37 @@ test.describe("Access methods", () => {
       await manageAccessPage.assertPasskeyExists("in-use-passkey");
     });
 
-    test("which is currently in use", async ({
-      page,
+    test("currently in use passkey is disabled when other methods exist", async ({
       manageAccessPage,
-      identities,
-      signInWithIdentity,
-      setCredentialsForIdentity,
     }) => {
-      // Remove currently in use passkey
       await manageAccessPage.assertPasskeyCount(2);
       await manageAccessPage
         .findPasskey("in-use-passkey")
-        .remove(async (dialog) => {
-          await dialog.assertSignOutWarningShown();
-          await dialog.confirm();
-        });
-
-      await page.waitForURL(II_URL); // Expect to be signed out
-      await manageAccessPage.goto(); // Go back to the manage page
-
-      // Remove the credential corresponding to the removed passkey
-      await setCredentialsForIdentity(
-        identities[0].identityNumber,
-        identities[0].credentials.slice(1),
-      );
-
-      // Sign in with the new passkey and assert it's the only passkey
-      await signInWithIdentity(page, identities[0].identityNumber);
-      await manageAccessPage.assertPasskeyCount(1);
-      await manageAccessPage.assertPasskeyExists("additional-passkey");
+        .assertRemoveDisabledWithTooltip(
+          "Switch to another method before removing",
+        );
     });
   });
 
-  test("cannot remove a single passkey", async ({ manageAccessPage }) => {
+  test("cannot remove a single passkey without a recovery method", async ({
+    manageAccessPage,
+  }) => {
     await manageAccessPage.assertPasskeyCount(1);
     await manageAccessPage
       .findPasskey(DEFAULT_PASSKEY_NAME)
-      .assertUnremovable();
+      .assertRemoveDisabledWithTooltip(
+        "Add another method or sign in via recovery to remove",
+      );
     await manageAccessPage.assertPasskeyCount(1);
+  });
+
+  test("switch is disabled when already signed in with that passkey", async ({
+    manageAccessPage,
+  }) => {
+    await manageAccessPage.assertPasskeyCount(1);
+    await manageAccessPage
+      .findPasskey(DEFAULT_PASSKEY_NAME)
+      .assertSwitchDisabled();
   });
 
   test("cannot have more than 16 passkeys", async ({
@@ -202,6 +196,56 @@ test.describe("Access methods", () => {
       await dialog.close();
     });
     await manageAccessPage.assertPasskeyCount(16);
+  });
+
+  test("returns to the chooser when the cross-device dialog is closed", async ({
+    page,
+  }) => {
+    // Open the "Add access method" chooser.
+    await page
+      .getByRole("main")
+      .getByRole("button", { name: "Add new" })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Add access method" }),
+    ).toBeVisible();
+
+    // Open the cross-device pairing modal via the single "URL | QR Code" link.
+    await page.getByRole("button", { name: "URL | QR Code" }).click();
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Add this identity to another device",
+      }),
+    ).toBeVisible();
+
+    // The pairing modal is layered on top of the chooser; closing it returns
+    // to the chooser rather than tearing down the whole add-access dialog.
+    // Both <dialog>s match getByRole("dialog") (the pairing one is nested),
+    // so target the innermost via .last().
+    const pairingDialog = page
+      .getByRole("dialog")
+      .filter({
+        has: page.getByRole("heading", {
+          name: "Add this identity to another device",
+        }),
+      })
+      .last();
+    await pairingDialog.getByRole("button", { name: "Close" }).click();
+
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Add this identity to another device",
+      }),
+    ).toBeHidden();
+    // The chooser is still open — the dialog was not torn down.
+    await expect(
+      page.getByRole("heading", { name: "Add access method" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Continue with passkey" }),
+    ).toBeVisible();
   });
 
   test.describe("can remove a legacy passkey", () => {
@@ -304,6 +348,109 @@ test.describe("Access methods", () => {
     });
   });
 
+  test.describe("with an SSO method", () => {
+    const ssoEmail = "switch-sso@example.com";
+
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [{ claims: { email: ssoEmail } }],
+      },
+    });
+
+    test("can link an SSO method and switch to it", async ({
+      page,
+      manageAccessPage,
+      openSsoPopup,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      // Link the SSO method via the Add access method dialog. The SSO entry
+      // button (aria-label "Continue with SSO") routes the wizard to the
+      // SignInWithSso view, where `openSsoPopup` fills the domain, waits
+      // for canister-side discovery, and clicks Continue.
+      await manageAccessPage.add(async () => {
+        const popup = await openSsoPopup(page);
+        const closed = popup.waitForEvent("close", { timeout: 15_000 });
+        await signInWithOpenId(popup, openIdUsers[0].id);
+        await closed;
+      });
+
+      // The linked SSO credential renders as its own list item — pick it
+      // out by the email claim we set on the test IdP user.
+      const ssoItem = page
+        .getByRole("main")
+        .getByRole("listitem")
+        .filter({ hasText: ssoEmail });
+      await expect(ssoItem).toBeVisible();
+      // The passkey is still the active method.
+      const passkeyItem = page
+        .getByRole("main")
+        .getByRole("listitem")
+        .filter({ hasText: "Passkey" });
+      await expect(
+        passkeyItem.getByText("Active", { exact: true }),
+      ).toBeVisible();
+
+      // Drop the IdP's session cookie from the link popup so the switch
+      // popup re-prompts for sign-in; otherwise the IdP silently reuses
+      // the existing session and `signInWithOpenId` can't find its
+      // "Sign-in" heading. II's session lives in localStorage and on
+      // `id.ai`, so clearing `localhost` cookies leaves it untouched.
+      await page.context().clearCookies({ domain: "localhost" });
+
+      // Switch to the SSO method via More options → Switch → Continue. The
+      // canister rejects the JWT as "Authorization invalid" if the handler
+      // omits the SSO discovery domain (regression guard for the prior bug).
+      await ssoItem.getByRole("button", { name: "More options" }).click();
+      await page.getByRole("menuitem", { name: "Switch" }).click();
+      const switchDialog = page.getByRole("dialog").filter({
+        has: page.getByRole("heading", { name: "Switch access method" }),
+      });
+      await expect(switchDialog).toBeVisible();
+      const switchPopupPromise = page.context().waitForEvent("page");
+      await switchDialog.getByRole("button", { name: "Continue" }).click();
+      const switchPopup = await switchPopupPromise;
+      const switchPopupClosed = switchPopup.waitForEvent("close", {
+        timeout: 15_000,
+      });
+      await signInWithOpenId(switchPopup, openIdUsers[0].id);
+      await switchPopupClosed;
+
+      // Success toast + Active badge flips to the SSO item.
+      await expect(switchDialog).toBeHidden();
+      await expect(page.getByRole("status")).toContainText(
+        "Successfully switched access method",
+      );
+      await expect(ssoItem.getByText("Active", { exact: true })).toBeVisible();
+      await expect(
+        passkeyItem.getByText("Active", { exact: true }),
+      ).toBeHidden();
+
+      // Last-used entry must be tagged as `sso` so a subsequent "last used"
+      // sign-in re-authenticates via the SSO branch (not the configured
+      // OpenID branch, which would have no discovery domain).
+      const lastUsedRaw = await page.evaluate(() =>
+        localStorage.getItem("ii-last-used-identities"),
+      );
+      expect(lastUsedRaw).not.toBeNull();
+      const lastUsed = JSON.parse(lastUsedRaw!) as {
+        data: Record<string, { authMethod: Record<string, unknown> }>;
+      };
+      const entries = Object.values(lastUsed.data);
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.authMethod).toHaveProperty("sso");
+      expect(entries[0]?.authMethod).not.toHaveProperty("openid");
+      const sso = (entries[0]!.authMethod as { sso: Record<string, unknown> })
+        .sso;
+      expect(sso).toMatchObject({
+        domain: SSO_DISCOVERY_DOMAIN,
+        email: ssoEmail,
+      });
+      expect(sso.loginHint).toEqual(expect.any(String));
+    });
+  });
+
   test.describe("can be cancelled", () => {
     test.afterEach(
       async ({
@@ -335,7 +482,7 @@ test.describe("Access methods", () => {
     });
 
     test("when removing a passkey", async ({ manageAccessPage }) => {
-      // Rename current
+      // Rename current so we can identify it after adding a second passkey
       await manageAccessPage
         .findPasskey(DEFAULT_PASSKEY_NAME)
         .rename(async (dialog) => {
@@ -343,17 +490,24 @@ test.describe("Access methods", () => {
           await dialog.submit();
         });
 
-      // Add another, since we cannot remove a single passkey
+      // Add another passkey — the active method cannot be removed, so we
+      // cancel removal on the non-active one instead
       await manageAccessPage.add((dialog) => dialog.passkey());
-
-      // Then remove the current passkey, but cancel instead of confirm
-      await manageAccessPage
-        .findPasskey("in-use-passkey")
-        .remove((dialog) => dialog.cancel());
-
-      // Cleanup additional passkey and undo renaming of current
       await manageAccessPage
         .findPasskey(DEFAULT_PASSKEY_NAME)
+        .rename(async (dialog) => {
+          await dialog.fill("additional-passkey");
+          await dialog.submit();
+        });
+
+      // Cancel removal of the non-active passkey
+      await manageAccessPage
+        .findPasskey("additional-passkey")
+        .remove((dialog) => dialog.cancel());
+
+      // Cleanup: remove the additional passkey and restore the original name
+      await manageAccessPage
+        .findPasskey("additional-passkey")
         .remove((dialog) => dialog.confirm());
       await manageAccessPage
         .findPasskey("in-use-passkey")

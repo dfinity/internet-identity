@@ -155,9 +155,6 @@ class ManagePage {
     await expect(
       this.#page.getByRole("heading", { name: "Welcome" }),
     ).toBeVisible();
-    await expect(
-      this.#page.getByText("Your identity and sign-in methods at a glance."),
-    ).toBeVisible();
   }
 }
 

@@ -37,20 +37,42 @@ pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
 
     // Required to make II available on custom domains (e.g. backend.id.ai).
     // See https://internetcomputer.org/docs/current/developer-docs/production/custom-domain/#custom-domains-on-the-boundary-nodes
+    //
+    // The file lists every custom domain the canister serves, one per line.
+    // Besides the related origins (the passkey RP origins), we also include
+    // the backend origin so the II backend canister is reachable on its own
+    // custom domain (e.g. `backend.beta.id.ai`).
+    let mut ic_domains: Vec<String> = config
+        .related_origins
+        .clone()
+        .unwrap_or_default()
+        .iter()
+        .map(|origin| strip_origin_scheme(origin))
+        .collect();
+    if let Some(backend_origin) = &config.backend_origin {
+        let backend_domain = strip_origin_scheme(backend_origin);
+        // Skip when empty or already present (e.g. the backend origin is also
+        // listed among the related origins) to avoid blank or duplicate lines.
+        if !backend_domain.is_empty() && !ic_domains.contains(&backend_domain) {
+            ic_domains.push(backend_domain);
+        }
+    }
     assets.push(Asset {
         url_path: "/.well-known/ic-domains".to_string(),
-        content: config
-            .related_origins
-            .clone()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|origin| origin.replace("https://", ""))
-            .collect::<Vec<_>>()
-            .join("\n")
-            .into_bytes(),
+        content: ic_domains.join("\n").into_bytes(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::OCTETSTREAM,
     });
 
     assets
+}
+
+/// Strips the URL scheme (`https://` or `http://`) from an origin, leaving the
+/// bare host (and port, if any) as required by the `ic-domains` file format.
+fn strip_origin_scheme(origin: &str) -> String {
+    origin
+        .strip_prefix("https://")
+        .or_else(|| origin.strip_prefix("http://"))
+        .unwrap_or(origin)
+        .to_string()
 }
