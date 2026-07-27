@@ -355,6 +355,59 @@ const fromBase64 = (value: string): Uint8Array =>
   // @ts-ignore Uint8Array.fromBase64 is supported in all target browsers
   Uint8Array.fromBase64(value);
 
+// The redirect transport navigates the tab away and back, so the homepage form
+// is reset to its defaults on the return leg. Snapshot the form to sessionStorage
+// before navigating and restore it on load, so the inputs come back as the user
+// left them. (The window flow keeps its opener, so it never loses them.)
+const FORM_STATE_KEY = "test-app-form-state";
+type FormControl =
+  | HTMLInputElement
+  | HTMLSelectElement
+  | HTMLTextAreaElement;
+
+const formControls = (): FormControl[] =>
+  Array.from(
+    document.querySelectorAll<FormControl>(
+      "input[id], select[id], textarea[id]",
+    ),
+  );
+
+const isToggle = (el: FormControl): el is HTMLInputElement =>
+  el instanceof HTMLInputElement &&
+  (el.type === "checkbox" || el.type === "radio");
+
+const saveFormState = (): void => {
+  const state: Record<string, string | boolean> = {};
+  for (const el of formControls()) {
+    state[el.id] = isToggle(el) ? el.checked : el.value;
+  }
+  sessionStorage.setItem(FORM_STATE_KEY, JSON.stringify(state));
+};
+
+const restoreFormState = (): void => {
+  const raw = sessionStorage.getItem(FORM_STATE_KEY);
+  if (raw === null) {
+    return;
+  }
+  let state: Record<string, string | boolean>;
+  try {
+    state = JSON.parse(raw) as Record<string, string | boolean>;
+  } catch {
+    return;
+  }
+  for (const el of formControls()) {
+    const value = state[el.id];
+    if (value === undefined) {
+      continue;
+    }
+    if (isToggle(el)) {
+      el.checked = value === true;
+    } else {
+      el.value = String(value);
+    }
+  }
+};
+
 // On the return leg of a redirect sign-in, the callback page hands results back
 // in the hash. Recover the identity from the persisted session (as any redirect
 // relying party would) and render, reusing the same view as the window flow.
@@ -391,6 +444,7 @@ const renderRedirectResultIfPresent = async () => {
 };
 
 const init = async () => {
+  restoreFormState();
   await renderRedirectResultIfPresent();
   const userAgentElement = document.getElementById("userAgent") as HTMLElement;
   userAgentElement.innerText = navigator.userAgent;
@@ -421,6 +475,7 @@ const init = async () => {
             ? icrc3NonceEl.value.trim()
             : undefined,
       };
+      saveFormState();
       window.location.assign(`${CALLBACK_PATH}?${encodeInputs(inputs)}`);
       return;
     }
