@@ -162,7 +162,7 @@ fn resolve_gated_ii_client_sub(
             let anchor = state::storage_borrow(|storage| {
                 storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, ii_client_id, stable_id)
             })?;
-            ii_client_sub_on_anchor(anchor, iss, ii_client_id, sso_domain)
+            ii_client_sub_on_anchor(anchor, iss, ii_client_id, sso_domain, stable_id)
         }
         None => {
             let sub = &verification.credential.sub;
@@ -176,10 +176,14 @@ fn resolve_gated_ii_client_sub(
 }
 
 /// Load `anchor_number` and return the `sub` of its II-client-keyed OpenID
-/// credential for `(iss, ii_client_id)` established through `sso_domain`, if
-/// present. The `sso_domain` match is redundant with the domain-scoped index
-/// key that produced `anchor_number`, but kept explicit so this read is
-/// domain-scoped on its own terms (symmetric with the `sub`-org branch).
+/// credential for `(iss, ii_client_id, stable_id)` established through
+/// `sso_domain`, if present. The match uses the same full key that produced
+/// `anchor_number` from the domain-scoped index: an anchor can carry more than
+/// one II-client credential for the same `(iss, ii_client_id, sso_domain)` with
+/// different `(sub, stable_id)` (a user who linked several OIDC accounts from
+/// one provider+client), so `stable_id` selects the intended one — the
+/// delegation seed is keyed on `sub`, so reading back a different credential's
+/// `sub` would resolve to the wrong principal.
 /// `None` when the anchor is gone or no longer carries that credential — the
 /// index pointed here but the credential has since been removed, so the gated
 /// login fails safe.
@@ -188,6 +192,7 @@ fn ii_client_sub_on_anchor(
     iss: &str,
     ii_client_id: &str,
     sso_domain: &str,
+    stable_id: &str,
 ) -> Option<String> {
     state::storage_borrow(|storage| {
         let anchor = storage.read(anchor_number).ok()?;
@@ -198,6 +203,7 @@ fn ii_client_sub_on_anchor(
                 cred.iss == iss
                     && cred.aud == ii_client_id
                     && cred.sso_domain.as_deref() == Some(sso_domain)
+                    && cred.stable_id.as_deref() == Some(stable_id)
             })
             .map(|cred| cred.sub.clone())
     })
@@ -537,6 +543,57 @@ mod tests {
                 .credential
                 .sub,
             "ii-client-sub"
+        );
+    }
+
+    #[test]
+    fn gated_read_selects_by_stable_id_when_anchor_has_several() {
+        init_test_storage();
+        // One human links two OIDC accounts from the same provider+client
+        // through the same domain to a single anchor: two II-client credentials
+        // sharing (iss, ii_client_id, sso_domain) but differing in
+        // (sub, stable_id). Both stable-id index entries point at this anchor.
+        let cred_a =
+            resolve_ii_client_identity(&sso_verification(false, "oid", "ii-sub-a", Some("oid-a")))
+                .unwrap()
+                .credential;
+        let cred_b =
+            resolve_ii_client_identity(&sso_verification(false, "oid", "ii-sub-b", Some("oid-b")))
+                .unwrap()
+                .credential;
+        // Link the two accounts to one anchor as production does: two separate
+        // login writes, each reconciling the stable-id index on its own.
+        let anchor_no = crate::state::storage_borrow_mut(|storage| {
+            let mut anchor = storage.allocate_anchor(0).unwrap();
+            anchor.add_openid_credential(cred_a).unwrap();
+            let n = anchor.anchor_number();
+            storage.write(anchor).unwrap();
+            n
+        });
+        crate::state::storage_borrow_mut(|storage| {
+            let mut anchor = storage.read(anchor_no).unwrap();
+            anchor.add_openid_credential(cred_b).unwrap();
+            storage.write(anchor).unwrap();
+        });
+
+        // Each gated login must resolve to *its own* stable id's II-client sub.
+        // The read selects by the full index key, not the first credential that
+        // shares (iss, ii_client_id, sso_domain): the delegation seed is keyed
+        // on `sub`, so reading back the other credential's `sub` would be a
+        // wrong principal.
+        assert_eq!(
+            resolve_ii_client_identity(&sso_verification(true, "oid", "per-app-a", Some("oid-a")))
+                .unwrap()
+                .credential
+                .sub,
+            "ii-sub-a"
+        );
+        assert_eq!(
+            resolve_ii_client_identity(&sso_verification(true, "oid", "per-app-b", Some("oid-b")))
+                .unwrap()
+                .credential
+                .sub,
+            "ii-sub-b"
         );
     }
 }
