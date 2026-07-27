@@ -456,15 +456,12 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       openIdUsers,
       configureSsoGating,
     }) => {
-      // A brand-new gated SSO user flows through the standard "not connected →
-      // sign up" prompt (no direct-register shortcut); auto-drive the IdP popup.
+      // A brand-new gated SSO user: sign up, then one normal (II-client) sign-in
+      // via the "First sign-in with <org>" prompt (a second IdP popup), after
+      // which the stashed per-app token is replayed and the consent screen
+      // (manual flows always show it when attributes are requested) appears.
       await configureSsoGating(gatingConfig);
       const consent = attributeConsentView(authorizePage.page);
-      authorizePage.page.context().on("page", (popup) => {
-        void signInWithOpenId(popup, openIdUsers[0].id).catch(() => {
-          // A popup can close before it's driven; ignore.
-        });
-      });
       await authorizePage.page
         .getByRole("button", { name: "Sign in with SSO" })
         .click();
@@ -476,16 +473,47 @@ test.describe("Authorize with IdP-side per-app gating", () => {
         exact: true,
       });
       await expect(domainContinue).toBeEnabled({ timeout: 30_000 });
+      // Gated IdP popup.
+      const gatedPopupPromise = authorizePage.page
+        .context()
+        .waitForEvent("page");
       await domainContinue.click();
+      const gatedPopup = await gatedPopupPromise;
+      const closedGatedPopupPromise = gatedPopup.waitForEvent("close", {
+        timeout: 15_000,
+      });
+      await signInWithOpenId(gatedPopup, openIdUsers[0].id);
+      await closedGatedPopupPromise;
       // Fresh SSO user → IdentityNotConnectedDialog; confirm sign-up.
       await authorizePage.page
         .getByRole("dialog")
         .getByRole("button", { name: "Sign up" })
         .click();
+      // Per-app token can't establish the identity → "First sign-in with <org>"
+      // prompt; its Continue runs one normal (II-client) sign-in in a new popup,
+      // then replays the stashed per-app token.
+      await expect(
+        authorizePage.page.getByRole("heading", {
+          name: `First sign-in with Test SSO ${SSO_OPENID_PORT}`,
+        }),
+      ).toBeVisible({ timeout: 15_000 });
+      const normalPopupPromise = authorizePage.page
+        .context()
+        .waitForEvent("page");
       await authorizePage.page
         .getByRole("button", { name: "Continue", exact: true })
         .click();
-      // Listed: the consent screen surfaces the SSO-scoped rows.
+      const normalPopup = await normalPopupPromise;
+      const closedNormalPopupPromise = normalPopup.waitForEvent("close", {
+        timeout: 15_000,
+      });
+      await signInWithOpenId(normalPopup, openIdUsers[0].id);
+      await closedNormalPopupPromise;
+      await authorizePage.page
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+      // Manual flows always show the attribute consent screen when attributes
+      // are requested; approve it to complete and reach the app.
       await consent.waitForVisible();
       await expect(
         consent.row(`Test SSO ${SSO_OPENID_PORT} email:`),
@@ -572,10 +600,21 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       const popupPromise = page.context().waitForEvent("page");
       await page.getByRole("button", { name: "Sign In" }).click();
       const popup = await popupPromise;
-      // 1-click auto-approves the SSO allowlist (name, email) and self-closes
-      // the popup — no consent screen, no sign-up prompt.
+      // First gated login: the per-app token can't establish the identity, so II
+      // prompts one normal (II-client) sign-in via the "First sign-in with <org>"
+      // dialog, then replays the stashed per-app token — no consent screen or
+      // account-picker for 1-click.
       await signInWithOpenId(popup, openIdUsers[0].id);
-      await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
+      await expect(
+        popup.getByRole("heading", {
+          name: `First sign-in with Test SSO ${SSO_OPENID_PORT}`,
+        }),
+      ).toBeVisible({ timeout: 15_000 });
+      const normalPopupPromise = page.context().waitForEvent("page");
+      await popup.getByRole("button", { name: "Continue" }).click();
+      const normalPopup = await normalPopupPromise;
+      await signInWithOpenId(normalPopup, openIdUsers[0].id);
+      await expect(page.locator("#principal")).toBeVisible({ timeout: 25_000 });
     });
   });
 
@@ -668,8 +707,19 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       const popupPromise = page.context().waitForEvent("page");
       await page.getByRole("button", { name: "Sign In" }).click();
       const popup = await popupPromise;
+      // First gated login: one normal (II-client) sign-in via the "First sign-in
+      // with <org>" dialog, then the stashed per-app token is replayed.
       await signInWithOpenId(popup, openIdUsers[0].id);
-      await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
+      await expect(
+        popup.getByRole("heading", {
+          name: `First sign-in with Test SSO ${SSO_OPENID_PORT}`,
+        }),
+      ).toBeVisible({ timeout: 15_000 });
+      const normalPopupPromise = page.context().waitForEvent("page");
+      await popup.getByRole("button", { name: "Continue" }).click();
+      const normalPopup = await normalPopupPromise;
+      await signInWithOpenId(normalPopup, openIdUsers[0].id);
+      await expect(page.locator("#principal")).toBeVisible({ timeout: 25_000 });
     });
   });
 
