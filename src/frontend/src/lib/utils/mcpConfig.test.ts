@@ -1,5 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { originOf, isOriginTrusted, type McpConfig } from "./mcpConfig";
+import { describe, it, expect, vi } from "vitest";
+import type { ActorSubclass } from "@icp-sdk/core/agent";
+import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import {
+  originOf,
+  isOriginTrusted,
+  setMcpEnabled,
+  type McpConfig,
+} from "./mcpConfig";
 
 describe("originOf", () => {
   it("returns the origin (scheme + host + port), dropping path/query/hash", () => {
@@ -88,5 +95,43 @@ describe("isOriginTrusted", () => {
     expect(isOriginTrusted(trust("not a url"), "https://mcp.id.ai")).toBe(
       false,
     );
+  });
+});
+
+describe("setMcpEnabled", () => {
+  const ANCHOR = BigInt(10_000);
+  const CUSTOM_URL = "https://mcp.acme.com/mcp";
+
+  const makeActor = (current: McpConfig) => ({
+    mcp_get_config: vi.fn().mockResolvedValue({
+      enabled: current.enabled,
+      url: current.url === undefined ? [] : [current.url],
+    }),
+    mcp_set_config: vi.fn().mockResolvedValue({ Ok: null }),
+  });
+
+  const asActor = (actor: ReturnType<typeof makeActor>) =>
+    actor as unknown as ActorSubclass<_SERVICE>;
+
+  it("forgets the custom URL when turning the feature off", async () => {
+    const actor = makeActor({ enabled: true, url: CUSTOM_URL });
+
+    await setMcpEnabled(asActor(actor), ANCHOR, false);
+
+    expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
+      enabled: false,
+      url: [],
+    });
+  });
+
+  it("leaves the custom URL alone when turning the feature on", async () => {
+    const actor = makeActor({ enabled: false, url: CUSTOM_URL });
+
+    await setMcpEnabled(asActor(actor), ANCHOR, true);
+
+    expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
+      enabled: true,
+      url: [CUSTOM_URL],
+    });
   });
 });

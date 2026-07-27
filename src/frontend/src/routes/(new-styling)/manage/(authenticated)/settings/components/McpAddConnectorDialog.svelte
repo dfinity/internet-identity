@@ -11,6 +11,7 @@
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { parseMcpServerUrl, probeMcpServer } from "$lib/utils/mcpServer";
+  import { officialMcpUrl } from "$lib/globals";
 
   interface Props {
     onClose: () => void;
@@ -112,7 +113,9 @@
 
     <div class="flex flex-col gap-2">
       <h2 class="text-text-primary text-xl font-medium">
-        {$t`Add AI access`}
+        {officialMcpUrl() !== undefined
+          ? $t`Customize AI access`
+          : $t`Add AI access`}
       </h2>
       <p class="text-text-tertiary text-sm text-pretty">
         <Trans>

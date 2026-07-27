@@ -27,6 +27,7 @@ const OpenIdEmailVerificationIDL = IDL.Variant({
 });
 
 const backendCanisterConfigIDL = IDL.Record({
+  mcp_official_url: IDL.Opt(IDL.Text),
   openid_configs: IDL.Opt(
     IDL.Vec(
       IDL.Record({
@@ -64,6 +65,7 @@ export interface OpenIdConfig {
 }
 export type BackendCanisterConfig = {
   openid_configs: [] | [OpenIdConfig[]];
+  mcp_official_url: [] | [string];
 };
 
 export let canisterId: Principal;
@@ -72,6 +74,9 @@ export let backendCanisterConfig: BackendCanisterConfig;
 export let agentOptions: HttpAgentOptions;
 export let anonymousAgent: HttpAgent;
 export let anonymousActor: ActorSubclass<_SERVICE>;
+
+export const officialMcpUrl = (): string | undefined =>
+  backendCanisterConfig.mcp_official_url[0];
 
 export const initGlobals = async () => {
   canisterId = Principal.fromText(readCanisterId());

@@ -867,6 +867,7 @@ fn config() -> InternetIdentityInit {
         enable_dnssec_email_recovery: persistent_state.enable_dnssec_email_recovery,
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
+        mcp_official_url: persistent_state.mcp_official_url.clone(),
     })
 }
 
@@ -1018,6 +1019,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
             // Outer Some -> apply: inner None clears, inner Some replaces.
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.doh_config = doh_config;
+            })
+        }
+        if let Some(mcp_official_url) = arg.mcp_official_url {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.mcp_official_url = Some(mcp_official_url);
             })
         }
     }

@@ -86,7 +86,12 @@ export const setMcpEnabled = (
   actor: ActorSubclass<_SERVICE>,
   identityNumber: bigint,
   enabled: boolean,
-): Promise<McpConfig> => updateConfig(actor, identityNumber, { enabled });
+): Promise<McpConfig> =>
+  updateConfig(
+    actor,
+    identityNumber,
+    enabled ? { enabled: true } : { enabled: false, url: undefined },
+  );
 
 /** Set the trusted server URL (synced). */
 export const setMcpTrustedServer = (
@@ -108,9 +113,3 @@ export const clearMcpTrustedServer = (
   identityNumber: bigint,
 ): Promise<McpConfig> =>
   updateConfig(actor, identityNumber, { url: undefined });
-
-export const clearAndDisableMcp = (
-  actor: ActorSubclass<_SERVICE>,
-  identityNumber: bigint,
-): Promise<McpConfig> =>
-  updateConfig(actor, identityNumber, { url: undefined, enabled: false });

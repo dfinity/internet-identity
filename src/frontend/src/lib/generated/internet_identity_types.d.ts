@@ -1094,6 +1094,7 @@ export interface InternetIdentityInit {
    * Configuration of the captcha in the registration flow.
    */
   'captcha_config' : [] | [CaptchaConfig],
+  'mcp_official_url' : [] | [string],
   /**
    * Configuration for dummy authentication used in e2e tests.
    */

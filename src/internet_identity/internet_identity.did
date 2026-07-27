@@ -350,6 +350,7 @@ type InternetIdentityInit = record {
     // via HTTP outcalls when no DNSSEC chain is available — see
     // `docs/ongoing/email-recovery.md` §7.6. Same set/clear pattern.
     doh_config : opt opt DohConfig;
+    mcp_official_url : opt text;
 };
 
 // DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
