@@ -35,35 +35,6 @@ const decodeIcrc3TextEntries = (base64Data: string): Record<string, string> => {
 };
 
 test.describe("Authorize over the redirect transport", () => {
-  test.describe("1-click OpenID", () => {
-    test.use({
-      openIdConfig: {
-        defaultPort: DEFAULT_OPENID_PORT,
-        createUsers: [{ claims: { name: "John Doe" } }],
-      },
-      authorizeConfig: {
-        protocol: "icrc25",
-        transport: "redirect",
-        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-      },
-    });
-
-    test.afterEach(({ authorizedPrincipal }) => {
-      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-    });
-
-    // Exercises the full redirect round-trip, including II's own top-level
-    // redirect to the OpenID provider and back (the transport resumes its
-    // flow from sessionStorage across that hop).
-    test("authenticates", async ({
-      authorizePage,
-      signInWithOpenId,
-      openIdUsers,
-    }) => {
-      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-    });
-  });
-
   test.describe("passkey sign-up", () => {
     test.use({
       authorizeConfig: { protocol: "icrc25", transport: "redirect" },
@@ -100,6 +71,35 @@ test.describe("Authorize over the redirect transport", () => {
       // The redirect flow surfaces II's authorize screen; continue through it
       // to deliver the delegation back to the test app.
       await page.getByRole("button", { name: "Continue", exact: true }).click();
+    });
+  });
+
+  test.describe("1-click OpenID", () => {
+    test.use({
+      openIdConfig: {
+        defaultPort: DEFAULT_OPENID_PORT,
+        createUsers: [{ claims: { name: "John Doe" } }],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        transport: "redirect",
+        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+    });
+
+    // Exercises the full redirect round-trip, including II's own top-level
+    // redirect to the OpenID provider and back (the transport resumes its
+    // flow from sessionStorage across that hop).
+    test("authenticates", async ({
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
     });
   });
 
