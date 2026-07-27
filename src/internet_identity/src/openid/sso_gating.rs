@@ -162,11 +162,11 @@ fn resolve_gated_ii_client_sub(
             let anchor = state::storage_borrow(|storage| {
                 storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, ii_client_id, stable_id)
             })?;
-            ii_client_sub_on_anchor(anchor, iss, ii_client_id, sso_domain, stable_id)
+            ii_client_sub_on_anchor(anchor, sso_domain, iss, ii_client_id, stable_id)
         }
         None => {
             let sub = &verification.credential.sub;
-            if anchor_established_through_domain(iss, sub, ii_client_id, sso_domain) {
+            if anchor_established_through_domain(sso_domain, iss, ii_client_id, sub) {
                 Some(sub.clone())
             } else {
                 None
@@ -189,9 +189,9 @@ fn resolve_gated_ii_client_sub(
 /// login fails safe.
 fn ii_client_sub_on_anchor(
     anchor_number: AnchorNumber,
+    sso_domain: &str,
     iss: &str,
     ii_client_id: &str,
-    sso_domain: &str,
     stable_id: &str,
 ) -> Option<String> {
     state::storage_borrow(|storage| {
@@ -214,10 +214,10 @@ fn ii_client_sub_on_anchor(
 /// that `sso_domain` on the credential, so a credential established through a
 /// different domain — or a non-SSO one (`sso_domain == None`) — does not match.
 fn anchor_established_through_domain(
-    iss: &str,
-    sub: &str,
-    ii_client_id: &str,
     sso_domain: &str,
+    iss: &str,
+    ii_client_id: &str,
+    sub: &str,
 ) -> bool {
     let key = (iss.to_string(), sub.to_string(), ii_client_id.to_string());
     state::storage_borrow(|storage| {
