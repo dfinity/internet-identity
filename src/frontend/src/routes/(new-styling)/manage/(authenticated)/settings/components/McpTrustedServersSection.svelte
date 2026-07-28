@@ -44,7 +44,6 @@
 
   const official = backendCanisterConfig.mcp_official_url[0];
 
-  const enabled = $derived(config?.enabled ?? false);
   const trusted = $derived(config?.url);
   const active = $derived.by(() => {
     const url = trustedUrl(config, backendCanisterConfig);
@@ -52,6 +51,13 @@
       ? undefined
       : { url, custom: trusted !== undefined };
   });
+  // The toggle reflects whether a connect would currently be honoured (i.e.
+  // `active`), not the raw stored flag. So a never-configured identity with an
+  // official connector reads as on — which is the truth, since it can connect
+  // that connector by default — and turning it off writes the disabled config
+  // that actually blocks it (the opt-out). An explicitly disabled config reads
+  // as off and stays off.
+  const enabled = $derived(active !== undefined);
 
   const hostOf = (url: string): string => {
     try {

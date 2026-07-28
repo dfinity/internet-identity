@@ -69,21 +69,35 @@ test.describe("MCP settings", () => {
     ).toBeVisible();
   });
 
-  test("shows the official connector once AI access is enabled", async ({
-    page,
-  }) => {
-    // Enabling with no custom URL set falls back to the configured official
-    // connector rather than opening the add dialog.
-    await toggleAiAccess(page);
-
+  test("shows the official connector on by default", async ({ page }) => {
+    // A never-configured identity can connect the official connector by
+    // default, so AI access reads as on and the official connector is shown
+    // with no action — the state a user would turn off to opt out.
+    await expect(page.getByRole("switch", { name: "AI access" })).toBeChecked();
     await expect(page.getByText("Internet Computer MCP")).toBeVisible();
     await expect(page.getByText("Official · Hosted by DFINITY")).toBeVisible();
     await expect(page.getByText(OFFICIAL_URL)).toBeVisible();
     await expect(page.getByRole("button", { name: "Customize" })).toBeVisible();
   });
 
-  test("refuses the official connector as a custom one", async ({ page }) => {
+  test("turning AI access off opts out and hides the connector", async ({
+    page,
+  }) => {
+    // The opt-out: from the default-on state, switching off writes the disabled
+    // config that blocks even the official connector.
+    await expect(page.getByRole("switch", { name: "AI access" })).toBeChecked();
+
     await toggleAiAccess(page);
+
+    await expect(
+      page.getByRole("switch", { name: "AI access" }),
+    ).not.toBeChecked();
+    await expect(page.getByText("Trusted connector")).toBeHidden();
+    await expect(page.getByText("Internet Computer MCP")).toBeHidden();
+  });
+
+  test("refuses the official connector as a custom one", async ({ page }) => {
+    // AI access is on by default, so "Customize" is available immediately.
     await page.getByRole("button", { name: "Customize" }).click();
     await page.getByLabel("MCP server URL").fill(OFFICIAL_URL);
 
@@ -99,7 +113,6 @@ test.describe("MCP settings", () => {
     page,
     mcp,
   }) => {
-    await toggleAiAccess(page);
     const customUrl = await addCustomConnector(page, mcp);
 
     await expect(page.getByText("mcp.id.ai", { exact: true })).toBeVisible();
@@ -115,7 +128,6 @@ test.describe("MCP settings", () => {
     page,
     mcp,
   }) => {
-    await toggleAiAccess(page);
     await addCustomConnector(page, mcp);
 
     await Promise.all([
@@ -134,7 +146,6 @@ test.describe("MCP settings", () => {
     page,
     mcp,
   }) => {
-    await toggleAiAccess(page);
     await addCustomConnector(page, mcp);
 
     // Turning the master toggle off clears the custom URL by design.

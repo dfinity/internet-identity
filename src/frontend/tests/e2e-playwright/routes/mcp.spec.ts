@@ -157,7 +157,8 @@ test("Trusting the server in the Settings tab auto-advances the untrusted screen
         }),
       }),
   );
-  await settingsPage.getByRole("switch", { name: "AI access" }).click();
+  // AI access is on by default (an official connector is configured), so the
+  // custom server goes in behind "Customize" — no need to toggle it on first.
   await settingsPage.getByRole("button", { name: "Customize" }).click();
   await settingsPage.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
   await holdToConfirm(settingsPage, "Hold to continue");
@@ -268,7 +269,8 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   }
   await page.locator('a[href="/manage/settings"]').click();
   await page.waitForURL(II_URL + "/manage/settings");
-  await page.getByRole("switch", { name: "AI access" }).click();
+  // AI access is on by default (an official connector is configured), so the
+  // custom server goes in behind "Customize" — no need to toggle it on first.
   await page.getByRole("button", { name: "Customize" }).click();
   await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
   await holdToConfirm(page, "Hold to continue");

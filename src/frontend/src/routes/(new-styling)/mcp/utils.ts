@@ -219,10 +219,10 @@ export const mcpAuthorize = async ({
  * what enables the feature for them. One that switched the feature off may not:
  * they are sent back to Settings rather than silently re-enabled by a link.
  *
- * Deliberately not the same rule as Settings' `trustedUrl`, which answers what
- * the identity trusts *now*. The canister enforces the same split in
- * `connect_trusted_url` / `session_trusted_url`; this lives here, next to the
- * consent flow that needs it, so the two can't be confused at a call site.
+ * Same rule as Settings' `trustedUrl` (both mirror the canister's
+ * `connect_trusted_url`): a never-configured identity may connect the official
+ * connector, an explicitly disabled one may not. This variant answers it as a
+ * boolean against a specific origin, next to the consent flow that needs it.
  *
  * Takes the canister config rather than a bare URL so the official connector
  * can only come from the deployment, never from an arbitrary string at a call

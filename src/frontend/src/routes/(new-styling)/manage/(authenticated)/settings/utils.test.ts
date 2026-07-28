@@ -28,6 +28,17 @@ describe("trustedUrl", () => {
     expect(trustedUrl(cfg(true, CUSTOM), OFFICIAL)).toBe(CUSTOM);
   });
 
+  it("offers the official connector to a never-configured identity", () => {
+    // A brand-new identity (no stored config) can connect the official
+    // connector by default, so Settings shows AI access as on — mirrors the
+    // canister's connect_trusted_url.
+    expect(trustedUrl(undefined, OFFICIAL)).toBe(OFFICIAL.mcp_official_url[0]);
+  });
+
+  it("trusts nothing for a never-configured identity with no official connector", () => {
+    expect(trustedUrl(undefined, NO_OFFICIAL)).toBeUndefined();
+  });
+
   it("trusts nothing while the feature is disabled", () => {
     expect(trustedUrl(cfg(false, undefined), OFFICIAL)).toBeUndefined();
     expect(trustedUrl(cfg(false, CUSTOM), OFFICIAL)).toBeUndefined();
