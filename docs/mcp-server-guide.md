@@ -6,9 +6,9 @@ delegation** (5 minutes) that your server redeems to bind its **session
 key** to the user's identity (a _grant_, up to 30 days, revocable in II
 Settings at any time); the server then signs `mcp_*` canister calls with
 that key. The registration delegation is the only delegation chain your
-server ever handles, and it is redeemed at connect. Per-app delegations
-(up to 1 hour) are minted on demand through `mcp_prepare_delegation` /
-`mcp_get_delegation`.
+server ever handles, and it is redeemed at connect. Short-lived per-app
+delegations (capped at 5 minutes) are minted on demand through
+`mcp_prepare_delegation` / `mcp_get_delegation`, and re-minted as they expire.
 
 Your server generates **two keypairs per connection**:
 
@@ -56,7 +56,7 @@ sequenceDiagram
     note over M,App: Phase 2 — acting for the user (repeat until expiry)
     M->>C: mcp_get_accounts(target_origin) [signed by session key]
     C-->>M: [AccountInfo]
-    M->>C: mcp_prepare_delegation(target, account?, app_key, ttl <= 1h)
+    M->>C: mcp_prepare_delegation(target, account?, app_key, ttl <= 5min)
     C-->>M: {user_key, expiration, account_number}
     M->>C: mcp_get_delegation(target, account_number, app_key, expiration)
     C-->>M: SignedDelegation
@@ -361,7 +361,7 @@ mcp_prepare_delegation : (
     target_origin : text,
     account_number : opt nat64,   // from mcp_get_accounts; null = the anchor's default there
     session_key : blob,           // per-app key YOU generate for this target app
-    max_ttl : opt nat64           // ns; default and cap: 1 hour
+    max_ttl : opt nat64           // ns; default and cap: 5 minutes
   ) -> (variant { Ok : McpPrepareDelegation; Err : AccountDelegationError });
 
 mcp_get_delegation : (
@@ -372,7 +372,12 @@ mcp_get_delegation : (
   ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
 ```
 
-Per-app delegations are capped at 1 hour and never outlive the grant.
+Per-app delegations are capped at **5 minutes** and never outlive the grant.
+(That is a separate lifetime from the registration delegation's own 5 minutes in
+§3 — different chain, different purpose.) Re-minting is cheap and unattended: a
+fresh `mcp_prepare_delegation` + `mcp_get_delegation` pair signed by the session
+key alone, with no browser hop and no consent re-prompt. Re-mint when a
+delegation expires rather than holding one for the life of the session.
 
 `account_number = null` selects the anchor's **current default account** at the
 origin (the user can change which account that is; it is not a fixed identity).
@@ -419,3 +424,9 @@ a planned enhancement, not current behavior.
   off or changing the trusted URL). Indistinguishable from expiry on your
   side. Treat any `Unauthorized` as "session over → offer reconnect"; do not
   retry-loop.
+- **Already-minted per-app delegations outlive revocation.** Expiry and
+  revocation stop the `mcp_*` methods immediately, but a per-app delegation you
+  already hold keeps working at the target app until its own `expiration` — at
+  most 5 minutes past the end of the session. Bounding that residual window is
+  why the per-app cap is short. Discard the delegations you hold as soon as you
+  see `Unauthorized`.

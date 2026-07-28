@@ -29,7 +29,7 @@
 //! changing the trusted server URL in the synced config deletes the grant in
 //! the same update message ([`set_mcp_config`]). Which app account the server
 //! acts as is chosen per call against the *target app* origin (discover them
-//! with [`get_accounts`]); issued per-app delegations are capped at 1 hour
+//! with [`get_accounts`]); issued per-app delegations are capped at 5 minutes
 //! and never outlive the grant.
 
 use candid::Principal;
@@ -49,8 +49,21 @@ use crate::{
     storage::storable::mcp_grant::StorableMcpGrant,
 };
 
-/// Maximum lifetime of an MCP-minted per-app account delegation: 1 hour.
-const MCP_MAX_EXPIRATION_PERIOD_NS: u64 = 60 * 60 * 1_000_000_000;
+/// Maximum lifetime of an MCP-minted per-app account delegation: 5 minutes.
+/// Deliberately short, because this is the one window revocation cannot reach:
+/// disabling MCP or switching the trusted URL ([`set_mcp_config`]) deletes the
+/// grant, so the server can mint no *more* delegations, but one it already
+/// handed to a target app is a standalone signed credential that stays usable
+/// until it expires. Re-minting costs the server a `prepare`/`get` round trip
+/// and no user interaction at all, so a short cap is close to free for the
+/// honest case while bounding the revoked one.
+///
+/// Deliberately not shorter: delegation expiry is checked at ingress against
+/// the receiving node's clock, and IC gateways/libraries permit ~5 minutes of
+/// clock drift, so a tighter window could be partly consumed by skew — the same
+/// floor [`crate::mcp_registration::MCP_REGISTRATION_DELEGATION_TTL_NS`]
+/// documents for the registration delegation.
+const MCP_MAX_EXPIRATION_PERIOD_NS: u64 = 5 * 60 * 1_000_000_000;
 
 /// Longest trusted-server URL `set_mcp_config` accepts. Generous for a real MCP
 /// endpoint (host + path) while bounding the one per-anchor config entry that
@@ -462,7 +475,7 @@ impl McpSession {
         )
     }
 
-    /// `mcp_prepare_delegation`: mint a ≤1-hour account delegation for this
+    /// `mcp_prepare_delegation`: mint a ≤5-minute account delegation for this
     /// session at `target_origin`, as `account_number` — one of the anchor's
     /// accounts at that origin when given explicitly (discover them with
     /// [`get_accounts`](Self::get_accounts)), or the anchor's default account
@@ -486,8 +499,9 @@ impl McpSession {
         max_ttl: Option<u64>,
     ) -> Result<McpPrepareDelegation, AccountDelegationError> {
         let anchor_number = self.grant.anchor_number;
-        // Cap at 1 hour; the grant expiry is passed as an *absolute* cap so the
-        // delegation can't outlive the session even by the time an await spans.
+        // Cap at 5 minutes; the grant expiry is passed as an *absolute* cap so
+        // the delegation can't outlive the session even by the time an await
+        // spans.
         let capped_ttl = Some(u64::min(
             max_ttl.unwrap_or(MCP_MAX_EXPIRATION_PERIOD_NS),
             MCP_MAX_EXPIRATION_PERIOD_NS,

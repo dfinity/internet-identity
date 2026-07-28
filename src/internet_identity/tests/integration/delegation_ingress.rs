@@ -169,6 +169,14 @@ fn mint_mcp_delegation(
         .unwrap();
     let mcp = Principal::self_authenticating(&server_key);
 
+    // `max_ttl: None` takes the backend's per-app cap, and the cap is a hard
+    // ceiling, so this delegation's whole lifetime is 5 minutes — far shorter
+    // than the 30-minute default on the account path above. It only has to be
+    // unexpired as each envelope below is *processed* (the replica checks
+    // delegation expiry against its own clock at that moment, not against the
+    // envelope's claimed `ingress_expiry`), which is a couple of seconds of
+    // local work — but the margin is minutes now, not hours, so don't put slow
+    // setup between this mint and the assertions.
     let McpPrepareDelegation {
         user_key,
         expiration,
