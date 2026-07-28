@@ -7,6 +7,8 @@
  * only at the boundary via {@link sessionDurationToNanos}.
  */
 
+import type { Duration } from "$lib/stores/locale.store";
+
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
@@ -21,36 +23,25 @@ const NANOS_PER_SECOND = BigInt(1_000_000_000);
 const MAX_SESSION_DURATION_NANOS =
   BigInt(MAX_SESSION_DURATION_SECONDS) * NANOS_PER_SECOND;
 
-/** The units an off-preset duration is broken down into, largest first. */
-export type SessionDurationUnit = "day" | "hour" | "minute" | "second";
-
-/** One unit of a duration, e.g. `{ unit: "minute", value: 20 }`. */
-export interface SessionDurationPart {
-  unit: SessionDurationUnit;
-  value: number;
-}
-
 /**
- * An off-preset duration split into its non-zero units, largest first, e.g.
- * `7200 -> [{ hour, 2 }]`, `90_060 -> [{ day, 1 }, { hour, 1 }, { minute, 1 }]`.
- * The caller turns each part into a localized, spelled-out label (see
- * `SessionDurationSelect`) so an off-preset value reads like the named presets
- * ("20 minutes") instead of a compact "20m". A zero duration yields a single
- * zero-second part, so a label is never empty.
+ * An off-preset duration broken into its non-zero units, ready to be spelled out
+ * by `$formatDuration`: `7200 -> { hour: 2 }`, `90_060 -> { day: 1, hour: 1,
+ * minute: 1 }`. Zero units are left out so they don't show up in the label, with
+ * one exception: a zero duration keeps `{ second: 0 }`, so the label is never
+ * empty. Off-preset durations are spelled out like the named presets ("20
+ * minutes") rather than compactly ("20m"), see `SessionDurationSelect`.
  */
-export const sessionDurationParts = (
-  seconds: number,
-): SessionDurationPart[] => {
-  const parts: SessionDurationPart[] = [];
+export const sessionDurationBreakdown = (seconds: number): Duration => {
   const day = Math.floor(seconds / DAY);
   const hour = Math.floor((seconds % DAY) / HOUR);
   const minute = Math.floor((seconds % HOUR) / MINUTE);
   const second = seconds % MINUTE;
-  if (day > 0) parts.push({ unit: "day", value: day });
-  if (hour > 0) parts.push({ unit: "hour", value: hour });
-  if (minute > 0) parts.push({ unit: "minute", value: minute });
-  if (second > 0) parts.push({ unit: "second", value: second });
-  return parts.length > 0 ? parts : [{ unit: "second", value: 0 }];
+  const breakdown: Duration = {};
+  if (day > 0) breakdown.day = day;
+  if (hour > 0) breakdown.hour = hour;
+  if (minute > 0) breakdown.minute = minute;
+  if (second > 0) breakdown.second = second;
+  return Object.keys(breakdown).length > 0 ? breakdown : { second: 0 };
 };
 
 /**

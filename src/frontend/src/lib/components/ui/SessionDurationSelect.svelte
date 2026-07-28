@@ -1,11 +1,10 @@
 <script lang="ts">
   import Select from "$lib/components/ui/Select.svelte";
   import { ChevronDownIcon } from "@lucide/svelte";
-  import { plural, t } from "$lib/stores/locale.store";
+  import { formatDuration, t } from "$lib/stores/locale.store";
   import {
     cappedSessionDurations,
-    sessionDurationParts,
-    type SessionDurationPart,
+    sessionDurationBreakdown,
   } from "$lib/utils/sessionDuration";
 
   type Align = "start" | "center" | "end";
@@ -48,28 +47,12 @@
     { value: 30 * DAY, label: $t`30 days` },
   ]);
 
-  // One unit of an off-preset duration, spelled out and pluralized in the
-  // current locale, e.g. `{ unit: "minute", value: 20 } -> "20 minutes"`.
-  const partLabel = ({ unit, value }: SessionDurationPart): string => {
-    switch (unit) {
-      case "day":
-        return $plural(value, { one: `# day`, other: `# days` });
-      case "hour":
-        return $plural(value, { one: `# hour`, other: `# hours` });
-      case "minute":
-        return $plural(value, { one: `# minute`, other: `# minutes` });
-      case "second":
-        return $plural(value, { one: `# second`, other: `# seconds` });
-    }
-  };
-
-  // A named preset's label, or a spelled-out label built from the duration's
-  // units for an off-preset one (e.g. an off-preset cap shown as "2 hours").
-  // Off-preset values are written out like the presets rather than compactly,
-  // so the dropdown doesn't mix "10 minutes" with "20m".
+  // A named preset's label, or — for an off-preset duration such as a cap the
+  // app asked for — its units spelled out by the locale ("2 hours"), so the
+  // dropdown doesn't mix "10 minutes" with a compact "20m".
   const labelFor = (seconds: number): string =>
     presets.find((preset) => preset.value === seconds)?.label ??
-    sessionDurationParts(seconds).map(partLabel).join(" ");
+    $formatDuration(sessionDurationBreakdown(seconds));
 
   // Every preset up to the cap, plus the cap itself when it isn't a preset, each
   // with its label and a flag for the current selection.
