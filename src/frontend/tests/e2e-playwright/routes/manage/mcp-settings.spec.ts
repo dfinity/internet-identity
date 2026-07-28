@@ -89,7 +89,7 @@ test.describe("MCP settings", () => {
 
     // It is already the default, so spending the one custom slot on it is
     // refused rather than silently accepted.
-    await expect(page.getByText(/already your default/)).toBeVisible();
+    await expect(page.getByText(/No need to customize/)).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Hold to continue" }),
     ).toBeDisabled();

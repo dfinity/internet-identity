@@ -108,7 +108,7 @@
     verifyState === "invalid"
       ? $t`Enter a valid https URL (for example https://mcp.example.com/mcp).`
       : verifyState === "official"
-        ? $t`That's already your default connector.`
+        ? $t`That's the official connector. No need to customize.`
         : undefined,
   );
 
