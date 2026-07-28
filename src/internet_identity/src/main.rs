@@ -643,7 +643,20 @@ fn get_account_delegation(
 /// devices. Read by the Settings UI and by the `/mcp` connect flow, which
 /// verifies the connecting origin against it at connect time. `null` means the
 /// anchor has never written a config.
-#[query]
+///
+/// Deliberately an **update**, not a query: this is the one read whose answer
+/// decides which origin the `/mcp` connect flow will hand a registration
+/// delegation to. A query reply is signed by the single answering node, so a
+/// malicious replica or boundary node could answer with a trusted-server URL
+/// the user never set; combined with a link that names that server as its
+/// callback, the frontend would then mint and deliver a registration delegation
+/// to an origin the identity does not trust — and the backend cannot catch it
+/// (`prepare_mcp_registration_delegation` records the anchor's *real* trusted
+/// URL, so redemption's URL check still passes). Going through consensus makes
+/// the reply certified, so the trust decision rests on the subnet rather than
+/// on whichever node served the read. The body is read-only: keep it that way,
+/// so this stays a plain replicated read.
+#[update]
 fn mcp_get_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
     if check_session_authorization(anchor_number).is_err() {
         // Deliberately the switched-off shape rather than `None`: `None` means

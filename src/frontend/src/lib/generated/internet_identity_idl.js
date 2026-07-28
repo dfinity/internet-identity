@@ -1190,7 +1190,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
-    'mcp_get_config' : IDL.Func([UserNumber], [IDL.Opt(McpConfig)], ['query']),
+    'mcp_get_config' : IDL.Func([UserNumber], [IDL.Opt(McpConfig)], []),
     'mcp_get_delegation' : IDL.Func(
         [FrontendHostname, IDL.Opt(AccountNumber), SessionKey, Timestamp],
         [

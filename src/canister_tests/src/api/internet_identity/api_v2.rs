@@ -573,7 +573,32 @@ pub fn mcp_set_config(
     .map(|(x,)| x)
 }
 
+/// `mcp_get_config` is an update, not a query: it is the read that decides which
+/// origin the `/mcp` connect flow will deliver a registration delegation to, so
+/// its reply must be certified by the subnet rather than signed by whichever
+/// node answered. See [`mcp_get_config_as_query`] for the regression guard.
 pub fn mcp_get_config(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+) -> Result<Option<McpConfig>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "mcp_get_config",
+        (identity_number,),
+    )
+    .map(|(x,)| x)
+}
+
+/// Deliberately calls `mcp_get_config` on the *query* path, so a test can assert
+/// the uncertified read is unavailable. Only ever expected to fail — flipping the
+/// endpoint back to `#[query]` would make it succeed and hand the connect flow's
+/// trust decision back to a single node.
+pub fn mcp_get_config_as_query(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,

@@ -2205,6 +2205,12 @@ export interface _SERVICE {
    * stored one that is switched off. The two behave differently at /mcp: the
    * first may connect the deployment's official connector (completing the
    * consent is what enables it), the second is sent back to Settings.
+   * 
+   * Deliberately an update rather than a query, even though it only reads:
+   * this answer decides which origin /mcp hands a registration delegation to,
+   * and a query reply is signed by the single node that served it — so a
+   * malicious replica or boundary node could name a trusted server the user
+   * never set. Going through consensus makes the reply certified.
    */
   'mcp_get_config' : ActorMethod<[UserNumber], [] | [McpConfig]>,
   /**

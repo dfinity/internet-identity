@@ -169,7 +169,9 @@
   // regaining focus here is exactly the moment the synced config may have
   // changed. The read reuses the actor the untrusted screen already holds
   // (reaching it authenticated the identity); minting still waits for an explicit
-  // "Allow access" on the connect screen.
+  // "Allow access" on the connect screen. It is an update call (the trust
+  // decision must rest on a certified reply — see `readMcpConfig`), so the
+  // `checking` guard also keeps focus churn from stacking round trips.
   $effect(() => {
     if (phase.kind !== "untrusted" || mcpServer === undefined) {
       return;
@@ -253,6 +255,15 @@
         // server's origin. Verifying here (post-authentication) means the result
         // is the same on every device, regardless of any local state — and the
         // backend re-checks it when registering.
+        //
+        // `readMcpConfig` is an update call, so this answer is certified by the
+        // subnet rather than by the single node that served it. That matters
+        // precisely here: this check is the *only* thing standing between an
+        // attacker-crafted connect link and a registration delegation delivered
+        // to an origin the user never trusted (the backend records the anchor's
+        // real trusted URL, so its own check at redemption can't tell the
+        // difference). A node that could forge this reply could impersonate the
+        // user at any app.
         const config = await readMcpConfig(
           authenticated.actor,
           authenticated.identityNumber,

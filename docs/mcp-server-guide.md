@@ -35,7 +35,7 @@ sequenceDiagram
     note over U,C: Phase 1 — connect handshake (once per session)
     M->>U: redirect to /mcp#registration_key, callback, state, ttl
     U->>F: open /mcp, authenticate and consent (pick TTL)
-    F->>C: mcp_get_config(anchor)
+    F->>C: mcp_get_config(anchor) — update call, certified reply
     C-->>F: enabled + trusted URL (verify callback origin)
     F->>M: GET /.well-known/ii-auth-callbacks
     M-->>F: {"callbacks": [...]} — link's callback must exact-match

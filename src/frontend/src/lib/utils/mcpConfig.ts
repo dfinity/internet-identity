@@ -2,9 +2,11 @@
  * The user's trusted-MCP-server configuration, persisted on-chain (keyed by
  * anchor) so it syncs across all of the identity's devices — unlike the
  * CLI-access toggle, which is device-local. It is read via `mcp_get_config` and
- * written via `mcp_set_config`, both authenticated as the identity, so only the
- * user (never a page that initiates a connect request) can change it. The `/mcp`
- * connect flow reads it as the source of truth at connect time.
+ * written via `mcp_set_config`, both authenticated as the identity and both
+ * update calls, so only the user (never a page that initiates a connect request)
+ * can change it and no single node can misreport it. The `/mcp` connect flow
+ * reads it as the source of truth at connect time (see `readMcpConfig` for why
+ * the read must be certified).
  *
  * The config has two parts:
  *  - `enabled`: the feature's master toggle for this identity.
@@ -49,7 +51,23 @@ export const originOf = (url: string): string | undefined => {
   }
 };
 
-/** Read the identity's synced MCP config from the canister. */
+/**
+ * Read the identity's synced MCP config from the canister.
+ *
+ * `mcp_get_config` is declared as an **update** in the canister interface, so
+ * this goes through consensus and the reply is certified — never a query. That
+ * is load-bearing rather than incidental: this read is what tells the `/mcp`
+ * connect flow which origin the identity trusts, and a query reply is signed by
+ * the single node that served it. A malicious replica or boundary node could
+ * answer with a trusted-server URL the user never set, and the connect flow
+ * would then mint and deliver a registration delegation to it — a server the
+ * user never approved acting as them at any app. The backend can't catch that
+ * either: `prepare_mcp_registration_delegation` records the anchor's *real*
+ * trusted URL, so the check at redemption still passes. Certification is the
+ * only thing that makes the answer trustworthy, which is why the endpoint is an
+ * update (see the `mcp_get_config` comment in `internet_identity.did`) and why
+ * `readMcpConfig` must stay the single way the frontend obtains this config.
+ */
 export const readMcpConfig = async (
   actor: ActorSubclass<_SERVICE>,
   identityNumber: bigint,

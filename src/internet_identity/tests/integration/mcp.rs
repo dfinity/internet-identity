@@ -12,9 +12,9 @@ use candid::Principal;
 use canister_tests::{
     api::internet_identity::api_v2::{
         create_account, get_mcp_registration_delegation, mcp_get_accounts, mcp_get_config,
-        mcp_get_delegation, mcp_prepare_delegation, mcp_register_v2, mcp_set_config,
-        prepare_account_delegation, prepare_mcp_registration_delegation, set_default_account,
-        AccountDelegationParams,
+        mcp_get_config_as_query, mcp_get_delegation, mcp_prepare_delegation, mcp_register_v2,
+        mcp_set_config, prepare_account_delegation, prepare_mcp_registration_delegation,
+        set_default_account, AccountDelegationParams,
     },
     flows,
     framework::{
@@ -1055,6 +1055,47 @@ fn mcp_config_round_trips_and_persists_across_upgrade() -> Result<(), RejectResp
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
         Some(config.clone())
+    );
+
+    Ok(())
+}
+
+/// `mcp_get_config` must not be reachable as a query. It is the read that tells
+/// the `/mcp` connect flow which origin this identity trusts, and a query reply
+/// carries only the answering node's signature: a malicious replica or boundary
+/// node could name a trusted server the user never set, and the frontend would
+/// mint and deliver a registration delegation to it. The backend cannot catch
+/// that afterwards — `prepare_mcp_registration_delegation` records the anchor's
+/// *real* trusted URL, so `mcp_register_v2`'s URL check still passes and the
+/// attacker's session key ends up bound to the identity. Only consensus makes
+/// the answer trustworthy, so the endpoint is an update and the uncertified read
+/// path must stay closed; this test fails the moment it is reopened.
+#[test]
+fn mcp_get_config_is_not_available_as_a_query() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+
+    let config = McpConfig {
+        enabled: true,
+        url: Some(format!("{MCP_ORIGIN}/mcp")),
+    };
+    mcp_set_config(&env, canister_id, principal_1(), anchor, config.clone())
+        .unwrap()
+        .unwrap();
+
+    // The identity's own authenticated query is rejected too: there is no
+    // uncertified way to read this config, not merely no *useful* one.
+    let rejected = mcp_get_config_as_query(&env, canister_id, principal_1(), anchor);
+    assert!(
+        rejected.is_err(),
+        "mcp_get_config must not answer on the query path, got {rejected:?}"
+    );
+
+    // The update path still serves it.
+    assert_eq!(
+        mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
+        Some(config)
     );
 
     Ok(())

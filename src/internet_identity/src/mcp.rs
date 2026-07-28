@@ -239,6 +239,11 @@ pub fn register(
 /// off stays blocked. The caller must already be authorized for
 /// `anchor_number` (checked by the canister method). The stored
 /// `session_principal` pointer is internal bookkeeping and not exposed.
+///
+/// Read-only, but exposed through an **update** endpoint on purpose (see
+/// `mcp_get_config` in `main.rs`): the `/mcp` frontend decides from this answer
+/// which origin it hands a registration delegation to, and an uncertified query
+/// reply would let a single malicious node redirect that decision.
 pub fn get_mcp_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
     storage_borrow(|storage| storage.lookup_mcp_config(anchor_number)).map(|config| McpConfig {
         enabled: config.enabled,
