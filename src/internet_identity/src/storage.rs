@@ -341,6 +341,18 @@ pub struct SsoCredentialMigrationBatchOutcome {
     pub next_cursor: Option<StorableOpenIdCredentialKey>,
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct McpConfigMigrationBatchOutcome {
+    /// Number of stored MCP configs rewritten this batch.
+    pub migrated: u64,
+    /// `true` when the scan has reached the end of the config map — caller
+    /// should stop the interval timer.
+    pub is_done: bool,
+    /// Last anchor examined this batch; pass back as `cursor` of the next
+    /// batch to resume the scan. `None` when the batch examined nothing.
+    pub next_cursor: Option<StorableAnchorNumber>,
+}
+
 /// Data type responsible for managing anchor data in stable memory.
 pub struct Storage<M: Memory> {
     header: Header,
@@ -1198,6 +1210,80 @@ impl<M: Memory + Clone> Storage<M> {
     /// Look up the MCP session grant registered for `principal` (the caller
     /// of the server-facing `mcp_*` methods). Callers are responsible for
     /// checking `expires_at_ns`; the map itself never authorizes anything.
+    /// Rewrite up to `batch_size` stored MCP configs to "enabled, official
+    /// connector" — the pre-official-connector meaning of every stored value
+    /// was "no custom server of mine", never a choice about a connector that
+    /// did not exist yet.
+    ///
+    /// Any live grant on a rewritten row is deleted: a grant that was inert
+    /// only because the config was disabled must not come back to life
+    /// authorized against a connector it was never granted for.
+    pub fn migrate_mcp_configs_batch(
+        &mut self,
+        cursor: Option<StorableAnchorNumber>,
+        batch_size: u64,
+    ) -> McpConfigMigrationBatchOutcome {
+        let mut outcome = McpConfigMigrationBatchOutcome::default();
+        if batch_size == 0 {
+            outcome.is_done = true;
+            return outcome;
+        }
+
+        // Collect first so the rewrite below doesn't alias the range borrow.
+        use std::ops::Bound as RangeBound;
+        let range = match cursor {
+            Some(cursor) => (RangeBound::Excluded(cursor), RangeBound::Unbounded),
+            None => (RangeBound::Unbounded, RangeBound::Unbounded),
+        };
+        let mut examined: u64 = 0;
+        let mut stale: Vec<(StorableAnchorNumber, StorableMcpConfig)> = vec![];
+        for (anchor_number, config) in self
+            .mcp_config_memory
+            .range(range)
+            .take(batch_size as usize)
+        {
+            examined += 1;
+            outcome.next_cursor = Some(anchor_number);
+            // Idempotency: a row already in the migrated shape is left alone,
+            // so a re-run is a no-op.
+            if config.enabled && config.url.is_none() {
+                continue;
+            }
+            stale.push((anchor_number, config));
+        }
+
+        for (anchor_number, config) in stale {
+            if let Some(bytes) = &config.session_principal {
+                if let Ok(principal) = Principal::try_from_slice(bytes) {
+                    // Only remove a grant this anchor actually owns, so a
+                    // stale pointer can't delete another identity's session.
+                    if self
+                        .lookup_mcp_grant(principal)
+                        .is_some_and(|grant| grant.anchor_number == anchor_number)
+                    {
+                        self.remove_mcp_grant(principal);
+                    }
+                }
+            }
+            self.mcp_config_memory.insert(
+                anchor_number,
+                StorableMcpConfig {
+                    enabled: true,
+                    url: None,
+                    session_principal: None,
+                    pending_registration: config.pending_registration,
+                },
+            );
+            outcome.migrated += 1;
+        }
+
+        // A short batch means the scan has reached the end of the map.
+        if examined < batch_size {
+            outcome.is_done = true;
+        }
+        outcome
+    }
+
     pub fn lookup_mcp_grant(&self, principal: Principal) -> Option<StorableMcpGrant> {
         self.mcp_grant_memory.get(&principal)
     }
