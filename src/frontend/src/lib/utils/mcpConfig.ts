@@ -64,33 +64,30 @@ export const trustedUrl = (
     : undefined;
 
 /**
- * The URL a *new* connect may target. An identity that never configured MCP
+ * Whether `origin` may be connected. An identity that never configured MCP
  * (`undefined`) may connect the official connector — completing the consent is
  * what enables the feature for them. One that switched the feature off may not:
  * they are sent back to Settings rather than silently re-enabled by a link.
- * Mirrors `connect_trusted_url` in the canister, which is what enforces it.
- */
-export const connectTrustedUrl = (
-  config: McpConfig | undefined,
-  officialUrl: string | undefined,
-): string | undefined => {
-  if (config === undefined) {
-    return officialUrl;
-  }
-  return config.enabled ? (config.url ?? officialUrl) : undefined;
-};
-
-/**
- * Whether `origin` may be connected. Matching is by origin — the same security
- * boundary the delegation uses (II derives a per-origin principal; the path
- * can't scope it).
+ *
+ * Deliberately not the same rule as [`trustedUrl`], which answers what the
+ * identity trusts *now* and is what Settings renders. Kept inline rather than
+ * exported so the two can't be confused at a call site — the canister enforces
+ * the same split in `connect_trusted_url` / `session_trusted_url`.
+ *
+ * Matching is by origin, the same boundary the delegation uses (II derives a
+ * per-origin principal; the path can't scope it).
  */
 export const isOriginTrusted = (
   config: McpConfig | undefined,
   origin: string,
   officialUrl?: string,
 ): boolean => {
-  const url = connectTrustedUrl(config, officialUrl);
+  const url =
+    config === undefined
+      ? officialUrl
+      : config.enabled
+        ? (config.url ?? officialUrl)
+        : undefined;
   return url !== undefined && originOf(url) === origin;
 };
 

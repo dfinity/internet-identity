@@ -5,7 +5,6 @@ import {
   originOf,
   isOriginTrusted,
   trustedUrl,
-  connectTrustedUrl,
   setMcpEnabled,
   trustAndEnableMcp,
   clearMcpTrustedServer,
@@ -143,64 +142,45 @@ describe("trustedUrl", () => {
   });
 });
 
-describe("connectTrustedUrl", () => {
-  it("offers the official connector to an identity that never configured MCP (no stored config)", () => {
-    expect(connectTrustedUrl(undefined, OFFICIAL)).toBe(OFFICIAL);
+describe("isOriginTrusted — official connector", () => {
+  const OFFICIAL_ORIGIN = "https://official-mcp.id.ai";
+  const CUSTOM_ORIGIN = "https://mcp.acme.com";
+
+  it("accepts it for an identity that never configured MCP", () => {
+    expect(isOriginTrusted(undefined, OFFICIAL_ORIGIN, OFFICIAL)).toBe(true);
   });
 
-  it("blocks once the feature has been switched off", () => {
-    // The reason `configured` exists: this reads identically to a fresh
-    // identity, but must be sent back to Settings rather than silently
-    // re-enabled by a connect link.
-    expect(connectTrustedUrl(cfg(false, undefined), OFFICIAL)).toBeUndefined();
-  });
-
-  it("offers the official connector to an enabled config with no custom server", () => {
-    expect(connectTrustedUrl(cfg(true, undefined), OFFICIAL)).toBe(OFFICIAL);
-  });
-
-  it("lets a custom connector displace the official one", () => {
-    expect(connectTrustedUrl(cfg(true, CUSTOM), OFFICIAL)).toBe(CUSTOM);
-  });
-
-  it("requires the feature enabled for a custom connector", () => {
-    expect(connectTrustedUrl(cfg(false, CUSTOM), OFFICIAL)).toBeUndefined();
-  });
-
-  it("offers nothing without an official connector", () => {
-    expect(connectTrustedUrl(undefined, undefined)).toBeUndefined();
-  });
-});
-
-describe("isOriginTrusted with an official connector", () => {
-  it("accepts the official origin when no custom URL is set", () => {
+  it("rejects it once the feature has been switched off", () => {
+    // A stored disabled config must not be re-enabled by a connect link, so it
+    // has to behave differently from the never-configured case above.
     expect(
-      isOriginTrusted(
-        cfg(true, undefined),
-        "https://official-mcp.id.ai",
-        OFFICIAL,
-      ),
+      isOriginTrusted(cfg(false, undefined), OFFICIAL_ORIGIN, OFFICIAL),
+    ).toBe(false);
+  });
+
+  it("accepts it for an enabled config with no custom server", () => {
+    expect(
+      isOriginTrusted(cfg(true, undefined), OFFICIAL_ORIGIN, OFFICIAL),
     ).toBe(true);
   });
 
-  it("stops accepting the official origin once a custom URL is set", () => {
-    expect(
-      isOriginTrusted(
-        cfg(true, CUSTOM),
-        "https://official-mcp.id.ai",
-        OFFICIAL,
-      ),
-    ).toBe(false);
+  it("lets a custom connector displace it", () => {
+    expect(isOriginTrusted(cfg(true, CUSTOM), CUSTOM_ORIGIN, OFFICIAL)).toBe(
+      true,
+    );
+    expect(isOriginTrusted(cfg(true, CUSTOM), OFFICIAL_ORIGIN, OFFICIAL)).toBe(
+      false,
+    );
   });
 
-  it("rejects the official origin after the feature was switched off", () => {
-    expect(
-      isOriginTrusted(
-        cfg(false, undefined),
-        "https://official-mcp.id.ai",
-        OFFICIAL,
-      ),
-    ).toBe(false);
+  it("requires the feature enabled for a custom connector", () => {
+    expect(isOriginTrusted(cfg(false, CUSTOM), CUSTOM_ORIGIN, OFFICIAL)).toBe(
+      false,
+    );
+  });
+
+  it("accepts nothing when no official connector is configured", () => {
+    expect(isOriginTrusted(undefined, OFFICIAL_ORIGIN, undefined)).toBe(false);
   });
 });
 
