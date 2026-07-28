@@ -6,7 +6,11 @@ import { DelegationChain } from "@icp-sdk/core/identity";
 import { toHex } from "$lib/utils/utils";
 import type { BackendCanisterConfig } from "$lib/globals";
 import type { McpConfig } from "$lib/utils/mcpConfig";
-import { isOriginTrusted, mcpAuthorize, McpUntrustedServerError } from "./utils";
+import {
+  isOriginTrusted,
+  mcpAuthorize,
+  McpUntrustedServerError,
+} from "./utils";
 
 const IDENTITY_NUMBER = BigInt(42);
 const MCP_ORIGIN = "https://mcp.id.ai";
@@ -50,11 +54,9 @@ const makeActor = () => {
   const expiration = expirationNanos();
   return {
     expiration,
-    prepare_mcp_registration_delegation: vi
-      .fn()
-      .mockResolvedValue({
-        Ok: { user_key: USER_KEY, expiration, trusted_url: TRUSTED_URL },
-      }),
+    prepare_mcp_registration_delegation: vi.fn().mockResolvedValue({
+      Ok: { user_key: USER_KEY, expiration, trusted_url: TRUSTED_URL },
+    }),
     get_mcp_registration_delegation: vi.fn(
       (
         _anchor: bigint,

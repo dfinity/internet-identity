@@ -25,7 +25,11 @@
   import McpConnectingView from "./views/McpConnectingView.svelte";
   import ManageHandoff from "$lib/components/ui/ManageHandoff.svelte";
   import { ManageHandoffFlow } from "$lib/flows/manageHandoffFlow.svelte";
-  import { isOriginTrusted, mcpAuthorize, McpUntrustedServerError } from "./utils";
+  import {
+    isOriginTrusted,
+    mcpAuthorize,
+    McpUntrustedServerError,
+  } from "./utils";
   import { showIdentitySwitcher } from "./mcp-switcher.store";
   import {
     mcpAuthorizeFunnel,
