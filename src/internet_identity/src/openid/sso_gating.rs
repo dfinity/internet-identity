@@ -12,6 +12,14 @@
 //! identity via the storage-maintained SSO stable-id index — keyed on the
 //! II-client credential's cross-client-stable `stable_id`, which the anchor
 //! `write()` reconciles into the index.
+//!
+//! The gate only proves the token is genuine for its client; the mapping picks
+//! which anchor the login controls, so it is the security-critical step. It
+//! relabels `aud` to the II client, scoped to `sso_domain`: a gated login
+//! resolves only to an identity established (via a non-gated login) through the
+//! same domain. Without that scope an issuer with a cross-client-stable `sub`
+//! (e.g. Google) would let an attacker's domain relabel a victim's sign-in onto
+//! the victim's anchor. A foreign domain matches nothing and fails safe.
 
 use super::{sso, verify, Cached, OpenIDJWTVerificationError, OpenIdCredential};
 use crate::state;
@@ -99,15 +107,13 @@ pub struct SsoResolvedIdentity {
     pub credential: OpenIdCredential,
 }
 
-/// Resolve a verified SSO login to the II-client identity. Reads only (safe from
-/// a query context). A *gated* login (its token was issued for a per-app client)
-/// resolves through [`resolve_gated_ii_client_sub`], scoped to the discovery
-/// domain it was discovered through; a non-gated login carries a token issued
-/// for the II client directly and resolves to its own `sub`. `Err(NoSuchAnchor)`
-/// when a gated login isn't backed by an II-client identity established through
-/// that same domain (never linked, or the credential was removed) — so it fails
-/// safe. The caller persists `credential` through the normal anchor `write()`,
-/// which reconciles the index.
+/// Resolve a verified SSO login to the II-client identity the anchor is keyed
+/// on. Read-only. A *gated* login (per-app `aud`) is relabeled to the II client
+/// via [`resolve_gated_ii_client_sub`], which succeeds only if that identity was
+/// established through the same discovery domain — else `Err(NoSuchAnchor)`, so
+/// it can't be relabeled onto an unrelated anchor. A non-gated login resolves to
+/// its own `sub`. The caller persists `credential` via anchor `write()`, which
+/// reconciles the stable-id index.
 pub fn resolve_ii_client_identity(
     verification: &VerifiedSsoLogin,
 ) -> Result<SsoResolvedIdentity, OpenIdDelegationError> {
@@ -141,15 +147,16 @@ pub fn resolve_ii_client_identity(
     Ok(SsoResolvedIdentity { credential })
 }
 
-/// Resolve the II-client `sub` for a *gated* login, scoped to the discovery
-/// domain it was discovered through. Both org kinds resolve to an anchor whose
-/// II-client credential was established through that same domain:
-///   - non-`sub` orgs bridge via the domain-scoped stable-id index (the token's
-///     per-app `sub` differs from the II-client `sub`);
-///   - `sub` orgs share one `sub` across clients, so the token `sub` *is* the
-///     II-client `sub`, resolved only if established through this domain.
+/// Resolve the II-client `sub` for a *gated* login, scoped to its discovery
+/// domain — the check that blocks the cross-domain relabel. Returns `Some` only
+/// if an II-client identity for `(iss, ii_client_id)` was established through
+/// `sso_domain`:
+///   - non-`sub` orgs bridge via the domain-scoped stable-id index
+///     ([`ii_client_sub_on_anchor`]); the per-app `sub` differs from the II one.
+///   - `sub` orgs share one `sub` across clients, so the domain check in
+///     [`anchor_established_through_domain`] is the only thing making it safe.
 ///
-/// `None` (→ fail safe) when no such anchor exists.
+/// `None` (→ `NoSuchAnchor`) when none exists: sign in normally first.
 fn resolve_gated_ii_client_sub(
     verification: &VerifiedSsoLogin,
     stable_id: Option<&str>,
@@ -175,18 +182,13 @@ fn resolve_gated_ii_client_sub(
     }
 }
 
-/// Load `anchor_number` and return the `sub` of its II-client-keyed OpenID
-/// credential for `(iss, ii_client_id, stable_id)` established through
-/// `sso_domain`, if present. The match uses the same full key that produced
-/// `anchor_number` from the domain-scoped index: an anchor can carry more than
-/// one II-client credential for the same `(iss, ii_client_id, sso_domain)` with
-/// different `(sub, stable_id)` (a user who linked several OIDC accounts from
-/// one provider+client), so `stable_id` selects the intended one — the
-/// delegation seed is keyed on `sub`, so reading back a different credential's
-/// `sub` would resolve to the wrong principal.
-/// `None` when the anchor is gone or no longer carries that credential — the
-/// index pointed here but the credential has since been removed, so the gated
-/// login fails safe.
+/// Non-`sub` counterpart to [`anchor_established_through_domain`]: return the
+/// `sub` of the II-client credential matching the full index key
+/// `(sso_domain, iss, ii_client_id, stable_id)`. `sso_domain` scopes resolution
+/// to the establishing domain; `stable_id` disambiguates when one anchor linked
+/// several accounts under the same `(sso_domain, iss, ii_client_id)` (the seed is
+/// keyed on `sub`, so the wrong one mints the wrong principal). `None` if the
+/// credential is gone → fail safe.
 fn ii_client_sub_on_anchor(
     anchor_number: AnchorNumber,
     sso_domain: &str,
@@ -209,10 +211,13 @@ fn ii_client_sub_on_anchor(
     })
 }
 
-/// Is there an anchor carrying an II-client credential `(iss, sub, ii_client_id)`
-/// stored with this exact `sso_domain`? A non-gated login through a domain stamps
-/// that `sso_domain` on the credential, so a credential established through a
-/// different domain — or a non-SSO one (`sso_domain == None`) — does not match.
+/// The `sub`-org domain check: is there an anchor with an II-client credential
+/// `(iss, sub, ii_client_id)` established through this exact `sso_domain`? For a
+/// `sub` org the per-app token's `sub` already equals the II-client `sub` (one
+/// `sub` across clients, e.g. Google), so the `sso_domain` match is what stops a
+/// login through a foreign domain from resolving onto an identity established
+/// elsewhere. Another domain — or a non-SSO credential (`sso_domain == None`) —
+/// doesn't match.
 fn anchor_established_through_domain(
     sso_domain: &str,
     iss: &str,
