@@ -22,15 +22,6 @@ export interface McpConfig {
   enabled: boolean;
   /** The trusted server URL, or undefined when none is set. */
   url: string | undefined;
-  /**
-   * Whether this identity has ever written a config. `enabled: false` alone is
-   * ambiguous — it reads the same for someone who never touched the feature and
-   * for someone who switched it off in Settings — and those must differ at
-   * `/mcp`: the first may connect the official connector, the second is sent
-   * back to Settings. `undefined` means an older backend that doesn't report
-   * it, in which case only a stored URL is ever trusted.
-   */
-  configured: boolean | undefined;
 }
 
 // Candid `opt text` <-> `string | undefined`.
@@ -42,15 +33,11 @@ const toOpt = (value: string | undefined): [] | [string] =>
 const fromCanister = (config: CanisterMcpConfig): McpConfig => ({
   enabled: config.enabled,
   url: fromOpt(config.url),
-  configured: config.configured.length === 0 ? undefined : config.configured[0],
 });
 
-// `configured` is read-only — the canister ignores it here — but it round-trips
-// so a read-modify-write doesn't have to strip it.
 const toCanister = (config: McpConfig): CanisterMcpConfig => ({
   enabled: config.enabled,
   url: toOpt(config.url),
-  configured: config.configured === undefined ? [] : [config.configured],
 });
 
 /** Origin (scheme + host[:port], no path) of a URL, or undefined if unparsable. */
@@ -63,35 +50,34 @@ export const originOf = (url: string): string | undefined => {
 };
 
 /**
- * The URL `config` trusts: the identity's own when they set one, otherwise
- * `officialUrl`. Exactly one is trusted at a time, and nothing is while the
- * feature is off. Mirrors `trusted_url_of` in the canister, which is what
- * actually enforces it.
+ * The URL `config` trusts for display: the identity's own server when they set
+ * one, otherwise `officialUrl`. Nothing while the feature is off, or when the
+ * identity has never configured it. Mirrors `session_trusted_url` in the
+ * canister.
  */
 export const trustedUrl = (
-  config: McpConfig,
+  config: McpConfig | undefined,
   officialUrl: string | undefined,
 ): string | undefined =>
-  config.enabled ? (config.url ?? officialUrl) : undefined;
+  config !== undefined && config.enabled
+    ? (config.url ?? officialUrl)
+    : undefined;
 
 /**
- * The URL a *new* connect may target. An identity that never configured MCP may
- * connect the official connector — completing the consent is what enables the
- * feature for them. One that switched the feature off may not: they are sent
- * back to Settings rather than silently re-enabled by a link. Mirrors
- * `connect_trusted_url` in the canister, which is what actually enforces it.
+ * The URL a *new* connect may target. An identity that never configured MCP
+ * (`undefined`) may connect the official connector — completing the consent is
+ * what enables the feature for them. One that switched the feature off may not:
+ * they are sent back to Settings rather than silently re-enabled by a link.
+ * Mirrors `connect_trusted_url` in the canister, which is what enforces it.
  */
 export const connectTrustedUrl = (
-  config: McpConfig,
+  config: McpConfig | undefined,
   officialUrl: string | undefined,
 ): string | undefined => {
-  if (config.configured === false) {
+  if (config === undefined) {
     return officialUrl;
   }
-  if (!config.enabled) {
-    return undefined;
-  }
-  return config.url ?? officialUrl;
+  return config.enabled ? (config.url ?? officialUrl) : undefined;
 };
 
 /**
@@ -100,7 +86,7 @@ export const connectTrustedUrl = (
  * can't scope it).
  */
 export const isOriginTrusted = (
-  config: McpConfig,
+  config: McpConfig | undefined,
   origin: string,
   officialUrl?: string,
 ): boolean => {
@@ -112,8 +98,10 @@ export const isOriginTrusted = (
 export const readMcpConfig = async (
   actor: ActorSubclass<_SERVICE>,
   identityNumber: bigint,
-): Promise<McpConfig> =>
-  fromCanister(await actor.mcp_get_config(identityNumber));
+): Promise<McpConfig | undefined> => {
+  const config = await actor.mcp_get_config(identityNumber);
+  return config.length === 0 ? undefined : fromCanister(config[0]);
+};
 
 // Read-modify-write a single field of the synced config and persist it. Reads
 // the current config first so an unrelated field (toggle vs URL) isn't clobbered
@@ -123,7 +111,10 @@ const updateConfig = async (
   identityNumber: bigint,
   patch: Partial<McpConfig>,
 ): Promise<McpConfig> => {
-  const current = await readMcpConfig(actor, identityNumber);
+  const current = (await readMcpConfig(actor, identityNumber)) ?? {
+    enabled: false,
+    url: undefined,
+  };
   const next: McpConfig = { ...current, ...patch };
   const result = await actor.mcp_set_config(identityNumber, toCanister(next));
   if ("Err" in result) {

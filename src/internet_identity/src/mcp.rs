@@ -233,19 +233,17 @@ pub fn register(
 }
 
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
-/// trusted server URL). Returns the disabled, no-server default for an anchor
-/// that has never written one — the official connector is not reported here,
-/// so Settings shows the feature as off until the identity turns it on or
-/// completes a connect. The caller must already be authorized for
+/// trusted server URL), or `None` when the anchor has never written one.
+/// Distinguishing the two is what lets a first-time identity connect the
+/// deployment's official connector while an identity that switched the feature
+/// off stays blocked. The caller must already be authorized for
 /// `anchor_number` (checked by the canister method). The stored
 /// `session_principal` pointer is internal bookkeeping and not exposed.
-pub fn get_mcp_config(anchor_number: AnchorNumber) -> McpConfig {
-    let stored = storage_borrow(|storage| storage.lookup_mcp_config(anchor_number));
-    McpConfig {
-        enabled: stored.as_ref().is_some_and(|config| config.enabled),
-        url: stored.as_ref().and_then(|config| config.url.clone()),
-        configured: Some(stored.is_some()),
-    }
+pub fn get_mcp_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
+    storage_borrow(|storage| storage.lookup_mcp_config(anchor_number)).map(|config| McpConfig {
+        enabled: config.enabled,
+        url: config.url,
+    })
 }
 
 /// Persist `anchor_number`'s trusted-MCP-server config, overwriting any
@@ -609,7 +607,6 @@ mod tests {
             McpConfig {
                 enabled: false,
                 url: Some(CUSTOM.to_string()),
-                configured: None,
             },
         )
         .expect_err("a disabled config carrying a URL must be rejected");
@@ -626,7 +623,6 @@ mod tests {
             McpConfig {
                 enabled: true,
                 url: Some("https://".to_string() + &"a".repeat(MCP_TRUSTED_URL_MAX_BYTES)),
-                configured: None,
             },
         )
         .expect_err("an oversized URL must be rejected");

@@ -1168,26 +1168,7 @@ export type LookupByRegistrationIdError = { 'InvalidRegistrationId' : string };
  * display/re-probe a path-based endpoint; the connect flow matches trust by
  * origin.
  */
-export interface McpConfig {
-  'url' : [] | [string],
-  'enabled' : boolean,
-  /**
-   * Whether this identity has ever written an MCP config. Read-only: it is
-   * reported by mcp_get_config and ignored on mcp_set_config.
-   * 
-   * `enabled = false` alone is ambiguous — it looks the same for an identity
-   * that never touched the feature and for one that deliberately switched it
-   * off in Settings. Those two must behave differently at /mcp: the first may
-   * connect the official connector (completing the consent is what enables
-   * it), the second must be sent back to Settings instead of being silently
-   * re-enabled by a link. This flag is what tells them apart.
-   * 
-   * `opt` so an older backend that doesn't report it decodes as absent
-   * rather than failing, and an older frontend can keep omitting it on
-   * mcp_set_config — the two canisters are deployed independently.
-   */
-  'configured' : [] | [boolean],
-}
+export interface McpConfig { 'url' : [] | [string], 'enabled' : boolean }
 /**
  * Result of mcp_prepare_delegation. Carries the account_number the canister
  * used (the one named in the request, or the anchor's default account at
@@ -2220,8 +2201,12 @@ export interface _SERVICE {
    * devices. Read by the Settings UI and the /mcp connect flow (which verifies
    * the connecting origin against it). Returns the disabled, no-server default
    * for an unauthorized caller or an anchor that never wrote a config.
+   * `null` means the identity has never written a config — distinct from a
+   * stored one that is switched off. The two behave differently at /mcp: the
+   * first may connect the deployment's official connector (completing the
+   * consent is what enables it), the second is sent back to Settings.
    */
-  'mcp_get_config' : ActorMethod<[UserNumber], McpConfig>,
+  'mcp_get_config' : ActorMethod<[UserNumber], [] | [McpConfig]>,
   /**
    * Fetch the delegation prepared above; the anchor is recovered from
    * caller()'s grant. account_number and expiration must be the values

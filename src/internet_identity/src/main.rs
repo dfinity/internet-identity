@@ -641,20 +641,18 @@ fn get_account_delegation(
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
 /// trusted server URL). Persisted on-chain, so it follows the identity across
 /// devices. Read by the Settings UI and by the `/mcp` connect flow, which
-/// verifies the connecting origin against it at connect time. Returns the
-/// disabled, no-server default for an unauthorized caller or an anchor that
-/// never wrote a config.
+/// verifies the connecting origin against it at connect time. `null` means the
+/// anchor has never written a config.
 #[query]
-fn mcp_get_config(anchor_number: AnchorNumber) -> McpConfig {
+fn mcp_get_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
     if check_session_authorization(anchor_number).is_err() {
-        // Not `McpConfig::default()`: the default now depends on the
-        // deployment's official connector, and an unauthorized caller must
-        // never be told an identity trusts one.
-        return McpConfig {
+        // Deliberately the switched-off shape rather than `None`: `None` means
+        // "never configured", which is the branch that lets a connect proceed.
+        // An unauthorized caller must land on the blocking one.
+        return Some(McpConfig {
             enabled: false,
             url: None,
-            configured: Some(false),
-        };
+        });
     }
     mcp::get_mcp_config(anchor_number)
 }

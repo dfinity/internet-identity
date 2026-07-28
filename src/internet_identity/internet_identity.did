@@ -1162,20 +1162,6 @@ type PrepareSessionDelegation = record {
 type McpConfig = record {
     enabled : bool;
     url : opt text;
-    // Whether this identity has ever written an MCP config. Read-only: it is
-    // reported by mcp_get_config and ignored on mcp_set_config.
-    //
-    // `enabled = false` alone is ambiguous — it looks the same for an identity
-    // that never touched the feature and for one that deliberately switched it
-    // off in Settings. Those two must behave differently at /mcp: the first may
-    // connect the official connector (completing the consent is what enables
-    // it), the second must be sent back to Settings instead of being silently
-    // re-enabled by a link. This flag is what tells them apart.
-    //
-    // `opt` so an older backend that doesn't report it decodes as absent
-    // rather than failing, and an older frontend can keep omitting it on
-    // mcp_set_config — the two canisters are deployed independently.
-    configured : opt bool;
 };
 
 // Result of prepare_mcp_registration_delegation: the canister-signature public
@@ -1902,7 +1888,11 @@ service : (opt InternetIdentityInit) -> {
     // devices. Read by the Settings UI and the /mcp connect flow (which verifies
     // the connecting origin against it). Returns the disabled, no-server default
     // for an unauthorized caller or an anchor that never wrote a config.
-    mcp_get_config : (anchor_number : UserNumber) -> (McpConfig) query;
+    // `null` means the identity has never written a config — distinct from a
+    // stored one that is switched off. The two behave differently at /mcp: the
+    // first may connect the deployment's official connector (completing the
+    // consent is what enables it), the second is sent back to Settings.
+    mcp_get_config : (anchor_number : UserNumber) -> (opt McpConfig) query;
 
     // Persist the identity's trusted-MCP-server config so it syncs across the
     // identity's devices. Authenticated as the identity, so only the user — never

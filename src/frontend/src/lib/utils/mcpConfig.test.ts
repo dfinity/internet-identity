@@ -103,11 +103,12 @@ describe("isOriginTrusted", () => {
 const ANCHOR = BigInt(10_000);
 
 const makeActor = (current: McpConfig) => ({
-  mcp_get_config: vi.fn().mockResolvedValue({
-    enabled: current.enabled,
-    url: current.url === undefined ? [] : [current.url],
-    configured: current.configured === undefined ? [] : [current.configured],
-  }),
+  mcp_get_config: vi.fn().mockResolvedValue([
+    {
+      enabled: current.enabled,
+      url: current.url === undefined ? [] : [current.url],
+    },
+  ]),
   mcp_set_config: vi.fn().mockResolvedValue({ Ok: null }),
 });
 
@@ -117,13 +118,11 @@ const asActor = (actor: ReturnType<typeof makeActor>) =>
 const OFFICIAL = "https://official-mcp.id.ai/mcp";
 const CUSTOM = "https://mcp.acme.com/mcp";
 
-/** A stored config. `configured: false` stands for an identity that has never
- *  written one. */
-const cfg = (
-  enabled: boolean,
-  url: string | undefined,
-  configured = true,
-): McpConfig => ({ enabled, url, configured });
+/** A stored config. `undefined` stands for an identity that never wrote one. */
+const cfg = (enabled: boolean, url: string | undefined): McpConfig => ({
+  enabled,
+  url,
+});
 
 describe("trustedUrl", () => {
   it("falls back to the official connector when no custom URL is set", () => {
@@ -145,19 +144,15 @@ describe("trustedUrl", () => {
 });
 
 describe("connectTrustedUrl", () => {
-  it("offers the official connector to an identity that never configured MCP", () => {
-    expect(connectTrustedUrl(cfg(false, undefined, false), OFFICIAL)).toBe(
-      OFFICIAL,
-    );
+  it("offers the official connector to an identity that never configured MCP (no stored config)", () => {
+    expect(connectTrustedUrl(undefined, OFFICIAL)).toBe(OFFICIAL);
   });
 
   it("blocks once the feature has been switched off", () => {
     // The reason `configured` exists: this reads identically to a fresh
     // identity, but must be sent back to Settings rather than silently
     // re-enabled by a connect link.
-    expect(
-      connectTrustedUrl(cfg(false, undefined, true), OFFICIAL),
-    ).toBeUndefined();
+    expect(connectTrustedUrl(cfg(false, undefined), OFFICIAL)).toBeUndefined();
   });
 
   it("offers the official connector to an enabled config with no custom server", () => {
@@ -173,26 +168,7 @@ describe("connectTrustedUrl", () => {
   });
 
   it("offers nothing without an official connector", () => {
-    expect(
-      connectTrustedUrl(cfg(false, undefined, false), undefined),
-    ).toBeUndefined();
-  });
-
-  it("trusts only a stored URL when the backend doesn't report `configured`", () => {
-    // Older backend: it can't have an official connector either, so falling
-    // back to the strict rule loses nothing.
-    expect(
-      connectTrustedUrl(
-        { enabled: false, url: undefined, configured: undefined },
-        OFFICIAL,
-      ),
-    ).toBeUndefined();
-    expect(
-      connectTrustedUrl(
-        { enabled: true, url: CUSTOM, configured: undefined },
-        OFFICIAL,
-      ),
-    ).toBe(CUSTOM);
+    expect(connectTrustedUrl(undefined, undefined)).toBeUndefined();
   });
 });
 
@@ -237,7 +213,6 @@ describe("setMcpEnabled", () => {
     expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
       enabled: false,
       url: [],
-      configured: [true],
     });
   });
 
@@ -249,7 +224,6 @@ describe("setMcpEnabled", () => {
     expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
       enabled: true,
       url: [CUSTOM],
-      configured: [true],
     });
   });
 });
@@ -263,7 +237,6 @@ describe("trustAndEnableMcp", () => {
     expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
       enabled: true,
       url: [CUSTOM],
-      configured: [true],
     });
   });
 });
@@ -277,7 +250,6 @@ describe("clearMcpTrustedServer", () => {
     expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
       enabled: true,
       url: [],
-      configured: [true],
     });
   });
 
@@ -289,7 +261,6 @@ describe("clearMcpTrustedServer", () => {
     expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
       enabled: false,
       url: [],
-      configured: [true],
     });
   });
 });

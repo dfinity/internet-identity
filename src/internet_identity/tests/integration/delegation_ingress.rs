@@ -143,7 +143,6 @@ fn mint_mcp_delegation(
         McpConfig {
             enabled: true,
             url: Some(format!("{MCP_ORIGIN}/mcp")),
-            configured: None,
         },
     )
     .unwrap()

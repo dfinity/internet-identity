@@ -637,7 +637,6 @@ export const idlFactory = ({ IDL }) => {
   const McpConfig = IDL.Record({
     'url' : IDL.Opt(IDL.Text),
     'enabled' : IDL.Bool,
-    'configured' : IDL.Opt(IDL.Bool),
   });
   const McpPrepareDelegation = IDL.Record({
     'user_key' : UserKey,
@@ -1191,7 +1190,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
-    'mcp_get_config' : IDL.Func([UserNumber], [McpConfig], ['query']),
+    'mcp_get_config' : IDL.Func([UserNumber], [IDL.Opt(McpConfig)], ['query']),
     'mcp_get_delegation' : IDL.Func(
         [FrontendHostname, IDL.Opt(AccountNumber), SessionKey, Timestamp],
         [

@@ -20,6 +20,7 @@
     trustAndEnableMcp,
     clearMcpTrustedServer,
     trustedUrl,
+    type McpConfig,
   } from "$lib/utils/mcpConfig";
   import { officialMcpUrl } from "$lib/globals";
   import McpAddConnectorDialog from "./McpAddConnectorDialog.svelte";
@@ -35,9 +36,7 @@
   // URL for this identity. Persisted on-chain (keyed by anchor), so it follows
   // the identity across devices. Read once on mount and kept in local state
   // that the handlers update after each canister write.
-  let enabled = $state(false);
-  let trusted = $state<string | undefined>(undefined);
-  let configured = $state<boolean | undefined>(undefined);
+  let config = $state<McpConfig | undefined>(undefined);
   // True until the initial config read completes, so the toggle doesn't flicker
   // off-then-on and writes can't race the load.
   let loaded = $state(false);
@@ -45,8 +44,10 @@
 
   const official = officialMcpUrl();
 
+  const enabled = $derived(config?.enabled ?? false);
+  const trusted = $derived(config?.url);
   const active = $derived.by(() => {
-    const url = trustedUrl({ enabled, url: trusted, configured }, official);
+    const url = trustedUrl(config, official);
     return url === undefined
       ? undefined
       : { url, custom: trusted !== undefined };
@@ -63,13 +64,7 @@
   onMount(() => {
     void (async () => {
       try {
-        const config = await readMcpConfig(
-          $authenticatedStore.actor,
-          identityNumber,
-        );
-        enabled = config.enabled;
-        trusted = config.url;
-        configured = config.configured;
+        config = await readMcpConfig($authenticatedStore.actor, identityNumber);
       } catch {
         toaster.error({
           title: $t`Couldn't load your AI access settings.`,
@@ -81,22 +76,25 @@
     })();
   });
 
-  const handleToggle = async () => {
-    const next = enabled;
-    if (next && active === undefined) {
-      enabled = false;
+  const handleToggle = async (next: boolean) => {
+    // Enabling with nothing to enable — no custom server and no official
+    // connector — opens the dialog instead of writing a config that trusts
+    // nothing.
+    if (
+      next &&
+      trustedUrl({ enabled: true, url: trusted }, official) === undefined
+    ) {
       showAdd = true;
       return;
     }
-    const previousTrusted = trusted;
-    if (!next) {
-      trusted = undefined;
-    }
+    const previous = config;
+    config = next
+      ? { enabled: true, url: trusted }
+      : { enabled: false, url: undefined };
     try {
       await setMcpEnabled($authenticatedStore.actor, identityNumber, next);
     } catch {
-      enabled = !next;
-      trusted = previousTrusted;
+      config = previous;
       toaster.error({
         title: $t`Couldn't save your change. Please try again.`,
         duration: 4000,
@@ -111,8 +109,7 @@
   const handleAddSave = async (url: string) => {
     try {
       await trustAndEnableMcp($authenticatedStore.actor, identityNumber, url);
-      enabled = true;
-      trusted = url;
+      config = { enabled: true, url };
       showAdd = false;
     } catch {
       toaster.error({
@@ -124,21 +121,19 @@
 
   const handleRestoreDefault = async () => {
     if (trusted === undefined) return;
-    const previousUrl = trusted;
-    const previousEnabled = enabled;
-    trusted = undefined;
-    if (official === undefined) {
-      enabled = false;
-    }
+    const previous = config;
+    // Without an official connector to fall back to, dropping the custom one
+    // would leave the feature on with nothing trusted, so turn it off instead.
+    const fallsBack = official !== undefined;
+    config = { enabled: fallsBack, url: undefined };
     try {
-      if (official === undefined) {
-        await setMcpEnabled($authenticatedStore.actor, identityNumber, false);
-      } else {
+      if (fallsBack) {
         await clearMcpTrustedServer($authenticatedStore.actor, identityNumber);
+      } else {
+        await setMcpEnabled($authenticatedStore.actor, identityNumber, false);
       }
     } catch {
-      trusted = previousUrl;
-      enabled = previousEnabled;
+      config = previous;
       toaster.error({
         title: $t`Couldn't remove the connector. Please try again.`,
         duration: 4000,
@@ -179,8 +174,8 @@
     <div class="flex h-6 shrink-0 items-center">
       {#if loaded}
         <Toggle
-          bind:checked={enabled}
-          onchange={handleToggle}
+          checked={enabled}
+          onchange={() => handleToggle(!enabled)}
           aria-labelledby={titleId}
         />
       {:else}
