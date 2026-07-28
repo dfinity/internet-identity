@@ -11,7 +11,7 @@
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { parseMcpServerUrl, probeMcpServer } from "$lib/utils/mcpServer";
-  import { officialMcpUrl } from "$lib/globals";
+  import { backendCanisterConfig } from "$lib/globals";
 
   interface Props {
     onClose: () => void;
@@ -113,7 +113,7 @@
 
     <div class="flex flex-col gap-2">
       <h2 class="text-text-primary text-xl font-medium">
-        {officialMcpUrl() !== undefined
+        {backendCanisterConfig.mcp_official_url.length > 0
           ? $t`Customize AI access`
           : $t`Add AI access`}
       </h2>

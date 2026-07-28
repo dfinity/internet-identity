@@ -75,9 +75,6 @@ export let agentOptions: HttpAgentOptions;
 export let anonymousAgent: HttpAgent;
 export let anonymousActor: ActorSubclass<_SERVICE>;
 
-export const officialMcpUrl = (): string | undefined =>
-  backendCanisterConfig.mcp_official_url[0];
-
 export const initGlobals = async () => {
   canisterId = Principal.fromText(readCanisterId());
 
