@@ -244,6 +244,12 @@ pub async fn prepare(
                 ),
             };
         let mut config = stored.unwrap_or_default();
+        // Reaching here means the user authenticated and consented, so a
+        // first-time identity gets a real enabled config. Materializing the row
+        // for the pending-registration bookkeeping while leaving `enabled`
+        // false would make the anchor read as "switched off" at redemption,
+        // and `register_v2` would refuse the connect it just authorized.
+        config.enabled = true;
         if let Some(previous) = config.pending_registration.take() {
             if let Ok(principal) = Principal::try_from_slice(&previous) {
                 storage.remove_mcp_registration(principal);
