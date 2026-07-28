@@ -491,7 +491,7 @@ fn mcp_disabling_config_revokes_the_session() -> Result<(), RejectResponse> {
         anchor,
         McpConfig {
             enabled: false,
-            url: Some(format!("{MCP_ORIGIN}/mcp")),
+            url: None,
             configured: None,
         },
     )
@@ -697,7 +697,7 @@ fn mcp_register_v2_rejects_a_key_registered_to_another_identity() -> Result<(), 
         anchor_1,
         McpConfig {
             enabled: false,
-            url: Some(format!("{MCP_ORIGIN}/mcp")),
+            url: None,
             configured: None,
         },
     )
@@ -1882,8 +1882,8 @@ fn mcp_prepare_registration_delegation_requires_trusted_server() -> Result<(), R
         "prepare with no config must be rejected: {none:?}"
     );
 
-    // MCP disabled, even with a URL set.
-    mcp_set_config(
+    // A disabled config can't even keep a URL — the write itself is rejected.
+    assert!(mcp_set_config(
         &env,
         canister_id,
         principal_1(),
@@ -1891,6 +1891,21 @@ fn mcp_prepare_registration_delegation_requires_trusted_server() -> Result<(), R
         McpConfig {
             enabled: false,
             url: Some(format!("{MCP_ORIGIN}/mcp")),
+            configured: None,
+        },
+    )
+    .unwrap()
+    .is_err());
+
+    // MCP switched off.
+    mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        McpConfig {
+            enabled: false,
+            url: None,
             configured: None,
         },
     )
