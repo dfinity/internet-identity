@@ -586,6 +586,36 @@ mod tests {
     }
 
     #[test]
+    fn set_mcp_config_rejects_a_disabled_config_that_keeps_a_url() {
+        // Rejected before any storage access, so this needs no harness.
+        let err = set_mcp_config(
+            10_000,
+            McpConfig {
+                enabled: false,
+                url: Some(CUSTOM.to_string()),
+            },
+        )
+        .expect_err("a disabled config carrying a URL must be rejected");
+        assert!(
+            err.contains("cannot keep a trusted server URL"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn set_mcp_config_rejects_an_oversized_url() {
+        let err = set_mcp_config(
+            10_000,
+            McpConfig {
+                enabled: true,
+                url: Some("https://".to_string() + &"a".repeat(MCP_TRUSTED_URL_MAX_BYTES)),
+            },
+        )
+        .expect_err("an oversized URL must be rejected");
+        assert!(err.contains("at most"), "unexpected error: {err}");
+    }
+
+    #[test]
     fn a_live_session_falls_back_to_the_official_connector() {
         assert_eq!(
             session_trusted_url_with(&config(true, None), official()),
