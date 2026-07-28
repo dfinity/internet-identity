@@ -251,13 +251,28 @@
           phase = { kind: "authorize" };
           return;
         }
-        // Connect only when this identity trusts the link's server. The trust
-        // decision is made inside `mcpAuthorize` against `prepare`'s *certified*
-        // `trusted_url` (an update call) — not an uncertified `mcp_get_config`
-        // query a malicious node could forge into naming an attacker's origin.
-        // A mismatch throws `McpUntrustedServerError` (handled below); the same
-        // call then matches the link's callback against the trusted server's
-        // declared allow-list before delivering. The backend re-checks the
+        // Fast pre-filter, NOT the security gate: if this identity plainly
+        // doesn't trust the link's origin, go to the untrusted screen now —
+        // before `mcpAuthorize`, whose `prepare` step would otherwise mint a
+        // registration and flip the synced config to enabled for a connect we
+        // are about to reject. This `mcp_get_config` query is forgeable by a
+        // malicious node, so it does NOT gate delivery: delivery is gated
+        // authoritatively inside `mcpAuthorize` on `prepare`'s *certified*
+        // `trusted_url` (an update call), which a forged query cannot defeat.
+        const config = await readMcpConfig(
+          authenticated.actor,
+          authenticated.identityNumber,
+        );
+        if (!isOriginTrusted(config, server.origin, backendCanisterConfig)) {
+          mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.ServerUntrusted);
+          phase = { kind: "untrusted" };
+          return;
+        }
+        // Trust looks right; mint and deliver. `mcpAuthorize` re-checks the
+        // origin against `prepare`'s certified `trusted_url` (the real gate) and
+        // matches the link's callback against the server's declared allow-list
+        // before delivering. A certified-gate mismatch throws
+        // `McpUntrustedServerError` (handled below); the backend re-checks the
         // trust again when the server registers.
         const deliveryUrl = await mcpAuthorize({
           authenticated,
