@@ -233,7 +233,7 @@ pub async fn prepare(
     // config at this one. That keeps the registration index bounded to one entry
     // per anchor without any cap/reject path. Yields the trusted URL hash to
     // store.
-    let trusted_url_hash = state::storage_borrow_mut(|storage| {
+    let (trusted_url_hash, trusted_url) = state::storage_borrow_mut(|storage| {
         let stored = storage.lookup_mcp_config(anchor_number);
         let url =
             match mcp::connect_trusted_url(stored.as_ref()) {
@@ -257,7 +257,9 @@ pub async fn prepare(
         }
         config.pending_registration = Some(p_reg.as_slice().to_vec());
         storage.write_mcp_config(anchor_number, config);
-        Ok(hash_trusted_url(&url))
+        // Return the resolved URL alongside its hash: the frontend gates
+        // delivery on this certified value (see `PrepareMcpRegistrationDelegation`).
+        Ok((hash_trusted_url(&url), url))
     })?;
 
     state::signature_map_mut(|sigs| {
@@ -293,6 +295,7 @@ pub async fn prepare(
     Ok(PrepareMcpRegistrationDelegation {
         user_key: ByteBuf::from(user_key),
         expiration,
+        trusted_url,
     })
 }
 

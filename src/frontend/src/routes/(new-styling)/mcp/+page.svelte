@@ -15,7 +15,6 @@
   import { fromBase64URL } from "$lib/utils/utils";
   import { readMcpConfig } from "$lib/utils/mcpConfig";
   import { backendCanisterConfig } from "$lib/globals";
-  import { matchDeclaredCallback } from "$lib/utils/authCallbacks";
   import { get } from "svelte/store";
   import { onMount } from "svelte";
   import McpHero from "./components/McpHero.svelte";
@@ -26,7 +25,7 @@
   import McpConnectingView from "./views/McpConnectingView.svelte";
   import ManageHandoff from "$lib/components/ui/ManageHandoff.svelte";
   import { ManageHandoffFlow } from "$lib/flows/manageHandoffFlow.svelte";
-  import { isOriginTrusted, mcpAuthorize } from "./utils";
+  import { isOriginTrusted, mcpAuthorize, McpUntrustedServerError } from "./utils";
   import { showIdentitySwitcher } from "./mcp-switcher.store";
   import {
     mcpAuthorizeFunnel,
@@ -39,8 +38,8 @@
   // The MCP server the user is connecting is identified by the origin of the
   // request's callback: each user trusts whichever (remote) server they connect.
   // The connect flow delivers the registration delegation to that callback —
-  // once it has been matched against the allow-list the server declares on its
-  // origin (see `matchDeclaredCallback` in `handleAuthorize`). MCP is
+  // once `mcpAuthorize` has confirmed the origin is trusted and matched it
+  // against the allow-list the server declares on its origin. MCP is
   // remote-only, so only https callbacks are accepted (a plain-http or loopback
   // callback is rejected). A disallowed (or unparsable) callback yields
   // `undefined` → the invalid screen.
@@ -248,38 +247,22 @@
           phase = { kind: "authorize" };
           return;
         }
-        // The identity's synced trusted-server config is the source of truth:
-        // connect only when this identity has MCP enabled and trusts this
-        // server's origin. Verifying here (post-authentication) means the result
-        // is the same on every device, regardless of any local state — and the
-        // backend re-checks it when registering.
-        const config = await readMcpConfig(
-          authenticated.actor,
-          authenticated.identityNumber,
-        );
-        if (!isOriginTrusted(config, server.origin, backendCanisterConfig)) {
-          mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.ServerUntrusted);
-          phase = { kind: "untrusted" };
-          return;
-        }
-        // Deliver to the trusted server only at a callback it *declares*: the
-        // server hosts an allow-list at a fixed well-known path on its origin
-        // (/.well-known/ii-auth-callbacks), and the link's callback must
-        // exact-match a declared entry. The (attacker-craftable) link only
-        // ever selects among the server-declared set — a crafted link can't
-        // point II at an arbitrary path on the trusted origin (a planted
-        // file, a reflecting or redirecting route). An undeclared callback,
-        // or an unreachable/invalid allow-list, throws: the connect fails
-        // closed into the catch below, before anything is minted.
-        const callback = await matchDeclaredCallback(
-          server.origin,
-          request.callback,
-        );
+        // Connect only when this identity trusts the link's server. The trust
+        // decision is made inside `mcpAuthorize` against `prepare`'s *certified*
+        // `trusted_url` (an update call) — not an uncertified `mcp_get_config`
+        // query a malicious node could forge into naming an attacker's origin.
+        // A mismatch throws `McpUntrustedServerError` (handled below); the same
+        // call then matches the link's callback against the trusted server's
+        // declared allow-list before delivering. The backend re-checks the
+        // trust again when the server registers.
         const deliveryUrl = await mcpAuthorize({
           authenticated,
           ttlSeconds,
           accessLevel,
-          callback,
+          serverOrigin: server.origin,
+          // The raw callback from the (attacker-craftable) link; matched inside
+          // `mcpAuthorize` only once its origin is trust-confirmed.
+          requestedCallback: request.callback,
           state: request.state,
           // The server's public per-connect key `X` from the link (validated
           // base64url in `load`); the browser-signed final hop of the
@@ -297,7 +280,16 @@
         phase = { kind: "close", redirecting: true };
         window.location.assign(deliveryUrl);
       } catch (error) {
-        // Return to the connect screen so the user can retry.
+        // An untrusted server is an expected outcome, not an error: route to
+        // the untrusted screen (where setting the trusted server auto-advances
+        // the connect). Nothing has been delivered — the minted registration
+        // stays inert and expires.
+        if (error instanceof McpUntrustedServerError) {
+          mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.ServerUntrusted);
+          phase = { kind: "untrusted" };
+          return;
+        }
+        // Anything else returns to the connect screen so the user can retry.
         mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Error);
         phase = { kind: "authorize" };
         handleError(error);

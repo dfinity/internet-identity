@@ -1426,6 +1426,7 @@ export interface PrepareIdAliasRequest {
 export interface PrepareMcpRegistrationDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
+  'trusted_url' : string,
 }
 export interface PrepareSessionDelegation {
   'user_key' : UserKey,
