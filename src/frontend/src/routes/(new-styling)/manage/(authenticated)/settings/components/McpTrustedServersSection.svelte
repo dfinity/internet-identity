@@ -46,6 +46,17 @@
 
   const trusted = $derived(config?.url);
   const active = $derived.by(() => {
+    // Resolve nothing until the real config is loaded. `config` is `undefined`
+    // both while the read is in flight and when the identity genuinely never
+    // configured MCP, and `trustedUrl` maps `undefined` to the official
+    // connector — so without this guard an opted-out (explicitly disabled)
+    // identity would briefly flash the official connector and "Customize"
+    // before its config arrives. The toggle is already behind the `loaded`
+    // guard; this extends the same protection to `enabled` and the connector
+    // section below.
+    if (!loaded) {
+      return undefined;
+    }
     const url = trustedUrl(config, backendCanisterConfig);
     return url === undefined
       ? undefined
