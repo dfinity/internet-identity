@@ -2452,6 +2452,49 @@ fn mcp_config_migration_enables_stored_configs_and_revokes_their_grants() {
 }
 
 #[test]
+fn mcp_config_migration_also_resets_an_enabled_custom_connector() {
+    use crate::storage::storable::mcp_config::StorableMcpConfig;
+    use crate::storage::storable::mcp_grant::StorableMcpGrant;
+
+    let mut storage = Storage::new((0, 100), VectorMemory::default());
+    let session = Principal::self_authenticating([3u8; 32]);
+
+    // A working custom connector with a live session.
+    storage.write_mcp_config(
+        10_000,
+        StorableMcpConfig {
+            enabled: true,
+            url: Some("https://mcp.acme.com/mcp".to_string()),
+            session_principal: Some(session.as_slice().to_vec()),
+            pending_registration: None,
+        },
+    );
+    storage.insert_mcp_grant(
+        session,
+        StorableMcpGrant {
+            anchor_number: 10_000,
+            expires_at_ns: u64::MAX,
+            read_only: false,
+        },
+    );
+
+    let outcome = storage.migrate_mcp_configs_batch(None, 2_000);
+
+    // Deliberate: choosing a custom server predates the official connector, so
+    // it wasn't a choice against it. These identities are reset to the default
+    // and re-add their server if they still want it.
+    assert_eq!(outcome.migrated, 1);
+    assert_eq!(
+        storage.read_mcp_config(10_000),
+        StorableMcpConfig {
+            enabled: true,
+            ..Default::default()
+        }
+    );
+    assert!(storage.lookup_mcp_grant(session).is_none());
+}
+
+#[test]
 fn mcp_config_migration_resumes_from_the_cursor() {
     use crate::storage::storable::mcp_config::StorableMcpConfig;
 

@@ -1208,9 +1208,16 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Rewrite up to `batch_size` stored MCP configs to "enabled, official
-    /// connector" — the pre-official-connector meaning of every stored value
+    /// connector". The pre-official-connector meaning of every stored value
     /// was "no custom server of mine", never a choice about a connector that
     /// did not exist yet.
+    ///
+    /// That deliberately includes rows that are already enabled with a custom
+    /// server: `{ enabled: true, url: Some(..) }` is reset to the official
+    /// connector like everything else, so those identities have to re-add their
+    /// server if they still want it. Only rows already in the target shape
+    /// (`{ enabled: true, url: None }`) are skipped, which is what makes a
+    /// re-run a no-op.
     ///
     /// Any live grant on a rewritten row is deleted, along with any in-flight
     /// registration: neither may come back to life because a migration
@@ -1244,8 +1251,9 @@ impl<M: Memory + Clone> Storage<M> {
         {
             examined += 1;
             outcome.next_cursor = Some(anchor_number);
-            // Idempotency: a row already in the migrated shape is left alone,
-            // so a re-run is a no-op.
+            // Only the target shape is skipped — an enabled row with a custom
+            // server is rewritten too (see the doc comment). Skipping it also
+            // makes a re-run a no-op.
             if config.enabled && config.url.is_none() {
                 continue;
             }
