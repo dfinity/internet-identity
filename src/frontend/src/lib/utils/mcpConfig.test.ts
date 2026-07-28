@@ -4,6 +4,8 @@ import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import {
   originOf,
   isOriginTrusted,
+  trustedUrl,
+  connectTrustedUrl,
   setMcpEnabled,
   trustAndEnableMcp,
   clearMcpTrustedServer,
@@ -113,6 +115,98 @@ const makeActor = (current: McpConfig) => ({
 
 const asActor = (actor: ReturnType<typeof makeActor>) =>
   actor as unknown as ActorSubclass<_SERVICE>;
+
+describe("trustedUrl", () => {
+  const OFFICIAL = "https://official-mcp.id.ai/mcp";
+
+  it("falls back to the official connector when no custom URL is set", () => {
+    expect(trustedUrl({ enabled: true, url: undefined }, OFFICIAL)).toBe(
+      OFFICIAL,
+    );
+  });
+
+  it("prefers the custom connector over the official one", () => {
+    expect(
+      trustedUrl({ enabled: true, url: "https://mcp.acme.com/mcp" }, OFFICIAL),
+    ).toBe("https://mcp.acme.com/mcp");
+  });
+
+  it("trusts nothing while the feature is disabled", () => {
+    expect(
+      trustedUrl({ enabled: false, url: undefined }, OFFICIAL),
+    ).toBeUndefined();
+    expect(
+      trustedUrl({ enabled: false, url: "https://mcp.acme.com/mcp" }, OFFICIAL),
+    ).toBeUndefined();
+  });
+
+  it("trusts nothing when enabled with no custom and no official connector", () => {
+    expect(
+      trustedUrl({ enabled: true, url: undefined }, undefined),
+    ).toBeUndefined();
+  });
+});
+
+describe("connectTrustedUrl", () => {
+  const OFFICIAL = "https://official-mcp.id.ai/mcp";
+  const CUSTOM = "https://mcp.acme.com/mcp";
+
+  it("offers the official connector to an identity that never enabled the feature", () => {
+    expect(
+      connectTrustedUrl({ enabled: false, url: undefined }, OFFICIAL),
+    ).toBe(OFFICIAL);
+  });
+
+  it("still offers it after the feature was switched off", () => {
+    // Completing the consent at /mcp is what turns it back on, so a disabled
+    // config is not a permanent block on connecting.
+    expect(
+      connectTrustedUrl({ enabled: false, url: undefined }, OFFICIAL),
+    ).toBe(OFFICIAL);
+  });
+
+  it("lets a custom connector displace the official one", () => {
+    expect(connectTrustedUrl({ enabled: true, url: CUSTOM }, OFFICIAL)).toBe(
+      CUSTOM,
+    );
+  });
+
+  it("requires the feature enabled for a custom connector", () => {
+    expect(
+      connectTrustedUrl({ enabled: false, url: CUSTOM }, OFFICIAL),
+    ).toBeUndefined();
+  });
+
+  it("offers nothing without an official connector", () => {
+    expect(
+      connectTrustedUrl({ enabled: false, url: undefined }, undefined),
+    ).toBeUndefined();
+  });
+});
+
+describe("isOriginTrusted with an official connector", () => {
+  const OFFICIAL = "https://official-mcp.id.ai/mcp";
+
+  it("accepts the official origin when no custom URL is set", () => {
+    expect(
+      isOriginTrusted(
+        { enabled: true, url: undefined },
+        "https://official-mcp.id.ai",
+        OFFICIAL,
+      ),
+    ).toBe(true);
+  });
+
+  it("stops accepting the official origin once a custom URL is set", () => {
+    expect(
+      isOriginTrusted(
+        { enabled: true, url: "https://mcp.acme.com/mcp" },
+        "https://official-mcp.id.ai",
+        OFFICIAL,
+      ),
+    ).toBe(false);
+  });
+});
 
 describe("setMcpEnabled", () => {
   it("forgets the custom URL when turning the feature off", async () => {

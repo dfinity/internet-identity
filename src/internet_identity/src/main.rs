@@ -647,7 +647,13 @@ fn get_account_delegation(
 #[query]
 fn mcp_get_config(anchor_number: AnchorNumber) -> McpConfig {
     if check_session_authorization(anchor_number).is_err() {
-        return McpConfig::default();
+        // Not `McpConfig::default()`: the default now depends on the
+        // deployment's official connector, and an unauthorized caller must
+        // never be told an identity trusts one.
+        return McpConfig {
+            enabled: false,
+            url: None,
+        };
     }
     mcp::get_mcp_config(anchor_number)
 }

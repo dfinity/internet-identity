@@ -50,12 +50,47 @@ export const originOf = (url: string): string | undefined => {
 };
 
 /**
- * Whether `config` trusts `origin`: the feature is enabled and a trusted server
- * of that origin is set. Matching is by origin — the same security boundary the
- * delegation uses (II derives a per-origin principal; the path can't scope it).
+ * The URL `config` trusts: the identity's own when they set one, otherwise
+ * `officialUrl`. Exactly one is trusted at a time, and nothing is while the
+ * feature is off. Mirrors `trusted_url_of` in the canister, which is what
+ * actually enforces it.
  */
-export const isOriginTrusted = (config: McpConfig, origin: string): boolean =>
-  config.enabled && config.url !== undefined && originOf(config.url) === origin;
+export const trustedUrl = (
+  config: McpConfig,
+  officialUrl: string | undefined,
+): string | undefined =>
+  config.enabled ? (config.url ?? officialUrl) : undefined;
+
+/**
+ * The URL a *new* connect may target. The official connector is available
+ * whenever the identity hasn't chosen a server of their own — including before
+ * they have ever enabled the feature, since completing the consent is what
+ * enables it. Mirrors `connect_trusted_url` in the canister, which is what
+ * actually enforces it.
+ */
+export const connectTrustedUrl = (
+  config: McpConfig,
+  officialUrl: string | undefined,
+): string | undefined =>
+  config.url !== undefined
+    ? config.enabled
+      ? config.url
+      : undefined
+    : officialUrl;
+
+/**
+ * Whether `origin` may be connected. Matching is by origin — the same security
+ * boundary the delegation uses (II derives a per-origin principal; the path
+ * can't scope it).
+ */
+export const isOriginTrusted = (
+  config: McpConfig,
+  origin: string,
+  officialUrl?: string,
+): boolean => {
+  const url = connectTrustedUrl(config, officialUrl);
+  return url !== undefined && originOf(url) === origin;
+};
 
 /** Read the identity's synced MCP config from the canister. */
 export const readMcpConfig = async (

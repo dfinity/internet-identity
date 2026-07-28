@@ -167,14 +167,9 @@ fn permissions_of(read_only: bool) -> Permissions {
 /// the index entry; [`register_v2`] compares the stored URL against this again,
 /// so a config change or disable between consent and redemption is caught.
 fn trusted_url(anchor_number: AnchorNumber) -> Result<String, String> {
-    let config = mcp::get_mcp_config(anchor_number);
-    match (config.enabled, config.url) {
-        (true, Some(url)) => Ok(url),
-        _ => Err(
-            "MCP registration failed: no trusted MCP server is enabled for this identity."
-                .to_string(),
-        ),
-    }
+    mcp::resolve_connect_url(anchor_number).ok_or_else(|| {
+        "MCP registration failed: no trusted MCP server is enabled for this identity.".to_string()
+    })
 }
 
 /// `prepare_mcp_registration_delegation`: mint the `P_reg -> Y` delegation
@@ -241,9 +236,9 @@ pub async fn prepare(
     let trusted_url_hash = state::storage_borrow_mut(|storage| {
         let mut config = storage.read_mcp_config(anchor_number);
         let url =
-            match (config.enabled, config.url.as_ref()) {
-                (true, Some(url)) => url.clone(),
-                _ => return Err(
+            match mcp::connect_trusted_url(&config) {
+                Some(url) => url,
+                None => return Err(
                     "MCP registration failed: no trusted MCP server is enabled for this identity."
                         .to_string(),
                 ),

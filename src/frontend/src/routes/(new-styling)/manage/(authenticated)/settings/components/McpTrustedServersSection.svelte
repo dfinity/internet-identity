@@ -19,6 +19,7 @@
     setMcpEnabled,
     trustAndEnableMcp,
     clearMcpTrustedServer,
+    trustedUrl,
   } from "$lib/utils/mcpConfig";
   import { officialMcpUrl } from "$lib/globals";
   import McpAddConnectorDialog from "./McpAddConnectorDialog.svelte";
@@ -43,13 +44,12 @@
 
   const official = officialMcpUrl();
 
-  const active = $derived(
-    trusted !== undefined
-      ? { url: trusted, custom: true }
-      : official !== undefined
-        ? { url: official, custom: false }
-        : undefined,
-  );
+  const active = $derived.by(() => {
+    const url = trustedUrl({ enabled, url: trusted }, official);
+    return url === undefined
+      ? undefined
+      : { url, custom: trusted !== undefined };
+  });
 
   const hostOf = (url: string): string => {
     try {
@@ -163,7 +163,7 @@
         <h3 id={titleId} class="text-text-primary text-base font-semibold">
           {$t`AI access`}
         </h3>
-        {#if enabled && active !== undefined}
+        {#if active !== undefined}
           <Badge color="success" size="sm" dot>
             {$t`Enabled on all devices`}
           </Badge>
