@@ -163,9 +163,6 @@
         <h3 id={titleId} class="text-text-primary text-base font-semibold">
           {$t`AI access`}
         </h3>
-        <Badge color="surface" size="sm">
-          {$t`Preview`}
-        </Badge>
         {#if enabled && active !== undefined}
           <Badge color="success" size="sm" dot>
             {$t`Enabled on all devices`}
