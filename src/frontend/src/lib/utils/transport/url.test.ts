@@ -462,7 +462,9 @@ describe("UrlTransport.establishChannel", () => {
 
     // The return load (e.g. after an OpenID hop): no hash, no allow-list fetch.
     installLocation("#");
-    const resumed = await new UrlTransport().establishChannel();
+    const resumed = await new UrlTransport().establishChannel({
+      allowedOrigin: ORIGIN,
+    });
     expect(resumed.origin).toBe(ORIGIN);
     const seen: JsonRequest[] = [];
     resumed.addEventListener("request", (r) => seen.push(r));
@@ -483,7 +485,9 @@ describe("UrlTransport.establishChannel", () => {
     await new UrlTransport().establishChannel(); // generates + persists ephemeral
 
     installLocation("#");
-    const resumed = await new UrlTransport().establishChannel();
+    const resumed = await new UrlTransport().establishChannel({
+      allowedOrigin: ORIGIN,
+    });
     const seen: JsonRequest[] = [];
     resumed.addEventListener("request", (r) => seen.push(r));
     const ephemeralKey = new Uint8Array(
@@ -544,7 +548,9 @@ describe("UrlTransport.establishChannel", () => {
 
     // Redirect, then resume: request 1's response is restored from storage.
     installLocation("#");
-    const resumed = await new UrlTransport().establishChannel();
+    const resumed = await new UrlTransport().establishChannel({
+      allowedOrigin: ORIGIN,
+    });
     const seen: JsonRequest[] = [];
     resumed.addEventListener("request", (r) => seen.push(r));
     expect(seen.map((r) => r.id)).toEqual([2]); // only the unanswered one
@@ -576,6 +582,51 @@ describe("UrlTransport.establishChannel", () => {
     await expect(new UrlTransport().establishChannel()).rejects.toBeInstanceOf(
       UrlTransportUnsupportedError,
     );
+    expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it("resumes only for a resume-mode establish matching the flow's origin", async () => {
+    // Persist a fresh flow, then simulate the hashless return load.
+    const persistFlow = async () => {
+      installLocation(hashFor({ jsonrpc: "2.0", id: 1, method: "m" }));
+      stubAllowList([CALLBACK]);
+      await new UrlTransport().establishChannel();
+      installLocation("#");
+      expect(sessionStorage.getItem(STORAGE_KEY)).not.toBeNull();
+    };
+
+    // A normal load (no `allowedOrigin`) is not a resume for us: decline and
+    // drop the abandoned flow rather than pick it up.
+    await persistFlow();
+    await expect(new UrlTransport().establishChannel()).rejects.toBeInstanceOf(
+      UrlTransportUnsupportedError,
+    );
+    expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+
+    // A resume for a different origin declines (a load for another app carries
+    // that app's origin, so a stray copy of this flow can't be resumed there).
+    await persistFlow();
+    await expect(
+      new UrlTransport().establishChannel({
+        allowedOrigin: "https://other.example",
+      }),
+    ).rejects.toBeInstanceOf(UrlTransportUnsupportedError);
+
+    // A matching resume succeeds.
+    await persistFlow();
+    const resumed = await new UrlTransport().establishChannel({
+      allowedOrigin: ORIGIN,
+    });
+    expect(resumed.origin).toBe(ORIGIN);
+  });
+
+  it("clears the persisted flow when the channel is closed without delivering", async () => {
+    installLocation(hashFor({ jsonrpc: "2.0", id: 1, method: "m" }));
+    stubAllowList([CALLBACK]);
+    const channel = await new UrlTransport().establishChannel();
+    expect(sessionStorage.getItem(STORAGE_KEY)).not.toBeNull();
+
+    await channel.close();
     expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 });

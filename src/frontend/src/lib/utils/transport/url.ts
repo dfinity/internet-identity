@@ -323,6 +323,9 @@ export class UrlChannel implements Channel {
   #onResponsesChanged: (responses: Record<string, JsonResponse>) => void;
   // Invoked just before the response redirect, to drop any persisted flow.
   #onDelivered: () => void;
+  // Invoked when the channel is torn down without ever delivering, to drop the
+  // persisted flow that delivery would otherwise have cleared.
+  #onClosed: () => void;
 
   constructor(params: {
     origin: string;
@@ -334,6 +337,7 @@ export class UrlChannel implements Channel {
     responses?: Record<string, JsonResponse>;
     onResponsesChanged?: (responses: Record<string, JsonResponse>) => void;
     onDelivered?: () => void;
+    onClosed?: () => void;
   }) {
     this.#origin = params.origin;
     this.#callback = params.callback;
@@ -341,6 +345,7 @@ export class UrlChannel implements Channel {
     this.#batch = params.batch;
     this.#onResponsesChanged = params.onResponsesChanged ?? (() => {});
     this.#onDelivered = params.onDelivered ?? (() => {});
+    this.#onClosed = params.onClosed ?? (() => {});
     this.#requests = params.interceptors.map(({ request }) => request);
     for (const { request, finalize } of params.interceptors) {
       if (request.id !== undefined) {
@@ -454,6 +459,13 @@ export class UrlChannel implements Channel {
   }
 
   close(): Promise<void> {
+    // A channel torn down without ever delivering leaves its persisted flow
+    // behind (delivery is what clears it). Drop it here too. Guarded on
+    // `#delivered` so a post-delivery close never wipes a subsequent flow, and
+    // on `#closed` so a double close is a no-op.
+    if (!this.#delivered && !this.#closed) {
+      this.#onClosed();
+    }
     this.#closed = true;
     this.#closeListeners.forEach((listener) => listener());
     return Promise.resolve();
@@ -597,21 +609,31 @@ const readStoredFlow = (): PersistedFlow | undefined => {
 };
 
 export class UrlTransport implements Transport {
-  async establishChannel(_options?: ChannelOptions): Promise<UrlChannel> {
+  async establishChannel(options?: ChannelOptions): Promise<UrlChannel> {
     const request = readUrlRequest();
     if (request !== undefined) {
       return await this.#establishFresh(request);
     }
     // No request in the hash: this may be the return load of an II-internal
     // redirect (e.g. an OpenID/SSO hop) that unloaded the page mid-flow, so
-    // resume a persisted flow if one is still in progress. Any other load has
-    // nothing to resume.
+    // resume the persisted flow — but only when II re-established in resume
+    // mode for the flow's own origin. `channelStore.establish` forwards
+    // `allowedOrigin` (the channel origin stashed before the redirect, the same
+    // signal the postMessage/legacy transports scope to) on the `openid-resume`
+    // return, and nothing on a normal load. Requiring that signal and an exact
+    // origin match keeps an unrelated later load — or a copy of this flow that
+    // rode into another context via sessionStorage — from resuming it: a load
+    // for a different app carries that app's origin, which won't match.
     const stored = readStoredFlow();
-    if (stored !== undefined) {
+    if (stored !== undefined && options?.allowedOrigin === stored.origin) {
       return await this.#rehydrate(stored);
     }
+    // This establish is not resuming the stored flow, so any flow still sitting
+    // in storage is abandoned (its own load never delivered and never came back
+    // in resume mode). Drop it now rather than let it linger to its timeout.
+    deleteFlow();
     throw new UrlTransportUnsupportedError(
-      "No ICRC-167 request in the URL hash and no flow to resume",
+      "No ICRC-167 request in the URL hash and no resumable flow for this load",
     );
   }
 
@@ -662,6 +684,7 @@ export class UrlTransport implements Transport {
       interceptors,
       onResponsesChanged: persistResponses,
       onDelivered: deleteFlow,
+      onClosed: deleteFlow,
     });
   }
 
@@ -699,6 +722,7 @@ export class UrlTransport implements Transport {
       responses: flow.responses,
       onResponsesChanged: persistResponses,
       onDelivered: deleteFlow,
+      onClosed: deleteFlow,
     });
   }
 }
