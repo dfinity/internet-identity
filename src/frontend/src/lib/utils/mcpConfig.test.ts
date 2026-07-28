@@ -5,6 +5,8 @@ import {
   originOf,
   isOriginTrusted,
   setMcpEnabled,
+  trustAndEnableMcp,
+  clearMcpTrustedServer,
   type McpConfig,
 } from "./mcpConfig";
 
@@ -98,21 +100,21 @@ describe("isOriginTrusted", () => {
   });
 });
 
+const ANCHOR = BigInt(10_000);
+const CUSTOM_URL = "https://mcp.acme.com/mcp";
+
+const makeActor = (current: McpConfig) => ({
+  mcp_get_config: vi.fn().mockResolvedValue({
+    enabled: current.enabled,
+    url: current.url === undefined ? [] : [current.url],
+  }),
+  mcp_set_config: vi.fn().mockResolvedValue({ Ok: null }),
+});
+
+const asActor = (actor: ReturnType<typeof makeActor>) =>
+  actor as unknown as ActorSubclass<_SERVICE>;
+
 describe("setMcpEnabled", () => {
-  const ANCHOR = BigInt(10_000);
-  const CUSTOM_URL = "https://mcp.acme.com/mcp";
-
-  const makeActor = (current: McpConfig) => ({
-    mcp_get_config: vi.fn().mockResolvedValue({
-      enabled: current.enabled,
-      url: current.url === undefined ? [] : [current.url],
-    }),
-    mcp_set_config: vi.fn().mockResolvedValue({ Ok: null }),
-  });
-
-  const asActor = (actor: ReturnType<typeof makeActor>) =>
-    actor as unknown as ActorSubclass<_SERVICE>;
-
   it("forgets the custom URL when turning the feature off", async () => {
     const actor = makeActor({ enabled: true, url: CUSTOM_URL });
 
@@ -133,5 +135,53 @@ describe("setMcpEnabled", () => {
       enabled: true,
       url: [CUSTOM_URL],
     });
+  });
+});
+
+describe("trustAndEnableMcp", () => {
+  it("enables the feature and stores the URL in a single write", async () => {
+    const actor = makeActor({ enabled: false, url: undefined });
+
+    await trustAndEnableMcp(asActor(actor), ANCHOR, CUSTOM_URL);
+
+    expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
+      enabled: true,
+      url: [CUSTOM_URL],
+    });
+  });
+});
+
+describe("clearMcpTrustedServer", () => {
+  it("forgets the custom URL without turning the feature off", async () => {
+    const actor = makeActor({ enabled: true, url: CUSTOM_URL });
+
+    await clearMcpTrustedServer(asActor(actor), ANCHOR);
+
+    expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
+      enabled: true,
+      url: [],
+    });
+  });
+
+  it("keeps the feature off when it was already off", async () => {
+    const actor = makeActor({ enabled: false, url: CUSTOM_URL });
+
+    await clearMcpTrustedServer(asActor(actor), ANCHOR);
+
+    expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
+      enabled: false,
+      url: [],
+    });
+  });
+});
+
+describe("write failures", () => {
+  it("rejects with the canister's error so callers can roll back", async () => {
+    const actor = makeActor({ enabled: true, url: CUSTOM_URL });
+    actor.mcp_set_config.mockResolvedValue({ Err: "config is too large" });
+
+    await expect(setMcpEnabled(asActor(actor), ANCHOR, false)).rejects.toThrow(
+      "config is too large",
+    );
   });
 });
