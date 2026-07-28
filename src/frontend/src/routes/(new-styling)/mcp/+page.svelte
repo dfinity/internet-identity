@@ -13,7 +13,7 @@
   import { toaster } from "$lib/components/utils/toaster";
   import { parseMcpServerUrl } from "$lib/utils/mcpServer";
   import { fromBase64URL } from "$lib/utils/utils";
-  import { readMcpConfig, isOriginTrusted } from "$lib/utils/mcpConfig";
+  import { readMcpConfig } from "$lib/utils/mcpConfig";
   import { officialMcpUrl } from "$lib/globals";
   import { matchDeclaredCallback } from "$lib/utils/authCallbacks";
   import { get } from "svelte/store";
@@ -26,7 +26,7 @@
   import McpConnectingView from "./views/McpConnectingView.svelte";
   import ManageHandoff from "$lib/components/ui/ManageHandoff.svelte";
   import { ManageHandoffFlow } from "$lib/flows/manageHandoffFlow.svelte";
-  import { mcpAuthorize } from "./utils";
+  import { isOriginTrusted, mcpAuthorize } from "./utils";
   import { showIdentitySwitcher } from "./mcp-switcher.store";
   import {
     mcpAuthorizeFunnel,

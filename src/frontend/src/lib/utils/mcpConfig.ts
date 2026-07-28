@@ -49,48 +49,6 @@ export const originOf = (url: string): string | undefined => {
   }
 };
 
-/**
- * The URL `config` trusts for display: the identity's own server when they set
- * one, otherwise `officialUrl`. Nothing while the feature is off, or when the
- * identity has never configured it. Mirrors `session_trusted_url` in the
- * canister.
- */
-export const trustedUrl = (
-  config: McpConfig | undefined,
-  officialUrl: string | undefined,
-): string | undefined =>
-  config !== undefined && config.enabled
-    ? (config.url ?? officialUrl)
-    : undefined;
-
-/**
- * Whether `origin` may be connected. An identity that never configured MCP
- * (`undefined`) may connect the official connector — completing the consent is
- * what enables the feature for them. One that switched the feature off may not:
- * they are sent back to Settings rather than silently re-enabled by a link.
- *
- * Deliberately not the same rule as [`trustedUrl`], which answers what the
- * identity trusts *now* and is what Settings renders. Kept inline rather than
- * exported so the two can't be confused at a call site — the canister enforces
- * the same split in `connect_trusted_url` / `session_trusted_url`.
- *
- * Matching is by origin, the same boundary the delegation uses (II derives a
- * per-origin principal; the path can't scope it).
- */
-export const isOriginTrusted = (
-  config: McpConfig | undefined,
-  origin: string,
-  officialUrl?: string,
-): boolean => {
-  const url =
-    config === undefined
-      ? officialUrl
-      : config.enabled
-        ? (config.url ?? officialUrl)
-        : undefined;
-  return url !== undefined && originOf(url) === origin;
-};
-
 /** Read the identity's synced MCP config from the canister. */
 export const readMcpConfig = async (
   actor: ActorSubclass<_SERVICE>,

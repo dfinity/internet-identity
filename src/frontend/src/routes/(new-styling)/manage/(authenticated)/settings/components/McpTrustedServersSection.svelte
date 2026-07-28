@@ -19,9 +19,9 @@
     setMcpEnabled,
     trustAndEnableMcp,
     clearMcpTrustedServer,
-    trustedUrl,
     type McpConfig,
   } from "$lib/utils/mcpConfig";
+  import { trustedUrl } from "../utils";
   import { officialMcpUrl } from "$lib/globals";
   import McpAddConnectorDialog from "./McpAddConnectorDialog.svelte";
 

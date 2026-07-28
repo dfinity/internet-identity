@@ -3,8 +3,6 @@ import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import {
   originOf,
-  isOriginTrusted,
-  trustedUrl,
   setMcpEnabled,
   trustAndEnableMcp,
   clearMcpTrustedServer,
@@ -31,74 +29,6 @@ describe("originOf", () => {
   });
 });
 
-describe("isOriginTrusted", () => {
-  const trust = (url: string | undefined, enabled = true): McpConfig =>
-    cfg(enabled, url);
-
-  it("trusts an origin that matches the configured server's origin", () => {
-    expect(
-      isOriginTrusted(trust("https://mcp.id.ai/mcp"), "https://mcp.id.ai"),
-    ).toBe(true);
-  });
-
-  it("matches by origin only, ignoring the trusted URL's path", () => {
-    // The URL is kept verbatim (e.g. a path-based endpoint), but trust is an
-    // origin decision — the path must not narrow or widen the match.
-    expect(
-      isOriginTrusted(
-        trust("https://mcp.id.ai/some/deep/path"),
-        "https://mcp.id.ai",
-      ),
-    ).toBe(true);
-  });
-
-  it("does not trust when the feature is disabled, even if the origin matches", () => {
-    expect(
-      isOriginTrusted(
-        trust("https://mcp.id.ai/mcp", false),
-        "https://mcp.id.ai",
-      ),
-    ).toBe(false);
-  });
-
-  it("does not trust when no server URL is configured", () => {
-    expect(isOriginTrusted(trust(undefined), "https://mcp.id.ai")).toBe(false);
-  });
-
-  it("rejects a different host", () => {
-    expect(
-      isOriginTrusted(
-        trust("https://mcp.id.ai/mcp"),
-        "https://evil.example.com",
-      ),
-    ).toBe(false);
-  });
-
-  it("rejects a scheme mismatch (http vs https is a different origin)", () => {
-    expect(
-      isOriginTrusted(trust("https://mcp.id.ai/mcp"), "http://mcp.id.ai"),
-    ).toBe(false);
-  });
-
-  it("rejects a port mismatch", () => {
-    expect(
-      isOriginTrusted(trust("https://mcp.id.ai:8443/mcp"), "https://mcp.id.ai"),
-    ).toBe(false);
-  });
-
-  it("rejects a subdomain that is not the exact origin", () => {
-    expect(
-      isOriginTrusted(trust("https://mcp.id.ai/mcp"), "https://sub.mcp.id.ai"),
-    ).toBe(false);
-  });
-
-  it("does not trust when the configured URL is unparsable", () => {
-    expect(isOriginTrusted(trust("not a url"), "https://mcp.id.ai")).toBe(
-      false,
-    );
-  });
-});
-
 const ANCHOR = BigInt(10_000);
 
 const makeActor = (current: McpConfig) => ({
@@ -114,74 +44,12 @@ const makeActor = (current: McpConfig) => ({
 const asActor = (actor: ReturnType<typeof makeActor>) =>
   actor as unknown as ActorSubclass<_SERVICE>;
 
-const OFFICIAL = "https://official-mcp.id.ai/mcp";
 const CUSTOM = "https://mcp.acme.com/mcp";
 
 /** A stored config. `undefined` stands for an identity that never wrote one. */
 const cfg = (enabled: boolean, url: string | undefined): McpConfig => ({
   enabled,
   url,
-});
-
-describe("trustedUrl", () => {
-  it("falls back to the official connector when no custom URL is set", () => {
-    expect(trustedUrl(cfg(true, undefined), OFFICIAL)).toBe(OFFICIAL);
-  });
-
-  it("prefers the custom connector over the official one", () => {
-    expect(trustedUrl(cfg(true, CUSTOM), OFFICIAL)).toBe(CUSTOM);
-  });
-
-  it("trusts nothing while the feature is disabled", () => {
-    expect(trustedUrl(cfg(false, undefined), OFFICIAL)).toBeUndefined();
-    expect(trustedUrl(cfg(false, CUSTOM), OFFICIAL)).toBeUndefined();
-  });
-
-  it("trusts nothing when enabled with no custom and no official connector", () => {
-    expect(trustedUrl(cfg(true, undefined), undefined)).toBeUndefined();
-  });
-});
-
-describe("isOriginTrusted — official connector", () => {
-  const OFFICIAL_ORIGIN = "https://official-mcp.id.ai";
-  const CUSTOM_ORIGIN = "https://mcp.acme.com";
-
-  it("accepts it for an identity that never configured MCP", () => {
-    expect(isOriginTrusted(undefined, OFFICIAL_ORIGIN, OFFICIAL)).toBe(true);
-  });
-
-  it("rejects it once the feature has been switched off", () => {
-    // A stored disabled config must not be re-enabled by a connect link, so it
-    // has to behave differently from the never-configured case above.
-    expect(
-      isOriginTrusted(cfg(false, undefined), OFFICIAL_ORIGIN, OFFICIAL),
-    ).toBe(false);
-  });
-
-  it("accepts it for an enabled config with no custom server", () => {
-    expect(
-      isOriginTrusted(cfg(true, undefined), OFFICIAL_ORIGIN, OFFICIAL),
-    ).toBe(true);
-  });
-
-  it("lets a custom connector displace it", () => {
-    expect(isOriginTrusted(cfg(true, CUSTOM), CUSTOM_ORIGIN, OFFICIAL)).toBe(
-      true,
-    );
-    expect(isOriginTrusted(cfg(true, CUSTOM), OFFICIAL_ORIGIN, OFFICIAL)).toBe(
-      false,
-    );
-  });
-
-  it("requires the feature enabled for a custom connector", () => {
-    expect(isOriginTrusted(cfg(false, CUSTOM), CUSTOM_ORIGIN, OFFICIAL)).toBe(
-      false,
-    );
-  });
-
-  it("accepts nothing when no official connector is configured", () => {
-    expect(isOriginTrusted(undefined, OFFICIAL_ORIGIN, undefined)).toBe(false);
-  });
 });
 
 describe("setMcpEnabled", () => {

@@ -1,4 +1,5 @@
 import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
+import { originOf, type McpConfig } from "$lib/utils/mcpConfig";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import type { PublicKey } from "@icp-sdk/core/agent";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
@@ -153,4 +154,32 @@ export const mcpAuthorize = async ({
   fragment.set("delegation", JSON.stringify(chain.toJSON()));
   fragment.set("state", state);
   return `${callback}#${fragment.toString()}`;
+};
+
+/**
+ * Whether `origin` may be connected. An identity that never configured MCP
+ * (`undefined`) may connect the official connector — completing the consent is
+ * what enables the feature for them. One that switched the feature off may not:
+ * they are sent back to Settings rather than silently re-enabled by a link.
+ *
+ * Deliberately not the same rule as Settings' `trustedUrl`, which answers what
+ * the identity trusts *now*. The canister enforces the same split in
+ * `connect_trusted_url` / `session_trusted_url`; this lives here, next to the
+ * consent flow that needs it, so the two can't be confused at a call site.
+ *
+ * Matching is by origin, the same boundary the delegation uses (II derives a
+ * per-origin principal; the path can't scope it).
+ */
+export const isOriginTrusted = (
+  config: McpConfig | undefined,
+  origin: string,
+  officialUrl?: string,
+): boolean => {
+  const url =
+    config === undefined
+      ? officialUrl
+      : config.enabled
+        ? (config.url ?? officialUrl)
+        : undefined;
+  return url !== undefined && originOf(url) === origin;
 };
