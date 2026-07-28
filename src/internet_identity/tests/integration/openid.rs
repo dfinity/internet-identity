@@ -2296,61 +2296,29 @@ mod sso_gating {
         .map(|result| result.identity_number)
     }
 
-    /// A `sub`-based org's first gated login registers directly, storing the
-    /// II-client-keyed credential; both a gated and an ungated login then resolve
-    /// to that anchor.
+    /// A `sub`-based org resolves a gated login through the same domain-scoped
+    /// path as a non-`sub` org: the first gated login (no II-client identity
+    /// established through this domain yet) requires a normal login first and
+    /// creates nothing. The positive path — resolving after a normal login has
+    /// established the II-client credential — is covered by
+    /// `gated_and_ungated_resolve_to_same_dapp_principal`.
     #[test]
-    fn sub_org_first_gated_login_registers_directly() -> Result<(), RejectResponse> {
+    fn sub_org_first_gated_login_needs_normal_login_first() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install(&env);
 
         // `sub` org: the gated per-app token shares the II-client credential's sub.
         let (gated_jwt, jwks) = token(PER_APP_CLIENT, II_CLIENT_SUB, &[]);
-        let (ii_client_jwt, _) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
 
         sync_time(&env, TEST_TIME_MS);
         warm_gate_caches(&env, canister_id, &responses, &gated_jwt, GATED_ORIGIN);
 
-        let identity_number = register_via_sso_gate(&env, canister_id, &gated_jwt, GATED_ORIGIN)
-            .expect("sub-org first gated login must register directly");
-
-        let session_key = ByteBuf::from("dapp session key");
-
-        // The gated login now resolves to the just-registered anchor.
-        let gated = expect_ready(drive_sso_until_ready(&env, &responses, || {
-            api::sso_prepare_delegation(
-                &env,
-                canister_id,
-                test_principal(),
-                &gated_jwt,
-                &test_salt(),
-                &session_key,
-                GATE_DOMAIN,
-                GATED_ORIGIN,
-            )
-            .unwrap()
-        }));
-        assert_eq!(gated.anchor_number, identity_number);
-
-        // The ungated login resolves to the same anchor: the stored credential is II-client-keyed.
-        let ungated = expect_ready(drive_sso_until_ready(&env, &responses, || {
-            api::sso_prepare_delegation(
-                &env,
-                canister_id,
-                test_principal(),
-                &ii_client_jwt,
-                &test_salt(),
-                &session_key,
-                GATE_DOMAIN,
-                UNGATED_ORIGIN,
-            )
-            .unwrap()
-        }));
-        assert_eq!(
-            ungated.anchor_number, identity_number,
-            "gate-registered credential must be II-client-keyed (ungated login resolves to it)"
+        let result = register_via_sso_gate(&env, canister_id, &gated_jwt, GATED_ORIGIN);
+        assert!(
+            matches!(result, Err(IdRegFinishError::SsoNormalLoginRequired)),
+            "sub-org first gated login must require a normal login first, got {result:?}"
         );
         Ok(())
     }
