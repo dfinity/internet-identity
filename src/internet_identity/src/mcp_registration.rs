@@ -234,15 +234,16 @@ pub async fn prepare(
     // per anchor without any cap/reject path. Yields the trusted URL hash to
     // store.
     let trusted_url_hash = state::storage_borrow_mut(|storage| {
-        let mut config = storage.read_mcp_config(anchor_number);
+        let stored = storage.lookup_mcp_config(anchor_number);
         let url =
-            match mcp::connect_trusted_url(&config) {
+            match mcp::connect_trusted_url(stored.as_ref()) {
                 Some(url) => url,
                 None => return Err(
                     "MCP registration failed: no trusted MCP server is enabled for this identity."
                         .to_string(),
                 ),
             };
+        let mut config = stored.unwrap_or_default();
         if let Some(previous) = config.pending_registration.take() {
             if let Ok(principal) = Principal::try_from_slice(&previous) {
                 storage.remove_mcp_registration(principal);

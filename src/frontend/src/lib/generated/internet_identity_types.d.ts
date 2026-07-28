@@ -1168,7 +1168,26 @@ export type LookupByRegistrationIdError = { 'InvalidRegistrationId' : string };
  * display/re-probe a path-based endpoint; the connect flow matches trust by
  * origin.
  */
-export interface McpConfig { 'url' : [] | [string], 'enabled' : boolean }
+export interface McpConfig {
+  'url' : [] | [string],
+  'enabled' : boolean,
+  /**
+   * Whether this identity has ever written an MCP config. Read-only: it is
+   * reported by mcp_get_config and ignored on mcp_set_config.
+   * 
+   * `enabled = false` alone is ambiguous — it looks the same for an identity
+   * that never touched the feature and for one that deliberately switched it
+   * off in Settings. Those two must behave differently at /mcp: the first may
+   * connect the official connector (completing the consent is what enables
+   * it), the second must be sent back to Settings instead of being silently
+   * re-enabled by a link. This flag is what tells them apart.
+   * 
+   * `opt` so an older backend that doesn't report it decodes as absent
+   * rather than failing, and an older frontend can keep omitting it on
+   * mcp_set_config — the two canisters are deployed independently.
+   */
+  'configured' : [] | [boolean],
+}
 /**
  * Result of mcp_prepare_delegation. Carries the account_number the canister
  * used (the one named in the request, or the anchor's default account at

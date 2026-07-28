@@ -653,6 +653,7 @@ fn mcp_get_config(anchor_number: AnchorNumber) -> McpConfig {
         return McpConfig {
             enabled: false,
             url: None,
+            configured: Some(false),
         };
     }
     mcp::get_mcp_config(anchor_number)

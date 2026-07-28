@@ -90,30 +90,31 @@ fn session_trusted_url_with(
     config.url.clone().or(official)
 }
 
-/// The URL a *new* connect may target. The official connector is available
-/// whenever the identity hasn't chosen a server of their own — including
-/// before they have ever enabled the feature, because completing the consent
-/// at `/mcp` is what enables it. A custom server still requires the feature to
-/// be on, and displaces the official one while it is set.
-pub(crate) fn connect_trusted_url(config: &StorableMcpConfig) -> Option<String> {
-    connect_trusted_url_with(config, official_url())
+/// The URL a *new* connect may target. An identity that never configured MCP
+/// may connect the official connector — completing the consent at `/mcp` is
+/// what enables the feature for them. One that *switched the feature off*
+/// may not: they are sent back to Settings rather than silently re-enabled by
+/// a link an MCP server sent them. Hence the `Option`: `None` means no stored
+/// config, which is not the same as a stored disabled one.
+pub(crate) fn connect_trusted_url(stored: Option<&StorableMcpConfig>) -> Option<String> {
+    connect_trusted_url_with(stored, official_url())
 }
 
 fn connect_trusted_url_with(
-    config: &StorableMcpConfig,
+    stored: Option<&StorableMcpConfig>,
     official: Option<String>,
 ) -> Option<String> {
-    match &config.url {
-        Some(url) if config.enabled => Some(url.clone()),
-        Some(_) => None,
+    match stored {
         None => official,
+        Some(config) if !config.enabled => None,
+        Some(config) => config.url.clone().or(official),
     }
 }
 
 /// [`connect_trusted_url`] for `anchor_number`'s stored config.
 pub fn resolve_connect_url(anchor_number: AnchorNumber) -> Option<String> {
-    let config = storage_borrow(|storage| storage.read_mcp_config(anchor_number));
-    connect_trusted_url(&config)
+    let stored = storage_borrow(|storage| storage.lookup_mcp_config(anchor_number));
+    connect_trusted_url(stored.as_ref())
 }
 
 /// The anchor's default account at `origin` (synthetic when none is reserved).
@@ -176,16 +177,17 @@ pub fn register(
     let expires_at_ns =
         now.saturating_add(grant_ttl_ns.clamp(MCP_GRANT_MIN_TTL_NS, MCP_GRANT_MAX_TTL_NS));
     storage_borrow_mut(|storage| {
-        let mut config = storage.read_mcp_config(anchor_number);
+        let stored = storage.lookup_mcp_config(anchor_number);
         // A grant can only exist under a live trusted-server config: this is
         // what makes config-driven revocation (see [`set_mcp_config`]) cover
         // every session ever registered.
-        if connect_trusted_url(&config).is_none() {
+        if connect_trusted_url(stored.as_ref()).is_none() {
             return Err(
                 "MCP registration failed: no trusted MCP server is enabled for this identity."
                     .to_string(),
             );
         }
+        let mut config = stored.unwrap_or_default();
         // One key serves one identity: reject a key with a live grant for a
         // different anchor (an expired one is fine to overwrite). Deliberately
         // does not echo the other anchor number.
@@ -238,10 +240,11 @@ pub fn register(
 /// `anchor_number` (checked by the canister method). The stored
 /// `session_principal` pointer is internal bookkeeping and not exposed.
 pub fn get_mcp_config(anchor_number: AnchorNumber) -> McpConfig {
-    let config = storage_borrow(|storage| storage.read_mcp_config(anchor_number));
+    let stored = storage_borrow(|storage| storage.lookup_mcp_config(anchor_number));
     McpConfig {
-        enabled: config.enabled,
-        url: config.url,
+        enabled: stored.as_ref().is_some_and(|config| config.enabled),
+        url: stored.as_ref().and_then(|config| config.url.clone()),
+        configured: Some(stored.is_some()),
     }
 }
 
@@ -536,18 +539,23 @@ mod tests {
 
     #[test]
     fn a_fresh_identity_may_connect_the_official_connector() {
+        assert_eq!(connect_trusted_url_with(None, official()), official());
+    }
+
+    #[test]
+    fn switching_the_feature_off_blocks_connecting() {
+        // The whole point of `configured`: a stored disabled config must not be
+        // silently re-enabled by a connect link, unlike a fresh identity.
         assert_eq!(
-            connect_trusted_url_with(&config(false, None), official()),
-            official()
+            connect_trusted_url_with(Some(&config(false, None)), official()),
+            None
         );
     }
 
     #[test]
-    fn connecting_is_offered_even_after_the_feature_was_switched_off() {
-        // Completing the consent at `/mcp` is what turns it back on, so the
-        // connect path does not treat a disabled config as a permanent block.
+    fn an_enabled_config_with_no_custom_server_connects_the_official_one() {
         assert_eq!(
-            connect_trusted_url_with(&config(false, None), official()),
+            connect_trusted_url_with(Some(&config(true, None)), official()),
             official()
         );
     }
@@ -555,7 +563,7 @@ mod tests {
     #[test]
     fn a_custom_server_displaces_the_official_one() {
         assert_eq!(
-            connect_trusted_url_with(&config(true, Some(CUSTOM)), official()),
+            connect_trusted_url_with(Some(&config(true, Some(CUSTOM))), official()),
             Some(CUSTOM.to_string())
         );
     }
@@ -563,14 +571,14 @@ mod tests {
     #[test]
     fn a_custom_server_still_needs_the_feature_enabled() {
         assert_eq!(
-            connect_trusted_url_with(&config(false, Some(CUSTOM)), official()),
+            connect_trusted_url_with(Some(&config(false, Some(CUSTOM))), official()),
             None
         );
     }
 
     #[test]
     fn nothing_to_connect_without_an_official_connector() {
-        assert_eq!(connect_trusted_url_with(&config(false, None), None), None);
+        assert_eq!(connect_trusted_url_with(None, None), None);
     }
 
     #[test]
@@ -586,6 +594,14 @@ mod tests {
     }
 
     #[test]
+    fn a_live_session_falls_back_to_the_official_connector() {
+        assert_eq!(
+            session_trusted_url_with(&config(true, None), official()),
+            official()
+        );
+    }
+
+    #[test]
     fn set_mcp_config_rejects_a_disabled_config_that_keeps_a_url() {
         // Rejected before any storage access, so this needs no harness.
         let err = set_mcp_config(
@@ -593,6 +609,7 @@ mod tests {
             McpConfig {
                 enabled: false,
                 url: Some(CUSTOM.to_string()),
+                configured: None,
             },
         )
         .expect_err("a disabled config carrying a URL must be rejected");
@@ -609,17 +626,10 @@ mod tests {
             McpConfig {
                 enabled: true,
                 url: Some("https://".to_string() + &"a".repeat(MCP_TRUSTED_URL_MAX_BYTES)),
+                configured: None,
             },
         )
         .expect_err("an oversized URL must be rejected");
         assert!(err.contains("at most"), "unexpected error: {err}");
-    }
-
-    #[test]
-    fn a_live_session_falls_back_to_the_official_connector() {
-        assert_eq!(
-            session_trusted_url_with(&config(true, None), official()),
-            official()
-        );
     }
 }

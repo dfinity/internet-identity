@@ -37,6 +37,7 @@
   // that the handlers update after each canister write.
   let enabled = $state(false);
   let trusted = $state<string | undefined>(undefined);
+  let configured = $state<boolean | undefined>(undefined);
   // True until the initial config read completes, so the toggle doesn't flicker
   // off-then-on and writes can't race the load.
   let loaded = $state(false);
@@ -45,7 +46,7 @@
   const official = officialMcpUrl();
 
   const active = $derived.by(() => {
-    const url = trustedUrl({ enabled, url: trusted }, official);
+    const url = trustedUrl({ enabled, url: trusted, configured }, official);
     return url === undefined
       ? undefined
       : { url, custom: trusted !== undefined };
@@ -68,6 +69,7 @@
         );
         enabled = config.enabled;
         trusted = config.url;
+        configured = config.configured;
       } catch {
         toaster.error({
           title: $t`Couldn't load your AI access settings.`,

@@ -1307,6 +1307,12 @@ impl<M: Memory + Clone> Storage<M> {
             .unwrap_or_default()
     }
 
+    /// `anchor_number`'s stored config, or `None` when it never wrote one.
+    /// The two are deliberately distinguishable: see `McpConfig::configured`.
+    pub fn lookup_mcp_config(&self, anchor_number: AnchorNumber) -> Option<StorableMcpConfig> {
+        self.mcp_config_memory.get(&anchor_number)
+    }
+
     /// Persist `anchor_number`'s trusted-MCP-server config (overwriting any
     /// previous value), so it syncs across the identity's devices.
     pub fn write_mcp_config(&mut self, anchor_number: AnchorNumber, config: StorableMcpConfig) {

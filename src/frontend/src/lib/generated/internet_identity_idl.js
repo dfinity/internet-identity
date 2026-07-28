@@ -637,6 +637,7 @@ export const idlFactory = ({ IDL }) => {
   const McpConfig = IDL.Record({
     'url' : IDL.Opt(IDL.Text),
     'enabled' : IDL.Bool,
+    'configured' : IDL.Opt(IDL.Bool),
   });
   const McpPrepareDelegation = IDL.Record({
     'user_key' : UserKey,

@@ -22,6 +22,15 @@ export interface McpConfig {
   enabled: boolean;
   /** The trusted server URL, or undefined when none is set. */
   url: string | undefined;
+  /**
+   * Whether this identity has ever written a config. `enabled: false` alone is
+   * ambiguous — it reads the same for someone who never touched the feature and
+   * for someone who switched it off in Settings — and those must differ at
+   * `/mcp`: the first may connect the official connector, the second is sent
+   * back to Settings. `undefined` means an older backend that doesn't report
+   * it, in which case only a stored URL is ever trusted.
+   */
+  configured: boolean | undefined;
 }
 
 // Candid `opt text` <-> `string | undefined`.
@@ -33,11 +42,15 @@ const toOpt = (value: string | undefined): [] | [string] =>
 const fromCanister = (config: CanisterMcpConfig): McpConfig => ({
   enabled: config.enabled,
   url: fromOpt(config.url),
+  configured: config.configured.length === 0 ? undefined : config.configured[0],
 });
 
+// `configured` is read-only — the canister ignores it here — but it round-trips
+// so a read-modify-write doesn't have to strip it.
 const toCanister = (config: McpConfig): CanisterMcpConfig => ({
   enabled: config.enabled,
   url: toOpt(config.url),
+  configured: config.configured === undefined ? [] : [config.configured],
 });
 
 /** Origin (scheme + host[:port], no path) of a URL, or undefined if unparsable. */
@@ -62,21 +75,24 @@ export const trustedUrl = (
   config.enabled ? (config.url ?? officialUrl) : undefined;
 
 /**
- * The URL a *new* connect may target. The official connector is available
- * whenever the identity hasn't chosen a server of their own — including before
- * they have ever enabled the feature, since completing the consent is what
- * enables it. Mirrors `connect_trusted_url` in the canister, which is what
- * actually enforces it.
+ * The URL a *new* connect may target. An identity that never configured MCP may
+ * connect the official connector — completing the consent is what enables the
+ * feature for them. One that switched the feature off may not: they are sent
+ * back to Settings rather than silently re-enabled by a link. Mirrors
+ * `connect_trusted_url` in the canister, which is what actually enforces it.
  */
 export const connectTrustedUrl = (
   config: McpConfig,
   officialUrl: string | undefined,
-): string | undefined =>
-  config.url !== undefined
-    ? config.enabled
-      ? config.url
-      : undefined
-    : officialUrl;
+): string | undefined => {
+  if (config.configured === false) {
+    return officialUrl;
+  }
+  if (!config.enabled) {
+    return undefined;
+  }
+  return config.url ?? officialUrl;
+};
 
 /**
  * Whether `origin` may be connected. Matching is by origin — the same security

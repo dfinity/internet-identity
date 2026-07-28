@@ -33,10 +33,8 @@ describe("originOf", () => {
 });
 
 describe("isOriginTrusted", () => {
-  const trust = (url: string | undefined, enabled = true): McpConfig => ({
-    enabled,
-    url,
-  });
+  const trust = (url: string | undefined, enabled = true): McpConfig =>
+    cfg(enabled, url);
 
   it("trusts an origin that matches the configured server's origin", () => {
     expect(
@@ -103,12 +101,12 @@ describe("isOriginTrusted", () => {
 });
 
 const ANCHOR = BigInt(10_000);
-const CUSTOM_URL = "https://mcp.acme.com/mcp";
 
 const makeActor = (current: McpConfig) => ({
   mcp_get_config: vi.fn().mockResolvedValue({
     enabled: current.enabled,
     url: current.url === undefined ? [] : [current.url],
+    configured: current.configured === undefined ? [] : [current.configured],
   }),
   mcp_set_config: vi.fn().mockResolvedValue({ Ok: null }),
 });
@@ -116,81 +114,93 @@ const makeActor = (current: McpConfig) => ({
 const asActor = (actor: ReturnType<typeof makeActor>) =>
   actor as unknown as ActorSubclass<_SERVICE>;
 
-describe("trustedUrl", () => {
-  const OFFICIAL = "https://official-mcp.id.ai/mcp";
+const OFFICIAL = "https://official-mcp.id.ai/mcp";
+const CUSTOM = "https://mcp.acme.com/mcp";
 
+/** A stored config. `configured: false` stands for an identity that has never
+ *  written one. */
+const cfg = (
+  enabled: boolean,
+  url: string | undefined,
+  configured = true,
+): McpConfig => ({ enabled, url, configured });
+
+describe("trustedUrl", () => {
   it("falls back to the official connector when no custom URL is set", () => {
-    expect(trustedUrl({ enabled: true, url: undefined }, OFFICIAL)).toBe(
-      OFFICIAL,
-    );
+    expect(trustedUrl(cfg(true, undefined), OFFICIAL)).toBe(OFFICIAL);
   });
 
   it("prefers the custom connector over the official one", () => {
-    expect(
-      trustedUrl({ enabled: true, url: "https://mcp.acme.com/mcp" }, OFFICIAL),
-    ).toBe("https://mcp.acme.com/mcp");
+    expect(trustedUrl(cfg(true, CUSTOM), OFFICIAL)).toBe(CUSTOM);
   });
 
   it("trusts nothing while the feature is disabled", () => {
-    expect(
-      trustedUrl({ enabled: false, url: undefined }, OFFICIAL),
-    ).toBeUndefined();
-    expect(
-      trustedUrl({ enabled: false, url: "https://mcp.acme.com/mcp" }, OFFICIAL),
-    ).toBeUndefined();
+    expect(trustedUrl(cfg(false, undefined), OFFICIAL)).toBeUndefined();
+    expect(trustedUrl(cfg(false, CUSTOM), OFFICIAL)).toBeUndefined();
   });
 
   it("trusts nothing when enabled with no custom and no official connector", () => {
-    expect(
-      trustedUrl({ enabled: true, url: undefined }, undefined),
-    ).toBeUndefined();
+    expect(trustedUrl(cfg(true, undefined), undefined)).toBeUndefined();
   });
 });
 
 describe("connectTrustedUrl", () => {
-  const OFFICIAL = "https://official-mcp.id.ai/mcp";
-  const CUSTOM = "https://mcp.acme.com/mcp";
-
-  it("offers the official connector to an identity that never enabled the feature", () => {
-    expect(
-      connectTrustedUrl({ enabled: false, url: undefined }, OFFICIAL),
-    ).toBe(OFFICIAL);
-  });
-
-  it("still offers it after the feature was switched off", () => {
-    // Completing the consent at /mcp is what turns it back on, so a disabled
-    // config is not a permanent block on connecting.
-    expect(
-      connectTrustedUrl({ enabled: false, url: undefined }, OFFICIAL),
-    ).toBe(OFFICIAL);
-  });
-
-  it("lets a custom connector displace the official one", () => {
-    expect(connectTrustedUrl({ enabled: true, url: CUSTOM }, OFFICIAL)).toBe(
-      CUSTOM,
+  it("offers the official connector to an identity that never configured MCP", () => {
+    expect(connectTrustedUrl(cfg(false, undefined, false), OFFICIAL)).toBe(
+      OFFICIAL,
     );
   });
 
-  it("requires the feature enabled for a custom connector", () => {
+  it("blocks once the feature has been switched off", () => {
+    // The reason `configured` exists: this reads identically to a fresh
+    // identity, but must be sent back to Settings rather than silently
+    // re-enabled by a connect link.
     expect(
-      connectTrustedUrl({ enabled: false, url: CUSTOM }, OFFICIAL),
+      connectTrustedUrl(cfg(false, undefined, true), OFFICIAL),
     ).toBeUndefined();
+  });
+
+  it("offers the official connector to an enabled config with no custom server", () => {
+    expect(connectTrustedUrl(cfg(true, undefined), OFFICIAL)).toBe(OFFICIAL);
+  });
+
+  it("lets a custom connector displace the official one", () => {
+    expect(connectTrustedUrl(cfg(true, CUSTOM), OFFICIAL)).toBe(CUSTOM);
+  });
+
+  it("requires the feature enabled for a custom connector", () => {
+    expect(connectTrustedUrl(cfg(false, CUSTOM), OFFICIAL)).toBeUndefined();
   });
 
   it("offers nothing without an official connector", () => {
     expect(
-      connectTrustedUrl({ enabled: false, url: undefined }, undefined),
+      connectTrustedUrl(cfg(false, undefined, false), undefined),
     ).toBeUndefined();
+  });
+
+  it("trusts only a stored URL when the backend doesn't report `configured`", () => {
+    // Older backend: it can't have an official connector either, so falling
+    // back to the strict rule loses nothing.
+    expect(
+      connectTrustedUrl(
+        { enabled: false, url: undefined, configured: undefined },
+        OFFICIAL,
+      ),
+    ).toBeUndefined();
+    expect(
+      connectTrustedUrl(
+        { enabled: true, url: CUSTOM, configured: undefined },
+        OFFICIAL,
+      ),
+    ).toBe(CUSTOM);
   });
 });
 
 describe("isOriginTrusted with an official connector", () => {
-  const OFFICIAL = "https://official-mcp.id.ai/mcp";
-
   it("accepts the official origin when no custom URL is set", () => {
     expect(
       isOriginTrusted(
-        { enabled: true, url: undefined },
+        cfg(true, undefined),
         "https://official-mcp.id.ai",
         OFFICIAL,
       ),
@@ -200,7 +210,17 @@ describe("isOriginTrusted with an official connector", () => {
   it("stops accepting the official origin once a custom URL is set", () => {
     expect(
       isOriginTrusted(
-        { enabled: true, url: "https://mcp.acme.com/mcp" },
+        cfg(true, CUSTOM),
+        "https://official-mcp.id.ai",
+        OFFICIAL,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects the official origin after the feature was switched off", () => {
+    expect(
+      isOriginTrusted(
+        cfg(false, undefined),
         "https://official-mcp.id.ai",
         OFFICIAL,
       ),
@@ -210,68 +230,73 @@ describe("isOriginTrusted with an official connector", () => {
 
 describe("setMcpEnabled", () => {
   it("forgets the custom URL when turning the feature off", async () => {
-    const actor = makeActor({ enabled: true, url: CUSTOM_URL });
+    const actor = makeActor(cfg(true, CUSTOM));
 
     await setMcpEnabled(asActor(actor), ANCHOR, false);
 
     expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
       enabled: false,
       url: [],
+      configured: [true],
     });
   });
 
   it("leaves the custom URL alone when turning the feature on", async () => {
-    const actor = makeActor({ enabled: false, url: CUSTOM_URL });
+    const actor = makeActor(cfg(false, CUSTOM));
 
     await setMcpEnabled(asActor(actor), ANCHOR, true);
 
     expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
       enabled: true,
-      url: [CUSTOM_URL],
+      url: [CUSTOM],
+      configured: [true],
     });
   });
 });
 
 describe("trustAndEnableMcp", () => {
   it("enables the feature and stores the URL in a single write", async () => {
-    const actor = makeActor({ enabled: false, url: undefined });
+    const actor = makeActor(cfg(false, undefined));
 
-    await trustAndEnableMcp(asActor(actor), ANCHOR, CUSTOM_URL);
+    await trustAndEnableMcp(asActor(actor), ANCHOR, CUSTOM);
 
     expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
       enabled: true,
-      url: [CUSTOM_URL],
+      url: [CUSTOM],
+      configured: [true],
     });
   });
 });
 
 describe("clearMcpTrustedServer", () => {
   it("forgets the custom URL without turning the feature off", async () => {
-    const actor = makeActor({ enabled: true, url: CUSTOM_URL });
+    const actor = makeActor(cfg(true, CUSTOM));
 
     await clearMcpTrustedServer(asActor(actor), ANCHOR);
 
     expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
       enabled: true,
       url: [],
+      configured: [true],
     });
   });
 
   it("keeps the feature off when it was already off", async () => {
-    const actor = makeActor({ enabled: false, url: CUSTOM_URL });
+    const actor = makeActor(cfg(false, CUSTOM));
 
     await clearMcpTrustedServer(asActor(actor), ANCHOR);
 
     expect(actor.mcp_set_config).toHaveBeenCalledWith(ANCHOR, {
       enabled: false,
       url: [],
+      configured: [true],
     });
   });
 });
 
 describe("write failures", () => {
   it("rejects with the canister's error so callers can roll back", async () => {
-    const actor = makeActor({ enabled: true, url: CUSTOM_URL });
+    const actor = makeActor(cfg(true, CUSTOM));
     actor.mcp_set_config.mockResolvedValue({ Err: "config is too large" });
 
     await expect(setMcpEnabled(asActor(actor), ANCHOR, false)).rejects.toThrow(

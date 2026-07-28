@@ -61,6 +61,7 @@ fn trust_mcp_server(
         McpConfig {
             enabled: true,
             url: Some(format!("{MCP_ORIGIN}/mcp")),
+            configured: None,
         },
     )
     .unwrap()
@@ -491,6 +492,7 @@ fn mcp_disabling_config_revokes_the_session() -> Result<(), RejectResponse> {
         McpConfig {
             enabled: false,
             url: Some(format!("{MCP_ORIGIN}/mcp")),
+            configured: None,
         },
     )
     .unwrap()
@@ -562,6 +564,7 @@ fn mcp_changing_server_url_revokes_the_session() -> Result<(), RejectResponse> {
         McpConfig {
             enabled: true,
             url: Some("https://other-mcp.example.com/mcp".to_string()),
+            configured: None,
         },
     )
     .unwrap()
@@ -695,6 +698,7 @@ fn mcp_register_v2_rejects_a_key_registered_to_another_identity() -> Result<(), 
         McpConfig {
             enabled: false,
             url: Some(format!("{MCP_ORIGIN}/mcp")),
+            configured: None,
         },
     )
     .unwrap()
@@ -1017,29 +1021,48 @@ fn mcp_config_round_trips_and_persists_across_upgrade() -> Result<(), RejectResp
     // An anchor that never wrote a config reads the disabled, no-server default.
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
-        McpConfig::default()
+        unconfigured()
     );
 
     let config = McpConfig {
         enabled: true,
         url: Some(format!("{MCP_ORIGIN}/mcp")),
+        configured: None,
     };
     mcp_set_config(&env, canister_id, principal_1(), anchor, config.clone())
         .unwrap()
         .unwrap();
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
-        config
+        as_stored(&config)
     );
 
     // Persisted in stable memory: the same config reads back after an upgrade.
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
-        config
+        as_stored(&config)
     );
 
     Ok(())
+}
+
+/// What `mcp_get_config` reports for an anchor that never wrote a config —
+/// also what an unauthorized caller sees, so a read can't leak the real one.
+fn unconfigured() -> McpConfig {
+    McpConfig {
+        enabled: false,
+        url: None,
+        configured: Some(false),
+    }
+}
+
+/// What `mcp_get_config` reports for a config that has been written.
+fn as_stored(config: &McpConfig) -> McpConfig {
+    McpConfig {
+        configured: Some(true),
+        ..config.clone()
+    }
 }
 
 /// Only the authenticated identity can change what it trusts. An unrelated
@@ -1054,6 +1077,7 @@ fn mcp_config_is_gated_to_the_identity() -> Result<(), RejectResponse> {
     let config = McpConfig {
         enabled: true,
         url: Some(format!("{MCP_ORIGIN}/mcp")),
+        configured: None,
     };
     mcp_set_config(&env, canister_id, principal_1(), anchor, config.clone())
         .unwrap()
@@ -1072,12 +1096,12 @@ fn mcp_config_is_gated_to_the_identity() -> Result<(), RejectResponse> {
     // ...nor read the real one back (gets the default instead).
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_2(), anchor).unwrap(),
-        McpConfig::default()
+        unconfigured()
     );
     // The owner's config is unchanged.
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
-        config
+        as_stored(&config)
     );
 
     Ok(())
@@ -1601,6 +1625,7 @@ fn mcp_register_v2_rejects_after_config_change() -> Result<(), RejectResponse> {
         McpConfig {
             enabled: true,
             url: Some("https://other.example.com/mcp".to_string()),
+            configured: None,
         },
     )
     .unwrap()
@@ -1625,6 +1650,7 @@ fn mcp_register_v2_rejects_after_config_change() -> Result<(), RejectResponse> {
         McpConfig {
             enabled: false,
             url: None,
+            configured: None,
         },
     )
     .unwrap()
@@ -1865,6 +1891,7 @@ fn mcp_prepare_registration_delegation_requires_trusted_server() -> Result<(), R
         McpConfig {
             enabled: false,
             url: Some(format!("{MCP_ORIGIN}/mcp")),
+            configured: None,
         },
     )
     .unwrap()
@@ -1884,6 +1911,7 @@ fn mcp_prepare_registration_delegation_requires_trusted_server() -> Result<(), R
         McpConfig {
             enabled: true,
             url: None,
+            configured: None,
         },
     )
     .unwrap()
@@ -2019,6 +2047,7 @@ fn mcp_set_config_rejects_overlong_trusted_url() -> Result<(), RejectResponse> {
         McpConfig {
             enabled: true,
             url: Some(overlong),
+            configured: None,
         },
     )
     .unwrap();

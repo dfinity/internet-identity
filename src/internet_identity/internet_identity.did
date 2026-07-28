@@ -1162,6 +1162,20 @@ type PrepareSessionDelegation = record {
 type McpConfig = record {
     enabled : bool;
     url : opt text;
+    // Whether this identity has ever written an MCP config. Read-only: it is
+    // reported by mcp_get_config and ignored on mcp_set_config.
+    //
+    // `enabled = false` alone is ambiguous — it looks the same for an identity
+    // that never touched the feature and for one that deliberately switched it
+    // off in Settings. Those two must behave differently at /mcp: the first may
+    // connect the official connector (completing the consent is what enables
+    // it), the second must be sent back to Settings instead of being silently
+    // re-enabled by a link. This flag is what tells them apart.
+    //
+    // `opt` so an older backend that doesn't report it decodes as absent
+    // rather than failing, and an older frontend can keep omitting it on
+    // mcp_set_config — the two canisters are deployed independently.
+    configured : opt bool;
 };
 
 // Result of prepare_mcp_registration_delegation: the canister-signature public

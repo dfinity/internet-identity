@@ -675,6 +675,12 @@ pub enum SessionDelegationError {
 pub struct McpConfig {
     pub enabled: bool,
     pub url: Option<String>,
+    /// Whether this identity has ever written an MCP config. Reported by
+    /// `mcp_get_config`, ignored on `mcp_set_config`. Distinguishes "never
+    /// configured" (may connect the official connector) from "switched off"
+    /// (must not be re-enabled by a connect link) — `enabled = false` alone
+    /// looks identical for both.
+    pub configured: Option<bool>,
 }
 
 /// Result of the internal MCP grant-binding (`mcp::register`): the expiration
