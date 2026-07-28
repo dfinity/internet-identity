@@ -2247,6 +2247,34 @@ fn mcp_live_session_count_metric() -> Result<(), RejectResponse> {
     Ok(())
 }
 
+/// `prepare_mcp_registration_delegation` returns the identity's resolved
+/// trusted server URL. This lets the connect frontend gate delivery on a
+/// *certified* value (prepare is an update call) rather than on an uncertified
+/// `mcp_get_config` query a malicious node could forge to redirect the connect
+/// to an attacker's origin (II01).
+#[test]
+fn mcp_prepare_returns_resolved_trusted_url() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+
+    let prepared = prepare_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        ByteBuf::from("browser registration key Y (trusted_url test)"),
+        Some(false),
+        Some(GRANT_TTL_NS),
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(prepared.trusted_url, format!("{MCP_ORIGIN}/mcp"));
+    Ok(())
+}
+
 /// Security regression (II03): a revoking config write — disabling, or changing
 /// the trusted server — must *invalidate* any in-flight registration
 /// delegation, not merely suspend it. Disabling and then re-enabling the same

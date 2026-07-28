@@ -739,6 +739,7 @@ export const idlFactory = ({ IDL }) => {
   const PrepareMcpRegistrationDelegation = IDL.Record({
     'user_key' : UserKey,
     'expiration' : Timestamp,
+    'trusted_url' : IDL.Text,
   });
   const PrepareSessionDelegation = IDL.Record({
     'user_key' : UserKey,

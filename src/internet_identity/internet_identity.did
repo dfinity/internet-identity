@@ -1170,13 +1170,18 @@ type McpConfig = record {
 };
 
 // Result of prepare_mcp_registration_delegation: the canister-signature public
-// key the registration delegation is rooted at (P_reg), and the (short)
-// expiration of that delegation. The frontend fetches the signed delegation via
-// get_mcp_registration_delegation and delivers the chain to the trusted MCP
+// key the registration delegation is rooted at (P_reg), the (short) expiration
+// of that delegation, and the identity's resolved trusted_url (the anchor's own
+// server if set, else the official connector). trusted_url is certified (this
+// is an update call), so the frontend can gate delivery on it - delivering the
+// chain only when the connect link's origin matches - rather than trusting an
+// uncertified mcp_get_config query. The frontend fetches the signed delegation
+// via get_mcp_registration_delegation and delivers the chain to the trusted MCP
 // server, which redeems it with mcp_register_v2.
 type PrepareMcpRegistrationDelegation = record {
     user_key : UserKey;
     expiration : Timestamp;
+    trusted_url : text;
 };
 
 // Result of mcp_register_v2: the expiration (ns since epoch) of the MCP session

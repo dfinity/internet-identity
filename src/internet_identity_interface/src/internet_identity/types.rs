@@ -692,14 +692,26 @@ pub struct McpRegistration {
 /// Result of `prepare_mcp_registration_delegation`: the canister-signature
 /// public key the registration delegation chain is rooted at (`P_reg`; the
 /// canister-signed hop delegates to the browser-held registration key `Y`),
-/// and the (short) expiration of that delegation. The frontend fetches the
-/// signed delegation with `get_mcp_registration_delegation`, extends the chain
-/// browser-side to the MCP server's key, and delivers it to the server, which
-/// redeems it via `mcp_register_v2`.
+/// the (short) expiration of that delegation, and the identity's resolved
+/// `trusted_url` — the MCP server this connect is authorized for (the anchor's
+/// own server if set, otherwise the deployment's official connector).
+///
+/// `trusted_url` lets the frontend gate delivery on a *certified* value:
+/// because `prepare` is an update call, its response is certified through
+/// consensus, so the frontend can deliver the chain only when the connect
+/// link's origin matches `trusted_url`'s origin — rather than trusting an
+/// uncertified `mcp_get_config` query, whose response a single malicious node
+/// could forge to point the connect at an attacker's origin.
+///
+/// The frontend fetches the signed delegation with
+/// `get_mcp_registration_delegation`, extends the chain browser-side to the MCP
+/// server's key, and delivers it to the server, which redeems it via
+/// `mcp_register_v2`.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct PrepareMcpRegistrationDelegation {
     pub user_key: UserKey,
     pub expiration: Timestamp,
+    pub trusted_url: String,
 }
 
 /// Result of `mcp_register_v2`: the expiration (ns since epoch) of the MCP
