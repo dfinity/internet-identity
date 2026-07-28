@@ -351,6 +351,11 @@ type InternetIdentityInit = record {
     // `docs/ongoing/email-recovery.md` §7.6. Same set/clear pattern.
     doh_config : opt opt DohConfig;
     mcp_official_url : opt text;
+    // One-shot upgrade arg driving the MCP config migration: `opt true`
+    // rewrites every stored config to "enabled, official connector", since a
+    // value stored before the official connector existed was never a choice
+    // about it. Runs at most once per deployment; unset means no migration.
+    mcp_config_migration : opt bool;
 };
 
 // DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS

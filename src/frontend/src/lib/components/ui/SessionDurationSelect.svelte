@@ -1,10 +1,10 @@
 <script lang="ts">
   import Select from "$lib/components/ui/Select.svelte";
   import { ChevronDownIcon } from "@lucide/svelte";
-  import { t } from "$lib/stores/locale.store";
+  import { formatDuration, t } from "$lib/stores/locale.store";
   import {
     cappedSessionDurations,
-    formatSessionDuration,
+    sessionDurationBreakdown,
   } from "$lib/utils/sessionDuration";
 
   type Align = "start" | "center" | "end";
@@ -47,11 +47,12 @@
     { value: 30 * DAY, label: $t`30 days` },
   ]);
 
-  // A named preset's label, or the compact format for an off-preset duration
-  // (e.g. an off-preset cap shown as "2h").
+  // A named preset's label, or — for an off-preset duration such as a cap the
+  // app asked for — its units spelled out by the locale ("2 hours"), so the
+  // dropdown doesn't mix "10 minutes" with a compact "20m".
   const labelFor = (seconds: number): string =>
     presets.find((preset) => preset.value === seconds)?.label ??
-    formatSessionDuration(seconds);
+    $formatDuration(sessionDurationBreakdown(seconds));
 
   // Every preset up to the cap, plus the cap itself when it isn't a preset, each
   // with its label and a flag for the current selection.
