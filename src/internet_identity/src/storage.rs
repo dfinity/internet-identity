@@ -1207,9 +1207,6 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&principal)
     }
 
-    /// Look up the MCP session grant registered for `principal` (the caller
-    /// of the server-facing `mcp_*` methods). Callers are responsible for
-    /// checking `expires_at_ns`; the map itself never authorizes anything.
     /// Rewrite up to `batch_size` stored MCP configs to "enabled, official
     /// connector" — the pre-official-connector meaning of every stored value
     /// was "no custom server of mine", never a choice about a connector that
@@ -1284,6 +1281,9 @@ impl<M: Memory + Clone> Storage<M> {
         outcome
     }
 
+    /// Look up the MCP session grant registered for `principal` (the caller
+    /// of the server-facing `mcp_*` methods). Callers are responsible for
+    /// checking `expires_at_ns`; the map itself never authorizes anything.
     pub fn lookup_mcp_grant(&self, principal: Principal) -> Option<StorableMcpGrant> {
         self.mcp_grant_memory.get(&principal)
     }
