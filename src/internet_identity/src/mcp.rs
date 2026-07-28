@@ -273,9 +273,13 @@ pub fn get_mcp_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
 ///
 /// Rejects a trusted URL longer than [`MCP_TRUSTED_URL_MAX_BYTES`]: nothing
 /// legitimate needs a multi-KiB URL, and the bound keeps the stored config
-/// entry small. The anchor's pending-registration bookkeeping is carried over
-/// untouched — a config edit doesn't reset it (in-flight registrations are
-/// invalidated at redemption by the URL-hash check, and pruned by expiry).
+/// entry small. A revoking write (disable, or a change to the trusted server)
+/// also invalidates any in-flight registration delegation — the entry is
+/// evicted and the pending pointer cleared in the same message — so a
+/// disable/re-enable (or URL change and change-back) within the delegation's
+/// short TTL cannot resurrect it. A non-revoking edit carries the pending
+/// pointer over untouched, keeping a concurrent connect to the same server
+/// valid.
 pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), String> {
     if let Some(url) = &config.url {
         if url.len() > MCP_TRUSTED_URL_MAX_BYTES {
@@ -294,7 +298,6 @@ pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<
     }
     storage_borrow_mut(|storage| {
         let old = storage.read_mcp_config(anchor_number);
-        let pending_registration = old.pending_registration.clone();
         // Revoke whenever the server this identity trusts changes or goes
         // away. Comparing the *resolved* URL covers switching between the
         // official connector and a custom one, where the stored `url` field
@@ -322,6 +325,26 @@ pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<
             None
         } else {
             old.session_principal
+        };
+        // A revoking write must also invalidate any in-flight registration
+        // delegation, not just the live grant. Otherwise disabling and then
+        // re-enabling the same trusted server (or changing the URL and changing
+        // it back) within the delegation's short TTL would let it be redeemed
+        // after the user believed they had revoked access: `register_v2` looks
+        // the entry up by `caller()`, and its URL-hash check passes again once
+        // the same server is trusted again. Evict the entry and drop the
+        // pointer so the delegation cannot be resurrected. A non-revoking edit
+        // keeps it (still the same trusted server, so a pending connect stays
+        // valid).
+        let pending_registration = if revoke {
+            if let Some(bytes) = &old.pending_registration {
+                if let Ok(p_reg) = Principal::try_from_slice(bytes) {
+                    storage.remove_mcp_registration(p_reg);
+                }
+            }
+            None
+        } else {
+            old.pending_registration
         };
         storage.write_mcp_config(
             anchor_number,

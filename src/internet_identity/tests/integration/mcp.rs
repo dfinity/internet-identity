@@ -2246,3 +2246,148 @@ fn mcp_live_session_count_metric() -> Result<(), RejectResponse> {
 
     Ok(())
 }
+
+/// Security regression (II03): a revoking config write — disabling, or changing
+/// the trusted server — must *invalidate* any in-flight registration
+/// delegation, not merely suspend it. Disabling and then re-enabling the same
+/// trusted server (or changing the trusted URL and changing it back) within the
+/// delegation's short TTL must NOT let a server redeem it afterwards. Before the
+/// fix, `register_v2` still found the entry and its URL-hash check passed again
+/// once the same server was trusted again, so an accidental grant the user
+/// "revoked" by toggling the feature came back to life.
+#[test]
+fn mcp_revoking_config_invalidates_inflight_registration() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let trusted = McpConfig {
+        enabled: true,
+        url: Some(format!("{MCP_ORIGIN}/mcp")),
+    };
+
+    // Mint an in-flight registration delegation (as the connect flow's `prepare`
+    // does) and return its `P_reg` — the principal a server would redeem as.
+    let prepare = |browser_key: &str| -> Principal {
+        let prepared = prepare_mcp_registration_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            anchor,
+            ByteBuf::from(browser_key),
+            Some(false),
+            Some(GRANT_TTL_NS),
+        )
+        .unwrap()
+        .unwrap();
+        Principal::self_authenticating(&prepared.user_key)
+    };
+
+    // Variant 1: disable, then re-enable the same trusted server.
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let p_reg_toggle = prepare("browser key (disable/re-enable)");
+    mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        McpConfig {
+            enabled: false,
+            url: None,
+        },
+    )
+    .unwrap()
+    .unwrap();
+    mcp_set_config(&env, canister_id, principal_1(), anchor, trusted.clone())
+        .unwrap()
+        .unwrap();
+    let err = mcp_register_v2(
+        &env,
+        canister_id,
+        p_reg_toggle,
+        ByteBuf::from("session key after disable/re-enable"),
+    )
+    .unwrap()
+    .unwrap_err();
+    assert!(
+        err.contains("not authorized"),
+        "an in-flight registration must not survive disable/re-enable: {err}"
+    );
+
+    // Variant 2: change the trusted URL, then change it back.
+    let p_reg_urlswap = prepare("browser key (url change/back)");
+    mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        McpConfig {
+            enabled: true,
+            url: Some("https://other.example.com/mcp".to_string()),
+        },
+    )
+    .unwrap()
+    .unwrap();
+    mcp_set_config(&env, canister_id, principal_1(), anchor, trusted.clone())
+        .unwrap()
+        .unwrap();
+    let err = mcp_register_v2(
+        &env,
+        canister_id,
+        p_reg_urlswap,
+        ByteBuf::from("session key after url change/back"),
+    )
+    .unwrap()
+    .unwrap_err();
+    assert!(
+        err.contains("not authorized"),
+        "an in-flight registration must not survive a trusted-URL change and change-back: {err}"
+    );
+
+    Ok(())
+}
+
+/// The invalidation is surgical: a *non-revoking* config write (rewriting the
+/// identical, still-enabled config for the same trusted server) leaves an
+/// in-flight registration delegation redeemable, so a concurrent connect to the
+/// same server is unaffected.
+#[test]
+fn mcp_nonrevoking_config_write_keeps_inflight_registration() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let trusted = McpConfig {
+        enabled: true,
+        url: Some(format!("{MCP_ORIGIN}/mcp")),
+    };
+
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let prepared = prepare_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        ByteBuf::from("browser key (non-revoking rewrite)"),
+        Some(false),
+        Some(GRANT_TTL_NS),
+    )
+    .unwrap()
+    .unwrap();
+    let p_reg = Principal::self_authenticating(&prepared.user_key);
+
+    // Rewrite the identical config: same trusted server, still enabled -> not a
+    // revoke, so the in-flight registration is carried over and stays redeemable.
+    mcp_set_config(&env, canister_id, principal_1(), anchor, trusted)
+        .unwrap()
+        .unwrap();
+
+    mcp_register_v2(
+        &env,
+        canister_id,
+        p_reg,
+        ByteBuf::from("session key (non-revoking rewrite)"),
+    )
+    .unwrap()
+    .expect("a non-revoking config rewrite must keep the in-flight registration redeemable");
+
+    Ok(())
+}
