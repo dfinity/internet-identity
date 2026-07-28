@@ -77,9 +77,22 @@ test.describe("MCP settings", () => {
     await toggleAiAccess(page);
 
     await expect(page.getByText("Internet Computer MCP")).toBeVisible();
-    await expect(page.getByText("Official · by DFINITY")).toBeVisible();
+    await expect(page.getByText("Official · Hosted by DFINITY")).toBeVisible();
     await expect(page.getByText(OFFICIAL_URL)).toBeVisible();
     await expect(page.getByRole("button", { name: "Customize" })).toBeVisible();
+  });
+
+  test("refuses the official connector as a custom one", async ({ page }) => {
+    await toggleAiAccess(page);
+    await page.getByRole("button", { name: "Customize" }).click();
+    await page.getByLabel("MCP server URL").fill(OFFICIAL_URL);
+
+    // It is already the default, so spending the one custom slot on it is
+    // refused rather than silently accepted.
+    await expect(page.getByText(/already your default/)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Hold to continue" }),
+    ).toBeDisabled();
   });
 
   test("a custom connector replaces the official one", async ({
@@ -111,7 +124,7 @@ test.describe("MCP settings", () => {
     ]);
 
     await expect(page.getByText("Internet Computer MCP")).toBeVisible();
-    await expect(page.getByText("Official · by DFINITY")).toBeVisible();
+    await expect(page.getByText("Official · Hosted by DFINITY")).toBeVisible();
     await expect(page.getByText(OFFICIAL_URL)).toBeVisible();
     await expect(page.getByRole("button", { name: "Customize" })).toBeVisible();
     await expect(page.getByText("mcp.id.ai", { exact: true })).toBeHidden();
@@ -133,7 +146,7 @@ test.describe("MCP settings", () => {
     await toggleAiAccess(page);
 
     await expect(page.getByText("Internet Computer MCP")).toBeVisible();
-    await expect(page.getByText("Official · by DFINITY")).toBeVisible();
+    await expect(page.getByText("Official · Hosted by DFINITY")).toBeVisible();
     await expect(page.getByRole("button", { name: "Customize" })).toBeVisible();
     await expect(page.getByText("mcp.id.ai", { exact: true })).toBeHidden();
   });

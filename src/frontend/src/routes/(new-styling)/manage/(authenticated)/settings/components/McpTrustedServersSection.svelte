@@ -208,7 +208,7 @@
             </span>
             <span class="text-text-secondary text-sm">
               {#if !active.custom}
-                {$t`Official · by DFINITY`}
+                {$t`Official · Hosted by DFINITY`}
               {:else if official !== undefined}
                 {$t`Added by you · Replaces the official connector`}
               {:else}
