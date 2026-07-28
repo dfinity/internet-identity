@@ -22,7 +22,7 @@
     type McpConfig,
   } from "$lib/utils/mcpConfig";
   import { trustedUrl } from "../utils";
-  import { officialMcpUrl } from "$lib/globals";
+  import { backendCanisterConfig, officialMcpUrl } from "$lib/globals";
   import McpAddConnectorDialog from "./McpAddConnectorDialog.svelte";
 
   interface Props {
@@ -47,7 +47,7 @@
   const enabled = $derived(config?.enabled ?? false);
   const trusted = $derived(config?.url);
   const active = $derived.by(() => {
-    const url = trustedUrl(config, official);
+    const url = trustedUrl(config, backendCanisterConfig);
     return url === undefined
       ? undefined
       : { url, custom: trusted !== undefined };
@@ -82,7 +82,8 @@
     // nothing.
     if (
       next &&
-      trustedUrl({ enabled: true, url: trusted }, official) === undefined
+      trustedUrl({ enabled: true, url: trusted }, backendCanisterConfig) ===
+        undefined
     ) {
       showAdd = true;
       return;

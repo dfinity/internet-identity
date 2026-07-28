@@ -1,5 +1,6 @@
 import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
 import { originOf, type McpConfig } from "$lib/utils/mcpConfig";
+import type { BackendCanisterConfig } from "$lib/globals";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import type { PublicKey } from "@icp-sdk/core/agent";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
@@ -167,19 +168,22 @@ export const mcpAuthorize = async ({
  * `connect_trusted_url` / `session_trusted_url`; this lives here, next to the
  * consent flow that needs it, so the two can't be confused at a call site.
  *
- * Matching is by origin, the same boundary the delegation uses (II derives a
- * per-origin principal; the path can't scope it).
+ * Takes the canister config rather than a bare URL so the official connector
+ * can only come from the deployment, never from an arbitrary string at a call
+ * site. Matching is by origin, the same boundary the delegation uses (II
+ * derives a per-origin principal; the path can't scope it).
  */
 export const isOriginTrusted = (
   config: McpConfig | undefined,
   origin: string,
-  officialUrl?: string,
+  { mcp_official_url }: Pick<BackendCanisterConfig, "mcp_official_url">,
 ): boolean => {
+  const official = mcp_official_url[0];
   const url =
     config === undefined
-      ? officialUrl
+      ? official
       : config.enabled
-        ? (config.url ?? officialUrl)
+        ? (config.url ?? official)
         : undefined;
   return url !== undefined && originOf(url) === origin;
 };

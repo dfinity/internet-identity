@@ -14,7 +14,7 @@
   import { parseMcpServerUrl } from "$lib/utils/mcpServer";
   import { fromBase64URL } from "$lib/utils/utils";
   import { readMcpConfig } from "$lib/utils/mcpConfig";
-  import { officialMcpUrl } from "$lib/globals";
+  import { backendCanisterConfig } from "$lib/globals";
   import { matchDeclaredCallback } from "$lib/utils/authCallbacks";
   import { get } from "svelte/store";
   import { onMount } from "svelte";
@@ -200,7 +200,7 @@
           if (
             phase.kind === "untrusted" &&
             get(authenticationStore)?.identityNumber === identityNumber &&
-            isOriginTrusted(config, server.origin, officialMcpUrl())
+            isOriginTrusted(config, server.origin, backendCanisterConfig)
           ) {
             phase = { kind: "authorize" };
           }
@@ -257,7 +257,7 @@
           authenticated.actor,
           authenticated.identityNumber,
         );
-        if (!isOriginTrusted(config, server.origin, officialMcpUrl())) {
+        if (!isOriginTrusted(config, server.origin, backendCanisterConfig)) {
           mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.ServerUntrusted);
           phase = { kind: "untrusted" };
           return;

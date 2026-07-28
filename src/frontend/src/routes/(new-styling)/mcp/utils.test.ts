@@ -4,6 +4,7 @@ import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { DelegationChain } from "@icp-sdk/core/identity";
 import { toHex } from "$lib/utils/utils";
+import type { BackendCanisterConfig } from "$lib/globals";
 import type { McpConfig } from "$lib/utils/mcpConfig";
 import { isOriginTrusted, mcpAuthorize } from "./utils";
 
@@ -272,7 +273,12 @@ describe("mcpAuthorize failure paths", () => {
   });
 });
 
-const OFFICIAL = "https://official-mcp.id.ai/mcp";
+const OFFICIAL: Pick<BackendCanisterConfig, "mcp_official_url"> = {
+  mcp_official_url: ["https://official-mcp.id.ai/mcp"],
+};
+const NO_OFFICIAL: Pick<BackendCanisterConfig, "mcp_official_url"> = {
+  mcp_official_url: [],
+};
 const CUSTOM = "https://mcp.acme.com/mcp";
 
 /** A stored config. `undefined` stands for an identity that never wrote one. */
@@ -287,7 +293,11 @@ describe("isOriginTrusted", () => {
 
   it("trusts an origin that matches the configured server's origin", () => {
     expect(
-      isOriginTrusted(trust("https://mcp.id.ai/mcp"), "https://mcp.id.ai"),
+      isOriginTrusted(
+        trust("https://mcp.id.ai/mcp"),
+        "https://mcp.id.ai",
+        NO_OFFICIAL,
+      ),
     ).toBe(true);
   });
 
@@ -298,6 +308,7 @@ describe("isOriginTrusted", () => {
       isOriginTrusted(
         trust("https://mcp.id.ai/some/deep/path"),
         "https://mcp.id.ai",
+        NO_OFFICIAL,
       ),
     ).toBe(true);
   });
@@ -307,12 +318,15 @@ describe("isOriginTrusted", () => {
       isOriginTrusted(
         trust("https://mcp.id.ai/mcp", false),
         "https://mcp.id.ai",
+        NO_OFFICIAL,
       ),
     ).toBe(false);
   });
 
   it("does not trust when no server URL is configured", () => {
-    expect(isOriginTrusted(trust(undefined), "https://mcp.id.ai")).toBe(false);
+    expect(
+      isOriginTrusted(trust(undefined), "https://mcp.id.ai", NO_OFFICIAL),
+    ).toBe(false);
   });
 
   it("rejects a different host", () => {
@@ -320,32 +334,45 @@ describe("isOriginTrusted", () => {
       isOriginTrusted(
         trust("https://mcp.id.ai/mcp"),
         "https://evil.example.com",
+        NO_OFFICIAL,
       ),
     ).toBe(false);
   });
 
   it("rejects a scheme mismatch (http vs https is a different origin)", () => {
     expect(
-      isOriginTrusted(trust("https://mcp.id.ai/mcp"), "http://mcp.id.ai"),
+      isOriginTrusted(
+        trust("https://mcp.id.ai/mcp"),
+        "http://mcp.id.ai",
+        NO_OFFICIAL,
+      ),
     ).toBe(false);
   });
 
   it("rejects a port mismatch", () => {
     expect(
-      isOriginTrusted(trust("https://mcp.id.ai:8443/mcp"), "https://mcp.id.ai"),
+      isOriginTrusted(
+        trust("https://mcp.id.ai:8443/mcp"),
+        "https://mcp.id.ai",
+        NO_OFFICIAL,
+      ),
     ).toBe(false);
   });
 
   it("rejects a subdomain that is not the exact origin", () => {
     expect(
-      isOriginTrusted(trust("https://mcp.id.ai/mcp"), "https://sub.mcp.id.ai"),
+      isOriginTrusted(
+        trust("https://mcp.id.ai/mcp"),
+        "https://sub.mcp.id.ai",
+        NO_OFFICIAL,
+      ),
     ).toBe(false);
   });
 
   it("does not trust when the configured URL is unparsable", () => {
-    expect(isOriginTrusted(trust("not a url"), "https://mcp.id.ai")).toBe(
-      false,
-    );
+    expect(
+      isOriginTrusted(trust("not a url"), "https://mcp.id.ai", NO_OFFICIAL),
+    ).toBe(false);
   });
 });
 
@@ -387,6 +414,8 @@ describe("isOriginTrusted — official connector", () => {
   });
 
   it("accepts nothing when no official connector is configured", () => {
-    expect(isOriginTrusted(undefined, OFFICIAL_ORIGIN, undefined)).toBe(false);
+    expect(isOriginTrusted(undefined, OFFICIAL_ORIGIN, NO_OFFICIAL)).toBe(
+      false,
+    );
   });
 });
