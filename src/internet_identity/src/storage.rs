@@ -1212,9 +1212,12 @@ impl<M: Memory + Clone> Storage<M> {
     /// was "no custom server of mine", never a choice about a connector that
     /// did not exist yet.
     ///
-    /// Any live grant on a rewritten row is deleted: a grant that was inert
-    /// only because the config was disabled must not come back to life
-    /// authorized against a connector it was never granted for.
+    /// Any live grant on a rewritten row is deleted, along with any in-flight
+    /// registration: neither may come back to life because a migration
+    /// re-enabled the identity. A grant that was inert only because the config
+    /// was disabled must not end up authorized against a connector it was never
+    /// granted for, and a registration delegation consented to before the
+    /// switch-off must not become redeemable again.
     pub fn migrate_mcp_configs_batch(
         &mut self,
         cursor: Option<StorableAnchorNumber>,
@@ -1262,13 +1265,26 @@ impl<M: Memory + Clone> Storage<M> {
                     }
                 }
             }
+            // `set_mcp_config` carries an in-flight registration over, because
+            // the redemption's URL-hash check invalidates it. That check
+            // compares against the *current* trusted URL though, and this
+            // migration can restore the very URL the entry was minted under, so
+            // here it has to go.
+            if let Some(bytes) = &config.pending_registration {
+                if let Ok(principal) = Principal::try_from_slice(bytes) {
+                    if self
+                        .lookup_mcp_registration(principal)
+                        .is_some_and(|entry| entry.anchor_number == anchor_number)
+                    {
+                        self.remove_mcp_registration(principal);
+                    }
+                }
+            }
             self.mcp_config_memory.insert(
                 anchor_number,
                 StorableMcpConfig {
                     enabled: true,
-                    url: None,
-                    session_principal: None,
-                    pending_registration: config.pending_registration,
+                    ..Default::default()
                 },
             );
             outcome.migrated += 1;

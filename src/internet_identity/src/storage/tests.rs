@@ -2378,18 +2378,31 @@ mod migrate_sso_credentials_batch_tests {
 fn mcp_config_migration_enables_stored_configs_and_revokes_their_grants() {
     use crate::storage::storable::mcp_config::StorableMcpConfig;
     use crate::storage::storable::mcp_grant::StorableMcpGrant;
+    use crate::storage::storable::mcp_registration::StorableMcpRegistration;
 
     let mut storage = Storage::new((0, 100), VectorMemory::default());
     let session = Principal::self_authenticating([1u8; 32]);
+    let p_reg = Principal::self_authenticating([2u8; 32]);
 
-    // Disabled, still pointing at a grant that is inert only because of the flag.
+    // Disabled, still pointing at a grant and an in-flight registration that are
+    // inert only because of the flag.
     storage.write_mcp_config(
         10_000,
         StorableMcpConfig {
             enabled: false,
             url: Some("https://mcp.acme.com/mcp".to_string()),
             session_principal: Some(session.as_slice().to_vec()),
-            pending_registration: None,
+            pending_registration: Some(p_reg.as_slice().to_vec()),
+        },
+    );
+    storage.insert_mcp_registration(
+        p_reg,
+        StorableMcpRegistration {
+            anchor_number: 10_000,
+            read_only: false,
+            grant_ttl_ns: 3_600_000_000_000,
+            trusted_url_hash: vec![7u8; 32],
+            expires_at_ns: u64::MAX,
         },
     );
     storage.insert_mcp_grant(
@@ -2427,6 +2440,10 @@ fn mcp_config_migration_enables_stored_configs_and_revokes_their_grants() {
     // The grant must not survive: re-enabling would otherwise revive a session
     // against a connector it was never granted for.
     assert!(storage.lookup_mcp_grant(session).is_none());
+    // Nor the in-flight registration: its redemption is gated on the *current*
+    // trusted URL, which this migration can restore to the one it was minted
+    // under, making a pre-switch-off delegation redeemable again.
+    assert!(storage.lookup_mcp_registration(p_reg).is_none());
 
     // Re-running is a no-op.
     let again = storage.migrate_mcp_configs_batch(None, 2_000);
