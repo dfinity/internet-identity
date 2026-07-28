@@ -578,7 +578,7 @@ pub fn mcp_get_config(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-) -> Result<McpConfig, RejectResponse> {
+) -> Result<Option<McpConfig>, RejectResponse> {
     query_candid_as(
         env,
         canister_id,

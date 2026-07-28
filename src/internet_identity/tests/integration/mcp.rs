@@ -23,7 +23,8 @@ use canister_tests::{
     },
 };
 use internet_identity_interface::internet_identity::types::{
-    AccountDelegationError, AnchorNumber, McpConfig, McpPrepareDelegation, Permissions,
+    AccountDelegationError, AnchorNumber, InternetIdentityInit, McpConfig, McpPrepareDelegation,
+    Permissions,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -43,6 +44,23 @@ const GRANT_TTL_NS: u64 = 24 * 60 * 60 * 1_000_000_000;
 // server it chooses via its synced config. So a plain install suffices.
 fn install_with_mcp(env: &PocketIc) -> Principal {
     install_ii_canister_with_arg(env, II_WASM.clone(), None)
+}
+
+/// The official MCP connector a deployment can ship. Deliberately a different
+/// origin from [`MCP_ORIGIN`], which stands in for a server the user adds
+/// themselves.
+const OFFICIAL_MCP_URL: &str = "https://official-mcp.id.ai/mcp";
+
+/// II with an official connector configured, the way a real deployment ships.
+fn install_with_official_mcp(env: &PocketIc) -> Principal {
+    install_ii_canister_with_arg(
+        env,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            mcp_official_url: Some(OFFICIAL_MCP_URL.to_string()),
+            ..Default::default()
+        }),
+    )
 }
 
 /// Set the identity's synced config to trust `MCP_ORIGIN` — the precondition
@@ -490,7 +508,7 @@ fn mcp_disabling_config_revokes_the_session() -> Result<(), RejectResponse> {
         anchor,
         McpConfig {
             enabled: false,
-            url: Some(format!("{MCP_ORIGIN}/mcp")),
+            url: None,
         },
     )
     .unwrap()
@@ -694,7 +712,7 @@ fn mcp_register_v2_rejects_a_key_registered_to_another_identity() -> Result<(), 
         anchor_1,
         McpConfig {
             enabled: false,
-            url: Some(format!("{MCP_ORIGIN}/mcp")),
+            url: None,
         },
     )
     .unwrap()
@@ -1017,7 +1035,7 @@ fn mcp_config_round_trips_and_persists_across_upgrade() -> Result<(), RejectResp
     // An anchor that never wrote a config reads the disabled, no-server default.
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
-        McpConfig::default()
+        None
     );
 
     let config = McpConfig {
@@ -1029,14 +1047,115 @@ fn mcp_config_round_trips_and_persists_across_upgrade() -> Result<(), RejectResp
         .unwrap();
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
-        config
+        Some(config.clone())
     );
 
     // Persisted in stable memory: the same config reads back after an upgrade.
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
-        config
+        Some(config.clone())
+    );
+
+    Ok(())
+}
+
+/// What `mcp_get_config` reports for an unauthorized caller: the switched-off
+/// shape rather than `None`, so a read neither leaks the real config nor makes
+/// the anchor look like it may connect.
+fn hidden() -> Option<McpConfig> {
+    Some(McpConfig {
+        enabled: false,
+        url: None,
+    })
+}
+
+/// The headline flow: an identity that has never configured MCP connects to the
+/// deployment's official connector without visiting Settings first, and ends up
+/// with a real stored config rather than a default.
+///
+/// Regression test — `prepare` materializes the anchor's config row for its
+/// pending-registration bookkeeping, and when it wrote that row with `enabled`
+/// still false the redemption refused the very connect it had just authorized.
+#[test]
+fn mcp_fresh_identity_connects_the_official_connector() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_official_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+
+    // Nothing configured: Settings shows the feature off.
+    assert_eq!(
+        mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
+        None
+    );
+
+    // Connecting works anyway — completing the consent is what enables it.
+    let session_key = ByteBuf::from("official mcp server session key");
+    let (session_principal, _) = register_session(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        &session_key,
+        GRANT_TTL_NS,
+    );
+
+    // ...and leaves a real config behind, pointing at the official connector.
+    assert_eq!(
+        mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
+        Some(McpConfig {
+            enabled: true,
+            url: None,
+        })
+    );
+
+    // The session is live: it can act for the identity.
+    assert!(mcp_get_accounts(
+        &env,
+        canister_id,
+        session_principal,
+        "https://some-app.example.com".to_string(),
+    )
+    .is_ok());
+
+    Ok(())
+}
+
+/// Once the identity switches AI access off, a connect link can no longer
+/// re-enable it — the official connector is only offered to someone who never
+/// made that choice.
+#[test]
+fn mcp_switching_off_blocks_the_official_connector() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_official_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+
+    mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        McpConfig {
+            enabled: false,
+            url: None,
+        },
+    )
+    .unwrap()
+    .unwrap();
+
+    let prepared = prepare_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        ByteBuf::from("browser registration key Y"),
+        Some(false),
+        Some(GRANT_TTL_NS),
+    )
+    .unwrap();
+    assert!(
+        matches!(&prepared, Err(message) if message.contains("no trusted MCP server")),
+        "a switched-off identity must not be able to connect: {prepared:?}"
     );
 
     Ok(())
@@ -1072,12 +1191,12 @@ fn mcp_config_is_gated_to_the_identity() -> Result<(), RejectResponse> {
     // ...nor read the real one back (gets the default instead).
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_2(), anchor).unwrap(),
-        McpConfig::default()
+        hidden()
     );
     // The owner's config is unchanged.
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
-        config
+        Some(config.clone())
     );
 
     Ok(())
@@ -1856,8 +1975,8 @@ fn mcp_prepare_registration_delegation_requires_trusted_server() -> Result<(), R
         "prepare with no config must be rejected: {none:?}"
     );
 
-    // MCP disabled, even with a URL set.
-    mcp_set_config(
+    // A disabled config can't even keep a URL — the write itself is rejected.
+    assert!(mcp_set_config(
         &env,
         canister_id,
         principal_1(),
@@ -1865,6 +1984,20 @@ fn mcp_prepare_registration_delegation_requires_trusted_server() -> Result<(), R
         McpConfig {
             enabled: false,
             url: Some(format!("{MCP_ORIGIN}/mcp")),
+        },
+    )
+    .unwrap()
+    .is_err());
+
+    // MCP switched off.
+    mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        McpConfig {
+            enabled: false,
+            url: None,
         },
     )
     .unwrap()

@@ -350,6 +350,7 @@ type InternetIdentityInit = record {
     // via HTTP outcalls when no DNSSEC chain is available — see
     // `docs/ongoing/email-recovery.md` §7.6. Same set/clear pattern.
     doh_config : opt opt DohConfig;
+    mcp_official_url : opt text;
 };
 
 // DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
@@ -1887,7 +1888,11 @@ service : (opt InternetIdentityInit) -> {
     // devices. Read by the Settings UI and the /mcp connect flow (which verifies
     // the connecting origin against it). Returns the disabled, no-server default
     // for an unauthorized caller or an anchor that never wrote a config.
-    mcp_get_config : (anchor_number : UserNumber) -> (McpConfig) query;
+    // `null` means the identity has never written a config — distinct from a
+    // stored one that is switched off. The two behave differently at /mcp: the
+    // first may connect the deployment's official connector (completing the
+    // consent is what enables it), the second is sent back to Settings.
+    mcp_get_config : (anchor_number : UserNumber) -> (opt McpConfig) query;
 
     // Persist the identity's trusted-MCP-server config so it syncs across the
     // identity's devices. Authenticated as the identity, so only the user — never

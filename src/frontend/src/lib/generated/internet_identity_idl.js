@@ -87,6 +87,7 @@ export const idlFactory = ({ IDL }) => {
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),
     'backend_origin' : IDL.Opt(IDL.Text),
     'captcha_config' : IDL.Opt(CaptchaConfig),
+    'mcp_official_url' : IDL.Opt(IDL.Text),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
     'sso_allow_insecure_discovery' : IDL.Opt(IDL.Bool),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
@@ -1189,7 +1190,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
-    'mcp_get_config' : IDL.Func([UserNumber], [McpConfig], ['query']),
+    'mcp_get_config' : IDL.Func([UserNumber], [IDL.Opt(McpConfig)], ['query']),
     'mcp_get_delegation' : IDL.Func(
         [FrontendHostname, IDL.Opt(AccountNumber), SessionKey, Timestamp],
         [
@@ -1493,6 +1494,7 @@ export const init = ({ IDL }) => {
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),
     'backend_origin' : IDL.Opt(IDL.Text),
     'captcha_config' : IDL.Opt(CaptchaConfig),
+    'mcp_official_url' : IDL.Opt(IDL.Text),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
     'sso_allow_insecure_discovery' : IDL.Opt(IDL.Bool),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),

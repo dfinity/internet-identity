@@ -1094,6 +1094,7 @@ export interface InternetIdentityInit {
    * Configuration of the captcha in the registration flow.
    */
   'captcha_config' : [] | [CaptchaConfig],
+  'mcp_official_url' : [] | [string],
   /**
    * Configuration for dummy authentication used in e2e tests.
    */
@@ -2200,8 +2201,12 @@ export interface _SERVICE {
    * devices. Read by the Settings UI and the /mcp connect flow (which verifies
    * the connecting origin against it). Returns the disabled, no-server default
    * for an unauthorized caller or an anchor that never wrote a config.
+   * `null` means the identity has never written a config — distinct from a
+   * stored one that is switched off. The two behave differently at /mcp: the
+   * first may connect the deployment's official connector (completing the
+   * consent is what enables it), the second is sent back to Settings.
    */
-  'mcp_get_config' : ActorMethod<[UserNumber], McpConfig>,
+  'mcp_get_config' : ActorMethod<[UserNumber], [] | [McpConfig]>,
   /**
    * Fetch the delegation prepared above; the anchor is recovered from
    * caller()'s grant. account_number and expiration must be the values

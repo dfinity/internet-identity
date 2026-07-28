@@ -13,7 +13,8 @@
   import { toaster } from "$lib/components/utils/toaster";
   import { parseMcpServerUrl } from "$lib/utils/mcpServer";
   import { fromBase64URL } from "$lib/utils/utils";
-  import { readMcpConfig, isOriginTrusted } from "$lib/utils/mcpConfig";
+  import { readMcpConfig } from "$lib/utils/mcpConfig";
+  import { backendCanisterConfig } from "$lib/globals";
   import { matchDeclaredCallback } from "$lib/utils/authCallbacks";
   import { get } from "svelte/store";
   import { onMount } from "svelte";
@@ -25,7 +26,7 @@
   import McpConnectingView from "./views/McpConnectingView.svelte";
   import ManageHandoff from "$lib/components/ui/ManageHandoff.svelte";
   import { ManageHandoffFlow } from "$lib/flows/manageHandoffFlow.svelte";
-  import { mcpAuthorize } from "./utils";
+  import { isOriginTrusted, mcpAuthorize } from "./utils";
   import { showIdentitySwitcher } from "./mcp-switcher.store";
   import {
     mcpAuthorizeFunnel,
@@ -199,7 +200,7 @@
           if (
             phase.kind === "untrusted" &&
             get(authenticationStore)?.identityNumber === identityNumber &&
-            isOriginTrusted(config, server.origin)
+            isOriginTrusted(config, server.origin, backendCanisterConfig)
           ) {
             phase = { kind: "authorize" };
           }
@@ -256,7 +257,7 @@
           authenticated.actor,
           authenticated.identityNumber,
         );
-        if (!isOriginTrusted(config, server.origin)) {
+        if (!isOriginTrusted(config, server.origin, backendCanisterConfig)) {
           mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.ServerUntrusted);
           phase = { kind: "untrusted" };
           return;

@@ -281,6 +281,7 @@ pub struct InternetIdentityFrontendArgs {
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct InternetIdentitySynchronizedConfig {
     pub openid_configs: Option<Vec<OpenIdConfig>>,
+    pub mcp_official_url: Option<String>,
 }
 
 /// Init arguments of II which can be supplied on install and upgrade.
@@ -340,6 +341,7 @@ pub struct InternetIdentityInit {
     /// `docs/ongoing/email-recovery.md` §7.6). Same set/clear pattern
     /// as `dnssec_config`.
     pub doh_config: Option<Option<DohConfig>>,
+    pub mcp_official_url: Option<String>,
 }
 
 /// One entry of the `sso_credential_migration` backfill (see
