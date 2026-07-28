@@ -2411,12 +2411,12 @@ mod sso_gating {
         .map(|result| result.identity_number)
     }
 
-    /// A `sub`-based org resolves a gated login through the same domain-scoped
-    /// path as a non-`sub` org: the first gated login (no II-client identity
-    /// established through this domain yet) requires a normal login first and
-    /// creates nothing. The positive path — resolving after a normal login has
-    /// established the II-client credential — is covered by
-    /// `gated_and_ungated_resolve_to_same_dapp_principal`.
+    /// A gated login can't establish an anchor identity by itself, so a domain
+    /// can't bootstrap one from a gated token alone: with no II-client identity
+    /// yet established through this domain, a `sub`-org's first gated login
+    /// requires a normal login first and creates nothing. The positive path —
+    /// resolving after a normal login established the II-client credential — is
+    /// covered by `gated_and_ungated_resolve_to_same_dapp_principal`.
     #[test]
     fn sub_org_first_gated_login_needs_normal_login_first() -> Result<(), RejectResponse> {
         let env = env();
@@ -2438,11 +2438,12 @@ mod sso_gating {
         Ok(())
     }
 
-    /// A non-`sub` (`oid`) org's first gated login cannot register directly (no
-    /// aux bridge yet); registration fails safe with `SsoNormalLoginRequired`
-    /// and creates nothing.
+    /// Same for a non-`sub` (`oid`) org: with no stable-id bridge established
+    /// through this domain yet, the first gated registration can't create an
+    /// identity — it returns `SsoNormalLoginRequired` and stores nothing.
     #[test]
-    fn non_sub_org_first_gated_registration_fails_safe() -> Result<(), RejectResponse> {
+    fn non_sub_org_first_gated_registration_needs_normal_login_first() -> Result<(), RejectResponse>
+    {
         let env = env();
         let canister_id = install(&env);
 
@@ -2456,7 +2457,7 @@ mod sso_gating {
         let result = register_via_sso_gate(&env, canister_id, &gated_jwt, GATED_ORIGIN);
         assert!(
             matches!(result, Err(IdRegFinishError::SsoNormalLoginRequired)),
-            "non-sub first gated registration must fail safe, got {result:?}"
+            "non-sub first gated registration must require a normal login first, got {result:?}"
         );
         Ok(())
     }

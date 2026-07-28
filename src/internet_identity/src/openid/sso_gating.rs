@@ -398,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_ii_client_identity_sub_normal_login_uses_token_sub() {
+    fn sub_normal_login_uses_token_sub() {
         init_test_storage();
         // A non-gated `sub` login carries a token genuinely issued for the II
         // client, so it resolves directly to the token `sub` — the normal /
@@ -412,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_ii_client_identity_sub_gated_needs_normal_login_first() {
+    fn sub_gated_login_requires_same_domain_identity() {
         init_test_storage();
         // A gated `sub` login must not resolve until an II-client identity has
         // been established through this same discovery domain — mirroring the
@@ -435,7 +435,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_ii_client_identity_non_sub_gated_needs_normal_login_first() {
+    fn non_sub_gated_login_requires_same_domain_bridge() {
         init_test_storage();
         let gated = sso_verification(true, "oid", "per-app-sub", Some("oid-1"));
         // No II-client credential stored yet: the index has no entry, fail safe.
@@ -519,7 +519,7 @@ mod tests {
     }
 
     #[test]
-    fn sso_stable_id_index_is_scoped_per_discovery_domain() {
+    fn gated_login_resolves_only_within_same_discovery_domain() {
         init_test_storage();
         // An II-client identity established through the org's real domain.
         let ii_client_login = sso_verification(false, "oid", "ii-client-sub", Some("oid-9"));
@@ -531,8 +531,8 @@ mod tests {
 
         // A gated login carrying the same (iss, ii_client_id, stable_id) but
         // discovered through a *different* domain must not resolve to that
-        // identity — the domain is part of the index key, so cross-domain
-        // injection into a foreign namespace fails safe.
+        // identity: the domain is part of the lookup key, so a login through a
+        // foreign domain fails safe rather than resolving onto it.
         let mut gated_other_domain = sso_verification(true, "oid", "pairwise", Some("oid-9"));
         gated_other_domain.credential.sso_domain = Some("attacker.example".to_string());
         assert!(matches!(
