@@ -1,7 +1,7 @@
 import {
   cappedSessionDurations,
-  formatSessionDuration,
   MAX_SESSION_DURATION_SECONDS,
+  sessionDurationBreakdown,
   sessionDurationCeilingSeconds,
   sessionDurationToNanos,
 } from "./sessionDuration";
@@ -14,19 +14,28 @@ const NANOS_PER_SECOND = BigInt(1_000_000_000);
 
 const PRESETS = [10 * MINUTE, HOUR, 8 * HOUR, DAY, WEEK, 30 * DAY];
 
-describe("formatSessionDuration", () => {
-  it("formats a single unit", () => {
-    expect(formatSessionDuration(2 * HOUR)).toBe("2h");
-    expect(formatSessionDuration(10 * MINUTE)).toBe("10m");
-    expect(formatSessionDuration(DAY)).toBe("1d");
+describe("sessionDurationBreakdown", () => {
+  it("breaks out a single unit", () => {
+    expect(sessionDurationBreakdown(2 * HOUR)).toEqual({ hour: 2 });
+    expect(sessionDurationBreakdown(10 * MINUTE)).toEqual({ minute: 10 });
+    expect(sessionDurationBreakdown(DAY)).toEqual({ day: 1 });
   });
 
-  it("combines units, largest first", () => {
-    expect(formatSessionDuration(DAY + HOUR + MINUTE + 1)).toBe("1d 1h 1m 1s");
+  it("breaks out every non-zero unit", () => {
+    expect(sessionDurationBreakdown(DAY + HOUR + MINUTE + 1)).toEqual({
+      day: 1,
+      hour: 1,
+      minute: 1,
+      second: 1,
+    });
+    expect(sessionDurationBreakdown(DAY + MINUTE)).toEqual({
+      day: 1,
+      minute: 1,
+    });
   });
 
-  it("formats zero", () => {
-    expect(formatSessionDuration(0)).toBe("0s");
+  it("keeps a zero duration as zero seconds", () => {
+    expect(sessionDurationBreakdown(0)).toEqual({ second: 0 });
   });
 });
 
