@@ -158,10 +158,11 @@ test("Trusting the server in the Settings tab auto-advances the untrusted screen
       }),
   );
   await settingsPage.getByRole("switch", { name: "AI access" }).click();
+  await settingsPage.getByRole("button", { name: "Customize" }).click();
   await settingsPage.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
   await holdToConfirm(settingsPage, "Hold to continue");
   await expect(
-    settingsPage.getByRole("button", { name: "Remove this server" }),
+    settingsPage.getByRole("button", { name: "Restore default" }),
   ).toBeVisible();
 
   // Back on the original tab. In a real browser, returning to a backgrounded tab
@@ -268,10 +269,11 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   await page.locator('a[href="/manage/settings"]').click();
   await page.waitForURL(II_URL + "/manage/settings");
   await page.getByRole("switch", { name: "AI access" }).click();
+  await page.getByRole("button", { name: "Customize" }).click();
   await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
   await holdToConfirm(page, "Hold to continue");
   await expect(
-    page.getByRole("button", { name: "Remove this server" }),
+    page.getByRole("button", { name: "Restore default" }),
   ).toBeVisible();
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
@@ -493,7 +495,7 @@ test("A failed redemption surfaces on the server's page and registers nothing", 
   expect(mcp.completions).toHaveLength(0);
 });
 
-test("Removing the trusted server in Settings blocks connecting", async ({
+test("Restoring the default connector in Settings blocks the custom server", async ({
   page,
   mcp,
 }) => {
@@ -510,17 +512,18 @@ test("Removing the trusted server in Settings blocks connecting", async ({
         response.url().includes("/call") &&
         response.request().method() === "POST",
     ),
-    page.getByRole("button", { name: "Remove this server" }).click(),
+    page.getByRole("button", { name: "Restore default" }).click(),
   ]);
   await expect(
-    page.getByRole("button", { name: "Remove this server" }),
+    page.getByRole("button", { name: "Restore default" }),
   ).toHaveCount(0);
-  await expect(
-    page.getByRole("switch", { name: "AI access" }),
-  ).not.toBeChecked();
+  // AI access stays on: dropping the custom server falls back to the
+  // deployment's official connector rather than turning the feature off.
+  await expect(page.getByRole("switch", { name: "AI access" })).toBeChecked();
+  await expect(page.getByText("Internet Computer MCP")).toBeVisible();
 
-  // Trust is re-verified against the synced config at connect time, so with no
-  // trusted server the connect lands on the untrusted screen.
+  // Trust is re-verified against the synced config at connect time, and the
+  // official connector is a different origin, so this server is untrusted.
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await allowAccess(page);
   await expect(
@@ -528,10 +531,7 @@ test("Removing the trusted server in Settings blocks connecting", async ({
   ).toBeVisible();
 });
 
-test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
-  page,
-  mcp,
-}) => {
+test("Disabling the master toggle blocks connecting", async ({ page, mcp }) => {
   test.slow();
   await addVirtualAuthenticator(page);
   await page.goto(II_URL);
@@ -539,8 +539,8 @@ test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
   await page.waitForURL(II_URL + "/manage");
   await mcp.trustServer(page);
 
-  // Turn the feature off for this identity. The URL stays saved on-chain, but
-  // the config is no longer `enabled`, so trust is off.
+  // Turn the feature off for this identity: that also forgets the custom URL,
+  // so nothing is trusted until it is set again.
   const toggle = page.getByRole("switch", { name: "AI access" });
   await Promise.all([
     page.waitForResponse(
