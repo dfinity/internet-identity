@@ -244,21 +244,13 @@ fn init_assets(alternative_origins: String, extra_auth_callbacks: Vec<String>) {
         .map(|domain| format!("https://{canister_id}.{domain}/callback"))
         .collect();
     callbacks.extend(extra_auth_callbacks);
-    // Emit each callback as a JSON string literal. The test app has no
-    // serde_json, so escape the two characters that would otherwise break out
-    // of the quotes (`\` first, then `"`) — the derived callbacks never contain
-    // them, but `extra_auth_callbacks` come from the init argument.
-    let callbacks_json = callbacks
-        .iter()
-        .map(|callback| {
-            let escaped = callback.replace('\\', "\\\\").replace('"', "\\\"");
-            format!("\"{escaped}\"")
-        })
-        .collect::<Vec<_>>()
-        .join(",");
+    // Serialize with serde_json so the callback strings — the derived ones are
+    // safe, but `extra_auth_callbacks` come from the init argument — are always
+    // properly escaped JSON string literals.
+    let content = serde_json::json!({ "callbacks": callbacks }).to_string();
     assets.push(Asset {
         url_path: AUTH_CALLBACKS_PATH.to_string(),
-        content: format!(r#"{{"callbacks":[{callbacks_json}]}}"#).into_bytes(),
+        content: content.into_bytes(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::JSON,
     });
