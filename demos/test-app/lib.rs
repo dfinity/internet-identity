@@ -174,7 +174,10 @@ fn not_found_response(path: &str) -> HttpResponse {
 fn static_headers() -> Vec<HeaderField> {
     vec![
         ("Access-Control-Allow-Origin".to_string(), "*".to_string()),
-        ("Referrer-Policy".to_string(), "strict-origin-when-cross-origin".to_string()),
+        (
+            "Referrer-Policy".to_string(),
+            "strict-origin-when-cross-origin".to_string(),
+        ),
     ]
 }
 
@@ -241,9 +244,16 @@ fn init_assets(alternative_origins: String, extra_auth_callbacks: Vec<String>) {
         .map(|domain| format!("https://{canister_id}.{domain}/callback"))
         .collect();
     callbacks.extend(extra_auth_callbacks);
+    // Emit each callback as a JSON string literal. The test app has no
+    // serde_json, so escape the two characters that would otherwise break out
+    // of the quotes (`\` first, then `"`) — the derived callbacks never contain
+    // them, but `extra_auth_callbacks` come from the init argument.
     let callbacks_json = callbacks
         .iter()
-        .map(|callback| format!("\"{callback}\""))
+        .map(|callback| {
+            let escaped = callback.replace('\\', "\\\\").replace('"', "\\\"");
+            format!("\"{escaped}\"")
+        })
         .collect::<Vec<_>>()
         .join(",");
     assets.push(Asset {

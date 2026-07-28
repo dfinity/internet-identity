@@ -24,6 +24,17 @@ import {
   type DelegationInterceptor,
 } from "./url";
 
+// The loopback (`http`) secure-context allowance is gated on the `dev_csp`
+// canister config — only the dev CSP permits the loopback allow-list fetch — so
+// mock the frontend config and flip `dev_csp` per test (reset to off, i.e.
+// production, in `beforeEach`).
+const { mockFrontendCanisterConfig } = vi.hoisted(() => ({
+  mockFrontendCanisterConfig: { dev_csp: [] as [] | [boolean] },
+}));
+vi.mock("$lib/globals", () => ({
+  frontendCanisterConfig: mockFrontendCanisterConfig,
+}));
+
 // Same store the transport keeps its ephemeral keys in — inspected/reset here.
 const EPHEMERAL_KEY_STORE = createStore("ii-icrc167-ephemeral-keys", "keys");
 
@@ -160,6 +171,8 @@ beforeEach(async () => {
   sessionStorage.clear();
   await idbClear(EPHEMERAL_KEY_STORE);
   vi.spyOn(window.history, "replaceState").mockImplementation(() => undefined);
+  // Default to production (dev CSP off); the loopback test opts in explicitly.
+  mockFrontendCanisterConfig.dev_csp = [];
 });
 
 afterEach(() => {
@@ -364,7 +377,8 @@ describe("UrlTransport.establishChannel", () => {
     },
   );
 
-  it("allows an http callback on loopback", async () => {
+  it("allows an http callback on loopback when the dev CSP is enabled", async () => {
+    mockFrontendCanisterConfig.dev_csp = [true];
     const callback = "http://localhost:8080/callback";
     const params = new URLSearchParams({
       message: JSON.stringify({
@@ -380,6 +394,51 @@ describe("UrlTransport.establishChannel", () => {
 
     const channel = await new UrlTransport().establishChannel();
     expect(channel.origin).toBe("http://localhost:8080");
+  });
+
+  it("rejects an http loopback callback when the dev CSP is disabled (production)", async () => {
+    // dev_csp defaults to off in beforeEach: II's production CSP would block
+    // the loopback allow-list fetch, so the callback is not a secure context.
+    const params = new URLSearchParams({
+      message: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "m" }),
+      callback: "http://localhost:8080/callback",
+      state: "state-123",
+    });
+    installLocation(`#${params.toString()}`);
+
+    await expect(new UrlTransport().establishChannel()).rejects.toThrow();
+    expect(assignMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a request without an id (a notification cannot be answered)", async () => {
+    installLocation(hashFor({ jsonrpc: "2.0", method: "m" }));
+    stubAllowList([CALLBACK]);
+
+    await expect(new UrlTransport().establishChannel()).rejects.toThrow();
+    expect(assignMock).not.toHaveBeenCalled();
+  });
+
+  it("journals distinct ephemeral keys for numeric and string ids that stringify alike", async () => {
+    const batch = [1, "1"].map((id) => ({
+      jsonrpc: "2.0",
+      id,
+      method: "icrc34_delegation",
+      params: DelegationParamsCodec.encode({
+        publicKey: Ed25519KeyIdentity.generate().getPublicKey(),
+      }),
+    }));
+    installLocation(hashFor(batch));
+    stubAllowList([CALLBACK]);
+
+    await new UrlTransport().establishChannel();
+
+    const flow = JSON.parse(
+      sessionStorage.getItem("ii-icrc167-url-flow") ?? "",
+    );
+    // The numeric `1` and string `"1"` are journaled under distinct type-tagged
+    // keys, so neither delegation's ephemeral key overwrites the other's.
+    expect(Object.keys(flow.ephemeralKeyIds)).toHaveLength(2);
+    expect(new Set(Object.values(flow.ephemeralKeyIds)).size).toBe(2);
   });
 
   const STORAGE_KEY = "ii-icrc167-url-flow";

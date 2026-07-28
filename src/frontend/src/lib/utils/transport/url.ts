@@ -51,6 +51,7 @@ import {
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import type { PublicKey } from "@icp-sdk/core/agent";
 import { matchDeclaredCallback } from "$lib/utils/authCallbacks";
+import { frontendCanisterConfig } from "$lib/globals";
 import {
   createStore,
   get as idbGet,
@@ -100,11 +101,22 @@ const isLoopbackHost = (host: string): boolean =>
  * decide it: `https`, or `http` only on a loopback host. Everything else — a
  * `javascript:`/`data:` scheme, or plain `http` on a remote host — is not a
  * secure context and is rejected as a redirect target.
+ *
+ * The loopback (`http`) allowance is further gated on the `dev_csp` canister
+ * config. Delivering the response is a same-tab navigation (not CSP-bound), but
+ * establishing the flow first fetches the callback origin's allow-list, and
+ * that fetch is a `connect-src` request: II's production CSP allows only
+ * `https:` there, so an `http` loopback allow-list can only be fetched when the
+ * canister runs with the dev CSP (`connect-src … http:`). Gating on the same
+ * flag keeps a loopback callback from passing this check yet failing the fetch
+ * in production.
  * @see https://w3c.github.io/webappsec-secure-contexts/
  */
 const isSecureContextUrl = (url: URL): boolean =>
   url.protocol === "https:" ||
-  (url.protocol === "http:" && isLoopbackHost(url.hostname));
+  (url.protocol === "http:" &&
+    isLoopbackHost(url.hostname) &&
+    frontendCanisterConfig.dev_csp[0] === true);
 
 interface UrlRequest {
   /** The JSON-RPC request(s). An array is an ICRC-25 batch, answered in one redirect. */
@@ -187,6 +199,15 @@ const readUrlRequest = (): UrlRequest | undefined => {
     if (!result.success) {
       throw new Error(
         "ICRC-167 request message is not a valid JSON-RPC request",
+      );
+    }
+    // The response is correlated and delivered by id (the JSON-RPC response
+    // schema requires one), and a single redirect carries the whole batch — an
+    // id-less request (a JSON-RPC notification) can never be answered, so
+    // reject it rather than silently drop it from the delivered response.
+    if (result.data.id === undefined) {
+      throw new Error(
+        "ICRC-167 request must have an id (notifications are not supported)",
       );
     }
     return result.data;
@@ -462,6 +483,13 @@ interface PersistedFlow {
   responses: Record<string, JsonResponse>;
 }
 
+// Key into `ephemeralKeyIds` (a plain object, so string keys only) by a
+// type-tagged id: a JSON-RPC id is a string or a number, and
+// `String(1) === String("1")`, so a bare `String(id)` would collide a numeric
+// id with the string of the same digits. `JSON.stringify` distinguishes them
+// (`1` vs `"1"`), and store and lookup must agree on it.
+const ephemeralKeyMapKey = (id: string | number): string => JSON.stringify(id);
+
 const storeFlow = (flow: PersistedFlow): void => {
   sessionStorage.setItem(FLOW_STORAGE_KEY, JSON.stringify(flow));
 };
@@ -597,14 +625,14 @@ export class UrlTransport implements Transport {
     const ephemeralKeyIds: Record<string, string> = {};
     const interceptors: DelegationInterceptor[] = [];
     for (const jsonRequest of request.requests) {
-      if (!isDelegationRequest(jsonRequest)) {
+      if (!isDelegationRequest(jsonRequest) || jsonRequest.id === undefined) {
         interceptors.push(passthrough(jsonRequest));
         continue;
       }
       const ephemeral = await createEphemeralIdentity();
       const keyId = crypto.randomUUID();
       await storeEphemeralKey(keyId, ephemeral.getKeyPair());
-      ephemeralKeyIds[String(jsonRequest.id)] = keyId;
+      ephemeralKeyIds[ephemeralKeyMapKey(jsonRequest.id)] = keyId;
       interceptors.push(buildDelegationInterceptor(jsonRequest, ephemeral));
     }
 
@@ -637,7 +665,7 @@ export class UrlTransport implements Transport {
       flow.requests.map(async (jsonRequest) => {
         const keyId =
           jsonRequest.id !== undefined
-            ? flow.ephemeralKeyIds[String(jsonRequest.id)]
+            ? flow.ephemeralKeyIds[ephemeralKeyMapKey(jsonRequest.id)]
             : undefined;
         if (keyId === undefined) {
           return passthrough(jsonRequest);
