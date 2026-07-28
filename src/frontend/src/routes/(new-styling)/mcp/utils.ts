@@ -10,6 +10,16 @@ import {
   transformSignedDelegation,
 } from "$lib/utils/utils";
 
+/** The exact refusal `prepare_mcp_registration_delegation` returns when the
+ *  identity has no trusted MCP server (the feature is off or was never
+ *  configured). Kept in sync with the canister (`mcp_registration.rs`); matched
+ *  exactly, not as a substring, so only this refusal — never an unrelated error
+ *  that merely contains the phrase — routes the connect to the untrusted
+ *  screen. A wording drift only downgrades this UX to a generic error, never a
+ *  wrong delivery. */
+const NO_TRUSTED_SERVER_ERROR =
+  "MCP registration failed: no trusted MCP server is enabled for this identity.";
+
 interface McpAuthorizeInput {
   authenticated: Authenticated;
   /** Lifetime in seconds for the session grant (already clamped to
@@ -134,10 +144,9 @@ export const mcpAuthorize = async ({
     // "No trusted server" means MCP is off or unset for this identity — the
     // untrusted case, routed to the untrusted screen (where the user can set a
     // trusted server) like every other not-trusted outcome, rather than shown
-    // as a hard error. Other refusals (e.g. authentication) propagate. Couples
-    // to the backend message, but a mismatch here only ever downgrades UX to a
-    // generic error, never causes a wrong delivery.
-    if (prepared.Err.includes("no trusted MCP server")) {
+    // as a hard error. Matched exactly (see `NO_TRUSTED_SERVER_ERROR`) so an
+    // unrelated refusal (e.g. authentication) propagates as an error instead.
+    if (prepared.Err === NO_TRUSTED_SERVER_ERROR) {
       throw new McpUntrustedServerError();
     }
     throw new Error(prepared.Err);
