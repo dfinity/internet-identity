@@ -342,6 +342,7 @@ pub struct InternetIdentityInit {
     /// as `dnssec_config`.
     pub doh_config: Option<Option<DohConfig>>,
     pub mcp_official_url: Option<String>,
+    pub mcp_config_migration: Option<bool>,
 }
 
 /// One entry of the `sso_credential_migration` backfill (see

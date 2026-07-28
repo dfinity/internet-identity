@@ -29,7 +29,7 @@
 //! changing the trusted server URL in the synced config deletes the grant in
 //! the same update message ([`set_mcp_config`]). Which app account the server
 //! acts as is chosen per call against the *target app* origin (discover them
-//! with [`get_accounts`]); issued per-app delegations are capped at 1 hour
+//! with [`get_accounts`]); issued per-app delegations are capped at 5 minutes
 //! and never outlive the grant.
 
 use candid::Principal;
@@ -49,8 +49,21 @@ use crate::{
     storage::storable::mcp_grant::StorableMcpGrant,
 };
 
-/// Maximum lifetime of an MCP-minted per-app account delegation: 1 hour.
-const MCP_MAX_EXPIRATION_PERIOD_NS: u64 = 60 * 60 * 1_000_000_000;
+/// Maximum lifetime of an MCP-minted per-app account delegation: 5 minutes.
+/// Deliberately short, because this is the one window revocation cannot reach:
+/// disabling MCP or switching the trusted URL ([`set_mcp_config`]) deletes the
+/// grant, so the server can mint no *more* delegations, but one it already
+/// handed to a target app is a standalone signed credential that stays usable
+/// until it expires. Re-minting costs the server a `prepare`/`get` round trip
+/// and no user interaction at all, so a short cap is close to free for the
+/// honest case while bounding the revoked one.
+///
+/// Deliberately not shorter: delegation expiry is checked at ingress against
+/// the receiving node's clock, and IC gateways/libraries permit ~5 minutes of
+/// clock drift, so a tighter window could be partly consumed by skew — the same
+/// floor [`crate::mcp_registration::MCP_REGISTRATION_DELEGATION_TTL_NS`]
+/// documents for the registration delegation.
+const MCP_MAX_EXPIRATION_PERIOD_NS: u64 = 5 * 60 * 1_000_000_000;
 
 /// Longest trusted-server URL `set_mcp_config` accepts. Generous for a real MCP
 /// endpoint (host + path) while bounding the one per-anchor config entry that
@@ -260,9 +273,13 @@ pub fn get_mcp_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
 ///
 /// Rejects a trusted URL longer than [`MCP_TRUSTED_URL_MAX_BYTES`]: nothing
 /// legitimate needs a multi-KiB URL, and the bound keeps the stored config
-/// entry small. The anchor's pending-registration bookkeeping is carried over
-/// untouched — a config edit doesn't reset it (in-flight registrations are
-/// invalidated at redemption by the URL-hash check, and pruned by expiry).
+/// entry small. A revoking write (disable, or a change to the trusted server)
+/// also invalidates any in-flight registration delegation — the entry is
+/// evicted and the pending pointer cleared in the same message — so a
+/// disable/re-enable (or URL change and change-back) within the delegation's
+/// short TTL cannot resurrect it. A non-revoking edit carries the pending
+/// pointer over untouched, keeping a concurrent connect to the same server
+/// valid.
 pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), String> {
     if let Some(url) = &config.url {
         if url.len() > MCP_TRUSTED_URL_MAX_BYTES {
@@ -281,7 +298,6 @@ pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<
     }
     storage_borrow_mut(|storage| {
         let old = storage.read_mcp_config(anchor_number);
-        let pending_registration = old.pending_registration.clone();
         // Revoke whenever the server this identity trusts changes or goes
         // away. Comparing the *resolved* URL covers switching between the
         // official connector and a custom one, where the stored `url` field
@@ -309,6 +325,26 @@ pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<
             None
         } else {
             old.session_principal
+        };
+        // A revoking write must also invalidate any in-flight registration
+        // delegation, not just the live grant. Otherwise disabling and then
+        // re-enabling the same trusted server (or changing the URL and changing
+        // it back) within the delegation's short TTL would let it be redeemed
+        // after the user believed they had revoked access: `register_v2` looks
+        // the entry up by `caller()`, and its URL-hash check passes again once
+        // the same server is trusted again. Evict the entry and drop the
+        // pointer so the delegation cannot be resurrected. A non-revoking edit
+        // keeps it (still the same trusted server, so a pending connect stays
+        // valid).
+        let pending_registration = if revoke {
+            if let Some(bytes) = &old.pending_registration {
+                if let Ok(p_reg) = Principal::try_from_slice(bytes) {
+                    storage.remove_mcp_registration(p_reg);
+                }
+            }
+            None
+        } else {
+            old.pending_registration
         };
         storage.write_mcp_config(
             anchor_number,
@@ -439,7 +475,7 @@ impl McpSession {
         )
     }
 
-    /// `mcp_prepare_delegation`: mint a ≤1-hour account delegation for this
+    /// `mcp_prepare_delegation`: mint a ≤5-minute account delegation for this
     /// session at `target_origin`, as `account_number` — one of the anchor's
     /// accounts at that origin when given explicitly (discover them with
     /// [`get_accounts`](Self::get_accounts)), or the anchor's default account
@@ -463,8 +499,9 @@ impl McpSession {
         max_ttl: Option<u64>,
     ) -> Result<McpPrepareDelegation, AccountDelegationError> {
         let anchor_number = self.grant.anchor_number;
-        // Cap at 1 hour; the grant expiry is passed as an *absolute* cap so the
-        // delegation can't outlive the session even by the time an await spans.
+        // Cap at 5 minutes; the grant expiry is passed as an *absolute* cap so
+        // the delegation can't outlive the session even by the time an await
+        // spans.
         let capped_ttl = Some(u64::min(
             max_ttl.unwrap_or(MCP_MAX_EXPIRATION_PERIOD_NS),
             MCP_MAX_EXPIRATION_PERIOD_NS,

@@ -1027,6 +1027,13 @@ export interface InternetIdentityInit {
    */
   'is_production' : [] | [boolean],
   /**
+   * One-shot upgrade arg driving the MCP config migration: `opt true`
+   * rewrites every stored config to "enabled, official connector", since a
+   * value stored before the official connector existed was never a choice
+   * about it. Runs at most once per deployment; unset means no migration.
+   */
+  'mcp_config_migration' : [] | [boolean],
+  /**
    * Backend canister ID, needed for backward compatibility.
    */
   'backend_canister_id' : [] | [Principal],
@@ -2227,9 +2234,15 @@ export interface _SERVICE {
    * mcp_get_accounts), and null uses the anchor's default account there; an
    * account_number that isn't the anchor's at target_origin is rejected as
    * Unauthorized. max_ttl is the requested lifetime in ns, defaulting to and
-   * capped at 1 hour, and never outliving the session grant. The resolved
-   * account_number is returned in McpPrepareDelegation so it can be threaded
-   * into mcp_get_delegation (the default account at an origin is mutable).
+   * capped at 5 minutes, and never outliving the session grant. The cap is
+   * short because it is the residual window revocation cannot reach: once the
+   * session is revoked no further delegation can be minted, but one already
+   * minted stays usable until it expires. Re-minting is unattended (a fresh
+   * prepare/get pair signed by the session key, no user interaction), so
+   * re-mint rather than holding a delegation for the life of the session. The
+   * resolved account_number is returned in McpPrepareDelegation so it can be
+   * threaded into mcp_get_delegation (the default account at an origin is
+   * mutable).
    */
   'mcp_prepare_delegation' : ActorMethod<
     [FrontendHostname, [] | [AccountNumber], SessionKey, [] | [bigint]],

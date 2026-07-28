@@ -32,8 +32,8 @@ use serde_bytes::ByteBuf;
 use std::time::Duration;
 
 const MCP_ORIGIN: &str = "https://mcp.id.ai";
-/// The backend caps MCP-minted per-app delegations at 1 hour.
-const MCP_MAX_TTL_NS: u64 = 60 * 60 * 1_000_000_000;
+/// The backend caps MCP-minted per-app delegations at 5 minutes.
+const MCP_MAX_TTL_NS: u64 = 5 * 60 * 1_000_000_000;
 /// The backend clamps session-grant lifetimes to [10 min, 30 days].
 const GRANT_MIN_TTL_NS: u64 = 10 * 60 * 1_000_000_000;
 const GRANT_MAX_TTL_NS: u64 = 30 * 24 * 60 * 60 * 1_000_000_000;
@@ -146,7 +146,7 @@ fn register_session(
 }
 
 /// The happy path: a registered session mints a per-app delegation by caller
-/// alone (no `anchor_number` arg), capped at 1 hour, acting as the same
+/// alone (no `anchor_number` arg), capped at 5 minutes, acting as the same
 /// principal the anchor's default account at that app gets via the regular API.
 #[test]
 fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectResponse> {
@@ -184,7 +184,7 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
     .unwrap()
     .unwrap();
 
-    // Default TTL is the 1-hour cap.
+    // Default TTL is the 5-minute cap.
     assert_eq!(expiration, time(&env) + MCP_MAX_TTL_NS);
 
     // `get` is handed back the same account `prepare` resolved.
@@ -228,9 +228,9 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
     Ok(())
 }
 
-/// A longer requested TTL is clamped to the 1-hour cap.
+/// A longer requested TTL is clamped to the 5-minute cap.
 #[test]
-fn mcp_delegation_ttl_capped_at_1_hour() -> Result<(), RejectResponse> {
+fn mcp_delegation_ttl_capped_at_5_minutes() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
@@ -251,7 +251,8 @@ fn mcp_delegation_ttl_capped_at_1_hour() -> Result<(), RejectResponse> {
         "https://some-app.com".to_string(),
         None,
         ByteBuf::from("k"),
-        Some(Duration::from_secs(2 * 3600).as_nanos() as u64), // request 2 hours
+        // Request the hour this cap used to be, so a regression to it can't pass.
+        Some(Duration::from_secs(3600).as_nanos() as u64),
     )
     .unwrap()
     .unwrap();
@@ -260,15 +261,22 @@ fn mcp_delegation_ttl_capped_at_1_hour() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// A per-app delegation never outlives the session grant: with less than an
-/// hour of grant left, the delegation expires exactly when the grant does.
+/// A per-app delegation never outlives the session grant: with less grant left
+/// than the delegation cap, the delegation expires exactly when the grant does.
 #[test]
 fn mcp_delegation_never_outlives_the_grant() -> Result<(), RejectResponse> {
+    /// How much grant to leave alive: less than the delegation cap, so the
+    /// grant is what binds.
+    const GRANT_REMAINING_NS: u64 = 60 * 1_000_000_000;
+
     let env = env();
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
     trust_mcp_server(&env, canister_id, principal_1(), anchor);
-    // The whole grant lasts 10 minutes — shorter than the 1-hour delegation cap.
+    // Even the shortest grant the backend will register outlives a freshly
+    // minted delegation (10 minutes against the 5-minute cap, and requests
+    // below the floor are clamped up — see `mcp_grant_ttl_is_clamped`), so the
+    // grant has to be *worn down* rather than requested short.
     let (mcp, grant_expiration) = register_session(
         &env,
         canister_id,
@@ -276,6 +284,14 @@ fn mcp_delegation_never_outlives_the_grant() -> Result<(), RejectResponse> {
         anchor,
         &ByteBuf::from("mcp server session key"),
         GRANT_MIN_TTL_NS,
+    );
+    env.advance_time(Duration::from_nanos(GRANT_MIN_TTL_NS - GRANT_REMAINING_NS));
+    // The premise, asserted so a future TTL change can't quietly make the cap
+    // the binding constraint again and turn this into a tautology.
+    let remaining = grant_expiration.saturating_sub(time(&env));
+    assert!(
+        remaining > 0 && remaining < MCP_MAX_TTL_NS,
+        "the grant must still be live with less than a cap's worth left: {remaining} ns"
     );
 
     let prepared = mcp_prepare_delegation(
@@ -285,11 +301,13 @@ fn mcp_delegation_never_outlives_the_grant() -> Result<(), RejectResponse> {
         "https://some-app.com".to_string(),
         None,
         ByteBuf::from("k"),
-        None, // default request would be the 1-hour cap
+        None, // default request is the full cap — more than the grant has left
     )
     .unwrap()
     .unwrap();
+    // The grant, not the cap, is what bound.
     assert_eq!(prepared.expiration, grant_expiration);
+    assert!(prepared.expiration < time(&env) + MCP_MAX_TTL_NS);
 
     Ok(())
 }
@@ -1342,7 +1360,10 @@ fn mcp_query_methods_reject_expired_grant() -> Result<(), RejectResponse> {
     env.tick();
 
     // Both query methods refuse the expired session — including fetching a
-    // delegation that was validly prepared while the grant was live.
+    // delegation that was validly prepared while the grant was live. (That
+    // delegation has since expired on its own too — a per-app delegation never
+    // outlives the grant — so what this pins is that the *session* gate refuses
+    // before any signature lookup.)
     assert!(matches!(
         mcp_get_accounts(&env, canister_id, mcp, target.clone()).unwrap(),
         Err(AccountDelegationError::Unauthorized(p)) if p == mcp
@@ -2251,5 +2272,150 @@ fn mcp_prepare_returns_resolved_trusted_url() -> Result<(), RejectResponse> {
     .unwrap();
 
     assert_eq!(prepared.trusted_url, format!("{MCP_ORIGIN}/mcp"));
+    Ok(())
+}
+
+/// Security regression (II03): a revoking config write — disabling, or changing
+/// the trusted server — must *invalidate* any in-flight registration
+/// delegation, not merely suspend it. Disabling and then re-enabling the same
+/// trusted server (or changing the trusted URL and changing it back) within the
+/// delegation's short TTL must NOT let a server redeem it afterwards. Before the
+/// fix, `register_v2` still found the entry and its URL-hash check passed again
+/// once the same server was trusted again, so an accidental grant the user
+/// "revoked" by toggling the feature came back to life.
+#[test]
+fn mcp_revoking_config_invalidates_inflight_registration() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let trusted = McpConfig {
+        enabled: true,
+        url: Some(format!("{MCP_ORIGIN}/mcp")),
+    };
+
+    // Mint an in-flight registration delegation (as the connect flow's `prepare`
+    // does) and return its `P_reg` — the principal a server would redeem as.
+    let prepare = |browser_key: &str| -> Principal {
+        let prepared = prepare_mcp_registration_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            anchor,
+            ByteBuf::from(browser_key),
+            Some(false),
+            Some(GRANT_TTL_NS),
+        )
+        .unwrap()
+        .unwrap();
+        Principal::self_authenticating(&prepared.user_key)
+    };
+
+    // Variant 1: disable, then re-enable the same trusted server.
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let p_reg_toggle = prepare("browser key (disable/re-enable)");
+    mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        McpConfig {
+            enabled: false,
+            url: None,
+        },
+    )
+    .unwrap()
+    .unwrap();
+    mcp_set_config(&env, canister_id, principal_1(), anchor, trusted.clone())
+        .unwrap()
+        .unwrap();
+    let err = mcp_register_v2(
+        &env,
+        canister_id,
+        p_reg_toggle,
+        ByteBuf::from("session key after disable/re-enable"),
+    )
+    .unwrap()
+    .unwrap_err();
+    assert!(
+        err.contains("not authorized"),
+        "an in-flight registration must not survive disable/re-enable: {err}"
+    );
+
+    // Variant 2: change the trusted URL, then change it back.
+    let p_reg_urlswap = prepare("browser key (url change/back)");
+    mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        McpConfig {
+            enabled: true,
+            url: Some("https://other.example.com/mcp".to_string()),
+        },
+    )
+    .unwrap()
+    .unwrap();
+    mcp_set_config(&env, canister_id, principal_1(), anchor, trusted.clone())
+        .unwrap()
+        .unwrap();
+    let err = mcp_register_v2(
+        &env,
+        canister_id,
+        p_reg_urlswap,
+        ByteBuf::from("session key after url change/back"),
+    )
+    .unwrap()
+    .unwrap_err();
+    assert!(
+        err.contains("not authorized"),
+        "an in-flight registration must not survive a trusted-URL change and change-back: {err}"
+    );
+
+    Ok(())
+}
+
+/// The invalidation is surgical: a *non-revoking* config write (rewriting the
+/// identical, still-enabled config for the same trusted server) leaves an
+/// in-flight registration delegation redeemable, so a concurrent connect to the
+/// same server is unaffected.
+#[test]
+fn mcp_nonrevoking_config_write_keeps_inflight_registration() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let trusted = McpConfig {
+        enabled: true,
+        url: Some(format!("{MCP_ORIGIN}/mcp")),
+    };
+
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let prepared = prepare_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        ByteBuf::from("browser key (non-revoking rewrite)"),
+        Some(false),
+        Some(GRANT_TTL_NS),
+    )
+    .unwrap()
+    .unwrap();
+    let p_reg = Principal::self_authenticating(&prepared.user_key);
+
+    // Rewrite the identical config: same trusted server, still enabled -> not a
+    // revoke, so the in-flight registration is carried over and stays redeemable.
+    mcp_set_config(&env, canister_id, principal_1(), anchor, trusted)
+        .unwrap()
+        .unwrap();
+
+    mcp_register_v2(
+        &env,
+        canister_id,
+        p_reg,
+        ByteBuf::from("session key (non-revoking rewrite)"),
+    )
+    .unwrap()
+    .expect("a non-revoking config rewrite must keep the in-flight registration redeemable");
+
     Ok(())
 }
