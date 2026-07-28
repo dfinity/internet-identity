@@ -774,7 +774,7 @@ fn mcp_set_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), 
 /// per-app delegation at `target_origin` for `account_number` — one of the
 /// anchor's accounts there (discover them with `mcp_get_accounts`), or the
 /// anchor's default account when `None`. `max_ttl` is the requested lifetime in
-/// ns, defaulting to and capped at 1 hour, and never outliving the session
+/// ns, defaulting to and capped at 5 minutes, and never outliving the session
 /// grant. The resolved `account_number` is returned in `McpPrepareDelegation`
 /// to thread into `mcp_get_delegation`.
 ///
