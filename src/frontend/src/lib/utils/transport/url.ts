@@ -403,6 +403,13 @@ export class UrlChannel implements Channel {
 
     const finalize = this.#finalizers.get(response.id);
     const finalized = finalize ? await finalize(response) : response;
+    // Re-check after the `await`: a concurrent `send` (e.g. the error-abort
+    // path) may have delivered or closed the channel while this one was
+    // finalizing, and the guards above ran before that yield. Without this, an
+    // aborted batch could still deliver a real delegation via a second assign.
+    if (this.#delivered || this.#closed) {
+      return;
+    }
     this.#responses.set(response.id, finalized);
 
     // A redirect can only carry the whole batch once, so normally wait until

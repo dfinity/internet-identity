@@ -272,11 +272,19 @@ export const test = base.extend<{
     }
 
     const delegation = await testAppPage.locator("#delegation").innerText();
-    if (delegation === "") {
-      return use(undefined);
+    // The test app writes a plain status string here (e.g. "Current identity is
+    // not a DelegationIdentity") when no delegation was delivered, so parse
+    // defensively: anything that isn't valid JSON means "no delegation" and
+    // should fail the `toBeDefined()` assertion, not throw a SyntaxError from
+    // inside the fixture.
+    let parsed: Parameters<typeof use>[0];
+    try {
+      parsed = delegation === "" ? undefined : JSON.parse(delegation);
+    } catch {
+      parsed = undefined;
     }
 
-    await use(JSON.parse(delegation));
+    await use(parsed);
   },
   iiBackendCanisterId: async ({ browser }, use) => {
     // The II frontend canister rewrites every served HTML to embed
