@@ -236,7 +236,7 @@ pub async fn prepare(
     let (trusted_url_hash, trusted_url) = state::storage_borrow_mut(|storage| {
         let stored = storage.lookup_mcp_config(anchor_number);
         let url =
-            match mcp::connect_trusted_url(stored.as_ref()) {
+            match stored.as_ref().and_then(mcp::trusted_url) {
                 Some(url) => url,
                 None => return Err(
                     "MCP registration failed: no trusted MCP server is enabled for this identity."
@@ -244,11 +244,10 @@ pub async fn prepare(
                 ),
             };
         let mut config = stored.unwrap_or_default();
-        // Reaching here means the user authenticated and consented, so a
-        // first-time identity gets a real enabled config. Materializing the row
-        // for the pending-registration bookkeeping while leaving `enabled`
-        // false would make the anchor read as "switched off" at redemption,
-        // and `register_v2` would refuse the connect it just authorized.
+        // The guard above already proved the config is stored and enabled.
+        // Reasserted because this writes the row for the pending-registration
+        // bookkeeping, and a row that read "switched off" at redemption would
+        // make `register_v2` refuse the connect it just authorized.
         config.enabled = true;
         if let Some(previous) = config.pending_registration.take() {
             if let Ok(principal) = Principal::try_from_slice(&previous) {

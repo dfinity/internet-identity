@@ -1101,7 +1101,12 @@ export interface InternetIdentityInit {
    * Configuration of the captcha in the registration flow.
    */
   'captcha_config' : [] | [CaptchaConfig],
-  'mcp_official_url' : [] | [string],
+  /**
+   * URL of the official MCP connector the deployment ships, if any. Same
+   * set/clear pattern as `dnssec_config`: null keeps the previously stored
+   * value, `opt null` clears it, `opt opt "https://..."` sets it.
+   */
+  'mcp_official_url' : [] | [[] | [string]],
   /**
    * Configuration for dummy authentication used in e2e tests.
    */

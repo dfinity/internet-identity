@@ -47,7 +47,9 @@ use crate::{
     storage::account::{Account, AccountDelegationError, ReadAccountParams},
     storage::storable::mcp_config::StorableMcpConfig,
     storage::storable::mcp_grant::StorableMcpGrant,
+    storage::Storage,
 };
+use ic_stable_structures::DefaultMemoryImpl;
 
 /// Maximum lifetime of an MCP-minted per-app account delegation: 5 minutes.
 /// Deliberately short, because this is the one window revocation cannot reach:
@@ -85,49 +87,46 @@ fn official_url() -> Option<String> {
     persistent_state(|state| state.mcp_official_url.clone())
 }
 
-/// The URL an *already-issued* session is allowed to act for: the identity's
-/// own server when they set one, otherwise the official connector. Nothing
-/// while the feature is off — a live session must stand on a config that still
-/// says enabled.
-pub(crate) fn session_trusted_url(config: &StorableMcpConfig) -> Option<String> {
-    session_trusted_url_with(config, official_url())
+/// The URL `config` trusts: the identity's own server when they set one,
+/// otherwise the official connector. Nothing while the feature is off.
+///
+/// One rule for both a new connect and an already-issued session. An identity
+/// with no stored config trusts nothing and has to switch the feature on in
+/// Settings first; [`init_config_for_new_identity`] gives one to every identity
+/// registered on a deployment that ships an official connector.
+pub(crate) fn trusted_url(config: &StorableMcpConfig) -> Option<String> {
+    trusted_url_with(config, official_url())
 }
 
-fn session_trusted_url_with(
-    config: &StorableMcpConfig,
-    official: Option<String>,
-) -> Option<String> {
+/// Seed a freshly registered identity's config, so AI access reads on in
+/// Settings from the start rather than only after a first connect.
+///
+/// Only when the deployment ships an official connector. Without one the row
+/// would be `{ enabled: true, url: None }`, which resolves to no trusted URL at
+/// all — a switch that reads on with nothing behind it. Such a deployment
+/// leaves the identity with no row until it adds a server of its own.
+pub(crate) fn init_config_for_new_identity(
+    storage: &mut Storage<DefaultMemoryImpl>,
+    anchor_number: AnchorNumber,
+) {
+    if official_url().is_none() {
+        return;
+    }
+    storage.init_mcp_config(anchor_number);
+}
+
+fn trusted_url_with(config: &StorableMcpConfig, official: Option<String>) -> Option<String> {
     if !config.enabled {
         return None;
     }
     config.url.clone().or(official)
 }
 
-/// The URL a *new* connect may target. An identity that never configured MCP
-/// may connect the official connector — completing the consent at `/mcp` is
-/// what enables the feature for them. One that *switched the feature off*
-/// may not: they are sent back to Settings rather than silently re-enabled by
-/// a link an MCP server sent them. Hence the `Option`: `None` means no stored
-/// config, which is not the same as a stored disabled one.
-pub(crate) fn connect_trusted_url(stored: Option<&StorableMcpConfig>) -> Option<String> {
-    connect_trusted_url_with(stored, official_url())
-}
-
-fn connect_trusted_url_with(
-    stored: Option<&StorableMcpConfig>,
-    official: Option<String>,
-) -> Option<String> {
-    match stored {
-        None => official,
-        Some(config) if !config.enabled => None,
-        Some(config) => config.url.clone().or(official),
-    }
-}
-
-/// [`connect_trusted_url`] for `anchor_number`'s stored config.
+/// [`trusted_url`] for `anchor_number`, or `None` when it stores no config.
 pub fn resolve_connect_url(anchor_number: AnchorNumber) -> Option<String> {
-    let stored = storage_borrow(|storage| storage.lookup_mcp_config(anchor_number));
-    connect_trusted_url(stored.as_ref())
+    storage_borrow(|storage| storage.lookup_mcp_config(anchor_number))
+        .as_ref()
+        .and_then(trusted_url)
 }
 
 /// The anchor's default account at `origin` (synthetic when none is reserved).
@@ -194,7 +193,7 @@ pub fn register(
         // A grant can only exist under a live trusted-server config: this is
         // what makes config-driven revocation (see [`set_mcp_config`]) cover
         // every session ever registered.
-        if connect_trusted_url(stored.as_ref()).is_none() {
+        if stored.as_ref().and_then(trusted_url).is_none() {
             return Err(
                 "MCP registration failed: no trusted MCP server is enabled for this identity."
                     .to_string(),
@@ -233,9 +232,6 @@ pub fn register(
                 read_only,
             },
         );
-        // Completing the connect is the consent that enables the feature, so a
-        // first-time identity ends up with a real stored config rather than
-        // relying on a default.
         config.enabled = true;
         config.session_principal = Some(principal.as_slice().to_vec());
         storage.write_mcp_config(anchor_number, config);
@@ -246,11 +242,9 @@ pub fn register(
 }
 
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
-/// trusted server URL), or `None` when the anchor has never written one.
-/// Distinguishing the two is what lets a first-time identity connect the
-/// deployment's official connector while an identity that switched the feature
-/// off stays blocked. The caller must already be authorized for
-/// `anchor_number` (checked by the canister method). The stored
+/// trusted server URL), or `None` when the anchor has never written one, which
+/// Settings renders the same as switched off. The caller must already be
+/// authorized for `anchor_number` (checked by the canister method). The stored
 /// `session_principal` pointer is internal bookkeeping and not exposed.
 pub fn get_mcp_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
     storage_borrow(|storage| storage.lookup_mcp_config(anchor_number)).map(|config| McpConfig {
@@ -308,7 +302,7 @@ pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<
             session_principal: None,
             pending_registration: None,
         };
-        let revoke = !config.enabled || session_trusted_url(&next) != session_trusted_url(&old);
+        let revoke = !config.enabled || trusted_url(&next) != trusted_url(&old);
         let session_principal = if revoke {
             if let Some(bytes) = &old.session_principal {
                 if let Ok(principal) = Principal::try_from_slice(bytes) {
@@ -416,7 +410,7 @@ pub fn authorize_mcp_session() -> Result<McpSession, AccountDelegationError> {
         .session_principal
         .as_deref()
         .is_some_and(|bytes| bytes == caller.as_slice());
-    if session_trusted_url(&config).is_none() || !is_current_session {
+    if trusted_url(&config).is_none() || !is_current_session {
         return Err(AccountDelegationError::Unauthorized(caller));
     }
     Ok(McpSession { grant })
@@ -573,24 +567,15 @@ mod tests {
     }
 
     #[test]
-    fn a_fresh_identity_may_connect_the_official_connector() {
-        assert_eq!(connect_trusted_url_with(None, official()), official());
+    fn switching_the_feature_off_trusts_nothing() {
+        // A disabled config must not be silently re-enabled by a connect link.
+        assert_eq!(trusted_url_with(&config(false, None), official()), None);
     }
 
     #[test]
-    fn switching_the_feature_off_blocks_connecting() {
-        // The whole point of `configured`: a stored disabled config must not be
-        // silently re-enabled by a connect link, unlike a fresh identity.
+    fn an_enabled_config_with_no_custom_server_uses_the_official_one() {
         assert_eq!(
-            connect_trusted_url_with(Some(&config(false, None)), official()),
-            None
-        );
-    }
-
-    #[test]
-    fn an_enabled_config_with_no_custom_server_connects_the_official_one() {
-        assert_eq!(
-            connect_trusted_url_with(Some(&config(true, None)), official()),
+            trusted_url_with(&config(true, None), official()),
             official()
         );
     }
@@ -598,7 +583,7 @@ mod tests {
     #[test]
     fn a_custom_server_displaces_the_official_one() {
         assert_eq!(
-            connect_trusted_url_with(Some(&config(true, Some(CUSTOM))), official()),
+            trusted_url_with(&config(true, Some(CUSTOM)), official()),
             Some(CUSTOM.to_string())
         );
     }
@@ -606,34 +591,14 @@ mod tests {
     #[test]
     fn a_custom_server_still_needs_the_feature_enabled() {
         assert_eq!(
-            connect_trusted_url_with(Some(&config(false, Some(CUSTOM))), official()),
+            trusted_url_with(&config(false, Some(CUSTOM)), official()),
             None
         );
     }
 
     #[test]
-    fn nothing_to_connect_without_an_official_connector() {
-        assert_eq!(connect_trusted_url_with(None, None), None);
-    }
-
-    #[test]
-    fn a_live_session_requires_the_feature_enabled() {
-        assert_eq!(
-            session_trusted_url_with(&config(false, None), official()),
-            None
-        );
-        assert_eq!(
-            session_trusted_url_with(&config(false, Some(CUSTOM)), official()),
-            None
-        );
-    }
-
-    #[test]
-    fn a_live_session_falls_back_to_the_official_connector() {
-        assert_eq!(
-            session_trusted_url_with(&config(true, None), official()),
-            official()
-        );
+    fn an_enabled_config_trusts_nothing_without_an_official_connector() {
+        assert_eq!(trusted_url_with(&config(true, None), None), None);
     }
 
     #[test]

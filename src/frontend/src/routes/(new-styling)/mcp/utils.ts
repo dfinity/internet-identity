@@ -214,15 +214,10 @@ export const mcpAuthorize = async ({
 };
 
 /**
- * Whether `origin` may be connected. An identity that never configured MCP
- * (`undefined`) may connect the official connector — completing the consent is
- * what enables the feature for them. One that switched the feature off may not:
- * they are sent back to Settings rather than silently re-enabled by a link.
- *
- * Deliberately not the same rule as Settings' `trustedUrl`, which answers what
- * the identity trusts *now*. The canister enforces the same split in
- * `connect_trusted_url` / `session_trusted_url`; this lives here, next to the
- * consent flow that needs it, so the two can't be confused at a call site.
+ * Whether `origin` may be connected: the same question Settings' `trustedUrl`
+ * answers, asked about one origin. An identity with the feature off, or with no
+ * stored config at all, trusts nothing and has to turn it on in Settings first.
+ * Mirrors `trusted_url` in the canister, which gates the connect for real.
  *
  * Takes the canister config rather than a bare URL so the official connector
  * can only come from the deployment, never from an arbitrary string at a call
@@ -234,12 +229,9 @@ export const isOriginTrusted = (
   origin: string,
   { mcp_official_url }: Pick<BackendCanisterConfig, "mcp_official_url">,
 ): boolean => {
-  const official = mcp_official_url[0];
   const url =
-    config === undefined
-      ? official
-      : config.enabled
-        ? (config.url ?? official)
-        : undefined;
+    config !== undefined && config.enabled
+      ? (config.url ?? mcp_official_url[0])
+      : undefined;
   return url !== undefined && originOf(url) === origin;
 };

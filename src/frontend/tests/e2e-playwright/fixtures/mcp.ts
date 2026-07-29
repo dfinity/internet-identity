@@ -6,7 +6,7 @@ import {
 import { Actor, HttpAgent } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import { Agent as UndiciAgent } from "undici";
-import { test as base, type Page } from "@playwright/test";
+import { expect, test as base, type Page } from "@playwright/test";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import type {
@@ -114,8 +114,9 @@ export type McpFixture = {
    * Settings UI — the trusted server is now the identity's synced (on-chain)
    * config, not device-local storage, so there's no shortcut. Call after sign-up
    * (while on `/manage`) and before navigating to `/mcp`. Without it the connect
-   * flow lands on the "untrusted" screen once the user authenticates, since each
-   * identity trusts nothing by default.
+   * flow lands on the "untrusted" screen once the user authenticates: a new
+   * identity starts on the deployment's official connector, which is a different
+   * origin from this fixture's server.
    */
   trustServer: (page: Page) => Promise<void>;
   /**
@@ -381,9 +382,15 @@ export const test = base.extend<{ mcp: McpFixture }>({
       }
       await page.locator('a[href="/manage/settings"]').click();
       await page.waitForURL(`${II_URL}/manage/settings`);
-      await page.getByRole("switch", { name: "AI access" }).click();
-      // Enabling lands on the deployment's official connector, so the custom
-      // URL goes in behind "Customize" rather than a dialog that opens itself.
+      // Registration seeds an enabled config on the official connector, so the
+      // toggle arrives on and the custom URL goes in behind "Customize" rather
+      // than a dialog that opens itself. Asserting the seeded state here fails
+      // fast if that ever changes, instead of timing out on "Customize".
+      await expect(page.getByRole("switch", { name: "AI access" })).toBeChecked(
+        {
+          timeout: 15_000,
+        },
+      );
       await page.getByRole("button", { name: "Customize" }).click();
       await page.getByLabel("MCP server URL").fill(`${MCP_SERVER_ORIGIN}/mcp`);
       await holdToConfirm(page, "Hold to continue");

@@ -341,7 +341,13 @@ pub struct InternetIdentityInit {
     /// `docs/ongoing/email-recovery.md` §7.6). Same set/clear pattern
     /// as `dnssec_config`.
     pub doh_config: Option<Option<DohConfig>>,
-    pub mcp_official_url: Option<String>,
+    /// URL of the official MCP connector the deployment ships, if any.
+    ///
+    /// Same set/clear pattern as `dnssec_config`: outer `None` keeps the
+    /// previously-stored value across an upgrade, `Some(None)` clears it
+    /// (the deployment then has no official connector), `Some(Some(url))`
+    /// points it at `url`.
+    pub mcp_official_url: Option<Option<String>>,
     pub mcp_config_migration: Option<bool>,
 }
 
