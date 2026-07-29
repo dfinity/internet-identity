@@ -66,6 +66,27 @@ test("A non-https callback is rejected", async ({ page, mcp }) => {
   ).toBeVisible();
 });
 
+test("A user with no stored identity gets the sign-in picker, not the mode-less one", async ({
+  page,
+  mcp,
+}) => {
+  // The wizard is mounted in sign-in mode, like /authorize: sign-in-specific
+  // button copy and a switch-mode CTA into sign-up. Mounting it without a mode
+  // silently regresses this surface to the generic "Continue with …" picker,
+  // which also buries sign-up behind an extra interstitial.
+  await addVirtualAuthenticator(page);
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await expect(
+    page.getByRole("button", { name: "Sign in with passkey" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Continue with passkey" }),
+  ).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Create", exact: true }),
+  ).toBeVisible();
+});
+
 test("Signing up to an untrusted server prompts to add it in settings", async ({
   page,
   mcp,
