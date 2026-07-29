@@ -223,9 +223,11 @@ thread_local! {
 
 /// Temporary hidden endpoint: returns `(migrated_configs, is_done)` so beta
 /// monitoring can watch the migration land before it is proposed for
-/// production. Both values are per-boot, so `(0, false)` on a canister that
-/// was upgraded without `mcp_config_migration` means the migration was never
-/// asked for, not that it found nothing.
+/// production. Both values are per-boot, and `(0, false)` is ambiguous between
+/// two cases: this upgrade didn't pass `mcp_config_migration`, or it did and
+/// the scan hasn't finished. Only `(_, true)` means a run completed, so a
+/// `(0, false)` that persists past the first few batches is the signal that
+/// the arg never arrived.
 #[query(hidden = true)]
 fn mcp_config_migration_status() -> (u64, bool) {
     (
