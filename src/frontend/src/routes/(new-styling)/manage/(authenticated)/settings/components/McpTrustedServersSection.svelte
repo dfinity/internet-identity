@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import {
     BotIcon,
-    PlusIcon,
     RotateCcwIcon,
     SlidersHorizontalIcon,
     Trash2Icon,
@@ -41,10 +40,10 @@
   // off-then-on and writes can't race the load.
   let loaded = $state(false);
   let showAdd = $state(false);
+  let adding = $state(false);
 
   const official = backendCanisterConfig.mcp_official_url[0];
 
-  const enabled = $derived(config?.enabled ?? false);
   const trusted = $derived(config?.url);
   const active = $derived.by(() => {
     const url = trustedUrl(config, backendCanisterConfig);
@@ -52,6 +51,14 @@
       ? undefined
       : { url, custom: trusted !== undefined };
   });
+  // The switch reports whether a connector is actually trusted, not what the
+  // stored `enabled` flag says: on a deployment without an official connector,
+  // `{ enabled: true, url: undefined }` trusts nothing and has to read off.
+  // `adding` keeps it on while the dialog that supplies the first connector is
+  // open, so cancelling puts it back down — the switch is driven by this value
+  // alone, so anything that leaves it unchanged leaves the rendered position
+  // wherever the browser put it.
+  const switchOn = $derived(active !== undefined || adding);
 
   const hostOf = (url: string): string => {
     try {
@@ -85,6 +92,7 @@
       trustedUrl({ enabled: true, url: trusted }, backendCanisterConfig) ===
         undefined
     ) {
+      adding = true;
       showAdd = true;
       return;
     }
@@ -105,6 +113,7 @@
 
   const handleAddClose = () => {
     showAdd = false;
+    adding = false;
   };
 
   const handleAddSave = async (url: string) => {
@@ -112,6 +121,7 @@
       await trustAndEnableMcp($authenticatedStore.actor, identityNumber, url);
       config = { enabled: true, url };
       showAdd = false;
+      adding = false;
     } catch {
       toaster.error({
         title: $t`Couldn't save your connector. Please try again.`,
@@ -175,8 +185,8 @@
     <div class="flex h-6 shrink-0 items-center">
       {#if loaded}
         <Toggle
-          checked={enabled}
-          onchange={() => handleToggle(!enabled)}
+          checked={switchOn}
+          onchange={() => handleToggle(!switchOn)}
           aria-labelledby={titleId}
         />
       {:else}
@@ -185,76 +195,66 @@
     </div>
   </div>
 
-  {#if enabled}
+  {#if active !== undefined}
     <div class="border-border-tertiary mt-5 border-t pt-4">
       <p class="text-text-tertiary mb-3 text-xs font-semibold">
         {$t`Trusted connector`}
       </p>
 
-      {#if active !== undefined}
-        <div
-          class="border-border-tertiary bg-bg-primary flex flex-row items-center gap-3 rounded-lg border px-3 py-3 sm:px-4"
+      <div
+        class="border-border-tertiary bg-bg-primary flex flex-row items-center gap-3 rounded-lg border px-3 py-3 sm:px-4"
+      >
+        <span
+          class="border-border-secondary bg-bg-secondary text-fg-tertiary flex size-10 shrink-0 items-center justify-center rounded-md border"
+          aria-hidden="true"
         >
-          <span
-            class="border-border-secondary bg-bg-secondary text-fg-tertiary flex size-10 shrink-0 items-center justify-center rounded-md border"
-            aria-hidden="true"
-          >
-            <McpIcon class="size-4.5" />
+          <McpIcon class="size-4.5" />
+        </span>
+
+        <div class="flex min-w-0 flex-1 flex-col gap-1">
+          <span class="text-text-primary truncate text-sm font-semibold">
+            {active.custom ? hostOf(active.url) : $t`Internet Computer MCP`}
           </span>
-
-          <div class="flex min-w-0 flex-1 flex-col gap-1">
-            <span class="text-text-primary truncate text-sm font-semibold">
-              {active.custom ? hostOf(active.url) : $t`Internet Computer MCP`}
-            </span>
-            <span class="text-text-secondary text-sm">
-              {#if !active.custom}
-                {$t`Official · Hosted by DFINITY`}
-              {:else if official !== undefined}
-                {$t`Added by you · Replaces the official connector`}
-              {:else}
-                {$t`Added by you`}
-              {/if}
-            </span>
-            <span
-              class="text-text-tertiary truncate font-mono text-xs"
-              title={active.url}
-            >
-              {active.url}
-            </span>
-          </div>
-
-          {#if active.custom}
-            <button
-              class="btn btn-secondary btn-sm shrink-0 gap-2"
-              onclick={handleRestoreDefault}
-            >
-              {#if official !== undefined}
-                <RotateCcwIcon class="size-4" />
-                {$t`Restore default`}
-              {:else}
-                <Trash2Icon class="size-4" />
-                {$t`Remove`}
-              {/if}
-            </button>
-          {:else}
-            <button
-              class="btn btn-secondary btn-sm shrink-0 gap-2"
-              onclick={() => (showAdd = true)}
-            >
-              <SlidersHorizontalIcon class="size-4" />
-              {$t`Customize`}
-            </button>
-          {/if}
+          <span class="text-text-secondary text-sm">
+            {#if !active.custom}
+              {$t`Official · Hosted by DFINITY`}
+            {:else if official !== undefined}
+              {$t`Added by you · Replaces the official connector`}
+            {:else}
+              {$t`Added by you`}
+            {/if}
+          </span>
+          <span
+            class="text-text-tertiary truncate font-mono text-xs"
+            title={active.url}
+          >
+            {active.url}
+          </span>
         </div>
-      {:else}
-        <button
-          class="btn btn-secondary btn-sm gap-2"
-          onclick={() => (showAdd = true)}
-        >
-          <PlusIcon class="size-4" />
-          {$t`Add connector`}
-        </button>
-      {/if}
+
+        {#if active.custom}
+          <button
+            class="btn btn-secondary btn-sm shrink-0 gap-2"
+            onclick={handleRestoreDefault}
+          >
+            {#if official !== undefined}
+              <RotateCcwIcon class="size-4" />
+              {$t`Restore default`}
+            {:else}
+              <Trash2Icon class="size-4" />
+              {$t`Remove`}
+            {/if}
+          </button>
+        {:else}
+          <button
+            class="btn btn-secondary btn-sm shrink-0 gap-2"
+            onclick={() => (showAdd = true)}
+          >
+            <SlidersHorizontalIcon class="size-4" />
+            {$t`Customize`}
+          </button>
+        {/if}
+      </div>
     </div>
   {/if}
 </section>
