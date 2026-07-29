@@ -74,6 +74,7 @@ export const idlFactory = ({ IDL }) => {
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
     'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
+    'mcp_config_migration' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
@@ -87,6 +88,7 @@ export const idlFactory = ({ IDL }) => {
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),
     'backend_origin' : IDL.Opt(IDL.Text),
     'captcha_config' : IDL.Opt(CaptchaConfig),
+    'mcp_official_url' : IDL.Opt(IDL.Text),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
     'sso_allow_insecure_discovery' : IDL.Opt(IDL.Bool),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
@@ -737,6 +739,7 @@ export const idlFactory = ({ IDL }) => {
   const PrepareMcpRegistrationDelegation = IDL.Record({
     'user_key' : UserKey,
     'expiration' : Timestamp,
+    'trusted_url' : IDL.Text,
   });
   const PrepareSessionDelegation = IDL.Record({
     'user_key' : UserKey,
@@ -1189,7 +1192,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
-    'mcp_get_config' : IDL.Func([UserNumber], [McpConfig], ['query']),
+    'mcp_get_config' : IDL.Func([UserNumber], [IDL.Opt(McpConfig)], ['query']),
     'mcp_get_delegation' : IDL.Func(
         [FrontendHostname, IDL.Opt(AccountNumber), SessionKey, Timestamp],
         [
@@ -1480,6 +1483,7 @@ export const init = ({ IDL }) => {
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
     'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
+    'mcp_config_migration' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
@@ -1493,6 +1497,7 @@ export const init = ({ IDL }) => {
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),
     'backend_origin' : IDL.Opt(IDL.Text),
     'captcha_config' : IDL.Opt(CaptchaConfig),
+    'mcp_official_url' : IDL.Opt(IDL.Text),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
     'sso_allow_insecure_discovery' : IDL.Opt(IDL.Bool),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),

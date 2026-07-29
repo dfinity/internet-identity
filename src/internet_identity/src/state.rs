@@ -151,6 +151,8 @@ pub struct PersistentState {
     /// outcalls when no DNSSEC chain is available — see
     /// `docs/ongoing/email-recovery.md` §7.6.
     pub doh_config: Option<DohConfig>,
+    pub mcp_official_url: Option<String>,
+    pub mcp_config_migration_done: Option<bool>,
 }
 
 impl Default for PersistentState {
@@ -178,6 +180,8 @@ impl Default for PersistentState {
             enable_dnssec_email_recovery: None,
             dnssec_config: None,
             doh_config: None,
+            mcp_official_url: None,
+            mcp_config_migration_done: None,
         }
     }
 }

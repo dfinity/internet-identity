@@ -11,6 +11,8 @@
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { parseMcpServerUrl, probeMcpServer } from "$lib/utils/mcpServer";
+  import { originOf } from "$lib/utils/mcpConfig";
+  import { backendCanisterConfig } from "$lib/globals";
 
   interface Props {
     onClose: () => void;
@@ -25,12 +27,18 @@
     | "checking"
     | "ok"
     | "unverified"
-    | "invalid";
+    | "invalid"
+    | "official";
 
   let urlInput = $state("");
   let verifyState = $state<VerifyState>("idle");
   let parsedUrl = $state<string | undefined>(undefined);
   let saving = $state(false);
+
+  const officialOrigin =
+    backendCanisterConfig.mcp_official_url[0] !== undefined
+      ? originOf(backendCanisterConfig.mcp_official_url[0])
+      : undefined;
 
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   let destroyed = false;
@@ -66,6 +74,13 @@
       parsedUrl = undefined;
       return;
     }
+    // The official connector is already available without spending the one
+    // custom slot on it, so there is nothing to add here.
+    if (officialOrigin !== undefined && parsed.origin === officialOrigin) {
+      verifyState = "official";
+      parsedUrl = undefined;
+      return;
+    }
     verifyState = "typing";
     parsedUrl = undefined;
     debounceTimer = setTimeout(() => {
@@ -92,7 +107,9 @@
   const errorText = $derived(
     verifyState === "invalid"
       ? $t`Enter a valid https URL (for example https://mcp.example.com/mcp).`
-      : undefined,
+      : verifyState === "official"
+        ? $t`That's the official connector. No need to customize.`
+        : undefined,
   );
 
   const handleBlur = () => {
@@ -112,7 +129,9 @@
 
     <div class="flex flex-col gap-2">
       <h2 class="text-text-primary text-xl font-medium">
-        {$t`Add AI access`}
+        {backendCanisterConfig.mcp_official_url.length > 0
+          ? $t`Customize AI access`
+          : $t`Add AI access`}
       </h2>
       <p class="text-text-tertiary text-sm text-pretty">
         <Trans>

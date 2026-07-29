@@ -190,6 +190,108 @@ fn init_sso_credential_migration_timer() {
     });
 }
 
+// ---- MCP config migration (temporary; remove once every deployment has run
+// it) ----
+//
+// `enabled` on a stored `StorableMcpConfig` predates the official connector,
+// so a stored `false` only ever meant "no custom server of mine" — nobody
+// could have declined a connector that did not exist. This one-shot migration
+// rewrites every stored config to "enabled, official connector". Anchors with
+// no stored config need nothing: they already resolve to the official
+// connector at connect time.
+//
+// Driven by the `mcp_config_migration` upgrade arg and batched via an interval
+// timer, using the same convention as the SSO credential migration above:
+// rewriting every config in `post_upgrade` would blow the instruction limit.
+
+/// How long to wait between migration batches.
+const MCP_CONFIG_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
+
+/// Maximum number of stored configs to examine per batch (= per ingress
+/// message). Matches the 2 000-per-batch convention used for previous
+/// migrations.
+const MCP_CONFIG_MIGRATION_BATCH_SIZE: u64 = 2_000;
+
+thread_local! {
+    // TODO: Remove these after the data migration is complete.
+    static MCP_CONFIG_MIGRATION_REQUESTED: RefCell<bool> = const { RefCell::new(false) };
+    static MCP_CONFIG_MIGRATION_CURSOR: RefCell<Option<AnchorNumber>> = const { RefCell::new(None) };
+    static MCP_CONFIG_MIGRATION_DONE: RefCell<bool> = const { RefCell::new(false) };
+    static MCP_CONFIG_MIGRATION_COUNT: RefCell<u64> = const { RefCell::new(0) };
+    static MCP_CONFIG_MIGRATION_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
+}
+
+/// Temporary hidden endpoint: returns `(migrated_configs, is_done)` so beta
+/// monitoring can watch the migration land before it is proposed for
+/// production.
+#[query(hidden = true)]
+fn mcp_config_migration_status() -> (u64, bool) {
+    (
+        MCP_CONFIG_MIGRATION_COUNT.with_borrow(|c| *c),
+        MCP_CONFIG_MIGRATION_DONE.with_borrow(|d| *d),
+    )
+}
+
+/// Process one batch of the MCP config migration. Bound to the interval timer
+/// set up in [`init_mcp_config_migration_timer`]; clears the timer and records
+/// completion in the persistent state once the scan reaches the end.
+fn run_mcp_config_migration_batch() {
+    if MCP_CONFIG_MIGRATION_DONE.with_borrow(|done| *done) {
+        return;
+    }
+
+    let cursor = MCP_CONFIG_MIGRATION_CURSOR.with_borrow(|cursor| *cursor);
+    let outcome = state::storage_borrow_mut(|storage| {
+        storage.migrate_mcp_configs_batch(cursor, MCP_CONFIG_MIGRATION_BATCH_SIZE)
+    });
+
+    MCP_CONFIG_MIGRATION_COUNT.with_borrow_mut(|count| {
+        *count = count.saturating_add(outcome.migrated);
+    });
+    if let Some(next_cursor) = outcome.next_cursor {
+        MCP_CONFIG_MIGRATION_CURSOR.replace(Some(next_cursor));
+    }
+
+    if outcome.is_done {
+        MCP_CONFIG_MIGRATION_DONE.replace(true);
+        MCP_CONFIG_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
+            if let Some(timer_id) = id_slot.take() {
+                ic_cdk_timers::clear_timer(timer_id);
+            }
+        });
+        // Recorded in the persistent state, not just the heap: re-running would
+        // re-enable anyone who deliberately switched AI access off after the
+        // migration, so passing the arg again must be a no-op.
+        state::persistent_state_mut(|persistent_state| {
+            persistent_state.mcp_config_migration_done = Some(true);
+        });
+        let migrated = MCP_CONFIG_MIGRATION_COUNT.with_borrow(|c| *c);
+        ic_cdk::println!("MCP config migration COMPLETED ({migrated} configs migrated).");
+    }
+}
+
+/// Start the interval timer driving [`run_mcp_config_migration_batch`], unless
+/// this upgrade didn't ask for the migration or a previous one already ran it.
+fn init_mcp_config_migration_timer() {
+    let requested = MCP_CONFIG_MIGRATION_REQUESTED.with_borrow(|requested| *requested);
+    let already_done =
+        state::persistent_state(|persistent_state| persistent_state.mcp_config_migration_done)
+            == Some(true);
+    if !requested || already_done {
+        MCP_CONFIG_MIGRATION_DONE.replace(true);
+        return;
+    }
+    let timer_id = ic_cdk_timers::set_timer_interval(
+        MCP_CONFIG_MIGRATION_BATCH_BACKOFF_SECONDS,
+        run_mcp_config_migration_batch,
+    );
+    MCP_CONFIG_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(old_id) = id_slot.replace(timer_id) {
+            ic_cdk_timers::clear_timer(old_id);
+        }
+    });
+}
+
 #[update]
 async fn init_salt() {
     state::init_salt().await;
@@ -641,13 +743,18 @@ fn get_account_delegation(
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
 /// trusted server URL). Persisted on-chain, so it follows the identity across
 /// devices. Read by the Settings UI and by the `/mcp` connect flow, which
-/// verifies the connecting origin against it at connect time. Returns the
-/// disabled, no-server default for an unauthorized caller or an anchor that
-/// never wrote a config.
+/// verifies the connecting origin against it at connect time. `null` means the
+/// anchor has never written a config.
 #[query]
-fn mcp_get_config(anchor_number: AnchorNumber) -> McpConfig {
+fn mcp_get_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
     if check_session_authorization(anchor_number).is_err() {
-        return McpConfig::default();
+        // Deliberately the switched-off shape rather than `None`: `None` means
+        // "never configured", which is the branch that lets a connect proceed.
+        // An unauthorized caller must land on the blocking one.
+        return Some(McpConfig {
+            enabled: false,
+            url: None,
+        });
     }
     mcp::get_mcp_config(anchor_number)
 }
@@ -667,7 +774,7 @@ fn mcp_set_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), 
 /// per-app delegation at `target_origin` for `account_number` — one of the
 /// anchor's accounts there (discover them with `mcp_get_accounts`), or the
 /// anchor's default account when `None`. `max_ttl` is the requested lifetime in
-/// ns, defaulting to and capped at 1 hour, and never outliving the session
+/// ns, defaulting to and capped at 5 minutes, and never outliving the session
 /// grant. The resolved `account_number` is returned in `McpPrepareDelegation`
 /// to thread into `mcp_get_delegation`.
 ///
@@ -867,6 +974,10 @@ fn config() -> InternetIdentityInit {
         enable_dnssec_email_recovery: persistent_state.enable_dnssec_email_recovery,
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
+        mcp_official_url: persistent_state.mcp_official_url.clone(),
+        // One-shot upgrade arg driving the MCP config migration; not persisted
+        // as config, so there is nothing to report back here.
+        mcp_config_migration: None,
     })
 }
 
@@ -925,6 +1036,7 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     // signals done (immediately, when no `sso_credential_migration` arg was
     // supplied).
     init_sso_credential_migration_timer();
+    init_mcp_config_migration_timer();
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
@@ -1018,6 +1130,14 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
             // Outer Some -> apply: inner None clears, inner Some replaces.
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.doh_config = doh_config;
+            })
+        }
+        if arg.mcp_config_migration == Some(true) {
+            MCP_CONFIG_MIGRATION_REQUESTED.replace(true);
+        }
+        if let Some(mcp_official_url) = arg.mcp_official_url {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.mcp_official_url = Some(mcp_official_url);
             })
         }
     }

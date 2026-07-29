@@ -1,4 +1,7 @@
 import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
+import { originOf, type McpConfig } from "$lib/utils/mcpConfig";
+import { matchDeclaredCallback } from "$lib/utils/authCallbacks";
+import type { BackendCanisterConfig } from "$lib/globals";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import type { PublicKey } from "@icp-sdk/core/agent";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
@@ -6,6 +9,16 @@ import {
   throwTextCanisterError,
   transformSignedDelegation,
 } from "$lib/utils/utils";
+
+/** The exact refusal `prepare_mcp_registration_delegation` returns when the
+ *  identity has no trusted MCP server (the feature is off or was never
+ *  configured). Kept in sync with the canister (`mcp_registration.rs`); matched
+ *  exactly, not as a substring, so only this refusal — never an unrelated error
+ *  that merely contains the phrase — routes the connect to the untrusted
+ *  screen. A wording drift only downgrades this UX to a generic error, never a
+ *  wrong delivery. */
+const NO_TRUSTED_SERVER_ERROR =
+  "MCP registration failed: no trusted MCP server is enabled for this identity.";
 
 interface McpAuthorizeInput {
   authenticated: Authenticated;
@@ -17,14 +30,18 @@ interface McpAuthorizeInput {
    *  once at connect and recorded on the registration entry by `prepare`, so
    *  the server cannot upgrade a read-only session to full access. */
   accessLevel: AccessLevel;
-  /** The trusted server's declared connect callback: exact-matched by the
-   *  caller against the allow-list the server hosts at a fixed well-known
-   *  path on its (trusted) origin (see `matchDeclaredCallback`) — the
-   *  (attacker-craftable) connect link only ever selects among the entries
-   *  the server declares. Always https (the trusted origin is). This is where
-   *  II delivers the registration delegation (a top-level navigation carrying
-   *  it in the fragment). */
-  callback: string;
+  /** The connect link's server origin (scheme+host[:port] of its callback).
+   *  Delivery happens only after `prepare`'s *certified* `trusted_url` confirms
+   *  this is the origin the identity trusts — so a forged `mcp_get_config`
+   *  query can't redirect delivery to an attacker's origin. */
+  serverOrigin: string;
+  /** The exact callback the (attacker-craftable) connect link requested. Once
+   *  `serverOrigin` is trust-confirmed, it is matched against the allow-list
+   *  the server declares at a fixed well-known path on its origin (see
+   *  `matchDeclaredCallback`) — the link only ever selects among the declared
+   *  entries. This is where II delivers the registration delegation (a
+   *  top-level navigation carrying it in the fragment). */
+  requestedCallback: string;
   /** Opaque value the server issued for this connect, delivered back alongside
    *  the registration delegation so the server can tie it to the connect it
    *  started. */
@@ -69,18 +86,32 @@ interface McpAuthorizeInput {
  * `Y`, never to the link-supplied `X` an attacker could have planted. The only
  * redeemable artifact, the full `P_reg -> Y -> X` chain, is assembled inside
  * this page and leaves it exclusively via the fragment navigation to the
- * declared callback. Nothing is delivered anywhere but a callback the trusted
- * origin declares (the origin is verified against the synced config, and the
- * callback against the server's allow-list, by the caller). Resolves with the
- * delivery URL the caller should navigate the tab to; the server's callback
- * finishes the flow on its side (e.g. redeeming the chain and handing an OAuth
- * code back to an MCP client).
+ * declared callback.
+ *
+ * Delivery is gated here, on values that can't be forged by a single node: the
+ * connect link's origin must equal the origin of `prepare`'s `trusted_url`
+ * (certified, since `prepare` is an update call — so a forged `mcp_get_config`
+ * query can't redirect delivery to an attacker's origin), and only then is the
+ * link's callback matched against the allow-list the server declares on that
+ * origin. A trust mismatch throws {@link McpUntrustedServerError} before the
+ * chain is fetched or assembled, so the minted registration stays inert and
+ * expires undelivered. Resolves with the delivery URL the caller should
+ * navigate the tab to; the server's callback finishes the flow on its side
+ * (e.g. redeeming the chain and handing an OAuth code back to an MCP client).
  */
+export class McpUntrustedServerError extends Error {
+  constructor() {
+    super("The connect link's server is not trusted by this identity.");
+    this.name = "McpUntrustedServerError";
+  }
+}
+
 export const mcpAuthorize = async ({
   authenticated,
   ttlSeconds,
   accessLevel,
-  callback,
+  serverOrigin,
+  requestedCallback,
   state,
   registrationKey,
 }: McpAuthorizeInput): Promise<string> => {
@@ -103,14 +134,41 @@ export const mcpAuthorize = async ({
   // unauthenticated, ...) throws here and fails the connect before anything is
   // delivered.
   const grantTtlNanos = BigInt(ttlSeconds) * BigInt(1e9);
-  const { user_key, expiration } = await actor
-    .prepare_mcp_registration_delegation(
-      identityNumber,
-      browserKey,
-      toPermissionsArg(accessLevel),
-      [grantTtlNanos],
-    )
-    .then(throwTextCanisterError);
+  const prepared = await actor.prepare_mcp_registration_delegation(
+    identityNumber,
+    browserKey,
+    toPermissionsArg(accessLevel),
+    [grantTtlNanos],
+  );
+  if ("Err" in prepared) {
+    // "No trusted server" means MCP is off or unset for this identity — the
+    // untrusted case, routed to the untrusted screen (where the user can set a
+    // trusted server) like every other not-trusted outcome, rather than shown
+    // as a hard error. Matched exactly (see `NO_TRUSTED_SERVER_ERROR`) so an
+    // unrelated refusal (e.g. authentication) propagates as an error instead.
+    if (prepared.Err === NO_TRUSTED_SERVER_ERROR) {
+      throw new McpUntrustedServerError();
+    }
+    throw new Error(prepared.Err);
+  }
+  const { user_key, expiration, trusted_url } = prepared.Ok;
+
+  // Trust gate on a *certified* value. `prepare` is an update call, so
+  // `trusted_url` (the identity's resolved trusted server) is certified through
+  // consensus and cannot be forged by a single malicious replica or boundary
+  // node — unlike an `mcp_get_config` query. Deliver only when the connect
+  // link's origin is that trusted origin; on a mismatch we throw before
+  // fetching `get` or assembling the chain, so the registration `prepare` just
+  // minted is never turned into a redeemable artifact and simply expires.
+  if (originOf(trusted_url) !== serverOrigin) {
+    throw new McpUntrustedServerError();
+  }
+
+  // Trust confirmed: only now contact the server for its declared-callback
+  // allow-list, and require the link's callback to exact-match a declared
+  // entry (so a crafted link can't point II at an arbitrary path on the trusted
+  // origin). Failure here fails the connect closed, before delivery.
+  const callback = await matchDeclaredCallback(serverOrigin, requestedCallback);
 
   // `get` recovers the seed from `user_key` (the value `prepare` returned), so
   // it needs neither the consent params nor a deterministic re-derivation.
@@ -153,4 +211,35 @@ export const mcpAuthorize = async ({
   fragment.set("delegation", JSON.stringify(chain.toJSON()));
   fragment.set("state", state);
   return `${callback}#${fragment.toString()}`;
+};
+
+/**
+ * Whether `origin` may be connected. An identity that never configured MCP
+ * (`undefined`) may connect the official connector — completing the consent is
+ * what enables the feature for them. One that switched the feature off may not:
+ * they are sent back to Settings rather than silently re-enabled by a link.
+ *
+ * Deliberately not the same rule as Settings' `trustedUrl`, which answers what
+ * the identity trusts *now*. The canister enforces the same split in
+ * `connect_trusted_url` / `session_trusted_url`; this lives here, next to the
+ * consent flow that needs it, so the two can't be confused at a call site.
+ *
+ * Takes the canister config rather than a bare URL so the official connector
+ * can only come from the deployment, never from an arbitrary string at a call
+ * site. Matching is by origin, the same boundary the delegation uses (II
+ * derives a per-origin principal; the path can't scope it).
+ */
+export const isOriginTrusted = (
+  config: McpConfig | undefined,
+  origin: string,
+  { mcp_official_url }: Pick<BackendCanisterConfig, "mcp_official_url">,
+): boolean => {
+  const official = mcp_official_url[0];
+  const url =
+    config === undefined
+      ? official
+      : config.enabled
+        ? (config.url ?? official)
+        : undefined;
+  return url !== undefined && originOf(url) === origin;
 };

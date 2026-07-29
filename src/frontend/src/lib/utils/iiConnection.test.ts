@@ -42,6 +42,8 @@ const mockDelegationIdentity = {
 } as unknown as DelegationIdentity;
 
 const DEFAULT_INIT: InternetIdentityInit = {
+  mcp_official_url: [],
+  mcp_config_migration: [],
   analytics_config: [],
   archive_config: [],
   assigned_user_number_range: [],

@@ -382,10 +382,13 @@ export const test = base.extend<{ mcp: McpFixture }>({
       await page.locator('a[href="/manage/settings"]').click();
       await page.waitForURL(`${II_URL}/manage/settings`);
       await page.getByRole("switch", { name: "AI access" }).click();
+      // Enabling lands on the deployment's official connector, so the custom
+      // URL goes in behind "Customize" rather than a dialog that opens itself.
+      await page.getByRole("button", { name: "Customize" }).click();
       await page.getByLabel("MCP server URL").fill(`${MCP_SERVER_ORIGIN}/mcp`);
       await holdToConfirm(page, "Hold to continue");
       await page
-        .getByRole("button", { name: "Remove this server" })
+        .getByRole("button", { name: "Restore default" })
         .waitFor({ state: "visible" });
     };
 

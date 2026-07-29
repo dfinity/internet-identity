@@ -696,8 +696,10 @@ prompt_be_extra_args() {
     # Defaults are `null` (preserve). To set a value, type the full
     # Candid expression at the prompt — e.g. `opt "https://backend.beta.id.ai"`
     # or `opt vec { "https://beta.id.ai"; "https://beta.identity.icp0.io" }`.
-    BE_BACKEND_ORIGIN_ARG=$(prompt_default  "backend_origin (opt text)"       "null")
-    BE_RELATED_ORIGINS_ARG=$(prompt_default "related_origins (opt vec text)"  "null")
+    BE_BACKEND_ORIGIN_ARG=$(prompt_default    "backend_origin (opt text)"       "null")
+    BE_RELATED_ORIGINS_ARG=$(prompt_default   "related_origins (opt vec text)"  "null")
+    BE_MCP_OFFICIAL_URL_ARG=$(prompt_default  "mcp_official_url (opt text)"     "null")
+    BE_MCP_CONFIG_MIGRATION_ARG=$(prompt_default "mcp_config_migration (opt bool)" "null")
 }
 
 # -------------------------
@@ -788,6 +790,7 @@ EXTRA
         fi
         local managed
         for managed in backend_canister_id backend_origin related_origins \
+                       mcp_official_url mcp_config_migration \
                        openid_configs dnssec_config doh_config; do
             # Match the field name only as a record-field key: at a line start
             # (ignoring leading whitespace) and followed by `=`. This avoids
@@ -796,8 +799,8 @@ EXTRA
                     | grep -qE "^[[:space:]]*${managed}[[:space:]]*=" ; then
                 echo "Error: --be-extra-args-file sets '$managed', which this script already sets." >&2
                 echo "       Set it via its own path instead: backend_canister_id comes from the" >&2
-                echo "       staging selection (-sa/-sb/-sc/-sd / --staging); backend_origin and" >&2
-                echo "       related_origins from the prompts; openid_configs from" >&2
+                echo "       staging selection (-sa/-sb/-sc/-sd / --staging); backend_origin," >&2
+                echo "       related_origins and mcp_official_url from the prompts; openid_configs from" >&2
                 echo "       --openid-configs-file; dnssec_config / doh_config from" >&2
                 echo "       --update-email-recovery-init." >&2
                 return 1
@@ -811,6 +814,8 @@ EXTRA
     backend_canister_id = opt principal "$BE_ID";
     backend_origin = $BE_BACKEND_ORIGIN_ARG;
     related_origins = $BE_RELATED_ORIGINS_ARG;
+    mcp_official_url = $BE_MCP_OFFICIAL_URL_ARG;
+    mcp_config_migration = $BE_MCP_CONFIG_MIGRATION_ARG;
     openid_configs = $openid_configs_arg;
 $extra
 $extra_user

@@ -46,6 +46,8 @@ pub struct StorablePersistentState {
     enable_dnssec_email_recovery: Option<bool>,
     dnssec_config: Option<DnssecConfig>,
     doh_config: Option<DohConfig>,
+    mcp_official_url: Option<String>,
+    mcp_config_migration_done: Option<bool>,
 }
 
 impl Storable for StorablePersistentState {
@@ -96,6 +98,8 @@ impl From<PersistentState> for StorablePersistentState {
             enable_dnssec_email_recovery: s.enable_dnssec_email_recovery,
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
+            mcp_official_url: s.mcp_official_url,
+            mcp_config_migration_done: s.mcp_config_migration_done,
         }
     }
 }
@@ -124,6 +128,8 @@ impl From<StorablePersistentState> for PersistentState {
             enable_dnssec_email_recovery: s.enable_dnssec_email_recovery,
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
+            mcp_official_url: s.mcp_official_url,
+            mcp_config_migration_done: s.mcp_config_migration_done,
         }
     }
 }
@@ -180,6 +186,8 @@ mod tests {
             enable_dnssec_email_recovery: None,
             dnssec_config: None,
             doh_config: None,
+            mcp_official_url: None,
+            mcp_config_migration_done: None,
         };
 
         pretty_assertions::assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -212,6 +220,8 @@ mod tests {
             enable_dnssec_email_recovery: None,
             dnssec_config: None,
             doh_config: None,
+            mcp_official_url: None,
+            mcp_config_migration_done: None,
         };
         pretty_assertions::assert_eq!(PersistentState::default(), expected_defaults);
     }

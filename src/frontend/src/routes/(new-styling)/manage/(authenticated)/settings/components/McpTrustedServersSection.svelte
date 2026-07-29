@@ -1,10 +1,15 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { BotIcon, Trash2Icon } from "@lucide/svelte";
+  import {
+    BotIcon,
+    PlusIcon,
+    RotateCcwIcon,
+    SlidersHorizontalIcon,
+    Trash2Icon,
+  } from "@lucide/svelte";
   import McpIcon from "$lib/components/icons/McpIcon.svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
-  import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import { t } from "$lib/stores/locale.store";
@@ -13,8 +18,11 @@
     readMcpConfig,
     setMcpEnabled,
     trustAndEnableMcp,
-    clearAndDisableMcp,
+    clearMcpTrustedServer,
+    type McpConfig,
   } from "$lib/utils/mcpConfig";
+  import { trustedUrl } from "../utils";
+  import { backendCanisterConfig } from "$lib/globals";
   import McpAddConnectorDialog from "./McpAddConnectorDialog.svelte";
 
   interface Props {
@@ -24,16 +32,26 @@
   const { identityNumber }: Props = $props();
   const titleId = $props.id();
 
-  // The synced (on-chain) MCP config: a master toggle and the single trusted
-  // server URL for this identity. Persisted on-chain (keyed by anchor), so it
-  // follows the identity across devices. Read once on mount and kept in local
-  // state that the handlers update after each canister write.
-  let enabled = $state(false);
-  let trusted = $state<string | undefined>(undefined);
+  // The synced (on-chain) MCP config: a master toggle and the custom server
+  // URL for this identity. Persisted on-chain (keyed by anchor), so it follows
+  // the identity across devices. Read once on mount and kept in local state
+  // that the handlers update after each canister write.
+  let config = $state<McpConfig | undefined>(undefined);
   // True until the initial config read completes, so the toggle doesn't flicker
   // off-then-on and writes can't race the load.
   let loaded = $state(false);
   let showAdd = $state(false);
+
+  const official = backendCanisterConfig.mcp_official_url[0];
+
+  const enabled = $derived(config?.enabled ?? false);
+  const trusted = $derived(config?.url);
+  const active = $derived.by(() => {
+    const url = trustedUrl(config, backendCanisterConfig);
+    return url === undefined
+      ? undefined
+      : { url, custom: trusted !== undefined };
+  });
 
   const hostOf = (url: string): string => {
     try {
@@ -46,15 +64,10 @@
   onMount(() => {
     void (async () => {
       try {
-        const config = await readMcpConfig(
-          $authenticatedStore.actor,
-          identityNumber,
-        );
-        enabled = config.enabled;
-        trusted = config.url;
+        config = await readMcpConfig($authenticatedStore.actor, identityNumber);
       } catch {
         toaster.error({
-          title: $t`Couldn't load your trusted MCP server settings.`,
+          title: $t`Couldn't load your AI access settings.`,
           duration: 4000,
         });
       } finally {
@@ -63,17 +76,26 @@
     })();
   });
 
-  const handleToggle = async () => {
-    const next = enabled;
-    if (next && trusted === undefined) {
-      enabled = false;
+  const handleToggle = async (next: boolean) => {
+    // Enabling with nothing to enable — no custom server and no official
+    // connector — opens the dialog instead of writing a config that trusts
+    // nothing.
+    if (
+      next &&
+      trustedUrl({ enabled: true, url: trusted }, backendCanisterConfig) ===
+        undefined
+    ) {
       showAdd = true;
       return;
     }
+    const previous = config;
+    config = next
+      ? { enabled: true, url: trusted }
+      : { enabled: false, url: undefined };
     try {
       await setMcpEnabled($authenticatedStore.actor, identityNumber, next);
     } catch {
-      enabled = !next;
+      config = previous;
       toaster.error({
         title: $t`Couldn't save your change. Please try again.`,
         duration: 4000,
@@ -88,30 +110,33 @@
   const handleAddSave = async (url: string) => {
     try {
       await trustAndEnableMcp($authenticatedStore.actor, identityNumber, url);
-      enabled = true;
-      trusted = url;
+      config = { enabled: true, url };
       showAdd = false;
     } catch {
       toaster.error({
-        title: $t`Couldn't save your trusted server. Please try again.`,
+        title: $t`Couldn't save your connector. Please try again.`,
         duration: 4000,
       });
     }
   };
 
-  const handleRemove = async () => {
+  const handleRestoreDefault = async () => {
     if (trusted === undefined) return;
-    const previousUrl = trusted;
-    const previousEnabled = enabled;
-    trusted = undefined;
-    enabled = false;
+    const previous = config;
+    // Without an official connector to fall back to, dropping the custom one
+    // would leave the feature on with nothing trusted, so turn it off instead.
+    const fallsBack = official !== undefined;
+    config = { enabled: fallsBack, url: undefined };
     try {
-      await clearAndDisableMcp($authenticatedStore.actor, identityNumber);
+      if (fallsBack) {
+        await clearMcpTrustedServer($authenticatedStore.actor, identityNumber);
+      } else {
+        await setMcpEnabled($authenticatedStore.actor, identityNumber, false);
+      }
     } catch {
-      trusted = previousUrl;
-      enabled = previousEnabled;
+      config = previous;
       toaster.error({
-        title: $t`Couldn't remove the server. Please try again.`,
+        title: $t`Couldn't remove the connector. Please try again.`,
         duration: 4000,
       });
     }
@@ -136,10 +161,7 @@
         <h3 id={titleId} class="text-text-primary text-base font-semibold">
           {$t`AI access`}
         </h3>
-        <Badge color="surface" size="sm">
-          {$t`Preview`}
-        </Badge>
-        {#if enabled && trusted !== undefined}
+        {#if active !== undefined}
           <Badge color="success" size="sm" dot>
             {$t`Enabled on all devices`}
           </Badge>
@@ -153,8 +175,8 @@
     <div class="flex h-6 shrink-0 items-center">
       {#if loaded}
         <Toggle
-          bind:checked={enabled}
-          onchange={handleToggle}
+          checked={enabled}
+          onchange={() => handleToggle(!enabled)}
           aria-labelledby={titleId}
         />
       {:else}
@@ -166,10 +188,10 @@
   {#if enabled}
     <div class="border-border-tertiary mt-5 border-t pt-4">
       <p class="text-text-tertiary mb-3 text-xs font-semibold">
-        {$t`Trusted connectors`}
+        {$t`Trusted connector`}
       </p>
 
-      {#if trusted !== undefined}
+      {#if active !== undefined}
         <div
           class="border-border-tertiary bg-bg-primary flex flex-row items-center gap-3 rounded-lg border px-3 py-3 sm:px-4"
         >
@@ -180,28 +202,58 @@
             <McpIcon class="size-4.5" />
           </span>
 
-          <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div class="flex min-w-0 flex-1 flex-col gap-1">
             <span class="text-text-primary truncate text-sm font-semibold">
-              {hostOf(trusted)}
+              {active.custom ? hostOf(active.url) : $t`Internet Computer MCP`}
+            </span>
+            <span class="text-text-secondary text-sm">
+              {#if !active.custom}
+                {$t`Official · Hosted by DFINITY`}
+              {:else if official !== undefined}
+                {$t`Added by you · Replaces the official connector`}
+              {:else}
+                {$t`Added by you`}
+              {/if}
             </span>
             <span
               class="text-text-tertiary truncate font-mono text-xs"
-              title={trusted}
+              title={active.url}
             >
-              {trusted}
+              {active.url}
             </span>
           </div>
 
-          <Tooltip label={$t`Remove`}>
+          {#if active.custom}
             <button
-              class="btn btn-tertiary btn-sm btn-icon shrink-0"
-              onclick={handleRemove}
-              aria-label={$t`Remove this server`}
+              class="btn btn-secondary btn-sm shrink-0 gap-2"
+              onclick={handleRestoreDefault}
             >
-              <Trash2Icon class="size-4.5" />
+              {#if official !== undefined}
+                <RotateCcwIcon class="size-4" />
+                {$t`Restore default`}
+              {:else}
+                <Trash2Icon class="size-4" />
+                {$t`Remove`}
+              {/if}
             </button>
-          </Tooltip>
+          {:else}
+            <button
+              class="btn btn-secondary btn-sm shrink-0 gap-2"
+              onclick={() => (showAdd = true)}
+            >
+              <SlidersHorizontalIcon class="size-4" />
+              {$t`Customize`}
+            </button>
+          {/if}
         </div>
+      {:else}
+        <button
+          class="btn btn-secondary btn-sm gap-2"
+          onclick={() => (showAdd = true)}
+        >
+          <PlusIcon class="size-4" />
+          {$t`Add connector`}
+        </button>
       {/if}
     </div>
   {/if}
