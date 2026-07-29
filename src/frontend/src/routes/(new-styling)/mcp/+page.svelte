@@ -360,7 +360,7 @@
   <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
     <AuthPanel>
       <McpHero mcpServer={mcpServer.host} />
-      <AuthWizard {...wizardSignInHandlers}>
+      <AuthWizard {...wizardSignInHandlers} mode="signin">
         <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
           {$t`Choose method`}
         </h1>
