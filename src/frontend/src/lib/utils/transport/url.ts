@@ -37,12 +37,14 @@
  *    mirrors the redirect path of {@link LegacyChannel}, but as a pure
  *    request/response transform decoupled from the redirect itself.
  */
+import { z } from "zod";
 import {
   type Channel,
   type ChannelOptions,
   type JsonRequest,
   JsonRequestSchema,
   type JsonResponse,
+  JsonResponseSchema,
   type Transport,
   DelegationParamsCodec,
   DelegationResultSchema,
@@ -66,6 +68,15 @@ const MESSAGE_PARAM = "message";
 const CALLBACK_PARAM = "callback";
 /** Hash-fragment parameter the RP uses to correlate the response with its request. */
 const STATE_PARAM = "state";
+
+/** Upper bound on the raw `message` param. A delegation params blob plus
+ *  batched attributes is well under 1 KB, so this is generous headroom while
+ *  bounding the work a crafted link can impose before any user interaction
+ *  (parsing, per-request keygen, IndexedDB writes). */
+const MAX_MESSAGE_LENGTH = 16 * 1024;
+/** Upper bound on batch size. The real 1-click batch is 2 (`icrc34_delegation`
+ *  + `ii-icrc3-attributes`); anything approaching this is abuse. */
+const MAX_BATCH_SIZE = 10;
 
 // The outer (intermediate -> RP session key) delegation lasts 30 days; the
 // chain still expires earlier if the inner canister-signed hop does. Matches
@@ -146,6 +157,13 @@ const readUrlRequest = (): UrlRequest | undefined => {
     return undefined;
   }
 
+  // Bound the raw request before parsing: the message is attacker-craftable
+  // (anyone can put it in a link), so cap it so an oversized payload can't
+  // impose parse/keygen/storage cost before any user interaction.
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    throw new Error("ICRC-167 request message is too large");
+  }
+
   // Strip the request from the URL so it does not linger in history or leak via
   // the address bar while the flow runs (mirrors the legacy/MCP redirect flows).
   const stripped = new URL(window.location.href);
@@ -194,6 +212,9 @@ const readUrlRequest = (): UrlRequest | undefined => {
 
   const batch = Array.isArray(parsed);
   const values: unknown[] = batch ? (parsed as unknown[]) : [parsed];
+  if (values.length > MAX_BATCH_SIZE) {
+    throw new Error("ICRC-167 batch has too many requests");
+  }
   const requests = values.map((value) => {
     const result = JsonRequestSchema.safeParse(value);
     if (!result.success) {
@@ -212,6 +233,15 @@ const readUrlRequest = (): UrlRequest | undefined => {
     }
     return result.data;
   });
+
+  // Reject duplicate ids (type-tagged, so `1` and `"1"` don't collide). Responses
+  // are collected in an id-keyed map and delivered by id, so two requests sharing
+  // an id would overwrite each other's finalizer, coalesce early, and duplicate
+  // the response in the delivered batch.
+  const idKeys = requests.map((request) => JSON.stringify(request.id));
+  if (new Set(idKeys).size !== idKeys.length) {
+    throw new Error("ICRC-167 request ids must be unique");
+  }
 
   return { requests, batch, callback: callbackUrl.href, state };
 };
@@ -305,6 +335,10 @@ export const interceptDelegation = async (
 
 export class UrlChannel implements Channel {
   #origin: string;
+  // Stable per-flow token (generated once when the flow is first established,
+  // journaled in the PersistedFlow, and handed back to the resumed channel), so
+  // the transport can prove a resume belongs to this flow.
+  #resumeToken: string;
   #callback: string;
   #state: string;
   #batch: boolean;
@@ -333,6 +367,8 @@ export class UrlChannel implements Channel {
     state: string;
     batch: boolean;
     interceptors: DelegationInterceptor[];
+    // The flow's stable resume token; a fresh one is minted when omitted.
+    resumeToken?: string;
     // Responses already collected on an earlier load (resume), keyed by id.
     responses?: Record<string, JsonResponse>;
     onResponsesChanged?: (responses: Record<string, JsonResponse>) => void;
@@ -340,6 +376,7 @@ export class UrlChannel implements Channel {
     onClosed?: () => void;
   }) {
     this.#origin = params.origin;
+    this.#resumeToken = params.resumeToken ?? crypto.randomUUID();
     this.#callback = params.callback;
     this.#state = params.state;
     this.#batch = params.batch;
@@ -361,6 +398,10 @@ export class UrlChannel implements Channel {
 
   get origin() {
     return this.#origin;
+  }
+
+  get resumeToken() {
+    return this.#resumeToken;
   }
 
   get closed() {
@@ -486,6 +527,10 @@ interface PersistedFlow {
   state: string;
   batch: boolean;
   timestamp: number;
+  // Stable per-flow token minted at establish. The resume must present it (via
+  // ChannelOptions.resumeToken) to prove ownership, so a lingering flow can't
+  // be resumed by an unrelated later establish — even one for the same origin.
+  resumeToken: string;
   // Original requests as received from the RP (`publicKey` still the RP session
   // key); the ephemeral rewrite is re-derived on resume.
   requests: JsonRequest[];
@@ -587,18 +632,40 @@ const persistResponses = (responses: Record<string, JsonResponse>): void => {
   }
 };
 
+// Validates a stored flow on read: a truncated write (storage quota, a
+// `persistResponses` interleaving), a tampered entry, or a future format change
+// must be rejected here rather than reach #rehydrate with a half-built shape —
+// the resume path anchors the whole transport's security invariant.
+const PersistedFlowSchema = z.object({
+  origin: z.string(),
+  callback: z.string(),
+  state: z.string(),
+  batch: z.boolean(),
+  timestamp: z.number(),
+  resumeToken: z.string(),
+  requests: z.array(JsonRequestSchema),
+  ephemeralKeyIds: z.record(z.string(), z.string()),
+  responses: z.record(z.string(), JsonResponseSchema),
+});
+
 const readStoredFlow = (): PersistedFlow | undefined => {
   const json = sessionStorage.getItem(FLOW_STORAGE_KEY);
   if (json === null) {
     return undefined;
   }
-  let flow: PersistedFlow;
+  let parsed: unknown;
   try {
-    flow = JSON.parse(json) as PersistedFlow;
+    parsed = JSON.parse(json);
   } catch {
     sessionStorage.removeItem(FLOW_STORAGE_KEY);
     return undefined;
   }
+  const result = PersistedFlowSchema.safeParse(parsed);
+  if (!result.success) {
+    sessionStorage.removeItem(FLOW_STORAGE_KEY);
+    return undefined;
+  }
+  const flow: PersistedFlow = result.data;
   if (Date.now() > flow.timestamp + FLOW_TIMEOUT_MS) {
     // The flow is abandoned; its ephemeral keys are reclaimed by
     // sweepExpiredEphemeralKeys (they carry the same timeout).
@@ -616,16 +683,20 @@ export class UrlTransport implements Transport {
     }
     // No request in the hash: this may be the return load of an II-internal
     // redirect (e.g. an OpenID/SSO hop) that unloaded the page mid-flow, so
-    // resume the persisted flow — but only when II re-established in resume
-    // mode for the flow's own origin. `channelStore.establish` forwards
-    // `allowedOrigin` (the channel origin stashed before the redirect, the same
-    // signal the postMessage/legacy transports scope to) on the `openid-resume`
-    // return, and nothing on a normal load. Requiring that signal and an exact
-    // origin match keeps an unrelated later load — or a copy of this flow that
-    // rode into another context via sessionStorage — from resuming it: a load
-    // for a different app carries that app's origin, which won't match.
+    // resume the persisted flow — but only when the caller PROVES it owns this
+    // flow. `channelStore.establish` forwards, on the `openid-resume` return,
+    // the redirecting channel's `resumeToken` (stashed before the redirect) and
+    // its `allowedOrigin`; a normal load carries neither. Requiring the token to
+    // match the journaled one — not merely inferring ownership from the origin —
+    // means an unrelated later establish, even one for the same origin, can't
+    // resume this flow: its channel carries a different token. The origin check
+    // is kept as a cheap corroborating guard.
     const stored = readStoredFlow();
-    if (stored !== undefined && options?.allowedOrigin === stored.origin) {
+    if (
+      stored !== undefined &&
+      options?.allowedOrigin === stored.origin &&
+      options?.resumeToken === stored.resumeToken
+    ) {
       return await this.#rehydrate(stored);
     }
     // This establish is not resuming the stored flow, so any flow still sitting
@@ -665,12 +736,17 @@ export class UrlTransport implements Transport {
       interceptors.push(buildDelegationInterceptor(jsonRequest, ephemeral));
     }
 
+    // Mint the flow's stable resume token once, journal it, and hand it to the
+    // channel so channel.resumeToken === flow.resumeToken. The authorize page
+    // stashes it before the IdP redirect and passes it back on resume.
+    const resumeToken = crypto.randomUUID();
     storeFlow({
       origin,
       callback: request.callback,
       state: request.state,
       batch: request.batch,
       timestamp: Date.now(),
+      resumeToken,
       requests: request.requests,
       ephemeralKeyIds,
       responses: {},
@@ -681,6 +757,7 @@ export class UrlTransport implements Transport {
       callback: request.callback,
       state: request.state,
       batch: request.batch,
+      resumeToken,
       interceptors,
       onResponsesChanged: persistResponses,
       onDelivered: deleteFlow,
@@ -698,6 +775,17 @@ export class UrlTransport implements Transport {
             ? flow.ephemeralKeyIds[ephemeralKeyMapKey(jsonRequest.id)]
             : undefined;
         if (keyId === undefined) {
+          // A non-delegation request legitimately has no journaled key. But a
+          // delegation request MUST have one (every delegation request is keyed
+          // in #establishFresh); reaching here means the stored flow is missing
+          // it (corruption / tampering / format drift), so fail rather than let
+          // the canister certify a delegation directly to the RP-supplied key —
+          // the same fail-closed stance as the ephemeral-key-gone branch below.
+          if (isDelegationRequest(jsonRequest)) {
+            throw new Error(
+              "ICRC-167 flow cannot resume: no ephemeral key journaled for a delegation request",
+            );
+          }
           return passthrough(jsonRequest);
         }
         const ephemeral = await loadEphemeralIdentity(keyId);
@@ -718,6 +806,7 @@ export class UrlTransport implements Transport {
       callback: flow.callback,
       state: flow.state,
       batch: flow.batch,
+      resumeToken: flow.resumeToken,
       interceptors,
       responses: flow.responses,
       onResponsesChanged: persistResponses,

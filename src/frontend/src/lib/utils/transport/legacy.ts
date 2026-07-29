@@ -206,6 +206,10 @@ export const endRedirectSession = async (
 };
 
 class LegacyChannel implements Channel {
+  // The legacy redirect flow re-establishes from its own hash keys on return
+  // rather than resuming a persisted URL-transport flow, so nothing here can be
+  // hijacked; it carries the token for the Channel contract but does not gate.
+  readonly resumeToken = crypto.randomUUID();
   #closed = false;
   #origin: string;
   #intermediateIdentityPromise: Promise<ECDSAKeyIdentity>;

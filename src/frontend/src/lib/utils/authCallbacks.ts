@@ -28,6 +28,16 @@
  *
  * The server must serve the document with CORS headers that let II read it
  * (`Access-Control-Allow-Origin`), like any cross-origin JSON resource.
+ *
+ * Responsibility of the declaring server: a declared callback must not itself
+ * be an open redirect. A response is delivered to the callback in the URL
+ * fragment, and a `3xx` whose `Location` carries no fragment re-attaches the
+ * original fragment to the redirect target — so a callback that forwards onward
+ * would leak the delivered delegation (scoped to the callback's own origin, and
+ * therefore usable to impersonate the user *at that origin*) to wherever it
+ * forwards. II validates only that the callback is declared, never where it
+ * ultimately lands, so the declaring origin must ensure its callbacks terminate
+ * locally — the same caveat OAuth's `redirect_uri` has always carried.
  */
 
 /** The fixed well-known path where a server declares the auth callbacks it

@@ -418,6 +418,41 @@ describe("UrlTransport.establishChannel", () => {
     expect(assignMock).not.toHaveBeenCalled();
   });
 
+  it("rejects a message larger than the cap before parsing", async () => {
+    const params = new URLSearchParams({
+      message: "x".repeat(17 * 1024),
+      callback: CALLBACK,
+      state: "state-123",
+    });
+    installLocation(`#${params.toString()}`);
+
+    await expect(new UrlTransport().establishChannel()).rejects.toThrow();
+    expect(assignMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a batch with too many requests", async () => {
+    const batch = Array.from({ length: 11 }, (_, i) => ({
+      jsonrpc: "2.0",
+      id: i,
+      method: "m",
+    }));
+    installLocation(hashFor(batch));
+
+    await expect(new UrlTransport().establishChannel()).rejects.toThrow();
+    expect(assignMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a batch with duplicate request ids", async () => {
+    const batch = [
+      { jsonrpc: "2.0", id: 1, method: "a" },
+      { jsonrpc: "2.0", id: 1, method: "b" },
+    ];
+    installLocation(hashFor(batch));
+
+    await expect(new UrlTransport().establishChannel()).rejects.toThrow();
+    expect(assignMock).not.toHaveBeenCalled();
+  });
+
   it("journals distinct ephemeral keys for numeric and string ids that stringify alike", async () => {
     const batch = [1, "1"].map((id) => ({
       jsonrpc: "2.0",
@@ -442,6 +477,18 @@ describe("UrlTransport.establishChannel", () => {
   });
 
   const STORAGE_KEY = "ii-icrc167-url-flow";
+  // Resume-mode options as the authorize page would supply them: the stored
+  // flow's origin and its resume token (read back from storage, as the page
+  // reads the stashed token it captured from the channel before the redirect).
+  const resumeOpts = (): { allowedOrigin: string; resumeToken: string } => {
+    const flow = JSON.parse(
+      sessionStorage.getItem(STORAGE_KEY) ?? "{}",
+    ) as Partial<{ origin: string; resumeToken: string }>;
+    return {
+      allowedOrigin: flow.origin ?? ORIGIN,
+      resumeToken: flow.resumeToken ?? "",
+    };
+  };
   const messageFrom = (): unknown =>
     JSON.parse(
       new URLSearchParams(
@@ -462,9 +509,7 @@ describe("UrlTransport.establishChannel", () => {
 
     // The return load (e.g. after an OpenID hop): no hash, no allow-list fetch.
     installLocation("#");
-    const resumed = await new UrlTransport().establishChannel({
-      allowedOrigin: ORIGIN,
-    });
+    const resumed = await new UrlTransport().establishChannel(resumeOpts());
     expect(resumed.origin).toBe(ORIGIN);
     const seen: JsonRequest[] = [];
     resumed.addEventListener("request", (r) => seen.push(r));
@@ -485,9 +530,7 @@ describe("UrlTransport.establishChannel", () => {
     await new UrlTransport().establishChannel(); // generates + persists ephemeral
 
     installLocation("#");
-    const resumed = await new UrlTransport().establishChannel({
-      allowedOrigin: ORIGIN,
-    });
+    const resumed = await new UrlTransport().establishChannel(resumeOpts());
     const seen: JsonRequest[] = [];
     resumed.addEventListener("request", (r) => seen.push(r));
     const ephemeralKey = new Uint8Array(
@@ -548,9 +591,7 @@ describe("UrlTransport.establishChannel", () => {
 
     // Redirect, then resume: request 1's response is restored from storage.
     installLocation("#");
-    const resumed = await new UrlTransport().establishChannel({
-      allowedOrigin: ORIGIN,
-    });
+    const resumed = await new UrlTransport().establishChannel(resumeOpts());
     const seen: JsonRequest[] = [];
     resumed.addEventListener("request", (r) => seen.push(r));
     expect(seen.map((r) => r.id)).toEqual([2]); // only the unanswered one
@@ -585,7 +626,46 @@ describe("UrlTransport.establishChannel", () => {
     expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
-  it("resumes only for a resume-mode establish matching the flow's origin", async () => {
+  it("fails to resume a delegation flow whose ephemeral key was never journaled", async () => {
+    // A stored flow with a delegation request but no journaled key (corruption
+    // / tampering) must fail rather than pass the delegation through
+    // un-intercepted — the canister would then certify to the RP-supplied key.
+    const rp = Ed25519KeyIdentity.generate();
+    sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        origin: ORIGIN,
+        callback: CALLBACK,
+        state: "s",
+        batch: false,
+        timestamp: Date.now(),
+        resumeToken: "tok-1",
+        requests: [delegationRequest(rp)],
+        ephemeralKeyIds: {},
+        responses: {},
+      }),
+    );
+    installLocation("#");
+
+    await expect(
+      new UrlTransport().establishChannel({
+        allowedOrigin: ORIGIN,
+        resumeToken: "tok-1",
+      }),
+    ).rejects.toThrow(/no ephemeral key journaled/);
+  });
+
+  it("rejects a malformed stored flow instead of trusting it", async () => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ origin: ORIGIN }));
+    installLocation("#");
+
+    await expect(
+      new UrlTransport().establishChannel({ allowedOrigin: ORIGIN }),
+    ).rejects.toBeInstanceOf(UrlTransportUnsupportedError);
+    expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it("resumes only when the resume token (and origin) prove ownership of the flow", async () => {
     // Persist a fresh flow, then simulate the hashless return load.
     const persistFlow = async () => {
       installLocation(hashFor({ jsonrpc: "2.0", id: 1, method: "m" }));
@@ -595,7 +675,7 @@ describe("UrlTransport.establishChannel", () => {
       expect(sessionStorage.getItem(STORAGE_KEY)).not.toBeNull();
     };
 
-    // A normal load (no `allowedOrigin`) is not a resume for us: decline and
+    // A normal load (no resume options) is not a resume for us: decline and
     // drop the abandoned flow rather than pick it up.
     await persistFlow();
     await expect(new UrlTransport().establishChannel()).rejects.toBeInstanceOf(
@@ -609,14 +689,24 @@ describe("UrlTransport.establishChannel", () => {
     await expect(
       new UrlTransport().establishChannel({
         allowedOrigin: "https://other.example",
+        resumeToken: resumeOpts().resumeToken,
       }),
     ).rejects.toBeInstanceOf(UrlTransportUnsupportedError);
 
-    // A matching resume succeeds.
+    // The origin matches but the resume token is another channel's: declines —
+    // this is what closes the same-origin case (e.g. a sibling flow's establish
+    // can't resume a lingering flow it doesn't own).
     await persistFlow();
-    const resumed = await new UrlTransport().establishChannel({
-      allowedOrigin: ORIGIN,
-    });
+    await expect(
+      new UrlTransport().establishChannel({
+        allowedOrigin: ORIGIN,
+        resumeToken: "some-other-channels-token",
+      }),
+    ).rejects.toBeInstanceOf(UrlTransportUnsupportedError);
+
+    // Origin and token both prove ownership: resumes.
+    await persistFlow();
+    const resumed = await new UrlTransport().establishChannel(resumeOpts());
     expect(resumed.origin).toBe(ORIGIN);
   });
 

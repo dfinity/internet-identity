@@ -14,6 +14,10 @@ const DISCONNECT_TIMEOUT_MS = 10000;
 export class PostMessageUnsupportedError extends Error {}
 
 class PostMessageChannel implements Channel {
+  // postMessage re-handshakes on the return load rather than resuming a
+  // persisted flow, so it has nothing a foreign channel could hijack; it
+  // carries the token to satisfy the Channel contract but does not gate on it.
+  readonly resumeToken = crypto.randomUUID();
   #origin: string;
   #source: WindowProxy;
   #windowListener: (event: MessageEvent) => void;

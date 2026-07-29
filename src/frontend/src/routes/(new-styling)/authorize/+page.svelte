@@ -209,6 +209,13 @@
       "ii-pending-channel-origin",
       $establishedChannelStore.origin,
     );
+    // Stash the established channel's resume token so the transport can prove,
+    // on the return load, that the resume belongs to this flow (see the URL
+    // transport's resume gate).
+    sessionStorage.setItem(
+      "ii-pending-channel-resume-token",
+      $establishedChannelStore.resumeToken,
+    );
     sessionStorage.setItem(
       "ii-openid-authorize-state",
       next.searchParams.get("state")!,
