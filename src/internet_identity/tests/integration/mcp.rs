@@ -8,6 +8,9 @@
 //! target origin. At most one session exists per identity, and changing the
 //! synced config (disable, or a different trusted URL) revokes it.
 
+use crate::v2_api::authn_method_test_helpers::{
+    create_identity_with_authn_method, test_authn_method,
+};
 use candid::Principal;
 use canister_tests::{
     api::internet_identity::api_v2::{
@@ -1050,10 +1053,14 @@ fn mcp_config_round_trips_and_persists_across_upgrade() -> Result<(), RejectResp
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
 
-    // An anchor that never wrote a config reads the disabled, no-server default.
+    // Registration seeds the enabled default, so the feature reads on before
+    // the identity has been anywhere near Settings.
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
-        None
+        Some(McpConfig {
+            enabled: true,
+            url: None,
+        })
     );
 
     let config = McpConfig {
@@ -1088,23 +1095,79 @@ fn hidden() -> Option<McpConfig> {
     })
 }
 
+/// Registration puts the identity on the official connector, so AI access
+/// reads on in Settings for someone who has never touched the feature. Covers
+/// both anchor-creating paths: the legacy v1 `register` and the v2
+/// `identity_registration_finish` every current client uses.
+#[test]
+fn mcp_registration_enables_the_official_connector() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_official_mcp(&env);
+    let enabled_on_official = Some(McpConfig {
+        enabled: true,
+        url: None,
+    });
+
+    let v1_anchor = flows::register_anchor(&env, canister_id);
+    assert_eq!(
+        mcp_get_config(&env, canister_id, principal_1(), v1_anchor).unwrap(),
+        enabled_on_official
+    );
+
+    let authn_method = test_authn_method();
+    let v2_anchor = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    assert_eq!(
+        mcp_get_config(&env, canister_id, authn_method.principal(), v2_anchor).unwrap(),
+        enabled_on_official
+    );
+
+    Ok(())
+}
+
+/// The seeded config doesn't depend on the deployment shipping a connector: a
+/// deployment with no `mcp_official_url` still gets the enabled row, it just
+/// resolves to nothing until one is configured. Keeping the write
+/// unconditional is what makes a registered identity indistinguishable from a
+/// migrated one.
+#[test]
+fn mcp_registration_seeds_the_config_without_an_official_connector() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+
+    assert_eq!(
+        mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
+        Some(McpConfig {
+            enabled: true,
+            url: None,
+        })
+    );
+
+    Ok(())
+}
+
 /// The headline flow: an identity that has never configured MCP connects to the
 /// deployment's official connector without visiting Settings first, and ends up
 /// with a real stored config rather than a default.
 ///
-/// Regression test — `prepare` materializes the anchor's config row for its
+/// Regression test. `prepare` materializes the anchor's config row for its
 /// pending-registration bookkeeping, and when it wrote that row with `enabled`
 /// still false the redemption refused the very connect it had just authorized.
+/// Registration now seeds an enabled row, so that shape is only reachable for
+/// identities that predate this, but `prepare` must still never switch one off.
 #[test]
 fn mcp_fresh_identity_connects_the_official_connector() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_with_official_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
 
-    // Nothing configured: Settings shows the feature off.
+    // Registration already put the identity on the official connector.
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
-        None
+        Some(McpConfig {
+            enabled: true,
+            url: None,
+        })
     );
 
     // Connecting works anyway — completing the consent is what enables it.

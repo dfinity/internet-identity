@@ -108,6 +108,7 @@ pub fn register(
                 "failed to write data of anchor {anchor_number}: {err}"
             ))
         });
+        storage.init_mcp_config(anchor_number);
         storage.registration_rates.new_registration()
     });
 
