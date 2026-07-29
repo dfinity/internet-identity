@@ -350,7 +350,10 @@ type InternetIdentityInit = record {
     // via HTTP outcalls when no DNSSEC chain is available — see
     // `docs/ongoing/email-recovery.md` §7.6. Same set/clear pattern.
     doh_config : opt opt DohConfig;
-    mcp_official_url : opt text;
+    // URL of the official MCP connector the deployment ships, if any. Same
+    // set/clear pattern as `dnssec_config`: null keeps the previously stored
+    // value, `opt null` clears it, `opt opt "https://..."` sets it.
+    mcp_official_url : opt opt text;
     // One-shot upgrade arg driving the MCP config migration: `opt true`
     // rewrites every stored config to "enabled, official connector", since a
     // value stored before the official connector existed was never a choice

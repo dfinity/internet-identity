@@ -460,13 +460,13 @@ describe("isOriginTrusted — official connector", () => {
   const OFFICIAL_ORIGIN = "https://official-mcp.id.ai";
   const CUSTOM_ORIGIN = "https://mcp.acme.com";
 
-  it("accepts it for an identity that never configured MCP", () => {
-    expect(isOriginTrusted(undefined, OFFICIAL_ORIGIN, OFFICIAL)).toBe(true);
+  it("rejects it for an identity that stores no config", () => {
+    // Registration seeds a config, so this is an identity that predates it and
+    // never used the feature. It has to turn AI access on in Settings first.
+    expect(isOriginTrusted(undefined, OFFICIAL_ORIGIN, OFFICIAL)).toBe(false);
   });
 
   it("rejects it once the feature has been switched off", () => {
-    // A stored disabled config must not be re-enabled by a connect link, so it
-    // has to behave differently from the never-configured case above.
     expect(
       isOriginTrusted(cfg(false, undefined), OFFICIAL_ORIGIN, OFFICIAL),
     ).toBe(false);
@@ -494,8 +494,8 @@ describe("isOriginTrusted — official connector", () => {
   });
 
   it("accepts nothing when no official connector is configured", () => {
-    expect(isOriginTrusted(undefined, OFFICIAL_ORIGIN, NO_OFFICIAL)).toBe(
-      false,
-    );
+    expect(
+      isOriginTrusted(cfg(true, undefined), OFFICIAL_ORIGIN, NO_OFFICIAL),
+    ).toBe(false);
   });
 });

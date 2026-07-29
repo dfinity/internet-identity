@@ -352,15 +352,17 @@ fn create_identity(
     let (identity_number, operation) = state::storage_borrow_mut(|storage| {
         let arg = validate_identity_data(storage, arg, verified_openid)?;
 
-        let allocation = storage.allocate_anchor_safe(now, |identity: &mut Anchor| {
-            let operation = apply_identity_data(identity, arg, now)?;
-            let identity_number = identity.anchor_number();
-            Ok::<_, IdRegFinishError>((identity_number, operation))
-        })?;
+        let (identity_number, operation) =
+            storage.allocate_anchor_safe(now, |identity: &mut Anchor| {
+                let operation = apply_identity_data(identity, arg, now)?;
+                let identity_number = identity.anchor_number();
+                Ok::<_, IdRegFinishError>((identity_number, operation))
+            })?;
 
+        crate::mcp::init_config_for_new_identity(storage, identity_number);
         storage.registration_rates.new_registration();
 
-        Ok::<_, IdRegFinishError>(allocation)
+        Ok::<_, IdRegFinishError>((identity_number, operation))
     })?;
 
     // TODO: propagate the `now` timestamp from above to here to avoid `time()` call.
