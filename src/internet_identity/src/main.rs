@@ -197,8 +197,9 @@ fn init_sso_credential_migration_timer() {
 // so a stored `false` only ever meant "no custom server of mine" — nobody
 // could have declined a connector that did not exist. This one-shot migration
 // rewrites every stored config to "enabled, official connector". Anchors with
-// no stored config need nothing: they already resolve to the official
-// connector at connect time.
+// no stored config are left alone: they trust nothing until the identity turns
+// the feature on in Settings, and every identity registered since
+// `Storage::init_mcp_config` starts out with a config already.
 //
 // Driven by the `mcp_config_migration` upgrade arg and batched via an interval
 // timer, using the same convention as the SSO credential migration above:
@@ -743,9 +744,9 @@ fn get_account_delegation(
 #[query]
 fn mcp_get_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
     if check_session_authorization(anchor_number).is_err() {
-        // Deliberately the switched-off shape rather than `None`: `None` means
-        // "never configured", which is the branch that lets a connect proceed.
-        // An unauthorized caller must land on the blocking one.
+        // Deliberately the switched-off shape rather than `None`, so an
+        // unauthorized read neither leaks the real config nor reports an
+        // absence the caller could tell apart from a disabled config.
         return Some(McpConfig {
             enabled: false,
             url: None,
