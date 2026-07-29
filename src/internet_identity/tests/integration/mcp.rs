@@ -1053,14 +1053,11 @@ fn mcp_config_round_trips_and_persists_across_upgrade() -> Result<(), RejectResp
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
 
-    // Registration seeds the enabled default, so the feature reads on before
-    // the identity has been anywhere near Settings.
+    // This deployment ships no official connector, so registration wrote no
+    // config and the identity starts out with nothing stored.
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
-        Some(McpConfig {
-            enabled: true,
-            url: None,
-        })
+        None
     );
 
     let config = McpConfig {
@@ -1124,23 +1121,19 @@ fn mcp_registration_enables_the_official_connector() -> Result<(), RejectRespons
     Ok(())
 }
 
-/// The seeded config doesn't depend on the deployment shipping a connector: a
-/// deployment with no `mcp_official_url` still gets the enabled row, it just
-/// resolves to nothing until one is configured. Keeping the write
-/// unconditional is what makes a registered identity indistinguishable from a
-/// migrated one.
+/// Seeding is gated on the deployment shipping a connector. With no
+/// `mcp_official_url` the row would say enabled while resolving to no trusted
+/// URL — a switch that reads on with nothing behind it — so no row is written
+/// and the identity stays untouched until it adds a server of its own.
 #[test]
-fn mcp_registration_seeds_the_config_without_an_official_connector() -> Result<(), RejectResponse> {
+fn mcp_registration_writes_no_config_without_an_official_connector() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
 
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
-        Some(McpConfig {
-            enabled: true,
-            url: None,
-        })
+        None
     );
 
     Ok(())

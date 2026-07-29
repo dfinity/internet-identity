@@ -1417,9 +1417,9 @@ impl<M: Memory + Clone> Storage<M> {
             .unwrap_or_default()
     }
 
-    /// `anchor_number`'s stored config, or `None` when it never wrote one.
-    /// Since [`Storage::init_mcp_config`] runs at registration, `None` now only
-    /// means an identity that predates it and never used the feature.
+    /// `anchor_number`'s stored config, or `None` when it never wrote one —
+    /// an identity that predates registration seeding and never used the
+    /// feature, or one registered on a deployment with no official connector.
     pub fn lookup_mcp_config(&self, anchor_number: AnchorNumber) -> Option<StorableMcpConfig> {
         self.mcp_config_memory.get(&anchor_number)
     }
@@ -1430,11 +1430,10 @@ impl<M: Memory + Clone> Storage<M> {
         self.mcp_config_memory.insert(anchor_number, config);
     }
 
-    /// Give a freshly registered `anchor_number` AI access on the official
-    /// connector. Without this the Settings toggle reads off until the identity
-    /// completes a connect, even though `/mcp` would already have let it
-    /// through. Writes the same shape `migrate_mcp_configs_batch` gives
-    /// identities that registered earlier.
+    /// Give `anchor_number` AI access on the official connector, the same shape
+    /// `migrate_mcp_configs_batch` gives identities that registered earlier.
+    /// Call it through `mcp::init_config_for_new_identity`, which holds the rule
+    /// that this is only written when the deployment has a connector to trust.
     pub fn init_mcp_config(&mut self, anchor_number: AnchorNumber) {
         self.mcp_config_memory.insert(
             anchor_number,

@@ -359,7 +359,7 @@ fn create_identity(
                 Ok::<_, IdRegFinishError>((identity_number, operation))
             })?;
 
-        storage.init_mcp_config(identity_number);
+        crate::mcp::init_config_for_new_identity(storage, identity_number);
         storage.registration_rates.new_registration();
 
         Ok::<_, IdRegFinishError>((identity_number, operation))

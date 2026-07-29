@@ -198,8 +198,8 @@ fn init_sso_credential_migration_timer() {
 // could have declined a connector that did not exist. This one-shot migration
 // rewrites every stored config to "enabled, official connector". Anchors with
 // no stored config are left alone: they trust nothing until the identity turns
-// the feature on in Settings, and every identity registered since
-// `Storage::init_mcp_config` starts out with a config already.
+// the feature on in Settings, and an identity registered on a deployment with
+// an official connector starts out with a config already.
 //
 // Driven by the `mcp_config_migration` upgrade arg and batched via an interval
 // timer, using the same convention as the SSO credential migration above:

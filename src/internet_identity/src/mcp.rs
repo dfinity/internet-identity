@@ -47,7 +47,9 @@ use crate::{
     storage::account::{Account, AccountDelegationError, ReadAccountParams},
     storage::storable::mcp_config::StorableMcpConfig,
     storage::storable::mcp_grant::StorableMcpGrant,
+    storage::Storage,
 };
+use ic_stable_structures::DefaultMemoryImpl;
 
 /// Maximum lifetime of an MCP-minted per-app account delegation: 5 minutes.
 /// Deliberately short, because this is the one window revocation cannot reach:
@@ -90,10 +92,27 @@ fn official_url() -> Option<String> {
 ///
 /// One rule for both a new connect and an already-issued session. An identity
 /// with no stored config trusts nothing and has to switch the feature on in
-/// Settings first; `Storage::init_mcp_config` gives every identity registered
-/// since it landed a config that already says enabled.
+/// Settings first; [`init_config_for_new_identity`] gives one to every identity
+/// registered on a deployment that ships an official connector.
 pub(crate) fn trusted_url(config: &StorableMcpConfig) -> Option<String> {
     trusted_url_with(config, official_url())
+}
+
+/// Seed a freshly registered identity's config, so AI access reads on in
+/// Settings from the start rather than only after a first connect.
+///
+/// Only when the deployment ships an official connector. Without one the row
+/// would be `{ enabled: true, url: None }`, which resolves to no trusted URL at
+/// all — a switch that reads on with nothing behind it. Such a deployment
+/// leaves the identity with no row until it adds a server of its own.
+pub(crate) fn init_config_for_new_identity(
+    storage: &mut Storage<DefaultMemoryImpl>,
+    anchor_number: AnchorNumber,
+) {
+    if official_url().is_none() {
+        return;
+    }
+    storage.init_mcp_config(anchor_number);
 }
 
 fn trusted_url_with(config: &StorableMcpConfig, official: Option<String>) -> Option<String> {
