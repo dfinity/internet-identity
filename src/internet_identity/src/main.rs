@@ -970,7 +970,7 @@ fn config() -> InternetIdentityInit {
         enable_dnssec_email_recovery: persistent_state.enable_dnssec_email_recovery,
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
-        mcp_official_url: persistent_state.mcp_official_url.clone(),
+        mcp_official_url: Some(persistent_state.mcp_official_url.clone()),
         // One-shot upgrade arg driving the MCP config migration; not persisted
         // as config, so there is nothing to report back here.
         mcp_config_migration: None,
@@ -1132,8 +1132,9 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
             MCP_CONFIG_MIGRATION_REQUESTED.replace(true);
         }
         if let Some(mcp_official_url) = arg.mcp_official_url {
+            // Outer Some -> apply: inner None clears, inner Some replaces.
             state::persistent_state_mut(|persistent_state| {
-                persistent_state.mcp_official_url = Some(mcp_official_url);
+                persistent_state.mcp_official_url = mcp_official_url;
             })
         }
     }

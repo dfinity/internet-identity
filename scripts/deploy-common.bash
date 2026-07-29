@@ -698,7 +698,8 @@ prompt_be_extra_args() {
     # or `opt vec { "https://beta.id.ai"; "https://beta.identity.icp0.io" }`.
     BE_BACKEND_ORIGIN_ARG=$(prompt_default    "backend_origin (opt text)"       "null")
     BE_RELATED_ORIGINS_ARG=$(prompt_default   "related_origins (opt vec text)"  "null")
-    BE_MCP_OFFICIAL_URL_ARG=$(prompt_default  "mcp_official_url (opt text)"     "null")
+    # `opt opt text`: `opt null` clears the official connector, `opt opt "…"` sets it.
+    BE_MCP_OFFICIAL_URL_ARG=$(prompt_default  "mcp_official_url (opt opt text)" "null")
     BE_MCP_CONFIG_MIGRATION_ARG=$(prompt_default "mcp_config_migration (opt bool)" "null")
 }
 

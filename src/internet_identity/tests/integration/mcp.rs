@@ -60,7 +60,7 @@ fn install_with_official_mcp(env: &PocketIc) -> Principal {
         env,
         II_WASM.clone(),
         Some(InternetIdentityInit {
-            mcp_official_url: Some(OFFICIAL_MCP_URL.to_string()),
+            mcp_official_url: Some(Some(OFFICIAL_MCP_URL.to_string())),
             ..Default::default()
         }),
     )

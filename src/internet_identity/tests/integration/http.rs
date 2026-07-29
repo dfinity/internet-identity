@@ -984,8 +984,9 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
 }
 
 /// Verifies that the `mcp_official_url` install arg reaches the frontend: it is
-/// persisted on install, survives an upgrade that doesn't re-supply it, and is
-/// served in the `/.config.did.bin` asset the frontend reads on page load.
+/// persisted on install, survives an upgrade that doesn't re-supply it, is
+/// cleared by `opt null`, and is served in the `/.config.did.bin` asset the
+/// frontend reads on page load.
 #[test]
 fn ii_canister_serves_mcp_official_url_in_synchronized_config() -> Result<(), RejectResponse> {
     let env = env();
@@ -994,7 +995,7 @@ fn ii_canister_serves_mcp_official_url_in_synchronized_config() -> Result<(), Re
         &env,
         II_WASM.clone(),
         Some(InternetIdentityInit {
-            mcp_official_url: Some(official_url.clone()),
+            mcp_official_url: Some(Some(official_url.clone())),
             ..Default::default()
         }),
     );
@@ -1019,6 +1020,33 @@ fn ii_canister_serves_mcp_official_url_in_synchronized_config() -> Result<(), Re
     // An upgrade that omits the field must preserve it, matching the `opt`
     // semantics the deploy prompts promise ("Enter = preserve").
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    assert_eq!(read_official_url()?, Some(official_url.clone()));
+
+    // `Some(None)` (`opt null` in Candid) unsets it, leaving the deployment
+    // without an official connector.
+    upgrade_ii_canister_with_arg(
+        &env,
+        canister_id,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            mcp_official_url: Some(None),
+            ..Default::default()
+        }),
+    )
+    .expect("upgrade clearing mcp_official_url failed");
+    assert_eq!(read_official_url()?, None);
+
+    // And it can be set again afterwards.
+    upgrade_ii_canister_with_arg(
+        &env,
+        canister_id,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            mcp_official_url: Some(Some(official_url.clone())),
+            ..Default::default()
+        }),
+    )
+    .expect("upgrade re-setting mcp_official_url failed");
     assert_eq!(read_official_url()?, Some(official_url));
 
     Ok(())
