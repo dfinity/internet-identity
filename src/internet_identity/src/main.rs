@@ -223,7 +223,9 @@ thread_local! {
 
 /// Temporary hidden endpoint: returns `(migrated_configs, is_done)` so beta
 /// monitoring can watch the migration land before it is proposed for
-/// production.
+/// production. Both values are per-boot, so `(0, false)` on a canister that
+/// was upgraded without `mcp_config_migration` means the migration was never
+/// asked for, not that it found nothing.
 #[query(hidden = true)]
 fn mcp_config_migration_status() -> (u64, bool) {
     (
@@ -233,8 +235,8 @@ fn mcp_config_migration_status() -> (u64, bool) {
 }
 
 /// Process one batch of the MCP config migration. Bound to the interval timer
-/// set up in [`init_mcp_config_migration_timer`]; clears the timer and records
-/// completion in the persistent state once the scan reaches the end.
+/// set up in [`init_mcp_config_migration_timer`]; clears the timer once the
+/// scan reaches the end.
 fn run_mcp_config_migration_batch() {
     if MCP_CONFIG_MIGRATION_DONE.with_borrow(|done| *done) {
         return;
@@ -259,26 +261,17 @@ fn run_mcp_config_migration_batch() {
                 ic_cdk_timers::clear_timer(timer_id);
             }
         });
-        // Recorded in the persistent state, not just the heap: re-running would
-        // re-enable anyone who deliberately switched AI access off after the
-        // migration, so passing the arg again must be a no-op.
-        state::persistent_state_mut(|persistent_state| {
-            persistent_state.mcp_config_migration_done = Some(true);
-        });
         let migrated = MCP_CONFIG_MIGRATION_COUNT.with_borrow(|c| *c);
         ic_cdk::println!("MCP config migration COMPLETED ({migrated} configs migrated).");
     }
 }
 
 /// Start the interval timer driving [`run_mcp_config_migration_batch`], unless
-/// this upgrade didn't ask for the migration or a previous one already ran it.
+/// this upgrade didn't ask for the migration. Nothing about a completed run is
+/// persisted, so the upgrade arg is the only control: passing it again re-runs
+/// the migration, exactly like the SSO credential migration above.
 fn init_mcp_config_migration_timer() {
-    let requested = MCP_CONFIG_MIGRATION_REQUESTED.with_borrow(|requested| *requested);
-    let already_done =
-        state::persistent_state(|persistent_state| persistent_state.mcp_config_migration_done)
-            == Some(true);
-    if !requested || already_done {
-        MCP_CONFIG_MIGRATION_DONE.replace(true);
+    if !MCP_CONFIG_MIGRATION_REQUESTED.with_borrow(|requested| *requested) {
         return;
     }
     let timer_id = ic_cdk_timers::set_timer_interval(
