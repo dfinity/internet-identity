@@ -10,3 +10,5 @@ import { writable } from "svelte/store";
  * owned by the page's phase.
  */
 export const showIdentitySwitcher = writable(false);
+
+export const identitySwitcherOpen = writable(false);

@@ -16,12 +16,12 @@
   /cli screen: the connection is whole-session and not scoped to one app, so
   there is no app tile — just the MCP server you're connecting.
 -->
-<div class="flex flex-1 flex-col items-center justify-center gap-6 py-5">
+<div class="flex flex-1 flex-col items-center justify-center gap-3 py-2">
   <div
-    class="border-border-tertiary text-fg-primary bg-bg-primary flex size-20 shrink-0 items-center justify-center rounded-2xl border"
+    class="border-border-tertiary text-fg-primary bg-bg-primary flex size-14 shrink-0 items-center justify-center rounded-xl border"
     aria-hidden="true"
   >
-    <McpIcon class="size-9" />
+    <McpIcon class="size-6" />
   </div>
   <Badge size="sm" class="max-w-[75%]">
     <Ellipsis text={mcpServer} position="middle" />

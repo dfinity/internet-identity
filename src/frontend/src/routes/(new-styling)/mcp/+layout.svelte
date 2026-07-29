@@ -15,7 +15,10 @@
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { ManageHandoffFlow } from "$lib/flows/manageHandoffFlow.svelte";
-  import { showIdentitySwitcher } from "./mcp-switcher.store";
+  import {
+    showIdentitySwitcher,
+    identitySwitcherOpen,
+  } from "./mcp-switcher.store";
 
   const { children }: LayoutProps = $props();
 
@@ -28,15 +31,16 @@
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 
   let identityButtonRef = $state<HTMLElement>();
-  let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
+
+  const closeIdentityPopover = (): void => identitySwitcherOpen.set(false);
 
   // Authenticate the selected identity here, then open /manage in a new tab
   // carrying the session — so the user doesn't have to sign in again there.
   const manageHandoff = new ManageHandoffFlow();
   const handleManageIdentity = async (): Promise<void> => {
-    isIdentityPopoverOpen = false;
+    closeIdentityPopover();
     if (selectedIdentity === undefined) {
       return;
     }
@@ -52,7 +56,7 @@
   // for the selected identity, so the user always makes that explicit choice.
   const handleSelectIdentity = (identityNumber: bigint): Promise<void> => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    isIdentityPopoverOpen = false;
+    closeIdentityPopover();
     isAuthDialogOpen = false;
     return Promise.resolve();
   };
@@ -112,7 +116,7 @@
       <button
         bind:this={identityButtonRef}
         class="btn btn-tertiary ms-auto gap-2.5 pe-3 md:-me-3"
-        onclick={() => (isIdentityPopoverOpen = true)}
+        onclick={() => identitySwitcherOpen.set(true)}
         aria-label="Switch identity"
       >
         <Avatar size="xs">
@@ -121,10 +125,10 @@
         <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span>
         <ChevronDownIcon class="size-4" />
       </button>
-      {#if isIdentityPopoverOpen}
+      {#if $identitySwitcherOpen}
         <Popover
           anchor={identityButtonRef}
-          onClose={() => (isIdentityPopoverOpen = false)}
+          onClose={closeIdentityPopover}
           direction="down"
           align="end"
           distance="0.75rem"
@@ -136,19 +140,19 @@
             onSwitchIdentity={(identityNumber) =>
               handleSelectIdentity(identityNumber)}
             onUseAnotherIdentity={() => {
-              isIdentityPopoverOpen = false;
+              closeIdentityPopover();
               isAuthDialogOpen = true;
             }}
             onManageIdentity={handleManageIdentity}
             onManageIdentities={() => {
-              isIdentityPopoverOpen = false;
+              closeIdentityPopover();
               isManageIdentitiesDialogOpen = true;
             }}
             onError={(error) => {
-              isIdentityPopoverOpen = false;
+              closeIdentityPopover();
               handleError(error);
             }}
-            onClose={() => (isIdentityPopoverOpen = false)}
+            onClose={closeIdentityPopover}
           />
         </Popover>
       {/if}

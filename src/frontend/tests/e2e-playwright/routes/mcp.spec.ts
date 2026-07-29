@@ -87,6 +87,37 @@ test("A user with no stored identity gets the sign-in picker, not the mode-less 
   ).toBeVisible();
 });
 
+test("The connect screen names the acting identity and keeps the consent in view", async ({
+  page,
+  mcp,
+}) => {
+  await addVirtualAuthenticator(page);
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await signUp(page);
+
+  const identityRow = page.getByRole("button", {
+    name: "Choose identity",
+  });
+  await expect(identityRow).toBeVisible();
+  await expect(identityRow).toContainText("Test User");
+
+  const allowAccess = page.getByRole("button", { name: "Allow access" });
+  const revokeNote = page.getByRole("link", { name: "settings" });
+  await expect(identityRow).toBeInViewport();
+  await expect(allowAccess).toBeInViewport();
+  await expect(revokeNote).toBeInViewport();
+
+  await page.mouse.wheel(0, 2000);
+  await expect(identityRow).toBeInViewport();
+  await expect(allowAccess).toBeInViewport();
+  await expect(revokeNote).toBeInViewport();
+
+  await identityRow.click();
+  await expect(
+    page.getByRole("button", { name: "Sign in with another identity" }),
+  ).toBeVisible();
+});
+
 test("Signing up to an untrusted server prompts to add it in settings", async ({
   page,
   mcp,
