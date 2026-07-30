@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  notificationsEnabledFor,
   notificationsGloballyGranted,
   recordNotifOptInDecision,
   shouldOfferNotifications,
@@ -138,6 +139,52 @@ describe("notificationsGloballyGranted", () => {
     recordNotifOptInDecision(IDENTITY, ORIGIN, "dismissed");
 
     expect(notificationsGloballyGranted()).toBe(true);
+  });
+});
+
+describe("notificationsEnabledFor", () => {
+  it("is false before the user has answered", () => {
+    setPermission("granted");
+
+    expect(notificationsEnabledFor(IDENTITY, ORIGIN)).toBe(false);
+  });
+
+  it("is true once enabled for that identity and origin", () => {
+    setPermission("granted");
+    recordNotifOptInDecision(IDENTITY, ORIGIN, "enabled");
+
+    expect(notificationsEnabledFor(IDENTITY, ORIGIN)).toBe(true);
+  });
+
+  it("is false when the user dismissed instead", () => {
+    setPermission("granted");
+    recordNotifOptInDecision(IDENTITY, ORIGIN, "dismissed");
+
+    expect(notificationsEnabledFor(IDENTITY, ORIGIN)).toBe(false);
+  });
+
+  it("is scoped to the origin it was enabled for", () => {
+    setPermission("granted");
+    recordNotifOptInDecision(IDENTITY, ORIGIN, "enabled");
+
+    expect(notificationsEnabledFor(IDENTITY, OTHER_ORIGIN)).toBe(false);
+  });
+
+  it("is scoped to the identity it was enabled for", () => {
+    setPermission("granted");
+    recordNotifOptInDecision(IDENTITY, ORIGIN, "enabled");
+
+    expect(notificationsEnabledFor(OTHER_IDENTITY, ORIGIN)).toBe(false);
+  });
+
+  it("is false when the browser permission was revoked after enabling", () => {
+    // The stored "enabled" only means the user said yes here; the browser is
+    // the authority on whether anything can still be delivered, so claiming
+    // "On" after a revoke would be a lie.
+    recordNotifOptInDecision(IDENTITY, ORIGIN, "enabled");
+    setPermission("denied");
+
+    expect(notificationsEnabledFor(IDENTITY, ORIGIN)).toBe(false);
   });
 });
 

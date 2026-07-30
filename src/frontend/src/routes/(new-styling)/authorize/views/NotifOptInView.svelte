@@ -53,8 +53,8 @@
 
   // Layer 1 (browser permission for II's origin) is granted once and shared by
   // every dApp; layer 2 (this app's consent) is asked per app in II's own UI.
-  // Once layer 1 is in place there is no browser prompt left to show, so this
-  // screen becomes a plain per-app consent rather than a first-run explainer.
+  // The screen looks the same either way — only the browser prompt is skipped
+  // once layer 1 is in place, since there is nothing left for it to ask.
   const globallyGranted = notificationsGloballyGranted();
 
   const handleEnable = async () => {
@@ -193,64 +193,47 @@
   >
     {$t`Let ${dappName} notify you`}
   </h1>
-  {#if globallyGranted}
-    <p class="text-text-secondary mt-2 text-sm leading-relaxed">
-      <Trans>
-        Notifications are already on for your identity. Choose whether this app
-        can reach you.
-      </Trans>
-    </p>
-  {:else}
-    <p class="text-text-secondary mt-2 text-sm leading-relaxed">
-      <Trans>
-        Receive alerts from the apps you approve, and stay on top of what
-        matters seamlessly.
-      </Trans>
-    </p>
-  {/if}
+  <p class="text-text-secondary mt-2 text-sm leading-relaxed">
+    <Trans>
+      Receive alerts from the apps you approve, and stay on top of what matters
+      seamlessly.
+    </Trans>
+  </p>
 
-  <!-- Explaining what notifications are earns its place only on the first ask.
-       Once they're on, this is a per-app consent and the list is noise. -->
-  {#if !globallyGranted}
-    <ul class="mt-5 flex flex-col gap-4">
-      <li class="flex items-start gap-3.5">
-        <span
-          class="border-border-secondary bg-bg-secondary text-text-primary flex size-9 shrink-0 items-center justify-center rounded-full border"
-          aria-hidden="true"
-        >
-          <ZapIcon class="size-4" />
-        </span>
-        <div class="min-w-0 flex-1">
-          <div class="text-text-primary text-sm font-semibold">
-            {$t`Instant activity alerts`}
-          </div>
-          <p class="text-text-tertiary mt-0.5 text-sm leading-snug">
-            <Trans
-              >Transfers, replies and mentions the moment they happen.</Trans
-            >
-          </p>
+  <ul class="mt-5 flex flex-col gap-4">
+    <li class="flex items-start gap-3.5">
+      <span
+        class="border-border-secondary bg-bg-secondary text-text-primary flex size-9 shrink-0 items-center justify-center rounded-full border"
+        aria-hidden="true"
+      >
+        <ZapIcon class="size-4" />
+      </span>
+      <div class="min-w-0 flex-1">
+        <div class="text-text-primary text-sm font-semibold">
+          {$t`Instant activity alerts`}
         </div>
-      </li>
-      <li class="flex items-start gap-3.5">
-        <span
-          class="border-border-secondary bg-bg-secondary text-text-primary flex size-9 shrink-0 items-center justify-center rounded-full border"
-          aria-hidden="true"
-        >
-          <ClockIcon class="size-4" />
-        </span>
-        <div class="min-w-0 flex-1">
-          <div class="text-text-primary text-sm font-semibold">
-            {$t`Reachable anytime`}
-          </div>
-          <p class="text-text-tertiary mt-0.5 text-sm leading-snug">
-            <Trans
-              >Updates reach your device without keeping the app open.</Trans
-            >
-          </p>
+        <p class="text-text-tertiary mt-0.5 text-sm leading-snug">
+          <Trans>Transfers, replies and mentions the moment they happen.</Trans>
+        </p>
+      </div>
+    </li>
+    <li class="flex items-start gap-3.5">
+      <span
+        class="border-border-secondary bg-bg-secondary text-text-primary flex size-9 shrink-0 items-center justify-center rounded-full border"
+        aria-hidden="true"
+      >
+        <ClockIcon class="size-4" />
+      </span>
+      <div class="min-w-0 flex-1">
+        <div class="text-text-primary text-sm font-semibold">
+          {$t`Reachable anytime`}
         </div>
-      </li>
-    </ul>
-  {/if}
+        <p class="text-text-tertiary mt-0.5 text-sm leading-snug">
+          <Trans>Updates reach your device without keeping the app open.</Trans>
+        </p>
+      </div>
+    </li>
+  </ul>
 
   {#if enableError !== undefined}
     <div
@@ -275,8 +258,6 @@
       {#if enabling}
         <ProgressRing />
         <span>{$t`Turning on...`}</span>
-      {:else if globallyGranted}
-        <span>{$t`Allow notifications`}</span>
       {:else}
         <span>{$t`Enable notifications`}</span>
       {/if}

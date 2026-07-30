@@ -64,6 +64,22 @@ export const recordNotifOptInDecision = (
 };
 
 /**
+ * Whether this identity has notifications on for `origin`.
+ *
+ * Reads the same record the opt-in screen writes, so the Continue screen can
+ * show the state without a canister round trip on a latency-sensitive path.
+ * False when the browser permission has since been revoked, because the stored
+ * "enabled" only ever meant "the user said yes here" — the browser is the
+ * authority on whether anything can actually be delivered.
+ */
+export const notificationsEnabledFor = (
+  identityNumber: bigint,
+  origin: string,
+): boolean =>
+  notificationsGloballyGranted() &&
+  decisionFor(identityNumber, origin) === "enabled";
+
+/**
  * Whether the **global** layer is already in place: the browser-level
  * notification permission, which belongs to II's origin and is therefore
  * granted once and shared by every dApp.
