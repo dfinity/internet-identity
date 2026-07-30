@@ -93,7 +93,10 @@
       completed
         ? "bg-bg-brand-solid"
         : variant === "primary"
-          ? "bg-bg-brand-solid_hover"
+          ? // A translucent inversed foreground rather than the brand hover
+            // shade: `brand-800` on `brand-900` (and `brand-200` on `brand-25`
+            // in dark) are adjacent, so the progress was barely legible.
+            "bg-fg-primary-inversed opacity-25"
           : "bg-bg-primary_hover",
     ]}
     style="width: {progress * 100}%"

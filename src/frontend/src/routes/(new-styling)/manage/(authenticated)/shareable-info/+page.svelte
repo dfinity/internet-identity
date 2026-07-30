@@ -1,5 +1,6 @@
 <script lang="ts">
   import { VerifiedEmailsPanel } from "$lib/components/settings";
+  import { getMetadataString } from "$lib/utils/openID";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import type { PageProps } from "./$types";
@@ -12,6 +13,11 @@
   let verifiedEmails = $derived(data.identityInfo.verified_emails[0] ?? []);
   let recoveryAddresses = $derived(
     (data.identityInfo.email_recovery[0] ?? []).map((c) => c.address),
+  );
+  let openidAddresses = $derived(
+    (data.identityInfo.openid_credentials[0] ?? [])
+      .map((c) => getMetadataString(c.metadata, "email"))
+      .filter((e): e is string => e !== undefined),
   );
 </script>
 
@@ -29,6 +35,7 @@
   <VerifiedEmailsPanel
     {verifiedEmails}
     {recoveryAddresses}
+    {openidAddresses}
     capacity={VERIFIED_EMAILS_CAPACITY}
   />
 </div>

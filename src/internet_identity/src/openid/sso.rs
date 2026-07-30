@@ -11,14 +11,38 @@
 //! jwks_uri ─[JWKS cache]──────▶ keys
 //! ```
 //!
-//! The discovery domain is gated by the canary allowlist.
+//! A caller-supplied discovery domain is validated as a bare authority (see
+//! `validate_discovery_domain`); there is no domain allowlist.
 
-use super::verify::{Descriptor, Stamp};
+use super::verify::{Descriptor, SsoProvider};
 use super::OpenIDJWTVerificationError;
 use crate::openid::AudClaim;
 use crate::single_flight_cache::{self, CacheConfig, Cached, RetryBackoff, SingleFlightCache};
 use identity_jose::jwk::Jwk;
+use sha2::{Digest, Sha256};
 use std::cell::RefCell;
+
+/// Default for the well-known's optional `stable_identifier_claim`. `sub` is the
+/// OIDC subject claim; when an org's `sub` is the same across its OIDC clients,
+/// II keys identity on it directly (no bridge). An org with a pairwise `sub`
+/// (a different value per client, e.g. Entra) overrides this with a claim that
+/// is stable across clients (e.g. `oid`).
+pub(super) const DEFAULT_STABLE_IDENTIFIER_CLAIM: &str = "sub";
+
+/// The non-default stable-identifier claim, or `None` for a `sub` org (which
+/// keys identity on the token `sub` directly and needs no bridge).
+pub(super) fn non_default_stable_claim(claim: &str) -> Option<String> {
+    (claim != DEFAULT_STABLE_IDENTIFIER_CLAIM).then(|| claim.to_string())
+}
+
+/// Max `app_clients` entries accepted from an org's well-known. The parsed map
+/// is retained in the in-memory SSO discovery cache (one per cached domain), so
+/// this bounds its heap footprint there — a generous per-org ceiling. An
+/// over-cap map is rejected, never truncated (see `validate_app_clients`).
+pub(super) const MAX_APP_CLIENTS: usize = 100;
+
+/// Maximum length of an app_clients client_id.
+const MAX_APP_CLIENT_ID_LENGTH: usize = 255;
 
 #[cfg(not(test))]
 use crate::state;
@@ -26,9 +50,8 @@ use crate::state;
 // Cache sizing. II runs on a system subnet (HTTP outcalls cost no cycles) and
 // ingress flooding is handled by the boundary nodes, so these caches don't need
 // to rate-limit outcalls or account for cycles. Their one DDoS-relevant job is
-// to keep canister state *bounded and fairly evicted* — especially once the
-// discovery allowlist is removed and `domain` / `jwks_uri` become caller-
-// controlled and unbounded.
+// to keep canister state *bounded and fairly evicted* — the discovery domain
+// and `jwks_uri` are caller-controlled and unbounded.
 //
 // Discovery and JWKS are a single coupled flow (`domain → discovery cache →
 // jwks_uri → JWKS cache`): a verification needs *both* the domain's discovery
@@ -58,11 +81,11 @@ const RETRY_MULTIPLIER: u64 = 2;
 const ABANDON_FILL_AFTER_SECONDS: u64 = 120;
 
 /// Response-size cap for the two discovery hops (`ii-openid-configuration` and
-/// the OIDC discovery document). Both are small JSON docs; 16 KiB bounds the
-/// fill's transient buffer against a hostile endpoint without rejecting any
-/// real one.
+/// the OIDC discovery document). Sized to fit up to `MAX_APP_CLIENTS`
+/// `origin -> client_id` entries (each key up to ~140 bytes when hashed) with
+/// headroom.
 #[cfg(not(test))]
-const DISCOVERY_MAX_RESPONSE_BYTES: u64 = 16 * 1024;
+const DISCOVERY_MAX_RESPONSE_BYTES: u64 = 64 * 1024;
 /// Cap on the number of `scopes_supported` stored per discovery entry. `scopes`
 /// is the only unbounded field in `DiscoveredConfig`; capping it keeps a
 /// discovery entry ~1-2 KB so its share of the shared budget stays small. II
@@ -98,11 +121,113 @@ const MAX_DOMAIN_LENGTH: usize = 255;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct DiscoveredConfig {
     pub issuer: String,
+    /// The org's primary OIDC client; identity is keyed on it.
     pub client_id: String,
     pub jwks_uri: String,
     pub authorization_endpoint: String,
     pub scopes: Vec<String>,
     pub name: Option<String>,
+    pub app_clients: Vec<AppClient>,
+    /// When true, an origin not in `app_clients` is denied.
+    pub gate_all_apps: bool,
+    /// Claim holding the cross-client-stable identifier (default `sub`).
+    pub stable_identifier_claim: String,
+}
+
+/// One `origin -> client_id` entry from `app_clients`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct AppClient {
+    pub key: AppClientKey,
+    pub client_id: String,
+}
+
+/// An `app_clients` key: a cleartext origin or a salted hash
+/// (`sha256(origin || salt)` hex + hex `salt`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum AppClientKey {
+    Cleartext(String),
+    Hashed { hash: String, salt: String },
+}
+
+impl AppClientKey {
+    /// Parse a raw `app_clients` key: hashed iff it has the exact `<hex>:<hex>`
+    /// shape, else cleartext.
+    fn parse(raw: &str) -> Self {
+        if let Some((hash, salt)) = raw.split_once(':') {
+            let is_hex = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_hexdigit());
+            if is_hex(hash) && is_hex(salt) {
+                return AppClientKey::Hashed {
+                    hash: hash.to_ascii_lowercase(),
+                    salt: salt.to_string(),
+                };
+            }
+        }
+        AppClientKey::Cleartext(raw.to_string())
+    }
+
+    /// Does this key designate `origin`?
+    fn matches(&self, origin: &str) -> bool {
+        match self {
+            AppClientKey::Cleartext(o) => o == origin,
+            AppClientKey::Hashed { hash, salt } => {
+                let mut hasher = Sha256::new();
+                hasher.update(origin.as_bytes());
+                hasher.update(salt.as_bytes());
+                let computed = hex::encode(hasher.finalize());
+                computed.eq_ignore_ascii_case(hash)
+            }
+        }
+    }
+}
+
+/// An origin denied under `gate_all_apps` (not listed in `app_clients`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Forbidden;
+
+/// Parse the raw `app_clients` map, rejecting (never truncating) a map over
+/// `MAX_APP_CLIENTS` — truncation could silently drop a gated origin into the
+/// open fallback.
+pub(super) fn validate_app_clients(
+    entries: &std::collections::HashMap<String, String>,
+) -> Result<Vec<AppClient>, String> {
+    if entries.len() > MAX_APP_CLIENTS {
+        return Err(format!(
+            "app_clients exceeds the {MAX_APP_CLIENTS}-entry cap ({} entries)",
+            entries.len()
+        ));
+    }
+    entries
+        .iter()
+        .map(|(key, client_id)| {
+            if client_id.len() > MAX_APP_CLIENT_ID_LENGTH {
+                return Err(format!(
+                    "app_clients client_id exceeds the {MAX_APP_CLIENT_ID_LENGTH}-byte cap"
+                ));
+            }
+            Ok(AppClient {
+                key: AppClientKey::parse(key),
+                client_id: client_id.clone(),
+            })
+        })
+        .collect()
+}
+
+impl DiscoveredConfig {
+    /// The client id `origin` signs in against: its per-app client if listed in
+    /// `app_clients`, else the org's primary client — unless `gate_all_apps`
+    /// denies an unlisted origin (`Forbidden`).
+    pub(super) fn resolve_client_for_origin(&self, origin: &str) -> Result<String, Forbidden> {
+        for app in &self.app_clients {
+            if app.key.matches(origin) {
+                return Ok(app.client_id.clone());
+            }
+        }
+        if self.gate_all_apps {
+            Err(Forbidden)
+        } else {
+            Ok(self.client_id.clone())
+        }
+    }
 }
 
 type DiscoveryCache = SingleFlightCache<String, DiscoveredConfig, String>;
@@ -143,11 +268,11 @@ fn new_jwks_cache() -> JwksCache {
 /// disallowed domain.
 pub(super) fn prefetch(domain: &str) {
     let domain = domain.to_ascii_lowercase();
-    if validate_allowed_discovery_domain(&domain).is_err() {
+    if validate_discovery_domain(&domain).is_err() {
         return;
     }
-    if let Cached::Ready(cfg) = single_flight_cache::get(&DISCOVERY_CACHE, domain) {
-        single_flight_cache::get(&JWKS_CACHE, cfg.jwks_uri);
+    if let Cached::Ready(discovery_config) = single_flight_cache::get(&DISCOVERY_CACHE, domain) {
+        single_flight_cache::get(&JWKS_CACHE, discovery_config.jwks_uri);
     }
 }
 
@@ -157,14 +282,14 @@ pub(super) fn prefetch(domain: &str) {
 /// domain.
 pub(super) fn drive_discovery(domain: &str) {
     let domain = domain.to_ascii_lowercase();
-    if validate_allowed_discovery_domain(&domain).is_ok() {
+    if validate_discovery_domain(&domain).is_ok() {
         single_flight_cache::get(&DISCOVERY_CACHE, domain);
     }
 }
 
 /// Read the cached discovery result for `domain`, peek-only (never spawns) so
 /// it's safe from a query. `Pending` means no cached value yet; the caller
-/// gates on [`validate_allowed_discovery_domain`] separately where it needs to
+/// gates on [`validate_discovery_domain`] separately where it needs to
 /// tell a disallowed domain apart from a cold one.
 pub(super) fn peek_discovery(domain: &str) -> Cached<DiscoveredConfig> {
     single_flight_cache::peek(&DISCOVERY_CACHE, &domain.to_ascii_lowercase())
@@ -178,33 +303,36 @@ pub(super) fn resolve(
     jwt_iss: &str,
     jwt_aud: &AudClaim,
 ) -> Result<Cached<(Descriptor, String)>, OpenIDJWTVerificationError> {
-    validate_allowed_discovery_domain(domain).map_err(OpenIDJWTVerificationError::GenericError)?;
-    let cfg = match peek_discovery(domain) {
+    validate_discovery_domain(domain).map_err(OpenIDJWTVerificationError::GenericError)?;
+    let discovery_config = match peek_discovery(domain) {
         Cached::Pending => return Ok(Cached::Pending),
-        Cached::Ready(cfg) => cfg,
+        Cached::Ready(discovery_config) => discovery_config,
     };
-    if !jwt_aud.matches(&cfg.client_id) {
+    if !jwt_aud.matches(&discovery_config.client_id) {
         return Err(OpenIDJWTVerificationError::GenericError(format!(
             "JWT audience '{jwt_aud}' does not match discovered client_id '{}' for domain '{domain}'",
-            cfg.client_id
+            discovery_config.client_id
         )));
     }
 
-    if cfg.issuer != jwt_iss {
+    if discovery_config.issuer != jwt_iss {
         return Err(OpenIDJWTVerificationError::GenericError(format!(
             "JWT issuer '{jwt_iss}' does not match discovered issuer '{}' for domain '{domain}'",
-            cfg.issuer
+            discovery_config.issuer
         )));
     }
     let descriptor = Descriptor {
-        issuer: cfg.issuer,
-        client_id: cfg.client_id,
-        stamp: Stamp::Sso {
+        issuer: discovery_config.issuer,
+        client_id: discovery_config.client_id,
+        sso: Some(SsoProvider {
             domain: domain.to_string(),
-            name: cfg.name,
-        },
+            name: discovery_config.name,
+            stable_identifier_claim: non_default_stable_claim(
+                &discovery_config.stable_identifier_claim,
+            ),
+        }),
     };
-    Ok(Cached::Ready((descriptor, cfg.jwks_uri)))
+    Ok(Cached::Ready((descriptor, discovery_config.jwks_uri)))
 }
 
 /// Read the cached SSO JWKs for `jwks_uri`. Peek-only.
@@ -213,72 +341,42 @@ pub(super) fn read_jwks(jwks_uri: &str) -> Cached<Vec<Jwk>> {
 }
 
 // ---------------------------------------------------------------------------
-// Allowlist (canary gate).
+// Discovery-domain validation + scheme selection.
 // ---------------------------------------------------------------------------
 
-pub fn allowed_discovery_domains() -> Vec<String> {
+/// Deploy flag: when set, discovery outcalls to loopback hosts may use plain
+/// `http` (so e2e can point at local mock IdPs). See
+/// `InternetIdentityInit::sso_allow_insecure_discovery`. Non-loopback hosts
+/// always require `https` regardless.
+fn sso_allow_insecure_discovery() -> bool {
     #[cfg(not(test))]
     {
-        let configured = state::persistent_state(|ps| ps.sso_discoverable_domains.clone());
-        if let Some(domains) = configured {
-            return domains;
-        }
-        let is_production = state::persistent_state(|ps| ps.is_production);
-        match is_production {
-            Some(true) => vec!["dfinity.org".to_string()],
-            _ => vec!["beta.dfinity.org".to_string()],
-        }
+        state::persistent_state(|ps| ps.sso_allow_insecure_discovery).unwrap_or(false)
     }
     #[cfg(test)]
     {
-        tests::TEST_ALLOWED.with_borrow(|d| d.clone())
+        tests::TEST_ALLOW_INSECURE.with_borrow(|b| *b)
     }
 }
 
-/// Deploy flag: when set, the SSO discovery domain gate accepts *any* domain
-/// (see `InternetIdentityInit::sso_allow_any_domain`). Deliberately does not
-/// feed the `https`-relaxation gate ([`is_allowlisted_host`]), which always
-/// consults the explicit allowlist so opening the domain gate never lets an
-/// arbitrary host serve discovery over plain HTTP.
-fn sso_allow_any_domain() -> bool {
-    #[cfg(not(test))]
-    {
-        state::persistent_state(|ps| ps.sso_allow_any_domain).unwrap_or(false)
-    }
-    #[cfg(test)]
-    {
-        tests::TEST_ALLOW_ANY.with_borrow(|b| *b)
-    }
-}
-
-/// True if `domain` is on the configured/default SSO allowlist
-/// (case-insensitive). The explicit list only — independent of the
-/// `sso_allow_any_domain` deploy flag.
-fn is_explicitly_allowlisted(domain: &str) -> bool {
-    allowed_discovery_domains()
-        .iter()
-        .any(|allowed| allowed.eq_ignore_ascii_case(domain))
-}
-
-pub fn validate_allowed_discovery_domain(domain: &str) -> Result<(), String> {
+/// Validate a caller-supplied SSO discovery domain: it must be within the length
+/// cap and a bare URL authority (a host, optionally `host:port`, and nothing
+/// else). The bare-authority check is the security boundary — `domain` is
+/// interpolated into a discovery URL (`{scheme}://{domain}/.well-known/...`), so
+/// inputs carrying userinfo (`evil.com@127.0.0.1`), a path, a query, or a
+/// fragment could otherwise change the effective request target.
+pub fn validate_discovery_domain(domain: &str) -> Result<(), String> {
     if domain.len() > MAX_DOMAIN_LENGTH {
         return Err(format!(
             "SSO discovery domain exceeds {MAX_DOMAIN_LENGTH} bytes"
         ));
     }
-    // An explicitly allowlisted domain is admin-curated and trusted verbatim.
-    // The `sso_allow_any_domain` flag, by contrast, makes the domain
-    // caller-controlled, and `domain` is later interpolated into a discovery
-    // URL (`{scheme}://{domain}/.well-known/...`). Require it to be a bare
-    // authority so the flag means "any *domain*", not "any string that happens
-    // to parse inside a URL": inputs carrying userinfo (`evil.com@127.0.0.1`), a
-    // path (`host/..`), a query, or a fragment could otherwise change the
-    // effective request target.
-    if is_explicitly_allowlisted(domain) || (sso_allow_any_domain() && is_bare_authority(domain)) {
-        Ok(())
-    } else {
-        Err(format!("SSO discovery domain not allowed: {domain}"))
+    if !is_bare_authority(domain) {
+        return Err(format!(
+            "SSO discovery domain is not a bare authority: {domain}"
+        ));
     }
+    Ok(())
 }
 
 /// True if `domain` is a bare URL authority — a host, optionally `host:port`,
@@ -311,16 +409,18 @@ fn is_bare_authority(domain: &str) -> bool {
     authority == domain.to_ascii_lowercase()
 }
 
-/// True if `host` (the `host:port` portion of a URL) matches an allowlist
-/// entry. Used as the gate for relaxing the `https://` requirement: any domain
-/// explicitly blessed by an II admin MAY publish its discovery endpoints over
-/// plain HTTP, which is what makes e2e tests against `http://localhost:11107`
-/// work without weakening prod's strict-HTTPS posture for unblessed hosts.
-/// Consults the explicit allowlist only — the `sso_allow_any_domain` deploy
-/// flag opens the domain gate but never relaxes the `https` requirement.
-#[cfg(not(test))]
-fn is_allowlisted_host(host: &str) -> bool {
-    is_explicitly_allowlisted(host)
+/// True if `host` (host or `host:port`) is loopback.
+fn is_loopback_host(host: &str) -> bool {
+    let bare = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
+    matches!(bare.as_str(), "localhost" | "127.0.0.1")
+}
+
+/// `http` discovery is permitted only for a loopback host, and only when the
+/// `sso_allow_insecure_discovery` deploy flag is set (e2e mock IdPs). Every
+/// other host — and everything in production, where the flag is off — requires
+/// `https`, so an un-flagged caller can never trigger an `http` outcall.
+fn allow_insecure_scheme(host: &str) -> bool {
+    sso_allow_insecure_discovery() && is_loopback_host(host)
 }
 
 // ---------------------------------------------------------------------------
@@ -336,6 +436,15 @@ struct IIOpenIdConfiguration {
     openid_configuration: String,
     #[serde(default)]
     name: Option<String>,
+    /// Per-app clients: `origin -> client_id`.
+    #[serde(default)]
+    app_clients: std::collections::HashMap<String, String>,
+    /// Default-deny an origin not in `app_clients`.
+    #[serde(default)]
+    gate_all_apps: bool,
+    /// Cross-client-stable identifier claim (default `sub`).
+    #[serde(default)]
+    stable_identifier_claim: Option<String>,
 }
 
 /// OIDC discovery document — only the fields the canister needs.
@@ -385,14 +494,21 @@ fn validate_discovery_document(doc: &DiscoveryDocument) -> Result<(), String> {
 /// stale-if-error).
 #[cfg(not(test))]
 async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
-    // Hop 1: fetch /.well-known/ii-openid-configuration. Default to https; an
-    // explicitly allowlisted loopback host (the e2e provider, which can't serve
-    // TLS) may use http. The explicit allowlist is the trust gate — the
-    // `sso_allow_any_domain` flag opens the domain gate but never picks http.
-    let hop1_scheme = scheme_for_allowlisted_host(&domain);
+    // Hop 1: fetch /.well-known/ii-openid-configuration. `https` by default; a
+    // loopback host may use `http` under the `sso_allow_insecure_discovery` flag
+    // (the e2e mock provider, which can't serve TLS).
+    let hop1_scheme = scheme_for_host(&domain);
     let hop1_url = format!("{hop1_scheme}://{domain}/.well-known/ii-openid-configuration");
     let ii_config = fetch_ii_openid_configuration(hop1_url).await?;
     validate_discovery_url(&ii_config.openid_configuration)?;
+
+    let app_clients = validate_app_clients(&ii_config.app_clients)?;
+    let stable_identifier_claim = ii_config
+        .stable_identifier_claim
+        .clone()
+        .filter(|c| !c.is_empty())
+        .unwrap_or_else(|| DEFAULT_STABLE_IDENTIFIER_CLAIM.to_string());
+    let gate_all_apps = ii_config.gate_all_apps;
 
     // Hop 2: fetch the standard OIDC discovery document.
     let doc = fetch_discovery(ii_config.openid_configuration.clone()).await?;
@@ -436,6 +552,9 @@ async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
         authorization_endpoint,
         scopes,
         name,
+        app_clients,
+        gate_all_apps,
+        stable_identifier_claim,
     })
 }
 
@@ -559,7 +678,7 @@ fn validate_discovery_url(url: &str) -> Result<(), String> {
         "https" => Ok(()),
         "http" => {
             let host = host_with_port(&parsed).ok_or_else(|| format!("URL has no host: {url}"))?;
-            if is_allowlisted_host(&host) {
+            if allow_insecure_scheme(&host) {
                 Ok(())
             } else {
                 Err(format!(
@@ -581,18 +700,11 @@ fn host_with_port(url: &url::Url) -> Option<String> {
     })
 }
 
-/// Scheme for the hop-1 URL. A loopback host (the e2e test provider, which
-/// can't serve TLS) gets `http`, but *only* when it's explicitly allowlisted;
-/// every other host gets `https`. Crucially, a loopback host that is reachable
-/// only because the `sso_allow_any_domain` flag opened the domain gate is *not*
-/// explicitly allowlisted, so it still gets `https`. This is what keeps the
-/// flag from becoming a plain-HTTP SSRF footgun: opening the domain gate must
-/// never let an un-allowlisted caller trigger an `http://` outcall to
-/// `localhost`/`127.0.0.1`. Consults the same explicit-allowlist gate as the
-/// hop-2 `https`-relaxation check ([`is_allowlisted_host`]).
-fn scheme_for_allowlisted_host(host: &str) -> &'static str {
-    let bare = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
-    if matches!(bare.as_str(), "localhost" | "127.0.0.1") && is_explicitly_allowlisted(host) {
+/// Scheme for the hop-1 URL: `http` only for a loopback host under the
+/// `sso_allow_insecure_discovery` flag (the e2e mock provider, which can't serve
+/// TLS); every other host — and everything in production — gets `https`.
+fn scheme_for_host(host: &str) -> &'static str {
+    if allow_insecure_scheme(host) {
         "http"
     } else {
         "https"
@@ -626,6 +738,33 @@ fn validate_same_host(reference_url: &str, other_url: &str) -> Result<(), String
     Ok(())
 }
 
+/// Test-only: reset the SSO caches and warm `domain`'s discovery + JWKS from an
+/// injected `DiscoveredConfig`.
+#[cfg(test)]
+pub(super) fn test_setup_discovery(
+    domain: &str,
+    discovery_config: DiscoveredConfig,
+    jwks: Vec<Jwk>,
+) {
+    use crate::single_flight_cache::{run_detached, set_test_now};
+    set_test_now(1_700_000_000);
+    DISCOVERY_CACHE.with(|c| *c.borrow_mut() = new_discovery_cache());
+    JWKS_CACHE.with(|c| *c.borrow_mut() = new_jwks_cache());
+    tests::TEST_DISCOVERY.with_borrow_mut(|m| {
+        m.clear();
+        m.insert(domain.to_string(), discovery_config.clone());
+    });
+    tests::TEST_JWKS.with_borrow_mut(|m| {
+        m.clear();
+        m.insert(discovery_config.jwks_uri.clone(), jwks);
+    });
+    // First pass warms discovery; the second warms JWKS now that discovery is Ready.
+    prefetch(domain);
+    run_detached();
+    prefetch(domain);
+    run_detached();
+}
+
 // ---------------------------------------------------------------------------
 // Tests.
 // ---------------------------------------------------------------------------
@@ -637,16 +776,14 @@ mod tests {
     use std::collections::HashMap;
 
     thread_local! {
-        pub(super) static TEST_ALLOWED: RefCell<Vec<String>> = const { RefCell::new(vec![]) };
-        pub(super) static TEST_ALLOW_ANY: RefCell<bool> = const { RefCell::new(false) };
+        pub(super) static TEST_ALLOW_INSECURE: RefCell<bool> = const { RefCell::new(false) };
         pub(super) static TEST_DISCOVERY: RefCell<HashMap<String, DiscoveredConfig>> = RefCell::new(HashMap::new());
         pub(super) static TEST_JWKS: RefCell<HashMap<String, Vec<Jwk>>> = RefCell::new(HashMap::new());
     }
 
     fn reset() {
         set_test_now(1_700_000_000);
-        TEST_ALLOWED.with_borrow_mut(|d| *d = vec!["example.org".to_string()]);
-        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = false);
+        TEST_ALLOW_INSECURE.with_borrow_mut(|b| *b = false);
         TEST_DISCOVERY.with_borrow_mut(|m| m.clear());
         TEST_JWKS.with_borrow_mut(|m| m.clear());
         DISCOVERY_CACHE.with(|c| *c.borrow_mut() = new_discovery_cache());
@@ -661,6 +798,9 @@ mod tests {
             authorization_endpoint: "https://idp.example.org/authorize".to_string(),
             scopes: vec!["openid".to_string()],
             name: Some("Example".to_string()),
+            app_clients: vec![],
+            gate_all_apps: false,
+            stable_identifier_claim: DEFAULT_STABLE_IDENTIFIER_CLAIM.to_string(),
         }
     }
 
@@ -669,17 +809,18 @@ mod tests {
     }
 
     fn allowed(domain: &str) -> bool {
-        validate_allowed_discovery_domain(domain).is_ok()
+        validate_discovery_domain(domain).is_ok()
     }
 
     #[test]
-    fn resolve_rejects_disallowed_domain() {
+    fn resolve_rejects_non_authority_domain() {
         reset();
-        assert!(!allowed("not-allowed.com"));
-        assert!(allowed("example.org"));
-        // The verify path rejects a disallowed domain.
+        // No allowlist: any bare authority is accepted; a non-authority is not.
+        assert!(allowed("not-allowed.com"));
+        assert!(!allowed("evil.com@127.0.0.1"));
+        // The verify path rejects a non-authority domain.
         assert!(resolve(
-            "not-allowed.com",
+            "evil.com@127.0.0.1",
             "https://idp.example.org",
             &test_aud_claim()
         )
@@ -687,46 +828,34 @@ mod tests {
     }
 
     #[test]
-    fn allow_any_domain_opens_the_gate() {
+    fn any_bare_authority_is_allowed() {
         reset();
-        // Off by default: a domain off the explicit allowlist is rejected.
-        assert!(!allowed("not-allowed.com"));
-        // Flag on: every domain passes the discovery gate.
-        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
+        // No allowlist: any bare-authority domain passes the discovery gate.
         assert!(allowed("not-allowed.com"));
         assert!(allowed("example.org"));
-        // The explicit allowlist is unchanged — the `https`-relaxation gate
-        // still consults it, so the flag does not bless arbitrary http hosts.
-        assert!(is_explicitly_allowlisted("example.org"));
-        assert!(!is_explicitly_allowlisted("not-allowed.com"));
+        assert!(allowed("sub.example.com:8443"));
     }
 
     #[test]
-    fn allow_any_domain_does_not_relax_https_for_loopback() {
+    fn http_scheme_requires_insecure_flag_and_loopback() {
         reset();
-        // e2e setup: the loopback provider is explicitly allowlisted, so hop-1
-        // is allowed to use plain http (it can't serve TLS).
-        TEST_ALLOWED.with_borrow_mut(|d| *d = vec!["localhost:11107".to_string()]);
-        assert_eq!(scheme_for_allowlisted_host("localhost:11107"), "http");
+        // Default (flag off): https for every host, loopback included.
+        assert_eq!(scheme_for_host("localhost:11107"), "https");
+        assert_eq!(scheme_for_host("127.0.0.1:8080"), "https");
+        assert_eq!(scheme_for_host("example.com"), "https");
 
-        // Flag on opens the *domain* gate for everything, loopback included...
-        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
-        assert!(allowed("localhost"));
-        assert!(allowed("127.0.0.1:8080"));
-        // ...but a loopback host reachable only via the flag (not on the
-        // explicit allowlist) still gets https: the flag must never trigger a
-        // plain-http outcall to localhost/127.0.0.1.
-        assert_eq!(scheme_for_allowlisted_host("localhost"), "https");
-        assert_eq!(scheme_for_allowlisted_host("localhost:9999"), "https");
-        assert_eq!(scheme_for_allowlisted_host("127.0.0.1:8080"), "https");
-        // Non-loopback hosts are always https regardless.
-        assert_eq!(scheme_for_allowlisted_host("evil.example.com"), "https");
+        // Flag on: loopback hosts may use plain http (the e2e mock provider,
+        // which can't serve TLS)...
+        TEST_ALLOW_INSECURE.with_borrow_mut(|b| *b = true);
+        assert_eq!(scheme_for_host("localhost:11107"), "http");
+        assert_eq!(scheme_for_host("127.0.0.1:8080"), "http");
+        // ...but non-loopback hosts always require https.
+        assert_eq!(scheme_for_host("evil.example.com"), "https");
     }
 
     #[test]
-    fn allow_any_domain_rejects_non_authority() {
+    fn non_authority_domain_is_rejected() {
         reset();
-        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
 
         // Bare authorities pass: host, sub-host, and explicit (non-default)
         // port, case-insensitively.
@@ -750,34 +879,18 @@ mod tests {
             "exa mple.com",          // whitespace in host
             "",                      // empty
         ] {
-            assert!(
-                !allowed(bad),
-                "expected `{bad}` to be rejected even with sso_allow_any_domain on",
-            );
+            assert!(!allowed(bad), "expected `{bad}` to be rejected");
         }
-
-        // The bare-authority check only gates the flag path: an explicitly
-        // allowlisted entry is admin-curated and trusted verbatim, so it is
-        // accepted even if it wouldn't pass `is_bare_authority` on its own.
-        TEST_ALLOWED.with_borrow_mut(|d| *d = vec!["example.com/weird".to_string()]);
-        assert!(!is_bare_authority("example.com/weird"));
-        assert!(allowed("example.com/weird"));
     }
 
     #[test]
-    fn over_long_domain_is_never_allowed() {
+    fn over_long_domain_is_rejected() {
         reset();
-        // Even with the gate fully open, an over-length domain is rejected.
-        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
         let at_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 4));
         assert_eq!(at_cap.len(), MAX_DOMAIN_LENGTH);
         assert!(allowed(&at_cap));
         let over_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 3));
         assert_eq!(over_cap.len(), MAX_DOMAIN_LENGTH + 1);
-        assert!(!allowed(&over_cap));
-        // The length cap fires even for an explicitly allowlisted entry.
-        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = false);
-        TEST_ALLOWED.with_borrow_mut(|d| *d = vec![over_cap.clone()]);
         assert!(!allowed(&over_cap));
     }
 
@@ -795,7 +908,9 @@ mod tests {
         assert_eq!(peek_discovery("example.org"), Cached::Pending);
         run_detached();
         match peek_discovery("example.org") {
-            Cached::Ready(cfg) => assert_eq!(cfg.issuer, "https://idp.example.org"),
+            Cached::Ready(discovery_config) => {
+                assert_eq!(discovery_config.issuer, "https://idp.example.org")
+            }
             other => panic!("expected Ready, got {other:?}"),
         }
     }
@@ -818,6 +933,128 @@ mod tests {
     }
 
     #[test]
+    fn app_client_cleartext_resolution() {
+        let discovery_config = DiscoveredConfig {
+            app_clients: vec![
+                AppClient {
+                    key: AppClientKey::Cleartext("https://payroll.com".to_string()),
+                    client_id: "0oaPAYROLL".to_string(),
+                },
+                AppClient {
+                    key: AppClientKey::Cleartext("https://admin.internal.app".to_string()),
+                    client_id: "0oaADMIN".to_string(),
+                },
+            ],
+            ..sample_config()
+        };
+        assert_eq!(
+            discovery_config.resolve_client_for_origin("https://payroll.com"),
+            Ok("0oaPAYROLL".to_string())
+        );
+        assert_eq!(
+            discovery_config.resolve_client_for_origin("https://public.app"),
+            Ok("client-123".to_string())
+        );
+    }
+
+    #[test]
+    fn app_client_hashed_key_resolution() {
+        let origin = "https://oc.app";
+        let salt = "9f3a7c2e";
+        let mut hasher = Sha256::new();
+        hasher.update(origin.as_bytes());
+        hasher.update(salt.as_bytes());
+        let hash = hex::encode(hasher.finalize());
+        let discovery_config = DiscoveredConfig {
+            app_clients: vec![AppClient {
+                key: AppClientKey::Hashed {
+                    hash: hash.clone(),
+                    salt: salt.to_string(),
+                },
+                client_id: "0oaCHAT".to_string(),
+            }],
+            ..sample_config()
+        };
+        assert_eq!(
+            discovery_config.resolve_client_for_origin(origin),
+            Ok("0oaCHAT".to_string())
+        );
+        assert_eq!(
+            discovery_config.resolve_client_for_origin("https://evil.app"),
+            Ok("client-123".to_string())
+        );
+    }
+
+    #[test]
+    fn gate_all_apps_default_deny() {
+        let discovery_config = DiscoveredConfig {
+            app_clients: vec![AppClient {
+                key: AppClientKey::Cleartext("https://payroll.com".to_string()),
+                client_id: "0oaPAYROLL".to_string(),
+            }],
+            gate_all_apps: true,
+            ..sample_config()
+        };
+        assert_eq!(
+            discovery_config.resolve_client_for_origin("https://payroll.com"),
+            Ok("0oaPAYROLL".to_string())
+        );
+        assert_eq!(
+            discovery_config.resolve_client_for_origin("https://public.app"),
+            Err(Forbidden)
+        );
+    }
+
+    #[test]
+    fn app_clients_over_cap_rejected() {
+        let mut entries = std::collections::HashMap::new();
+        for i in 0..=MAX_APP_CLIENTS {
+            entries.insert(format!("https://app{i}.com"), format!("client{i}"));
+        }
+        assert!(entries.len() > MAX_APP_CLIENTS);
+        assert!(validate_app_clients(&entries).is_err());
+
+        entries.clear();
+        for i in 0..MAX_APP_CLIENTS {
+            entries.insert(format!("https://app{i}.com"), format!("client{i}"));
+        }
+        assert_eq!(entries.len(), MAX_APP_CLIENTS);
+        assert!(validate_app_clients(&entries).is_ok());
+    }
+
+    #[test]
+    fn app_clients_over_long_client_id_rejected() {
+        let mut entries = std::collections::HashMap::new();
+        entries.insert(
+            "https://app.com".to_string(),
+            "a".repeat(MAX_APP_CLIENT_ID_LENGTH + 1),
+        );
+        assert!(validate_app_clients(&entries).is_err());
+
+        entries.clear();
+        entries.insert(
+            "https://app.com".to_string(),
+            "a".repeat(MAX_APP_CLIENT_ID_LENGTH),
+        );
+        assert!(validate_app_clients(&entries).is_ok());
+    }
+
+    #[test]
+    fn app_client_key_parse_distinguishes_cleartext_from_hashed() {
+        assert_eq!(
+            AppClientKey::parse("https://payroll.com"),
+            AppClientKey::Cleartext("https://payroll.com".to_string())
+        );
+        assert_eq!(
+            AppClientKey::parse("b5d4045c:9f3a7c2e"),
+            AppClientKey::Hashed {
+                hash: "b5d4045c".to_string(),
+                salt: "9f3a7c2e".to_string()
+            }
+        );
+    }
+
+    #[test]
     fn resolve_cross_checks_issuer() {
         reset();
         TEST_DISCOVERY.with_borrow_mut(|m| {
@@ -832,7 +1069,7 @@ mod tests {
         match resolve("example.org", "https://idp.example.org", &test_aud_claim()) {
             Ok(Cached::Ready((descriptor, jwks_uri))) => {
                 assert_eq!(jwks_uri, "https://idp.example.org/jwks");
-                assert!(matches!(descriptor.stamp, Stamp::Sso { .. }));
+                assert!(descriptor.sso.is_some());
             }
             _ => panic!("expected Ready"),
         }

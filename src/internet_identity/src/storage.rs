@@ -140,6 +140,7 @@ use storable::mcp_registration::StorableMcpRegistration;
 use storable::openid_credential::StorableOpenIdCredential;
 use storable::openid_credential_key::StorableOpenIdCredentialKey;
 use storable::openid_jwks::StorableJwks;
+use storable::sso_stable_id_key::StorableSsoStableIdKey;
 use storable::storable_persistent_state::StorablePersistentState;
 
 pub mod anchor;
@@ -211,13 +212,15 @@ const MCP_GRANT_MEMORY_INDEX: u8 = 29u8;
 // region is abandoned rather than migrated, matching the retired MCP indexes above.
 // const DEPRECATED_MCP_REGISTRATION_URL_MEMORY_INDEX: u8 = 30u8;
 const MCP_REGISTRATION_MEMORY_INDEX: u8 = 31u8;
+const SSO_STABLE_ID_INDEX_MEMORY_INDEX: u8 = 32u8;
 
 // Push notifications PoC — three maps used by the RFC 8291 delivery flow
-// (docs/push-notifications-poc.md). All three are additive: the PoC never
-// touches an existing map's schema.
-const PUSH_SUBSCRIPTIONS_MEMORY_INDEX: u8 = 31u8;
-const PUSH_CONSENT_MEMORY_INDEX: u8 = 32u8;
-const PUSH_PRINCIPAL_INDEX_MEMORY_INDEX: u8 = 33u8;
+// (docs/push-notifications.md). All three are additive: the PoC never touches
+// an existing map's schema. Indices 31 and 32 are taken (MCP registration,
+// SSO stable-id index), so these start at 33.
+const PUSH_SUBSCRIPTIONS_MEMORY_INDEX: u8 = 33u8;
+const PUSH_CONSENT_MEMORY_INDEX: u8 = 34u8;
+const PUSH_PRINCIPAL_INDEX_MEMORY_INDEX: u8 = 35u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -293,6 +296,10 @@ const MCP_REGISTRATION_MEMORY_ID: MemoryId = MemoryId::new(MCP_REGISTRATION_MEMO
 /// serialization.
 const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
 
+/// SSO stable-id bridge:
+/// `SHA-256(sso_domain, iss, ii_client_id, stable_id) -> AnchorNumber`.
+const SSO_STABLE_ID_INDEX_MEMORY_ID: MemoryId = MemoryId::new(SSO_STABLE_ID_INDEX_MEMORY_INDEX);
+
 /// Device subscriptions: `(anchor, endpoint_sha256) -> StorablePushSubscription`.
 /// One row per browser that ran `pushManager.subscribe()`. Idempotent — the
 /// same browser re-subscribing overwrites in place.
@@ -360,6 +367,18 @@ pub struct SsoCredentialMigrationBatchOutcome {
     /// batch to resume the scan where this one left off. `None` when the
     /// batch examined no keys.
     pub next_cursor: Option<StorableOpenIdCredentialKey>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct McpConfigMigrationBatchOutcome {
+    /// Number of stored MCP configs rewritten this batch.
+    pub migrated: u64,
+    /// `true` when the scan has reached the end of the config map — caller
+    /// should stop the interval timer.
+    pub is_done: bool,
+    /// Last anchor examined this batch; pass back as `cursor` of the next
+    /// batch to resume the scan. `None` when the batch examined nothing.
+    pub next_cursor: Option<StorableAnchorNumber>,
 }
 
 /// Data type responsible for managing anchor data in stable memory.
@@ -468,6 +487,17 @@ pub struct Storage<M: Memory> {
     mcp_config_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Per-anchor trusted-MCP-server config. See [`MCP_CONFIG_MEMORY_ID`].
     mcp_config_memory: StableBTreeMap<StorableAnchorNumber, StorableMcpConfig, ManagedMemory<M>>,
+
+    sso_stable_id_index_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// SSO stable-id lookup index:
+    /// `SHA-256(sso_domain, iss, ii_client_id, stable_id) ->
+    /// AnchorNumber`. Storage-maintained — [`Storage::write`] reconciles it
+    /// from the anchors' stored OpenID credentials on every write, so it
+    /// self-cleans when a credential is removed or moved. Mirrors
+    /// [`Storage::lookup_anchor_with_openid_credential`]'s value type. See
+    /// [`SSO_STABLE_ID_INDEX_MEMORY_ID`].
+    sso_stable_id_index_memory:
+        StableBTreeMap<StorableSsoStableIdKey, StorableAnchorNumberList, ManagedMemory<M>>,
 
     // ---- Push notifications PoC ----------------------------------------
     push_subscriptions_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
@@ -582,6 +612,7 @@ impl<M: Memory + Clone> Storage<M> {
         let mcp_registration_memory = memory_manager.get(MCP_REGISTRATION_MEMORY_ID);
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
+        let sso_stable_id_index_memory = memory_manager.get(SSO_STABLE_ID_INDEX_MEMORY_ID);
         let push_subscriptions_memory = memory_manager.get(PUSH_SUBSCRIPTIONS_MEMORY_ID);
         let push_consent_memory = memory_manager.get(PUSH_CONSENT_MEMORY_ID);
         let push_principal_index_memory = memory_manager.get(PUSH_PRINCIPAL_INDEX_MEMORY_ID);
@@ -699,6 +730,10 @@ impl<M: Memory + Clone> Storage<M> {
             openid_jwks_cache_memory: StableBTreeMap::init(openid_jwks_cache_memory),
             mcp_config_memory_wrapper: MemoryWrapper::new(mcp_config_memory.clone()),
             mcp_config_memory: StableBTreeMap::init(mcp_config_memory),
+            sso_stable_id_index_memory_wrapper: MemoryWrapper::new(
+                sso_stable_id_index_memory.clone(),
+            ),
+            sso_stable_id_index_memory: StableBTreeMap::init(sso_stable_id_index_memory),
 
             push_subscriptions_memory_wrapper: MemoryWrapper::new(
                 push_subscriptions_memory.clone(),
@@ -911,7 +946,14 @@ impl<M: Memory + Clone> Storage<M> {
         // reverse-lookup index — verified emails are addressable only
         // via the owning anchor.
 
-        // Right now, this is the only index that needs to be updated based on `StorableAnchor`.
+        // The SSO stable-id index is derived from the same credentials; sync it
+        // first (with clones) since the openid-credential sync below consumes
+        // the vecs.
+        self.sync_anchor_with_sso_stable_id_index(
+            anchor_number,
+            previous_openid_credentials.clone(),
+            storable_anchor.openid_credentials.clone(),
+        );
         self.sync_anchor_with_openid_credential_index(
             anchor_number,
             previous_openid_credentials,
@@ -1014,6 +1056,54 @@ impl<M: Memory + Clone> Storage<M> {
             self.lookup_anchor_with_openid_credential_memory
                 .insert(key, vec![anchor_number].into());
         });
+    }
+
+    /// Reconcile the SSO stable-id index against `anchor_number`'s stored
+    /// credentials. Mirrors [`Storage::sync_anchor_with_openid_credential_index`]:
+    /// derive the `(sso_domain, iss, ii_client_id, stable_id)` keyset from each
+    /// credential that carries a `stable_id`, diff previous vs current, and
+    /// apply only the delta — `remove` the entries that disappeared, `insert`
+    /// the new ones pointing at this anchor. Because the keyset is derived from
+    /// the stored credentials, removing or moving an SSO credential removes or
+    /// moves its index entry too; there are no orphans.
+    fn sync_anchor_with_sso_stable_id_index(
+        &mut self,
+        anchor_number: AnchorNumber,
+        previous: Vec<StorableOpenIdCredential>,
+        current: Vec<StorableOpenIdCredential>,
+    ) {
+        fn keys(credentials: Vec<StorableOpenIdCredential>) -> BTreeSet<StorableSsoStableIdKey> {
+            credentials
+                .into_iter()
+                .filter_map(|cred| {
+                    // Both are set together on an SSO non-`sub` credential; a
+                    // `stable_id` without an `sso_domain` can't be domain-scoped,
+                    // so it isn't indexed.
+                    let stable_id = cred.stable_id?;
+                    let sso_domain = cred.sso_domain?;
+                    Some(StorableSsoStableIdKey::new(
+                        &sso_domain,
+                        &cred.iss,
+                        &cred.aud,
+                        &stable_id,
+                    ))
+                })
+                .collect()
+        }
+
+        let previous_set = keys(previous);
+        let current_set = keys(current);
+
+        previous_set.difference(&current_set).for_each(|key| {
+            self.sso_stable_id_index_memory.remove(key);
+        });
+        current_set
+            .difference(&previous_set)
+            .cloned()
+            .for_each(|key| {
+                self.sso_stable_id_index_memory
+                    .insert(key, vec![anchor_number].into());
+            });
     }
 
     pub fn lookup_anchor_with_openid_credential(
@@ -1184,6 +1274,104 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&principal)
     }
 
+    /// Rewrite up to `batch_size` stored MCP configs to "enabled, official
+    /// connector". The pre-official-connector meaning of every stored value
+    /// was "no custom server of mine", never a choice about a connector that
+    /// did not exist yet.
+    ///
+    /// That deliberately includes rows that are already enabled with a custom
+    /// server: `{ enabled: true, url: Some(..) }` is reset to the official
+    /// connector like everything else, so those identities have to re-add their
+    /// server if they still want it. Only rows already in the target shape
+    /// (`{ enabled: true, url: None }`) are skipped, which is what makes a
+    /// re-run a no-op.
+    ///
+    /// Any live grant on a rewritten row is deleted, along with any in-flight
+    /// registration: neither may come back to life because a migration
+    /// re-enabled the identity. A grant that was inert only because the config
+    /// was disabled must not end up authorized against a connector it was never
+    /// granted for, and a registration delegation consented to before the
+    /// switch-off must not become redeemable again.
+    pub fn migrate_mcp_configs_batch(
+        &mut self,
+        cursor: Option<StorableAnchorNumber>,
+        batch_size: u64,
+    ) -> McpConfigMigrationBatchOutcome {
+        let mut outcome = McpConfigMigrationBatchOutcome::default();
+        if batch_size == 0 {
+            outcome.is_done = true;
+            return outcome;
+        }
+
+        // Collect first so the rewrite below doesn't alias the range borrow.
+        use std::ops::Bound as RangeBound;
+        let range = match cursor {
+            Some(cursor) => (RangeBound::Excluded(cursor), RangeBound::Unbounded),
+            None => (RangeBound::Unbounded, RangeBound::Unbounded),
+        };
+        let mut examined: u64 = 0;
+        let mut stale: Vec<(StorableAnchorNumber, StorableMcpConfig)> = vec![];
+        for (anchor_number, config) in self
+            .mcp_config_memory
+            .range(range)
+            .take(batch_size as usize)
+        {
+            examined += 1;
+            outcome.next_cursor = Some(anchor_number);
+            // Only the target shape is skipped — an enabled row with a custom
+            // server is rewritten too (see the doc comment). Skipping it also
+            // makes a re-run a no-op.
+            if config.enabled && config.url.is_none() {
+                continue;
+            }
+            stale.push((anchor_number, config));
+        }
+
+        for (anchor_number, config) in stale {
+            if let Some(bytes) = &config.session_principal {
+                if let Ok(principal) = Principal::try_from_slice(bytes) {
+                    // Only remove a grant this anchor actually owns, so a
+                    // stale pointer can't delete another identity's session.
+                    if self
+                        .lookup_mcp_grant(principal)
+                        .is_some_and(|grant| grant.anchor_number == anchor_number)
+                    {
+                        self.remove_mcp_grant(principal);
+                    }
+                }
+            }
+            // `set_mcp_config` carries an in-flight registration over, because
+            // the redemption's URL-hash check invalidates it. That check
+            // compares against the *current* trusted URL though, and this
+            // migration can restore the very URL the entry was minted under, so
+            // here it has to go.
+            if let Some(bytes) = &config.pending_registration {
+                if let Ok(principal) = Principal::try_from_slice(bytes) {
+                    if self
+                        .lookup_mcp_registration(principal)
+                        .is_some_and(|entry| entry.anchor_number == anchor_number)
+                    {
+                        self.remove_mcp_registration(principal);
+                    }
+                }
+            }
+            self.mcp_config_memory.insert(
+                anchor_number,
+                StorableMcpConfig {
+                    enabled: true,
+                    ..Default::default()
+                },
+            );
+            outcome.migrated += 1;
+        }
+
+        // A short batch means the scan has reached the end of the map.
+        if examined < batch_size {
+            outcome.is_done = true;
+        }
+        outcome
+    }
+
     /// Look up the MCP session grant registered for `principal` (the caller
     /// of the server-facing `mcp_*` methods). Callers are responsible for
     /// checking `expires_at_ns`; the map itself never authorizes anything.
@@ -1202,6 +1390,28 @@ impl<M: Memory + Clone> Storage<M> {
     /// Remove the MCP session grant keyed by `principal`.
     pub fn remove_mcp_grant(&mut self, principal: Principal) {
         self.mcp_grant_memory.remove(&principal);
+    }
+
+    /// Total number of MCP session grant entries currently stored — live
+    /// grants plus any expired residue that has not been superseded or
+    /// removed yet (grants are replaced per anchor on re-registration and
+    /// dropped on the config change that revokes them, but an expired grant
+    /// whose anchor never returns lingers until then). O(1).
+    pub fn mcp_grant_count(&self) -> u64 {
+        self.mcp_grant_memory.len()
+    }
+
+    /// Number of *live* (non-expired at `now_ns`) MCP session grants: the
+    /// currently-authorized MCP sessions, at most one per anchor. Scans the
+    /// grant map and filters by `expires_at_ns`, since the map may also hold
+    /// expired residue (see [`Self::mcp_grant_count`]); O(n) in stored grants.
+    pub fn count_live_mcp_grants(&self, now_ns: u64) -> u64 {
+        // Accumulate directly into a `u64`: `Iterator::count` returns `usize`,
+        // which is 32-bit on wasm32 and would wrap in a release build.
+        self.mcp_grant_memory
+            .iter()
+            .filter(|(_, grant)| grant.expires_at_ns > now_ns)
+            .fold(0u64, |acc, _| acc + 1)
     }
 
     /// Look up the pending MCP registration entry keyed by `principal` (the
@@ -1274,10 +1484,55 @@ impl<M: Memory + Clone> Storage<M> {
             .unwrap_or_default()
     }
 
+    /// `anchor_number`'s stored config, or `None` when it never wrote one —
+    /// an identity that predates registration seeding and never used the
+    /// feature, or one registered on a deployment with no official connector.
+    pub fn lookup_mcp_config(&self, anchor_number: AnchorNumber) -> Option<StorableMcpConfig> {
+        self.mcp_config_memory.get(&anchor_number)
+    }
+
     /// Persist `anchor_number`'s trusted-MCP-server config (overwriting any
     /// previous value), so it syncs across the identity's devices.
     pub fn write_mcp_config(&mut self, anchor_number: AnchorNumber, config: StorableMcpConfig) {
         self.mcp_config_memory.insert(anchor_number, config);
+    }
+
+    /// Give `anchor_number` AI access on the official connector, the same shape
+    /// `migrate_mcp_configs_batch` gives identities that registered earlier.
+    /// Call it through `mcp::init_config_for_new_identity`, which holds the rule
+    /// that this is only written when the deployment has a connector to trust.
+    pub fn init_mcp_config(&mut self, anchor_number: AnchorNumber) {
+        self.mcp_config_memory.insert(
+            anchor_number,
+            StorableMcpConfig {
+                enabled: true,
+                ..Default::default()
+            },
+        );
+    }
+
+    /// Resolve a non-`sub` SSO stable id to the anchor that carries the matching
+    /// II-client credential, or `None` if no anchor does (never linked, or the
+    /// credential has since been removed — the index self-cleans on `write()`,
+    /// so a stale `Some` can't linger). Mirrors
+    /// [`Storage::lookup_anchor_with_openid_credential`].
+    pub fn lookup_anchor_by_sso_stable_id(
+        &self,
+        sso_domain: &str,
+        iss: &str,
+        ii_client_id: &str,
+        stable_id: &str,
+    ) -> Option<AnchorNumber> {
+        let anchor_numbers: Vec<AnchorNumber> = self
+            .sso_stable_id_index_memory
+            .get(&StorableSsoStableIdKey::new(
+                sso_domain,
+                iss,
+                ii_client_id,
+                stable_id,
+            ))
+            .map(Into::into)?;
+        anchor_numbers.first().copied()
     }
 
     /// Resolve the verified `From:` of an inbound recovery email to
@@ -2493,6 +2748,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "mcp_config_memory".to_string(),
                 self.mcp_config_memory_wrapper.size(),
+            ),
+            (
+                "sso_stable_id_index_memory".to_string(),
+                self.sso_stable_id_index_memory_wrapper.size(),
             ),
             (
                 "push_subscriptions_memory".to_string(),

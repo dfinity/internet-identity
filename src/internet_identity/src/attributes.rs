@@ -359,6 +359,7 @@ impl Anchor {
     /// - If `spec.value` is `Some`, validates it matches the stored value.
     /// - Computes the certified key: if `omit_scope` is true, uses just the attribute name
     ///   (e.g., `"email"`); otherwise uses the full key (e.g., `"openid:https://...:email"`).
+    #[allow(clippy::too_many_arguments)]
     pub fn prepare_icrc3_attributes(
         &self,
         attribute_specs: Vec<ValidatedAttributeSpec>,
@@ -373,6 +374,9 @@ impl Anchor {
         unmapped_origin: Option<String>,
         issued_at_timestamp_ns: u64,
         account: Account,
+        // SSO domain this session signed in through, or `None` for non-SSO
+        // sessions; `sso:<domain>` attributes certify only when it matches.
+        sso_session_domain: Option<String>,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
         let mut certified_pairs: BTreeMap<String, Icrc3Value> = BTreeMap::new();
         let mut problems = Vec::new();
@@ -414,6 +418,13 @@ impl Anchor {
                     insert_certified_attribute(&mut certified_pairs, &mut problems, spec, stored);
                 }
                 Some(AttributeScope::Sso { domain }) => {
+                    // Certify SSO attributes only for a session that signed in through this exact domain.
+                    if sso_session_domain.as_deref() != Some(domain.as_str()) {
+                        problems.push(format!(
+                            "sso:{domain} attributes require an SSO sign-in through that domain"
+                        ));
+                        continue;
+                    }
                     let credential = self.openid_credentials.iter().find(|c| {
                         c.matched_attribute_scope()
                             == Some(AttributeScope::Sso {
@@ -557,9 +568,12 @@ impl Anchor {
     /// `("verified_email", value)` — one wire row per (name, address),
     /// so an anchor with multiple verified emails produces multiple
     /// rows that share the same key but carry different values.
+    ///
+    /// `sso_session_domain` gates `sso:<domain>` rows to the domain this session can certify.
     pub fn list_available_attributes(
         &self,
         requested: Option<Vec<AttributeKey>>,
+        sso_session_domain: Option<String>,
     ) -> Vec<(String, Vec<u8>)> {
         let all_attribute_names = AttributeName::all();
         let mut result: Vec<(String, Vec<u8>)> = Vec::new();
@@ -575,6 +589,18 @@ impl Anchor {
             let Some(scope) = credential.matched_attribute_scope() else {
                 continue;
             };
+
+            // List `sso:<domain>` rows only for a session that can certify that
+            // exact domain. A credential for a different SSO domain (an anchor
+            // can hold several) simply isn't listed for this session — skipped,
+            // not an error: listing is best-effort and non-blocking by design,
+            // so a requested-but-unavailable attribute is just absent from the
+            // result, never a failure of the sign-in flow.
+            if let AttributeScope::Sso { domain } = &scope {
+                if sso_session_domain.as_deref() != Some(domain) {
+                    continue;
+                }
+            }
 
             for &attr_name in all_attribute_names {
                 // `verified_email` isn't supported under `sso:` yet (PR
@@ -672,6 +698,7 @@ mod tests {
             metadata,
             sso_domain: None,
             sso_name: None,
+            stable_id: None,
         }];
         anchor
     }
@@ -690,6 +717,7 @@ mod tests {
                 metadata,
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             })
             .collect();
         anchor
@@ -1136,6 +1164,7 @@ mod tests {
                 metadata,
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             }
         }
 
@@ -1150,6 +1179,7 @@ mod tests {
                 metadata,
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             }
         }
 
@@ -1441,6 +1471,7 @@ mod tests {
                 metadata,
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             };
             let anchor = anchor_with_openid_credentials(vec![credential]);
             let mut requested = request_verified_email_for(microsoft_scope());
@@ -1479,6 +1510,7 @@ mod tests {
                 metadata,
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             };
             let anchor = anchor_with_openid_credentials(vec![credential]);
             let mut requested = request_verified_email_for(microsoft_scope());
@@ -1681,6 +1713,7 @@ mod tests {
                 metadata,
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             };
             let anchor = anchor_with_openid_credentials(vec![credential]);
 
@@ -1774,6 +1807,7 @@ mod tests {
                 ]),
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             }
         }
 
@@ -1859,6 +1893,7 @@ mod tests {
                 ]),
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             }];
             anchor
         }
@@ -1896,6 +1931,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
 
             match result {
@@ -1934,6 +1970,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
 
             match result {
@@ -1971,6 +2008,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
 
             match result {
@@ -2002,6 +2040,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
 
             match result {
@@ -2139,6 +2178,7 @@ mod tests {
                 ]),
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             }];
             anchor
         }
@@ -2148,7 +2188,7 @@ mod tests {
             setup_google_provider();
             let anchor = google_anchor();
 
-            let result = anchor.list_available_attributes(None);
+            let result = anchor.list_available_attributes(None, None);
 
             // Should have email and name (verified_email requires email_verified=true in metadata)
             pretty_assert_eq!(result.len(), 2);
@@ -2162,12 +2202,15 @@ mod tests {
             setup_google_provider();
             let anchor = google_anchor();
 
-            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
-                scope: Some(AttributeScope::OpenId {
-                    issuer: GOOGLE_ISSUER.to_string(),
-                }),
-                attribute_name: AttributeName::Email,
-            }]));
+            let result = anchor.list_available_attributes(
+                Some(vec![AttributeKey {
+                    scope: Some(AttributeScope::OpenId {
+                        issuer: GOOGLE_ISSUER.to_string(),
+                    }),
+                    attribute_name: AttributeName::Email,
+                }]),
+                None,
+            );
 
             pretty_assert_eq!(result.len(), 1);
             pretty_assert_eq!(result[0].0, format!("openid:{}:email", GOOGLE_ISSUER));
@@ -2180,10 +2223,13 @@ mod tests {
             let anchor = google_anchor();
 
             // "email" without scope should match all scopes
-            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
-                scope: None,
-                attribute_name: AttributeName::Email,
-            }]));
+            let result = anchor.list_available_attributes(
+                Some(vec![AttributeKey {
+                    scope: None,
+                    attribute_name: AttributeName::Email,
+                }]),
+                None,
+            );
 
             pretty_assert_eq!(result.len(), 1);
             pretty_assert_eq!(result[0].0, format!("openid:{}:email", GOOGLE_ISSUER));
@@ -2195,12 +2241,15 @@ mod tests {
             setup_google_provider();
             let anchor = google_anchor();
 
-            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
-                scope: Some(AttributeScope::OpenId {
-                    issuer: GOOGLE_ISSUER.to_string(),
-                }),
-                attribute_name: AttributeName::VerifiedEmail,
-            }]));
+            let result = anchor.list_available_attributes(
+                Some(vec![AttributeKey {
+                    scope: Some(AttributeScope::OpenId {
+                        issuer: GOOGLE_ISSUER.to_string(),
+                    }),
+                    attribute_name: AttributeName::VerifiedEmail,
+                }]),
+                None,
+            );
 
             // verified_email is not available because email_verified is not "true" in metadata
             pretty_assert_eq!(result.len(), 0);
@@ -2211,7 +2260,7 @@ mod tests {
             setup_google_provider();
             let anchor = Anchor::new(ANCHOR_NUMBER, 0); // no credentials
 
-            let result = anchor.list_available_attributes(None);
+            let result = anchor.list_available_attributes(None, None);
             pretty_assert_eq!(result.len(), 0);
         }
 
@@ -2221,7 +2270,7 @@ mod tests {
             let anchor = google_anchor();
 
             // Some(vec![]) means "filter by these keys" with no keys → nothing matches
-            let result = anchor.list_available_attributes(Some(vec![]));
+            let result = anchor.list_available_attributes(Some(vec![]), None);
             pretty_assert_eq!(result.len(), 0);
         }
 
@@ -2230,12 +2279,15 @@ mod tests {
             setup_google_provider();
             let anchor = google_anchor();
 
-            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
-                scope: Some(AttributeScope::OpenId {
-                    issuer: "https://unknown-issuer.com".to_string(),
-                }),
-                attribute_name: AttributeName::Email,
-            }]));
+            let result = anchor.list_available_attributes(
+                Some(vec![AttributeKey {
+                    scope: Some(AttributeScope::OpenId {
+                        issuer: "https://unknown-issuer.com".to_string(),
+                    }),
+                    attribute_name: AttributeName::Email,
+                }]),
+                None,
+            );
 
             pretty_assert_eq!(result.len(), 0);
         }
@@ -2267,6 +2319,7 @@ mod tests {
                 // `matched_attribute_scope()` read this directly.
                 sso_domain: Some(SSO_DOMAIN.to_string()),
                 sso_name: None,
+                stable_id: None,
             }
         }
 
@@ -2370,7 +2423,7 @@ mod tests {
                     sso_credential_with(email_and_name_metadata()),
                 ]);
 
-            let listed = anchor.list_available_attributes(None);
+            let listed = anchor.list_available_attributes(None, Some(SSO_DOMAIN.to_string()));
             let keys: BTreeSet<String> = listed.iter().map(|(k, _)| k.clone()).collect();
 
             pretty_assert_eq!(
@@ -2379,6 +2432,21 @@ mod tests {
                     format!("sso:{}:email", SSO_DOMAIN),
                     format!("sso:{}:name", SSO_DOMAIN),
                 ]),
+            );
+        }
+
+        #[test]
+        fn list_available_attributes_excludes_sso_credential_without_matching_bundle() {
+            let anchor =
+                anchor_with_openid_credentials(vec![
+                    sso_credential_with(email_and_name_metadata()),
+                ]);
+
+            pretty_assert_eq!(anchor.list_available_attributes(None, None), vec![]);
+
+            pretty_assert_eq!(
+                anchor.list_available_attributes(None, Some("other.example".to_string())),
+                vec![]
             );
         }
 
@@ -2420,6 +2488,8 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                // SSO session for this domain, so the request reaches the verified_email branch.
+                Some(SSO_DOMAIN.to_string()),
             );
             match res {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2469,6 +2539,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
             match res {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2542,13 +2613,14 @@ mod tests {
                 ]),
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             }
         }
 
         #[test]
         fn lists_email_and_verified_email_for_each_entry() {
             let anchor = anchor_with_verified(&["alice@example.com"]);
-            let result = anchor.list_available_attributes(None);
+            let result = anchor.list_available_attributes(None, None);
 
             let entries: Vec<(String, String)> = result
                 .iter()
@@ -2576,7 +2648,7 @@ mod tests {
         #[test]
         fn lists_multiple_verified_emails() {
             let anchor = anchor_with_verified(&["alice@example.com", "bob@example.com"]);
-            let result = anchor.list_available_attributes(None);
+            let result = anchor.list_available_attributes(None, None);
             pretty_assert_eq!(result.len(), 4);
 
             let emails: Vec<&str> = result
@@ -2591,10 +2663,13 @@ mod tests {
         #[test]
         fn filters_by_unscoped_key() {
             let anchor = anchor_with_verified(&["alice@example.com"]);
-            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
-                scope: None,
-                attribute_name: AttributeName::Email,
-            }]));
+            let result = anchor.list_available_attributes(
+                Some(vec![AttributeKey {
+                    scope: None,
+                    attribute_name: AttributeName::Email,
+                }]),
+                None,
+            );
 
             pretty_assert_eq!(result.len(), 1);
             pretty_assert_eq!(result[0].0, "email");
@@ -2609,7 +2684,7 @@ mod tests {
                 created_at: 1_000,
                 last_used: None,
             }];
-            let result = anchor.list_available_attributes(None);
+            let result = anchor.list_available_attributes(None, None);
             pretty_assert_eq!(result.len(), 0, "recovery email leaked: {result:?}");
         }
 
@@ -2619,7 +2694,7 @@ mod tests {
             let mut anchor = anchor_with_verified(&["user@gmail.com"]);
             anchor.openid_credentials = vec![google_credential_with("user@gmail.com", true)];
 
-            let result = anchor.list_available_attributes(None);
+            let result = anchor.list_available_attributes(None, None);
             let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
 
             assert!(
@@ -2641,7 +2716,7 @@ mod tests {
             anchor.openid_credentials =
                 vec![google_credential_with("alice.personal@gmail.com", true)];
 
-            let result = anchor.list_available_attributes(None);
+            let result = anchor.list_available_attributes(None, None);
             let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
 
             assert!(
@@ -2660,7 +2735,7 @@ mod tests {
             let mut anchor = anchor_with_verified(&["alice@gmail.com"]);
             anchor.openid_credentials = vec![google_credential_with("Alice@Gmail.com", true)];
 
-            let result = anchor.list_available_attributes(None);
+            let result = anchor.list_available_attributes(None, None);
             let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
             assert!(
                 !keys.iter().any(|k| *k == "email" || *k == "verified_email"),
@@ -2694,6 +2769,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
             match result {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2731,6 +2807,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
             match result {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2766,6 +2843,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
             match result {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2808,6 +2886,7 @@ mod tests {
                     None,
                     1_000_000_000,
                     account,
+                    None,
                 )
             }));
             // Reaching the panic (signature store) means the matcher

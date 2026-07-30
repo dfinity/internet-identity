@@ -27,6 +27,7 @@ const OpenIdEmailVerificationIDL = IDL.Variant({
 });
 
 const backendCanisterConfigIDL = IDL.Record({
+  mcp_official_url: IDL.Opt(IDL.Text),
   openid_configs: IDL.Opt(
     IDL.Vec(
       IDL.Record({
@@ -64,6 +65,7 @@ export interface OpenIdConfig {
 }
 export type BackendCanisterConfig = {
   openid_configs: [] | [OpenIdConfig[]];
+  mcp_official_url: [] | [string];
 };
 
 export let canisterId: Principal;

@@ -21,6 +21,7 @@ export interface AttributeConsentContext {
   requestedKeys: string[];
   recoveryAddresses: string[];
   verifiedAddresses: string[];
+  openidAddresses: string[];
 }
 
 export interface AttributeConsent {

@@ -318,17 +318,12 @@ type InternetIdentityInit = record {
     new_flow_origins : opt vec text;
     // Configurations for OpenID clients
     openid_configs : opt vec OpenIdConfig;
-    // Allowlist of domains that may be used as discoverable SSO providers.
-    // When set, fully replaces the built-in defaults. When unset, falls back
-    // to `dfinity.org` (production) or `beta.dfinity.org` (everything else),
-    // keyed off `is_production`.
-    sso_discoverable_domains : opt vec text;
-    // Deploy flag opening the SSO discovery domain gate to any domain. When
-    // `true`, `sso_discoverable_domains` (and its defaults) no longer restrict
-    // which domains may be discovered as SSO providers. Does not relax the
-    // strict-`https` requirement: serving discovery over plain `http` still
-    // requires the host to be on the explicit `sso_discoverable_domains` list.
-    sso_allow_any_domain : opt bool;
+    // Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
+    // loopback hosts (`localhost` / `127.0.0.1`) so e2e tests can point at local
+    // mock IdPs served over plain `http`. Unset / `false` (the default) require
+    // `https` for every discovery host. Never enable in production — non-loopback
+    // hosts always require `https` regardless.
+    sso_allow_insecure_discovery : opt bool;
     // One-shot backfill of the `sso_domain` / `sso_name` fields on stored
     // OpenID credentials. When set, a batched timer-driven migration stamps
     // every stored credential whose (iss, aud) matches an entry and whose
@@ -367,6 +362,15 @@ type InternetIdentityInit = record {
     // via HTTP outcalls when no DNSSEC chain is available — see
     // `docs/ongoing/email-recovery.md` §7.6. Same set/clear pattern.
     doh_config : opt opt DohConfig;
+    // URL of the official MCP connector the deployment ships, if any. Same
+    // set/clear pattern as `dnssec_config`: null keeps the previously stored
+    // value, `opt null` clears it, `opt opt "https://..."` sets it.
+    mcp_official_url : opt opt text;
+    // One-shot upgrade arg driving the MCP config migration: `opt true`
+    // rewrites every stored config to "enabled, official connector", since a
+    // value stored before the official connector existed was never a choice
+    // about it. Runs at most once per deployment; unset means no migration.
+    mcp_config_migration : opt bool;
 };
 
 // DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
@@ -500,20 +504,28 @@ type OpenIdConfig = record {
 // from the domain's two-hop discovery documents, on demand and cached.
 type SsoDiscovery = record {
     discovery_domain : text;
+    // The org's primary OIDC client.
     client_id : text;
     issuer : text;
     authorization_endpoint : text;
     scopes : vec text;
     name : opt text;
+    // Client the target origin runs its ceremony against; `null` when denied.
+    resolved_client_id : opt text;
 };
 
-// State of a domain's SSO discovery, read by `get_sso_discovery`. A failed
-// fetch isn't a distinct state — it reads as `Pending` and the frontend times
-// out — so the states are resolved, in flight, or not allowed.
-type SsoDiscoveryState = variant {
+// Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
+// failed fetch isn't a distinct status — it reads as `Pending` and the frontend
+// times out — so the statuses are: resolved, or in flight.
+type SsoDiscoveryStatus = variant {
     Resolved : SsoDiscovery;
     Pending;
-    NotAllowed;
+};
+
+// Request for `get_sso_discovery_status`.
+type GetSsoDiscoveryStatusRequest = record {
+    org_domain : text;
+    target_app_origin : opt FrontendHostname;
 };
 
 type OpenIdCredentialKey = record { Iss; Sub; Aud };
@@ -568,6 +580,40 @@ type OpenIdPrepareDelegationResponse = record {
     user_key : UserKey;
     expiration : Timestamp;
     anchor_number : UserNumber;
+};
+
+// Request for `sso_prepare_delegation`.
+type SsoPrepareDelegationRequest = record {
+    jwt : JWT;
+    salt : Salt;
+    session_key : SessionKey;
+    org_domain : text;
+    target_app_origin : FrontendHostname;
+};
+
+// Request for `sso_get_delegation`.
+type SsoGetDelegationRequest = record {
+    jwt : JWT;
+    salt : Salt;
+    session_key : SessionKey;
+    expiration : Timestamp;
+    org_domain : text;
+    target_app_origin : FrontendHostname;
+    sso_attr_bundle : blob;
+};
+
+// Response of `sso_prepare_delegation`.
+type SsoPrepareDelegationResponse = record {
+    user_key : UserKey;
+    expiration : Timestamp;
+    anchor_number : UserNumber;
+    sso_attr_bundle : blob;
+};
+
+// Response of `sso_get_delegation`.
+type SsoGetDelegationResponse = record {
+    signed_delegation : SignedDelegation;
+    sso_attr_bundle_signature : blob;
 };
 
 // Email-recovery types
@@ -914,6 +960,8 @@ type OpenIDRegFinishArg = record {
     // SSO discovery domain the JWT was obtained through, or null for a direct
     // provider (Google / Microsoft / Apple). Selects the JWK source.
     discovery_domain : opt text;
+    // Target dapp origin, set only for a first gated SSO login.
+    origin : opt text;
 };
 
 // Extra information about registration status for new authentication methods
@@ -1137,13 +1185,18 @@ type McpConfig = record {
 };
 
 // Result of prepare_mcp_registration_delegation: the canister-signature public
-// key the registration delegation is rooted at (P_reg), and the (short)
-// expiration of that delegation. The frontend fetches the signed delegation via
-// get_mcp_registration_delegation and delivers the chain to the trusted MCP
+// key the registration delegation is rooted at (P_reg), the (short) expiration
+// of that delegation, and the identity's resolved trusted_url (the anchor's own
+// server if set, else the official connector). trusted_url is certified (this
+// is an update call), so the frontend can gate delivery on it - delivering the
+// chain only when the connect link's origin matches - rather than trusting an
+// uncertified mcp_get_config query. The frontend fetches the signed delegation
+// via get_mcp_registration_delegation and delivers the chain to the trusted MCP
 // server, which redeems it with mcp_register_v2.
 type PrepareMcpRegistrationDelegation = record {
     user_key : UserKey;
     expiration : Timestamp;
+    trusted_url : text;
 };
 
 // Result of mcp_register_v2: the expiration (ns since epoch) of the MCP session
@@ -1279,6 +1332,9 @@ type IdRegFinishError = variant {
     InvalidAuthnMethod : text;
     // Error while persisting the new identity.
     StorageError : text;
+    // A gated SSO login for a non-`sub` org: the user must first sign in
+    // through the org's primary client.
+    SsoNormalLoginRequired;
 };
 
 type AccountInfo = record {
@@ -1679,11 +1735,20 @@ service : (opt InternetIdentityInit) -> {
     openid_get_delegation : (JWT, Salt, SessionKey, Timestamp, opt text) -> (variant { Ok : SignedDelegation; Pending; Err : OpenIdDelegationError }) query;
 
     // SSO discovery for the sign-in initiation flow. The frontend polls
-    // `get_sso_discovery` (query) and, while it reads `Pending`, drives the
+    // `get_sso_discovery_status` (query) and, while it reads `Pending`, drives the
     // on-demand two-hop discovery fetch with `discover_sso` (update); once the
     // fetch completes the query returns `Resolved` with the config.
+    //
+    // The optional second argument is the target dapp origin; when supplied,
+    // `resolved_client_id` reports the client that origin must use (`null` = denied).
     discover_sso : (text) -> ();
-    get_sso_discovery : (text) -> (SsoDiscoveryState) query;
+    get_sso_discovery_status : (GetSsoDiscoveryStatusRequest) -> (SsoDiscoveryStatus) query;
+
+    // SSO sign-in path. Mints a delegation only if the JWT's `aud` matches the
+    // client the target origin resolves to. `Pending` means the discovery/JWKS
+    // cache is cold — re-call to drive the fetch.
+    sso_prepare_delegation : (SsoPrepareDelegationRequest) -> (variant { Ok : SsoPrepareDelegationResponse; Pending; Err : OpenIdDelegationError });
+    sso_get_delegation : (SsoGetDelegationRequest) -> (variant { Ok : SsoGetDelegationResponse; Pending; Err : OpenIdDelegationError }) query;
 
     // ===================================================================
     // Email-challenge protocol (shared inbound-DKIM primitive)
@@ -1848,7 +1913,11 @@ service : (opt InternetIdentityInit) -> {
     // devices. Read by the Settings UI and the /mcp connect flow (which verifies
     // the connecting origin against it). Returns the disabled, no-server default
     // for an unauthorized caller or an anchor that never wrote a config.
-    mcp_get_config : (anchor_number : UserNumber) -> (McpConfig) query;
+    // `null` means the identity has never written a config — distinct from a
+    // stored one that is switched off. The two behave differently at /mcp: the
+    // first may connect the deployment's official connector (completing the
+    // consent is what enables it), the second is sent back to Settings.
+    mcp_get_config : (anchor_number : UserNumber) -> (opt McpConfig) query;
 
     // Persist the identity's trusted-MCP-server config so it syncs across the
     // identity's devices. Authenticated as the identity, so only the user — never
@@ -1867,9 +1936,15 @@ service : (opt InternetIdentityInit) -> {
     // mcp_get_accounts), and null uses the anchor's default account there; an
     // account_number that isn't the anchor's at target_origin is rejected as
     // Unauthorized. max_ttl is the requested lifetime in ns, defaulting to and
-    // capped at 1 hour, and never outliving the session grant. The resolved
-    // account_number is returned in McpPrepareDelegation so it can be threaded
-    // into mcp_get_delegation (the default account at an origin is mutable).
+    // capped at 5 minutes, and never outliving the session grant. The cap is
+    // short because it is the residual window revocation cannot reach: once the
+    // session is revoked no further delegation can be minted, but one already
+    // minted stays usable until it expires. Re-minting is unattended (a fresh
+    // prepare/get pair signed by the session key, no user interaction), so
+    // re-mint rather than holding a delegation for the life of the session. The
+    // resolved account_number is returned in McpPrepareDelegation so it can be
+    // threaded into mcp_get_delegation (the default account at an origin is
+    // mutable).
     mcp_prepare_delegation : (
         target_origin : FrontendHostname,
         account_number : opt AccountNumber,

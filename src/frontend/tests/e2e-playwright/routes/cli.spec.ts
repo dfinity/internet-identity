@@ -215,7 +215,7 @@ test("Returning user opens on the Continue screen, not the method wizard", async
     page.getByRole("button", { name: "Continue", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Continue with passkey" }),
+    page.getByRole("button", { name: "Sign in with passkey" }),
   ).toBeHidden();
 
   // Continue authenticates the last-used identity and posts the delegation.

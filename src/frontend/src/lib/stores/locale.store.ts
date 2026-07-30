@@ -135,6 +135,48 @@ export const formatNumber = derived(
     i18n.number(value, format),
 );
 
+/** The units {@link formatDuration} can spell out, largest first. */
+const durationUnits = ["day", "hour", "minute", "second"] as const;
+
+/**
+ * A duration as a count per unit, e.g. `{ day: 1, hour: 2 }`. Only the units
+ * present are formatted, so leave a unit out to hide it — including a zero one,
+ * which the caller may still pass deliberately (`{ second: 0 }` -> "0 seconds").
+ */
+export type Duration = Partial<Record<(typeof durationUnits)[number], number>>;
+
+/**
+ * Usage: <span>{$formatDuration({ day: 1, hour: 2 })}</span>
+ *
+ * Each unit is spelled out by `Intl.NumberFormat`'s unit style, which pluralizes
+ * it for the locale, and the units are joined the way the locale joins a list of
+ * them ("1 day 2 hours", "1 Tag und 2 Stunden").
+ *
+ * `Intl.DurationFormat` would do both in a single call, and this is the place to
+ * switch to it once we can: it only reached the last of the browsers we support
+ * during 2025 (Safari 18.4, Firefox 140), so older ones would throw, and
+ * TypeScript doesn't declare it yet either. `NumberFormat`/`ListFormat` have
+ * been available for years and leave the wording to the locale just the same.
+ */
+export const formatDuration = derived(
+  localeStore,
+  (locale) => (duration: Duration) =>
+    new Intl.ListFormat(locale, { type: "unit", style: "narrow" }).format(
+      durationUnits.flatMap((unit) => {
+        const value = duration[unit];
+        return value === undefined
+          ? []
+          : [
+              new Intl.NumberFormat(locale, {
+                style: "unit",
+                unit,
+                unitDisplay: "long",
+              }).format(value),
+            ];
+      }),
+    ),
+);
+
 // Current time, used in below `formatRelative`
 const now = readable(Date.now(), (set) => {
   const interval = setInterval(() => set(Date.now()), 1000);

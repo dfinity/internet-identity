@@ -2,6 +2,7 @@ import {
   getReplicaHost,
   readCanisterId,
 } from "@dfinity/internet-identity-vite-plugins";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
@@ -27,6 +28,13 @@ export default defineConfig(({ command, mode }) => ({
     outDir: "../dist",
     emptyOutDir: true,
     rollupOptions: {
+      // Two entries: the homepage and the ICRC-167 redirect callback page.
+      input: {
+        index: fileURLToPath(new URL("./src/index.html", import.meta.url)),
+        callback: fileURLToPath(
+          new URL("./src/callback.html", import.meta.url),
+        ),
+      },
       output: {
         entryFileNames: `[name].js`,
         chunkFileNames: `[name].js`,

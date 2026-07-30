@@ -21,6 +21,11 @@ import {
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 import { authenticationStore } from "$lib/stores/authentication.store";
+import {
+  attributeConsentResultStore,
+  attributeConsentStore,
+} from "$lib/stores/attributeConsent.store";
+import { get } from "svelte/store";
 
 /** Serialize delegation requests so a malicious dapp sending several in
  *  parallel can't race the authorization state (effective origin, auth
@@ -81,11 +86,34 @@ export const handleDelegationRequest =
         const effectiveOrigin = remapToLegacyDomain(
           params.icrc95DerivationOrigin ?? channel.origin,
         );
-        authorizationStore.setEffectiveOrigin(effectiveOrigin);
+        // Set the effective origin (which makes the sign-in UI render) and the
+        // app's requested session duration together, so the sign-in screen
+        // always sees the requested duration — the picker's ceiling — from its
+        // first render. `undefined` when the app didn't specify one, in which
+        // case the backend applies its default.
+        authorizationStore.setRequestContext(
+          effectiveOrigin,
+          params.maxTimeToLive,
+        );
 
-        // Authorization is the commit point — the user may switch identities
-        // freely before this. Once authorized, the UI is no longer needed.
-        const authorized = await waitForStore(authorizedStore);
+        let authorized = await waitForStore(authorizedStore);
+        while (
+          get(attributeConsentStore) !== undefined &&
+          get(attributeConsentResultStore) === undefined
+        ) {
+          const outcome = await Promise.race([
+            waitForStore(attributeConsentResultStore).then(
+              () => "settled" as const,
+            ),
+            waitForStore(authorizedStore, (current) =>
+              current !== authorized ? ("switched" as const) : undefined,
+            ),
+          ]);
+          if (outcome === "settled") {
+            break;
+          }
+          authorized = await waitForStore(authorizedStore);
+        }
 
         // Read the identity *after* authorization so we capture whichever
         // identity the user settled on (they may have switched mid-flow).
@@ -112,13 +140,19 @@ export const handleDelegationRequest =
         // omitted-arg default.
         const permissions = toPermissionsArg(authorized.accessLevel);
 
+        // Prefer the duration the user chose on the sign-in screen; it's already
+        // capped at the app's request. Fall back to the app's requested value
+        // for flows without a picker (e.g. 1-click OpenID/SSO), and to the
+        // backend default when neither is set.
+        const maxTimeToLive = authorized.maxTimeToLive ?? params.maxTimeToLive;
+
         const { user_key, expiration } = await actor
           .prepare_account_delegation(
             identityNumber,
             effectiveOrigin,
             accountNumber !== undefined ? [accountNumber] : [],
             sessionPublicKey,
-            params.maxTimeToLive !== undefined ? [params.maxTimeToLive] : [],
+            maxTimeToLive !== undefined ? [maxTimeToLive] : [],
             permissions,
           )
           .then(throwCanisterError);

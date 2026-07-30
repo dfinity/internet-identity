@@ -28,5 +28,6 @@ pub mod push_sender_info;
 pub mod push_subscription;
 pub mod recovery_key;
 pub mod special_device_migration;
+pub mod sso_stable_id_key;
 pub mod storable_persistent_state;
 pub mod verified_email;

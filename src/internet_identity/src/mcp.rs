@@ -29,7 +29,7 @@
 //! changing the trusted server URL in the synced config deletes the grant in
 //! the same update message ([`set_mcp_config`]). Which app account the server
 //! acts as is chosen per call against the *target app* origin (discover them
-//! with [`get_accounts`]); issued per-app delegations are capped at 1 hour
+//! with [`get_accounts`]); issued per-app delegations are capped at 5 minutes
 //! and never outlive the grant.
 
 use candid::Principal;
@@ -43,14 +43,29 @@ use internet_identity_interface::internet_identity::types::{
 use crate::{
     account_management,
     delegation::DelegationAccess,
-    state::{storage_borrow, storage_borrow_mut},
+    state::{persistent_state, storage_borrow, storage_borrow_mut},
     storage::account::{Account, AccountDelegationError, ReadAccountParams},
     storage::storable::mcp_config::StorableMcpConfig,
     storage::storable::mcp_grant::StorableMcpGrant,
+    storage::Storage,
 };
+use ic_stable_structures::DefaultMemoryImpl;
 
-/// Maximum lifetime of an MCP-minted per-app account delegation: 1 hour.
-const MCP_MAX_EXPIRATION_PERIOD_NS: u64 = 60 * 60 * 1_000_000_000;
+/// Maximum lifetime of an MCP-minted per-app account delegation: 5 minutes.
+/// Deliberately short, because this is the one window revocation cannot reach:
+/// disabling MCP or switching the trusted URL ([`set_mcp_config`]) deletes the
+/// grant, so the server can mint no *more* delegations, but one it already
+/// handed to a target app is a standalone signed credential that stays usable
+/// until it expires. Re-minting costs the server a `prepare`/`get` round trip
+/// and no user interaction at all, so a short cap is close to free for the
+/// honest case while bounding the revoked one.
+///
+/// Deliberately not shorter: delegation expiry is checked at ingress against
+/// the receiving node's clock, and IC gateways/libraries permit ~5 minutes of
+/// clock drift, so a tighter window could be partly consumed by skew — the same
+/// floor [`crate::mcp_registration::MCP_REGISTRATION_DELEGATION_TTL_NS`]
+/// documents for the registration delegation.
+const MCP_MAX_EXPIRATION_PERIOD_NS: u64 = 5 * 60 * 1_000_000_000;
 
 /// Longest trusted-server URL `set_mcp_config` accepts. Generous for a real MCP
 /// endpoint (host + path) while bounding the one per-anchor config entry that
@@ -66,6 +81,53 @@ pub(crate) const MCP_TRUSTED_URL_MAX_BYTES: usize = 2048;
 /// is the effective one.
 pub(crate) const MCP_GRANT_MIN_TTL_NS: u64 = 10 * 60 * 1_000_000_000;
 pub(crate) const MCP_GRANT_MAX_TTL_NS: u64 = 30 * 24 * 60 * 60 * 1_000_000_000;
+
+/// The official MCP connector this deployment ships, if any.
+fn official_url() -> Option<String> {
+    persistent_state(|state| state.mcp_official_url.clone())
+}
+
+/// The URL `config` trusts: the identity's own server when they set one,
+/// otherwise the official connector. Nothing while the feature is off.
+///
+/// One rule for both a new connect and an already-issued session. An identity
+/// with no stored config trusts nothing and has to switch the feature on in
+/// Settings first; [`init_config_for_new_identity`] gives one to every identity
+/// registered on a deployment that ships an official connector.
+pub(crate) fn trusted_url(config: &StorableMcpConfig) -> Option<String> {
+    trusted_url_with(config, official_url())
+}
+
+/// Seed a freshly registered identity's config, so AI access reads on in
+/// Settings from the start rather than only after a first connect.
+///
+/// Only when the deployment ships an official connector. Without one the row
+/// would be `{ enabled: true, url: None }`, which resolves to no trusted URL at
+/// all — a switch that reads on with nothing behind it. Such a deployment
+/// leaves the identity with no row until it adds a server of its own.
+pub(crate) fn init_config_for_new_identity(
+    storage: &mut Storage<DefaultMemoryImpl>,
+    anchor_number: AnchorNumber,
+) {
+    if official_url().is_none() {
+        return;
+    }
+    storage.init_mcp_config(anchor_number);
+}
+
+fn trusted_url_with(config: &StorableMcpConfig, official: Option<String>) -> Option<String> {
+    if !config.enabled {
+        return None;
+    }
+    config.url.clone().or(official)
+}
+
+/// [`trusted_url`] for `anchor_number`, or `None` when it stores no config.
+pub fn resolve_connect_url(anchor_number: AnchorNumber) -> Option<String> {
+    storage_borrow(|storage| storage.lookup_mcp_config(anchor_number))
+        .as_ref()
+        .and_then(trusted_url)
+}
 
 /// The anchor's default account at `origin` (synthetic when none is reserved).
 fn default_account(anchor_number: AnchorNumber, origin: &FrontendHostname) -> Account {
@@ -127,16 +189,17 @@ pub fn register(
     let expires_at_ns =
         now.saturating_add(grant_ttl_ns.clamp(MCP_GRANT_MIN_TTL_NS, MCP_GRANT_MAX_TTL_NS));
     storage_borrow_mut(|storage| {
-        let mut config = storage.read_mcp_config(anchor_number);
+        let stored = storage.lookup_mcp_config(anchor_number);
         // A grant can only exist under a live trusted-server config: this is
         // what makes config-driven revocation (see [`set_mcp_config`]) cover
         // every session ever registered.
-        if !config.enabled || config.url.is_none() {
+        if stored.as_ref().and_then(trusted_url).is_none() {
             return Err(
                 "MCP registration failed: no trusted MCP server is enabled for this identity."
                     .to_string(),
             );
         }
+        let mut config = stored.unwrap_or_default();
         // One key serves one identity: reject a key with a live grant for a
         // different anchor (an expired one is fine to overwrite). Deliberately
         // does not echo the other anchor number.
@@ -169,6 +232,7 @@ pub fn register(
                 read_only,
             },
         );
+        config.enabled = true;
         config.session_principal = Some(principal.as_slice().to_vec());
         storage.write_mcp_config(anchor_number, config);
         Ok(McpRegistration {
@@ -178,16 +242,15 @@ pub fn register(
 }
 
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
-/// trusted server URL). Returns the disabled, no-server default for an anchor
-/// that has never written one. The caller must already be authorized for
-/// `anchor_number` (checked by the canister method). The stored
+/// trusted server URL), or `None` when the anchor has never written one, which
+/// Settings renders the same as switched off. The caller must already be
+/// authorized for `anchor_number` (checked by the canister method). The stored
 /// `session_principal` pointer is internal bookkeeping and not exposed.
-pub fn get_mcp_config(anchor_number: AnchorNumber) -> McpConfig {
-    let stored = storage_borrow(|storage| storage.read_mcp_config(anchor_number));
-    McpConfig {
-        enabled: stored.enabled,
-        url: stored.url,
-    }
+pub fn get_mcp_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
+    storage_borrow(|storage| storage.lookup_mcp_config(anchor_number)).map(|config| McpConfig {
+        enabled: config.enabled,
+        url: config.url,
+    })
 }
 
 /// Persist `anchor_number`'s trusted-MCP-server config, overwriting any
@@ -204,9 +267,13 @@ pub fn get_mcp_config(anchor_number: AnchorNumber) -> McpConfig {
 ///
 /// Rejects a trusted URL longer than [`MCP_TRUSTED_URL_MAX_BYTES`]: nothing
 /// legitimate needs a multi-KiB URL, and the bound keeps the stored config
-/// entry small. The anchor's pending-registration bookkeeping is carried over
-/// untouched — a config edit doesn't reset it (in-flight registrations are
-/// invalidated at redemption by the URL-hash check, and pruned by expiry).
+/// entry small. A revoking write (disable, or a change to the trusted server)
+/// also invalidates any in-flight registration delegation — the entry is
+/// evicted and the pending pointer cleared in the same message — so a
+/// disable/re-enable (or URL change and change-back) within the delegation's
+/// short TTL cannot resurrect it. A non-revoking edit carries the pending
+/// pointer over untouched, keeping a concurrent connect to the same server
+/// valid.
 pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), String> {
     if let Some(url) = &config.url {
         if url.len() > MCP_TRUSTED_URL_MAX_BYTES {
@@ -214,11 +281,28 @@ pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<
                 "MCP configuration failed: trusted server URL must be at most {MCP_TRUSTED_URL_MAX_BYTES} bytes."
             ));
         }
+        // A disabled config carrying a URL would be a server the identity
+        // neither trusts nor has forgotten. Turning the feature off forgets it.
+        if !config.enabled {
+            return Err(
+                "MCP configuration failed: a disabled configuration cannot keep a trusted server URL."
+                    .to_string(),
+            );
+        }
     }
     storage_borrow_mut(|storage| {
         let old = storage.read_mcp_config(anchor_number);
-        let pending_registration = old.pending_registration.clone();
-        let revoke = !config.enabled || config.url != old.url;
+        // Revoke whenever the server this identity trusts changes or goes
+        // away. Comparing the *resolved* URL covers switching between the
+        // official connector and a custom one, where the stored `url` field
+        // changes meaning rather than merely changing value.
+        let next = StorableMcpConfig {
+            enabled: config.enabled,
+            url: config.url.clone(),
+            session_principal: None,
+            pending_registration: None,
+        };
+        let revoke = !config.enabled || trusted_url(&next) != trusted_url(&old);
         let session_principal = if revoke {
             if let Some(bytes) = &old.session_principal {
                 if let Ok(principal) = Principal::try_from_slice(bytes) {
@@ -235,6 +319,26 @@ pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<
             None
         } else {
             old.session_principal
+        };
+        // A revoking write must also invalidate any in-flight registration
+        // delegation, not just the live grant. Otherwise disabling and then
+        // re-enabling the same trusted server (or changing the URL and changing
+        // it back) within the delegation's short TTL would let it be redeemed
+        // after the user believed they had revoked access: `register_v2` looks
+        // the entry up by `caller()`, and its URL-hash check passes again once
+        // the same server is trusted again. Evict the entry and drop the
+        // pointer so the delegation cannot be resurrected. A non-revoking edit
+        // keeps it (still the same trusted server, so a pending connect stays
+        // valid).
+        let pending_registration = if revoke {
+            if let Some(bytes) = &old.pending_registration {
+                if let Ok(p_reg) = Principal::try_from_slice(bytes) {
+                    storage.remove_mcp_registration(p_reg);
+                }
+            }
+            None
+        } else {
+            old.pending_registration
         };
         storage.write_mcp_config(
             anchor_number,
@@ -306,7 +410,7 @@ pub fn authorize_mcp_session() -> Result<McpSession, AccountDelegationError> {
         .session_principal
         .as_deref()
         .is_some_and(|bytes| bytes == caller.as_slice());
-    if !config.enabled || config.url.is_none() || !is_current_session {
+    if trusted_url(&config).is_none() || !is_current_session {
         return Err(AccountDelegationError::Unauthorized(caller));
     }
     Ok(McpSession { grant })
@@ -365,7 +469,7 @@ impl McpSession {
         )
     }
 
-    /// `mcp_prepare_delegation`: mint a ≤1-hour account delegation for this
+    /// `mcp_prepare_delegation`: mint a ≤5-minute account delegation for this
     /// session at `target_origin`, as `account_number` — one of the anchor's
     /// accounts at that origin when given explicitly (discover them with
     /// [`get_accounts`](Self::get_accounts)), or the anchor's default account
@@ -389,8 +493,9 @@ impl McpSession {
         max_ttl: Option<u64>,
     ) -> Result<McpPrepareDelegation, AccountDelegationError> {
         let anchor_number = self.grant.anchor_number;
-        // Cap at 1 hour; the grant expiry is passed as an *absolute* cap so the
-        // delegation can't outlive the session even by the time an await spans.
+        // Cap at 5 minutes; the grant expiry is passed as an *absolute* cap so
+        // the delegation can't outlive the session even by the time an await
+        // spans.
         let capped_ttl = Some(u64::min(
             max_ttl.unwrap_or(MCP_MAX_EXPIRATION_PERIOD_NS),
             MCP_MAX_EXPIRATION_PERIOD_NS,
@@ -439,5 +544,90 @@ impl McpSession {
             expiration,
             DelegationAccess::from_read_only(self.grant.read_only),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const OFFICIAL: &str = "https://official-mcp.example.com/mcp";
+    const CUSTOM: &str = "https://mcp.acme.com/mcp";
+
+    fn config(enabled: bool, url: Option<&str>) -> StorableMcpConfig {
+        StorableMcpConfig {
+            enabled,
+            url: url.map(str::to_string),
+            ..Default::default()
+        }
+    }
+
+    fn official() -> Option<String> {
+        Some(OFFICIAL.to_string())
+    }
+
+    #[test]
+    fn switching_the_feature_off_trusts_nothing() {
+        // A disabled config must not be silently re-enabled by a connect link.
+        assert_eq!(trusted_url_with(&config(false, None), official()), None);
+    }
+
+    #[test]
+    fn an_enabled_config_with_no_custom_server_uses_the_official_one() {
+        assert_eq!(
+            trusted_url_with(&config(true, None), official()),
+            official()
+        );
+    }
+
+    #[test]
+    fn a_custom_server_displaces_the_official_one() {
+        assert_eq!(
+            trusted_url_with(&config(true, Some(CUSTOM)), official()),
+            Some(CUSTOM.to_string())
+        );
+    }
+
+    #[test]
+    fn a_custom_server_still_needs_the_feature_enabled() {
+        assert_eq!(
+            trusted_url_with(&config(false, Some(CUSTOM)), official()),
+            None
+        );
+    }
+
+    #[test]
+    fn an_enabled_config_trusts_nothing_without_an_official_connector() {
+        assert_eq!(trusted_url_with(&config(true, None), None), None);
+    }
+
+    #[test]
+    fn set_mcp_config_rejects_a_disabled_config_that_keeps_a_url() {
+        // Rejected before any storage access, so this needs no harness.
+        let err = set_mcp_config(
+            10_000,
+            McpConfig {
+                enabled: false,
+                url: Some(CUSTOM.to_string()),
+            },
+        )
+        .expect_err("a disabled config carrying a URL must be rejected");
+        assert!(
+            err.contains("cannot keep a trusted server URL"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn set_mcp_config_rejects_an_oversized_url() {
+        let err = set_mcp_config(
+            10_000,
+            McpConfig {
+                enabled: true,
+                url: Some("https://".to_string() + &"a".repeat(MCP_TRUSTED_URL_MAX_BYTES)),
+            },
+        )
+        .expect_err("an oversized URL must be rejected");
+        assert!(err.contains("at most"), "unexpected error: {err}");
     }
 }

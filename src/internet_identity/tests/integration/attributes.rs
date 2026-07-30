@@ -1365,6 +1365,7 @@ fn setup_icrc3_test_env_with_fake_openid() -> (
         email_verified: true,
         iat_secs,
         exp_secs,
+        extra_claims: &[],
     });
 
     // Install canister with a Google-flavoured OpenID config whose JWKS URL we override below.
@@ -1431,17 +1432,19 @@ fn setup_icrc3_test_env_with_fake_openid() -> (
     )
 }
 
-struct FakeJwtInput<'a> {
-    salt: &'a [u8; 32],
-    principal: &'a Principal,
-    issuer: &'a str,
-    aud: &'a str,
-    sub: &'a str,
-    email: &'a str,
-    name: &'a str,
-    email_verified: bool,
-    iat_secs: u64,
-    exp_secs: u64,
+pub(crate) struct FakeJwtInput<'a> {
+    pub salt: &'a [u8; 32],
+    pub principal: &'a Principal,
+    pub issuer: &'a str,
+    pub aud: &'a str,
+    pub sub: &'a str,
+    pub email: &'a str,
+    pub name: &'a str,
+    pub email_verified: bool,
+    pub iat_secs: u64,
+    pub exp_secs: u64,
+    /// Extra top-level claims merged into the JWT payload after the standard ones.
+    pub extra_claims: &'a [(&'a str, &'a str)],
 }
 
 /// Generates an RSA-2048 key pair from a fixed seed, signs a synthetic JWT, and returns both
@@ -1449,7 +1452,7 @@ struct FakeJwtInput<'a> {
 ///
 /// The JWT `nonce` is computed as `BASE64_URL_SAFE_NO_PAD(SHA256(salt || caller_principal_bytes))`,
 /// matching the binding that II's generic OpenID provider enforces.
-fn build_fake_google_jwt_and_jwks(input: FakeJwtInput) -> (String, String) {
+pub(crate) fn build_fake_google_jwt_and_jwks(input: FakeJwtInput) -> (String, String) {
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
     use rand_chacha::rand_core::SeedableRng;
     use rsa::pkcs1v15::SigningKey;
@@ -1480,7 +1483,7 @@ fn build_fake_google_jwt_and_jwks(input: FakeJwtInput) -> (String, String) {
         "kid": kid,
         "typ": "JWT",
     });
-    let claims = json!({
+    let mut claims = json!({
         "iss": input.issuer,
         "azp": input.aud,
         "aud": input.aud,
@@ -1496,6 +1499,11 @@ fn build_fake_google_jwt_and_jwks(input: FakeJwtInput) -> (String, String) {
         "exp": input.exp_secs,
         "jti": "icrc3-test-vectors-jti-0001",
     });
+    if let Some(map) = claims.as_object_mut() {
+        for (key, value) in input.extra_claims {
+            map.insert((*key).to_string(), json!(value));
+        }
+    }
 
     let header_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&header).unwrap());
     let claims_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());

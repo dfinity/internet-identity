@@ -781,6 +781,13 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
+/**
+ * Request for `get_sso_discovery_status`.
+ */
+export interface GetSsoDiscoveryStatusRequest {
+  'target_app_origin' : [] | [FrontendHostname],
+  'org_domain' : string,
+}
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -813,6 +820,13 @@ export interface IdRegFinishArg {
   'authn_method' : AuthnMethodData,
 }
 export type IdRegFinishError = {
+    /**
+     * A gated SSO login for a non-`sub` org: the user must first sign in
+     * through the org's primary client.
+     */
+    'SsoNormalLoginRequired' : null
+  } |
+  {
     /**
      * No registration flow ongoing for the caller.
      */
@@ -987,14 +1001,6 @@ export interface InternetIdentityInit {
    */
   'doh_config' : [] | [[] | [DohConfig]],
   /**
-   * Deploy flag opening the SSO discovery domain gate to any domain. When
-   * `true`, `sso_discoverable_domains` (and its defaults) no longer restrict
-   * which domains may be discovered as SSO providers. Does not relax the
-   * strict-`https` requirement: serving discovery over plain `http` still
-   * requires the host to be on the explicit `sso_discoverable_domains` list.
-   */
-  'sso_allow_any_domain' : [] | [boolean],
-  /**
    * One-shot backfill of the `sso_domain` / `sso_name` fields on stored
    * OpenID credentials. When set, a batched timer-driven migration stamps
    * every stored credential whose (iss, aud) matches an entry and whose
@@ -1008,6 +1014,13 @@ export interface InternetIdentityInit {
    * For now, this is used only to show or hide the banner.
    */
   'is_production' : [] | [boolean],
+  /**
+   * One-shot upgrade arg driving the MCP config migration: `opt true`
+   * rewrites every stored config to "enabled, official connector", since a
+   * value stored before the official connector existed was never a choice
+   * about it. Runs at most once per deployment; unset means no migration.
+   */
+  'mcp_config_migration' : [] | [boolean],
   /**
    * Backend canister ID, needed for backward compatibility.
    */
@@ -1037,13 +1050,6 @@ export interface InternetIdentityInit {
    * sets it to `c`.
    */
   'dnssec_config' : [] | [[] | [DnssecConfig]],
-  /**
-   * Allowlist of domains that may be used as discoverable SSO providers.
-   * When set, fully replaces the built-in defaults. When unset, falls back
-   * to `dfinity.org` (production) or `beta.dfinity.org` (everything else),
-   * keyed off `is_production`.
-   */
-  'sso_discoverable_domains' : [] | [Array<string>],
   /**
    * Configuration parameters related to the II archive.
    * Note: some parameters changes (like the polling interval) will only take effect after an archive deployment.
@@ -1084,9 +1090,23 @@ export interface InternetIdentityInit {
    */
   'captcha_config' : [] | [CaptchaConfig],
   /**
+   * URL of the official MCP connector the deployment ships, if any. Same
+   * set/clear pattern as `dnssec_config`: null keeps the previously stored
+   * value, `opt null` clears it, `opt opt "https://..."` sets it.
+   */
+  'mcp_official_url' : [] | [[] | [string]],
+  /**
    * Configuration for dummy authentication used in e2e tests.
    */
   'dummy_auth' : [] | [[] | [DummyAuthConfig]],
+  /**
+   * Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
+   * loopback hosts (`localhost` / `127.0.0.1`) so e2e tests can point at local
+   * mock IdPs served over plain `http`. Unset / `false` (the default) require
+   * `https` for every discovery host. Never enable in production — non-loopback
+   * hosts always require `https` regardless.
+   */
+  'sso_allow_insecure_discovery' : [] | [boolean],
   /**
    * Rate limit for the `register` call.
    */
@@ -1198,6 +1218,10 @@ export type MetadataMapV2 = Array<
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
+  /**
+   * Target dapp origin, set only for a first gated SSO login.
+   */
+  'origin' : [] | [string],
   'salt' : Salt,
   /**
    * SSO discovery domain the JWT was obtained through, or null for a direct
@@ -1394,13 +1418,18 @@ export interface PrepareIdAliasRequest {
 }
 /**
  * Result of prepare_mcp_registration_delegation: the canister-signature public
- * key the registration delegation is rooted at (P_reg), and the (short)
- * expiration of that delegation. The frontend fetches the signed delegation via
- * get_mcp_registration_delegation and delivers the chain to the trusted MCP
+ * key the registration delegation is rooted at (P_reg), the (short) expiration
+ * of that delegation, and the identity's resolved trusted_url (the anchor's own
+ * server if set, else the official connector). trusted_url is certified (this
+ * is an update call), so the frontend can gate delivery on it - delivering the
+ * chain only when the connect link's origin matches - rather than trusting an
+ * uncertified mcp_get_config query. The frontend fetches the signed delegation
+ * via get_mcp_registration_delegation and delivers the chain to the trusted MCP
  * server, which redeems it with mcp_register_v2.
  */
 export interface PrepareMcpRegistrationDelegation {
   'user_key' : UserKey,
+  'trusted_url' : string,
   'expiration' : Timestamp,
 }
 export interface PrepareSessionDelegation {
@@ -1632,17 +1661,61 @@ export interface SsoDiscovery {
   'name' : [] | [string],
   'authorization_endpoint' : string,
   'issuer' : string,
+  /**
+   * Client the target origin runs its ceremony against; `null` when denied.
+   */
+  'resolved_client_id' : [] | [string],
   'discovery_domain' : string,
+  /**
+   * The org's primary OIDC client.
+   */
   'client_id' : string,
 }
 /**
- * State of a domain's SSO discovery, read by `get_sso_discovery`. A failed
- * fetch isn't a distinct state — it reads as `Pending` and the frontend times
- * out — so the states are resolved, in flight, or not allowed.
+ * Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
+ * failed fetch isn't a distinct status — it reads as `Pending` and the frontend
+ * times out — so the statuses are: resolved, or in flight.
  */
-export type SsoDiscoveryState = { 'NotAllowed' : null } |
-  { 'Resolved' : SsoDiscovery } |
+export type SsoDiscoveryStatus = { 'Resolved' : SsoDiscovery } |
   { 'Pending' : null };
+/**
+ * Request for `sso_get_delegation`.
+ */
+export interface SsoGetDelegationRequest {
+  'jwt' : JWT,
+  'session_key' : SessionKey,
+  'salt' : Salt,
+  'sso_attr_bundle' : Uint8Array | number[],
+  'target_app_origin' : FrontendHostname,
+  'expiration' : Timestamp,
+  'org_domain' : string,
+}
+/**
+ * Response of `sso_get_delegation`.
+ */
+export interface SsoGetDelegationResponse {
+  'signed_delegation' : SignedDelegation,
+  'sso_attr_bundle_signature' : Uint8Array | number[],
+}
+/**
+ * Request for `sso_prepare_delegation`.
+ */
+export interface SsoPrepareDelegationRequest {
+  'jwt' : JWT,
+  'session_key' : SessionKey,
+  'salt' : Salt,
+  'target_app_origin' : FrontendHostname,
+  'org_domain' : string,
+}
+/**
+ * Response of `sso_prepare_delegation`.
+ */
+export interface SsoPrepareDelegationResponse {
+  'user_key' : UserKey,
+  'sso_attr_bundle' : Uint8Array | number[],
+  'expiration' : Timestamp,
+  'anchor_number' : UserNumber,
+}
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
   'body' : Uint8Array | number[],
@@ -1851,9 +1924,12 @@ export interface _SERVICE {
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   /**
    * SSO discovery for the sign-in initiation flow. The frontend polls
-   * `get_sso_discovery` (query) and, while it reads `Pending`, drives the
+   * `get_sso_discovery_status` (query) and, while it reads `Pending`, drives the
    * on-demand two-hop discovery fetch with `discover_sso` (update); once the
    * fetch completes the query returns `Resolved` with the config.
+   * 
+   * The optional second argument is the target dapp origin; when supplied,
+   * `resolved_client_id` reports the client that origin must use (`null` = denied).
    */
   'discover_sso' : ActorMethod<[string], undefined>,
   'email_challenge_diagnostics' : ActorMethod<
@@ -2027,7 +2103,10 @@ export interface _SERVICE {
     { 'Ok' : SignedDelegation } |
       { 'Err' : SessionDelegationError }
   >,
-  'get_sso_discovery' : ActorMethod<[string], SsoDiscoveryState>,
+  'get_sso_discovery_status' : ActorMethod<
+    [GetSsoDiscoveryStatusRequest],
+    SsoDiscoveryStatus
+  >,
   /**
    * HTTP Gateway protocol
    * =====================
@@ -2140,8 +2219,12 @@ export interface _SERVICE {
    * devices. Read by the Settings UI and the /mcp connect flow (which verifies
    * the connecting origin against it). Returns the disabled, no-server default
    * for an unauthorized caller or an anchor that never wrote a config.
+   * `null` means the identity has never written a config — distinct from a
+   * stored one that is switched off. The two behave differently at /mcp: the
+   * first may connect the deployment's official connector (completing the
+   * consent is what enables it), the second is sent back to Settings.
    */
-  'mcp_get_config' : ActorMethod<[UserNumber], McpConfig>,
+  'mcp_get_config' : ActorMethod<[UserNumber], [] | [McpConfig]>,
   /**
    * Fetch the delegation prepared above; the anchor is recovered from
    * caller()'s grant. account_number and expiration must be the values
@@ -2161,9 +2244,15 @@ export interface _SERVICE {
    * mcp_get_accounts), and null uses the anchor's default account there; an
    * account_number that isn't the anchor's at target_origin is rejected as
    * Unauthorized. max_ttl is the requested lifetime in ns, defaulting to and
-   * capped at 1 hour, and never outliving the session grant. The resolved
-   * account_number is returned in McpPrepareDelegation so it can be threaded
-   * into mcp_get_delegation (the default account at an origin is mutable).
+   * capped at 5 minutes, and never outliving the session grant. The cap is
+   * short because it is the residual window revocation cannot reach: once the
+   * session is revoked no further delegation can be minted, but one already
+   * minted stays usable until it expires. Re-minting is unattended (a fresh
+   * prepare/get pair signed by the session key, no user interaction), so
+   * re-mint rather than holding a delegation for the life of the session. The
+   * resolved account_number is returned in McpPrepareDelegation so it can be
+   * threaded into mcp_get_delegation (the default account at an origin is
+   * mutable).
    */
   'mcp_prepare_delegation' : ActorMethod<
     [FrontendHostname, [] | [AccountNumber], SessionKey, [] | [bigint]],
@@ -2422,6 +2511,23 @@ export interface _SERVICE {
    * insensitive), and 550 (mailbox unavailable) for everything else.
    */
   'smtp_request_validate' : ActorMethod<[SmtpRequest], SmtpResponse>,
+  'sso_get_delegation' : ActorMethod<
+    [SsoGetDelegationRequest],
+    { 'Ok' : SsoGetDelegationResponse } |
+      { 'Err' : OpenIdDelegationError } |
+      { 'Pending' : null }
+  >,
+  /**
+   * SSO sign-in path. Mints a delegation only if the JWT's `aud` matches the
+   * client the target origin resolves to. `Pending` means the discovery/JWKS
+   * cache is cold — re-call to drive the fetch.
+   */
+  'sso_prepare_delegation' : ActorMethod<
+    [SsoPrepareDelegationRequest],
+    { 'Ok' : SsoPrepareDelegationResponse } |
+      { 'Err' : OpenIdDelegationError } |
+      { 'Pending' : null }
+  >,
   'stats' : ActorMethod<[], InternetIdentityStats>,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<

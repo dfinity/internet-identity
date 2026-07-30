@@ -22,6 +22,13 @@ import {
   Icrc3Attributes,
 } from "./auth";
 import { formatIcrc3Attributes } from "./icrc3";
+import { AuthClient } from "@icp-sdk/auth/client";
+import {
+  CALLBACK_PATH,
+  decodeResults,
+  encodeSnapshot,
+  type FormSnapshot,
+} from "./redirectFlow";
 
 import "./main.css";
 
@@ -85,6 +92,7 @@ const allowPinAuthenticationEl = document.getElementById(
   "allowPinAuthentication",
 ) as HTMLInputElement;
 const useIcrc25El = document.getElementById("useIcrc25") as HTMLInputElement;
+const transportEl = document.getElementById("transport") as HTMLSelectElement;
 const useIcrc3AttributesEl = document.getElementById(
   "useIcrc3Attributes",
 ) as HTMLInputElement;
@@ -378,7 +386,92 @@ function isTgInAppBrowser() {
   return hasBridge || hasUA;
 }
 
+const fromBase64 = (value: string): Uint8Array =>
+  // @ts-ignore Uint8Array.fromBase64 is supported in all target browsers
+  Uint8Array.fromBase64(value);
+
+// The redirect transport navigates the tab away and back, resetting the homepage
+// form to its defaults on the return leg. The full form is carried with the
+// flow: the homepage snapshots every sign-in control into the callback query,
+// the callback journals it via `memoize` (so it survives II's own redirect) and
+// hands it back in the result hash, and the homepage restores it here.
+type FormControl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+
+const formControls = (): FormControl[] =>
+  Array.from(
+    document.querySelectorAll<FormControl>(
+      "input[id], select[id], textarea[id]",
+    ),
+  );
+
+const isToggle = (el: FormControl): el is HTMLInputElement =>
+  el instanceof HTMLInputElement &&
+  (el.type === "checkbox" || el.type === "radio");
+
+const serializeForm = (): FormSnapshot => {
+  const form: FormSnapshot = {};
+  for (const el of formControls()) {
+    form[el.id] = isToggle(el) ? el.checked : el.value;
+  }
+  return form;
+};
+
+const restoreForm = (form: FormSnapshot): void => {
+  for (const el of formControls()) {
+    const value = form[el.id];
+    if (value === undefined) {
+      continue;
+    }
+    if (isToggle(el)) {
+      el.checked = value === true;
+    } else {
+      el.value = String(value);
+    }
+  }
+};
+
+// On the return leg of a redirect sign-in, the callback page hands results back
+// in the hash. Recover the identity from the persisted session (as any redirect
+// relying party would) and render, reusing the same view as the window flow.
+const renderRedirectResultIfPresent = async () => {
+  const results = decodeResults(window.location.hash);
+  if (results === undefined) {
+    return;
+  }
+  // Drop the hash so a reload doesn't re-render stale results.
+  window.history.replaceState(
+    null,
+    "",
+    window.location.pathname + window.location.search,
+  );
+  // Put the form back the way the user left it, from the snapshot the callback
+  // journaled and handed back — even on error, so the failed attempt is visible.
+  if (results.form !== undefined) {
+    restoreForm(results.form);
+  }
+  if (results.error !== undefined) {
+    showError(results.error);
+    return;
+  }
+  const authClient = new AuthClient({ idleOptions: { disableIdle: true } });
+  const identity = await authClient.getIdentity();
+  if (identity instanceof DelegationIdentity) {
+    delegationIdentity = identity;
+  }
+  updateDelegationView({
+    identity,
+    icrc3Attributes:
+      results.attributes !== undefined
+        ? {
+            data: fromBase64(results.attributes.data),
+            signature: fromBase64(results.attributes.signature),
+          }
+        : undefined,
+  });
+};
+
 const init = async () => {
+  await renderRedirectResultIfPresent();
   const userAgentElement = document.getElementById("userAgent") as HTMLElement;
   userAgentElement.innerText = navigator.userAgent;
   const isTelegramElement = document.getElementById(
@@ -386,6 +479,18 @@ const init = async () => {
   ) as HTMLElement;
   isTelegramElement.innerText = isTgInAppBrowser() ? "Yes" : "No";
   signInBtn.onclick = async () => {
+    // Redirect transport: hand the inputs to the callback page, which runs the
+    // ICRC-167 flow on load and returns the results here (see below). Nothing
+    // else on this page runs — the tab navigates away.
+    if (transportEl.value === "redirect") {
+      // Hand the whole form to the callback, which derives the flow inputs from
+      // it. Nothing else on this page runs — the tab navigates away.
+      window.location.assign(
+        `${CALLBACK_PATH}?${encodeSnapshot(serializeForm())}`,
+      );
+      return;
+    }
+
     const maxTimeToLive_ = BigInt(maxTimeToLiveEl.value);
     // The default max TTL set in the @icp-sdk/auth/client library
     const authClientDefaultMaxTTL =
