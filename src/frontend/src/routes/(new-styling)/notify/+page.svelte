@@ -34,19 +34,55 @@
     return url.origin === origin ? url.href : undefined;
   };
 
+  // This page fails closed on anything it can't verify, which makes a genuine
+  // misconfiguration indistinguishable from an attacker's hand-crafted link.
+  // The reason goes to the console rather than the screen: the developer gets
+  // what they need to debug, while a crafted link learns nothing it could use
+  // to probe which origins an anchor has consented to.
+  const deny = (reason: string, detail?: unknown): void => {
+    console.warn(`[ii-notify] refused to open: ${reason}`, detail ?? "");
+    status = "denied";
+  };
+
   const isConsentedOrigin = async (origin: string): Promise<boolean> => {
     const identities = Object.values($lastUsedIdentitiesStore.identities);
+    if (identities.length === 0) {
+      console.warn(
+        "[ii-notify] no known identities in this browser profile — nothing to check consent against",
+      );
+      return false;
+    }
+    let anyActor = false;
     for (const identity of identities) {
       const actor = await actorForIdentity(identity.identityNumber);
-      if (actor === undefined) continue;
+      if (actor === undefined) {
+        console.warn(
+          `[ii-notify] no usable session for identity ${identity.identityNumber} (missing or expired session delegation)`,
+        );
+        continue;
+      }
+      anyActor = true;
       try {
         const origins = await actor.push_list_consented_origins(
           identity.identityNumber,
         );
+        console.warn(
+          `[ii-notify] identity ${identity.identityNumber} consented origins:`,
+          origins,
+        );
         if (origins.includes(origin)) return true;
-      } catch {
+      } catch (error) {
+        console.warn(
+          `[ii-notify] consent lookup failed for identity ${identity.identityNumber}`,
+          error,
+        );
         continue;
       }
+    }
+    if (!anyActor) {
+      console.warn(
+        "[ii-notify] no identity had a usable session, so consent could not be checked at all",
+      );
     }
     return false;
   };
@@ -54,14 +90,23 @@
   onMount(() => {
     void (async () => {
       const params = new URL(window.location.href).searchParams;
-      const origin = parseOrigin(params.get("origin"));
+      const rawOrigin = params.get("origin");
+      const rawTo = params.get("to");
+      const origin = parseOrigin(rawOrigin);
       if (origin === undefined) {
-        status = "denied";
+        deny("the `origin` parameter is missing or not a valid URL", rawOrigin);
         return;
       }
-      const target = resolveDestination(origin, params.get("to"));
-      if (target === undefined || !(await isConsentedOrigin(origin))) {
-        status = "denied";
+      const target = resolveDestination(origin, rawTo);
+      if (target === undefined) {
+        deny(
+          `the \`to\` target is not on the sender's origin (${origin})`,
+          rawTo,
+        );
+        return;
+      }
+      if (!(await isConsentedOrigin(origin))) {
+        deny(`no identity in this browser has consented to ${origin}`);
         return;
       }
       senderOrigin = origin;
