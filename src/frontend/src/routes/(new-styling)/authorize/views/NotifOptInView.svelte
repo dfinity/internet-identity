@@ -28,6 +28,7 @@
   const dappName = $derived(application ?? new URL(displayOrigin).hostname);
 
   let enabling = $state(false);
+  let enableError = $state<string | undefined>(undefined);
 
   const pushSupported =
     typeof navigator !== "undefined" &&
@@ -80,6 +81,7 @@
       return;
     }
     enabling = true;
+    enableError = undefined;
     try {
       // Already-granted permission resolves immediately without prompting, but
       // skip the call entirely so the intent is explicit: nothing browser-native
@@ -99,10 +101,16 @@
       // Deliberately not remembered: a failure here (canister call, service
       // worker registration) is our problem, not a user decision, so they
       // should get the chance again rather than silently losing the feature.
+      //
+      // Surfaced rather than only logged, because the symptom of a swallowed
+      // failure here is "the screen keeps coming back" — indistinguishable
+      // from a bug in the remembering itself.
       console.warn("Enable notifications failed:", error);
-    } finally {
-      onContinue();
+      enableError = error instanceof Error ? error.message : String(error);
+      enabling = false;
+      return;
     }
+    onContinue();
   };
 
   const handleMaybeLater = () => {
@@ -260,6 +268,20 @@
         </div>
       </li>
     </ul>
+  {/if}
+
+  {#if enableError !== undefined}
+    <div
+      class="border-border-secondary bg-bg-secondary mt-5 rounded-xl border p-3"
+      role="alert"
+    >
+      <div class="text-text-primary text-sm font-semibold">
+        {$t`Couldn't turn on notifications`}
+      </div>
+      <p class="text-text-tertiary mt-1 text-sm break-words">
+        {enableError}
+      </p>
+    </div>
   {/if}
 
   <div class="mt-6 flex flex-col gap-2">
