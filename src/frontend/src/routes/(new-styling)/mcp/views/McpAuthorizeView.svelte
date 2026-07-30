@@ -117,7 +117,7 @@
   level. There is no account picker — accounts are per-app and the MCP server
   origin is just the connector; the server selects an app account per call later.
 -->
-<div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
+<div class="flex w-full justify-center py-8 max-sm:flex-1 sm:max-w-110">
   <AuthPanel class="overflow-visible!">
     <McpHero mcpServer={mcpServerHost} />
     <h1 class="text-text-primary mt-2 text-2xl font-medium">
