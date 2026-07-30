@@ -167,14 +167,9 @@ fn permissions_of(read_only: bool) -> Permissions {
 /// the index entry; [`register_v2`] compares the stored URL against this again,
 /// so a config change or disable between consent and redemption is caught.
 fn trusted_url(anchor_number: AnchorNumber) -> Result<String, String> {
-    let config = mcp::get_mcp_config(anchor_number);
-    match (config.enabled, config.url) {
-        (true, Some(url)) => Ok(url),
-        _ => Err(
-            "MCP registration failed: no trusted MCP server is enabled for this identity."
-                .to_string(),
-        ),
-    }
+    mcp::resolve_connect_url(anchor_number).ok_or_else(|| {
+        "MCP registration failed: no trusted MCP server is enabled for this identity.".to_string()
+    })
 }
 
 /// `prepare_mcp_registration_delegation`: mint the `P_reg -> Y` delegation
@@ -238,16 +233,22 @@ pub async fn prepare(
     // config at this one. That keeps the registration index bounded to one entry
     // per anchor without any cap/reject path. Yields the trusted URL hash to
     // store.
-    let trusted_url_hash = state::storage_borrow_mut(|storage| {
-        let mut config = storage.read_mcp_config(anchor_number);
+    let (trusted_url_hash, trusted_url) = state::storage_borrow_mut(|storage| {
+        let stored = storage.lookup_mcp_config(anchor_number);
         let url =
-            match (config.enabled, config.url.as_ref()) {
-                (true, Some(url)) => url.clone(),
-                _ => return Err(
+            match stored.as_ref().and_then(mcp::trusted_url) {
+                Some(url) => url,
+                None => return Err(
                     "MCP registration failed: no trusted MCP server is enabled for this identity."
                         .to_string(),
                 ),
             };
+        let mut config = stored.unwrap_or_default();
+        // The guard above already proved the config is stored and enabled.
+        // Reasserted because this writes the row for the pending-registration
+        // bookkeeping, and a row that read "switched off" at redemption would
+        // make `register_v2` refuse the connect it just authorized.
+        config.enabled = true;
         if let Some(previous) = config.pending_registration.take() {
             if let Ok(principal) = Principal::try_from_slice(&previous) {
                 storage.remove_mcp_registration(principal);
@@ -255,7 +256,9 @@ pub async fn prepare(
         }
         config.pending_registration = Some(p_reg.as_slice().to_vec());
         storage.write_mcp_config(anchor_number, config);
-        Ok(hash_trusted_url(&url))
+        // Return the resolved URL alongside its hash: the frontend gates
+        // delivery on this certified value (see `PrepareMcpRegistrationDelegation`).
+        Ok((hash_trusted_url(&url), url))
     })?;
 
     state::signature_map_mut(|sigs| {
@@ -291,6 +294,7 @@ pub async fn prepare(
     Ok(PrepareMcpRegistrationDelegation {
         user_key: ByteBuf::from(user_key),
         expiration,
+        trusted_url,
     })
 }
 

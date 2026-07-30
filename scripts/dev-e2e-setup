@@ -31,6 +31,7 @@ LOG_DIR="$STATE_DIR/logs"
 STATE_FILE="$STATE_DIR/state"
 II_ARGS_FILE="$STATE_DIR/ii-init-args.did"
 FE_ARGS_FILE="$STATE_DIR/fe-init-args.did"
+TEST_APP_ARGS_FILE="$STATE_DIR/test-app-init-args.did"
 mkdir -p "$STATE_DIR" "$LOG_DIR"
 
 log() { printf '\033[1;36m>>\033[0m %s\n' "$*"; }
@@ -318,7 +319,14 @@ write_install_args() {
   dnssec_config="$(node src/frontend/tests/e2e-playwright/utils/renderDnssecTestAnchor.mjs)"
 
   cat > "$II_ARGS_FILE" <<EOF
-(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { "https://id.ai"; "https://identity.ic0.app"; "https://identity.internetcomputer.org" }; new_flow_origins = opt vec { "https://id.ai" }; openid_configs = opt vec { $openid_configs }; sso_allow_insecure_discovery = opt true; enable_dnssec_email_recovery = opt true; dnssec_config = $dnssec_config })
+(opt record { mcp_official_url = opt opt "https://official-mcp.id.ai/mcp"; captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { "https://id.ai"; "https://identity.ic0.app"; "https://identity.internetcomputer.org" }; new_flow_origins = opt vec { "https://id.ai" }; openid_configs = opt vec { $openid_configs }; sso_allow_insecure_discovery = opt true; enable_dnssec_email_recovery = opt true; dnssec_config = $dnssec_config })
+EOF
+
+  # Declare the test app's ICRC-167 redirect callback on the e2e host so II's
+  # URL transport accepts a redirect back to it. Its own gateway origins are
+  # derived in-canister from its id, so only the custom e2e domain is passed.
+  cat > "$TEST_APP_ARGS_FILE" <<EOF
+(opt record { auth_callbacks = vec { "https://nice-name.com/callback" } })
 EOF
 
   # FE args depend on the II canister ID, which we only know after create_canisters.
@@ -359,7 +367,7 @@ install_canisters() {
   for entry in \
       "internet_identity|internet_identity.wasm.gz|$II_ARGS_FILE|$REBUILT_II" \
       "internet_identity_frontend|internet_identity_frontend.wasm.gz|$FE_ARGS_FILE|$REBUILT_FE" \
-      "test_app|demos/test-app/test_app.wasm||0"; do
+      "test_app|demos/test-app/test_app.wasm|$TEST_APP_ARGS_FILE|0"; do
     IFS='|' read -r name wasm args_file rebuilt <<<"$entry"
     if module_installed "$name" && [[ "$rebuilt" != 1 ]]; then
       log "Canister $name already installed and up to date"
@@ -446,7 +454,7 @@ do_teardown() {
     # purges it. Clean it up for symmetry.
     rm -f "$HOME"/.cache/icp-cli/port-descriptors/8000.{json,lock}
   fi
-  rm -f "$STATE_FILE" "$II_ARGS_FILE" "$FE_ARGS_FILE"
+  rm -f "$STATE_FILE" "$II_ARGS_FILE" "$FE_ARGS_FILE" "$TEST_APP_ARGS_FILE"
   log "Teardown complete"
 }
 

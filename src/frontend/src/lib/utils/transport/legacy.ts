@@ -206,6 +206,11 @@ export const endRedirectSession = async (
 };
 
 class LegacyChannel implements Channel {
+  // Carried so the authorize page can stash it before a 1-click redirect, but
+  // not gated on here: this transport re-establishes via the opener handshake
+  // (scoped by `allowedOrigin`), not by resuming a persisted flow. Transports
+  // that do resume a persisted flow gate on it.
+  readonly resumeToken = crypto.randomUUID();
   #closed = false;
   #origin: string;
   #intermediateIdentityPromise: Promise<ECDSAKeyIdentity>;

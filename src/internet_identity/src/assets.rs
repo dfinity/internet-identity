@@ -27,6 +27,7 @@ pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
     // the frontend does not need the list in advance, so we don't ship it.
     let synchronized = InternetIdentitySynchronizedConfig {
         openid_configs: config.openid_configs.clone(),
+        mcp_official_url: config.mcp_official_url.clone().flatten(),
     };
     let mut assets = vec![Asset {
         url_path: "/.config.did.bin".to_string(),

@@ -10,6 +10,10 @@ const supportedStandards = [
     url: "https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_29_window_post_message_transport.md",
   },
   {
+    name: "ICRC-167",
+    url: "https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_167_browser_url_transport.md",
+  },
+  {
     name: "ICRC-34",
     url: "https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_34_delegation.md",
   },

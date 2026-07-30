@@ -14,6 +14,11 @@ const DISCONNECT_TIMEOUT_MS = 10000;
 export class PostMessageUnsupportedError extends Error {}
 
 class PostMessageChannel implements Channel {
+  // Carried so the authorize page can stash it before a 1-click redirect, but
+  // not gated on here: this transport re-handshakes with the opener (scoped by
+  // `allowedOrigin`), not by resuming a persisted flow. Transports that do
+  // resume a persisted flow gate on it.
+  readonly resumeToken = crypto.randomUUID();
   #origin: string;
   #source: WindowProxy;
   #windowListener: (event: MessageEvent) => void;
