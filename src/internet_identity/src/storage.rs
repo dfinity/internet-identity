@@ -124,6 +124,7 @@ use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::push_consent::StorablePushConsent;
 use crate::storage::storable::push_endpoint_hash::StorableEndpointSha256;
 use crate::storage::storable::push_sender_info::StorablePushSenderInfo;
+use crate::storage::storable::push_sender_registration::StorablePushSenderRegistration;
 use crate::storage::storable::push_subscription::StorablePushSubscription;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use internet_identity_interface::internet_identity::types::*;
@@ -221,6 +222,7 @@ const SSO_STABLE_ID_INDEX_MEMORY_INDEX: u8 = 32u8;
 const PUSH_SUBSCRIPTIONS_MEMORY_INDEX: u8 = 33u8;
 const PUSH_CONSENT_MEMORY_INDEX: u8 = 34u8;
 const PUSH_PRINCIPAL_INDEX_MEMORY_INDEX: u8 = 35u8;
+const PUSH_SENDER_MEMORY_INDEX: u8 = 36u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -315,6 +317,12 @@ const PUSH_CONSENT_MEMORY_ID: MemoryId = MemoryId::new(PUSH_CONSENT_MEMORY_INDEX
 /// so this lets us find the subscriptions/consent rows to look up.
 /// Written at `push_grant_consent` time, cleared on `push_revoke_consent`.
 const PUSH_PRINCIPAL_INDEX_MEMORY_ID: MemoryId = MemoryId::new(PUSH_PRINCIPAL_INDEX_MEMORY_INDEX);
+
+/// Which canister may send push notifications as a given origin:
+/// `origin_sha256 -> StorablePushSenderRegistration`. Consulted by
+/// `notify_user`, written only by a controller (there is no `.well-known`
+/// verification yet — see `push_register_sender`).
+const PUSH_SENDER_MEMORY_ID: MemoryId = MemoryId::new(PUSH_SENDER_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -523,6 +531,11 @@ pub struct Storage<M: Memory> {
     /// See [`PUSH_PRINCIPAL_INDEX_MEMORY_ID`].
     pub(crate) push_principal_index_memory:
         StableBTreeMap<Principal, StorablePushSenderInfo, ManagedMemory<M>>,
+
+    push_sender_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// See [`PUSH_SENDER_MEMORY_ID`].
+    pub(crate) push_sender_memory:
+        StableBTreeMap<StorableOriginSha256, StorablePushSenderRegistration, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -616,6 +629,7 @@ impl<M: Memory + Clone> Storage<M> {
         let push_subscriptions_memory = memory_manager.get(PUSH_SUBSCRIPTIONS_MEMORY_ID);
         let push_consent_memory = memory_manager.get(PUSH_CONSENT_MEMORY_ID);
         let push_principal_index_memory = memory_manager.get(PUSH_PRINCIPAL_INDEX_MEMORY_ID);
+        let push_sender_memory = memory_manager.get(PUSH_SENDER_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -745,6 +759,8 @@ impl<M: Memory + Clone> Storage<M> {
                 push_principal_index_memory.clone(),
             ),
             push_principal_index_memory: StableBTreeMap::init(push_principal_index_memory),
+            push_sender_memory_wrapper: MemoryWrapper::new(push_sender_memory.clone()),
+            push_sender_memory: StableBTreeMap::init(push_sender_memory),
         }
     }
 
@@ -2764,6 +2780,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "push_principal_index_memory".to_string(),
                 self.push_principal_index_memory_wrapper.size(),
+            ),
+            (
+                "push_sender_memory".to_string(),
+                self.push_sender_memory_wrapper.size(),
             ),
         ])
     }

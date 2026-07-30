@@ -1370,6 +1370,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Text)],
         ['query'],
       ),
+    'push_register_sender' : IDL.Func(
+        [IDL.Text, IDL.Opt(IDL.Principal)],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'push_registered_sender' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(IDL.Principal)],
+        ['query'],
+      ),
     'push_revoke_consent' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],

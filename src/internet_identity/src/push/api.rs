@@ -20,6 +20,7 @@ use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::push_consent::StorablePushConsent;
 use crate::storage::storable::push_endpoint_hash::StorableEndpointSha256;
 use crate::storage::storable::push_sender_info::StorablePushSenderInfo;
+use crate::storage::storable::push_sender_registration::StorablePushSenderRegistration;
 use crate::storage::storable::push_subscription::StorablePushSubscription;
 use candid::Principal;
 use ic_cdk::api::management_canister::http_request::{
@@ -46,6 +47,11 @@ pub struct PushAlert {
 /// we cap at 1 KiB to bound the per-row footprint. Anything longer is
 /// almost certainly malformed and rejected up front.
 const MAX_ENDPOINT_LEN: usize = 1024;
+
+/// Matches `delegation::check_frontend_length`, which is what derives the
+/// in-app principal. Checked rather than trapped on: this is reachable from a
+/// caller-supplied string, and canister code must not trap on user input.
+const MAX_ORIGIN_LEN: usize = 255;
 
 /// Register a browser subscription for `anchor_number` on this device.
 ///
@@ -233,6 +239,63 @@ const PUSH_OUTCALL_CYCLES: u128 = 3_000_000_000;
 ///
 /// `entropy_seed` is 32 bytes pre-fetched from `raw_rand`; we HKDF-
 /// expand it per-device so each RFC 8291 encryption gets a fresh
+/// Register `sender` as the canister allowed to send as `origin`, or clear the
+/// registration when `sender` is `None`. Authorization is the caller's
+/// responsibility (see `push_register_sender`).
+pub fn register_sender(origin: FrontendHostname, sender: Option<Principal>) -> Result<(), String> {
+    if origin.len() > MAX_ORIGIN_LEN {
+        return Err(format!(
+            "origin must be at most {MAX_ORIGIN_LEN} bytes, got {}",
+            origin.len()
+        ));
+    }
+    let origin_hash = StorableOriginSha256::from_origin(&origin);
+    storage_borrow_mut(|storage| match sender {
+        Some(principal) => {
+            storage.push_sender_memory.insert(
+                origin_hash,
+                StorablePushSenderRegistration::new(principal, time()),
+            );
+        }
+        None => {
+            storage.push_sender_memory.remove(&origin_hash);
+        }
+    });
+    Ok(())
+}
+
+/// The canister registered to send as `origin`, if any.
+pub fn registered_sender(origin: FrontendHostname) -> Option<Principal> {
+    if origin.len() > MAX_ORIGIN_LEN {
+        return None;
+    }
+    let origin_hash = StorableOriginSha256::from_origin(&origin);
+    storage_borrow(|storage| storage.push_sender_memory.get(&origin_hash))
+        .and_then(|registration| registration.sender_principal())
+}
+
+/// Whether `caller()` may send notifications attributed to `origin_hash`.
+///
+/// Accepts the registered sender for the origin, or the recipient itself
+/// (a user asking to be notified needs no further authorization).
+fn authorize_sender(
+    origin_hash: &StorableOriginSha256,
+    in_app_principal: Principal,
+) -> Result<(), String> {
+    let caller = ic_cdk::caller();
+    if caller == in_app_principal {
+        return Ok(());
+    }
+    let registered = storage_borrow(|storage| storage.push_sender_memory.get(origin_hash))
+        .and_then(|registration| registration.sender_principal());
+    match registered {
+        Some(sender) if sender == caller => Ok(()),
+        // Deliberately does not say whether a sender is registered for this
+        // origin — the caller learns only that it isn't the one.
+        _ => Err("caller is not a registered sender for that origin".to_string()),
+    }
+}
+
 /// ephemeral scalar + salt without another async round-trip.
 pub async fn notify_user(
     in_app_principal: Principal,
@@ -250,6 +313,21 @@ pub async fn notify_user(
     let anchor = sender.anchor;
     let origin_hash =
         StorableOriginSha256::from_bytes(std::borrow::Cow::Owned(sender.origin_hash.to_vec()));
+
+    // 1b. Authorize the caller as a sender for that origin.
+    //
+    //     Not "prove you are the recipient": `in_app_principal` is a
+    //     canister-signature principal derived from II's seed, so only the
+    //     user's own browser can ever present it as `caller()` — an
+    //     inter-canister call always arrives as the calling canister's
+    //     principal. Requiring caller == recipient therefore rejects every
+    //     real sender and admits only self-sends, which is the opposite of
+    //     what this endpoint is for.
+    //
+    //     A self-send is still allowed: the recipient asking to be notified
+    //     is trivially authorized, and it keeps the browser-driven demo path
+    //     working.
+    authorize_sender(&origin_hash, in_app_principal)?;
 
     // 2. Defensive consent check — grant/revoke keep both maps in sync,
     //    but if the consent row is missing we treat this as revoked

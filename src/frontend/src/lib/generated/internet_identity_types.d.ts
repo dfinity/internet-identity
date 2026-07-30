@@ -2289,12 +2289,22 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   /**
-   * Called by a dApp on the user's behalf: encrypt + fan out a push
-   * notification to every device the target identity has subscribed with
-   * consent for the caller's origin. Returns in milliseconds — outcalls
-   * to the relay are detached via `ic_cdk::spawn` and their success is
-   * observed by the browser, not by the caller. Rate-limited per anchor
-   * (see `canister_inspect_message`).
+   * Called by a dApp's backend on the user's behalf: encrypt + fan out a
+   * push notification to every device the target identity has subscribed
+   * with consent for that origin. Returns in milliseconds — outcalls to the
+   * relay are detached via `ic_cdk::spawn` and their success is observed by
+   * the browser, not by the caller.
+   * 
+   * The caller must be the origin's registered sender (see
+   * `push_register_sender`), or the recipient itself. Note it cannot be
+   * "prove you are the recipient" alone: `in_app_principal` is a
+   * canister-signature principal derived from II's seed, so only the user's
+   * browser can present it as caller() — an inter-canister call always
+   * arrives as the calling canister's own principal.
+   * 
+   * NOT rate-limited: there is no admission control yet, and
+   * `canister_inspect_message` could not provide it anyway (it is not
+   * invoked for inter-canister calls).
    */
   'notify_user' : ActorMethod<
     [Principal, PushAlert],
@@ -2436,6 +2446,22 @@ export interface _SERVICE {
    * empty vec for an unauthorized caller or an anchor with no consents.
    */
   'push_list_consented_origins' : ActorMethod<[UserNumber], Array<string>>,
+  /**
+   * Register (or replace) the canister allowed to send notifications as
+   * `origin`; pass `null` to deregister. Controller-only: the design has
+   * senders self-register with II verifying ownership via
+   * `/.well-known/ii-push-senders`, and until that exists self-service
+   * would let any canister claim any origin.
+   */
+  'push_register_sender' : ActorMethod<
+    [string, [] | [Principal]],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * The canister currently registered to send as `origin`, if any.
+   */
+  'push_registered_sender' : ActorMethod<[string], [] | [Principal]>,
   /**
    * Revoke a previously-granted consent. Subscription rows are kept
    * intact — a subsequent grant does not require re-subscribing.

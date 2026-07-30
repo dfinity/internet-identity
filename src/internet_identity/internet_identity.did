@@ -2093,12 +2093,35 @@ service : (opt InternetIdentityInit) -> {
     // keys are omitted.
     push_debug_list_devices : (anchor_number : UserNumber) -> (vec text) query;
 
-    // Called by a dApp on the user's behalf: encrypt + fan out a push
-    // notification to every device the target identity has subscribed with
-    // consent for the caller's origin. Returns in milliseconds — outcalls
-    // to the relay are detached via `ic_cdk::spawn` and their success is
-    // observed by the browser, not by the caller. Rate-limited per anchor
-    // (see `canister_inspect_message`).
+    // Register (or replace) the canister allowed to send notifications as
+    // `origin`; pass `null` to deregister. Controller-only: the design has
+    // senders self-register with II verifying ownership via
+    // `/.well-known/ii-push-senders`, and until that exists self-service
+    // would let any canister claim any origin.
+    push_register_sender : (
+        origin : text,
+        sender : opt principal,
+    ) -> (variant { Ok; Err : text });
+
+    // The canister currently registered to send as `origin`, if any.
+    push_registered_sender : (origin : text) -> (opt principal) query;
+
+    // Called by a dApp's backend on the user's behalf: encrypt + fan out a
+    // push notification to every device the target identity has subscribed
+    // with consent for that origin. Returns in milliseconds — outcalls to the
+    // relay are detached via `ic_cdk::spawn` and their success is observed by
+    // the browser, not by the caller.
+    //
+    // The caller must be the origin's registered sender (see
+    // `push_register_sender`), or the recipient itself. Note it cannot be
+    // "prove you are the recipient" alone: `in_app_principal` is a
+    // canister-signature principal derived from II's seed, so only the user's
+    // browser can present it as caller() — an inter-canister call always
+    // arrives as the calling canister's own principal.
+    //
+    // NOT rate-limited: there is no admission control yet, and
+    // `canister_inspect_message` could not provide it anyway (it is not
+    // invoked for inter-canister calls).
     notify_user : (
         in_app_principal : principal,
         alert : PushAlert,

@@ -939,6 +939,28 @@ fn push_unsubscribe_device(anchor_number: AnchorNumber, endpoint: String) -> Res
     push::api::unsubscribe_device(anchor_number, endpoint)
 }
 
+/// Register (or replace) the canister allowed to send push notifications as
+/// `origin`. Pass `sender = null` to deregister.
+///
+/// Controller-gated, deliberately. The design has senders self-register and II
+/// verify ownership by fetching `/.well-known/ii-push-senders` from the origin
+/// (see docs/push-notifications.md); until that exists, self-service would let
+/// any canister claim any origin and send notifications wearing its name. An
+/// operator registering senders by hand has no such hole.
+#[update]
+fn push_register_sender(origin: FrontendHostname, sender: Option<Principal>) -> Result<(), String> {
+    if !ic_cdk::api::is_controller(&caller()) {
+        return Err("only a controller may register push senders".to_string());
+    }
+    push::api::register_sender(origin, sender)
+}
+
+/// The canister currently registered to send as `origin`, if any.
+#[query]
+fn push_registered_sender(origin: FrontendHostname) -> Option<Principal> {
+    push::api::registered_sender(origin)
+}
+
 #[update]
 fn push_grant_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> Result<(), String> {
     check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
@@ -984,17 +1006,13 @@ fn push_debug_list_devices(anchor_number: AnchorNumber) -> Vec<String> {
 /// outcall to the relay is detached via `ic_cdk::spawn` (see
 /// [`push::api::notify_user`]).
 ///
-/// Called by dApps on behalf of the user. No `check_authz_and_record_activity`
-/// here: the dApp doesn't authenticate as the anchor, it authenticates as
-/// its own per-anchor-per-origin principal (`in_app_principal`). We verify
-/// authorization by requiring that `caller()` matches the `in_app_principal`
-/// argument — a dApp can only send pushes on behalf of principals it can
-/// prove it *is*.
+/// Called by a dApp's backend on behalf of the user. No
+/// `check_authz_and_record_activity` here: the sender doesn't authenticate as
+/// the anchor. Authorization happens in [`push::api::notify_user`], which
+/// resolves `in_app_principal` to its origin and checks that `caller()` is the
+/// registered sender for it (or the recipient itself).
 #[update]
 async fn notify_user(in_app_principal: Principal, alert: PushAlert) -> Result<(), String> {
-    if caller() != in_app_principal {
-        return Err("caller must be the in_app_principal".to_string());
-    }
     let entropy = random_salt().await;
     push::api::notify_user(
         in_app_principal,
