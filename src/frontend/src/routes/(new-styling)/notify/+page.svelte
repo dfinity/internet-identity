@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { actorForIdentity } from "$lib/stores/session-delegation.store";
+  import { remapToLegacyDomain } from "$lib/utils/iiConnection";
   import { t } from "$lib/stores/locale.store";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import NotifyRedirectView from "./NotifyRedirectView.svelte";
@@ -11,14 +12,39 @@
   let senderOrigin = $state<string | undefined>(undefined);
   let destination = $state<string | undefined>(undefined);
 
+  /**
+   * Parses `raw` into an origin, rejecting anything that isn't `https:`.
+   *
+   * The scheme check is load-bearing, not defensive tidiness: `javascript:` and
+   * `data:` URLs both report their origin as the *string* `"null"`, so without
+   * it a crafted link could satisfy the origin-equality check below and then be
+   * handed to `location.href`, executing script on II's own origin.
+   */
   const parseOrigin = (raw: string | null): string | undefined => {
     if (raw === null || raw.length === 0) return undefined;
     try {
-      return new URL(raw).origin;
+      const url = new URL(raw);
+      return url.protocol === "https:" ? url.origin : undefined;
     } catch {
       return undefined;
     }
   };
+
+  /**
+   * Whether two origins are the same application.
+   *
+   * Not string equality, because II records consent against the *effective*
+   * origin, which passes through `remapToLegacyDomain` — so a canister served
+   * at `<id>.icp0.io` is consented and attributed as `<id>.ic0.app`. A dApp's
+   * own deep links naturally use the domain the user is actually browsing, so
+   * comparing the two verbatim rejects legitimate links.
+   *
+   * Normalising both sides is safe rather than loose: the remap only collapses
+   * the boundary-node domains for the *same* subdomain, and that subdomain is
+   * the canister id. Two different canisters can never normalise to one origin.
+   */
+  const sameApp = (a: string, b: string): boolean =>
+    remapToLegacyDomain(a) === remapToLegacyDomain(b);
 
   const resolveDestination = (
     origin: string,
@@ -31,7 +57,8 @@
     } catch {
       return undefined;
     }
-    return url.origin === origin ? url.href : undefined;
+    if (url.protocol !== "https:") return undefined;
+    return sameApp(url.origin, origin) ? url.href : undefined;
   };
 
   // This page fails closed on anything it can't verify, which makes a genuine
@@ -70,7 +97,8 @@
           `[ii-notify] identity ${identity.identityNumber} consented origins:`,
           origins,
         );
-        if (origins.includes(origin)) return true;
+        if (origins.some((consented) => sameApp(consented, origin)))
+          return true;
       } catch (error) {
         console.warn(
           `[ii-notify] consent lookup failed for identity ${identity.identityNumber}`,
