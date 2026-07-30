@@ -7,7 +7,9 @@
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import Popover from "$lib/components/ui/Popover.svelte";
+  import Popover, {
+    MOBILE_BREAKPOINT,
+  } from "$lib/components/ui/Popover.svelte";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import ManageHandoff from "$lib/components/ui/ManageHandoff.svelte";
@@ -18,6 +20,7 @@
   import {
     showIdentitySwitcher,
     identitySwitcherOpen,
+    screenHasIdentityRow,
   } from "./mcp-switcher.store";
 
   const { children }: LayoutProps = $props();
@@ -31,13 +34,16 @@
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 
   let identityButtonRef = $state<HTMLElement>();
+  let windowWidth = $state(window.innerWidth);
+
+  const showHeaderSwitcher = $derived(
+    !$screenHasIdentityRow || windowWidth >= MOBILE_BREAKPOINT,
+  );
   let isAuthDialogOpen = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
 
   const closeIdentityPopover = (): void => identitySwitcherOpen.set(false);
 
-  // A phase that hides the switcher must also drop any open state, or the
-  // popover springs back open the next time a phase shows it again.
   $effect(() => {
     if (!$showIdentitySwitcher) {
       closeIdentityPopover();
@@ -121,18 +127,21 @@
   <div class="h-[env(safe-area-inset-top)]"></div>
   <Header>
     {#if selectedIdentity !== undefined && $showIdentitySwitcher}
-      <button
-        bind:this={identityButtonRef}
-        class="btn btn-tertiary ms-auto gap-2.5 pe-3 md:-me-3"
-        onclick={() => identitySwitcherOpen.set(true)}
-        aria-label="Switch identity"
-      >
-        <Avatar size="xs">
-          <UserIcon class="size-4" />
-        </Avatar>
-        <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span>
-        <ChevronDownIcon class="size-4" />
-      </button>
+      {#if showHeaderSwitcher}
+        <button
+          bind:this={identityButtonRef}
+          class="btn btn-tertiary ms-auto gap-2.5 pe-3 md:-me-3"
+          onclick={() => identitySwitcherOpen.set(true)}
+          aria-label="Switch identity"
+        >
+          <Avatar size="xs">
+            <UserIcon class="size-4" />
+          </Avatar>
+          <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span
+          >
+          <ChevronDownIcon class="size-4" />
+        </button>
+      {/if}
       {#if $identitySwitcherOpen}
         <Popover
           anchor={identityButtonRef}
@@ -204,3 +213,5 @@
 {/if}
 
 <ManageHandoff flow={manageHandoff} />
+
+<svelte:window bind:innerWidth={windowWidth} />

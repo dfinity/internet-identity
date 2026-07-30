@@ -3,7 +3,10 @@
   import McpHero from "../components/McpHero.svelte";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import IdentityListItem from "$lib/components/ui/IdentityListItem.svelte";
-  import { identitySwitcherOpen } from "../mcp-switcher.store";
+  import {
+    identitySwitcherOpen,
+    screenHasIdentityRow,
+  } from "../mcp-switcher.store";
   import SessionDurationSelect from "$lib/components/ui/SessionDurationSelect.svelte";
   import { MAX_SESSION_DURATION_SECONDS } from "$lib/utils/sessionDuration";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
@@ -44,6 +47,11 @@
   const selectedIdentityLabel = $derived(
     selectedIdentity?.name ?? `${selectedIdentity?.identityNumber}`,
   );
+
+  $effect(() => {
+    screenHasIdentityRow.set(true);
+    return () => screenHasIdentityRow.set(false);
+  });
   $effect(() => {
     if (selectedIdentityNumber !== undefined) {
       authLastUsedFlow.init([selectedIdentityNumber]);
@@ -116,7 +124,7 @@
       {$t`Connect ${mcpServerHost}`}
     </h1>
     <p class="text-text-tertiary mt-1 text-base text-pretty">
-      {$t`Can act as you across your apps.`}
+      {$t`Let AI access your apps.`}
     </p>
 
     {#if selectedIdentity !== undefined}

@@ -12,3 +12,5 @@ import { writable } from "svelte/store";
 export const showIdentitySwitcher = writable(false);
 
 export const identitySwitcherOpen = writable(false);
+
+export const screenHasIdentityRow = writable(false);

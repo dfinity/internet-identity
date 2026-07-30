@@ -1,3 +1,7 @@
+<script lang="ts" module>
+  export const MOBILE_BREAKPOINT = 480;
+</script>
+
 <script lang="ts">
   import type { HTMLAttributes } from "svelte/elements";
   import { fade } from "svelte/transition";
@@ -28,8 +32,6 @@
     flip = true,
     ...props
   }: Props = $props();
-
-  const MOBILE_BREAKPOINT = 480;
 
   let popoverRef = $state<HTMLElement | null>();
   let windowWidth = $state(window.innerWidth);
@@ -194,8 +196,6 @@
       ) {
         return;
       }
-      // The anchor may be the trigger itself rather than a wrapper around it,
-      // in which case there is no inner button to hand focus back to.
       (anchorRef?.querySelector("button") ?? anchorRef)?.focus();
       onClose?.();
     }}
