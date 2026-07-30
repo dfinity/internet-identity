@@ -499,17 +499,21 @@ test("Identity switcher shows while signing in and hides once connecting", async
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   const switcher = page.getByRole("button", { name: "Switch identity" });
+  // The connect screen names the identity itself, and drops the header button on
+  // viewports with no room for both — so the affordance is one or the other.
+  const identityRow = page.getByRole("button", { name: /^Choose identity/ });
   const allow = page.getByRole("button", { name: "Allow access" });
   await expect(allow).toBeVisible();
-  await expect(switcher).toBeVisible();
+  await expect(switcher.or(identityRow).first()).toBeVisible();
 
   // Pick an access level to enable "Allow access" (unselected on a first-time
   // connect), then connect.
   await page.getByRole("radio", { name: "Actions & questions" }).check();
   await allow.click();
-  // Once connecting, the switcher is gone — and it stays gone as the tab is
-  // handed to the server's declared callback (a different origin entirely).
+  // Once connecting, both are gone — and stay gone as the tab is handed to the
+  // server's declared callback (a different origin entirely).
   await expect(switcher).toBeHidden();
+  await expect(identityRow).toBeHidden();
 });
 
 test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
