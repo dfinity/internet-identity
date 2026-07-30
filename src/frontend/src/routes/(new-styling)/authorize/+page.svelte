@@ -27,6 +27,7 @@
   import UpgradeSuccessView from "./views/UpgradeSuccessView.svelte";
   import ContinueView from "./views/ContinueView.svelte";
   import NotifOptInView from "./views/NotifOptInView.svelte";
+  import { shouldOfferNotifications } from "./notifOptIn";
   import type { AccessLevel } from "$lib/utils/accessLevel";
   import AuthWizardView from "./views/AuthWizardView.svelte";
   import AttributeConsentView from "./views/AttributeConsentView.svelte";
@@ -190,6 +191,20 @@
     accountNumber: Promise<bigint | undefined>,
     accessLevel: AccessLevel,
   ) => {
+    const identity = selectedIdentity;
+    // Only interrupt the redirect when there is actually something to ask. If
+    // this identity already answered for this origin (or the browser can't do
+    // push), authorize straight through as if the screen didn't exist.
+    if (
+      identity === undefined ||
+      !shouldOfferNotifications(
+        identity.identityNumber,
+        $authorizationContextStore.effectiveOrigin,
+      )
+    ) {
+      handleAuthorize(accountNumber, accessLevel);
+      return;
+    }
     pendingAuthorization = {
       accountNumberPromise: accountNumber,
       accessLevel,

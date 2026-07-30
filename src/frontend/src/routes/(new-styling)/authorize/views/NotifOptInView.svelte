@@ -8,6 +8,10 @@
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { bufFromBufLike, throwTextCanisterError } from "$lib/utils/utils";
   import { getVapidPublicKey, subscribeDevice } from "$lib/utils/pushConsent";
+  import {
+    notificationsGloballyGranted,
+    recordNotifOptInDecision,
+  } from "../notifOptIn";
 
   interface Props {
     effectiveOrigin: string;
@@ -56,6 +60,20 @@
       .then(throwTextCanisterError);
   };
 
+  const remember = (decision: "enabled" | "dismissed") => {
+    recordNotifOptInDecision(
+      $authenticatedStore.identityNumber,
+      effectiveOrigin,
+      decision,
+    );
+  };
+
+  // Layer 1 (browser permission for II's origin) is granted once and shared by
+  // every dApp; layer 2 (this app's consent) is asked per app in II's own UI.
+  // Once layer 1 is in place there is no browser prompt left to show, so this
+  // screen becomes a plain per-app consent rather than a first-run explainer.
+  const globallyGranted = notificationsGloballyGranted();
+
   const handleEnable = async () => {
     if (!pushSupported) {
       onContinue();
@@ -63,15 +81,33 @@
     }
     enabling = true;
     try {
-      const permission = await Notification.requestPermission();
+      // Already-granted permission resolves immediately without prompting, but
+      // skip the call entirely so the intent is explicit: nothing browser-native
+      // happens on the per-app path.
+      const permission = globallyGranted
+        ? "granted"
+        : await Notification.requestPermission();
       if (permission === "granted") {
         await subscribeThisDevice();
+        remember("enabled");
+      } else {
+        // Blocked or dismissed at the browser prompt. Either way the user has
+        // answered, so don't re-ask on the next sign-in.
+        remember("dismissed");
       }
     } catch (error) {
+      // Deliberately not remembered: a failure here (canister call, service
+      // worker registration) is our problem, not a user decision, so they
+      // should get the chance again rather than silently losing the feature.
       console.warn("Enable notifications failed:", error);
     } finally {
       onContinue();
     }
+  };
+
+  const handleMaybeLater = () => {
+    remember("dismissed");
+    onContinue();
   };
 </script>
 
@@ -167,47 +203,64 @@
   >
     {$t`Let ${dappName} notify you`}
   </h1>
-  <p class="text-text-secondary mt-2 text-sm leading-relaxed">
-    <Trans>
-      Receive alerts from the apps you approve, and stay on top of what matters
-      seamlessly.
-    </Trans>
-  </p>
+  {#if globallyGranted}
+    <p class="text-text-secondary mt-2 text-sm leading-relaxed">
+      <Trans>
+        Notifications are already on for your identity. Choose whether this app
+        can reach you.
+      </Trans>
+    </p>
+  {:else}
+    <p class="text-text-secondary mt-2 text-sm leading-relaxed">
+      <Trans>
+        Receive alerts from the apps you approve, and stay on top of what
+        matters seamlessly.
+      </Trans>
+    </p>
+  {/if}
 
-  <ul class="mt-5 flex flex-col gap-4">
-    <li class="flex items-start gap-3.5">
-      <span
-        class="border-border-secondary bg-bg-secondary text-text-primary flex size-9 shrink-0 items-center justify-center rounded-full border"
-        aria-hidden="true"
-      >
-        <ZapIcon class="size-4" />
-      </span>
-      <div class="min-w-0 flex-1">
-        <div class="text-text-primary text-sm font-semibold">
-          {$t`Instant activity alerts`}
+  <!-- Explaining what notifications are earns its place only on the first ask.
+       Once they're on, this is a per-app consent and the list is noise. -->
+  {#if !globallyGranted}
+    <ul class="mt-5 flex flex-col gap-4">
+      <li class="flex items-start gap-3.5">
+        <span
+          class="border-border-secondary bg-bg-secondary text-text-primary flex size-9 shrink-0 items-center justify-center rounded-full border"
+          aria-hidden="true"
+        >
+          <ZapIcon class="size-4" />
+        </span>
+        <div class="min-w-0 flex-1">
+          <div class="text-text-primary text-sm font-semibold">
+            {$t`Instant activity alerts`}
+          </div>
+          <p class="text-text-tertiary mt-0.5 text-sm leading-snug">
+            <Trans
+              >Transfers, replies and mentions the moment they happen.</Trans
+            >
+          </p>
         </div>
-        <p class="text-text-tertiary mt-0.5 text-sm leading-snug">
-          <Trans>Transfers, replies and mentions the moment they happen.</Trans>
-        </p>
-      </div>
-    </li>
-    <li class="flex items-start gap-3.5">
-      <span
-        class="border-border-secondary bg-bg-secondary text-text-primary flex size-9 shrink-0 items-center justify-center rounded-full border"
-        aria-hidden="true"
-      >
-        <ClockIcon class="size-4" />
-      </span>
-      <div class="min-w-0 flex-1">
-        <div class="text-text-primary text-sm font-semibold">
-          {$t`Reachable anytime`}
+      </li>
+      <li class="flex items-start gap-3.5">
+        <span
+          class="border-border-secondary bg-bg-secondary text-text-primary flex size-9 shrink-0 items-center justify-center rounded-full border"
+          aria-hidden="true"
+        >
+          <ClockIcon class="size-4" />
+        </span>
+        <div class="min-w-0 flex-1">
+          <div class="text-text-primary text-sm font-semibold">
+            {$t`Reachable anytime`}
+          </div>
+          <p class="text-text-tertiary mt-0.5 text-sm leading-snug">
+            <Trans
+              >Updates reach your device without keeping the app open.</Trans
+            >
+          </p>
         </div>
-        <p class="text-text-tertiary mt-0.5 text-sm leading-snug">
-          <Trans>Updates reach your device without keeping the app open.</Trans>
-        </p>
-      </div>
-    </li>
-  </ul>
+      </li>
+    </ul>
+  {/if}
 
   <div class="mt-6 flex flex-col gap-2">
     <button
@@ -218,13 +271,15 @@
       {#if enabling}
         <ProgressRing />
         <span>{$t`Turning on...`}</span>
+      {:else if globallyGranted}
+        <span>{$t`Allow notifications`}</span>
       {:else}
         <span>{$t`Enable notifications`}</span>
       {/if}
     </button>
     <button
       class="btn btn-tertiary btn-lg w-full"
-      onclick={onContinue}
+      onclick={handleMaybeLater}
       disabled={enabling}
     >
       {$t`Maybe later`}
