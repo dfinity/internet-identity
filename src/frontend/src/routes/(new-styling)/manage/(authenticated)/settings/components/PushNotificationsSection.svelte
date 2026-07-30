@@ -8,12 +8,10 @@
   import { toaster } from "$lib/components/utils/toaster";
   import { t } from "$lib/stores/locale.store";
   import { authenticatedStore } from "$lib/stores/authentication.store";
-  import { bufFromBufLike } from "$lib/utils/utils";
   import {
     listConsentedOrigins,
     revokeConsent,
-    getVapidPublicKey,
-    subscribeDevice,
+    ensureDeviceSubscription,
     unsubscribeDevice,
   } from "$lib/utils/pushConsent";
 
@@ -107,26 +105,10 @@
         });
         return;
       }
-      const registration =
-        await navigator.serviceWorker.register("/service-worker.js");
-      await navigator.serviceWorker.ready;
-      const vapidPublicKey = await getVapidPublicKey($authenticatedStore.actor);
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: bufFromBufLike(vapidPublicKey),
-      });
-      const { endpoint, keys } = subscription.toJSON() as {
-        endpoint: string;
-        keys: { p256dh: string; auth: string };
-      };
-      await subscribeDevice(
+      deviceSubscription = await ensureDeviceSubscription(
         $authenticatedStore.actor,
         identityNumber,
-        endpoint,
-        keys.p256dh,
-        keys.auth,
       );
-      deviceSubscription = subscription;
     } catch (err) {
       console.error("enable push notifications failed:", err);
       const detail =

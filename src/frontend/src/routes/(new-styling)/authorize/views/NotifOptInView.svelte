@@ -6,8 +6,8 @@
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
-  import { bufFromBufLike, throwTextCanisterError } from "$lib/utils/utils";
-  import { getVapidPublicKey, subscribeDevice } from "$lib/utils/pushConsent";
+  import { throwTextCanisterError } from "$lib/utils/utils";
+  import { ensureDeviceSubscription } from "$lib/utils/pushConsent";
   import {
     notificationsGloballyGranted,
     recordNotifOptInDecision,
@@ -37,25 +37,7 @@
 
   const subscribeThisDevice = async (): Promise<void> => {
     const { actor, identityNumber } = $authenticatedStore;
-    const registration =
-      await navigator.serviceWorker.register("/service-worker.js");
-    await navigator.serviceWorker.ready;
-    const vapidPublicKey = await getVapidPublicKey(actor);
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: bufFromBufLike(vapidPublicKey),
-    });
-    const { endpoint, keys } = subscription.toJSON() as {
-      endpoint: string;
-      keys: { p256dh: string; auth: string };
-    };
-    await subscribeDevice(
-      actor,
-      identityNumber,
-      endpoint,
-      keys.p256dh,
-      keys.auth,
-    );
+    await ensureDeviceSubscription(actor, identityNumber);
     await actor
       .push_grant_consent(identityNumber, effectiveOrigin)
       .then(throwTextCanisterError);

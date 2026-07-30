@@ -13,7 +13,11 @@
  */
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { fromBase64URL, throwTextCanisterError } from "$lib/utils/utils";
+import {
+  bufFromBufLike,
+  fromBase64URL,
+  throwTextCanisterError,
+} from "$lib/utils/utils";
 
 /** List the origins this identity has granted push-notification consent to. */
 export const listConsentedOrigins = (
@@ -64,6 +68,89 @@ export const subscribeDevice = async (
       fromBase64URL(auth),
     )
     .then(throwTextCanisterError);
+};
+
+/**
+ * Register this device for push and record it against `identityNumber`,
+ * returning the live subscription.
+ *
+ * The awkward part is that a browser allows only **one** push subscription per
+ * service worker, permanently bound to the `applicationServerKey` it was created
+ * with. `subscribe()` rejects outright when asked for a different key:
+ *
+ *   "A subscription with a different applicationServerKey ... already exists;
+ *    to change the applicationServerKey, unsubscribe then resubscribe."
+ *
+ * That happens whenever II's VAPID key changes — which it did when the key moved
+ * from a hardcoded pair to one generated on the canister — leaving every browser
+ * that had subscribed unable to re-enable. So an existing subscription is reused
+ * when its key still matches, and replaced when it doesn't.
+ *
+ * Replacing rotates the endpoint, which strands rows other identities on this
+ * browser hold for the old one. That is acceptable precisely here: a subscription
+ * bound to a key II no longer holds is already undeliverable for *every*
+ * identity, so rotating fixes them rather than harming them. This anchor's own
+ * stale row is cleaned up explicitly; the rest need `pushsubscriptionchange`
+ * handling, which is tracked separately.
+ */
+export const ensureDeviceSubscription = async (
+  actor: ActorSubclass<_SERVICE>,
+  identityNumber: bigint,
+): Promise<PushSubscription> => {
+  const registration =
+    await navigator.serviceWorker.register("/service-worker.js");
+  await navigator.serviceWorker.ready;
+  const vapidPublicKey = await getVapidPublicKey(actor);
+
+  const existing = await registration.pushManager.getSubscription();
+  if (existing !== null) {
+    const existingKey = existing.options.applicationServerKey;
+    if (
+      existingKey !== null &&
+      existingKey !== undefined &&
+      sameBytes(new Uint8Array(existingKey), vapidPublicKey)
+    ) {
+      // Same key: the subscription is still valid, so re-registering it is
+      // enough. Idempotent server-side, keyed by the endpoint's hash.
+      await registerSubscription(actor, identityNumber, existing);
+      return existing;
+    }
+    // Different key (or a subscription with no key at all): unusable. Drop this
+    // anchor's row for the dead endpoint first, best-effort — it may never have
+    // been recorded — so it can't linger as an undeliverable target.
+    await unsubscribeDevice(actor, identityNumber, existing.endpoint).catch(
+      () => undefined,
+    );
+    await existing.unsubscribe();
+  }
+
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: bufFromBufLike(vapidPublicKey),
+  });
+  await registerSubscription(actor, identityNumber, subscription);
+  return subscription;
+};
+
+const sameBytes = (a: Uint8Array, b: Uint8Array): boolean =>
+  a.length === b.length && a.every((byte, index) => byte === b[index]);
+
+const registerSubscription = async (
+  actor: ActorSubclass<_SERVICE>,
+  identityNumber: bigint,
+  subscription: PushSubscription,
+): Promise<void> => {
+  const { endpoint, keys } = subscription.toJSON() as {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+  };
+  await subscribeDevice(
+    actor,
+    identityNumber,
+    endpoint,
+    keys.p256dh,
+    keys.auth,
+  );
 };
 
 /** Remove this device's subscription (identified by its push `endpoint`). */
