@@ -4,7 +4,7 @@
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import IdentityListItem from "$lib/components/ui/IdentityListItem.svelte";
   import {
-    identitySwitcherOpen,
+    identitySwitcherTrigger,
     connectScreenActive,
   } from "../mcp-switcher.store";
   import SessionDurationSelect from "$lib/components/ui/SessionDurationSelect.svelte";
@@ -136,7 +136,7 @@
         </span>
         <ButtonCard
           class="w-full text-start"
-          onclick={() => identitySwitcherOpen.set(true)}
+          onclick={() => identitySwitcherTrigger.set("row")}
           disabled={isAuthorizing}
           aria-label={$t`Choose identity, currently ${selectedIdentityLabel}`}
         >

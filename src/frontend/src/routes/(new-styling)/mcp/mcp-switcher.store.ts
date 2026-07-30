@@ -11,6 +11,10 @@ import { writable } from "svelte/store";
  */
 export const showIdentitySwitcher = writable(false);
 
-export const identitySwitcherOpen = writable(false);
+export type IdentitySwitcherTrigger = "header" | "row";
+
+export const identitySwitcherTrigger = writable<
+  IdentitySwitcherTrigger | undefined
+>(undefined);
 
 export const connectScreenActive = writable(false);
