@@ -194,7 +194,9 @@
       ) {
         return;
       }
-      anchorRef?.querySelector("button")?.focus();
+      // The anchor may be the trigger itself rather than a wrapper around it,
+      // in which case there is no inner button to hand focus back to.
+      (anchorRef?.querySelector("button") ?? anchorRef)?.focus();
       onClose?.();
     }}
     class="popover fixed overflow-visible bg-transparent"

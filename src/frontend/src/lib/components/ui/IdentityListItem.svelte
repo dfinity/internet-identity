@@ -18,7 +18,7 @@
     {identity.name ?? identity.identityNumber}
   </span>
   <span
-    class="text-text-tertiary overflow-hidden text-sm text-ellipsis whitespace-nowrap"
+    class="text-text-tertiary overflow-hidden text-sm font-normal text-ellipsis whitespace-nowrap"
   >
     {#if "openid" in identity.authMethod && identity.authMethod.openid.metadata !== undefined}
       <span

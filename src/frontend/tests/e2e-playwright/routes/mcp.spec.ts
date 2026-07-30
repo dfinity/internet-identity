@@ -96,7 +96,7 @@ test("The connect screen names the acting identity and keeps the consent in view
   await signUp(page);
 
   const identityRow = page.getByRole("button", {
-    name: "Choose identity",
+    name: /^Choose identity/,
   });
   await expect(identityRow).toBeVisible();
   await expect(identityRow).toContainText("Test User");

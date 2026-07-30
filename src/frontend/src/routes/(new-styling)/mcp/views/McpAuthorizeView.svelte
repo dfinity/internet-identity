@@ -41,6 +41,9 @@
   const authLastUsedFlow = new AuthLastUsedFlow();
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
   const selectedIdentityNumber = $derived(selectedIdentity?.identityNumber);
+  const selectedIdentityLabel = $derived(
+    selectedIdentity?.name ?? `${selectedIdentity?.identityNumber}`,
+  );
   $effect(() => {
     if (selectedIdentityNumber !== undefined) {
       authLastUsedFlow.init([selectedIdentityNumber]);
@@ -127,10 +130,12 @@
           class="w-full text-start"
           onclick={() => identitySwitcherOpen.set(true)}
           disabled={isAuthorizing}
-          aria-label={$t`Choose identity`}
+          aria-label={$t`Choose identity, currently ${selectedIdentityLabel}`}
         >
-          <IdentityListItem identity={selectedIdentity} />
-          <ChevronDownIcon class="text-fg-tertiary ms-auto size-4 shrink-0" />
+          <div class="ms-0.5 me-2 flex w-full items-center gap-3">
+            <IdentityListItem identity={selectedIdentity} />
+            <ChevronDownIcon class="text-fg-tertiary ms-auto size-4 shrink-0" />
+          </div>
         </ButtonCard>
       </div>
     {/if}

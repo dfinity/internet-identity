@@ -36,6 +36,14 @@
 
   const closeIdentityPopover = (): void => identitySwitcherOpen.set(false);
 
+  // A phase that hides the switcher must also drop any open state, or the
+  // popover springs back open the next time a phase shows it again.
+  $effect(() => {
+    if (!$showIdentitySwitcher) {
+      closeIdentityPopover();
+    }
+  });
+
   // Authenticate the selected identity here, then open /manage in a new tab
   // carrying the session — so the user doesn't have to sign in again there.
   const manageHandoff = new ManageHandoffFlow();
