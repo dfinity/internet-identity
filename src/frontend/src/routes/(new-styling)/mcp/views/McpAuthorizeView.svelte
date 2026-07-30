@@ -5,7 +5,7 @@
   import IdentityListItem from "$lib/components/ui/IdentityListItem.svelte";
   import {
     identitySwitcherOpen,
-    screenHasIdentityRow,
+    connectScreenActive,
   } from "../mcp-switcher.store";
   import SessionDurationSelect from "$lib/components/ui/SessionDurationSelect.svelte";
   import { MAX_SESSION_DURATION_SECONDS } from "$lib/utils/sessionDuration";
@@ -49,8 +49,8 @@
   );
 
   $effect(() => {
-    screenHasIdentityRow.set(true);
-    return () => screenHasIdentityRow.set(false);
+    connectScreenActive.set(true);
+    return () => connectScreenActive.set(false);
   });
   $effect(() => {
     if (selectedIdentityNumber !== undefined) {

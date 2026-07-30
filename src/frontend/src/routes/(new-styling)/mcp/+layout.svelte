@@ -20,7 +20,7 @@
   import {
     showIdentitySwitcher,
     identitySwitcherOpen,
-    screenHasIdentityRow,
+    connectScreenActive,
   } from "./mcp-switcher.store";
 
   const { children }: LayoutProps = $props();
@@ -37,7 +37,7 @@
   let windowWidth = $state(window.innerWidth);
 
   const showHeaderSwitcher = $derived(
-    !$screenHasIdentityRow || windowWidth >= MOBILE_BREAKPOINT,
+    !$connectScreenActive || windowWidth >= MOBILE_BREAKPOINT,
   );
   let isAuthDialogOpen = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
@@ -125,7 +125,7 @@
 
 <div class="flex min-h-[100dvh] flex-col" data-page="mcp-authorize-view">
   <div class="h-[env(safe-area-inset-top)]"></div>
-  <Header>
+  <Header showLogo={!$connectScreenActive}>
     {#if selectedIdentity !== undefined && $showIdentitySwitcher}
       {#if showHeaderSwitcher}
         <button

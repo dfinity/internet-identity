@@ -2,9 +2,16 @@
   import type { HTMLAttributes } from "svelte/elements";
   import Logo from "$lib/components/ui/Logo.svelte";
 
-  type Props = HTMLAttributes<HTMLElement>;
+  type Props = HTMLAttributes<HTMLElement> & {
+    showLogo?: boolean;
+  };
 
-  const { children, class: className, ...props }: Props = $props();
+  const {
+    children,
+    class: className,
+    showLogo = true,
+    ...props
+  }: Props = $props();
 </script>
 
 <header
@@ -15,12 +22,14 @@
   ]}
 >
   <div class="flex h-16 flex-1 items-center gap-4">
-    <a href="/" dir="ltr" class="flex items-center gap-4">
-      <Logo class="text-fg-primary h-5.5" />
-      <h1 class="text-text-primary hidden text-base font-semibold sm:block">
-        Internet Identity
-      </h1>
-    </a>
+    {#if showLogo}
+      <a href="/" dir="ltr" class="flex items-center gap-4">
+        <Logo class="text-fg-primary h-5.5" />
+        <h1 class="text-text-primary hidden text-base font-semibold sm:block">
+          Internet Identity
+        </h1>
+      </a>
+    {/if}
     {@render children?.()}
   </div>
 </header>

@@ -13,4 +13,4 @@ export const showIdentitySwitcher = writable(false);
 
 export const identitySwitcherOpen = writable(false);
 
-export const screenHasIdentityRow = writable(false);
+export const connectScreenActive = writable(false);
