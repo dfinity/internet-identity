@@ -114,7 +114,7 @@ test("The connect screen names the acting identity and keeps the consent in view
 
   await identityRow.click();
   await expect(
-    page.getByRole("button", { name: "Sign in with another identity" }),
+    page.getByRole("button", { name: "Add identity" }),
   ).toBeVisible();
 });
 

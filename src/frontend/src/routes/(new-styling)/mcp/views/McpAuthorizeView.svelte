@@ -141,17 +141,22 @@
     {/if}
 
     <!-- Session: how long the connection lasts before the user must reconnect. -->
-    <div class="mt-4 mb-5 flex flex-row items-center justify-between gap-2">
-      <span class="text-text-primary text-base font-medium">
+    <div class="mt-4 mb-5 flex flex-col">
+      <span class="text-text-primary mb-0.5 text-base font-medium">
         {$t`Session duration`}
       </span>
-      <!-- The connect flow lets the user pick any duration up to the 30-day
-           maximum, defaulting to the requested value. -->
-      <SessionDurationSelect
-        maxSeconds={MAX_SESSION_DURATION_SECONDS}
-        bind:value={selectedTtlSeconds}
-        disabled={isAuthorizing}
-      />
+      <div class="flex flex-row items-center justify-between gap-2">
+        <span class="text-text-tertiary text-base">
+          {$t`Time until you have to reconnect:`}
+        </span>
+        <!-- The connect flow lets the user pick any duration up to the 30-day
+             maximum, defaulting to the requested value. -->
+        <SessionDurationSelect
+          maxSeconds={MAX_SESSION_DURATION_SECONDS}
+          bind:value={selectedTtlSeconds}
+          disabled={isAuthorizing}
+        />
+      </div>
     </div>
 
     <AccessLevelSelector
