@@ -1,7 +1,3 @@
-<script lang="ts" module>
-  export const MOBILE_BREAKPOINT = 480;
-</script>
-
 <script lang="ts">
   import type { HTMLAttributes } from "svelte/elements";
   import { fade } from "svelte/transition";
@@ -32,6 +28,8 @@
     flip = true,
     ...props
   }: Props = $props();
+
+  const MOBILE_BREAKPOINT = 480;
 
   let popoverRef = $state<HTMLElement | null>();
   let windowWidth = $state(window.innerWidth);

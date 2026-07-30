@@ -7,9 +7,7 @@
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import Popover, {
-    MOBILE_BREAKPOINT,
-  } from "$lib/components/ui/Popover.svelte";
+  import Popover from "$lib/components/ui/Popover.svelte";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import ManageHandoff from "$lib/components/ui/ManageHandoff.svelte";
@@ -34,11 +32,6 @@
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 
   let identityButtonRef = $state<HTMLElement>();
-  let windowWidth = $state(window.innerWidth);
-
-  const showHeaderSwitcher = $derived(
-    !$connectScreenActive || windowWidth >= MOBILE_BREAKPOINT,
-  );
   let isAuthDialogOpen = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
 
@@ -126,9 +119,9 @@
 
 <div class="flex min-h-[100dvh] flex-col" data-page="mcp-authorize-view">
   <div class="h-[env(safe-area-inset-top)]"></div>
-  <Header showLogo={!$connectScreenActive}>
-    {#if selectedIdentity !== undefined && $showIdentitySwitcher}
-      {#if showHeaderSwitcher}
+  {#if !$connectScreenActive}
+    <Header>
+      {#if selectedIdentity !== undefined && $showIdentitySwitcher}
         <button
           bind:this={identityButtonRef}
           class="btn btn-tertiary ms-auto gap-2.5 pe-3 md:-me-3"
@@ -143,70 +136,8 @@
           <ChevronDownIcon class="size-4" />
         </button>
       {/if}
-      {#snippet switcher()}
-        <IdentitySwitcher
-          selected={selectedIdentity.identityNumber}
-          identities={lastUsedIdentities}
-          onSwitchIdentity={(identityNumber) =>
-            handleSelectIdentity(identityNumber)}
-          onUseAnotherIdentity={() => {
-            closeIdentitySwitcher();
-            isAuthDialogOpen = true;
-          }}
-          onManageIdentity={handleManageIdentity}
-          onManageIdentities={() => {
-            closeIdentitySwitcher();
-            isManageIdentitiesDialogOpen = true;
-          }}
-          onError={(error) => {
-            closeIdentitySwitcher();
-            handleError(error);
-          }}
-          onClose={closeIdentitySwitcher}
-        />
-      {/snippet}
-      {#if $identitySwitcherTrigger === "row"}
-        <Dialog
-          onClose={closeIdentitySwitcher}
-          showCloseButton={false}
-          contentClass="!p-0"
-          class="!bg-bg-primary"
-        >
-          {@render switcher()}
-        </Dialog>
-      {:else if $identitySwitcherTrigger === "header"}
-        <Popover
-          anchor={identityButtonRef}
-          onClose={closeIdentitySwitcher}
-          direction="down"
-          align="end"
-          distance="0.75rem"
-          class="!bg-bg-primary"
-        >
-          {@render switcher()}
-        </Popover>
-      {/if}
-      {#if isAuthDialogOpen}
-        <Dialog onClose={() => (isAuthDialogOpen = false)}>
-          <AuthWizard
-            onSignIn={handleSelectIdentity}
-            onSignUp={handleSignUp}
-            onError={(error) => {
-              isAuthDialogOpen = false;
-              handleError(error);
-            }}
-          >
-            <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-              {$t`Sign in`}
-            </h1>
-            <p class="text-text-secondary mb-6 self-start text-sm">
-              {$t`Choose method to continue`}
-            </p>
-          </AuthWizard>
-        </Dialog>
-      {/if}
-    {/if}
-  </Header>
+    </Header>
+  {/if}
 
   <div class="flex flex-1 flex-col items-center justify-center">
     {@render children()}
@@ -215,6 +146,71 @@
   <Footer />
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
+
+{#if selectedIdentity !== undefined && $showIdentitySwitcher}
+  {#snippet switcher()}
+    <IdentitySwitcher
+      selected={selectedIdentity.identityNumber}
+      identities={lastUsedIdentities}
+      onSwitchIdentity={(identityNumber) =>
+        handleSelectIdentity(identityNumber)}
+      onUseAnotherIdentity={() => {
+        closeIdentitySwitcher();
+        isAuthDialogOpen = true;
+      }}
+      onManageIdentity={handleManageIdentity}
+      onManageIdentities={() => {
+        closeIdentitySwitcher();
+        isManageIdentitiesDialogOpen = true;
+      }}
+      onError={(error) => {
+        closeIdentitySwitcher();
+        handleError(error);
+      }}
+      onClose={closeIdentitySwitcher}
+    />
+  {/snippet}
+  {#if $identitySwitcherTrigger === "row"}
+    <Dialog
+      onClose={closeIdentitySwitcher}
+      showCloseButton={false}
+      contentClass="!p-0"
+      class="!bg-bg-primary"
+    >
+      {@render switcher()}
+    </Dialog>
+  {:else if $identitySwitcherTrigger === "header"}
+    <Popover
+      anchor={identityButtonRef}
+      onClose={closeIdentitySwitcher}
+      direction="down"
+      align="end"
+      distance="0.75rem"
+      class="!bg-bg-primary"
+    >
+      {@render switcher()}
+    </Popover>
+  {/if}
+  {#if isAuthDialogOpen}
+    <Dialog onClose={() => (isAuthDialogOpen = false)}>
+      <AuthWizard
+        onSignIn={handleSelectIdentity}
+        onSignUp={handleSignUp}
+        onError={(error) => {
+          isAuthDialogOpen = false;
+          handleError(error);
+        }}
+      >
+        <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
+          {$t`Sign in`}
+        </h1>
+        <p class="text-text-secondary mb-6 self-start text-sm">
+          {$t`Choose method to continue`}
+        </p>
+      </AuthWizard>
+    </Dialog>
+  {/if}
+{/if}
 
 {#if isManageIdentitiesDialogOpen}
   <Dialog onClose={() => (isManageIdentitiesDialogOpen = false)}>
@@ -226,5 +222,3 @@
 {/if}
 
 <ManageHandoff flow={manageHandoff} />
-
-<svelte:window bind:innerWidth={windowWidth} />

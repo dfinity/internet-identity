@@ -112,12 +112,13 @@ test("The connect screen names the acting identity and keeps the consent in view
   await expect(allowAccess).toBeInViewport();
   await expect(revokeNote).toBeInViewport();
 
-  const headerSwitcher = page.getByRole("button", { name: "Switch identity" });
-  if ((page.viewportSize()?.width ?? 0) < 480) {
-    await expect(headerSwitcher).toBeHidden();
-  } else {
-    await expect(headerSwitcher).toBeVisible();
-  }
+  // The screen carries the identity and its control, so it has no header.
+  await expect(
+    page.getByRole("button", { name: "Switch identity" }),
+  ).toBeHidden();
+  await expect(
+    page.getByRole("link", { name: "Internet Identity" }),
+  ).toBeHidden();
 
   await identityRow.click();
   await expect(
