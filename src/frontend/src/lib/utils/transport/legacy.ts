@@ -206,15 +206,10 @@ export const endRedirectSession = async (
 };
 
 class LegacyChannel implements Channel {
-  // Every channel carries a resumeToken because the authorize page stashes
-  // `$establishedChannelStore.resumeToken` before a 1-click redirect for
-  // whichever channel established. This transport does not gate on it: on the
-  // return it re-establishes via the opener handshake (scoped by
-  // `allowedOrigin`), not by resuming a persisted flow, so a token would have
-  // nothing to protect here. The check lives in the URL transport — the only
-  // transport that resumes a persisted flow — which, because tokens are
-  // distinct, also declines to resume a stale URL flow during this transport's
-  // own return.
+  // Carried so the authorize page can stash it before a 1-click redirect, but
+  // not gated on here: this transport re-establishes via the opener handshake
+  // (scoped by `allowedOrigin`), not by resuming a persisted flow. Transports
+  // that do resume a persisted flow gate on it.
   readonly resumeToken = crypto.randomUUID();
   #closed = false;
   #origin: string;
