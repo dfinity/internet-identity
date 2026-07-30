@@ -11,11 +11,22 @@ export const GENERIC_ERROR_CODE = 1000;
 export interface ChannelOptions {
   allowedOrigin?: string;
   pending?: boolean;
+  // Proof, on a resume-mode establish (the `openid-resume` return), that the
+  // caller owns the flow being resumed: the `resumeToken` of the channel that
+  // initiated the II-internal redirect, stashed before it and passed back here.
+  // A transport that persists a resumable flow requires it to match.
+  resumeToken?: string;
 }
 
 export interface Channel {
   origin: string;
   closed: boolean;
+  // Per-channel random token, stable across an II-internal redirect (a resumed
+  // channel keeps the token of the flow it resumes). The authorize page stashes
+  // it before redirecting to the IdP and hands it back via
+  // `ChannelOptions.resumeToken`, so a transport can prove a resume belongs to
+  // the channel that started the flow rather than inferring it from the origin.
+  resumeToken: string;
   addEventListener(event: "close", listener: () => void): () => void;
   addEventListener(
     event: "request",
