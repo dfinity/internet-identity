@@ -7,6 +7,8 @@
  * only at the boundary via {@link sessionDurationToNanos}.
  */
 
+import type { Duration } from "$lib/stores/locale.store";
+
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
@@ -22,21 +24,24 @@ const MAX_SESSION_DURATION_NANOS =
   BigInt(MAX_SESSION_DURATION_SECONDS) * NANOS_PER_SECOND;
 
 /**
- * Compact label for an off-preset duration, e.g. `7200 -> "2h"`,
- * `90_060 -> "1d 1h 1m"`. Used when the selected/cap value isn't one of the
- * named presets.
+ * An off-preset duration broken into its non-zero units, ready to be spelled out
+ * by `$formatDuration`: `7200 -> { hour: 2 }`, `90_060 -> { day: 1, hour: 1,
+ * minute: 1 }`. Zero units are left out so they don't show up in the label, with
+ * one exception: a zero duration keeps `{ second: 0 }`, so the label is never
+ * empty. Off-preset durations are spelled out like the named presets ("20
+ * minutes") rather than compactly ("20m"), see `SessionDurationSelect`.
  */
-export const formatSessionDuration = (seconds: number): string => {
-  const parts: string[] = [];
-  const d = Math.floor(seconds / DAY);
-  const h = Math.floor((seconds % DAY) / HOUR);
-  const m = Math.floor((seconds % HOUR) / MINUTE);
-  const s = seconds % MINUTE;
-  if (d > 0) parts.push(`${d}d`);
-  if (h > 0) parts.push(`${h}h`);
-  if (m > 0) parts.push(`${m}m`);
-  if (s > 0) parts.push(`${s}s`);
-  return parts.length > 0 ? parts.join(" ") : "0s";
+export const sessionDurationBreakdown = (seconds: number): Duration => {
+  const day = Math.floor(seconds / DAY);
+  const hour = Math.floor((seconds % DAY) / HOUR);
+  const minute = Math.floor((seconds % HOUR) / MINUTE);
+  const second = seconds % MINUTE;
+  const breakdown: Duration = {};
+  if (day > 0) breakdown.day = day;
+  if (hour > 0) breakdown.hour = hour;
+  if (minute > 0) breakdown.minute = minute;
+  if (second > 0) breakdown.second = second;
+  return Object.keys(breakdown).length > 0 ? breakdown : { second: 0 };
 };
 
 /**

@@ -971,6 +971,7 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
         decoded_config,
         InternetIdentitySynchronizedConfig {
             openid_configs: Some(openid_configs),
+            mcp_official_url: None,
         }
     );
 
@@ -978,6 +979,75 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
 
     let result = verify_response_certification(&env, canister_id, request, http_response, 2);
     assert_eq!(result.verification_version, 2);
+
+    Ok(())
+}
+
+/// Verifies that the `mcp_official_url` install arg reaches the frontend: it is
+/// persisted on install, survives an upgrade that doesn't re-supply it, is
+/// cleared by `opt null`, and is served in the `/.config.did.bin` asset the
+/// frontend reads on page load.
+#[test]
+fn ii_canister_serves_mcp_official_url_in_synchronized_config() -> Result<(), RejectResponse> {
+    let env = env();
+    let official_url = "https://mcp.internetcomputer.org/mcp".to_string();
+    let canister_id = install_ii_canister_with_arg(
+        &env,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            mcp_official_url: Some(Some(official_url.clone())),
+            ..Default::default()
+        }),
+    );
+
+    let read_official_url = || -> Result<Option<String>, RejectResponse> {
+        let request = HttpRequest {
+            method: "GET".to_string(),
+            url: "/.config.did.bin".to_string(),
+            headers: vec![],
+            body: ByteBuf::new(),
+            certificate_version: Some(2),
+        };
+        let http_response = http_request(&env, canister_id, &request)?;
+        assert_eq!(http_response.status_code, 200);
+        let decoded: InternetIdentitySynchronizedConfig = candid::decode_one(&http_response.body)
+            .expect("Failed to decode /.config.did.bin as InternetIdentitySynchronizedConfig");
+        Ok(decoded.mcp_official_url)
+    };
+
+    assert_eq!(read_official_url()?, Some(official_url.clone()));
+
+    // An upgrade that omits the field must preserve it, matching the `opt`
+    // semantics the deploy prompts promise ("Enter = preserve").
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    assert_eq!(read_official_url()?, Some(official_url.clone()));
+
+    // `Some(None)` (`opt null` in Candid) unsets it, leaving the deployment
+    // without an official connector.
+    upgrade_ii_canister_with_arg(
+        &env,
+        canister_id,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            mcp_official_url: Some(None),
+            ..Default::default()
+        }),
+    )
+    .expect("upgrade clearing mcp_official_url failed");
+    assert_eq!(read_official_url()?, None);
+
+    // And it can be set again afterwards.
+    upgrade_ii_canister_with_arg(
+        &env,
+        canister_id,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            mcp_official_url: Some(Some(official_url.clone())),
+            ..Default::default()
+        }),
+    )
+    .expect("upgrade re-setting mcp_official_url failed");
+    assert_eq!(read_official_url()?, Some(official_url));
 
     Ok(())
 }
