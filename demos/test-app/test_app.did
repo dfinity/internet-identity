@@ -18,7 +18,7 @@ type AlternativeOriginsMode = variant {
     CertifiedContent;
     UncertifiedContent;
     Redirect: record { location: text; };
-}
+};
 
 type CallerAttributes = record {
     /// Canister that signed the attributes attached to the caller's
@@ -30,7 +30,14 @@ type CallerAttributes = record {
     data: blob;
 };
 
-service : {
+type InitArg = record {
+    /// Extra callback URLs added to the ICRC-167 auth-callback allow-list, on
+    /// top of the canister's own gateway origins (e.g. a custom domain like the
+    /// e2e `nice-name.com`).
+    auth_callbacks: vec text;
+};
+
+service : (opt InitArg) -> {
   whoami: () -> (principal) query;
   update_alternative_origins: (text, AlternativeOriginsMode) -> ();
   http_request: (request: HttpRequest) -> (HttpResponse) query;

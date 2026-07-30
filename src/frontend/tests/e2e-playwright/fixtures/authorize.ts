@@ -7,6 +7,13 @@ export type AuthorizeConfig = {
   testAppURL: string;
   internetIdentityURL: string;
   protocol: "legacy" | "icrc25";
+  /**
+   * Sign-in transport the test app uses. Defaults to `"window"` (the popup /
+   * postMessage flow). `"redirect"` drives the ICRC-167 single-tab redirect
+   * flow: clicking "Sign In" navigates the same tab to the callback page and on
+   * to II, and the response is delivered back by navigation (no popup).
+   */
+  transport?: "window" | "redirect";
 } & (
   | { protocol: "legacy" }
   | {
@@ -43,6 +50,19 @@ export const test = base.extend<{
   authorizedPrincipal: Principal | undefined;
   authorizedAttributes: Record<string, string> | undefined;
   authorizedIcrc3Attributes: { data: string; signature: string } | undefined;
+  /**
+   * The delegation chain the test app received, parsed from its `#delegation`
+   * view (pubkeys and publicKey are hex). Lets a spec assert the chain's shape
+   * — e.g. the redirect flow's two-hop intermediate-key structure. Waits for
+   * the redirect return before reading, like {@link authorizedPrincipal};
+   * `undefined` when the page has no delegation.
+   */
+  authorizedDelegation:
+    | {
+        delegations: { delegation: { pubkey: string } }[];
+        publicKey: string;
+      }
+    | undefined;
   /**
    * The II backend canister id, discovered by visiting the II URL in a
    * throwaway page and reading `<body data-canister-id>` (the II
@@ -127,19 +147,56 @@ export const test = base.extend<{
     }
 
     await expect(testAppPage.locator("#principal")).toBeHidden();
-    const authPagePromise = testAppPage.context().waitForEvent("page");
-    await testAppPage.getByRole("button", { name: "Sign In" }).click();
-    const authPage = await authPagePromise;
-    const closePromise = authPage.waitForEvent("close", { timeout: 15_000 });
 
-    await use(new AuthorizePage(authPage));
+    const transport = authorizeConfig.transport ?? "window";
+    switch (transport) {
+      case "redirect": {
+        // Redirect flow: clicking "Sign In" navigates THIS tab to /callback → II
+        // /authorize. The authenticate interaction runs on the same page, and II
+        // delivers the response back by navigation — no popup.
+        await testAppPage.locator("#transport").selectOption("redirect");
+        await testAppPage.getByRole("button", { name: "Sign In" }).click();
 
-    await closePromise;
+        await use(new AuthorizePage(testAppPage));
+
+        // On the return load the homepage renders the principal.
+        await expect(testAppPage.locator("#principal")).toBeVisible({
+          timeout: 15_000,
+        });
+        break;
+      }
+      case "window": {
+        // Window flow: clicking "Sign In" opens II in a new tab; the response
+        // comes back over postMessage and the tab closes.
+        const authPagePromise = testAppPage.context().waitForEvent("page");
+        await testAppPage.getByRole("button", { name: "Sign In" }).click();
+        const authPage = await authPagePromise;
+        const closePromise = authPage.waitForEvent("close", {
+          timeout: 15_000,
+        });
+
+        await use(new AuthorizePage(authPage));
+
+        await closePromise;
+        break;
+      }
+      default: {
+        transport satisfies never;
+        throw new Error(`Unhandled transport: ${String(transport)}`);
+      }
+    }
   },
-  authorizedPrincipal: async ({ page }, use) => {
+  authorizedPrincipal: async ({ page, authorizeConfig }, use) => {
     const [testAppPage, authPage] = page.context().pages();
     if (authPage !== undefined) {
       await authPage.waitForEvent("close", { timeout: 15_000 });
+    }
+    // The redirect flow renders the principal only after navigating back to the
+    // test app, so wait for it before reading (window flow already has it).
+    if (authorizeConfig?.transport === "redirect") {
+      await expect(testAppPage.locator("#principal")).toBeVisible({
+        timeout: 15_000,
+      });
     }
 
     const principal = await testAppPage.locator("#principal").textContent();
@@ -171,10 +228,17 @@ export const test = base.extend<{
       ),
     );
   },
-  authorizedIcrc3Attributes: async ({ page }, use) => {
+  authorizedIcrc3Attributes: async ({ page, authorizeConfig }, use) => {
     const [testAppPage, authPage] = page.context().pages();
     if (authPage !== undefined) {
       await authPage.waitForEvent("close", { timeout: 15_000 });
+    }
+    // The redirect flow renders results only after navigating back to the test
+    // app, so wait for the return (principal visible) before reading.
+    if (authorizeConfig?.transport === "redirect") {
+      await expect(testAppPage.locator("#principal")).toBeVisible({
+        timeout: 15_000,
+      });
     }
 
     // Tests that bypass the test_app entirely (e.g. the channel-error
@@ -193,6 +257,34 @@ export const test = base.extend<{
     }
 
     await use(JSON.parse(icrc3Attributes));
+  },
+  authorizedDelegation: async ({ page, authorizeConfig }, use) => {
+    const [testAppPage, authPage] = page.context().pages();
+    if (authPage !== undefined) {
+      await authPage.waitForEvent("close", { timeout: 15_000 });
+    }
+    // The redirect flow renders the delegation only after navigating back to
+    // the test app, so wait for the return (principal visible) before reading.
+    if (authorizeConfig?.transport === "redirect") {
+      await expect(testAppPage.locator("#principal")).toBeVisible({
+        timeout: 15_000,
+      });
+    }
+
+    const delegation = await testAppPage.locator("#delegation").innerText();
+    // The test app writes a plain status string here (e.g. "Current identity is
+    // not a DelegationIdentity") when no delegation was delivered, so parse
+    // defensively: anything that isn't valid JSON means "no delegation" and
+    // should fail the `toBeDefined()` assertion, not throw a SyntaxError from
+    // inside the fixture.
+    let parsed: Parameters<typeof use>[0];
+    try {
+      parsed = delegation === "" ? undefined : JSON.parse(delegation);
+    } catch {
+      parsed = undefined;
+    }
+
+    await use(parsed);
   },
   iiBackendCanisterId: async ({ browser }, use) => {
     // The II frontend canister rewrites every served HTML to embed
