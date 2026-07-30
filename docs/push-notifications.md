@@ -988,6 +988,62 @@ sign-in derives the identity from the callback origin or its `derivationOrigin`.
 They must agree, or the principal that was notified is not the principal the
 user comes back with.
 
+### What about apps with no URL routing (e.g. Caffeine)?
+
+**This is a hard prerequisite that some app platforms do not currently meet, and
+it needs checking before we promise notifications to them.**
+
+Everything above — deep-linking _and_ signed-in tap-through — assumes the app
+has **addressable URLs**. Caffeine-built apps were, last time anyone checked,
+fully stateful with no URL-based routing: there is no address to point a
+notification at. If that is still true, two things break, and the first is worse
+than the second:
+
+- **Deep-linking breaks outright.** With nothing to put in `alert.url`, a
+  notification can only ever open the app's root, so the context the
+  notification was _about_ ("which message", "which order") is lost on arrival.
+  A notification that cannot say where it goes is a much weaker product than one
+  that can.
+- **Signed-in landing breaks**, because the guarded-route pattern needs two real
+  routes: the restricted page and the sign-in/callback page.
+
+What such a platform has to add, in dependency order:
+
+1. **Addressable destinations.** Either a real route per notifiable view, or —
+   cheaper and probably the right fit for a stateful app — a **single entry route
+   that takes an opaque state token** (`/open?s=<token>`) and restores the
+   in-app state from it. Notifications then carry that token. This is the
+   unavoidable one: without it, notifications are reduced to "something
+   happened, open the app".
+2. **A sign-in route in the project template.** A hardcoded page that constructs
+   the redirect `AuthClient` at page load, memoizes the destination, calls
+   `signIn()`, and forwards to the memoized destination on return. It is
+   boilerplate, which is exactly why it belongs in the template rather than in
+   each app.
+3. **A guard on restricted views** calling `isAuthenticated()` and bouncing to
+   that route.
+4. **`/.well-known/ii-auth-callbacks`** served from the app's origin, listing the
+   sign-in route exactly, with CORS.
+
+One constraint that shapes the template: the callback URL must be **protocol +
+host + path only** — no query string — so the destination cannot ride on the
+callback and must live in memoized flow state. A template that tries
+`callback=/sign-in?next=…` will be rejected by the transport.
+
+Open questions to confirm rather than assume:
+
+- Is routing still absent, or has it changed?
+- Does the **builder sandbox** differ from a **published** app? URL routing
+  inside a live-preview environment (possibly iframed) may be constrained in
+  ways the published app is not, so both need checking — a design that works
+  only when published is still workable, but it changes what can be
+  demonstrated.
+
+**Fallback if routing cannot be added:** notifications still function, but only
+as "open the app" — no deep link, no authenticated landing. Worth stating plainly
+to set expectations, and it pairs naturally with the `Hidden` content variant,
+which also shows a generic message and reveals context only after the tap.
+
 ### Can a notification be updated or dismissed after it's shown?
 
 Yes, via a dApp-chosen `notification_id`, which the service worker maps to the
@@ -1475,6 +1531,11 @@ Must-fix before a real deployment:
 
 Must-decide (design, not code):
 
+- **App platforms without URL routing** — confirm whether Caffeine-built apps
+  can address a destination at all, in the builder sandbox _and_ published. If
+  not, deep-linking and signed-in tap-through are both unavailable there and
+  notifications degrade to "open the app". See
+  [What about apps with no URL routing](#what-about-apps-with-no-url-routing-eg-caffeine).
 - **iOS reality** — iOS Safari is the one platform where a PWA install is
   _mandatory_ for Web Push (Android/desktop work in a plain tab). It is also
   flakier and more throttled; "best-effort" is weakest there. Set expectations
