@@ -7,7 +7,11 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { throwTextCanisterError } from "$lib/utils/utils";
-  import { ensureDeviceSubscription } from "$lib/utils/pushConsent";
+  import { onMount } from "svelte";
+  import {
+    ensureDeviceSubscription,
+    listConsentedOrigins,
+  } from "$lib/utils/pushConsent";
   import {
     notificationsGloballyGranted,
     recordNotifOptInDecision,
@@ -30,10 +34,41 @@
   let enabling = $state(false);
   let enableError = $state<string | undefined>(undefined);
 
+  // Whether this identity already allowed this app on some OTHER device.
+  //
+  // Consent lives with the identity and is shared by every device, but a push
+  // subscription belongs to one browser — so "allowed" and "reachable here" are
+  // different questions, and the ask is a different ask. Asking someone to
+  // "allow this app to notify you" when they already did on their phone reads
+  // as though the earlier answer was lost.
+  let allowedOnAnotherDevice = $state(false);
+
   const pushSupported =
     typeof navigator !== "undefined" &&
     "serviceWorker" in navigator &&
     "PushManager" in window;
+
+  // Resolved after the screen is already up, deliberately: the decision to SHOW
+  // it is local and synchronous so nothing is added to the pre-redirect path,
+  // and only the wording depends on this.
+  onMount(() => {
+    void (async () => {
+      if (!pushSupported) return;
+      try {
+        const { actor, identityNumber } = $authenticatedStore;
+        const [origins, registration] = await Promise.all([
+          listConsentedOrigins(actor, identityNumber),
+          navigator.serviceWorker.getRegistration(),
+        ]);
+        if (!origins.includes(effectiveOrigin)) return;
+        const subscription = await registration?.pushManager.getSubscription();
+        allowedOnAnotherDevice =
+          subscription === null || subscription === undefined;
+      } catch {
+        // Leave the first-run wording: it is never wrong, only less specific.
+      }
+    })();
+  });
 
   const subscribeThisDevice = async (): Promise<void> => {
     const { actor, identityNumber } = $authenticatedStore;
@@ -191,14 +226,29 @@
   <h1
     class="text-text-primary mt-6 max-w-full min-w-0 self-start text-2xl font-medium tracking-tight break-words"
   >
-    {$t`Let ${dappName} notify you`}
+    {#if allowedOnAnotherDevice}
+      {$t`Also notify you on this device?`}
+    {:else}
+      {$t`Let ${dappName} notify you`}
+    {/if}
   </h1>
-  <p class="text-text-secondary mt-2 text-sm leading-relaxed">
-    <Trans>
-      Receive alerts from the apps you approve, and stay on top of what matters
-      seamlessly.
-    </Trans>
-  </p>
+  {#if allowedOnAnotherDevice}
+    <!-- Consent is already granted for this app; only this browser is missing a
+         subscription. Saying "allow this app to notify you" here would read as
+         though the earlier answer had been lost. -->
+    <p class="text-text-secondary mt-2 text-sm leading-relaxed">
+      <Trans>
+        You already allowed {dappName} to notify you. Turn it on for this device too.
+      </Trans>
+    </p>
+  {:else}
+    <p class="text-text-secondary mt-2 text-sm leading-relaxed">
+      <Trans>
+        Receive alerts from the apps you approve, and stay on top of what
+        matters seamlessly.
+      </Trans>
+    </p>
+  {/if}
 
   <ul class="mt-5 flex flex-col gap-4">
     <li class="flex items-start gap-3.5">
@@ -258,6 +308,8 @@
       {#if enabling}
         <ProgressRing />
         <span>{$t`Turning on...`}</span>
+      {:else if allowedOnAnotherDevice}
+        <span>{$t`Enable on this device`}</span>
       {:else}
         <span>{$t`Enable notifications`}</span>
       {/if}
