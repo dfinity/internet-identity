@@ -194,6 +194,7 @@
   {#if isAuthDialogOpen}
     <Dialog onClose={() => (isAuthDialogOpen = false)}>
       <AuthWizard
+        mode="signin"
         onSignIn={handleSelectIdentity}
         onSignUp={handleSignUp}
         onError={(error) => {
