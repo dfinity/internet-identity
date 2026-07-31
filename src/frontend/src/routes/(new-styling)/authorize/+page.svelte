@@ -158,7 +158,10 @@
         throw new Error("Gated SSO sign-in did not resolve after normal login");
       }
       authorizationStore.setFlow({ type: "1-click-sso", domain });
-      authorizationStore.authorize(Promise.resolve(undefined), "full-access");
+      offerNotificationsThenAuthorize(
+        Promise.resolve(undefined),
+        "full-access",
+      );
     } catch (e) {
       ssoNormalLoginBusy = false;
       if (isOpenIdCancelError(e)) {
@@ -184,17 +187,32 @@
     | {
         accountNumberPromise: Promise<bigint | undefined>;
         accessLevel: AccessLevel;
+        maxTimeToLive?: bigint;
+        /** Run after authorizing — the 1-click flows trigger their funnel here. */
+        after?: () => void;
       }
     | undefined
   >(undefined);
-  const handleContinueIntent = (
+
+  /**
+   * Authorize, but first offer notifications when this identity hasn't yet
+   * answered for this origin.
+   *
+   * Every path that authorizes goes through here, not just the Continue screen:
+   * the 1-click OpenID and SSO flows authorize directly and never render
+   * ContinueView, so routing only that screen through the offer meant a
+   * one-click sign-in never saw the opt-in at all.
+   */
+  const offerNotificationsThenAuthorize = (
     accountNumber: Promise<bigint | undefined>,
     accessLevel: AccessLevel,
+    maxTimeToLive?: bigint,
+    after?: () => void,
   ) => {
     const identity = selectedIdentity;
-    // Only interrupt the redirect when there is actually something to ask. If
-    // this identity already answered for this origin (or the browser can't do
-    // push), authorize straight through as if the screen didn't exist.
+    // Only interrupt the redirect when there is something to ask. If this
+    // identity already answered for this origin (or the browser can't do push),
+    // authorize straight through as if the screen didn't exist.
     if (
       identity === undefined ||
       !shouldOfferNotifications(
@@ -202,20 +220,34 @@
         $authorizationContextStore.effectiveOrigin,
       )
     ) {
-      handleAuthorize(accountNumber, accessLevel);
+      handleAuthorize(accountNumber, accessLevel, maxTimeToLive);
+      after?.();
       return;
     }
+    // The 1-click flows are mid-"resuming" when they get here; leaving that set
+    // would render the redirect animation over the opt-in, since it is matched
+    // first.
+    openIdResumeProcessing = false;
     pendingAuthorization = {
       accountNumberPromise: accountNumber,
       accessLevel,
+      maxTimeToLive,
+      after,
     };
   };
+
   const finalizePendingAuthorization = () => {
-    if (pendingAuthorization === undefined) return;
+    const pending = pendingAuthorization;
+    if (pending === undefined) return;
+    // Cleared first so the opt-in branch can't win the render race against the
+    // redirect animation once authorization is under way.
+    pendingAuthorization = undefined;
     handleAuthorize(
-      pendingAuthorization.accountNumberPromise,
-      pendingAuthorization.accessLevel,
+      pending.accountNumberPromise,
+      pending.accessLevel,
+      pending.maxTimeToLive,
     );
+    pending.after?.();
   };
 
   const handleAttributeConsent = (consent: AttributeConsent) => {
@@ -485,9 +517,16 @@
         throw e;
       }
     }
-    // 1-click OpenID flow: no access-level toggle, always full access.
-    authorizationStore.authorize(Promise.resolve(undefined), "full-access");
-    directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToApp);
+    // 1-click OpenID flow: no access-level toggle, always full access. The
+    // funnel event fires after authorizing, so it rides along as `after` —
+    // otherwise it would report a redirect that hasn't happened yet while the
+    // user is still on the notifications opt-in.
+    offerNotificationsThenAuthorize(
+      Promise.resolve(undefined),
+      "full-access",
+      undefined,
+      () => directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToApp),
+    );
   };
 
   onMount(() => {
@@ -663,7 +702,7 @@
     effectiveOrigin={$authorizationContextStore.effectiveOrigin}
     displayOrigin={$establishedChannelStore.origin}
     requestedMaxTimeToLive={$requestedMaxTimeToLiveStore}
-    onAuthorize={handleContinueIntent}
+    onAuthorize={offerNotificationsThenAuthorize}
   />
 {/snippet}
 
