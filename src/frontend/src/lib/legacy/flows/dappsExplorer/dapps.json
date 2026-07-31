@@ -772,5 +772,17 @@
       "https://hcv4s-uaaaa-aaabq-qaaba-cai.icp.net"
     ],
     "logo": "multidex_logo.svg"
+  },
+  {
+    "name": "Mission Planets: Astronauts",
+    "oneLiner": "Join the Astronaut Corps — track missions, crew up, and conquer planets.",
+    "website": "https://astronauts.missionplanets.com",
+    "authOrigins": [
+      "https://astronauts.missionplanets.com",
+      "https://astronautas.missionplanets.com",
+      "https://27rfc-tiaaa-aaaan-q6moa-cai.icp0.io",
+      "https://27rfc-tiaaa-aaaan-q6moa-cai.raw.icp0.io"
+    ],
+    "logo": "mission_planets_astronauts_logo.webp"
   }
 ]
