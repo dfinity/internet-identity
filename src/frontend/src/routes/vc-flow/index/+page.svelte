@@ -27,6 +27,8 @@
     enable_dnssec_email_recovery: [],
     doh_config: [],
     dnssec_config: [],
+    mcp_official_url: [],
+    mcp_config_migration: [],
   });
 </script>
 

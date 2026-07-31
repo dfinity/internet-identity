@@ -76,8 +76,10 @@
       channelStore.establish({ pending: true });
     } else if (flow === "openid-resume") {
       const pendingOrigin = sessionStorage.getItem("ii-pending-channel-origin");
+      const resumeToken =
+        sessionStorage.getItem("ii-pending-channel-resume-token") ?? undefined;
       if (pendingOrigin !== null) {
-        channelStore.establish({ allowedOrigin: pendingOrigin });
+        channelStore.establish({ allowedOrigin: pendingOrigin, resumeToken });
       } else {
         channelErrorStore.set("connection-closed");
       }

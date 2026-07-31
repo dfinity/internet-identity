@@ -66,6 +66,66 @@ test("A non-https callback is rejected", async ({ page, mcp }) => {
   ).toBeVisible();
 });
 
+test("A user with no stored identity gets the sign-in picker, not the mode-less one", async ({
+  page,
+  mcp,
+}) => {
+  // The wizard is mounted in sign-in mode, like /authorize: sign-in-specific
+  // button copy and a switch-mode CTA into sign-up. Mounting it without a mode
+  // silently regresses this surface to the generic "Continue with …" picker,
+  // which also buries sign-up behind an extra interstitial.
+  await addVirtualAuthenticator(page);
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await expect(
+    page.getByRole("button", { name: "Sign in with passkey" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Continue with passkey" }),
+  ).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Create", exact: true }),
+  ).toBeVisible();
+});
+
+test("The connect screen names the acting identity and keeps the consent in view", async ({
+  page,
+  mcp,
+}) => {
+  await addVirtualAuthenticator(page);
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await signUp(page);
+
+  const identityRow = page.getByRole("button", {
+    name: /^Choose identity/,
+  });
+  await expect(identityRow).toBeVisible();
+  await expect(identityRow).toContainText("Test User");
+
+  const allowAccess = page.getByRole("button", { name: "Allow access" });
+  const revokeNote = page.getByRole("link", { name: "settings" });
+  await expect(identityRow).toBeInViewport();
+  await expect(allowAccess).toBeInViewport();
+  await expect(revokeNote).toBeInViewport();
+
+  await page.mouse.wheel(0, 2000);
+  await expect(identityRow).toBeInViewport();
+  await expect(allowAccess).toBeInViewport();
+  await expect(revokeNote).toBeInViewport();
+
+  // The screen carries the identity and its control, so it has no header.
+  await expect(
+    page.getByRole("button", { name: "Switch identity" }),
+  ).toBeHidden();
+  await expect(
+    page.getByRole("link", { name: "Internet Identity" }),
+  ).toBeHidden();
+
+  await identityRow.click();
+  await expect(
+    page.getByRole("button", { name: "Add identity" }),
+  ).toBeVisible();
+});
+
 test("Signing up to an untrusted server prompts to add it in settings", async ({
   page,
   mcp,
@@ -157,11 +217,16 @@ test("Trusting the server in the Settings tab auto-advances the untrusted screen
         }),
       }),
   );
-  await settingsPage.getByRole("switch", { name: "AI access" }).click();
+  // Registration seeds an enabled config, so the toggle arrives on and only the
+  // connector URL has to change.
+  await expect(
+    settingsPage.getByRole("switch", { name: "AI access" }),
+  ).toBeChecked({ timeout: 15_000 });
+  await settingsPage.getByRole("button", { name: "Customize" }).click();
   await settingsPage.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
   await holdToConfirm(settingsPage, "Hold to continue");
   await expect(
-    settingsPage.getByRole("button", { name: "Remove this server" }),
+    settingsPage.getByRole("button", { name: "Restore default" }),
   ).toBeVisible();
 
   // Back on the original tab. In a real browser, returning to a backgrounded tab
@@ -267,11 +332,16 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   }
   await page.locator('a[href="/manage/settings"]').click();
   await page.waitForURL(II_URL + "/manage/settings");
-  await page.getByRole("switch", { name: "AI access" }).click();
+  // Registration seeds an enabled config, so the toggle arrives on and only the
+  // connector URL has to change.
+  await expect(page.getByRole("switch", { name: "AI access" })).toBeChecked({
+    timeout: 15_000,
+  });
+  await page.getByRole("button", { name: "Customize" }).click();
   await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
   await holdToConfirm(page, "Hold to continue");
   await expect(
-    page.getByRole("button", { name: "Remove this server" }),
+    page.getByRole("button", { name: "Restore default" }),
   ).toBeVisible();
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
@@ -430,17 +500,21 @@ test("Identity switcher shows while signing in and hides once connecting", async
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   const switcher = page.getByRole("button", { name: "Switch identity" });
+  // The connect screen names the identity itself, and drops the header button on
+  // viewports with no room for both — so the affordance is one or the other.
+  const identityRow = page.getByRole("button", { name: /^Choose identity/ });
   const allow = page.getByRole("button", { name: "Allow access" });
   await expect(allow).toBeVisible();
-  await expect(switcher).toBeVisible();
+  await expect(switcher.or(identityRow).first()).toBeVisible();
 
   // Pick an access level to enable "Allow access" (unselected on a first-time
   // connect), then connect.
   await page.getByRole("radio", { name: "Actions & questions" }).check();
   await allow.click();
-  // Once connecting, the switcher is gone — and it stays gone as the tab is
-  // handed to the server's declared callback (a different origin entirely).
+  // Once connecting, both are gone — and stay gone as the tab is handed to the
+  // server's declared callback (a different origin entirely).
   await expect(switcher).toBeHidden();
+  await expect(identityRow).toBeHidden();
 });
 
 test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
@@ -493,7 +567,7 @@ test("A failed redemption surfaces on the server's page and registers nothing", 
   expect(mcp.completions).toHaveLength(0);
 });
 
-test("Removing the trusted server in Settings blocks connecting", async ({
+test("Restoring the default connector in Settings blocks the custom server", async ({
   page,
   mcp,
 }) => {
@@ -510,17 +584,18 @@ test("Removing the trusted server in Settings blocks connecting", async ({
         response.url().includes("/call") &&
         response.request().method() === "POST",
     ),
-    page.getByRole("button", { name: "Remove this server" }).click(),
+    page.getByRole("button", { name: "Restore default" }).click(),
   ]);
   await expect(
-    page.getByRole("button", { name: "Remove this server" }),
+    page.getByRole("button", { name: "Restore default" }),
   ).toHaveCount(0);
-  await expect(
-    page.getByRole("switch", { name: "AI access" }),
-  ).not.toBeChecked();
+  // AI access stays on: dropping the custom server falls back to the
+  // deployment's official connector rather than turning the feature off.
+  await expect(page.getByRole("switch", { name: "AI access" })).toBeChecked();
+  await expect(page.getByText("Internet Computer MCP")).toBeVisible();
 
-  // Trust is re-verified against the synced config at connect time, so with no
-  // trusted server the connect lands on the untrusted screen.
+  // Trust is re-verified against the synced config at connect time, and the
+  // official connector is a different origin, so this server is untrusted.
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await allowAccess(page);
   await expect(
@@ -528,10 +603,7 @@ test("Removing the trusted server in Settings blocks connecting", async ({
   ).toBeVisible();
 });
 
-test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
-  page,
-  mcp,
-}) => {
+test("Disabling the master toggle blocks connecting", async ({ page, mcp }) => {
   test.slow();
   await addVirtualAuthenticator(page);
   await page.goto(II_URL);
@@ -539,8 +611,8 @@ test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
   await page.waitForURL(II_URL + "/manage");
   await mcp.trustServer(page);
 
-  // Turn the feature off for this identity. The URL stays saved on-chain, but
-  // the config is no longer `enabled`, so trust is off.
+  // Turn the feature off for this identity: that also forgets the custom URL,
+  // so nothing is trusted until it is set again.
   const toggle = page.getByRole("switch", { name: "AI access" });
   await Promise.all([
     page.waitForResponse(

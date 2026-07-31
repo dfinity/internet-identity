@@ -1495,6 +1495,12 @@ mod sso_gating {
     /// sub, bridged via the `oid` stable-id index.
     const PER_APP_SUB: &str = "entra-pairwise-sub-0002";
     const STABLE_OID: &str = "entra-oid-stable-0003";
+    /// A second discovery domain that declares the same `client_id`/issuer as
+    /// `GATE_DOMAIN` but is served from a host someone else controls.
+    const FOREIGN_DOMAIN: &str = "other.example.org";
+    /// The per-app client that `FOREIGN_DOMAIN`'s well-known maps the gated
+    /// origin to (a client registered with the same issuer by that other host).
+    const FOREIGN_PER_APP_CLIENT: &str = "foreign-per-app-client-id";
     const TEST_TIME_MS: u64 = 1_800_000_000_000;
 
     fn test_salt() -> [u8; 32] {
@@ -1617,6 +1623,19 @@ mod sso_gating {
             ),
             (format!("{GATE_ISSUER}/jwks"), jwks_json),
         ]
+    }
+
+    /// Like [`responses`] but the hop-1 well-known is hosted on `domain` instead
+    /// of `GATE_DOMAIN`. Hop 2 / JWKS stay on `GATE_ISSUER`, modelling a second
+    /// discovery domain that points its `openid_configuration` at the same IdP.
+    fn responses_on_domain(
+        domain: &str,
+        well_known_json: String,
+        jwks_json: String,
+    ) -> Vec<(String, String)> {
+        let mut r = responses(well_known_json, jwks_json);
+        r[0].0 = format!("https://{domain}/.well-known/ii-openid-configuration");
+        r
     }
 
     fn install(env: &PocketIc) -> Principal {
@@ -1745,6 +1764,102 @@ mod sso_gating {
         assert_eq!(
             via_sso.user_key, via_passkey.user_key,
             "same dapp principal f(account, origin) regardless of the login path"
+        );
+
+        Ok(())
+    }
+
+    /// A gated login discovered through one domain must not resolve onto an
+    /// II-client identity established through a *different* discovery domain —
+    /// even when both domains declare the same `client_id` and issuer and the
+    /// token carries a `sub` that is stable across the issuer's clients (as
+    /// Google's is).
+    ///
+    /// Domain A (`GATE_DOMAIN`) hosts the org's real discovery; an anchor
+    /// establishes its II-client credential there. Domain B (`FOREIGN_DOMAIN`)
+    /// is a second discovery, on a host someone else controls, that declares the
+    /// *same* `client_id` and maps the gated origin to its own per-app client. A
+    /// gated login is then driven through B, by a different caller, carrying A's
+    /// anchor's cross-client `sub`.
+    ///
+    /// Resolution is scoped to the discovery domain, so B's login finds no
+    /// II-client identity established through B and fails with `NoSuchAnchor`.
+    /// Without that scoping the login through B resolves onto A's anchor and
+    /// mints a delegation for its dapp principal — i.e. a login through an
+    /// unrelated domain takes over an identity that only ever authenticated
+    /// through A. This test fails on that unscoped behaviour.
+    #[test]
+    fn gated_login_cannot_resolve_across_discovery_domains() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        // Domain A: the org's real discovery. Register an anchor and establish
+        // its II-client credential through A (stamps sso_domain = GATE_DOMAIN).
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
+        let app_clients_a = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses_a = responses(well_known(&app_clients_a, false, "sub"), jwks.clone());
+        let identity_number =
+            register_with_ii_client_credential(&env, canister_id, &responses_a, &ii_client_jwt);
+
+        let session_key = ByteBuf::from("dapp session key");
+
+        // Sanity: a gated login through A — the domain that established the
+        // identity — resolves onto the anchor. Same-domain gating works.
+        let (gated_a_jwt, _) = token(PER_APP_CLIENT, II_CLIENT_SUB, &[]);
+        let via_a = expect_ready(drive_sso_until_ready(&env, &responses_a, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_a_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(via_a.anchor_number, identity_number);
+
+        // Domain B: a different discovery domain declaring the SAME client_id and
+        // issuer, mapping the gated origin to its own per-app client. The login
+        // is driven by a different caller and carries A's anchor's cross-client
+        // sub (II_CLIENT_SUB — stable across the issuer's clients).
+        let (gated_b_jwt, _) = token_for(
+            &test_principal_b(),
+            FOREIGN_PER_APP_CLIENT,
+            II_CLIENT_SUB,
+            &[],
+        );
+        let app_clients_b = format!(r#"{{"{GATED_ORIGIN}":"{FOREIGN_PER_APP_CLIENT}"}}"#);
+        let responses_b = responses_on_domain(
+            FOREIGN_DOMAIN,
+            well_known(&app_clients_b, false, "sub"),
+            jwks,
+        );
+
+        let via_b = drive_sso_until_ready(&env, &responses_b, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal_b(),
+                &gated_b_jwt,
+                &test_salt(),
+                &session_key,
+                FOREIGN_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        });
+
+        // The login through B cannot reach A's anchor: resolution is scoped to
+        // the domain the identity was established through. (Unscoped, this
+        // returned Ready { anchor_number: identity_number, .. } and minted A's
+        // dapp principal for B's caller.)
+        assert!(
+            matches!(via_b, Err(OpenIdDelegationError::NoSuchAnchor)),
+            "a gated login through a foreign discovery domain must not resolve \
+             onto an identity established through another domain, got {via_b:?}"
         );
 
         Ok(())
@@ -2296,70 +2411,39 @@ mod sso_gating {
         .map(|result| result.identity_number)
     }
 
-    /// A `sub`-based org's first gated login registers directly, storing the
-    /// II-client-keyed credential; both a gated and an ungated login then resolve
-    /// to that anchor.
+    /// A gated login can't establish an anchor identity by itself, so a domain
+    /// can't bootstrap one from a gated token alone: with no II-client identity
+    /// yet established through this domain, a `sub`-org's first gated login
+    /// requires a normal login first and creates nothing. The positive path —
+    /// resolving after a normal login established the II-client credential — is
+    /// covered by `gated_and_ungated_resolve_to_same_dapp_principal`.
     #[test]
-    fn sub_org_first_gated_login_registers_directly() -> Result<(), RejectResponse> {
+    fn sub_org_first_gated_login_needs_normal_login_first() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install(&env);
 
         // `sub` org: the gated per-app token shares the II-client credential's sub.
         let (gated_jwt, jwks) = token(PER_APP_CLIENT, II_CLIENT_SUB, &[]);
-        let (ii_client_jwt, _) = token(II_CLIENT, II_CLIENT_SUB, &[]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
 
         sync_time(&env, TEST_TIME_MS);
         warm_gate_caches(&env, canister_id, &responses, &gated_jwt, GATED_ORIGIN);
 
-        let identity_number = register_via_sso_gate(&env, canister_id, &gated_jwt, GATED_ORIGIN)
-            .expect("sub-org first gated login must register directly");
-
-        let session_key = ByteBuf::from("dapp session key");
-
-        // The gated login now resolves to the just-registered anchor.
-        let gated = expect_ready(drive_sso_until_ready(&env, &responses, || {
-            api::sso_prepare_delegation(
-                &env,
-                canister_id,
-                test_principal(),
-                &gated_jwt,
-                &test_salt(),
-                &session_key,
-                GATE_DOMAIN,
-                GATED_ORIGIN,
-            )
-            .unwrap()
-        }));
-        assert_eq!(gated.anchor_number, identity_number);
-
-        // The ungated login resolves to the same anchor: the stored credential is II-client-keyed.
-        let ungated = expect_ready(drive_sso_until_ready(&env, &responses, || {
-            api::sso_prepare_delegation(
-                &env,
-                canister_id,
-                test_principal(),
-                &ii_client_jwt,
-                &test_salt(),
-                &session_key,
-                GATE_DOMAIN,
-                UNGATED_ORIGIN,
-            )
-            .unwrap()
-        }));
-        assert_eq!(
-            ungated.anchor_number, identity_number,
-            "gate-registered credential must be II-client-keyed (ungated login resolves to it)"
+        let result = register_via_sso_gate(&env, canister_id, &gated_jwt, GATED_ORIGIN);
+        assert!(
+            matches!(result, Err(IdRegFinishError::SsoNormalLoginRequired)),
+            "sub-org first gated login must require a normal login first, got {result:?}"
         );
         Ok(())
     }
 
-    /// A non-`sub` (`oid`) org's first gated login cannot register directly (no
-    /// aux bridge yet); registration fails safe with `SsoNormalLoginRequired`
-    /// and creates nothing.
+    /// Same for a non-`sub` (`oid`) org: with no stable-id bridge established
+    /// through this domain yet, the first gated registration can't create an
+    /// identity — it returns `SsoNormalLoginRequired` and stores nothing.
     #[test]
-    fn non_sub_org_first_gated_registration_fails_safe() -> Result<(), RejectResponse> {
+    fn non_sub_org_first_gated_registration_needs_normal_login_first() -> Result<(), RejectResponse>
+    {
         let env = env();
         let canister_id = install(&env);
 
@@ -2373,7 +2457,7 @@ mod sso_gating {
         let result = register_via_sso_gate(&env, canister_id, &gated_jwt, GATED_ORIGIN);
         assert!(
             matches!(result, Err(IdRegFinishError::SsoNormalLoginRequired)),
-            "non-sub first gated registration must fail safe, got {result:?}"
+            "non-sub first gated registration must require a normal login first, got {result:?}"
         );
         Ok(())
     }

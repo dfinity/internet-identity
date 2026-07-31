@@ -1,5 +1,6 @@
 (
   opt record {
+    mcp_official_url = opt opt "https://official-mcp.id.ai/mcp";
     captcha_config = opt record {
       max_unsolved_captchas = 50 : nat64;
       captcha_trigger = variant { Static = variant { CaptchaDisabled } };

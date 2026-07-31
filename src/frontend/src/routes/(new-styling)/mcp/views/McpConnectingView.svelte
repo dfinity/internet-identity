@@ -20,7 +20,7 @@
 -->
 <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
   <AuthPanel>
-    <McpHero {mcpServer} />
+    <McpHero />
     <div class="mt-2 flex flex-col items-center gap-3">
       <ProgressRing class="text-fg-tertiary size-8" />
       <p class="text-text-primary text-base font-medium">

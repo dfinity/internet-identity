@@ -4,16 +4,35 @@ import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { DelegationChain } from "@icp-sdk/core/identity";
 import { toHex } from "$lib/utils/utils";
-import { mcpAuthorize } from "./utils";
+import type { BackendCanisterConfig } from "$lib/globals";
+import type { McpConfig } from "$lib/utils/mcpConfig";
+import {
+  isOriginTrusted,
+  mcpAuthorize,
+  McpUntrustedServerError,
+} from "./utils";
 
 const IDENTITY_NUMBER = BigInt(42);
 const MCP_ORIGIN = "https://mcp.id.ai";
-/** The trusted server's declared connect callback (exact-matched by the caller
- *  against the server's /.well-known/ii-auth-callbacks allow-list): where the
- *  caller delivers the registration delegation. */
+/** The identity's resolved trusted server, as `prepare` returns it (certified).
+ *  Its origin is what the connect link's origin is gated against. */
+const TRUSTED_URL = `${MCP_ORIGIN}/mcp`;
+/** The trusted server's declared connect callback (exact-matched, once the
+ *  origin is trust-confirmed, against the server's
+ *  /.well-known/ii-auth-callbacks allow-list): where the caller delivers the
+ *  registration delegation. */
 const CALLBACK = `${MCP_ORIGIN}/mcp/connect`;
+const AUTH_CALLBACKS_URL = `${MCP_ORIGIN}/.well-known/ii-auth-callbacks`;
 const STATE = "opaque-state";
 const TTL_SECONDS = 3600;
+
+/** A well-formed allow-list response declaring {@link CALLBACK}. A fresh
+ *  `Response` per call, since its body is single-use. */
+const allowListResponse = (): Response =>
+  new Response(JSON.stringify({ callbacks: [CALLBACK] }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
 
 /** The MCP server's per-connect registration public key `X` (DER), from the
  *  link. The browser-signed final hop targets it — the canister never sees it. */
@@ -35,9 +54,9 @@ const makeActor = () => {
   const expiration = expirationNanos();
   return {
     expiration,
-    prepare_mcp_registration_delegation: vi
-      .fn()
-      .mockResolvedValue({ Ok: { user_key: USER_KEY, expiration } }),
+    prepare_mcp_registration_delegation: vi.fn().mockResolvedValue({
+      Ok: { user_key: USER_KEY, expiration, trusted_url: TRUSTED_URL },
+    }),
     get_mcp_registration_delegation: vi.fn(
       (
         _anchor: bigint,
@@ -89,16 +108,21 @@ const authorize = (
     } as unknown as Authenticated,
     ttlSeconds: TTL_SECONDS,
     accessLevel,
-    callback: CALLBACK,
+    serverOrigin: MCP_ORIGIN,
+    requestedCallback: CALLBACK,
     state: STATE,
     registrationKey: REGISTRATION_KEY,
   });
 
 beforeEach(() => {
-  // The v2 connect makes no network calls of its own — delivery is by
-  // navigation. Stub fetch so any accidental call is observable (and asserted
-  // against below), rather than hitting the real network.
-  vi.stubGlobal("fetch", vi.fn());
+  // The connect's only network call of its own is the trusted server's
+  // declared-callback allow-list (fetched after the origin is trust-confirmed);
+  // the delegation itself is delivered by navigation, not a request. Stub fetch
+  // to serve a well-formed allow-list declaring the callback.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => Promise.resolve(allowListResponse())),
+  );
 });
 
 afterEach(() => {
@@ -170,9 +194,67 @@ describe("mcpAuthorize registration-delegation minting", () => {
     );
   });
 
-  it("makes no network request of its own (delivery is by navigation)", async () => {
+  it("fetches only the declared-callback allow-list (delivery is by navigation)", async () => {
+    // The single network request the connect makes is the GET for the trusted
+    // server's callback allow-list; the delegation is delivered by the returned
+    // URL, never a request carrying it.
     await authorize(makeActor(), "read-only");
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(AUTH_CALLBACKS_URL);
+  });
+});
+
+describe("mcpAuthorize trust gate (certified trusted_url)", () => {
+  it("refuses to deliver when the link origin is not prepare's trusted origin", async () => {
+    // A forged config can't help an attacker here: the gate is prepare's
+    // certified trusted_url, and its origin does not match the link's server.
+    const actor = makeActor();
+    actor.prepare_mcp_registration_delegation.mockResolvedValue({
+      Ok: {
+        user_key: USER_KEY,
+        expiration: actor.expiration,
+        trusted_url: "https://evil.example.com/mcp",
+      },
+    });
+
+    await expect(authorize(actor, "full-access")).rejects.toBeInstanceOf(
+      McpUntrustedServerError,
+    );
+    // Aborted before contacting the server or fetching the delegation, so the
+    // minted registration is never turned into a redeemable chain.
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(actor.get_mcp_registration_delegation).not.toHaveBeenCalled();
+  });
+
+  it("treats a 'no trusted server' prepare refusal as untrusted, not an error", async () => {
+    // MCP off/unset for this identity: route to the untrusted screen (where the
+    // user can set a trusted server), like every other not-trusted outcome.
+    const actor = makeActor();
+    actor.prepare_mcp_registration_delegation.mockResolvedValue({
+      Err: "MCP registration failed: no trusted MCP server is enabled for this identity.",
+    });
+
+    await expect(authorize(actor, "read-only")).rejects.toBeInstanceOf(
+      McpUntrustedServerError,
+    );
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(actor.get_mcp_registration_delegation).not.toHaveBeenCalled();
+  });
+
+  it("delivers when the link origin matches prepare's trusted origin (path ignored)", async () => {
+    // trusted_url keeps its path; the gate is an origin decision, so a
+    // path-based trusted endpoint still authorizes a connect to that origin.
+    const actor = makeActor();
+    actor.prepare_mcp_registration_delegation.mockResolvedValue({
+      Ok: {
+        user_key: USER_KEY,
+        expiration: actor.expiration,
+        trusted_url: `${MCP_ORIGIN}/some/deep/path`,
+      },
+    });
+
+    const url = await authorize(actor, "read-only");
+    expect(url.startsWith(`${CALLBACK}#`)).toBe(true);
   });
 });
 
@@ -268,5 +350,152 @@ describe("mcpAuthorize failure paths", () => {
     await expect(authorize(actor, "read-only")).rejects.toThrow(
       /no such delegation/,
     );
+  });
+});
+
+const OFFICIAL: Pick<BackendCanisterConfig, "mcp_official_url"> = {
+  mcp_official_url: ["https://official-mcp.id.ai/mcp"],
+};
+const NO_OFFICIAL: Pick<BackendCanisterConfig, "mcp_official_url"> = {
+  mcp_official_url: [],
+};
+const CUSTOM = "https://mcp.acme.com/mcp";
+
+/** A stored config. `undefined` stands for an identity that never wrote one. */
+const cfg = (enabled: boolean, url: string | undefined): McpConfig => ({
+  enabled,
+  url,
+});
+
+describe("isOriginTrusted", () => {
+  const trust = (url: string | undefined, enabled = true): McpConfig =>
+    cfg(enabled, url);
+
+  it("trusts an origin that matches the configured server's origin", () => {
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai/mcp"),
+        "https://mcp.id.ai",
+        NO_OFFICIAL,
+      ),
+    ).toBe(true);
+  });
+
+  it("matches by origin only, ignoring the trusted URL's path", () => {
+    // The URL is kept verbatim (e.g. a path-based endpoint), but trust is an
+    // origin decision — the path must not narrow or widen the match.
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai/some/deep/path"),
+        "https://mcp.id.ai",
+        NO_OFFICIAL,
+      ),
+    ).toBe(true);
+  });
+
+  it("does not trust when the feature is disabled, even if the origin matches", () => {
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai/mcp", false),
+        "https://mcp.id.ai",
+        NO_OFFICIAL,
+      ),
+    ).toBe(false);
+  });
+
+  it("does not trust when no server URL is configured", () => {
+    expect(
+      isOriginTrusted(trust(undefined), "https://mcp.id.ai", NO_OFFICIAL),
+    ).toBe(false);
+  });
+
+  it("rejects a different host", () => {
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai/mcp"),
+        "https://evil.example.com",
+        NO_OFFICIAL,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a scheme mismatch (http vs https is a different origin)", () => {
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai/mcp"),
+        "http://mcp.id.ai",
+        NO_OFFICIAL,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a port mismatch", () => {
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai:8443/mcp"),
+        "https://mcp.id.ai",
+        NO_OFFICIAL,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a subdomain that is not the exact origin", () => {
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai/mcp"),
+        "https://sub.mcp.id.ai",
+        NO_OFFICIAL,
+      ),
+    ).toBe(false);
+  });
+
+  it("does not trust when the configured URL is unparsable", () => {
+    expect(
+      isOriginTrusted(trust("not a url"), "https://mcp.id.ai", NO_OFFICIAL),
+    ).toBe(false);
+  });
+});
+
+describe("isOriginTrusted — official connector", () => {
+  const OFFICIAL_ORIGIN = "https://official-mcp.id.ai";
+  const CUSTOM_ORIGIN = "https://mcp.acme.com";
+
+  it("rejects it for an identity that stores no config", () => {
+    // Registration seeds a config, so this is an identity that predates it and
+    // never used the feature. It has to turn AI access on in Settings first.
+    expect(isOriginTrusted(undefined, OFFICIAL_ORIGIN, OFFICIAL)).toBe(false);
+  });
+
+  it("rejects it once the feature has been switched off", () => {
+    expect(
+      isOriginTrusted(cfg(false, undefined), OFFICIAL_ORIGIN, OFFICIAL),
+    ).toBe(false);
+  });
+
+  it("accepts it for an enabled config with no custom server", () => {
+    expect(
+      isOriginTrusted(cfg(true, undefined), OFFICIAL_ORIGIN, OFFICIAL),
+    ).toBe(true);
+  });
+
+  it("lets a custom connector displace it", () => {
+    expect(isOriginTrusted(cfg(true, CUSTOM), CUSTOM_ORIGIN, OFFICIAL)).toBe(
+      true,
+    );
+    expect(isOriginTrusted(cfg(true, CUSTOM), OFFICIAL_ORIGIN, OFFICIAL)).toBe(
+      false,
+    );
+  });
+
+  it("requires the feature enabled for a custom connector", () => {
+    expect(isOriginTrusted(cfg(false, CUSTOM), CUSTOM_ORIGIN, OFFICIAL)).toBe(
+      false,
+    );
+  });
+
+  it("accepts nothing when no official connector is configured", () => {
+    expect(
+      isOriginTrusted(cfg(true, undefined), OFFICIAL_ORIGIN, NO_OFFICIAL),
+    ).toBe(false);
   });
 });
