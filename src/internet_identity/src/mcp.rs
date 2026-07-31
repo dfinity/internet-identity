@@ -83,7 +83,7 @@ pub(crate) const MCP_GRANT_MIN_TTL_NS: u64 = 10 * 60 * 1_000_000_000;
 pub(crate) const MCP_GRANT_MAX_TTL_NS: u64 = 30 * 24 * 60 * 60 * 1_000_000_000;
 
 /// The official MCP connector this deployment ships, if any.
-fn official_url() -> Option<String> {
+pub(crate) fn official_url() -> Option<String> {
     persistent_state(|state| state.mcp_official_url.clone())
 }
 
