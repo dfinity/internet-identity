@@ -131,7 +131,8 @@
     const { discovery, jwt, config, domain, origin } = ssoNormalLogin;
     ssoNormalLoginBusy = true;
     try {
-      const authFlow = new AuthFlow();
+      // Reached only from the 1-click SSO flow, which isn't tracked.
+      const authFlow = new AuthFlow({ trackLastUsed: false });
       const primaryResult: SsoDiscoveryResult = {
         ...discovery,
         resolvedClientId: discovery.clientId,
@@ -327,10 +328,6 @@
       // start sign-in again.
       return;
     }
-    // Track the last-used identity: a 1-click sign-up (or a sign-in on a
-    // device with no local entry yet) must land in localStorage so the
-    // identity shows up when the user later visits II directly.
-    const authFlow = new AuthFlow();
     const { iss, aud, ...metadata } = decodeJWT(jwt);
     // The marker is set by `initiateSso` for the `?sso=<domain>` path.
     // If present, treat the returning JWT as a 1-click SSO flow so the
@@ -339,6 +336,8 @@
     // marker can't leak into a subsequent direct-OpenID round-trip.
     const ssoDomain = sessionStorage.getItem("ii-sso-1-click-domain");
     sessionStorage.removeItem("ii-sso-1-click-domain");
+    // SSO is never tracked as a last-used identity.
+    const authFlow = new AuthFlow({ trackLastUsed: ssoDomain === null });
     // Show the redirect animation now so the wait below doesn't flash the wizard.
     openIdResumeProcessing = true;
     // Redeem through the origin-bound gate path so the session certifies
