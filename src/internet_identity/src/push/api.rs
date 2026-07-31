@@ -349,6 +349,20 @@ pub async fn notify_user(
         .origin
         .ok_or_else(|| "consent row is missing its origin; re-grant to fix".to_string())?;
 
+    // 3b. The deep link must be on the sender's own application.
+    //
+    //     Checked here rather than on the device because this is the only place
+    //     that knows, authoritatively, which origin the user consented to. With
+    //     it, `alert.url` is trustworthy by construction and the service worker
+    //     can open it directly — which is what removes a hop from the
+    //     tap-through. Left to the client, the check would sit on a publicly
+    //     craftable URL and every consumer would have to repeat it.
+    if let Some(url) = &alert.url {
+        if !url_is_on_origin(url, &alert.hostname) {
+            return Err("alert.url must be on the sender's own origin".to_string());
+        }
+    }
+
     // 4. Collect every subscription for the anchor. Bounded per-anchor
     //    by the number of devices the user has enabled II push on — a
     //    handful in practice.
@@ -495,6 +509,57 @@ pub async fn notify_user(
 
 /// Serialize a PushAlert as JSON for the encrypted body. The Service
 /// Worker parses this in its `onpush` handler.
+/// The `scheme://host[:port]` of an absolute URL, or `None` when it isn't one.
+///
+/// Only `https` and `http` are accepted, which is what makes the comparison in
+/// [`url_is_on_origin`] meaningful: a `javascript:` or `data:` URL has no host
+/// to compare and must never reach a navigation.
+fn origin_of_url(url: &str) -> Option<String> {
+    let (scheme, rest) = if let Some(rest) = url.strip_prefix("https://") {
+        ("https", rest)
+    } else if let Some(rest) = url.strip_prefix("http://") {
+        ("http", rest)
+    } else {
+        return None;
+    };
+    let host_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    if host_end == 0 {
+        return None;
+    }
+    Some(format!("{scheme}://{}", &rest[..host_end]))
+}
+
+/// Collapses the boundary-node domains onto the legacy one, mirroring the
+/// frontend's `remapToLegacyDomain`.
+///
+/// Needed because consent is recorded against the *effective* origin, which the
+/// frontend has already remapped — a canister served at `<id>.icp0.io` is
+/// consented as `<id>.ic0.app`. A dApp's own deep links use whichever domain the
+/// user is actually browsing, so comparing verbatim would reject legitimate
+/// links. Safe rather than loose: only the same subdomain collapses, and that
+/// subdomain is the canister id.
+fn canonical_origin(origin: &str) -> String {
+    for suffix in [".icp0.io", ".icp.net"] {
+        if let Some(host) = origin
+            .strip_prefix("https://")
+            .and_then(|rest| rest.strip_suffix(suffix))
+        {
+            if !host.is_empty() && !host.contains('/') {
+                return format!("https://{host}.ic0.app");
+            }
+        }
+    }
+    origin.to_string()
+}
+
+/// Whether `url` points at `origin`'s own application.
+fn url_is_on_origin(url: &str, origin: &str) -> bool {
+    match origin_of_url(url) {
+        Some(url_origin) => canonical_origin(&url_origin) == canonical_origin(origin),
+        None => false,
+    }
+}
+
 /// Lowercase hex of the first `n` bytes. Used for `msg_id`; avoids pulling in a
 /// hex crate for one 16-byte value.
 fn hex_prefix(bytes: &[u8], n: usize) -> String {
@@ -584,6 +649,72 @@ mod tests {
         let json = String::from_utf8(alert_to_json(&alert, "abc123")).unwrap();
 
         assert!(json.contains(r#""msg_id":"abc123""#), "got {json}");
+    }
+
+    #[test]
+    fn deep_link_must_be_on_the_senders_own_app() {
+        let consented = "https://app.example";
+
+        assert!(url_is_on_origin("https://app.example/thread/42", consented));
+        assert!(url_is_on_origin("https://app.example", consented));
+        // Another origin, a subdomain, and a suffix trick are all rejected.
+        assert!(!url_is_on_origin("https://evil.example/x", consented));
+        assert!(!url_is_on_origin("https://sub.app.example/x", consented));
+        assert!(!url_is_on_origin(
+            "https://app.example.evil.co/x",
+            consented
+        ));
+    }
+
+    #[test]
+    fn deep_link_may_use_the_apps_other_boundary_domain() {
+        // Consent is recorded against the effective origin, already remapped to
+        // ic0.app; the dApp's own links use the domain the user is browsing. If
+        // this failed, every real deep link would be refused.
+        let consented = "https://vt36r-2qaaa-aaaad-aad5a-cai.ic0.app";
+
+        assert!(url_is_on_origin(
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io/#markets/ICP",
+            consented
+        ));
+        assert!(url_is_on_origin(
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net/",
+            consented
+        ));
+        // A different canister must never collapse onto this one.
+        assert!(!url_is_on_origin(
+            "https://aaaaa-2qaaa-aaaad-aad5a-cai.icp0.io/",
+            consented
+        ));
+    }
+
+    #[test]
+    fn deep_link_rejects_schemes_that_are_not_web_pages() {
+        // These have no host to compare, and must never reach a navigation:
+        // in a browser their origin is the string "null", which would otherwise
+        // compare equal to another such URL.
+        let consented = "https://app.example";
+
+        assert!(!url_is_on_origin("javascript:alert(1)", consented));
+        assert!(!url_is_on_origin(
+            "data:text/html,<script></script>",
+            consented
+        ));
+        assert!(!url_is_on_origin("app.example/x", consented));
+        assert!(!url_is_on_origin("https://", consented));
+    }
+
+    #[test]
+    fn loopback_deep_link_is_matched_verbatim() {
+        // A locally served dApp consents and links on the same http origin, so
+        // no remapping applies and it must simply match.
+        let consented = "http://frontend.local.localhost:8000";
+
+        assert!(url_is_on_origin(
+            "http://frontend.local.localhost:8000/#markets/ICP",
+            consented
+        ));
+        assert!(!url_is_on_origin("http://evil.localhost:8000/", consented));
     }
 
     #[test]

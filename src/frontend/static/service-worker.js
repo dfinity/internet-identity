@@ -110,14 +110,37 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data || {};
+
+  // A deep link goes straight to the app. II validated at send time that it is
+  // on the sender's own origin, so there is nothing left to check here — and
+  // routing through /notify would only add a second visit to II in the middle
+  // of a journey the user expects to be one step. The scheme is re-checked
+  // anyway, cheaply, so a regression on the send side cannot turn into a
+  // navigation to something that isn't a web page.
+  if (data.url) {
+    let target;
+    try {
+      target = new URL(data.url);
+    } catch {
+      target = null;
+    }
+    if (
+      target !== null &&
+      (target.protocol === "https:" || target.protocol === "http:")
+    ) {
+      event.waitUntil(self.clients.openWindow(target.href));
+      return;
+    }
+    console.warn("[ii-sw] ignoring a notification url that is not http(s)");
+  }
+
   const origin = data.origin;
   if (!origin) {
     return;
   }
+  // No deep link: /notify resolves the sender's own origin, shows which app is
+  // being opened, and fails closed if it cannot verify the sender.
   const dest = new URL("/notify", self.location.origin);
   dest.searchParams.set("origin", origin);
-  if (data.url) {
-    dest.searchParams.set("to", data.url);
-  }
   event.waitUntil(self.clients.openWindow(dest.href));
 });
