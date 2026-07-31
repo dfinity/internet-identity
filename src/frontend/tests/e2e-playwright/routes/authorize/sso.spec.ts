@@ -98,13 +98,10 @@ test.describe("Authorize with 1-click SSO", () => {
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
     });
 
-    // Regression guard: the 1-click flow used to sign up without recording
-    // the new identity. It must land in `ii-last-used-identities` on the II
-    // origin, and — because the resume flow redeems the SSO JWT through
-    // `continueWithOpenId` — it must be tagged `sso` (keyed by domain), not
-    // `openid`. An `openid` entry would break a later "last used" sign-in,
-    // whose SSO branch needs the discovery domain to re-run discovery.
-    test("records the new identity as an sso entry in last-used storage", async ({
+    // 1-click SSO must not record a last-used identity, so nothing lands in
+    // `ii-last-used-identities` on the II origin. Contrast `openid.spec.ts`,
+    // where the equivalent 1-click OpenID sign-up is recorded.
+    test("does not record the new identity in last-used storage", async ({
       page,
       authorizePage,
       signInWithOpenId,
@@ -121,17 +118,16 @@ test.describe("Authorize with 1-click SSO", () => {
         const lastUsedRaw = await iiPage.evaluate(() =>
           localStorage.getItem("ii-last-used-identities"),
         );
-        expect(lastUsedRaw).not.toBeNull();
-        const lastUsed = JSON.parse(lastUsedRaw!) as {
-          data: Record<string, { authMethod: Record<string, unknown> }>;
-        };
-        // A brand-new identity was recorded (the buggy code left this empty).
-        const entries = Object.values(lastUsed.data);
-        expect(entries).toHaveLength(1);
-        expect(entries[0]?.authMethod).toHaveProperty("sso");
-        expect(entries[0]?.authMethod).not.toHaveProperty("openid");
-        const sso = (entries[0]!.authMethod as { sso: { domain: string } }).sso;
-        expect(sso.domain).toBe(SSO_DISCOVERY_DOMAIN);
+        // The store is either absent entirely or present but holding no
+        // identities; both mean the flow recorded nothing.
+        const entries =
+          lastUsedRaw === null
+            ? []
+            : Object.values(
+                (JSON.parse(lastUsedRaw) as { data: Record<string, unknown> })
+                  .data,
+              );
+        expect(entries).toHaveLength(0);
       } finally {
         await iiPage.close();
       }
@@ -909,11 +905,11 @@ test.describe("Continue as a last-used SSO identity", () => {
       defaultPort: SSO_OPENID_PORT,
       createUsers: [{ claims: { name, email } }],
     },
-    // First authorize (`?sso=` 1-click) seeds the last-used SSO entry; the second
-    // drops `?sso=` to run the ContinueView path.
+    // No `sso:` field: the first authorize seeds the last-used SSO entry via the
+    // manual wizard entry (1-click SSO records nothing), and the second reuses
+    // that entry to run the ContinueView path.
     authorizeConfig: {
       protocol: "icrc25",
-      sso: SSO_DISCOVERY_DOMAIN,
       useIcrc3Attributes: true,
       attributes: [
         `sso:${SSO_DISCOVERY_DOMAIN}:name`,
@@ -938,16 +934,35 @@ test.describe("Continue as a last-used SSO identity", () => {
     page,
     attributeConsentView,
     authorizePage,
+    openSsoPopup,
     signInWithOpenId,
     openIdUsers,
   }) => {
-    // FIRST authorize: 1-click SSO seeds the last-used SSO identity.
-    await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+    // FIRST authorize: the manual wizard entry seeds the last-used SSO identity.
+    const firstConsent = attributeConsentView(authorizePage.page);
+    const ssoPage = await openSsoPopup(
+      authorizePage.page,
+      SSO_DISCOVERY_DOMAIN,
+      "signin",
+    );
+    const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
+    await signInWithOpenId(ssoPage, openIdUsers[0].id);
+    await closePromise;
+    // Fresh SSO user → IdentityNotConnectedDialog; confirm sign-up.
+    await authorizePage.page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Sign up" })
+      .click();
+    await authorizePage.page
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+    await firstConsent.waitForVisible();
+    await firstConsent.continue();
     await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
 
-    // SECOND authorize: re-navigate test_app and drive a regular authorize (no
-    // `?sso=`). The last-used SSO identity persists across the reload, so the II
-    // popup shows the ContinueView "Continue" path.
+    // SECOND authorize: re-navigate test_app and drive another authorize. The
+    // last-used SSO identity persists across the reload, so the II popup shows
+    // the ContinueView "Continue" path.
     await page.goto("https://nice-name.com");
     await page
       .getByRole("textbox", { name: "Identity Provider" })
