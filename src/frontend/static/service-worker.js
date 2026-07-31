@@ -15,6 +15,55 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// Ids of messages already shown, so the same notification is never rendered
+// twice. Held in the Cache API rather than a variable because a service worker
+// is killed between pushes — an in-memory set would forget everything it needs
+// to remember. Bounded, and pruned oldest-first.
+const SEEN_CACHE = "ii-push-seen-v1";
+const SEEN_CAP = 200;
+
+/**
+ * Whether `msgId` has already been shown; records it when it hasn't.
+ *
+ * II sends one id per message, identical for every device in a fan-out, so two
+ * subscription rows pointing at this same browser — an endpoint rotation that
+ * left a stale row, a second registration, a retried send — arrive with the
+ * same id and only the first is rendered.
+ *
+ * A payload with no id (an older canister) is always shown: failing open is
+ * right here, since dropping a real notification is worse than a duplicate.
+ */
+const alreadyShown = async (msgId) => {
+  if (!msgId) {
+    return false;
+  }
+  try {
+    const cache = await caches.open(SEEN_CACHE);
+    // A synthetic key — nothing is ever fetched from this path.
+    const key = new URL(
+      `/__ii-push-seen/${encodeURIComponent(msgId)}`,
+      self.location.origin,
+    );
+    if (await cache.match(key)) {
+      return true;
+    }
+    await cache.put(key, new Response(""));
+    const keys = await cache.keys();
+    if (keys.length > SEEN_CAP) {
+      await Promise.all(
+        keys
+          .slice(0, keys.length - SEEN_CAP)
+          .map((stale) => cache.delete(stale)),
+      );
+    }
+    return false;
+  } catch (err) {
+    // Storage unavailable — show rather than swallow.
+    console.warn("[ii-sw] dedup unavailable:", err);
+    return false;
+  }
+};
+
 self.addEventListener("push", (event) => {
   if (!event.data) {
     // Empty pushes are valid per spec (used to just wake the worker), but
@@ -36,11 +85,25 @@ self.addEventListener("push", (event) => {
   const body = alert.body || "";
 
   event.waitUntil(
-    self.registration.showNotification(hostname, {
-      body: title !== "" && body !== "" ? `${title} — ${body}` : title || body,
-      tag: hostname,
-      data: { origin: alert.hostname || null, url: alert.url || null },
-    }),
+    (async () => {
+      if (await alreadyShown(alert.msg_id)) {
+        // Showing nothing can make the browser render its own "site updated in
+        // background" notice, and at volume that costs the permission. Accepted
+        // here: a suppressed duplicate is rare and always preceded by the real
+        // notification, so the user has already been told.
+        console.warn("[ii-sw] suppressed a duplicate notification");
+        return;
+      }
+      await self.registration.showNotification(hostname, {
+        body:
+          title !== "" && body !== "" ? `${title} — ${body}` : title || body,
+        // Deliberately no `tag`: tagging by hostname made every notification
+        // from an app replace that app's previous one, silently destroying an
+        // unread notification. Distinct notifications must stack; collapsing
+        // is something a sender opts into per message, never automatic.
+        data: { origin: alert.hostname || null, url: alert.url || null },
+      });
+    })(),
   );
 });
 

@@ -369,7 +369,12 @@ pub async fn notify_user(
     // 5. Derive a per-device RNG from the single `raw_rand` seed via a
     //    counter-mode ChaCha20 stream so each encryption gets distinct
     //    ephemeral P-256 key material without another async round-trip.
-    let plaintext = alert_to_json(&alert);
+    // One id per admitted message, shared by every device in this fan-out. It
+    // rides inside the encrypted payload, so no relay or gateway can read or
+    // forge it. Derived from the same `raw_rand` seed rather than a counter,
+    // which keeps it unguessable and needs no stored state.
+    let msg_id = hex_prefix(&entropy_seed, 16);
+    let plaintext = alert_to_json(&alert, &msg_id);
     let mut root_rng = ChaCha20Rng::from_seed(entropy_seed);
     let now_secs = time() / 1_000_000_000;
     let exp = now_secs + vapid::VAPID_JWT_MAX_LIFETIME_SECS;
@@ -456,11 +461,25 @@ pub async fn notify_user(
         // Detach the outcall. The SW observes success; the dApp caller
         // returns in ms. Failures are logged so a real deployment can
         // wire them into stats.
+        let dead_row = (
+            anchor,
+            StorableEndpointSha256::from_endpoint(&subscription.endpoint),
+        );
         ic_cdk::spawn(async move {
             match http_request(request, PUSH_OUTCALL_CYCLES).await {
                 Ok((response,)) => {
                     let status = response.status.0.to_string();
-                    if !status.starts_with('2') {
+                    // 404/410 mean the relay has no such subscription: the
+                    // browser dropped or rotated it. That is the only signal
+                    // that a row is dead, so drop it here — otherwise rows
+                    // accumulate forever and every future send pays for a
+                    // target that can never receive.
+                    if status == "404" || status == "410" {
+                        storage_borrow_mut(|storage| {
+                            storage.push_subscriptions_memory.remove(&dead_row);
+                        });
+                        ic_cdk::println!("push: dropped a subscription the relay reports gone");
+                    } else if !status.starts_with('2') {
                         ic_cdk::println!("push outcall non-2xx status: {status}");
                     }
                 }
@@ -476,12 +495,31 @@ pub async fn notify_user(
 
 /// Serialize a PushAlert as JSON for the encrypted body. The Service
 /// Worker parses this in its `onpush` handler.
-fn alert_to_json(alert: &PushAlert) -> Vec<u8> {
+/// Lowercase hex of the first `n` bytes. Used for `msg_id`; avoids pulling in a
+/// hex crate for one 16-byte value.
+fn hex_prefix(bytes: &[u8], n: usize) -> String {
+    let mut out = String::with_capacity(n * 2);
+    for byte in bytes.iter().take(n) {
+        out.push_str(&format!("{byte:02x}"));
+    }
+    out
+}
+
+/// Serializes the payload the service worker receives, including `msg_id`.
+///
+/// `msg_id` is deliberately not a field on `PushAlert`: no dApp supplies it, and
+/// it must be identical for every device in one fan-out. That is what lets the
+/// service worker collapse duplicates — two subscription rows pointing at the
+/// same browser (an endpoint rotation that left a stale row, a second
+/// registration) carry the same id, so the second banner is suppressed.
+fn alert_to_json(alert: &PushAlert, msg_id: &str) -> Vec<u8> {
     // Manual formatting rather than serde_json — the shape is fixed and
     // avoiding another serialization crate keeps the wasm smaller. We
     // escape `"` and `\` in the string fields per JSON grammar.
     let mut buf = String::with_capacity(256);
     buf.push('{');
+    push_json_field(&mut buf, "msg_id", msg_id);
+    buf.push(',');
     push_json_field(&mut buf, "hostname", &alert.hostname);
     buf.push(',');
     push_json_field(&mut buf, "title", &alert.title);
@@ -514,4 +552,51 @@ fn push_json_field(buf: &mut String, key: &str, value: &str) {
         }
     }
     buf.push('"');
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn msg_id_is_stable_for_one_seed_and_differs_across_seeds() {
+        // Every device in one fan-out must get the SAME id — that is what lets
+        // the service worker collapse two rows pointing at one browser. Two
+        // different sends must not collide, or a genuine notification would be
+        // suppressed as a duplicate.
+        let seed_a = [7u8; 32];
+        let seed_b = [8u8; 32];
+
+        assert_eq!(hex_prefix(&seed_a, 16), hex_prefix(&seed_a, 16));
+        assert_ne!(hex_prefix(&seed_a, 16), hex_prefix(&seed_b, 16));
+        assert_eq!(hex_prefix(&seed_a, 16).len(), 32);
+    }
+
+    #[test]
+    fn payload_carries_the_msg_id_the_worker_dedups_on() {
+        let alert = PushAlert {
+            hostname: "https://app.example".to_string(),
+            title: "t".to_string(),
+            body: "b".to_string(),
+            url: None,
+        };
+
+        let json = String::from_utf8(alert_to_json(&alert, "abc123")).unwrap();
+
+        assert!(json.contains(r#""msg_id":"abc123""#), "got {json}");
+    }
+
+    #[test]
+    fn payload_escapes_string_fields() {
+        let alert = PushAlert {
+            hostname: "https://app.example".to_string(),
+            title: r#"a"b\c"#.to_string(),
+            body: "b".to_string(),
+            url: None,
+        };
+
+        let json = String::from_utf8(alert_to_json(&alert, "id")).unwrap();
+
+        assert!(json.contains(r#"a\"b\\c"#), "got {json}");
+    }
 }
