@@ -80,6 +80,21 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             storage.count_live_mcp_grants(time()) as f64,
             "Number of live (non-expired) MCP session grants: the currently-authorized MCP sessions. Computed by scanning the grant map at scrape time (O(n) in stored grants).",
         )?;
+        w.encode_gauge(
+            "internet_identity_mcp_registration_count",
+            storage.mcp_registration_count() as f64,
+            "Number of pending MCP registration entries stored (in-flight registrations plus expired residue not yet reclaimed). Expired entries are swept by a bounded amortized GC driven by prepare writes, so the gap against the live count persists while registration traffic is idle.",
+        )?;
+        w.encode_gauge(
+            "internet_identity_mcp_live_registration_count",
+            storage.count_live_mcp_registrations(time()) as f64,
+            "Number of live (non-expired) MCP registration entries: the registration ceremonies currently redeemable. Computed by scanning the registration map at scrape time (O(n) in stored entries).",
+        )?;
+        w.encode_gauge(
+            "internet_identity_mcp_config_count",
+            storage.mcp_config_count() as f64,
+            "Number of stored per-anchor MCP configs. Configs never expire; after the MCP config migration this is one row per anchor.",
+        )?;
         if let Some(registration_rates) = storage.registration_rates.registration_rates() {
             w.gauge_vec(
                 "internet_identity_registrations_per_second",

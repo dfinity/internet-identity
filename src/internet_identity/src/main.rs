@@ -196,22 +196,29 @@ fn init_sso_credential_migration_timer() {
 // `enabled` on a stored `StorableMcpConfig` predates the official connector,
 // so a stored `false` only ever meant "no custom server of mine" — nobody
 // could have declined a connector that did not exist. This one-shot migration
-// rewrites every stored config to "enabled, official connector". Anchors with
-// no stored config are left alone: they trust nothing until the identity turns
-// the feature on in Settings, and an identity registered on a deployment with
-// an official connector starts out with a config already.
+// gives AI access on the official connector to *every* anchor: it walks the
+// anchor map, so anchors that never wrote a config get a row too. Those are the
+// anchors that registered before configs were seeded at registration time, and
+// nothing else would ever switch them on.
 //
 // Driven by the `mcp_config_migration` upgrade arg and batched via an interval
 // timer, using the same convention as the SSO credential migration above:
-// rewriting every config in `post_upgrade` would blow the instruction limit.
+// writing a config for every anchor in `post_upgrade` would blow the
+// instruction limit.
 
 /// How long to wait between migration batches.
 const MCP_CONFIG_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
 
-/// Maximum number of stored configs to examine per batch (= per ingress
-/// message). Matches the 2 000-per-batch convention used for previous
-/// migrations.
+/// Maximum number of anchors to examine per batch (= per ingress message).
+/// Matches the 2 000-per-batch convention used for previous migrations.
 const MCP_CONFIG_MIGRATION_BATCH_SIZE: u64 = 2_000;
+
+/// Largest window [`list_mcp_config_migration_errors`] serves in one call, so a
+/// wide `lo`/`hi` range can't push the response past the 2 MiB limit. The full
+/// set is accumulated regardless — even the pathological case of every anchor
+/// erroring is a few hundred MB of strings, which fits the heap — so paging is
+/// only about the response size, not about bounding what is kept.
+const MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT: u64 = 500;
 
 thread_local! {
     // TODO: Remove these after the data migration is complete.
@@ -219,7 +226,30 @@ thread_local! {
     static MCP_CONFIG_MIGRATION_CURSOR: RefCell<Option<AnchorNumber>> = const { RefCell::new(None) };
     static MCP_CONFIG_MIGRATION_DONE: RefCell<bool> = const { RefCell::new(false) };
     static MCP_CONFIG_MIGRATION_COUNT: RefCell<u64> = const { RefCell::new(0) };
+    static MCP_CONFIG_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     static MCP_CONFIG_MIGRATION_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
+}
+
+/// Temporary hidden endpoint: per-anchor errors encountered during the MCP
+/// config migration, as the half-open range `[lo, hi)`. The strings name an
+/// anchor number and the anomaly, never a principal.
+///
+/// Every error is collected, but paginated on read because this migration
+/// touches every anchor: returning the whole list at once could exceed the
+/// 2 MiB response limit and fail exactly when it is needed. `hi` is clamped to
+/// the number stored and to [`MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT`] past `lo`,
+/// so page until a call returns fewer than requested. An out-of-range `lo`
+/// yields an empty vector rather than trapping.
+#[update(hidden = true)]
+fn list_mcp_config_migration_errors(lo: u64, hi: u64) -> Vec<String> {
+    MCP_CONFIG_MIGRATION_ERRORS.with_borrow(|errors| {
+        let len = errors.len() as u64;
+        if lo >= len || hi <= lo {
+            return vec![];
+        }
+        let end = hi.min(len).min(lo + MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT);
+        errors[lo as usize..end as usize].to_vec()
+    })
 }
 
 /// Temporary hidden endpoint: returns `(migrated_configs, is_done)` so beta
@@ -229,6 +259,10 @@ thread_local! {
 /// the scan hasn't finished. Only `(_, true)` means a run completed, so a
 /// `(0, false)` that persists past the first few batches is the signal that
 /// the arg never arrived.
+///
+/// `(0, true)` alone does not mean success: a migration refused for want of an
+/// official connector also lands there. [`list_mcp_config_migration_errors`]
+/// carries the refusal, so check it before reading `true` as "done".
 #[query(hidden = true)]
 fn mcp_config_migration_status() -> (u64, bool) {
     (
@@ -253,6 +287,9 @@ fn run_mcp_config_migration_batch() {
     MCP_CONFIG_MIGRATION_COUNT.with_borrow_mut(|count| {
         *count = count.saturating_add(outcome.migrated);
     });
+    if !outcome.errors.is_empty() {
+        MCP_CONFIG_MIGRATION_ERRORS.with_borrow_mut(|errors| errors.extend(outcome.errors));
+    }
     if let Some(next_cursor) = outcome.next_cursor {
         MCP_CONFIG_MIGRATION_CURSOR.replace(Some(next_cursor));
     }
@@ -273,8 +310,25 @@ fn run_mcp_config_migration_batch() {
 /// this upgrade didn't ask for the migration. Nothing about a completed run is
 /// persisted, so the upgrade arg is the only control: passing it again re-runs
 /// the migration, exactly like the SSO credential migration above.
+///
+/// Without an official connector the migration is refused outright: the shape it
+/// writes resolves to no trusted URL at all, so it would leave every identity
+/// with AI access reading on and nothing behind it. Same rule as
+/// `mcp::init_config_for_new_identity`.
 fn init_mcp_config_migration_timer() {
     if !MCP_CONFIG_MIGRATION_REQUESTED.with_borrow(|requested| *requested) {
+        return;
+    }
+    if mcp::official_url().is_none() {
+        // Record the refusal, not just the log line: `mcp_config_migration_status`
+        // would otherwise report `(0, true)`, indistinguishable from a run that
+        // completed with nothing to do.
+        let err = "migration refused: mcp_config_migration was requested but this deployment has \
+                   no official connector"
+            .to_string();
+        ic_cdk::println!("WARNING: MCP config migration: {err}");
+        MCP_CONFIG_MIGRATION_ERRORS.with_borrow_mut(|errors| errors.push(err));
+        MCP_CONFIG_MIGRATION_DONE.replace(true);
         return;
     }
     let timer_id = ic_cdk_timers::set_timer_interval(
@@ -2595,5 +2649,66 @@ mod test {
         .unwrap_or_else(|e| {
             panic!("the canister code interface is not equal to the did file: {e:?}")
         });
+    }
+}
+
+#[cfg(test)]
+mod list_mcp_config_migration_errors_tests {
+    use super::*;
+
+    fn seed(count: usize) {
+        MCP_CONFIG_MIGRATION_ERRORS.with_borrow_mut(|errors| {
+            *errors = (0..count).map(|i| format!("anchor {i}")).collect();
+        });
+    }
+
+    #[test]
+    fn serves_the_requested_half_open_range() {
+        seed(10);
+        assert_eq!(
+            list_mcp_config_migration_errors(2, 5),
+            vec!["anchor 2", "anchor 3", "anchor 4"]
+        );
+    }
+
+    #[test]
+    fn clamps_hi_to_what_is_retained() {
+        seed(3);
+        assert_eq!(
+            list_mcp_config_migration_errors(1, u64::MAX),
+            vec!["anchor 1", "anchor 2"]
+        );
+    }
+
+    #[test]
+    fn caps_the_window_at_the_page_limit() {
+        let total = MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT as usize + 10;
+        seed(total);
+        assert_eq!(
+            list_mcp_config_migration_errors(0, total as u64).len(),
+            MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT as usize
+        );
+    }
+
+    #[test]
+    fn returns_empty_for_out_of_range_or_inverted_bounds() {
+        seed(3);
+        // Past the end, and an empty or backwards window: empty, never a trap.
+        assert!(list_mcp_config_migration_errors(3, 9).is_empty());
+        assert!(list_mcp_config_migration_errors(u64::MAX, u64::MAX).is_empty());
+        assert!(list_mcp_config_migration_errors(2, 2).is_empty());
+        assert!(list_mcp_config_migration_errors(2, 1).is_empty());
+    }
+
+    #[test]
+    fn empty_error_list_never_slices() {
+        seed(0);
+        // The `lo >= len` guard catches this because `lo` is a `u64`, so it can't
+        // be below an empty list's length of 0 — the slice is never reached.
+        assert!(list_mcp_config_migration_errors(0, 0).is_empty());
+        assert!(list_mcp_config_migration_errors(0, u64::MAX).is_empty());
+        assert!(
+            list_mcp_config_migration_errors(0, MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT).is_empty()
+        );
     }
 }

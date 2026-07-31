@@ -2374,148 +2374,315 @@ mod migrate_sso_credentials_batch_tests {
     }
 }
 
-#[test]
-fn mcp_config_migration_enables_stored_configs_and_revokes_their_grants() {
+mod migrate_mcp_configs_batch_tests {
+    use super::*;
     use crate::storage::storable::mcp_config::StorableMcpConfig;
     use crate::storage::storable::mcp_grant::StorableMcpGrant;
     use crate::storage::storable::mcp_registration::StorableMcpRegistration;
+    use pretty_assertions::assert_eq;
 
-    let mut storage = Storage::new((0, 100), VectorMemory::default());
-    let session = Principal::self_authenticating([1u8; 32]);
-    let p_reg = Principal::self_authenticating([2u8; 32]);
+    const CUSTOM_URL: &str = "https://mcp.acme.com/mcp";
 
-    // Disabled, still pointing at a grant and an in-flight registration that are
-    // inert only because of the flag.
-    storage.write_mcp_config(
-        10_000,
-        StorableMcpConfig {
-            enabled: false,
-            url: Some("https://mcp.acme.com/mcp".to_string()),
-            session_principal: Some(session.as_slice().to_vec()),
-            pending_registration: Some(p_reg.as_slice().to_vec()),
-        },
-    );
-    storage.insert_mcp_registration(
-        p_reg,
+    /// Register an anchor so the migration's anchor-map scan can reach it. The
+    /// anchors this migration exists for are exactly these: no config row.
+    fn seed_bare_anchor<M: Memory + Clone>(storage: &mut Storage<M>) -> u64 {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        anchor_number
+    }
+
+    fn registration(anchor_number: u64) -> StorableMcpRegistration {
         StorableMcpRegistration {
-            anchor_number: 10_000,
+            anchor_number,
             read_only: false,
             grant_ttl_ns: 3_600_000_000_000,
             trusted_url_hash: vec![7u8; 32],
             expires_at_ns: u64::MAX,
-        },
-    );
-    storage.insert_mcp_grant(
-        session,
-        StorableMcpGrant {
-            anchor_number: 10_000,
-            expires_at_ns: u64::MAX,
-            read_only: false,
-        },
-    );
-    // Already in the migrated shape.
-    storage.write_mcp_config(
-        10_001,
-        StorableMcpConfig {
-            enabled: true,
-            url: None,
-            session_principal: None,
-            pending_registration: None,
-        },
-    );
-
-    let outcome = storage.migrate_mcp_configs_batch(None, 2_000);
-
-    assert_eq!(outcome.migrated, 1);
-    assert!(outcome.is_done);
-    assert_eq!(
-        storage.read_mcp_config(10_000),
-        StorableMcpConfig {
-            enabled: true,
-            url: None,
-            session_principal: None,
-            pending_registration: None,
         }
-    );
-    // The grant must not survive: re-enabling would otherwise revive a session
-    // against a connector it was never granted for.
-    assert!(storage.lookup_mcp_grant(session).is_none());
-    // Nor the in-flight registration: its redemption is gated on the *current*
-    // trusted URL, which this migration can restore to the one it was minted
-    // under, making a pre-switch-off delegation redeemable again.
-    assert!(storage.lookup_mcp_registration(p_reg).is_none());
-
-    // Re-running is a no-op.
-    let again = storage.migrate_mcp_configs_batch(None, 2_000);
-    assert_eq!(again.migrated, 0);
-    assert!(again.is_done);
-}
-
-#[test]
-fn mcp_config_migration_also_resets_an_enabled_custom_connector() {
-    use crate::storage::storable::mcp_config::StorableMcpConfig;
-    use crate::storage::storable::mcp_grant::StorableMcpGrant;
-
-    let mut storage = Storage::new((0, 100), VectorMemory::default());
-    let session = Principal::self_authenticating([3u8; 32]);
-
-    // A working custom connector with a live session.
-    storage.write_mcp_config(
-        10_000,
-        StorableMcpConfig {
-            enabled: true,
-            url: Some("https://mcp.acme.com/mcp".to_string()),
-            session_principal: Some(session.as_slice().to_vec()),
-            pending_registration: None,
-        },
-    );
-    storage.insert_mcp_grant(
-        session,
-        StorableMcpGrant {
-            anchor_number: 10_000,
-            expires_at_ns: u64::MAX,
-            read_only: false,
-        },
-    );
-
-    let outcome = storage.migrate_mcp_configs_batch(None, 2_000);
-
-    // Deliberate: choosing a custom server predates the official connector, so
-    // it wasn't a choice against it. These identities are reset to the default
-    // and re-add their server if they still want it.
-    assert_eq!(outcome.migrated, 1);
-    assert_eq!(
-        storage.read_mcp_config(10_000),
-        StorableMcpConfig {
-            enabled: true,
-            ..Default::default()
-        }
-    );
-    assert!(storage.lookup_mcp_grant(session).is_none());
-}
-
-#[test]
-fn mcp_config_migration_resumes_from_the_cursor() {
-    use crate::storage::storable::mcp_config::StorableMcpConfig;
-
-    let mut storage = Storage::new((0, 100), VectorMemory::default());
-    let disabled = StorableMcpConfig {
-        enabled: false,
-        url: None,
-        session_principal: None,
-        pending_registration: None,
-    };
-    for anchor in 10_000..10_003 {
-        storage.write_mcp_config(anchor, disabled.clone());
     }
 
-    let first = storage.migrate_mcp_configs_batch(None, 2);
-    assert_eq!(first.migrated, 2);
-    assert!(!first.is_done);
-    assert_eq!(first.next_cursor, Some(10_001));
+    fn grant(anchor_number: u64) -> StorableMcpGrant {
+        StorableMcpGrant {
+            anchor_number,
+            expires_at_ns: u64::MAX,
+            read_only: false,
+        }
+    }
 
-    let second = storage.migrate_mcp_configs_batch(first.next_cursor, 2);
-    assert_eq!(second.migrated, 1);
-    assert!(second.is_done);
-    assert!(storage.read_mcp_config(10_002).enabled);
+    /// Drive the migration the way the interval timer does, threading the cursor
+    /// until a batch reports completion. Returns `(migrated, errors, batches)`.
+    fn run_to_completion<M: Memory + Clone>(
+        storage: &mut Storage<M>,
+        batch_size: u64,
+    ) -> (u64, Vec<String>, u64) {
+        let mut cursor = None;
+        let (mut migrated, mut errors, mut batches) = (0u64, vec![], 0u64);
+        loop {
+            let outcome = storage.migrate_mcp_configs_batch(cursor, batch_size);
+            migrated += outcome.migrated;
+            errors.extend(outcome.errors);
+            batches += 1;
+            if outcome.next_cursor.is_some() {
+                cursor = outcome.next_cursor;
+            }
+            if outcome.is_done {
+                return (migrated, errors, batches);
+            }
+        }
+    }
+
+    #[test]
+    fn writes_a_config_for_anchors_that_never_stored_one() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let anchors: Vec<u64> = (0..3).map(|_| seed_bare_anchor(&mut storage)).collect();
+
+        // The whole point of scanning the anchor map: a config-map scan cannot
+        // see these, so nothing would ever switch them on.
+        let (migrated, errors, _) = run_to_completion(&mut storage, 2_000);
+
+        assert_eq!(migrated, 3);
+        assert!(errors.is_empty());
+        for anchor in anchors {
+            assert_eq!(
+                storage.read_mcp_config(anchor),
+                StorableMcpConfig {
+                    enabled: true,
+                    ..Default::default()
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn rewrites_a_disabled_row_and_invalidates_its_session() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let session = Principal::self_authenticating([1u8; 32]);
+        let p_reg = Principal::self_authenticating([2u8; 32]);
+        let anchor = seed_bare_anchor(&mut storage);
+
+        // Disabled, still pointing at a grant and an in-flight registration that
+        // are inert only because of the flag.
+        storage.write_mcp_config(
+            anchor,
+            StorableMcpConfig {
+                enabled: false,
+                url: Some(CUSTOM_URL.to_string()),
+                session_principal: Some(session.as_slice().to_vec()),
+                pending_registration: Some(p_reg.as_slice().to_vec()),
+            },
+        );
+        storage.insert_mcp_registration(p_reg, registration(anchor));
+        storage.insert_mcp_grant(session, grant(anchor));
+
+        let (migrated, errors, _) = run_to_completion(&mut storage, 2_000);
+
+        assert_eq!(migrated, 1);
+        assert!(errors.is_empty());
+        assert_eq!(
+            storage.read_mcp_config(anchor),
+            StorableMcpConfig {
+                enabled: true,
+                ..Default::default()
+            }
+        );
+        // The session is dead because the rewritten config no longer names it:
+        // `authorize_mcp_session` only authorizes the principal the config
+        // points at. The grant row is left for the lazy expiry cleanup.
+        assert!(storage.lookup_mcp_grant(session).is_some());
+        // The registration has to go explicitly: redemption resolves it from the
+        // registration index and re-checks the *current* trusted URL, which this
+        // migration can restore to the one it was minted under.
+        assert!(storage.lookup_mcp_registration(p_reg).is_none());
+    }
+
+    #[test]
+    fn resets_an_enabled_custom_connector() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let session = Principal::self_authenticating([3u8; 32]);
+        let anchor = seed_bare_anchor(&mut storage);
+
+        storage.write_mcp_config(
+            anchor,
+            StorableMcpConfig {
+                enabled: true,
+                url: Some(CUSTOM_URL.to_string()),
+                session_principal: Some(session.as_slice().to_vec()),
+                pending_registration: None,
+            },
+        );
+        storage.insert_mcp_grant(session, grant(anchor));
+
+        let (migrated, _, _) = run_to_completion(&mut storage, 2_000);
+
+        // Deliberate: choosing a custom server predates the official connector,
+        // so it wasn't a choice against it. These identities are reset to the
+        // default and re-add their server if they still want it.
+        assert_eq!(migrated, 1);
+        assert_eq!(
+            storage.read_mcp_config(anchor),
+            StorableMcpConfig {
+                enabled: true,
+                ..Default::default()
+            }
+        );
+    }
+
+    #[test]
+    fn reports_a_registration_pointer_it_cannot_resolve() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let foreign = Principal::self_authenticating([4u8; 32]);
+        let owner = seed_bare_anchor(&mut storage);
+        let pointing_elsewhere = seed_bare_anchor(&mut storage);
+        let undecodable = seed_bare_anchor(&mut storage);
+
+        // A pointer to an entry another anchor owns must not evict that anchor's
+        // registration, so it survives and is reported instead.
+        storage.insert_mcp_registration(foreign, registration(owner));
+        storage.write_mcp_config(
+            pointing_elsewhere,
+            StorableMcpConfig {
+                enabled: false,
+                url: None,
+                session_principal: None,
+                pending_registration: Some(foreign.as_slice().to_vec()),
+            },
+        );
+        // Longer than the 29-byte principal maximum, so it cannot be resolved at
+        // all — whatever it pointed at can never be removed.
+        storage.write_mcp_config(
+            undecodable,
+            StorableMcpConfig {
+                enabled: false,
+                url: None,
+                session_principal: None,
+                pending_registration: Some(vec![1u8; 40]),
+            },
+        );
+
+        let (migrated, errors, _) = run_to_completion(&mut storage, 2_000);
+
+        assert_eq!(migrated, 3);
+        assert_eq!(errors.len(), 2);
+        assert!(errors
+            .iter()
+            .any(|err| err.contains(&format!("anchor {pointing_elsewhere}"))
+                && err.contains("another anchor")));
+        assert!(errors
+            .iter()
+            .any(|err| err.contains(&format!("anchor {undecodable}"))
+                && err.contains("not a valid principal")));
+        // Anchor number and anomaly only — never a principal, matching the rule
+        // the SSO credential migration set.
+        for err in &errors {
+            assert!(!err.contains(&foreign.to_text()));
+        }
+        // Reported, not silently evicted: the other identity keeps its entry.
+        assert!(storage.lookup_mcp_registration(foreign).is_some());
+        // The rows migrate regardless — the feature is on for them either way —
+        // and the bad pointer does not survive the rewrite. That is the whole
+        // cleanup available: an undecodable pointer yields no key, and the index
+        // is keyed by principal with no anchor reverse lookup, so an entry it
+        // may have referenced cannot be found without scanning the whole map.
+        // Those self-heal via the 5-minute TTL and the amortized sweep.
+        for anchor in [pointing_elsewhere, undecodable] {
+            let config = storage.read_mcp_config(anchor);
+            assert!(config.enabled);
+            assert_eq!(config.pending_registration, None);
+        }
+    }
+
+    #[test]
+    fn rerun_drops_sessions_established_since_the_first_run() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let session = Principal::self_authenticating([5u8; 32]);
+        let anchor = seed_bare_anchor(&mut storage);
+        storage.write_mcp_config(
+            anchor,
+            StorableMcpConfig {
+                enabled: false,
+                url: Some(CUSTOM_URL.to_string()),
+                ..Default::default()
+            },
+        );
+
+        let (migrated, _, _) = run_to_completion(&mut storage, 2_000);
+        assert_eq!(migrated, 1);
+
+        // A healthy identity connecting to the official connector afterwards
+        // lands on the target shape with a live session pointer.
+        let mut config = storage.read_mcp_config(anchor);
+        config.session_principal = Some(session.as_slice().to_vec());
+        storage.write_mcp_config(anchor, config);
+        storage.insert_mcp_grant(session, grant(anchor));
+
+        let (migrated_again, errors, _) = run_to_completion(&mut storage, 2_000);
+
+        // Accepted cost of writing unconditionally: unlike the SSO migration
+        // this one is not idempotent. Re-running rewrites the row and drops that
+        // session, so passing the arg twice logs everyone out of MCP.
+        assert_eq!(migrated_again, 1);
+        assert!(errors.is_empty());
+        assert_eq!(storage.read_mcp_config(anchor).session_principal, None);
+    }
+
+    #[test]
+    fn index_counters_separate_live_entries_from_residue() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let anchor = seed_bare_anchor(&mut storage);
+        let now = 1_000_000_000_000;
+        let live = Principal::self_authenticating([8u8; 32]);
+        let expired = Principal::self_authenticating([9u8; 32]);
+
+        storage.insert_mcp_registration(
+            live,
+            StorableMcpRegistration {
+                expires_at_ns: now + 1,
+                ..registration(anchor)
+            },
+        );
+        storage.insert_mcp_registration(
+            expired,
+            StorableMcpRegistration {
+                expires_at_ns: now,
+                ..registration(anchor)
+            },
+        );
+
+        // The gap between the two is residue the amortized sweep hasn't reached:
+        // `expires_at_ns == now` is already expired, the check is strictly `>`.
+        assert_eq!(storage.mcp_registration_count(), 2);
+        assert_eq!(storage.count_live_mcp_registrations(now), 1);
+
+        assert_eq!(storage.mcp_config_count(), 0);
+        run_to_completion(&mut storage, 2_000);
+        // Configs never expire, so this is simply one row per anchor afterwards.
+        assert_eq!(storage.mcp_config_count(), 1);
+    }
+
+    #[test]
+    fn resumes_from_the_cursor() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let anchors: Vec<u64> = (0..3).map(|_| seed_bare_anchor(&mut storage)).collect();
+
+        let first = storage.migrate_mcp_configs_batch(None, 2);
+        assert_eq!(first.migrated, 2);
+        assert!(!first.is_done);
+        assert_eq!(first.next_cursor, Some(anchors[1]));
+
+        let second = storage.migrate_mcp_configs_batch(first.next_cursor, 2);
+        assert_eq!(second.migrated, 1);
+        assert!(second.is_done);
+        assert!(storage.read_mcp_config(anchors[2]).enabled);
+
+        // Three anchors at two per batch: the whole scan takes two batches and
+        // the driver stops on the short one.
+        let mut fresh = Storage::new((0, 100), VectorMemory::default());
+        (0..3).for_each(|_| {
+            seed_bare_anchor(&mut fresh);
+        });
+        let (migrated, _, batches) = run_to_completion(&mut fresh, 2);
+        assert_eq!(migrated, 3);
+        assert_eq!(batches, 2);
+    }
 }
