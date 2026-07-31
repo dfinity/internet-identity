@@ -86,23 +86,39 @@ Built today (PoC on `feat/push-notifications-poc`):
   ever lands, the key moves off storage entirely.
 - Notification click routes through the consent-gated `/notify` redirect.
 
-What the PoC deliberately does **not** have, so it isn't mistaken for a
+Also built since, because using the PoC forced them:
+
+- **Sender authorization by origin.** `notify_user` originally required
+  `caller() == in_app_principal`, which cannot work: that principal is a
+  canister-signature principal derived from II's seed, so only the recipient's
+  own browser can present it — an inter-canister call always arrives as the
+  calling canister's principal. It admitted only self-sends, i.e. the one case
+  the endpoint is not for. A sender registry keyed by origin hash now authorizes
+  sends, with self-sends still allowed (the recipient asking to be notified needs
+  nothing further). `push_register_sender` is controller-only until the
+  `.well-known` verification below exists.
+- **`msg_id` + service-worker dedup**, and **`410`/`404` row cleanup** — see
+  [Duplicate and replay suppression](#duplicate-and-replay-suppression-msg_id).
+- **Send-time `alert.url` validation**, which is what lets a tap open the deep
+  link directly.
+- **VAPID key rotation handling** in the browser: an existing subscription bound
+  to a superseded key is replaced rather than failing forever.
+
+What it still deliberately does **not** have, so it isn't mistaken for a
 shippable subset:
 
-- **`notify_user` requires `caller() == in_app_principal`.** That principal is a
-  canister-signature principal, so it can only appear as `caller()` on an
-  _ingress_ message carrying the user's own delegation — a dApp **backend cannot
-  call it at all**. The PoC therefore demonstrates _delivery_, not _sending_:
-  the only party who can currently notify a user is a browser tab holding that
-  user's live session. Backend-initiated sends need the sender registry and
-  `push_send` from the design below.
+- No `push_send`, so no batching, no chunking, and no client library — a send is
+  one `notify_user` per recipient.
 - No rate limiting or admission control of any kind — `notify_user` is unmetered.
-- No endpoint validation beyond an `https://` prefix, and no per-anchor caps on
-  subscription or consent rows.
+- No `.well-known/ii-push-senders` verification: senders are registered by an
+  operator, so nothing yet proves a canister owns the origin it sends as.
+- No endpoint host allowlist, and no per-anchor caps on subscription or consent
+  rows.
 - `Display` content only — no `Hidden`, which is the variant the design
   recommends shipping first for E2E apps.
-- No `msg_id`, no `410` cleanup, no `pushsubscriptionchange` handling.
-- Integration and E2E test coverage is thin (unit tests for the crypto only).
+- No `pushsubscriptionchange` handling, so a rotated endpoint still leaves a
+  stale row until a relay reports it gone.
+- Integration and E2E test coverage is thin (unit tests only).
 
 Proposed (this doc):
 
@@ -111,10 +127,10 @@ Proposed (this doc):
   buffer, storage O(users × origins)), a durable client library, and delivery
   through a trusted web2 gateway (with direct per-device outcalls as the
   documented alternative/fallback).
-- Promoted to v1 requirements by review: `msg_id` + device dedup, a
-  `drain_epoch` acknowledgment signal, an endpoint host allowlist, per-anchor
-  caps, drain isolation and non-reentrancy, and a reserved outcall budget that
-  protects sign-in.
+- Promoted to v1 requirements by review, and still outstanding: a `drain_epoch`
+  acknowledgment signal, an endpoint host allowlist, per-anchor caps, drain
+  isolation and non-reentrancy, and a reserved outcall budget that protects
+  sign-in. (`msg_id` + device dedup was also promoted, and is now built.)
 - No cycles charging to senders in v1 — but a deployment that pays fees needs a
   cycle budget with a circuit breaker regardless. Sender charging is parked as a
   future exploration.
@@ -871,22 +887,38 @@ device is a v1 requirement, not a nicety.
 
 ## On the device: rendering and tap-through
 
-- **Subscribe** (Settings): request permission, `pushManager.subscribe` with
-  II's VAPID public key, store `(anchor, endpoint_hash) → {p256dh, auth}`. No
+- **Subscribe** (Settings, or the `/authorize` opt-in): request permission,
+  `pushManager.subscribe` with II's VAPID public key, store
+  `(anchor, endpoint_hash) → {endpoint, p256dh, auth}`. A browser allows one
+  subscription per service worker, permanently bound to the key it was created
+  with, so `subscribe` **refuses a different key**: an existing subscription is
+  reused when its key still matches and replaced when it doesn't. Otherwise
+  every browser that subscribed under a previous VAPID key could never
+  re-enable. No
   PWA install is needed on Android or desktop — this works in a plain tab;
   iOS Safari is the exception (it only allows Web Push for an installed
   home-screen app). The optional install adds an app icon / standalone window
   and slightly better attribution.
-- **Consent** (`/authorize`): `push_grant_consent(anchor, origin)`.
+- **Consent** (`/authorize`): `push_grant_consent(anchor, origin)`. Asked once
+  per `(identity, origin)` **per device** — the answer is remembered locally,
+  which matches what it commits to, since a subscription belongs to one browser.
+  Consent itself is shared by all of the identity's devices, so on a second
+  device only the subscription is missing and the screen says so ("Also notify
+  you on this device?") rather than repeating the first-run ask.
 - **Render**: the service worker branches on `content` — `Display` shows the
   supplied `title`/`body`; `Hidden` shows an II-controlled generic string
   keyed by `category` ("New message from `<origin>`"), never app-supplied text.
-- **Click**: the service worker opens
-  `/notify?origin=<sender>&to=<deep-link>`; the page validates and redirects
-  (see below), otherwise it fails closed. This prevents the redirect endpoint
-  from being abused as an open redirect. For `Hidden` (E2E) notifications this
-  tap-through is also the content-reveal path: the app opens and decrypts the
-  message in its own context.
+- **Click**: with a deep link, the service worker opens it **directly**. II
+  validated at send time that `alert.url` is on the consented origin (see
+  [the deep-link question](#can-the-app-choose-where-the-notification-opens)),
+  so there is nothing left to check on the device — and routing through II
+  would add a second visit in the middle of a journey the user expects to be
+  one step. Without a deep link it opens `/notify?origin=<sender>`, which
+  resolves the sender's own origin, shows which app is opening, and fails
+  closed if it cannot verify the sender.
+
+  For `Hidden` (E2E) notifications this tap-through is also the content-reveal
+  path: the app opens and decrypts the message in its own context.
 
 ### Shared devices and multiple identities
 
@@ -921,23 +953,35 @@ endpoint_hash) → {endpoint, p256dh, auth, created_at}` — the endpoint URL
 
 ### Can the app choose where the notification opens?
 
-The app may set `alert.url` to send the user to a specific page rather than
-the origin root. `/notify` honors it under two constraints, both enforced
-client-side:
+The app may set `alert.url` to send the user to a specific page rather than the
+origin root. **II validates it at send time** and refuses the send otherwise:
 
-- **The target's origin must equal the sender's origin.** The sender origin is
-  **II-derived**, not a field on `PushAlert`: the backend forces it to this
-  sender's consented origin and stamps it into the delivered payload, so a dApp
-  cannot set or spoof it. A notification can therefore deep-link anywhere within
-  the sender's own site (`https://app.com/thread/42`) but never to another
-  origin — not `evil.com`, and not another consented dApp.
-- **The sender origin must be in the anchor's consent list** (session-delegation
-  check). A hand-crafted `/notify?origin=…&to=…` therefore also fails closed.
+- **The target must be on the sender's own application.** The sender origin is
+  II-derived, not a field on `PushAlert`: the backend forces it to this sender's
+  consented origin, so a dApp cannot set or spoof it. A notification can
+  deep-link anywhere within the sender's own site
+  (`https://app.com/thread/42`) but never to another origin — not `evil.com`,
+  and not another consented dApp.
+- **Both sides are canonicalised** before comparing, because consent is recorded
+  against the _effective_ origin (already remapped to the legacy boundary
+  domain) while a dApp's links use whichever domain the user is browsing.
+  Without that, every real deep link is refused. It stays safe rather than
+  loose: only the same subdomain collapses, and that subdomain is the canister
+  id, so two different canisters can never normalise to one origin.
+- **Only `https`, or `http` on loopback** — the secure-context rule browsers
+  use. `javascript:` and `data:` URLs report their origin as the string
+  `"null"`, so without a scheme check two of them compare equal, pass an
+  origin test, and reach a navigation.
 
-No target → redirect to the sender origin's root. Because the check keys off
-the backend-forced `hostname`, this is entirely front-end; no backend or
-Candid change is required. (A backend `alert.url`-origin validation at send
-time is a nice defense-in-depth follow-up but not required for safety.)
+Validating on the send side rather than on the device is what lets the service
+worker open the link directly, removing a hop from the tap-through. It is also
+simply the better place: this is the only party that knows authoritatively which
+origin the user consented to, whereas the device-side check sat on a publicly
+craftable URL and every future consumer of `alert.url` would have had to repeat
+it.
+
+No target → the tap opens `/notify?origin=<sender>`, which resolves the sender's
+origin from the anchor's consent list and fails closed if it cannot.
 
 ### Can the tap land the user already signed in?
 
@@ -987,6 +1031,38 @@ One consistency requirement: push consent keys on the `effectiveOrigin` (see
 sign-in derives the identity from the callback origin or its `derivationOrigin`.
 They must agree, or the principal that was notified is not the principal the
 user comes back with.
+
+**Notifications should link straight at the sign-in route**, not at the app.
+Sending them to the app means it boots, discovers it has no usable session and
+bounces — a visible flash on the way to a redirect that was always going to
+happen. Linking direct makes the journey tap → Internet Identity → the page.
+
+Four things this cost to get right, all learned the hard way:
+
+- **The sign-in route must be its own URL.** The flow journals state per route,
+  so running it on the app root interleaves that journal with the app's whole
+  boot path. The symptom is landing signed out with nothing explaining why.
+- **Do not short-circuit on `isAuthenticated()` there.** A delegation can sit in
+  storage while the app considers the session over — an app that ends its
+  session when every tab closes is in exactly that state when a notification
+  arrives. Forwarding on it returns the user to an app that then signs them out.
+  Calling `signIn()` unconditionally is correct: it starts the redirect on the
+  first pass and completes from journaled state on the return one.
+- **A loopback callback needs II's `dev_csp`.** Establishing the flow fetches
+  the callback origin's allow-list, and that fetch is `connect-src`-bound, which
+  production CSP limits to `https:`. So a dApp on `http://localhost` can only do
+  this against an II deployed with the dev CSP — which is why the honest advice
+  for a demo is to serve the dApp over https.
+- **Chrome will ask the user.** A public II origin fetching an allow-list from a
+  loopback address is a local-network request, which Chrome gates behind a
+  permission prompt ("access other apps and services on this device"). Expected
+  on a local setup, absent once both sides are public https.
+
+Finally, the route is a page on the dApp's origin and **cannot be supplied by
+II or by the auth client**. The client is headless, and the redirect is a
+top-level navigation onto the relying party's own origin — which is also what
+generates the session key. So the realistic goal is making that page invisible
+(the app's own background and no decision on it), not removing it.
 
 ### What about apps with no URL routing (e.g. Caffeine)?
 
@@ -1305,26 +1381,47 @@ service worker drops out-of-order updates rather than applying them.
 
 ## Duplicate and replay suppression (`msg_id`)
 
-Promoted to a **v1 requirement**. Three independent mechanisms make duplicates
-the norm rather than the exception:
+**Built.** Four independent mechanisms make duplicates the norm rather than the
+exception, and the fourth is the one that showed up first in practice:
 
 1. **Replicated outcalls** — 34 POSTs per push, no idempotency key in RFC 8030.
 2. **Timer duplicate execution** — `ic-cdk-timers` documents that under load
    "timeouts may result in duplicate execution", and the drain is not idempotent.
 3. **Client retries and `drain_epoch` recovery** — by design, per the client
    library.
+4. **Accumulated subscription rows.** The fan-out sends one push per stored row,
+   browsers rotate endpoints, and nothing removed a row — so one browser ended up
+   behind two rows that both still delivered. This is what actually produced
+   duplicate banners during testing, before any of the above did.
 
-Design: II assigns a `msg_id` **once per admitted message**, stable across
-delivery retries, included in the JSON _before_ RFC 8291 encryption (so it is not
-a Candid field and no dApp supplies it). The service worker drops ids it has
-already shown.
+II assigns a `msg_id` **once per admitted message**, stable across delivery
+retries, included in the JSON _before_ RFC 8291 encryption — so it is not a
+Candid field, no dApp supplies it, and no relay or gateway can read or forge it.
+The service worker keeps a bounded set of ids it has shown and drops repeats.
 
-**Use a monotonic window, not a bounded recency set.** A bounded set of
-recently-seen ids is defeatable by construction: the attacker controls eviction
-pressure, so flooding a device with fresh notifications flushes the set and a
-replayed capture then looks new (clearing site data does the same). Keep a
-per-origin high-water mark and reject anything at or below it, and bind `msg_id`
-to a short validity window so an old capture fails on age alone.
+Two implementation notes that are easy to get wrong:
+
+- **The seen-set cannot live in a variable.** A service worker is killed between
+  pushes, so an in-memory set forgets exactly what it needs to remember. It is
+  held in the Cache API, bounded and pruned oldest-first.
+- **A payload with no id is always shown.** Failing open matters: dropping a
+  real notification is worse than showing a duplicate, and it keeps an older
+  canister working against a newer worker.
+
+Cause as well as symptom: the drain now **removes a subscription when the relay
+answers `404`/`410`**. That is the only signal a row is dead, and without it rows
+only accumulate while every future send pays for a target that can never receive.
+`pushsubscriptionchange` is still missing, so a rotated endpoint lingers until a
+relay reports it gone — self-healing now rather than permanent.
+
+**Still to harden: a monotonic window rather than a bounded recency set.** What
+is built collapses accidental duplicates, which is what the symptom was. It does
+not resist a deliberate replay: a bounded set means eviction, and the attacker
+controls the pressure, so flooding a device with fresh notifications flushes the
+set and a replayed capture then looks new (clearing site data does the same).
+The hardened form keeps a per-origin high-water mark, rejects anything at or
+below it, and binds `msg_id` to a short validity window so an old capture fails
+on age alone.
 
 Note `msg_id` is a **different thing** from the dApp-facing `notification_id`:
 `msg_id` is II-generated and suppresses exact duplicates (show at most once);
@@ -1487,12 +1584,16 @@ Must-fix before a real deployment:
   attempt counter, a stuck-buffer watchdog, and a claim step before the first
   `await`. Without these, one malformed row wedges the feature globally and
   overlapping ticks double-send.
-- **`msg_id` + device-side dedup.** Promoted from deferred — see
+- ~~**`msg_id` + device-side dedup.**~~ **Built** — see
   [Duplicate and replay suppression](#duplicate-and-replay-suppression-msg_id).
+  What remains is hardening it against deliberate replay (monotonic window
+  instead of a bounded set), not the duplicate-suppression itself.
 - **An acknowledgment signal (`drain_epoch`).** Promoted from implicit — the
   client-side durability story does not work without it. See
   [II's state model](#iis-state-model-stateless-for-campaigns).
 - **Stale-subscription cleanup.** <a id="stale-subscription-cleanup"></a>
+  `404`/`410` row removal is **built** on the direct path; what follows still
+  applies to the gateway, where per-device status cannot come back at all.
   Promoted from deferred, because on the _chosen_ path it is not merely missing
   but structurally impossible: `410 Gone` cannot return through the gateway's
   deterministic ack, and browsers rotate endpoints continuously. Left alone, the
