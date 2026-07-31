@@ -22,6 +22,12 @@ msgstr "Logo {0}"
 msgid "{0} user"
 msgstr "Utilisateur {0}"
 
+msgid "{address} has been associated with your Internet Identity."
+msgstr "{address} a été associée à votre Internet Identity."
+
+msgid "{address} is no longer associated with your Internet Identity."
+msgstr "{address} n'est plus associée à votre Internet Identity."
+
 msgid "{address} is now a recovery method."
 msgstr "{address} est maintenant une méthode de récupération."
 
@@ -31,14 +37,11 @@ msgstr "{application} est passé à la nouvelle Internet Identity"
 msgid "{attribute}:"
 msgstr "{attribute} :"
 
+msgid "{count} of {capacity} verified emails"
+msgstr "{count} sur {capacity} adresses e-mail vérifiées"
+
 msgid "{displayName} account"
 msgstr "Compte {displayName}"
-
-msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
-msgstr "{domainInput} n’a pas publié /.well-known/ii-openid-configuration (HTTP {0})."
-
-msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
-msgstr "Le fichier /.well-known/ii-openid-configuration de {domainInput} est mal formé."
 
 msgid "{domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type \"id_token code\"."
 msgstr "L’application SSO de {domainInput} n’autorise pas le flux OAuth hybride requis par II. Demandez à l’administrateur SSO d’activer le response_type « id_token code »."
@@ -70,8 +73,17 @@ msgstr "Adresse e-mail {providerName} :"
 msgid "{providerName} name:"
 msgstr "Nom {providerName} :"
 
+msgid "<0>{address}</0> has been associated with your Internet Identity."
+msgstr "<0>{address}</0> a été associée à votre Internet Identity."
+
+msgid "<0>{address}</0> is now your recovery email."
+msgstr "<0>{address}</0> est maintenant votre e-mail de récupération."
+
 msgid "<0>{address}</0> will no longer be able to sign in to your identity."
 msgstr "<0>{address}</0> ne pourra plus se connecter à votre identité."
+
+msgid "<0>{address}</0> will no longer be associated with your Internet Identity."
+msgstr "<0>{address}</0> ne sera plus associée à votre Internet Identity."
 
 msgid "<0>Completely redesigned interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Interface entièrement repensée :</0> Nous avons donné à Internet Identity un aspect moderne et rafraîchi. La nouvelle conception est intuitive et plus facile à parcourir, garantissant une expérience utilisateur plus fluide."
@@ -87,6 +99,24 @@ msgstr "<0>Plus de numéros d'identité :</0> Comme expliqué ci-dessus, les pas
 
 msgid "<0>Seamless passkey integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Intégration transparente des passkeys :</0> Nous continuons à adopter les passkeys comme avenir de l'authentification sécurisée. Internet Identity 2.0 exploite les dernières normes de passkeys pour une sécurité renforcée et une facilité d'utilisation accrue."
+
+msgid "1 day"
+msgstr "1 jour"
+
+msgid "1 hour"
+msgstr "1 heure"
+
+msgid "1 week"
+msgstr "1 semaine"
+
+msgid "10 minutes"
+msgstr "10 minutes"
+
+msgid "30 days"
+msgstr "30 jours"
+
+msgid "8 hours"
+msgstr "8 heures"
 
 msgid "A 24-word phrase you write down and keep offline."
 msgstr "Une phrase de 24 mots que vous notez et conservez hors ligne."
@@ -106,6 +136,9 @@ msgstr "Méthodes d’accès"
 msgid "Account name"
 msgstr "Nom du compte"
 
+msgid "Actions & questions"
+msgstr "Actions et questions"
+
 msgid "Activate"
 msgstr "Activer"
 
@@ -124,20 +157,23 @@ msgstr "Activé"
 msgid "Active"
 msgstr "Actif"
 
-msgid "Add a new identity"
-msgstr "Ajouter une nouvelle identité"
-
-msgid "Add a passkey"
-msgstr "Ajouter une passkey"
-
 msgid "Add a recovery email"
 msgstr "Ajouter un e-mail de récupération"
 
 msgid "Add access method"
 msgstr "Ajouter une méthode d’accès"
 
+msgid "Add AI access"
+msgstr "Ajouter un accès IA"
+
+msgid "Add an email"
+msgstr "Ajouter une adresse e-mail"
+
 msgid "Add another account"
 msgstr "Ajouter un autre compte"
+
+msgid "Add another email"
+msgstr "Ajouter une autre adresse e-mail"
 
 msgid "Add another method or sign in via recovery to remove"
 msgstr "Ajoutez une autre méthode ou connectez-vous via la récupération pour supprimer"
@@ -145,14 +181,17 @@ msgstr "Ajoutez une autre méthode ou connectez-vous via la récupération pour 
 msgid "Add another method or sign in via recovery to unlink"
 msgstr "Ajoutez une autre méthode ou connectez-vous via la récupération pour dissocier"
 
-msgid "Add another passkey"
-msgstr "Ajouter une autre passkey"
-
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Ajoutez un autre moyen de connexion avec une passkey ou un compte tiers pour un accès sécurisé."
 
+msgid "Add existing identity"
+msgstr "Ajouter une identité existante"
+
 msgid "Add identity"
 msgstr "Ajouter une identité"
+
+msgid "Add identity from another device"
+msgstr "Ajouter une identité depuis un autre appareil"
 
 msgid "Add new"
 msgstr "Ajouter"
@@ -160,20 +199,29 @@ msgstr "Ajouter"
 msgid "Add or remove the ways you can sign in with your identity."
 msgstr "Ajoutez ou supprimez les moyens qui vous permettent de vous connecter avec votre identité."
 
+msgid "Add this identity to another device"
+msgstr "Ajouter cette identité à un autre appareil"
+
+msgid "Added by you"
+msgstr "Ajouté par vous"
+
+msgid "Added by you · Replaces the official connector"
+msgstr "Ajouté par vous · Remplace le connecteur officiel"
+
 msgid "Advanced identity management"
 msgstr "Gestion avancée de l’identité"
 
-msgid "AI assistants on this device can ask to sign you in to apps."
-msgstr "Les assistants IA sur cet appareil peuvent vous demander de vous connecter à des applications."
+msgid "AI access"
+msgstr "Accès IA"
+
+msgid "All options"
+msgstr "Toutes les options"
 
 msgid "Allow access"
 msgstr "Autoriser l'accès"
 
 msgid "Allow CLI access"
 msgstr "Autoriser l'accès CLI"
-
-msgid "Allow MCP access"
-msgstr "Autoriser l'accès MCP"
 
 msgid "Allow to access this info"
 msgstr "Autoriser l’accès à ces informations"
@@ -190,6 +238,9 @@ msgstr "Vous avez déjà une identité ?"
 msgid "Already signed-in"
 msgstr "Déjà connecté"
 
+msgid "Also makes changes on your behalf."
+msgstr "Effectue également des modifications en votre nom."
+
 msgid "Are you sure?"
 msgstr "Êtes-vous sûr ?"
 
@@ -198,6 +249,12 @@ msgstr "Comme vous êtes actuellement connecté avec cette méthode d'accès, vo
 
 msgid "As you are currently signed in with this access method, you will be signed out immediately after unlinking."
 msgstr "Comme vous êtes actuellement connecté avec cette méthode d'accès, vous serez déconnecté immédiatement après la dissociation."
+
+msgid "Ask questions and perform actions across your apps by chatting with AI."
+msgstr "Posez des questions et effectuez des actions dans vos applications en discutant avec l'IA."
+
+msgid "Associate an email address with your Internet Identity"
+msgstr "Associer une adresse e-mail à votre Internet Identity"
 
 msgid "Attribute sharing failed"
 msgstr "Échec du partage des attributs"
@@ -213,6 +270,9 @@ msgstr "Authentification réussie"
 
 msgid "Authorize new device"
 msgstr "Autoriser un nouvel appareil"
+
+msgid "Available accounts"
+msgstr "Comptes disponibles"
 
 msgid "Back"
 msgstr "Retour"
@@ -232,8 +292,8 @@ msgstr "Les deux se trouvent sur le domaine <0>{host}</0>."
 msgid "Browser opened"
 msgstr "Navigateur ouvert"
 
-msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
-msgstr "En activant cette fonctionnalité, vous pouvez créer plusieurs comptes pour une seule application. Passez facilement d’un compte à l’autre (par exemple, professionnel, personnel ou démonstration)."
+msgid "By showing all options, you can choose how long your session lasts before signing in again and create more than one account for a single app (e.g. work, personal, or demo)."
+msgstr "En affichant toutes les options, vous pouvez choisir la durée de votre session avant de vous reconnecter et créer plusieurs comptes pour une même application (par ex. travail, personnel ou démo)."
 
 msgid "Can't find your identity?"
 msgstr "Vous ne trouvez pas votre identité ?"
@@ -268,11 +328,14 @@ msgstr "Vérification..."
 msgid "Choose an account"
 msgstr "Choisissez un compte"
 
+msgid "Choose identity, currently {selectedIdentityLabel}"
+msgstr "Choisir une identité, actuellement {selectedIdentityLabel}"
+
 msgid "choose language to continue"
 msgstr "choisissez une langue pour continuer"
 
 msgid "Choose method"
-msgstr "Choisissez une méthode"
+msgstr "Choisir une méthode"
 
 msgid "Choose method to continue"
 msgstr "Choisissez une méthode pour continuer"
@@ -331,17 +394,26 @@ msgstr "Confirmé"
 msgid "Confirming..."
 msgstr "Confirmation en cours..."
 
+msgid "Connect {mcpServerHost}"
+msgstr "Connecter {mcpServerHost}"
+
 msgid "Connected"
 msgstr "Connecté"
+
+msgid "Connecting {mcpServer}…"
+msgstr "Connexion à {mcpServer}…"
 
 msgid "Connection closed"
 msgstr "Connexion fermée"
 
+msgid "Connection duration"
+msgstr "Durée de la connexion"
+
+msgid "Connector URL"
+msgstr "URL du connecteur"
+
 msgid "Continue"
 msgstr "Continuer"
-
-msgid "Continue on another device"
-msgstr "Continuer sur un autre appareil"
 
 msgid "Continue on your new device"
 msgstr "Continuer sur votre nouvel appareil"
@@ -379,6 +451,24 @@ msgstr "Copier l'objet"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Impossible de charger les paramètres SSO depuis {domainInput}. Demandez à votre administrateur SSO de vérifier que /.well-known/ii-openid-configuration est accessible."
 
+msgid "Couldn't load your AI access settings."
+msgstr "Impossible de charger vos paramètres d'accès IA."
+
+msgid "Couldn't remove the connector. Please try again."
+msgstr "Impossible de supprimer le connecteur. Veuillez réessayer."
+
+msgid "Couldn't save your change. Please try again."
+msgstr "Impossible d'enregistrer votre modification. Veuillez réessayer."
+
+msgid "Couldn't save your connector. Please try again."
+msgstr "Impossible d'enregistrer votre connecteur. Veuillez réessayer."
+
+msgid "Couldn't validate MCP support"
+msgstr "Impossible de valider la prise en charge MCP"
+
+msgid "Create"
+msgstr "Créer"
+
 msgid "Create account"
 msgstr "Créer un compte"
 
@@ -394,11 +484,17 @@ msgstr "Créer une identité"
 msgid "Create new identity"
 msgstr "Créer une nouvelle identité"
 
-msgid "Create one in seconds."
-msgstr "Créez-en une en quelques secondes."
-
 msgid "Create passkey"
 msgstr "Créer une passkey"
+
+msgid "Create with {name}"
+msgstr "Créer avec {name}"
+
+msgid "Create with passkey"
+msgstr "Créer avec une passkey"
+
+msgid "Create with SSO"
+msgstr "Créer avec SSO"
 
 msgid "Create your Identity"
 msgstr "Créez votre Identité"
@@ -436,6 +532,12 @@ msgstr "Actuellement connecté avec cet e-mail de récupération"
 msgid "Currently signed in with this recovery phrase"
 msgstr "Actuellement connecté avec cette phrase de récupération"
 
+msgid "Customize"
+msgstr "Personnaliser"
+
+msgid "Customize AI access"
+msgstr "Personnaliser l'accès IA"
+
 msgid "Default"
 msgstr "Par défaut"
 
@@ -447,6 +549,9 @@ msgstr "Passkeys découvrables"
 
 msgid "Do you want to continue?"
 msgstr "Voulez-vous continuer ?"
+
+msgid "Done"
+msgstr "Terminé"
 
 msgid "Double-check the subject line. It has to match the one above exactly."
 msgstr "Vérifiez bien la ligne d'objet. Elle doit correspondre exactement à celle indiquée ci-dessus."
@@ -472,6 +577,15 @@ msgstr "Modifier les identités"
 msgid "Email address"
 msgstr "Adresse e-mail"
 
+msgid "Email address removed"
+msgstr "Adresse e-mail supprimée"
+
+msgid "Email address verified"
+msgstr "Adresse e-mail vérifiée"
+
+msgid "Email addresses"
+msgstr "Adresses e-mail"
+
 msgid "Email:"
 msgstr "Adresse e-mail :"
 
@@ -481,23 +595,17 @@ msgstr "Activer l'accès CLI"
 msgid "Enable CLI access for this device, then try again."
 msgstr "Activez l'accès CLI pour cet appareil, puis réessayez."
 
-msgid "Enable MCP access"
-msgstr "Activer l'accès MCP"
+msgid "Enabled on all devices"
+msgstr "Activé sur tous les appareils"
 
-msgid "Enable MCP access for this device, then try again."
-msgstr "Activez l'accès MCP pour cet appareil, puis réessayez."
-
-msgid "Enable multiple accounts"
-msgstr "Activer plusieurs comptes"
-
-msgid "Enabled"
-msgstr "Activé"
-
-msgid "Enabling this lets AI assistants on this device ask to sign you in to apps using your identity."
-msgstr "En activant ceci, les assistants IA sur cet appareil pourront vous demander de vous connecter aux applications avec votre identité."
+msgid "Enabled on this device"
+msgstr "Activé sur cet appareil"
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr "Saisissez un nom pour votre identité afin de terminer la mise à niveau. Une fois défini, il ne pourra plus être modifié."
+
+msgid "Enter a valid https URL (for example https://mcp.example.com/mcp)."
+msgstr "Entrez une URL https valide (par exemple https://mcp.example.com/mcp)."
 
 msgid "Enter characters"
 msgstr "Saisissez les caractères"
@@ -509,7 +617,7 @@ msgid "Enter recovery phrase"
 msgstr "Saisir la phrase de récupération"
 
 msgid "Enter the code"
-msgstr "Saisir le code"
+msgstr "Saisissez le code"
 
 msgid "Enter your company domain"
 msgstr "Saisissez le domaine de votre entreprise"
@@ -539,17 +647,23 @@ msgstr "FAQ"
 msgid "Featured apps"
 msgstr "Applications en vedette"
 
+msgid "First sign-in with {name}"
+msgstr "Première connexion avec {name}"
+
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 msgstr "Par exemple, l’utilisateur A se connecte à Internet Identity avec son compte Google « A@gmail.com » puis utilise Internet Identity pour s’authentifier dans l’application Z. Google ne saura jamais que l’utilisateur est authentifié dans l’application Z, seulement qu’il l’est via Internet Identity. De plus, l’application Z ne saura jamais que l’utilisateur A a utilisé Google pour authentifier son identité Internet Identity."
 
 msgid "For security, Internet Identity blocks command-line tools from signing in to apps using your identity."
 msgstr "Pour des raisons de sécurité, Internet Identity empêche les outils de ligne de commande de se connecter aux applications en utilisant votre identité."
 
-msgid "For security, Internet Identity blocks MCP clients from signing in to apps using your identity."
-msgstr "Pour des raisons de sécurité, Internet Identity empêche les clients MCP de se connecter aux applications en utilisant votre identité."
+msgid "For security, Internet Identity only connects the MCP server you've set as trusted. Set this server in Settings, then try again."
+msgstr "Pour des raisons de sécurité, Internet Identity ne se connecte qu'au serveur MCP que vous avez défini comme approuvé. Configurez ce serveur dans les Paramètres, puis réessayez."
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in. Quick, safe, and hassle-free."
 msgstr "Oubliez les noms d'utilisateur et mots de passe compliqués. Avec les passkeys, il vous suffit de sélectionner votre nom pour vous connecter. Rapide, sûr et sans tracas."
+
+msgid "Forget this email?"
+msgstr "Oublier cet e-mail ?"
 
 msgid "From"
 msgstr "De"
@@ -603,7 +717,10 @@ msgid "Hold for a few seconds. Release to cancel."
 msgstr "Maintenez appuyé quelques secondes. Relâchez pour annuler."
 
 msgid "Hold to confirm"
-msgstr "Maintenir pour confirmer"
+msgstr "Maintenez pour confirmer"
+
+msgid "Hold to continue"
+msgstr "Maintenez pour continuer"
 
 msgid "Home"
 msgstr "Accueil"
@@ -629,9 +746,6 @@ msgstr "Je suis responsable de ma phrase de récupération et celle-ci ne peut �
 msgid "I have written it down"
 msgstr "Je l’ai notée"
 
-msgid "I understand the risks."
-msgstr "Je comprends les risques."
-
 msgid "I'm using the official ICP CLI and I trust this device."
 msgstr "J'utilise l'ICP CLI officiel et je fais confiance à cet appareil."
 
@@ -640,6 +754,9 @@ msgstr "J'ai envoyé l'e-mail"
 
 msgid "Identities on this device"
 msgstr "Identités sur cet appareil"
+
+msgid "Identity"
+msgstr "Identité"
 
 msgid "Identity already upgraded"
 msgstr "Identité déjà mise à niveau"
@@ -665,8 +782,11 @@ msgstr "Identité supprimée"
 msgid "Identity upgraded."
 msgstr "Identité mise à niveau."
 
+msgid "If nothing happens, you can return to your agent."
+msgstr "Si rien ne se passe, vous pouvez retourner à votre agent."
+
 msgid "If this keeps happening, copy these details and include them in a <0>support request</0>."
-msgstr "Si cela se reproduit, copiez ces informations et incluez-les dans une <0>demande d'assistance</0>."
+msgstr "Si cela continue, copiez ces détails et incluez-les dans une <0>demande d'assistance</0>."
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "Si vous administrez <0>{domain}</0>, l'activation du DNSSEC auprès de votre bureau d'enregistrement de domaine ne prend généralement que quelques clics. Une fois propagé, cette adresse fonctionnera automatiquement. Aucune action supplémentaire de notre part n'est nécessaire."
@@ -689,8 +809,14 @@ msgstr "Ordre des mots incorrect. Vérifiez et réessayez."
 msgid "Incorrect. Try again with the new code."
 msgstr "Incorrect. Réessayez avec le nouveau code."
 
+msgid "Info you can choose to share when an app requests it. Never shared without your consent."
+msgstr "Informations que vous pouvez choisir de partager lorsqu'une application le demande. Jamais partagées sans votre consentement."
+
 msgid "Interaction canceled. Please try again."
 msgstr "Interaction annulée. Veuillez réessayer."
+
+msgid "Internet Computer MCP"
+msgstr "Internet Computer MCP"
 
 msgid "Internet Identity"
 msgstr "Internet Identity"
@@ -737,9 +863,6 @@ msgstr "Requête invalide"
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Mes données Face ID ou d’empreinte digitale sont-elles stockées dans Internet Identity ?"
 
-msgid "It can send messages or move funds on your behalf."
-msgstr "Il peut envoyer des messages ou déplacer des fonds en votre nom."
-
 msgid "It looks like you're trying to sign in from a social app. Follow these steps to continue:"
 msgstr "Il semble que vous essayiez de vous connecter depuis une application sociale. Suivez ces étapes pour continuer :"
 
@@ -767,6 +890,9 @@ msgstr "Gardez-la secrète"
 msgid "Keep your access and recovery methods up to date."
 msgstr "Gardez vos méthodes d'accès et de récupération à jour."
 
+msgid "Keep your recovery email private and separate from emails you share with apps."
+msgstr "Gardez votre e-mail de récupération privé et séparé des adresses e-mail que vous partagez avec les applications."
+
 msgid "Kept on a physical key. Authenticate on supported devices via tap/insert."
 msgstr "Conservée sur une clé physique. Authentifiez-vous sur les appareils compatibles par toucher ou insertion."
 
@@ -788,20 +914,14 @@ msgstr "Ancienne"
 msgid "Legacy identity"
 msgstr "Identité héritée"
 
-msgid "Let {mcpServer} act as {accountScope}"
-msgstr "Laisser {mcpServer} agir en tant que {accountScope}"
-
-msgid "Let AI assistants on this device sign in to apps using your identity."
-msgstr "Permettez aux assistants IA sur cet appareil de se connecter aux applications avec votre identité."
+msgid "Let AI access your apps."
+msgstr "Laissez l'IA accéder à vos applications."
 
 msgid "Let command-line tools on this device sign in to apps using your identity."
 msgstr "Permettez aux outils de ligne de commande sur cet appareil de se connecter aux applications avec votre identité."
 
 msgid "Let's get started"
 msgstr "Commençons"
-
-msgid "Like any AI, it can hallucinate and make mistakes."
-msgstr "Comme toute IA, il peut halluciner et faire des erreurs."
 
 msgid "Limit reached"
 msgstr "Limite atteinte"
@@ -818,6 +938,9 @@ msgstr "Chargement des autorisations"
 msgid "Long-press the link that opened this page."
 msgstr "Appuyez longuement sur le lien qui a ouvert cette page."
 
+msgid "Looks things up, changing nothing."
+msgstr "Effectue des recherches, sans modifier quoi que ce soit."
+
 msgid "Lookup by passkey"
 msgstr "Recherche par passkey"
 
@@ -833,11 +956,17 @@ msgstr "Simplifiez l’inscription et la connexion avec Google, Apple ou Microso
 msgid "Make sure no one can see what's on your screen or what you are writing."
 msgstr "Assurez-vous que personne ne puisse voir ce qui s’affiche sur votre écran ou ce que vous écrivez."
 
+msgid "Make sure the URL is from a source you trust."
+msgstr "Assurez-vous que l'URL provient d'une source en laquelle vous avez confiance."
+
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Veillez à ajouter une nouvelle méthode d’accès afin de pouvoir vous connecter la prochaine fois ou réinitialiser votre phrase de récupération."
 
 msgid "Manage how other tools connect to your identity."
 msgstr "Gérez la façon dont les autres outils se connectent à votre identité."
+
+msgid "Manage trusted server"
+msgstr "Gérer le serveur approuvé"
 
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Gérez vos identités et gardez le contrôle de vos applications et sites web grâce à votre tableau de bord. Explorez les fonctionnalités Pro pour personnaliser et sécuriser davantage votre expérience."
@@ -851,26 +980,23 @@ msgstr "Gérez votre Identité"
 msgid "Manage your Internet Identity"
 msgstr "Gérer votre Internet Identity"
 
+msgid "Manage your shareable emails. These should be different from your recovery email."
+msgstr "Gérez vos adresses e-mail partageables. Elles doivent être différentes de votre e-mail de récupération."
+
 msgid "Maximum length is 32 characters."
 msgstr "La longueur maximale est de 32 caractères."
 
 msgid "Maximum length is 64 characters."
 msgstr "La longueur maximale est de 64 caractères."
 
-msgid "MCP access"
-msgstr "Accès MCP"
+msgid "MCP server URL"
+msgstr "URL du serveur MCP"
 
-msgid "MCP access not enabled"
-msgstr "Accès MCP non activé"
-
-msgid "More information about multiple accounts"
-msgstr "Plus d’informations sur les comptes multiples"
+msgid "More information about all options"
+msgstr "Plus d'informations sur toutes les options"
 
 msgid "More options"
 msgstr "Plus d’options"
-
-msgid "Multiple accounts"
-msgstr "Comptes multiples"
 
 msgid "My {application} account"
 msgstr "Mon compte {application}"
@@ -892,6 +1018,9 @@ msgstr "Nom :"
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Aucune donnée n’est partagée avec Google, Microsoft ou Apple concernant les applications auxquelles vous vous connectez avec Internet Identity."
+
+msgid "No emails yet"
+msgstr "Aucune adresse e-mail pour l'instant"
 
 msgid "No identity found"
 msgstr "Aucune identité trouvée"
@@ -917,11 +1046,17 @@ msgstr "Non mis à niveau"
 msgid "Not verified"
 msgstr "Non vérifié"
 
+msgid "Official · Hosted by DFINITY"
+msgstr "Officiel · Hébergé par DFINITY"
+
 msgid "Once enabled, any command-line tool on this device can use your identity to sign in to apps."
 msgstr "Une fois activé, tout outil de ligne de commande sur cet appareil peut utiliser votre identité pour se connecter aux applications."
 
 msgid "One or more words are wrong or out of order."
 msgstr "Un ou plusieurs mots sont incorrects ou dans le mauvais ordre."
+
+msgid "Only add trusted connectors"
+msgstr "N'ajoutez que des connecteurs approuvés"
 
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "N'activez ceci que pour l'<0>ICP CLI</0> officiel. En cas de doute, réinstallez-le depuis la <1>source officielle</1>."
@@ -943,6 +1078,12 @@ msgstr "Ouvrir la gestion"
 
 msgid "Open menu"
 msgstr "Ouvrir le menu"
+
+msgid "Open Settings"
+msgstr "Ouvrir les Paramètres"
+
+msgid "Open Settings in a new tab to set your trusted MCP server."
+msgstr "Ouvrez les Paramètres dans un nouvel onglet pour définir votre serveur MCP approuvé."
 
 msgid "Or sign in with another identity"
 msgstr "Ou se connecter avec une autre identité"
@@ -986,6 +1127,9 @@ msgstr "Les passkeys utilisent des clés cryptographiques stockées sur votre ap
 msgid "Password-free"
 msgstr "Sans mot de passe"
 
+msgid "Permissions"
+msgstr "Autorisations"
+
 msgid "Pick a recovery method below to sign back in."
 msgstr "Choisissez une méthode de récupération ci-dessous pour vous reconnecter."
 
@@ -995,11 +1139,23 @@ msgstr "Choisissez quelque chose de reconnaissable, comme votre nom"
 msgid "Please confirm"
 msgstr "Veuillez confirmer"
 
+msgid "Please consider adding a different email that you may want to share with apps."
+msgstr "Envisagez d'ajouter une adresse e-mail différente que vous pourriez vouloir partager avec des applications."
+
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Veuillez retourner sur votre <0>appareil existant</0> et sélectionner <1>Recommencer</1> pour réessayer."
 
+msgid "Please sign in again to continue."
+msgstr "Veuillez vous reconnecter pour continuer."
+
 msgid "Powered by"
 msgstr "Propulsé par"
+
+msgid "Questions only"
+msgstr "Questions uniquement"
+
+msgid "Reachable MCP server"
+msgstr "Serveur MCP accessible"
 
 msgid "Real privacy"
 msgstr "Vraie confidentialité"
@@ -1043,6 +1199,9 @@ msgstr "Phrase de récupération définie"
 msgid "Remove"
 msgstr "Supprimer"
 
+msgid "Remove {0}"
+msgstr "Supprimer {0}"
+
 msgid "Remove and sign out"
 msgstr "Supprimer et se déconnecter"
 
@@ -1058,6 +1217,9 @@ msgstr "Supprimez les identités que vous n’utilisez pas. Vous pouvez les rajo
 msgid "Remove recovery email?"
 msgstr "Supprimer l'e-mail de récupération ?"
 
+msgid "Remove the connector to revoke AI access."
+msgstr "Supprimez le connecteur pour révoquer l'accès IA."
+
 msgid "Removing and signing out..."
 msgstr "Suppression et déconnexion..."
 
@@ -1069,6 +1231,9 @@ msgstr "Suppression de la passkey..."
 
 msgid "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later."
 msgstr "Supprimer cette passkey signifie que vous ne pourrez plus l’utiliser pour vous connecter. Vous pourrez toujours en ajouter une nouvelle plus tard."
+
+msgid "Removing…"
+msgstr "Suppression en cours…"
 
 msgid "Rename"
 msgstr "Renommer"
@@ -1106,6 +1271,9 @@ msgstr "Réinitialisation de la phrase de récupération..."
 msgid "Resetting will invalidate your current recovery phrase, leaving only the new one usable."
 msgstr "La réinitialisation invalidera votre phrase de récupération actuelle, seule la nouvelle sera utilisable."
 
+msgid "Restore default"
+msgstr "Restaurer les paramètres par défaut"
+
 msgid "Retry"
 msgstr "Réessayer"
 
@@ -1115,11 +1283,14 @@ msgstr "Retour à l’application"
 msgid "Return to application"
 msgstr "Retour à l’application"
 
-msgid "Return to your MCP client and try again. You can close this window."
-msgstr "Retournez à votre client MCP et réessayez. Vous pouvez fermer cette fenêtre."
-
 msgid "Review permissions"
 msgstr "Vérifier les autorisations"
+
+msgid "Revoke access anytime"
+msgstr "Révoquer l'accès à tout moment"
+
+msgid "Revoke access anytime in your <0>settings</0>."
+msgstr "Révoquez l'accès à tout moment dans vos <0>paramètres</0>."
 
 msgid "Right now"
 msgstr "À l’instant"
@@ -1142,8 +1313,14 @@ msgstr "Scannez le code QR ci‑dessus avec votre <0>nouvel appareil</0> ou sais
 msgid "Seamless access"
 msgstr "Accès transparent"
 
+msgid "Securely connecting your identity to the server."
+msgstr "Connexion sécurisée de votre identité au serveur."
+
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Sélectionnez <0>Ouvrir dans Safari</0> ou <1>Ouvrir dans Chrome</1>."
+
+msgid "Select a passkey"
+msgstr "Sélectionner une passkey"
 
 msgid "Select each word in the correct order:"
 msgstr "Sélectionnez chaque mot dans le bon ordre :"
@@ -1153,6 +1330,9 @@ msgstr "Envoyez un e-mail depuis votre boîte de réception."
 
 msgid "Send the email below to confirm."
 msgstr "Envoyez l'e-mail ci-dessous pour confirmer."
+
+msgid "Session duration"
+msgstr "Durée de la session"
 
 msgid "Session timed out"
 msgstr "Session expirée"
@@ -1167,7 +1347,7 @@ msgid "Set up recovery phrase"
 msgstr "Configurer la phrase de récupération"
 
 msgid "Set up your private, passwordless identity."
-msgstr "Configurez votre identité privée sans mot de passe."
+msgstr "Configurez votre identité privée et sans mot de passe."
 
 msgid "Settings"
 msgstr "Paramètres"
@@ -1175,8 +1355,14 @@ msgstr "Paramètres"
 msgid "Share {label}"
 msgstr "Partager {label}"
 
+msgid "Shareable info"
+msgstr "Informations partageables"
+
 msgid "Show all"
 msgstr "Tout afficher"
+
+msgid "Show all options"
+msgstr "Afficher toutes les options"
 
 msgid "Sign in"
 msgstr "Se connecter"
@@ -1184,8 +1370,8 @@ msgstr "Se connecter"
 msgid "Sign in again to continue where you left off."
 msgstr "Reconnectez-vous pour reprendre là où vous vous étiez arrêté."
 
-msgid "Sign in by sending a signed email from your inbox."
-msgstr "Connectez-vous en envoyant un e-mail signé depuis votre boîte de réception."
+msgid "Sign in by sending an email from your inbox."
+msgstr "Connectez-vous en envoyant un e-mail depuis votre boîte de réception."
 
 msgid "Sign in there."
 msgstr "Se connecter ici."
@@ -1235,17 +1421,11 @@ msgstr "Se déconnecter pour supprimer"
 msgid "Sign up"
 msgstr "S'inscrire"
 
-msgid "Sign up with {name}"
-msgstr "S'inscrire avec {name}"
-
-msgid "Sign up with passkey"
-msgstr "S'inscrire avec une passkey"
-
-msgid "Sign up with SSO"
-msgstr "S'inscrire avec SSO"
-
 msgid "Sign-in"
 msgstr "Connexion"
+
+msgid "Sign-in could not be completed"
+msgstr "La connexion n'a pas pu être complétée"
 
 msgid "Sign-up"
 msgstr "Inscription"
@@ -1265,6 +1445,9 @@ msgstr "Connexion..."
 msgid "Simplify your sign-in"
 msgstr "Simplifiez votre connexion"
 
+msgid "Skip for now"
+msgstr "Ignorer pour l'instant"
+
 msgid "Some mail providers queue outgoing mail. Check your sent folder to make sure it actually went out."
 msgstr "Certains fournisseurs de messagerie placent les e-mails sortants en file d'attente. Vérifiez votre dossier « Envoyés » pour vous assurer qu'il a bien été envoyé."
 
@@ -1281,14 +1464,14 @@ msgstr "Une erreur est survenue lors de la création de votre délégation. Veui
 msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
 msgstr "Une erreur est survenue lors du partage des attributs. Veuillez réessayer ; si le problème persiste, contactez le support."
 
+msgid "Something went wrong while signing in with your provider. Close this window and try again."
+msgstr "Une erreur s'est produite lors de la connexion avec votre fournisseur. Fermez cette fenêtre et réessayez."
+
 msgid "Source code"
 msgstr "Code source"
 
 msgid "SSO"
 msgstr "SSO"
-
-msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
-msgstr "Le SSO n’est pas encore disponible pour « {domainInput} ». Demandez à un administrateur II d’enregistrer ce domaine."
 
 msgid "SSO sign-in for {domainInput} failed. Please try again."
 msgstr "La connexion SSO pour {domainInput} a échoué. Veuillez réessayer."
@@ -1365,6 +1548,9 @@ msgstr "Passez à une autre méthode avant de dissocier"
 msgid "Switching..."
 msgstr "Changement en cours..."
 
+msgid "Taking you to the server to finish connecting…"
+msgstr "Connexion au serveur pour terminer la configuration…"
+
 msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
 msgstr "Touchez la <0>barre d’adresse</0> puis <1>ouvrir dans le navigateur</1>."
 
@@ -1383,20 +1569,23 @@ msgstr "Tester la connexion"
 msgid "That identity doesn't match"
 msgstr "Cette identité ne correspond pas"
 
+msgid "That's the official connector. No need to customize."
+msgstr "C'est le connecteur officiel. Pas besoin de personnaliser."
+
 msgid "The <0>existing device</0> is preparing to continue."
 msgstr "L’<0>appareil existant</0> se prépare à continuer."
 
 msgid "The <0>new device</0> is preparing to continue."
 msgstr "Le <0>nouvel appareil</0> se prépare à continuer."
 
-msgid "The CLI gets full access to your account in this app."
-msgstr "Le CLI obtient un accès complet à votre compte dans cette application."
-
 msgid "The CLI gets its own account, separate from your other apps."
 msgstr "Le CLI obtient son propre compte, distinct de vos autres applications."
 
 msgid "The CLI sign-in couldn't be completed. Check the CLI for details."
 msgstr "La connexion CLI n'a pas pu être complétée. Vérifiez le CLI pour plus de détails."
+
+msgid "The CLI uses your account in this app."
+msgstr "Le CLI utilise votre compte dans cette application."
 
 msgid "The DNSSEC zone must use a current algorithm — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms aren't supported."
 msgstr "La zone DNSSEC doit utiliser un algorithme actuel — RSA/SHA-256, RSA/SHA-512, ECDSA P-256 ou Ed25519. Les algorithmes SHA-1 obsolètes ne sont pas pris en charge."
@@ -1406,9 +1595,6 @@ msgstr "L'e-mail doit provenir directement de l'adresse indiquée ci-dessus. Les
 
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "L’intégration avec Google, Microsoft et Apple utilise un protocole d’authentification standard appelé OpenID. C’est le même protocole que d’autres applications utilisent pour se connecter avec Google."
-
-msgid "The MCP client couldn't finish connecting."
-msgstr "Le client MCP n'a pas pu terminer la connexion."
 
 msgid "The most reliable backup. Stored entirely by you, on paper. It does not depend on any account, service, or provider, and only you can use, lose, or replace it."
 msgstr "La sauvegarde la plus fiable. Conservée entièrement par vous, sur papier. Elle ne dépend d'aucun compte, service ou fournisseur, et vous seul pouvez l'utiliser, la perdre ou la remplacer."
@@ -1431,14 +1617,26 @@ msgstr "Ce compte est déjà associé à votre identité. Votre méthode d'accè
 msgid "This app has moved to the new Internet Identity"
 msgstr "Cette application est passée à la nouvelle Internet Identity"
 
+msgid "This app is requesting your email address. You can verify your email address now and share it, or skip and continue without sharing."
+msgstr "Cette application demande votre adresse e-mail. Vous pouvez vérifier votre adresse e-mail maintenant et la partager, ou ignorer et continuer sans partager."
+
 msgid "This browser is not supported."
 msgstr "Ce navigateur n’est pas pris en charge."
 
 msgid "This connection link is missing information or has been changed."
-msgstr "Ce lien de connexion manque d'informations ou a été modifié."
+msgstr "Ce lien de connexion est incomplet ou a été modifié."
+
+msgid "This doesn't look like a valid email address."
+msgstr "Cela ne ressemble pas à une adresse e-mail valide."
+
+msgid "This email is already linked through an OpenID provider."
+msgstr "Cette adresse e-mail est déjà liée via un fournisseur OpenID."
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Cette identité a déjà été mise à niveau vers la nouvelle expérience."
+
+msgid "This is already your recovery email."
+msgstr "C'est déjà votre e-mail de récupération."
 
 msgid "This is now the default method used to authenticate moving forward on this device."
 msgstr "C'est désormais la méthode par défaut utilisée pour s'authentifier sur cet appareil."
@@ -1455,6 +1653,9 @@ msgstr "Cette ancienne passkey n’est plus utilisable et doit être supprimée.
 msgid "This may take a few seconds"
 msgstr "Cela peut prendre quelques secondes"
 
+msgid "This MCP server isn't trusted yet"
+msgstr "Ce serveur MCP n'est pas encore approuvé"
+
 msgid "This passkey is no longer associated with any identity."
 msgstr "Cette passkey n’est plus associée à aucune identité."
 
@@ -1470,17 +1671,20 @@ msgstr "Cela prend généralement moins de 30 secondes."
 msgid "This will become the default method used to authenticate on this device moving forward."
 msgstr "Cela deviendra la méthode par défaut utilisée pour s'authentifier sur cet appareil."
 
+msgid "Time until you have to reconnect:"
+msgstr "Temps avant de devoir vous reconnecter :"
+
 msgid "To"
 msgstr "À"
 
 msgid "To accept email from a domain we either need DNSSEC at its apex (so we can cryptographically validate the DKIM key your provider uses) or for the domain to be on our list of known mailbox providers."
 msgstr "Pour accepter les e-mails d'un domaine, nous avons besoin soit du DNSSEC à son sommet (pour valider cryptographiquement la clé DKIM utilisée par votre fournisseur), soit que le domaine figure sur notre liste de fournisseurs de messagerie reconnus."
 
-msgid "to allow MCP access to {0}"
-msgstr "pour autoriser l'accès MCP à {0}"
-
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "Pour confirmer votre identité, saisissez le code ci‑dessous sur votre <0>appareil existant</0>."
+
+msgid "to connect {0}"
+msgstr "pour connecter {0}"
 
 msgid "to continue to {dappName}"
 msgstr "pour continuer vers {dappName}"
@@ -1493,6 +1697,12 @@ msgstr "Pour continuer :"
 
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "Pour terminer la configuration de votre passkey, suivez les instructions affichées sur votre <0>nouvel appareil</0>."
+
+msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
+msgstr "Pour permettre à l'IA de poser des questions et d'effectuer des actions dans vos applications, ajoutez un <0>connecteur MCP</0> en lequel vous avez confiance."
+
+msgid "Trusted connector"
+msgstr "Connecteur approuvé"
 
 msgid "Try a different address"
 msgstr "Essayez une adresse différente"
@@ -1509,11 +1719,11 @@ msgstr "Saisissez le code à 6 chiffres affiché sur le nouvel appareil."
 msgid "Type the characters exactly as shown below"
 msgstr "Tapez les caractères exactement comme indiqué ci‑dessous"
 
-msgid "Type the email address you registered as your recovery method. We'll ask you to send a signed email from this inbox to confirm."
-msgstr "Saisissez l'adresse e-mail que vous avez enregistrée comme méthode de récupération. Nous vous demanderons d'envoyer un e-mail signé depuis cette boîte de réception pour confirmer."
+msgid "Type the email address you registered as your recovery method. We'll ask you to send an email from this inbox to confirm."
+msgstr "Saisissez l'adresse e-mail que vous avez enregistrée comme méthode de récupération. Nous vous demanderons d'envoyer un e-mail depuis cette boîte de réception pour confirmer."
 
-msgid "Type the email address you want to use to recover this Internet Identity. We'll ask you to send a signed email from this inbox to confirm."
-msgstr "Saisissez l'adresse e-mail que vous souhaitez utiliser pour récupérer cette Internet Identity. Nous vous demanderons d'envoyer un e-mail signé depuis cette boîte de réception pour confirmer."
+msgid "Type the email address you want to use to recover this Internet Identity. We'll ask you to send an email from this inbox to confirm."
+msgstr "Saisissez l'adresse e-mail que vous souhaitez utiliser pour récupérer cette Internet Identity. Nous vous demanderons d'envoyer un e-mail depuis cette boîte de réception pour confirmer."
 
 msgid "Type your 24 recovery words."
 msgstr "Saisissez vos 24 mots de récupération."
@@ -1557,6 +1767,9 @@ msgstr "Déverrouiller pour continuer"
 msgid "Unsupported browser"
 msgstr "Navigateur non pris en charge"
 
+msgid "until you have to sign in again"
+msgstr "avant de devoir vous reconnecter"
+
 msgid "Unverified origin"
 msgstr "Origine non vérifiée"
 
@@ -1581,14 +1794,17 @@ msgstr "Mettre à niveau votre identité"
 msgid "Upgrading identity..."
 msgstr "Mise à niveau de l’identité..."
 
-msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
-msgstr "Utilisez un appareil qui contient déjà votre identité pour scanner ou ouvrir l’URL. Cela liera votre identité à cet appareil."
+msgid "URL | QR Code"
+msgstr "URL | Code QR"
+
+msgid "Use a device that already holds your identity to scan or open the URL. This will add your identity to this device."
+msgstr "Utilisez un appareil qui contient déjà votre identité pour scanner ou ouvrir l'URL. Cela ajoutera votre identité à cet appareil."
 
 msgid "Use a different method"
-msgstr "Utiliser une autre méthode"
+msgstr "Utiliser une méthode différente"
 
 msgid "Use a passkey or familiar provider."
-msgstr "Utilisez un Passkey ou un fournisseur habituel."
+msgstr "Utilisez une passkey ou un fournisseur familier."
 
 msgid "Use existing identity"
 msgstr "Utiliser une identité existante"
@@ -1596,11 +1812,23 @@ msgstr "Utiliser une identité existante"
 msgid "Use these to regain access to your identity if you ever lose it."
 msgstr "Utilisez-les pour récupérer l'accès à votre identité si vous venez à le perdre."
 
+msgid "Using a shareable email isn't recommended"
+msgstr "L'utilisation d'une adresse e-mail partageable n'est pas recommandée"
+
 msgid "Verification failed"
 msgstr "Échec de la vérification"
 
+msgid "Verified"
+msgstr "Vérifié"
+
+msgid "Verified email"
+msgstr "Adresse e-mail vérifiée"
+
 msgid "Verify"
 msgstr "Vérifier"
+
+msgid "Verify an email address"
+msgstr "Vérifier une adresse e-mail"
 
 msgid "Verify recovery phrase"
 msgstr "Vérifier la phrase de récupération"
@@ -1613,6 +1841,9 @@ msgstr "Vérifier que vous êtes humain"
 
 msgid "Verify your email"
 msgstr "Vérifiez votre e-mail"
+
+msgid "Verify your email address"
+msgstr "Vérifiez votre adresse e-mail"
 
 msgid "Verify your recovery phrase"
 msgstr "Vérifiez votre phrase de récupération"
@@ -1635,14 +1866,17 @@ msgstr "En attente de votre nouvel appareil"
 msgid "Waiting to receive…"
 msgstr "En attente de réception…"
 
-msgid "Want a new identity?"
-msgstr "Vous voulez une nouvelle identité ?"
-
 msgid "We can't verify mail from <0>{domain}</0> yet. Try a different address. Gmail, iCloud, Outlook, Fastmail, and Proton all work."
 msgstr "Nous ne pouvons pas encore vérifier les e-mails provenant de <0>{domain}</0>. Essayez une adresse différente. Gmail, iCloud, Outlook, Fastmail et Proton fonctionnent tous."
 
+msgid "We couldn't validate MCP support at this URL, but you can still trust it."
+msgstr "Nous n'avons pas pu valider la prise en charge MCP à cette URL, mais vous pouvez quand même lui faire confiance."
+
 msgid "We didn't recognize that activation code."
 msgstr "Nous n’avons pas reconnu ce code d’activation."
+
+msgid "We'll ask you to send an email from this inbox to confirm."
+msgstr "Nous vous demanderons d'envoyer un e-mail depuis cette boîte de réception pour confirmer."
 
 msgid "Welcome, <0>{name}</0>."
 msgstr "Bienvenue, <0>{name}</0>."
@@ -1673,9 +1907,6 @@ msgstr "Pourquoi est-ce que je vois ceci ?"
 
 msgid "Why isn't this supported?"
 msgstr "Pourquoi cela n'est-il pas pris en charge ?"
-
-msgid "With passkeys, you can now use your fingerprint, face, or screen lock to quickly and securely confirm it’s really you."
-msgstr "Avec les passkeys, vous pouvez désormais utiliser votre empreinte digitale, votre visage ou le verrouillage de votre écran pour confirmer rapidement et en toute sécurité qu’il s’agit bien de vous."
 
 msgid "with your identity in this app"
 msgstr "avec votre identité dans cette application"
@@ -1734,6 +1965,9 @@ msgstr "Vous pouvez gérer vos méthodes d'accès sur cette page."
 msgid "You can reset your recovery phrase at any time. This keeps your identity secure if it is ever exposed."
 msgstr "Vous pouvez réinitialiser votre phrase de récupération à tout moment. Cela permet de protèger votre identité si elle venait à être divulguée."
 
+msgid "You can return to your agent."
+msgstr "Vous pouvez retourner à votre agent."
+
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
 msgstr "Vous pouvez l'utiliser dès maintenant pour récupérer votre accès, mais vérifiez que vous l'avez bien sauvegardée correctement afin de pouvoir vous y fier par la suite."
 
@@ -1779,14 +2013,20 @@ msgstr "Vous êtes connecté"
 msgid "You're signing in as <0>{name}</0>."
 msgstr "Vous vous connectez en tant que <0>{name}</0>."
 
+msgid "You've already verified this email."
+msgstr "Vous avez déjà vérifié cette adresse e-mail."
+
 msgid "You've never used this {resolvedProviderName} account with Internet Identity."
 msgstr "Vous n'avez jamais utilisé ce compte {resolvedProviderName} avec Internet Identity."
 
-msgid "your {0} account"
-msgstr "votre compte {0}"
+msgid "You've reached the limit of {capacity} verified emails. Remove one before adding another."
+msgstr "Vous avez atteint la limite de {capacity} adresses e-mail vérifiées. Supprimez-en une avant d'en ajouter une autre."
 
-msgid "your account on {app}"
-msgstr "votre compte sur {app}"
+msgid "You've reached the limit of {limit} verified emails. Remove one to add another."
+msgstr "Vous avez atteint la limite de {limit} adresses e-mail vérifiées. Supprimez-en une pour en ajouter une autre."
+
+msgid "Your organization hasn't granted this app access via {domainInput}."
+msgstr "Votre organisation n'a pas accordé à cette application l'accès via {domainInput}."
 
 msgid "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
 msgstr "Vos passkeys et votre phrase de récupération ne sont pas affectées. Vous pouvez ajouter à nouveau un e-mail de récupération à tout moment."

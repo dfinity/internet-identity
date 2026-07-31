@@ -22,6 +22,12 @@ msgstr "{0} логотип"
 msgid "{0} user"
 msgstr "{0} пользователь"
 
+msgid "{address} has been associated with your Internet Identity."
+msgstr "{address} был привязан к вашей учётной записи Internet Identity."
+
+msgid "{address} is no longer associated with your Internet Identity."
+msgstr "{address} больше не связан с вашей учётной записью Internet Identity."
+
 msgid "{address} is now a recovery method."
 msgstr "{address} теперь является методом восстановления."
 
@@ -31,14 +37,11 @@ msgstr "приложение {application} переехало на новую в
 msgid "{attribute}:"
 msgstr "{attribute}:"
 
+msgid "{count} of {capacity} verified emails"
+msgstr "{count} из {capacity} подтверждённых email-адресов"
+
 msgid "{displayName} account"
 msgstr "Аккаунт {displayName}"
-
-msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
-msgstr "Домен {domainInput} не опубликовал /.well-known/ii-openid-configuration (HTTP {0})."
-
-msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
-msgstr "Файл /.well-known/ii-openid-configuration домена {domainInput} имеет неверный формат."
 
 msgid "{domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type \"id_token code\"."
 msgstr "SSO-приложение домена {domainInput} не поддерживает гибридный OAuth-поток, необходимый II. Попросите администратора SSO включить response_type «id_token code»."
@@ -70,8 +73,17 @@ msgstr "Email {providerName}:"
 msgid "{providerName} name:"
 msgstr "Имя {providerName}:"
 
+msgid "<0>{address}</0> has been associated with your Internet Identity."
+msgstr "<0>{address}</0> был привязан к вашей учётной записи Internet Identity."
+
+msgid "<0>{address}</0> is now your recovery email."
+msgstr "<0>{address}</0> теперь является вашим резервным email."
+
 msgid "<0>{address}</0> will no longer be able to sign in to your identity."
 msgstr "<0>{address}</0> больше не сможет выполнять вход в вашу учётную запись."
+
+msgid "<0>{address}</0> will no longer be associated with your Internet Identity."
+msgstr "<0>{address}</0> больше не будет связан с вашей учётной записью Internet Identity."
 
 msgid "<0>Completely redesigned interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Полностью переработанный интерфейс:</0> Мы обновили Internet Identity, придав ему современный и свежий облик. Новый дизайн интуитивно понятен и удобен в навигации, обеспечивая более плавный пользовательский опыт."
@@ -87,6 +99,24 @@ msgstr "<0>Больше никаких номеров учётной запис�
 
 msgid "<0>Seamless passkey integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Бесшовная интеграция Passkeys:</0> Мы по-прежнему делаем ставку на Passkeys как на будущее безопасной аутентификации. Internet Identity 2.0 использует новейшие стандарты ключей доступа для повышения безопасности и удобства использования."
+
+msgid "1 day"
+msgstr "1 день"
+
+msgid "1 hour"
+msgstr "1 час"
+
+msgid "1 week"
+msgstr "1 неделя"
+
+msgid "10 minutes"
+msgstr "10 минут"
+
+msgid "30 days"
+msgstr "30 дней"
+
+msgid "8 hours"
+msgstr "8 часов"
 
 msgid "A 24-word phrase you write down and keep offline."
 msgstr "Фраза из 24 слов, которую вы записываете и храните офлайн."
@@ -106,6 +136,9 @@ msgstr "Способы доступа"
 msgid "Account name"
 msgstr "Имя аккаунта"
 
+msgid "Actions & questions"
+msgstr "Действия и вопросы"
+
 msgid "Activate"
 msgstr "Активировать"
 
@@ -124,20 +157,23 @@ msgstr "Активирован"
 msgid "Active"
 msgstr "Активный"
 
-msgid "Add a new identity"
-msgstr "Добавить новую учётную запись"
-
-msgid "Add a passkey"
-msgstr "Добавить ключ доступа"
-
 msgid "Add a recovery email"
 msgstr "Добавить резервный email"
 
 msgid "Add access method"
 msgstr "Добавить способ доступа"
 
+msgid "Add AI access"
+msgstr "Добавить доступ AI"
+
+msgid "Add an email"
+msgstr "Добавить email"
+
 msgid "Add another account"
 msgstr "Добавить другой аккаунт"
+
+msgid "Add another email"
+msgstr "Добавить другой email"
 
 msgid "Add another method or sign in via recovery to remove"
 msgstr "Добавьте другой метод или войдите через восстановление, чтобы удалить"
@@ -145,14 +181,17 @@ msgstr "Добавьте другой метод или войдите чере�
 msgid "Add another method or sign in via recovery to unlink"
 msgstr "Добавьте другой метод или войдите через восстановление, чтобы отключить"
 
-msgid "Add another passkey"
-msgstr "Добавить другой ключ доступа"
-
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Добавьте еще один способ входа с помощью ключа доступа или стороннего аккаунта для безопасного доступа."
 
+msgid "Add existing identity"
+msgstr "Добавить существующую учётную запись"
+
 msgid "Add identity"
 msgstr "Добавить учётную запись"
+
+msgid "Add identity from another device"
+msgstr "Добавить учётную запись с другого устройства"
 
 msgid "Add new"
 msgstr "Добавить новый способ"
@@ -160,20 +199,29 @@ msgstr "Добавить новый способ"
 msgid "Add or remove the ways you can sign in with your identity."
 msgstr "Добавляйте или удаляйте способы входа."
 
+msgid "Add this identity to another device"
+msgstr "Добавить эту учётную запись на другое устройство"
+
+msgid "Added by you"
+msgstr "Добавлено вами"
+
+msgid "Added by you · Replaces the official connector"
+msgstr "Добавлено вами · Заменяет официальный коннектор"
+
 msgid "Advanced identity management"
 msgstr "Контроль над доступом"
 
-msgid "AI assistants on this device can ask to sign you in to apps."
-msgstr "Ассистенты AI на этом устройстве могут запрашивать вход в приложения от вашего имени."
+msgid "AI access"
+msgstr "Доступ AI"
+
+msgid "All options"
+msgstr "Все параметры"
 
 msgid "Allow access"
 msgstr "Разрешить доступ"
 
 msgid "Allow CLI access"
 msgstr "Разрешить доступ CLI"
-
-msgid "Allow MCP access"
-msgstr "Разрешить доступ MCP"
 
 msgid "Allow to access this info"
 msgstr "Разрешить доступ к этим данным"
@@ -190,6 +238,9 @@ msgstr "Уже есть учётная запись?"
 msgid "Already signed-in"
 msgstr "Вы уже вошли"
 
+msgid "Also makes changes on your behalf."
+msgstr "Также вносит изменения от вашего имени."
+
 msgid "Are you sure?"
 msgstr "Вы уверены?"
 
@@ -198,6 +249,12 @@ msgstr "Поскольку вы в данный момент вошли с по�
 
 msgid "As you are currently signed in with this access method, you will be signed out immediately after unlinking."
 msgstr "Поскольку вы в данный момент вошли с помощью этого метода доступа, вы будете немедленно выведены из системы после его отключения."
+
+msgid "Ask questions and perform actions across your apps by chatting with AI."
+msgstr "Задавайте вопросы и выполняйте действия в ваших приложениях через чат с AI."
+
+msgid "Associate an email address with your Internet Identity"
+msgstr "Привязать адрес электронной почты к вашей учётной записи Internet Identity"
 
 msgid "Attribute sharing failed"
 msgstr "Не удалось передать атрибуты"
@@ -214,6 +271,9 @@ msgstr "Аутентификация прошла успешно"
 msgid "Authorize new device"
 msgstr "Авторизовать новое устройство"
 
+msgid "Available accounts"
+msgstr "Доступные аккаунты"
+
 msgid "Back"
 msgstr "Назад"
 
@@ -227,13 +287,13 @@ msgid "Body"
 msgstr "Тело письма"
 
 msgid "Both are on the <0>{host}</0> domain."
-msgstr "Оба находятся в домене <0>{host}</0>."
+msgstr "Оба находятся на домене <0>{host}</0>."
 
 msgid "Browser opened"
 msgstr "Браузер открыт"
 
-msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
-msgstr "Включив эту функцию, вы сможете создавать несколько аккаунтов для одного приложения и легко переключаться между ними (например, рабочий, личный или демонстрационный)."
+msgid "By showing all options, you can choose how long your session lasts before signing in again and create more than one account for a single app (e.g. work, personal, or demo)."
+msgstr "Показывая все параметры, вы можете выбрать, как долго длится сессия до следующего входа, и создать несколько аккаунтов для одного приложения (например, рабочий, личный или демо)."
 
 msgid "Can't find your identity?"
 msgstr "Не получилось зайти?"
@@ -268,11 +328,14 @@ msgstr "Проверка..."
 msgid "Choose an account"
 msgstr "Выберите аккаунт"
 
+msgid "Choose identity, currently {selectedIdentityLabel}"
+msgstr "Выбрать учётную запись, текущая: {selectedIdentityLabel}"
+
 msgid "choose language to continue"
 msgstr "выберите язык для продолжения"
 
 msgid "Choose method"
-msgstr "Выберите способ"
+msgstr "Выберите метод"
 
 msgid "Choose method to continue"
 msgstr "Выберите способ входа"
@@ -331,17 +394,26 @@ msgstr "Подтверждено"
 msgid "Confirming..."
 msgstr "Подтверждение..."
 
+msgid "Connect {mcpServerHost}"
+msgstr "Подключить {mcpServerHost}"
+
 msgid "Connected"
 msgstr "Подключён"
+
+msgid "Connecting {mcpServer}…"
+msgstr "Подключение {mcpServer}…"
 
 msgid "Connection closed"
 msgstr "Соединение закрыто"
 
+msgid "Connection duration"
+msgstr "Продолжительность соединения"
+
+msgid "Connector URL"
+msgstr "URL коннектора"
+
 msgid "Continue"
 msgstr "Продолжить"
-
-msgid "Continue on another device"
-msgstr "Продолжить на другом устройстве"
 
 msgid "Continue on your new device"
 msgstr "Продолжить на вашем новом устройстве"
@@ -379,6 +451,24 @@ msgstr "Скопировать тему"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Не удалось загрузить настройки SSO с {domainInput}. Попросите вашего администратора SSO убедиться, что /.well-known/ii-openid-configuration доступен."
 
+msgid "Couldn't load your AI access settings."
+msgstr "Не удалось загрузить настройки доступа AI."
+
+msgid "Couldn't remove the connector. Please try again."
+msgstr "Не удалось удалить коннектор. Пожалуйста, попробуйте снова."
+
+msgid "Couldn't save your change. Please try again."
+msgstr "Не удалось сохранить изменение. Пожалуйста, попробуйте снова."
+
+msgid "Couldn't save your connector. Please try again."
+msgstr "Не удалось сохранить коннектор. Пожалуйста, попробуйте снова."
+
+msgid "Couldn't validate MCP support"
+msgstr "Не удалось проверить поддержку MCP"
+
+msgid "Create"
+msgstr "Создать"
+
 msgid "Create account"
 msgstr "Создать аккаунт"
 
@@ -394,11 +484,17 @@ msgstr "Создать"
 msgid "Create new identity"
 msgstr "Создать ключ доступа"
 
-msgid "Create one in seconds."
-msgstr "Создайте её за несколько секунд."
-
 msgid "Create passkey"
 msgstr "Создать ключ доступа"
+
+msgid "Create with {name}"
+msgstr "Создать с {name}"
+
+msgid "Create with passkey"
+msgstr "Создать с ключом доступа"
+
+msgid "Create with SSO"
+msgstr "Создать через SSO"
 
 msgid "Create your Identity"
 msgstr "Создайте свою учётную запись"
@@ -436,6 +532,12 @@ msgstr "В данный момент вошли с этим резервным e
 msgid "Currently signed in with this recovery phrase"
 msgstr "В данный момент вошли с этой резервной фразой"
 
+msgid "Customize"
+msgstr "Настроить"
+
+msgid "Customize AI access"
+msgstr "Настроить доступ AI"
+
 msgid "Default"
 msgstr "По умолчанию"
 
@@ -447,6 +549,9 @@ msgstr "Вход без паролей"
 
 msgid "Do you want to continue?"
 msgstr "Хотите продолжить?"
+
+msgid "Done"
+msgstr "Готово"
 
 msgid "Double-check the subject line. It has to match the one above exactly."
 msgstr "Проверьте тему письма. Она должна точно совпадать с указанной выше."
@@ -472,6 +577,15 @@ msgstr "Управление учётными записями"
 msgid "Email address"
 msgstr "Адрес электронной почты"
 
+msgid "Email address removed"
+msgstr "Адрес электронной почты удалён"
+
+msgid "Email address verified"
+msgstr "Адрес электронной почты подтверждён"
+
+msgid "Email addresses"
+msgstr "Адреса электронной почты"
+
 msgid "Email:"
 msgstr "Email:"
 
@@ -481,23 +595,17 @@ msgstr "Включить доступ CLI"
 msgid "Enable CLI access for this device, then try again."
 msgstr "Включите доступ CLI для этого устройства и попробуйте снова."
 
-msgid "Enable MCP access"
-msgstr "Включить доступ MCP"
+msgid "Enabled on all devices"
+msgstr "Включено на всех устройствах"
 
-msgid "Enable MCP access for this device, then try again."
-msgstr "Включите доступ MCP для этого устройства, затем повторите попытку."
-
-msgid "Enable multiple accounts"
-msgstr "Включить несколько аккаунтов"
-
-msgid "Enabled"
-msgstr "Включено"
-
-msgid "Enabling this lets AI assistants on this device ask to sign you in to apps using your identity."
-msgstr "Включение этой опции позволяет ассистентам AI на этом устройстве запрашивать вход в приложения с использованием вашей учётной записи."
+msgid "Enabled on this device"
+msgstr "Включено на этом устройстве"
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr "Введите имя учётной записи, чтобы завершить обновление. После сохранения, имя нельзя будет изменить."
+
+msgid "Enter a valid https URL (for example https://mcp.example.com/mcp)."
+msgstr "Введите корректный URL (например https://mcp.example.com/mcp)."
 
 msgid "Enter characters"
 msgstr "Введите символы"
@@ -539,17 +647,23 @@ msgstr "Часто задаваемые вопросы"
 msgid "Featured apps"
 msgstr "Популярные приложения"
 
+msgid "First sign-in with {name}"
+msgstr "Первый вход с {name}"
+
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 msgstr "Например, пользователь А входит в Internet Identity через свой аккаунт Google «A@gmail.com», а затем использует Internet Identity для аутентификации в приложении Z. Google никогда не узнает, что пользователь вошёл в приложение Z через Internet Identity. Приложение Z тоже не узнает, что пользователь А использовал Google для входа в Internet Identity."
 
 msgid "For security, Internet Identity blocks command-line tools from signing in to apps using your identity."
 msgstr "В целях безопасности Internet Identity запрещает инструментам командной строки входить в приложения с помощью вашей учётной записи."
 
-msgid "For security, Internet Identity blocks MCP clients from signing in to apps using your identity."
-msgstr "В целях безопасности Internet Identity блокирует MCP-клиентам возможность входа в приложения с использованием вашей учётной записи."
+msgid "For security, Internet Identity only connects the MCP server you've set as trusted. Set this server in Settings, then try again."
+msgstr "В целях безопасности Internet Identity подключается только к MCP-серверу, который вы установили как доверенный. Укажите этот сервер в Настройках и попробуйте снова."
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in. Quick, safe, and hassle-free."
 msgstr "Забудьте о запоминании сложных имён пользователей и паролей. С Passkeys достаточно просто выбрать своё имя для входа. Быстро, безопасно и без лишних усилий."
+
+msgid "Forget this email?"
+msgstr "Забыть этот email?"
 
 msgid "From"
 msgstr "От"
@@ -605,6 +719,9 @@ msgstr "Удерживайте несколько секунд. Отпустит
 msgid "Hold to confirm"
 msgstr "Удерживайте для подтверждения"
 
+msgid "Hold to continue"
+msgstr "Удерживайте для продолжения"
+
 msgid "Home"
 msgstr "Главная"
 
@@ -629,9 +746,6 @@ msgstr "Я несу ответственность за свою резервн�
 msgid "I have written it down"
 msgstr "Я записал(а) это"
 
-msgid "I understand the risks."
-msgstr "Я понимаю риски."
-
 msgid "I'm using the official ICP CLI and I trust this device."
 msgstr "Я использую официальный ICP CLI и доверяю этому устройству."
 
@@ -640,6 +754,9 @@ msgstr "Я отправил(а) письмо"
 
 msgid "Identities on this device"
 msgstr "Список учётных записей на этом устройстве"
+
+msgid "Identity"
+msgstr "Учётная запись"
 
 msgid "Identity already upgraded"
 msgstr "Учётная запись уже обновлена"
@@ -665,8 +782,11 @@ msgstr "Учётная запись удалена"
 msgid "Identity upgraded."
 msgstr "Учётная запись обновлена."
 
+msgid "If nothing happens, you can return to your agent."
+msgstr "Если ничего не происходит, вы можете вернуться к своему агенту."
+
 msgid "If this keeps happening, copy these details and include them in a <0>support request</0>."
-msgstr "Если проблема повторяется, скопируйте эти данные и приложите их к <0>запросу в службу поддержки</0>."
+msgstr "Если это продолжается, скопируйте эти данные и включите их в <0>запрос в поддержку</0>."
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "Если вы администрируете <0>{domain}</0>, включение DNSSEC у вашего регистратора домена обычно занимает несколько кликов. После распространения изменений этот адрес заработает автоматически. Никаких дополнительных действий с нашей стороны не потребуется."
@@ -689,8 +809,14 @@ msgstr "Неправильный порядок слов. Проверьте и 
 msgid "Incorrect. Try again with the new code."
 msgstr "Неверно. Попробуйте снова с новым кодом."
 
+msgid "Info you can choose to share when an app requests it. Never shared without your consent."
+msgstr "Информация, которой вы можете поделиться по запросу приложения. Никогда не передаётся без вашего согласия."
+
 msgid "Interaction canceled. Please try again."
 msgstr "Взаимодействие отменено. Пожалуйста, попробуйте снова."
+
+msgid "Internet Computer MCP"
+msgstr "Internet Computer MCP"
 
 msgid "Internet Identity"
 msgstr "Internet Identity"
@@ -737,9 +863,6 @@ msgstr "Недействительный запрос"
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Хранятся ли мои Face ID или отпечаток пальца в Internet Identity?"
 
-msgid "It can send messages or move funds on your behalf."
-msgstr "Он может отправлять сообщения или переводить средства от вашего имени."
-
 msgid "It looks like you're trying to sign in from a social app. Follow these steps to continue:"
 msgstr "Похоже, вы пытаетесь войти через социальное приложение. Выполните следующие шаги, чтобы продолжить:"
 
@@ -767,6 +890,9 @@ msgstr "Держите её в секрете"
 msgid "Keep your access and recovery methods up to date."
 msgstr "Держите методы доступа и восстановления в актуальном состоянии."
 
+msgid "Keep your recovery email private and separate from emails you share with apps."
+msgstr "Держите ваш резервный email в тайне и отдельно от email-адресов, которыми вы делитесь с приложениями."
+
 msgid "Kept on a physical key. Authenticate on supported devices via tap/insert."
 msgstr "Хранится на физическом ключе. Аутентифицируйтесь на поддерживаемых устройствах, коснувшись/вставив его."
 
@@ -788,20 +914,14 @@ msgstr "Устаревший"
 msgid "Legacy identity"
 msgstr "Устаревшая учётная запись"
 
-msgid "Let {mcpServer} act as {accountScope}"
-msgstr "Разрешить {mcpServer} действовать как {accountScope}"
-
-msgid "Let AI assistants on this device sign in to apps using your identity."
-msgstr "Разрешить ассистентам AI на этом устройстве входить в приложения с использованием вашей учётной записи."
+msgid "Let AI access your apps."
+msgstr "Разрешите AI доступ к вашим приложениям."
 
 msgid "Let command-line tools on this device sign in to apps using your identity."
 msgstr "Разрешите инструментам командной строки на этом устройстве входить в приложения с помощью вашей учётной записи."
 
 msgid "Let's get started"
 msgstr "Давайте начнем"
-
-msgid "Like any AI, it can hallucinate and make mistakes."
-msgstr "Как и любой AI, он может галлюцинировать и допускать ошибки."
 
 msgid "Limit reached"
 msgstr "Достигнут лимит"
@@ -818,6 +938,9 @@ msgstr "Загрузка разрешений"
 msgid "Long-press the link that opened this page."
 msgstr "Нажмите и удерживайте ссылку, открывшую эту страницу."
 
+msgid "Looks things up, changing nothing."
+msgstr "Только запрашивает данные, ничего не изменяет."
+
 msgid "Lookup by passkey"
 msgstr "Поиск по ключу доступа"
 
@@ -833,11 +956,17 @@ msgstr "Войдите с помощью Google, Apple или Microsoft — бе
 msgid "Make sure no one can see what's on your screen or what you are writing."
 msgstr "Убедитесь, что никто не видит, что на вашем экране или что вы пишете."
 
+msgid "Make sure the URL is from a source you trust."
+msgstr "Убедитесь, что URL из надёжного источника."
+
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Обязательно добавьте новый метод доступа, чтобы вы могли войти в систему в следующий раз или сбросить свою резервную фразу."
 
 msgid "Manage how other tools connect to your identity."
 msgstr "Управляйте тем, как другие инструменты подключаются к вашей учётной записи."
+
+msgid "Manage trusted server"
+msgstr "Управление доверенным сервером"
 
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Управляйте доступом к приложениям через ваши Internet Identity. Все настройки — в одном месте."
@@ -851,26 +980,23 @@ msgstr "Управление учётной записью"
 msgid "Manage your Internet Identity"
 msgstr "Управление вашим Internet Identity"
 
+msgid "Manage your shareable emails. These should be different from your recovery email."
+msgstr "Управляйте вашими общими email-адресами. Они должны отличаться от резервного email."
+
 msgid "Maximum length is 32 characters."
 msgstr "Максимальная длина — 32 символа."
 
 msgid "Maximum length is 64 characters."
 msgstr "Максимальная длина — 64 символа."
 
-msgid "MCP access"
-msgstr "Доступ MCP"
+msgid "MCP server URL"
+msgstr "URL MCP-сервера"
 
-msgid "MCP access not enabled"
-msgstr "Доступ MCP не включён"
-
-msgid "More information about multiple accounts"
-msgstr "Подробнее о нескольких аккаунтах"
+msgid "More information about all options"
+msgstr "Подробнее обо всех параметрах"
 
 msgid "More options"
 msgstr "Дополнительные параметры"
-
-msgid "Multiple accounts"
-msgstr "Несколько аккаунтов"
 
 msgid "My {application} account"
 msgstr "Мой аккаунт {application}"
@@ -892,6 +1018,9 @@ msgstr "Имя:"
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Никакие данные о том, в какие приложения вы входите с помощью Internet Identity, не передаются Google, Microsoft или Apple."
+
+msgid "No emails yet"
+msgstr "Email-адресов пока нет"
 
 msgid "No identity found"
 msgstr "Учётная запись не найдена"
@@ -917,11 +1046,17 @@ msgstr "Не обновлено"
 msgid "Not verified"
 msgstr "Не подтверждён"
 
+msgid "Official · Hosted by DFINITY"
+msgstr "Официальный · Размещён DFINITY"
+
 msgid "Once enabled, any command-line tool on this device can use your identity to sign in to apps."
 msgstr "После включения любой инструмент командной строки на этом устройстве сможет использовать вашу учётную запись для входа в приложения."
 
 msgid "One or more words are wrong or out of order."
 msgstr "Одно или несколько слов введены неверно или не по порядку."
+
+msgid "Only add trusted connectors"
+msgstr "Добавляйте только доверенные коннекторы"
 
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "Включайте это только для официального <0>ICP CLI</0>. Если вы не уверены, переустановите его из <1>официального источника</1>."
@@ -936,13 +1071,19 @@ msgid "Open in mail app"
 msgstr "Открыть в почтовом приложении"
 
 msgid "Open Internet Identity in a new tab to manage your access methods and recovery options."
-msgstr "Откройте Internet Identity в новой вкладке для управления методами доступа и параметрами восстановления."
+msgstr "Откройте Internet Identity в новой вкладке для управления методами доступа и восстановления."
 
 msgid "Open manage"
 msgstr "Открыть управление"
 
 msgid "Open menu"
 msgstr "Открыть меню"
+
+msgid "Open Settings"
+msgstr "Открыть настройки"
+
+msgid "Open Settings in a new tab to set your trusted MCP server."
+msgstr "Откройте Настройки в новой вкладке, чтобы указать доверенный MCP-сервер."
 
 msgid "Or sign in with another identity"
 msgstr "Или войдите с другой учётной записью"
@@ -986,6 +1127,9 @@ msgstr "Ключи доступа используют криптографич�
 msgid "Password-free"
 msgstr "Без паролей"
 
+msgid "Permissions"
+msgstr "Разрешения"
+
 msgid "Pick a recovery method below to sign back in."
 msgstr "Выберите метод восстановления ниже, чтобы снова войти."
 
@@ -993,13 +1137,25 @@ msgid "Pick something recognizable, like your name"
 msgstr "Выберите что-то узнаваемое, например, ваше имя"
 
 msgid "Please confirm"
-msgstr "Подтвердите"
+msgstr "Пожалуйста, подтвердите"
+
+msgid "Please consider adding a different email that you may want to share with apps."
+msgstr "Рекомендуем добавить другой email, которым вы можете делиться с приложениями."
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Пожалуйста, вернитесь на ваше <0>существующее устройство</0> и выберите <1>Начать заново</1>, чтобы повторить попытку."
 
+msgid "Please sign in again to continue."
+msgstr "Пожалуйста, войдите снова для продолжения."
+
 msgid "Powered by"
 msgstr "Разработано"
+
+msgid "Questions only"
+msgstr "Только вопросы"
+
+msgid "Reachable MCP server"
+msgstr "Доступный MCP-сервер"
 
 msgid "Real privacy"
 msgstr "Настоящая конфиденциальность"
@@ -1043,6 +1199,9 @@ msgstr "Резервная фраза установлена"
 msgid "Remove"
 msgstr "Удалить"
 
+msgid "Remove {0}"
+msgstr "Удалить {0}"
+
 msgid "Remove and sign out"
 msgstr "Удалить и выйти"
 
@@ -1058,6 +1217,9 @@ msgstr "Удалите неиспользуемые учётные записи.
 msgid "Remove recovery email?"
 msgstr "Удалить резервный email?"
 
+msgid "Remove the connector to revoke AI access."
+msgstr "Удалите коннектор, чтобы отозвать доступ AI."
+
 msgid "Removing and signing out..."
 msgstr "Удаление и выход из системы..."
 
@@ -1069,6 +1231,9 @@ msgstr "Удаление ключа доступа..."
 
 msgid "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later."
 msgstr "Удаление этого ключа доступа означает, что вы больше не сможете использовать его для входа. Вы всегда можете добавить новый позже."
+
+msgid "Removing…"
+msgstr "Удаление…"
 
 msgid "Rename"
 msgstr "Переименовать"
@@ -1106,6 +1271,9 @@ msgstr "Сброс резервной фразы..."
 msgid "Resetting will invalidate your current recovery phrase, leaving only the new one usable."
 msgstr "Сброс аннулирует вашу текущую резервную фразу, оставляя действующей только новую."
 
+msgid "Restore default"
+msgstr "Восстановить по умолчанию"
+
 msgid "Retry"
 msgstr "Повторить"
 
@@ -1115,11 +1283,14 @@ msgstr "Вернуться в приложение"
 msgid "Return to application"
 msgstr "Вернуться к приложению"
 
-msgid "Return to your MCP client and try again. You can close this window."
-msgstr "Вернитесь к MCP-клиенту и повторите попытку. Можете закрыть это окно."
-
 msgid "Review permissions"
 msgstr "Просмотреть разрешения"
+
+msgid "Revoke access anytime"
+msgstr "Отзовите доступ в любой момент"
+
+msgid "Revoke access anytime in your <0>settings</0>."
+msgstr "Отзовите доступ в любой момент в ваших <0>настройках</0>."
 
 msgid "Right now"
 msgstr "Прямо сейчас"
@@ -1142,8 +1313,14 @@ msgstr "Отсканируйте приведенный выше QR-код с в
 msgid "Seamless access"
 msgstr "Бесшовный доступ"
 
+msgid "Securely connecting your identity to the server."
+msgstr "Безопасное подключение вашей учётной записи к серверу."
+
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Выберите <0>Открыть в Safari</0> или <1>Открыть в Chrome</1>."
+
+msgid "Select a passkey"
+msgstr "Выберите ключ доступа"
 
 msgid "Select each word in the correct order:"
 msgstr "Выберите каждое слово в правильном порядке:"
@@ -1153,6 +1330,9 @@ msgstr "Отправьте письмо из вашего почтового я�
 
 msgid "Send the email below to confirm."
 msgstr "Отправьте письмо ниже для подтверждения."
+
+msgid "Session duration"
+msgstr "Длительность сессии"
 
 msgid "Session timed out"
 msgstr "Время сессии истекло"
@@ -1167,7 +1347,7 @@ msgid "Set up recovery phrase"
 msgstr "Настроить резервную фразу"
 
 msgid "Set up your private, passwordless identity."
-msgstr "Настройте свою личную учётную запись без пароля."
+msgstr "Создайте вашу приватную учётную запись без пароля."
 
 msgid "Settings"
 msgstr "Настройки"
@@ -1175,8 +1355,14 @@ msgstr "Настройки"
 msgid "Share {label}"
 msgstr "Поделиться: {label}"
 
+msgid "Shareable info"
+msgstr "Общая информация"
+
 msgid "Show all"
 msgstr "Показать все"
+
+msgid "Show all options"
+msgstr "Показать все параметры"
 
 msgid "Sign in"
 msgstr "Войти"
@@ -1184,8 +1370,8 @@ msgstr "Войти"
 msgid "Sign in again to continue where you left off."
 msgstr "Войдите снова, чтобы продолжить с того места, где вы остановились."
 
-msgid "Sign in by sending a signed email from your inbox."
-msgstr "Войдите, отправив подписанное письмо из вашего почтового ящика."
+msgid "Sign in by sending an email from your inbox."
+msgstr "Войдите, отправив письмо из вашего почтового ящика."
 
 msgid "Sign in there."
 msgstr "Войти там."
@@ -1235,17 +1421,11 @@ msgstr "Выйти и удалить"
 msgid "Sign up"
 msgstr "Зарегистрироваться"
 
-msgid "Sign up with {name}"
-msgstr "Зарегистрироваться через {name}"
-
-msgid "Sign up with passkey"
-msgstr "Зарегистрироваться с ключом доступа"
-
-msgid "Sign up with SSO"
-msgstr "Зарегистрироваться через SSO"
-
 msgid "Sign-in"
 msgstr "Вход"
+
+msgid "Sign-in could not be completed"
+msgstr "Не удалось завершить вход"
 
 msgid "Sign-up"
 msgstr "Регистрация"
@@ -1265,6 +1445,9 @@ msgstr "Вход..."
 msgid "Simplify your sign-in"
 msgstr "Новый способ входа"
 
+msgid "Skip for now"
+msgstr "Пропустить пока"
+
 msgid "Some mail providers queue outgoing mail. Check your sent folder to make sure it actually went out."
 msgstr "Некоторые почтовые провайдеры помещают исходящие письма в очередь. Проверьте папку «Отправленные», чтобы убедиться, что письмо действительно было отправлено."
 
@@ -1281,14 +1464,14 @@ msgstr "Что-то пошло не так при создании делеги�
 msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
 msgstr "Что-то пошло не так при передаче атрибутов. Пожалуйста, попробуйте снова; если проблема сохраняется, обратитесь в службу поддержки."
 
+msgid "Something went wrong while signing in with your provider. Close this window and try again."
+msgstr "Что-то пошло не так при входе через провайдер. Закройте это окно и попробуйте снова."
+
 msgid "Source code"
 msgstr "Исходный код"
 
 msgid "SSO"
 msgstr "SSO"
-
-msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
-msgstr "SSO для «{domainInput}» пока недоступен. Попросите администратора II зарегистрировать этот домен."
 
 msgid "SSO sign-in for {domainInput} failed. Please try again."
 msgstr "Не удалось выполнить вход через SSO для {domainInput}. Пожалуйста, попробуйте снова."
@@ -1297,7 +1480,7 @@ msgid "Start over"
 msgstr "Начать заново"
 
 msgid "Start the connection again from your MCP client. You can close this window."
-msgstr "Начните подключение заново из клиента MCP. Это окно можно закрыть."
+msgstr "Начните подключение снова из вашего MCP-клиента. Вы можете закрыть это окно."
 
 msgid "Step 2 of 2"
 msgstr "Шаг 2 из 2"
@@ -1365,6 +1548,9 @@ msgstr "Переключитесь на другой метод, прежде ч
 msgid "Switching..."
 msgstr "Переключение..."
 
+msgid "Taking you to the server to finish connecting…"
+msgstr "Переход на сервер для завершения подключения…"
+
 msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
 msgstr "Нажмите на <0>адресную строку</0> и <1>откройте в браузере</1>."
 
@@ -1383,20 +1569,23 @@ msgstr "Проверить вход"
 msgid "That identity doesn't match"
 msgstr "Эта учётная запись не совпадает"
 
+msgid "That's the official connector. No need to customize."
+msgstr "Это официальный коннектор. Настройка не требуется."
+
 msgid "The <0>existing device</0> is preparing to continue."
 msgstr "Ваше <0>существующее устройство</0> готовится продолжить."
 
 msgid "The <0>new device</0> is preparing to continue."
 msgstr "Ваше <0>новое устройство</0> готовится продолжить."
 
-msgid "The CLI gets full access to your account in this app."
-msgstr "CLI получает полный доступ к вашему аккаунту в этом приложении."
-
 msgid "The CLI gets its own account, separate from your other apps."
 msgstr "CLI получает собственный аккаунт, отдельный от ваших других приложений."
 
 msgid "The CLI sign-in couldn't be completed. Check the CLI for details."
 msgstr "Вход через CLI не удалось завершить. Проверьте CLI для получения подробностей."
+
+msgid "The CLI uses your account in this app."
+msgstr "CLI использует ваш аккаунт в этом приложении."
 
 msgid "The DNSSEC zone must use a current algorithm — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms aren't supported."
 msgstr "Зона DNSSEC должна использовать актуальный алгоритм — RSA/SHA-256, RSA/SHA-512, ECDSA P-256 или Ed25519. Устаревшие алгоритмы SHA-1 не поддерживаются."
@@ -1406,9 +1595,6 @@ msgstr "Письмо должно быть отправлено непосред
 
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "Интеграция с Google, Microsoft и Apple использует стандартный протокол аутентификации OpenID. Это тот же протокол, который стоит за кнопками «Войти через Google» в других приложениях."
-
-msgid "The MCP client couldn't finish connecting."
-msgstr "MCP-клиенту не удалось завершить подключение."
 
 msgid "The most reliable backup. Stored entirely by you, on paper. It does not depend on any account, service, or provider, and only you can use, lose, or replace it."
 msgstr "Самый надёжный способ резервного копирования. Хранится исключительно у вас, на бумаге. Не зависит ни от какого аккаунта, сервиса или провайдера, и только вы можете её использовать, потерять или заменить."
@@ -1423,7 +1609,7 @@ msgid "This {resolvedProviderName} account is already connected to an Internet I
 msgstr "Этот аккаунт {resolvedProviderName} уже подключён к учётной записи Internet Identity."
 
 msgid "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
-msgstr "Этот аккаунт {resolvedProviderName} пока не подключён к учётной записи Internet Identity."
+msgstr "Этот аккаунт {resolvedProviderName} ещё не подключён к учётной записи Internet Identity."
 
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "Этот аккаунт уже прикреплён к вашей учётной записи. Ваш активный метод доступа будет переключён на него."
@@ -1431,14 +1617,26 @@ msgstr "Этот аккаунт уже прикреплён к вашей учё
 msgid "This app has moved to the new Internet Identity"
 msgstr "Это приложение переехало на новую версию Internet Identity"
 
+msgid "This app is requesting your email address. You can verify your email address now and share it, or skip and continue without sharing."
+msgstr "Приложение запрашивает ваш адрес электронной почты. Вы можете подтвердить его сейчас и поделиться, или пропустить и продолжить без передачи."
+
 msgid "This browser is not supported."
 msgstr "Этот браузер не поддерживается."
 
 msgid "This connection link is missing information or has been changed."
-msgstr "В этой ссылке для подключения отсутствуют данные или она была изменена."
+msgstr "В ссылке для подключения отсутствует информация или она была изменена."
+
+msgid "This doesn't look like a valid email address."
+msgstr "Похоже, это недействительный адрес электронной почты."
+
+msgid "This email is already linked through an OpenID provider."
+msgstr "Этот email уже привязан через провайдера OpenID."
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Эта учётная запись уже была обновлена до нового интерфейса."
+
+msgid "This is already your recovery email."
+msgstr "Это уже ваш резервный email."
 
 msgid "This is now the default method used to authenticate moving forward on this device."
 msgstr "Теперь это метод по умолчанию для аутентификации на этом устройстве в дальнейшем."
@@ -1455,6 +1653,9 @@ msgstr "Этот устаревший ключ доступа больше не 
 msgid "This may take a few seconds"
 msgstr "Это может занять несколько секунд."
 
+msgid "This MCP server isn't trusted yet"
+msgstr "Этот MCP-сервер ещё не является доверенным"
+
 msgid "This passkey is no longer associated with any identity."
 msgstr "Этот ключ доступа больше не связан ни с одной учётной записью."
 
@@ -1470,17 +1671,20 @@ msgstr "Обычно это занимает менее 30 секунд."
 msgid "This will become the default method used to authenticate on this device moving forward."
 msgstr "Это станет методом по умолчанию для аутентификации на этом устройстве в дальнейшем."
 
+msgid "Time until you have to reconnect:"
+msgstr "Время до следующего переподключения:"
+
 msgid "To"
 msgstr "Кому"
 
 msgid "To accept email from a domain we either need DNSSEC at its apex (so we can cryptographically validate the DKIM key your provider uses) or for the domain to be on our list of known mailbox providers."
 msgstr "Для принятия писем от домена нам необходимо либо наличие DNSSEC на его вершине (чтобы мы могли криптографически проверить DKIM-ключ вашего провайдера), либо чтобы домен был в нашем списке известных почтовых провайдеров."
 
-msgid "to allow MCP access to {0}"
-msgstr "чтобы разрешить доступ MCP к {0}"
-
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "Чтобы подтвердить, что это вы, введите код ниже на вашем <0>существующем устройстве</0>."
+
+msgid "to connect {0}"
+msgstr "для подключения {0}"
 
 msgid "to continue to {dappName}"
 msgstr "чтобы перейти в {dappName}"
@@ -1494,6 +1698,12 @@ msgstr "Чтобы продолжить:"
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "Чтобы завершить настройку вашего ключа доступа, следуйте инструкциям, показанным на вашем <0>новом устройстве</0>."
 
+msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
+msgstr "Чтобы AI мог задавать вопросы и выполнять действия в ваших приложениях, добавьте доверенный <0>MCP коннектор</0>."
+
+msgid "Trusted connector"
+msgstr "Доверенный коннектор"
+
 msgid "Try a different address"
 msgstr "Попробуйте другой адрес"
 
@@ -1504,16 +1714,16 @@ msgid "Type each word in the correct order:"
 msgstr "Введите каждое слово в правильном порядке:"
 
 msgid "Type the 6-digit code shown on the new device."
-msgstr "Введите 6-значный код, отображаемый на новом устройстве."
+msgstr "Введите 6-значный код, показанный на новом устройстве."
 
 msgid "Type the characters exactly as shown below"
 msgstr "Введите символы точно так, как показано ниже"
 
-msgid "Type the email address you registered as your recovery method. We'll ask you to send a signed email from this inbox to confirm."
-msgstr "Введите адрес электронной почты, который вы зарегистрировали в качестве метода восстановления. Мы попросим вас отправить подписанное письмо из этого почтового ящика для подтверждения."
+msgid "Type the email address you registered as your recovery method. We'll ask you to send an email from this inbox to confirm."
+msgstr "Введите адрес электронной почты, зарегистрированный как метод восстановления. Мы попросим вас отправить письмо с этого ящика для подтверждения."
 
-msgid "Type the email address you want to use to recover this Internet Identity. We'll ask you to send a signed email from this inbox to confirm."
-msgstr "Введите адрес электронной почты, который вы хотите использовать для восстановления этой учётной записи Internet Identity. Мы попросим вас отправить подписанное письмо из этого почтового ящика для подтверждения."
+msgid "Type the email address you want to use to recover this Internet Identity. We'll ask you to send an email from this inbox to confirm."
+msgstr "Введите адрес электронной почты, который вы хотите использовать для восстановления этой учётной записи Internet Identity. Мы попросим вас отправить письмо с этого ящика для подтверждения."
 
 msgid "Type your 24 recovery words."
 msgstr "Введите ваши 24 слова для восстановления."
@@ -1557,6 +1767,9 @@ msgstr "Разблокировать для продолжения"
 msgid "Unsupported browser"
 msgstr "Неподдерживаемый браузер"
 
+msgid "until you have to sign in again"
+msgstr "до следующего входа"
+
 msgid "Unverified origin"
 msgstr "Непроверенный источник"
 
@@ -1581,14 +1794,17 @@ msgstr "Обновить вашу учётную запись"
 msgid "Upgrading identity..."
 msgstr "Обновление учётной записи..."
 
-msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
-msgstr "Используйте устройство, которое уже содержит вашу учётную запись, чтобы отсканировать или открыть URL. Это свяжет вашу учётную запись с этим устройством."
+msgid "URL | QR Code"
+msgstr "URL | QR-код"
+
+msgid "Use a device that already holds your identity to scan or open the URL. This will add your identity to this device."
+msgstr "Используйте устройство, на котором уже есть ваша учётная запись, чтобы отсканировать или открыть URL. Это добавит вашу учётную запись на это устройство."
 
 msgid "Use a different method"
 msgstr "Использовать другой метод"
 
 msgid "Use a passkey or familiar provider."
-msgstr "Используйте Passkey или знакомого провайдера."
+msgstr "Используйте ключ доступа или знакомый провайдер."
 
 msgid "Use existing identity"
 msgstr "Уже есть аккаунт? Войти"
@@ -1596,11 +1812,23 @@ msgstr "Уже есть аккаунт? Войти"
 msgid "Use these to regain access to your identity if you ever lose it."
 msgstr "Используйте их для восстановления доступа к вашей учётной записи, если вы его когда-либо потеряете."
 
+msgid "Using a shareable email isn't recommended"
+msgstr "Использовать общий email не рекомендуется"
+
 msgid "Verification failed"
 msgstr "Проверка не пройдена"
 
+msgid "Verified"
+msgstr "Подтверждён"
+
+msgid "Verified email"
+msgstr "Подтверждённый email"
+
 msgid "Verify"
 msgstr "Проверить"
+
+msgid "Verify an email address"
+msgstr "Подтвердить адрес электронной почты"
 
 msgid "Verify recovery phrase"
 msgstr "Подтвердить резервную фразу"
@@ -1613,6 +1841,9 @@ msgstr "Подтвердите, что вы человек"
 
 msgid "Verify your email"
 msgstr "Подтвердите ваш email"
+
+msgid "Verify your email address"
+msgstr "Подтвердите ваш адрес электронной почты"
 
 msgid "Verify your recovery phrase"
 msgstr "Подтвердите вашу резервную фразу"
@@ -1635,14 +1866,17 @@ msgstr "Ожидание вашего нового устройства"
 msgid "Waiting to receive…"
 msgstr "Ожидание получения…"
 
-msgid "Want a new identity?"
-msgstr "Хотите новую учётную запись?"
-
 msgid "We can't verify mail from <0>{domain}</0> yet. Try a different address. Gmail, iCloud, Outlook, Fastmail, and Proton all work."
 msgstr "Мы пока не можем верифицировать почту от <0>{domain}</0>. Попробуйте другой адрес. Gmail, iCloud, Outlook, Fastmail и Proton поддерживаются."
 
+msgid "We couldn't validate MCP support at this URL, but you can still trust it."
+msgstr "Не удалось проверить поддержку MCP по этому URL, но вы всё равно можете добавить его в доверенные."
+
 msgid "We didn't recognize that activation code."
 msgstr "Мы не распознали этот код активации."
+
+msgid "We'll ask you to send an email from this inbox to confirm."
+msgstr "Мы попросим вас отправить письмо с этого ящика для подтверждения."
 
 msgid "Welcome, <0>{name}</0>."
 msgstr "Добро пожаловать, <0>{name}</0>."
@@ -1673,9 +1907,6 @@ msgstr "Почему я вижу это?"
 
 msgid "Why isn't this supported?"
 msgstr "Почему это не поддерживается?"
-
-msgid "With passkeys, you can now use your fingerprint, face, or screen lock to quickly and securely confirm it’s really you."
-msgstr "С помощью ключей доступа вы теперь можете использовать свой отпечаток пальца, лицо или блокировку экрана, чтобы быстро и безопасно подтвердить, что это действительно вы."
 
 msgid "with your identity in this app"
 msgstr "с вашей учётной записью в этом приложении"
@@ -1734,11 +1965,14 @@ msgstr "Вы можете управлять своими методами до�
 msgid "You can reset your recovery phrase at any time. This keeps your identity secure if it is ever exposed."
 msgstr "Вы можете сбросить свою резервную фразу в любое время — это защитит вашу учётную запись, если фраза окажется скомпрометирована."
 
+msgid "You can return to your agent."
+msgstr "Вы можете вернуться к своему агенту."
+
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
 msgstr "Вы можете использовать её сейчас для восстановления, но убедитесь, что сохранили её правильно, чтобы впоследствии можно было на неё рассчитывать."
 
 msgid "You control both devices."
-msgstr "Вы управляете обоими устройствами."
+msgstr "Оба устройства принадлежат вам."
 
 msgid "You have reached the maximum number of passkeys"
 msgstr "Вы достигли максимального количества ключей доступа"
@@ -1753,7 +1987,7 @@ msgid "You signed up before with a different access method."
 msgstr "Ранее вы зарегистрировались с другим методом доступа."
 
 msgid "You unlinked this {resolvedProviderName} account from your identity."
-msgstr "Вы отвязали аккаунт {resolvedProviderName} от своей учётной записи."
+msgstr "Вы отключили этот аккаунт {resolvedProviderName} от вашей учётной записи."
 
 msgid "You're about to authorize a new device."
 msgstr "Вы собираетесь авторизовать новое устройство."
@@ -1779,14 +2013,20 @@ msgstr "Вы выполнили вход"
 msgid "You're signing in as <0>{name}</0>."
 msgstr "Вы входите как <0>{name}</0>."
 
+msgid "You've already verified this email."
+msgstr "Вы уже подтвердили этот email."
+
 msgid "You've never used this {resolvedProviderName} account with Internet Identity."
-msgstr "Этот аккаунт {resolvedProviderName} никогда не использовался с Internet Identity."
+msgstr "Вы никогда не использовали этот аккаунт {resolvedProviderName} с Internet Identity."
 
-msgid "your {0} account"
-msgstr "ваш аккаунт {0}"
+msgid "You've reached the limit of {capacity} verified emails. Remove one before adding another."
+msgstr "Вы достигли лимита в {capacity} подтверждённых email-адресов. Удалите один, прежде чем добавлять другой."
 
-msgid "your account on {app}"
-msgstr "ваш аккаунт в {app}"
+msgid "You've reached the limit of {limit} verified emails. Remove one to add another."
+msgstr "Вы достигли лимита в {limit} подтверждённых email-адресов. Удалите один, чтобы добавить другой."
+
+msgid "Your organization hasn't granted this app access via {domainInput}."
+msgstr "Ваша организация не предоставила этому приложению доступ через {domainInput}."
 
 msgid "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
 msgstr "Ваши ключи доступа и резервная фраза не затронуты. Вы можете добавить резервный email снова в любое время."
