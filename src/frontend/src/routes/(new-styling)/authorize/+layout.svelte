@@ -76,8 +76,10 @@
       channelStore.establish({ pending: true });
     } else if (flow === "openid-resume") {
       const pendingOrigin = sessionStorage.getItem("ii-pending-channel-origin");
+      const resumeToken =
+        sessionStorage.getItem("ii-pending-channel-resume-token") ?? undefined;
       if (pendingOrigin !== null) {
-        channelStore.establish({ allowedOrigin: pendingOrigin });
+        channelStore.establish({ allowedOrigin: pendingOrigin, resumeToken });
       } else {
         channelErrorStore.set("connection-closed");
       }
@@ -152,8 +154,11 @@
       isAuthenticating = true;
       if ($authenticationStore?.identityNumber !== identityNumber) {
         sessionStore.reset();
+        // Pass the effective origin so an SSO identity redeems through the gate
+        // path. Undefined before the dapp request arrives → plain OpenID path.
         await authLastUsedFlow.authenticate(
           $lastUsedIdentitiesStore.identities[`${identityNumber}`],
+          $authorizationStore?.effectiveOrigin,
         );
       }
       lastUsedIdentitiesStore.selectIdentity(identityNumber);
@@ -229,7 +234,10 @@
         .get_default_account(identityNumber, origin)
         .then(throwCanisterError)
         .then((account) => account.account_number[0]);
-      authorizationStore.authorize(Promise.resolve(accountNumber));
+      authorizationStore.authorize(
+        Promise.resolve(accountNumber),
+        "full-access",
+      );
     } catch (error) {
       handleError(error);
     }

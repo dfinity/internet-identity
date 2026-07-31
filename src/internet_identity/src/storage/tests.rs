@@ -236,6 +236,69 @@ fn should_write_and_update_openid_credential_lookup() {
     );
 }
 
+/// The SSO stable-id index is reconciled from the anchors' stored credentials
+/// on every `write()`: a credential carrying a `stable_id` gets an entry, and
+/// removing or moving that credential removes or moves the entry — no orphans.
+/// Mirrors `should_write_and_update_openid_credential_lookup`.
+#[test]
+fn should_write_and_update_sso_stable_id_index() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    let sso_domain = "acme.example";
+    let iss = "https://example.com";
+    let primary_client = "example-aud";
+    let stable_id = "oid-stable-42";
+
+    // A credential that carries a `stable_id` (a non-`sub` primary credential).
+    // An SSO credential always carries its discovery `sso_domain` too; the index
+    // key is scoped by it.
+    let mut bridged = openid_credential(0);
+    bridged.stable_id = Some(stable_id.to_string());
+    bridged.sso_domain = Some(sso_domain.to_string());
+    // A second credential on the same anchor without a `stable_id` — it must
+    // never appear in the SSO stable-id index.
+    let plain = openid_credential(1);
+
+    let mut anchor_a = storage.allocate_anchor(0).unwrap();
+    anchor_a.add_openid_credential(bridged.clone()).unwrap();
+    anchor_a.add_openid_credential(plain.clone()).unwrap();
+    storage.write(anchor_a.clone()).unwrap();
+
+    // The bridged credential is indexed; the plain one is not.
+    assert_eq!(
+        storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, primary_client, stable_id),
+        Some(anchor_a.anchor_number())
+    );
+    assert_eq!(
+        storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, primary_client, "no-such-oid"),
+        None
+    );
+    // The same (iss, primary_client, stable_id) discovered through a different
+    // domain does not resolve to this entry — the domain is part of the key.
+    assert_eq!(
+        storage.lookup_anchor_by_sso_stable_id("attacker.example", iss, primary_client, stable_id),
+        None
+    );
+
+    // Remove the bridged credential -> its index entry self-cleans on write.
+    anchor_a.remove_openid_credential(&bridged.key()).unwrap();
+    storage.write(anchor_a.clone()).unwrap();
+    assert_eq!(
+        storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, primary_client, stable_id),
+        None
+    );
+
+    // Move the bridged credential to a second anchor -> the entry follows it.
+    let mut anchor_b = storage.allocate_anchor(0).unwrap();
+    anchor_b.add_openid_credential(bridged.clone()).unwrap();
+    storage.write(anchor_b.clone()).unwrap();
+    assert_eq!(
+        storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, primary_client, stable_id),
+        Some(anchor_b.anchor_number())
+    );
+}
+
 #[test]
 fn should_write_and_update_device_credential_lookup() {
     let memory = VectorMemory::default();
@@ -561,6 +624,7 @@ fn openid_credential(n: u8) -> OpenIdCredential {
         metadata: HashMap::default(),
         sso_domain: None,
         sso_name: None,
+        stable_id: None,
     }
 }
 fn sample_persistent_state() -> PersistentState {
@@ -2099,6 +2163,7 @@ mod migrate_sso_credentials_batch_tests {
                 metadata: HashMap::new(),
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             })
             .unwrap();
         let anchor_number = anchor.anchor_number();
@@ -2307,4 +2372,150 @@ mod migrate_sso_credentials_batch_tests {
         assert_eq!(stamped_again, 0);
         assert!(errors.is_empty());
     }
+}
+
+#[test]
+fn mcp_config_migration_enables_stored_configs_and_revokes_their_grants() {
+    use crate::storage::storable::mcp_config::StorableMcpConfig;
+    use crate::storage::storable::mcp_grant::StorableMcpGrant;
+    use crate::storage::storable::mcp_registration::StorableMcpRegistration;
+
+    let mut storage = Storage::new((0, 100), VectorMemory::default());
+    let session = Principal::self_authenticating([1u8; 32]);
+    let p_reg = Principal::self_authenticating([2u8; 32]);
+
+    // Disabled, still pointing at a grant and an in-flight registration that are
+    // inert only because of the flag.
+    storage.write_mcp_config(
+        10_000,
+        StorableMcpConfig {
+            enabled: false,
+            url: Some("https://mcp.acme.com/mcp".to_string()),
+            session_principal: Some(session.as_slice().to_vec()),
+            pending_registration: Some(p_reg.as_slice().to_vec()),
+        },
+    );
+    storage.insert_mcp_registration(
+        p_reg,
+        StorableMcpRegistration {
+            anchor_number: 10_000,
+            read_only: false,
+            grant_ttl_ns: 3_600_000_000_000,
+            trusted_url_hash: vec![7u8; 32],
+            expires_at_ns: u64::MAX,
+        },
+    );
+    storage.insert_mcp_grant(
+        session,
+        StorableMcpGrant {
+            anchor_number: 10_000,
+            expires_at_ns: u64::MAX,
+            read_only: false,
+        },
+    );
+    // Already in the migrated shape.
+    storage.write_mcp_config(
+        10_001,
+        StorableMcpConfig {
+            enabled: true,
+            url: None,
+            session_principal: None,
+            pending_registration: None,
+        },
+    );
+
+    let outcome = storage.migrate_mcp_configs_batch(None, 2_000);
+
+    assert_eq!(outcome.migrated, 1);
+    assert!(outcome.is_done);
+    assert_eq!(
+        storage.read_mcp_config(10_000),
+        StorableMcpConfig {
+            enabled: true,
+            url: None,
+            session_principal: None,
+            pending_registration: None,
+        }
+    );
+    // The grant must not survive: re-enabling would otherwise revive a session
+    // against a connector it was never granted for.
+    assert!(storage.lookup_mcp_grant(session).is_none());
+    // Nor the in-flight registration: its redemption is gated on the *current*
+    // trusted URL, which this migration can restore to the one it was minted
+    // under, making a pre-switch-off delegation redeemable again.
+    assert!(storage.lookup_mcp_registration(p_reg).is_none());
+
+    // Re-running is a no-op.
+    let again = storage.migrate_mcp_configs_batch(None, 2_000);
+    assert_eq!(again.migrated, 0);
+    assert!(again.is_done);
+}
+
+#[test]
+fn mcp_config_migration_also_resets_an_enabled_custom_connector() {
+    use crate::storage::storable::mcp_config::StorableMcpConfig;
+    use crate::storage::storable::mcp_grant::StorableMcpGrant;
+
+    let mut storage = Storage::new((0, 100), VectorMemory::default());
+    let session = Principal::self_authenticating([3u8; 32]);
+
+    // A working custom connector with a live session.
+    storage.write_mcp_config(
+        10_000,
+        StorableMcpConfig {
+            enabled: true,
+            url: Some("https://mcp.acme.com/mcp".to_string()),
+            session_principal: Some(session.as_slice().to_vec()),
+            pending_registration: None,
+        },
+    );
+    storage.insert_mcp_grant(
+        session,
+        StorableMcpGrant {
+            anchor_number: 10_000,
+            expires_at_ns: u64::MAX,
+            read_only: false,
+        },
+    );
+
+    let outcome = storage.migrate_mcp_configs_batch(None, 2_000);
+
+    // Deliberate: choosing a custom server predates the official connector, so
+    // it wasn't a choice against it. These identities are reset to the default
+    // and re-add their server if they still want it.
+    assert_eq!(outcome.migrated, 1);
+    assert_eq!(
+        storage.read_mcp_config(10_000),
+        StorableMcpConfig {
+            enabled: true,
+            ..Default::default()
+        }
+    );
+    assert!(storage.lookup_mcp_grant(session).is_none());
+}
+
+#[test]
+fn mcp_config_migration_resumes_from_the_cursor() {
+    use crate::storage::storable::mcp_config::StorableMcpConfig;
+
+    let mut storage = Storage::new((0, 100), VectorMemory::default());
+    let disabled = StorableMcpConfig {
+        enabled: false,
+        url: None,
+        session_principal: None,
+        pending_registration: None,
+    };
+    for anchor in 10_000..10_003 {
+        storage.write_mcp_config(anchor, disabled.clone());
+    }
+
+    let first = storage.migrate_mcp_configs_batch(None, 2);
+    assert_eq!(first.migrated, 2);
+    assert!(!first.is_done);
+    assert_eq!(first.next_cursor, Some(10_001));
+
+    let second = storage.migrate_mcp_configs_batch(first.next_cursor, 2);
+    assert_eq!(second.migrated, 1);
+    assert!(second.is_done);
+    assert!(storage.read_mcp_config(10_002).enabled);
 }

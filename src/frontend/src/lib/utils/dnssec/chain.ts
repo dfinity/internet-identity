@@ -48,7 +48,7 @@ import type {
 } from "$lib/generated/internet_identity_types";
 
 import { dohQuery } from "./doh";
-import { parseRrsigRdata } from "./rrsig";
+import { dnsKeyTag, parseRrsigRdata } from "./rrsig";
 import { decodeDnsName, type DnsRR } from "./wire";
 
 const TYPE_TXT = 16;
@@ -56,6 +56,15 @@ const TYPE_CNAME = 5;
 const TYPE_DS = 43;
 const TYPE_RRSIG = 46;
 const TYPE_DNSKEY = 48;
+
+/**
+ * Secure Entry Point flag in the DNSKEY Flags field (RFC 4034 §2.1.1 /
+ * RFC 3757). The bit is advisory — it does not bind which DNSKEY a
+ * parent DS may reference — but by convention it marks the KSK, and the
+ * canister verifier only treats a SEP key as DS-pinnable
+ * (`matching_ksks`). We select on it to mirror the canister.
+ */
+const DNSKEY_FLAG_SEP = 0x0001;
 
 /**
  * Maximum CNAME hops accepted in a DKIM resolution. Mirrors the
@@ -394,7 +403,7 @@ async function fetchSignedRRsetEither(
   const rrsigs = msg.answers.filter(
     (rr) => rr.type === TYPE_RRSIG && rr.name.toLowerCase() === lowerName,
   );
-  const coveringRrsig = selectSupportedCoveringRrsig(rrsigs, matchedType);
+  const coveringRrsig = selectSupportedCoveringRrsig(rrsigs, matchedType, rrs);
   if (coveringRrsig === undefined) {
     return undefined;
   }
@@ -414,12 +423,33 @@ async function fetchSignedRRsetEither(
 }
 
 /**
- * From the RRSIGs present at one owner name, pick the first that both
- * covers `matchedType` and uses an algorithm the canister can verify
- * ({@link SUPPORTED_DNSSEC_ALGORITHMS}).
+ * From the RRSIGs present at one owner name, pick the one to bundle:
+ * it must cover `matchedType` and use an algorithm the canister can
+ * verify ({@link SUPPORTED_DNSSEC_ALGORITHMS}).
  *
- * Returns `undefined` when every covering RRSIG uses an unsupported
- * algorithm (a SHA-1-only zone, say). The walk then aborts and
+ * For a **DNSKEY** RRset the choice is constrained further. The
+ * canister authenticates a child DNSKEY RRset under the *DS-pinned
+ * KSK* specifically (RFC 4035 §5.2), so we must bundle the KSK's
+ * self-signature, not a ZSK's — a zone that signs its DNSKEY RRset
+ * with both (common: proton, many TLDs) otherwise hands us whichever
+ * RRSIG the resolver returned first, and a ZSK one would be rejected
+ * canister-side. The parent DS is not known at this point in the
+ * bottom-up walk, but the canister only treats a DNSKEY as a
+ * DS-pinnable KSK when its SEP bit is set (`matching_ksks` filters on
+ * it), so we mirror that and bundle the RRSIG made by a SEP DNSKEY in
+ * this very RRset. The SEP bit is advisory in the protocol (a DS may
+ * reference a key regardless), but matching the canister's requirement
+ * is what keeps the bundle verifiable. `rrsetRecords` carries those
+ * DNSKEYs.
+ *
+ * For DS / TXT / CNAME hops the canister verifies under the already
+ * trusted *full* zone DNSKEY set, so any supported covering RRSIG is
+ * fine and we keep the first (priority order).
+ *
+ * Returns `undefined` when no usable RRSIG exists — every covering
+ * RRSIG uses an unsupported algorithm (a SHA-1-only zone), or, for a
+ * DNSKEY RRset, no SEP key signed it with a supported algorithm (e.g.
+ * mailbox.org's RSA-SHA1 KSK). The walk then aborts and
  * `assembleSkeleton` yields nothing, so the wizard falls through to
  * the canister's DoH path — the same outcome as an unsigned zone.
  * Exported for unit testing the selection in isolation.
@@ -427,22 +457,51 @@ async function fetchSignedRRsetEither(
 export function selectSupportedCoveringRrsig(
   rrsigs: DnsRR[],
   matchedType: number,
+  rrsetRecords: DnsRR[] = [],
 ): DnsRR | undefined {
-  for (const candidate of rrsigs) {
-    // RRSIG RDATA layout: type-covered (2 bytes) | algorithm (1 byte) | …
-    if (candidate.rdata.length < 3) {
-      continue;
-    }
-    const typeCovered = (candidate.rdata[0] << 8) | candidate.rdata[1];
-    if (typeCovered !== matchedType) {
-      continue;
-    }
-    if (!SUPPORTED_DNSSEC_ALGORITHMS.has(candidate.rdata[2])) {
-      continue;
-    }
-    return candidate;
+  // Covering, supported-algorithm candidates, kept in wire order.
+  // Require the full 18-byte RRSIG fixed header (RFC 4034 §3.1: type
+  // covered, algorithm, …, key_tag): the chosen record is fed straight
+  // into `parseRrsigRdata`, which throws below 18 bytes, and the DNSKEY
+  // path reads the key_tag at bytes 16-17. Dropping malformed short
+  // RRSIGs here keeps a broken/hostile resolver response from throwing
+  // mid-walk instead of falling back to DoH.
+  const candidates = rrsigs.filter(
+    (c) =>
+      c.rdata.length >= 18 &&
+      ((c.rdata[0] << 8) | c.rdata[1]) === matchedType &&
+      SUPPORTED_DNSSEC_ALGORITHMS.has(c.rdata[2]),
+  );
+
+  if (matchedType !== TYPE_DNSKEY) {
+    return candidates[0];
   }
-  return undefined;
+
+  // DNSKEY RRset: bundle the signature made by a SEP (KSK) key present
+  // in this RRset, so the canister can validate it under the DS-pinned
+  // KSK. The canister matches DNSKEY candidates by *(algorithm,
+  // key_tag)* (`verify_rrsig_under_any_dnskey`), and `key_tag` — a
+  // 16-bit checksum (RFC 4034 §B) — can collide across algorithms. So
+  // we pair each SEP key's algorithm (DNSKEY RDATA byte 3) with its
+  // key_tag and match the RRSIG (algorithm at RDATA byte 2, key_tag at
+  // bytes 16-17) on both. Matching by key_tag alone could bundle an
+  // RRSIG no SEP key can verify, or one made by a non-SEP key whose tag
+  // happens to collide.
+  const sepKeyIds = new Set<number>(
+    rrsetRecords
+      .filter(
+        (rr) =>
+          rr.rdata.length >= 4 &&
+          (((rr.rdata[0] << 8) | rr.rdata[1]) & DNSKEY_FLAG_SEP) !== 0,
+      )
+      // (algorithm << 16) | key_tag — DNSKEY algorithm is RDATA byte 3.
+      .map((rr) => (rr.rdata[3] << 16) | dnsKeyTag(rr.rdata)),
+  );
+  // `candidates` already guarantees the 18-byte header, so reading the
+  // algorithm (byte 2) and key_tag (bytes 16-17) here is safe.
+  return candidates.find((c) =>
+    sepKeyIds.has((c.rdata[2] << 16) | ((c.rdata[16] << 8) | c.rdata[17])),
+  );
 }
 
 /**

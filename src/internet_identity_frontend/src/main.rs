@@ -100,23 +100,6 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                  content: _,
              }| {
                 if content_type == ContentType::HTML {
-                    // The /mcp connect flow delivers the standing delegation to
-                    // the user's chosen remote (https) MCP server via a top-level
-                    // form-POST, so that landing page — and only that page —
-                    // needs `form-action` to allow https origins. Scoping the
-                    // relaxation to the /mcp asset keeps the SPA-wide policy tight
-                    // for every other route (/authorize, /cli, …), so an HTML
-                    // injection elsewhere still can't form-POST data cross-origin.
-                    let csp_override = if is_mcp_landing_path(&path) {
-                        Some(get_content_security_policy(
-                            integrity_hashes.clone(),
-                            related_origins,
-                            dev_csp,
-                            true,
-                        ))
-                    } else {
-                        None
-                    };
                     AssetConfig::File {
                         path,
                         content_type: Some("text/html".to_string()),
@@ -124,7 +107,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                             integrity_hashes.clone(),
                             related_origins,
                             dev_csp,
-                            csp_override,
+                            None,
                             vec![(
                                 "cache-control".to_string(),
                                 NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
@@ -245,7 +228,7 @@ fn get_asset_headers(
         (
             "Content-Security-Policy".to_string(),
             content_security_policy_override.unwrap_or_else(|| {
-                get_content_security_policy(integrity_hashes, related_origins, dev_csp, false)
+                get_content_security_policy(integrity_hashes, related_origins, dev_csp)
             }),
         ),
         // Strict-Transport-Security (HSTS)
@@ -304,15 +287,6 @@ fn get_asset_headers(
     headers
 }
 
-/// Whether `path` is one of the url_paths the prerendered `/mcp` connect page
-/// is certified at. A top-level `mcp.html` (adapter-static, `prerender = true`)
-/// is served at `/mcp`, `/mcp/`, and `/mcp/index.html` (see
-/// `asset_util::filepath_to_urlpaths`), so the `form-action` relaxation must
-/// cover all three. This is the *only* asset that gets the relaxed policy.
-fn is_mcp_landing_path(path: &str) -> bool {
-    matches!(path, "/mcp" | "/mcp/" | "/mcp/index.html")
-}
-
 /// Full content security policy delivered via HTTP response header.
 ///
 /// CSP directives explained:
@@ -347,14 +321,9 @@ fn is_mcp_landing_path(path: &str) -> bool {
 ///   invalid source and silently ignored by the browser — so IPv6 loopback
 ///   isn't allowlistable here; the `/cli` parser only accepts 127.0.0.1 to
 ///   match. `localhost` is also excluded (it can resolve off-loopback) — so a
-///   form can never post to a remote origin.
-///   The SPA-wide policy is never broadened to `https:`. The `/mcp` connect
-///   page is the sole exception: it form-POSTs the standing delegation to the
-///   remote (https) MCP server the user chose, so that one asset is certified
-///   with a relaxed `form-action 'self' https:` (MCP is remote-only, so the
-///   loopback is not carried over; see `is_mcp_landing_path` and the
-///   `relax_form_action_to_https` parameter). Scoping the relaxation to that
-///   page keeps every other route tight against cross-origin form posts.
+///   form can never post to a remote origin. The policy is never broadened to
+///   `https:` for any route: the `/mcp` connect flow talks to the MCP server
+///   via `fetch` (covered by `connect-src`), not form posts.
 ///
 /// style-src 'self' 'unsafe-inline':
 ///   Allow stylesheets from same origin and inline styles
@@ -382,7 +351,6 @@ fn get_content_security_policy(
     integrity_hashes: Vec<String>,
     related_origins: Option<&Vec<String>>,
     dev_csp: bool,
-    relax_form_action_to_https: bool,
 ) -> String {
     let connect_src = if dev_csp {
         // Allow connecting via http for development purposes
@@ -415,18 +383,9 @@ fn get_content_security_policy(
         "'self'".to_string()
     };
 
-    // The SPA-wide `form-action` is same-origin + http loopback (the latter for
-    // the /cli flow). The /mcp connect page form-POSTs the standing delegation
-    // to the remote (https) MCP server the user chose, so it — and only it — is
-    // certified with `relax_form_action_to_https = true`, giving it
-    // `form-action 'self' https:`. MCP is remote-only, so the loopback is not
-    // carried over (see the certify loop and `is_mcp_landing_path`). Every other
-    // asset stays tight.
-    let form_action = if relax_form_action_to_https {
-        "'self' https:"
-    } else {
-        "'self' http://127.0.0.1:*"
-    };
+    // `form-action` is same-origin + http loopback (the latter for the /cli
+    // flow) on every asset; no route needs cross-origin form posts.
+    let form_action = "'self' http://127.0.0.1:*";
 
     let csp = format!(
         "default-src 'none';\
@@ -619,7 +578,7 @@ fn main() {}
 
 #[cfg(test)]
 mod tests {
-    use super::{get_content_security_policy, is_mcp_landing_path};
+    use super::get_content_security_policy;
     use crate::__export_service;
     use candid_parser::utils::{service_equal, CandidSource};
     use std::path::Path;
@@ -641,7 +600,7 @@ mod tests {
     #[test]
     fn csp_differs_between_dev_and_prod_for_connect_src_and_upgrade_insecure_requests() {
         // Dev CSP: allow http: in connect-src and omit upgrade-insecure-requests
-        let dev_csp = get_content_security_policy(Vec::new(), None, true, false);
+        let dev_csp = get_content_security_policy(Vec::new(), None, true);
 
         assert!(
             dev_csp.contains("connect-src 'self' https: http:"),
@@ -652,16 +611,16 @@ mod tests {
             "dev CSP should not include upgrade-insecure-requests, got: {dev_csp}"
         );
 
-        // Prod CSP: disallow http: in connect-src and include upgrade-insecure-requests
-        let prod_csp = get_content_security_policy(Vec::new(), None, false, false);
+        // Prod CSP: disallow http: in connect-src and include
+        // upgrade-insecure-requests. The trailing `;` pins the WHOLE
+        // directive: the fetch-based /mcp connect flow relies on connect-src
+        // being exactly self + https, and a bare substring check would let any
+        // extra scheme-source (ws:, http:, ...) slip in unnoticed.
+        let prod_csp = get_content_security_policy(Vec::new(), None, false);
 
         assert!(
-            prod_csp.contains("connect-src 'self' https:"),
-            "prod CSP should allow https: in connect-src, got: {prod_csp}"
-        );
-        assert!(
-            !prod_csp.contains("connect-src 'self' https: http:"),
-            "prod CSP should not allow http: in connect-src, got: {prod_csp}"
+            prod_csp.contains("connect-src 'self' https:;"),
+            "prod CSP connect-src should be exactly 'self' https:, got: {prod_csp}"
         );
         assert!(
             prod_csp.contains("upgrade-insecure-requests;"),
@@ -670,52 +629,17 @@ mod tests {
     }
 
     #[test]
-    fn csp_form_action_relaxed_only_for_mcp_landing() {
-        // The SPA-wide policy keeps form-action to same-origin + http loopback.
-        let tight = get_content_security_policy(Vec::new(), None, false, false);
-        assert!(
-            tight.contains("form-action 'self' http://127.0.0.1:*;"),
-            "default form-action should be self + loopback only, got: {tight}"
-        );
-        assert!(
-            !tight.contains("form-action 'self' http://127.0.0.1:* https:"),
-            "default form-action must not allow https:, got: {tight}"
-        );
-
-        // The /mcp landing page — and only it — relaxes form-action to https
-        // origins so the standing delegation can be form-POSTed to the MCP
-        // server. MCP is remote-only, so the loopback is dropped (not carried
-        // into the relaxed policy).
-        let relaxed = get_content_security_policy(Vec::new(), None, false, true);
-        assert!(
-            relaxed.contains("form-action 'self' https:;"),
-            "relaxed form-action should be self + https, got: {relaxed}"
-        );
-        assert!(
-            !relaxed.contains("127.0.0.1"),
-            "relaxed /mcp form-action must not carry the loopback, got: {relaxed}"
-        );
-    }
-
-    #[test]
-    fn only_mcp_landing_paths_get_relaxed_form_action() {
-        // The relaxation is gated on the prerendered /mcp asset's url_paths.
-        for path in ["/mcp", "/mcp/", "/mcp/index.html"] {
-            assert!(is_mcp_landing_path(path), "{path} should be an /mcp asset");
-        }
-        // Sibling/lookalike paths must stay on the tight SPA-wide policy.
-        for path in [
-            "/",
-            "/cli",
-            "/authorize",
-            "/mcp-foo",
-            "/mcpx",
-            "/manage/mcp",
-            "/foo/mcp",
-        ] {
+    fn csp_form_action_stays_tight_on_every_asset() {
+        // form-action is same-origin + http loopback everywhere — in prod AND
+        // dev CSP: the /mcp connect flow talks to the MCP server via fetch
+        // (connect-src), so no route needs — or gets — cross-origin form
+        // posts. The trailing `;` pins the whole directive, so a broadening
+        // (e.g. re-adding https: for a form POST) fails in either mode.
+        for dev_csp in [false, true] {
+            let csp = get_content_security_policy(Vec::new(), None, dev_csp);
             assert!(
-                !is_mcp_landing_path(path),
-                "{path} must not get the relaxed policy"
+                csp.contains("form-action 'self' http://127.0.0.1:*;"),
+                "form-action should be self + loopback only (dev_csp={dev_csp}), got: {csp}"
             );
         }
     }

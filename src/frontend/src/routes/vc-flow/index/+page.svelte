@@ -18,8 +18,7 @@
     analytics_config: [],
     related_origins: frontendCanisterConfig.related_origins,
     openid_configs: [],
-    sso_discoverable_domains: [],
-    sso_allow_any_domain: [],
+    sso_allow_insecure_discovery: [],
     sso_credential_migration: [],
     backend_origin: [frontendCanisterConfig.backend_origin],
     captcha_config: [],
@@ -28,6 +27,8 @@
     enable_dnssec_email_recovery: [],
     doh_config: [],
     dnssec_config: [],
+    mcp_official_url: [],
+    mcp_config_migration: [],
   });
 </script>
 

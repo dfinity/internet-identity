@@ -77,13 +77,13 @@ test.describe("multiple identities", () => {
       // Sign in with identity 0 and enable multiple accounts
       await signInWithIdentity(authPage, identities[0].identityNumber);
       await authPage
-        .getByRole("switch", { name: "Enable multiple accounts" })
+        .getByRole("switch", { name: "Show all options" })
         .setChecked(true);
 
       // Switch to identity 1 and verify toggle is reset
       await signInWithIdentity(authPage, identities[1].identityNumber);
       await expect(
-        authPage.getByRole("switch", { name: "Enable multiple accounts" }),
+        authPage.getByRole("switch", { name: "Show all options" }),
       ).not.toBeChecked();
       await authPage
         .getByRole("button", { name: "Continue", exact: true })

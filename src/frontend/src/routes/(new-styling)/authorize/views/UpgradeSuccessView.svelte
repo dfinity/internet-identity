@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { AccessLevel } from "$lib/utils/accessLevel";
   import MigrationSuccessIllustration from "$lib/components/illustrations/MigrationSuccessIllustration.svelte";
   import { onMount } from "svelte";
   import { t } from "$lib/stores/locale.store";
@@ -6,7 +7,10 @@
 
   interface Props {
     /** Called when the user clicks the continue button or the countdown expires. */
-    onAuthorize: (accountNumber: Promise<bigint | undefined>) => void;
+    onAuthorize: (
+      accountNumber: Promise<bigint | undefined>,
+      accessLevel: AccessLevel,
+    ) => void;
   }
 
   const { onAuthorize }: Props = $props();
@@ -22,7 +26,8 @@
       return;
     }
     redirected = true;
-    onAuthorize(Promise.resolve(undefined));
+    // Post-upgrade auto-continue: no access-level toggle, always full access.
+    onAuthorize(Promise.resolve(undefined), "full-access");
   };
 
   onMount(() => {

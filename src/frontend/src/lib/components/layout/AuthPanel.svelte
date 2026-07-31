@@ -1,9 +1,19 @@
+<script lang="ts" module>
+  import { getContext } from "svelte";
+
+  export const isInsideAuthPanel = (): boolean =>
+    getContext("inAuthPanel") === true;
+</script>
+
 <script lang="ts">
+  import { setContext } from "svelte";
   import type { HTMLAttributes } from "svelte/elements";
 
   type Props = HTMLAttributes<HTMLDivElement>;
 
   const { children, class: className, ...props }: Props = $props();
+
+  setContext("inAuthPanel", true);
 </script>
 
 <div

@@ -27,6 +27,7 @@ const OpenIdEmailVerificationIDL = IDL.Variant({
 });
 
 const backendCanisterConfigIDL = IDL.Record({
+  mcp_official_url: IDL.Opt(IDL.Text),
   openid_configs: IDL.Opt(
     IDL.Vec(
       IDL.Record({
@@ -64,6 +65,7 @@ export interface OpenIdConfig {
 }
 export type BackendCanisterConfig = {
   openid_configs: [] | [OpenIdConfig[]];
+  mcp_official_url: [] | [string];
 };
 
 export let canisterId: Principal;
@@ -102,7 +104,7 @@ export const initGlobals = async () => {
   anonymousAgent = HttpAgent.createSync(agentOptions);
   // Fetch subnet keys to speed up queries during authentication,
   // this avoids having to fetch them later on user interaction.
-  void anonymousAgent.fetchSubnetKeys(canisterId);
+  void anonymousAgent.fetchSubnetKeys({ canisterId });
   anonymousActor = Actor.createActor<_SERVICE>(internetIdentityIDL, {
     agent: anonymousAgent,
     canisterId,

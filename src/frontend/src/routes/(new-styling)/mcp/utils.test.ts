@@ -1,0 +1,501 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { ActorSubclass } from "@icp-sdk/core/agent";
+import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import type { Authenticated } from "$lib/stores/authentication.store";
+import { DelegationChain } from "@icp-sdk/core/identity";
+import { toHex } from "$lib/utils/utils";
+import type { BackendCanisterConfig } from "$lib/globals";
+import type { McpConfig } from "$lib/utils/mcpConfig";
+import {
+  isOriginTrusted,
+  mcpAuthorize,
+  McpUntrustedServerError,
+} from "./utils";
+
+const IDENTITY_NUMBER = BigInt(42);
+const MCP_ORIGIN = "https://mcp.id.ai";
+/** The identity's resolved trusted server, as `prepare` returns it (certified).
+ *  Its origin is what the connect link's origin is gated against. */
+const TRUSTED_URL = `${MCP_ORIGIN}/mcp`;
+/** The trusted server's declared connect callback (exact-matched, once the
+ *  origin is trust-confirmed, against the server's
+ *  /.well-known/ii-auth-callbacks allow-list): where the caller delivers the
+ *  registration delegation. */
+const CALLBACK = `${MCP_ORIGIN}/mcp/connect`;
+const AUTH_CALLBACKS_URL = `${MCP_ORIGIN}/.well-known/ii-auth-callbacks`;
+const STATE = "opaque-state";
+const TTL_SECONDS = 3600;
+
+/** A well-formed allow-list response declaring {@link CALLBACK}. A fresh
+ *  `Response` per call, since its body is single-use. */
+const allowListResponse = (): Response =>
+  new Response(JSON.stringify({ callbacks: [CALLBACK] }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+
+/** The MCP server's per-connect registration public key `X` (DER), from the
+ *  link. The browser-signed final hop targets it — the canister never sees it. */
+const REGISTRATION_KEY = new Uint8Array(44).fill(9);
+/** `P_reg`'s DER public key, returned by the mocked prepare call — the chain's
+ *  public key, and what makes the server's redemption `caller() == P_reg`. */
+const USER_KEY = new Uint8Array(62).fill(3);
+
+const expirationNanos = (): bigint =>
+  BigInt(Date.now() + 60 * 60 * 1000) * BigInt(1_000_000);
+
+/** Fake actor recording the exact candid arguments the flow sends. `prepare`
+ *  returns `P_reg`'s key + an expiration; `get` echoes back a well-formed
+ *  signed delegation for whatever key was requested (the browser-generated
+ *  `Y`, unknown to the test up front) — the chain is only assembled and
+ *  serialized on the frontend, never verified, so the signature needn't be
+ *  real. */
+const makeActor = () => {
+  const expiration = expirationNanos();
+  return {
+    expiration,
+    prepare_mcp_registration_delegation: vi.fn().mockResolvedValue({
+      Ok: { user_key: USER_KEY, expiration, trusted_url: TRUSTED_URL },
+    }),
+    get_mcp_registration_delegation: vi.fn(
+      (
+        _anchor: bigint,
+        requestedKey: Uint8Array,
+        _userKey: Uint8Array,
+        _expiration: bigint,
+      ): Promise<
+        | {
+            Ok: {
+              delegation: {
+                pubkey: number[];
+                expiration: bigint;
+                targets: never[];
+                permissions: never[];
+              };
+              signature: number[];
+            };
+          }
+        | { Err: string }
+      > =>
+        Promise.resolve({
+          Ok: {
+            delegation: {
+              pubkey: Array.from(requestedKey),
+              expiration,
+              targets: [],
+              permissions: [],
+            },
+            signature: Array.from(new Uint8Array(64).fill(1)),
+          },
+        }),
+    ),
+  };
+};
+
+/** The browser-generated registration key `Y` the flow sent to `prepare` —
+ *  readable only after the flow ran. */
+const browserKeyOf = (actor: ReturnType<typeof makeActor>): Uint8Array =>
+  actor.prepare_mcp_registration_delegation.mock.calls[0][1] as Uint8Array;
+
+const authorize = (
+  actor: ReturnType<typeof makeActor>,
+  accessLevel: "read-only" | "full-access",
+) =>
+  mcpAuthorize({
+    authenticated: {
+      identityNumber: IDENTITY_NUMBER,
+      actor: actor as unknown as ActorSubclass<_SERVICE>,
+    } as unknown as Authenticated,
+    ttlSeconds: TTL_SECONDS,
+    accessLevel,
+    serverOrigin: MCP_ORIGIN,
+    requestedCallback: CALLBACK,
+    state: STATE,
+    registrationKey: REGISTRATION_KEY,
+  });
+
+beforeEach(() => {
+  // The connect's only network call of its own is the trusted server's
+  // declared-callback allow-list (fetched after the origin is trust-confirmed);
+  // the delegation itself is delivered by navigation, not a request. Stub fetch
+  // to serve a well-formed allow-list declaring the callback.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => Promise.resolve(allowListResponse())),
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe("mcpAuthorize registration-delegation minting", () => {
+  it("prepares the delegation for the server's key with the chosen TTL and read-only", async () => {
+    const actor = makeActor();
+    await authorize(actor, "read-only");
+
+    // Minted for the identity and a browser-generated ephemeral key Y, with
+    // the user-chosen grant TTL and the read-only access level (recorded on
+    // the registration entry, never into the signature).
+    expect(actor.prepare_mcp_registration_delegation).toHaveBeenCalledWith(
+      IDENTITY_NUMBER,
+      expect.any(Uint8Array),
+      [{ queries: null }],
+      [BigInt(TTL_SECONDS) * BigInt(1_000_000_000)],
+    );
+  });
+
+  it("never sends the link's key X to the canister", async () => {
+    // The canister-signed hop must be inert to a transport-level observer:
+    // it targets the browser-held Y, never the (attacker-craftable) link's X.
+    const actor = makeActor();
+    await authorize(actor, "read-only");
+
+    const browserKey = browserKeyOf(actor);
+    expect(browserKey.length).toBeGreaterThan(0);
+    expect(toHex(browserKey)).not.toBe(toHex(REGISTRATION_KEY));
+    const [, getKey] = actor.get_mcp_registration_delegation.mock.calls[0];
+    expect(toHex(getKey)).toBe(toHex(browserKey));
+  });
+
+  it("generates a fresh Y per connect attempt", async () => {
+    const first = makeActor();
+    await authorize(first, "read-only");
+    const second = makeActor();
+    await authorize(second, "read-only");
+    expect(toHex(browserKeyOf(first))).not.toBe(toHex(browserKeyOf(second)));
+  });
+
+  it("passes full access explicitly (never relies on the backend default)", async () => {
+    const actor = makeActor();
+    await authorize(actor, "full-access");
+
+    expect(actor.prepare_mcp_registration_delegation).toHaveBeenCalledWith(
+      IDENTITY_NUMBER,
+      expect.any(Uint8Array),
+      [{ all: null }],
+      [BigInt(TTL_SECONDS) * BigInt(1_000_000_000)],
+    );
+  });
+
+  it("fetches the certified delegation by handing back the user_key prepare returned", async () => {
+    const actor = makeActor();
+    await authorize(actor, "read-only");
+
+    // `get` recovers the seed from `user_key` (no consent params), so it is
+    // called with the browser key Y, the user_key prepare returned, and the
+    // expiration.
+    expect(actor.get_mcp_registration_delegation).toHaveBeenCalledWith(
+      IDENTITY_NUMBER,
+      browserKeyOf(actor),
+      USER_KEY,
+      actor.expiration,
+    );
+  });
+
+  it("fetches only the declared-callback allow-list (delivery is by navigation)", async () => {
+    // The single network request the connect makes is the GET for the trusted
+    // server's callback allow-list; the delegation is delivered by the returned
+    // URL, never a request carrying it.
+    await authorize(makeActor(), "read-only");
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(AUTH_CALLBACKS_URL);
+  });
+});
+
+describe("mcpAuthorize trust gate (certified trusted_url)", () => {
+  it("refuses to deliver when the link origin is not prepare's trusted origin", async () => {
+    // A forged config can't help an attacker here: the gate is prepare's
+    // certified trusted_url, and its origin does not match the link's server.
+    const actor = makeActor();
+    actor.prepare_mcp_registration_delegation.mockResolvedValue({
+      Ok: {
+        user_key: USER_KEY,
+        expiration: actor.expiration,
+        trusted_url: "https://evil.example.com/mcp",
+      },
+    });
+
+    await expect(authorize(actor, "full-access")).rejects.toBeInstanceOf(
+      McpUntrustedServerError,
+    );
+    // Aborted before contacting the server or fetching the delegation, so the
+    // minted registration is never turned into a redeemable chain.
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(actor.get_mcp_registration_delegation).not.toHaveBeenCalled();
+  });
+
+  it("treats a 'no trusted server' prepare refusal as untrusted, not an error", async () => {
+    // MCP off/unset for this identity: route to the untrusted screen (where the
+    // user can set a trusted server), like every other not-trusted outcome.
+    const actor = makeActor();
+    actor.prepare_mcp_registration_delegation.mockResolvedValue({
+      Err: "MCP registration failed: no trusted MCP server is enabled for this identity.",
+    });
+
+    await expect(authorize(actor, "read-only")).rejects.toBeInstanceOf(
+      McpUntrustedServerError,
+    );
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(actor.get_mcp_registration_delegation).not.toHaveBeenCalled();
+  });
+
+  it("delivers when the link origin matches prepare's trusted origin (path ignored)", async () => {
+    // trusted_url keeps its path; the gate is an origin decision, so a
+    // path-based trusted endpoint still authorizes a connect to that origin.
+    const actor = makeActor();
+    actor.prepare_mcp_registration_delegation.mockResolvedValue({
+      Ok: {
+        user_key: USER_KEY,
+        expiration: actor.expiration,
+        trusted_url: `${MCP_ORIGIN}/some/deep/path`,
+      },
+    });
+
+    const url = await authorize(actor, "read-only");
+    expect(url.startsWith(`${CALLBACK}#`)).toBe(true);
+  });
+});
+
+describe("mcpAuthorize delivery URL", () => {
+  it("targets the declared callback and carries the state echo", async () => {
+    const url = await authorize(makeActor(), "read-only");
+
+    expect(url.startsWith(`${CALLBACK}#`)).toBe(true);
+    const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
+    expect(fragment.get("state")).toBe(STATE);
+  });
+
+  it("delivers only the delegation and state — no consent params", async () => {
+    // The server passes nothing but its session key to mcp_register_v2; the
+    // canister recovers the whole consent from the entry. So the fragment
+    // carries only the chain and the state echo — no anchor, permissions, or
+    // ttl (checked for both access levels, since neither should surface).
+    for (const level of ["read-only", "full-access"] as const) {
+      const url = await authorize(makeActor(), level);
+      const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
+      expect([...fragment.keys()].sort()).toEqual(["delegation", "state"]);
+      // Belt-and-suspenders: the anchor number appears as no param value (the
+      // delegation blob is hex and may contain the digits incidentally, so
+      // check values, not substrings).
+      for (const value of fragment.values()) {
+        expect(value).not.toBe(IDENTITY_NUMBER.toString());
+      }
+    }
+  });
+
+  it("marks a full-access connect as such to prepare (never in the fragment)", async () => {
+    const actor = makeActor();
+    await authorize(actor, "full-access");
+
+    // The access level reaches the canister via prepare, not the fragment.
+    expect(actor.prepare_mcp_registration_delegation).toHaveBeenCalledWith(
+      IDENTITY_NUMBER,
+      expect.any(Uint8Array),
+      [{ all: null }],
+      [BigInt(TTL_SECONDS) * BigInt(1_000_000_000)],
+    );
+  });
+
+  it("carries a reconstructable two-hop P_reg -> Y -> X chain", async () => {
+    const actor = makeActor();
+    const url = await authorize(actor, "read-only");
+
+    const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
+    const delegation = fragment.get("delegation");
+    if (delegation === null) throw new Error("no delegation in the fragment");
+
+    // The server round-trips the chain out of the fragment exactly like this.
+    const chain = DelegationChain.fromJSON(JSON.parse(delegation));
+    // Its public key is P_reg's DER key, so the redemption is caller() == P_reg.
+    expect(toHex(new Uint8Array(chain.publicKey))).toBe(toHex(USER_KEY));
+    expect(chain.delegations).toHaveLength(2);
+    const [canisterHop, browserHop] = chain.delegations;
+    // Hop 1 (canister-signed) targets the browser-held Y...
+    expect(toHex(new Uint8Array(canisterHop.delegation.pubkey))).toBe(
+      toHex(browserKeyOf(actor)),
+    );
+    // ...hop 2 (browser-signed) targets the server's X, expiring no later
+    // than the canister hop.
+    expect(toHex(new Uint8Array(browserHop.delegation.pubkey))).toBe(
+      toHex(REGISTRATION_KEY),
+    );
+    expect(
+      browserHop.delegation.expiration <= canisterHop.delegation.expiration,
+    ).toBe(true);
+  });
+});
+
+describe("mcpAuthorize failure paths", () => {
+  it("propagates a prepare refusal and never fetches the delegation", async () => {
+    const actor = makeActor();
+    actor.prepare_mcp_registration_delegation.mockResolvedValue({
+      Err: "MCP registration failed: 2vxsx-fae could not be authenticated.",
+    });
+
+    await expect(authorize(actor, "full-access")).rejects.toThrow(
+      /could not be authenticated/,
+    );
+    // Aborted before the certified delegation is even fetched.
+    expect(actor.get_mcp_registration_delegation).not.toHaveBeenCalled();
+  });
+
+  it("propagates a get refusal", async () => {
+    const actor = makeActor();
+    actor.get_mcp_registration_delegation.mockResolvedValue({
+      Err: "MCP registration failed: no such delegation.",
+    });
+
+    await expect(authorize(actor, "read-only")).rejects.toThrow(
+      /no such delegation/,
+    );
+  });
+});
+
+const OFFICIAL: Pick<BackendCanisterConfig, "mcp_official_url"> = {
+  mcp_official_url: ["https://official-mcp.id.ai/mcp"],
+};
+const NO_OFFICIAL: Pick<BackendCanisterConfig, "mcp_official_url"> = {
+  mcp_official_url: [],
+};
+const CUSTOM = "https://mcp.acme.com/mcp";
+
+/** A stored config. `undefined` stands for an identity that never wrote one. */
+const cfg = (enabled: boolean, url: string | undefined): McpConfig => ({
+  enabled,
+  url,
+});
+
+describe("isOriginTrusted", () => {
+  const trust = (url: string | undefined, enabled = true): McpConfig =>
+    cfg(enabled, url);
+
+  it("trusts an origin that matches the configured server's origin", () => {
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai/mcp"),
+        "https://mcp.id.ai",
+        NO_OFFICIAL,
+      ),
+    ).toBe(true);
+  });
+
+  it("matches by origin only, ignoring the trusted URL's path", () => {
+    // The URL is kept verbatim (e.g. a path-based endpoint), but trust is an
+    // origin decision — the path must not narrow or widen the match.
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai/some/deep/path"),
+        "https://mcp.id.ai",
+        NO_OFFICIAL,
+      ),
+    ).toBe(true);
+  });
+
+  it("does not trust when the feature is disabled, even if the origin matches", () => {
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai/mcp", false),
+        "https://mcp.id.ai",
+        NO_OFFICIAL,
+      ),
+    ).toBe(false);
+  });
+
+  it("does not trust when no server URL is configured", () => {
+    expect(
+      isOriginTrusted(trust(undefined), "https://mcp.id.ai", NO_OFFICIAL),
+    ).toBe(false);
+  });
+
+  it("rejects a different host", () => {
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai/mcp"),
+        "https://evil.example.com",
+        NO_OFFICIAL,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a scheme mismatch (http vs https is a different origin)", () => {
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai/mcp"),
+        "http://mcp.id.ai",
+        NO_OFFICIAL,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a port mismatch", () => {
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai:8443/mcp"),
+        "https://mcp.id.ai",
+        NO_OFFICIAL,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a subdomain that is not the exact origin", () => {
+    expect(
+      isOriginTrusted(
+        trust("https://mcp.id.ai/mcp"),
+        "https://sub.mcp.id.ai",
+        NO_OFFICIAL,
+      ),
+    ).toBe(false);
+  });
+
+  it("does not trust when the configured URL is unparsable", () => {
+    expect(
+      isOriginTrusted(trust("not a url"), "https://mcp.id.ai", NO_OFFICIAL),
+    ).toBe(false);
+  });
+});
+
+describe("isOriginTrusted — official connector", () => {
+  const OFFICIAL_ORIGIN = "https://official-mcp.id.ai";
+  const CUSTOM_ORIGIN = "https://mcp.acme.com";
+
+  it("rejects it for an identity that stores no config", () => {
+    // Registration seeds a config, so this is an identity that predates it and
+    // never used the feature. It has to turn AI access on in Settings first.
+    expect(isOriginTrusted(undefined, OFFICIAL_ORIGIN, OFFICIAL)).toBe(false);
+  });
+
+  it("rejects it once the feature has been switched off", () => {
+    expect(
+      isOriginTrusted(cfg(false, undefined), OFFICIAL_ORIGIN, OFFICIAL),
+    ).toBe(false);
+  });
+
+  it("accepts it for an enabled config with no custom server", () => {
+    expect(
+      isOriginTrusted(cfg(true, undefined), OFFICIAL_ORIGIN, OFFICIAL),
+    ).toBe(true);
+  });
+
+  it("lets a custom connector displace it", () => {
+    expect(isOriginTrusted(cfg(true, CUSTOM), CUSTOM_ORIGIN, OFFICIAL)).toBe(
+      true,
+    );
+    expect(isOriginTrusted(cfg(true, CUSTOM), OFFICIAL_ORIGIN, OFFICIAL)).toBe(
+      false,
+    );
+  });
+
+  it("requires the feature enabled for a custom connector", () => {
+    expect(isOriginTrusted(cfg(false, CUSTOM), CUSTOM_ORIGIN, OFFICIAL)).toBe(
+      false,
+    );
+  });
+
+  it("accepts nothing when no official connector is configured", () => {
+    expect(
+      isOriginTrusted(cfg(true, undefined), OFFICIAL_ORIGIN, NO_OFFICIAL),
+    ).toBe(false);
+  });
+});

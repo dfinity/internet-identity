@@ -13,9 +13,11 @@ import {
   authenticationStore,
 } from "$lib/stores/authentication.store";
 import {
+  type Authorized,
   authorizationStore,
   authorizedStore,
 } from "$lib/stores/authorization.store";
+import { getMetadataString } from "$lib/utils/openID";
 import { retryFor, throwCanisterError, waitForStore } from "$lib/utils/utils";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
@@ -276,11 +278,13 @@ export const handleLegacyAttributes =
 type ConsentPipeline = {
   accountNumberPromise: Promise<bigint | undefined>;
   authenticated: Authenticated;
+  authorized: Authorized;
   origin: string;
   unmappedOrigin: string;
   groups: AttributeGroup[];
   recoveryAddresses: string[];
   verifiedAddresses: string[];
+  openidAddresses: string[];
 };
 
 /**
@@ -299,7 +303,8 @@ const resolveConsentPipeline = async (params: {
 }): Promise<ConsentPipeline | null> => {
   const { channel, onError, derivationOrigin, requestedKeys } = params;
   try {
-    const { accountNumberPromise } = await waitForStore(authorizedStore);
+    const authorized = await waitForStore(authorizedStore);
+    const { accountNumberPromise } = authorized;
     const authenticated = await waitForStore(authenticationStore);
 
     const validationResult = await validateDerivationOrigin({
@@ -327,11 +332,12 @@ const resolveConsentPipeline = async (params: {
             })
             .then(throwCanisterError)
         : Promise.resolve([]);
+    const identityInfoPromise = authenticated.actor
+      .identity_info(authenticated.identityNumber)
+      .then(throwCanisterError);
     const [available, identityInfo] = await Promise.all([
       availablePromise,
-      authenticated.actor
-        .identity_info(authenticated.identityNumber)
-        .then(throwCanisterError),
+      identityInfoPromise,
     ]);
     const recoveryAddresses = (identityInfo.email_recovery[0] ?? []).map(
       (c: { address: string }) => c.address,
@@ -339,15 +345,20 @@ const resolveConsentPipeline = async (params: {
     const verifiedAddresses = (identityInfo.verified_emails[0] ?? []).map(
       (e: { address: string }) => e.address,
     );
+    const openidAddresses = (identityInfo.openid_credentials[0] ?? [])
+      .map((c) => getMetadataString(c.metadata, "email"))
+      .filter((e): e is string => e !== undefined);
 
     return {
       accountNumberPromise,
       authenticated,
+      authorized,
       origin,
       unmappedOrigin,
       groups: resolveAttributeGroups(requestedKeys, available),
       recoveryAddresses,
       verifiedAddresses,
+      openidAddresses,
     };
   } catch (error) {
     console.error(error);
@@ -520,10 +531,10 @@ export const handleIcrc3OneClickOpenIdAttributes =
   };
 
 /**
- * SSO equivalent of {@link handleIcrc3OneClickOpenIdAttributes}. When the
- * user signed in via the `?sso=<domain>` 1-click entry and every requested
- * key is in that domain's auto-approve allowlist, certify and send without
- * showing the consent UI.
+ * SSO equivalent of {@link handleIcrc3OneClickOpenIdAttributes}. When the app
+ * requested SSO sign-in via the `?sso=<domain>` 1-click entry and every
+ * requested key is in that domain's auto-approve allowlist, certify and send
+ * without showing the consent UI.
  */
 export const handleIcrc3OneClickSsoAttributes =
   (channel: Channel, onError: (error: ChannelError) => void) =>
@@ -545,18 +556,17 @@ export const handleIcrc3OneClickSsoAttributes =
       return;
     }
 
-    const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
-    if (flow.type !== "1-click-sso") {
-      return;
-    }
-    const ssoDomain = flow.domain;
-    if (!requestedKeys.every((key) => isOneClickSsoKey(key, ssoDomain))) {
-      return;
-    }
-
     try {
-      const { accountNumberPromise } = await waitForStore(authorizedStore);
+      const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
+      // Auto-approve only the `?sso=<domain>` 1-click entry, not the manual wizard or a passkey/OpenID session.
+      if (flow.type !== "1-click-sso") {
+        return;
+      }
+      if (!requestedKeys.every((key) => isOneClickSsoKey(key, flow.domain))) {
+        return;
+      }
       const authenticated = await waitForStore(authenticationStore);
+      const { accountNumberPromise } = await waitForStore(authorizedStore);
 
       const validationResult = await validateDerivationOrigin({
         requestOrigin: channel.origin,
@@ -640,9 +650,7 @@ export const handleIcrc3ConsentAttributes =
 
     await serializeConsentRequest(async () => {
       try {
-        // Wait for the flow — set eagerly by the authorize page — so we can
-        // bail out as soon as we know one of the 1-click handlers will
-        // take this request.
+        // Bail out as soon as we know one of the 1-click handlers will take this request.
         const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
         const oneClickHandlerWillHandle =
           requestedKeys.length > 0 &&
@@ -658,42 +666,6 @@ export const handleIcrc3ConsentAttributes =
           return;
         }
 
-        // Kick off the pipeline but don't await it yet — we want to set the
-        // consent context synchronously from the (still-pending) promise so
-        // the consent view can paint its loading skeleton while auth
-        // resolves and `list_available_attributes` runs in the background.
-        const pipelinePromise = resolveConsentPipeline({
-          channel,
-          onError,
-          derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
-          requestedKeys,
-        });
-
-        attributeConsentStore.setContext(
-          pipelinePromise.then((pipeline) => ({
-            groups: pipeline?.groups ?? [],
-            effectiveOrigin: pipeline?.origin ?? "",
-            requestedKeys,
-            recoveryAddresses: pipeline?.recoveryAddresses ?? [],
-            verifiedAddresses: pipeline?.verifiedAddresses ?? [],
-          })),
-        );
-
-        const pipeline = await pipelinePromise;
-        if (pipeline === null) {
-          // Error (or invalid origin) already reported — resolve the consent
-          // result so the UI transitions away from the loading state instead
-          // of hanging.
-          attributeConsentStore.setConsent({ attributes: [] });
-          return;
-        }
-
-        let attributeSpecs: Array<{
-          key: string;
-          value: [] | [Uint8Array];
-          omit_scope: boolean;
-        }>;
-
         // Only unscoped email/verified_email; scoped keys are pinned to
         // a source that the inline verify wizard can't satisfy.
         const emailRequested = requestedKeys.some((key) => {
@@ -702,32 +674,85 @@ export const handleIcrc3ConsentAttributes =
           return name === "email" || name === "verified_email";
         });
 
-        if (pipeline.groups.length === 0 && !emailRequested) {
-          // Nothing to share and no inline "Verify an email" affordance —
-          // certify an empty set so the UI skips the empty picker view.
-          attributeSpecs = [];
-          attributeConsentStore.setConsent({ attributes: [] });
-        } else {
-          const consent = await waitForStore(attributeConsentResultStore);
-          attributeSpecs = consent.attributes.map((attr) => ({
-            key: attr.key,
-            value: [new Uint8Array(attr.rawValue)] as [Uint8Array],
-            omit_scope: attr.omitScope,
-          }));
-        }
+        for (;;) {
+          // Kick off the pipeline but don't await it yet — we want to set the
+          // consent context synchronously from the (still-pending) promise so
+          // the consent view can paint its loading skeleton while auth
+          // resolves and `list_available_attributes` runs in the background.
+          const pipelinePromise = resolveConsentPipeline({
+            channel,
+            onError,
+            derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
+            requestedKeys,
+          });
 
-        const accountNumber = await pipeline.accountNumberPromise;
-        await certifyAndSend({
-          channel,
-          onError,
-          requestId,
-          nonce: paramsResult.data.nonce,
-          authenticated: pipeline.authenticated,
-          accountNumber,
-          origin: pipeline.origin,
-          unmappedOrigin: pipeline.unmappedOrigin,
-          attributeSpecs,
-        });
+          attributeConsentStore.setContext(
+            pipelinePromise.then((pipeline) => ({
+              groups: pipeline?.groups ?? [],
+              effectiveOrigin: pipeline?.origin ?? "",
+              requestedKeys,
+              recoveryAddresses: pipeline?.recoveryAddresses ?? [],
+              verifiedAddresses: pipeline?.verifiedAddresses ?? [],
+              openidAddresses: pipeline?.openidAddresses ?? [],
+            })),
+          );
+
+          const pipeline = await pipelinePromise;
+          if (pipeline === null) {
+            // Error (or invalid origin) already reported — resolve the consent
+            // result so the UI transitions away from the loading state instead
+            // of hanging.
+            attributeConsentStore.setConsent({ attributes: [] });
+            return;
+          }
+
+          let attributeSpecs: Array<{
+            key: string;
+            value: [] | [Uint8Array];
+            omit_scope: boolean;
+          }>;
+
+          if (pipeline.groups.length === 0 && !emailRequested) {
+            // Nothing to share and no inline "Verify an email" affordance —
+            // certify an empty set so the UI skips the empty picker view.
+            attributeSpecs = [];
+            attributeConsentStore.setConsent({ attributes: [] });
+          } else {
+            const outcome = await Promise.race([
+              waitForStore(attributeConsentResultStore).then((consent) => ({
+                type: "consent" as const,
+                consent,
+              })),
+              waitForStore(authorizedStore, (authorized) =>
+                authorized !== pipeline.authorized
+                  ? { type: "restart" as const }
+                  : undefined,
+              ),
+            ]);
+            if (outcome.type === "restart") {
+              continue;
+            }
+            attributeSpecs = outcome.consent.attributes.map((attr) => ({
+              key: attr.key,
+              value: [new Uint8Array(attr.rawValue)] as [Uint8Array],
+              omit_scope: attr.omitScope,
+            }));
+          }
+
+          const accountNumber = await pipeline.accountNumberPromise;
+          await certifyAndSend({
+            channel,
+            onError,
+            requestId,
+            nonce: paramsResult.data.nonce,
+            authenticated: pipeline.authenticated,
+            accountNumber,
+            origin: pipeline.origin,
+            unmappedOrigin: pipeline.unmappedOrigin,
+            attributeSpecs,
+          });
+          return;
+        }
       } finally {
         // Always reset consent state so the next request on this channel
         // starts from a clean slate (no leftover context/result from us).

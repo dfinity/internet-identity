@@ -72,15 +72,14 @@ export const idlFactory = ({ IDL }) => {
   });
   const InternetIdentityInit = IDL.Record({
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
-    'sso_allow_any_domain' : IDL.Opt(IDL.Bool),
     'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
+    'mcp_config_migration' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'dnssec_config' : IDL.Opt(IDL.Opt(DnssecConfig)),
-    'sso_discoverable_domains' : IDL.Opt(IDL.Vec(IDL.Text)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
@@ -89,7 +88,9 @@ export const idlFactory = ({ IDL }) => {
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),
     'backend_origin' : IDL.Opt(IDL.Text),
     'captcha_config' : IDL.Opt(CaptchaConfig),
+    'mcp_official_url' : IDL.Opt(IDL.Opt(IDL.Text)),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
+    'sso_allow_insecure_discovery' : IDL.Opt(IDL.Bool),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   const UserNumber = IDL.Nat64;
@@ -372,6 +373,7 @@ export const idlFactory = ({ IDL }) => {
     'nonce' : IDL.Text,
   });
   const Delegation = IDL.Record({
+    'permissions' : IDL.Opt(IDL.Text),
     'pubkey' : PublicKey,
     'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
     'expiration' : Timestamp,
@@ -386,6 +388,7 @@ export const idlFactory = ({ IDL }) => {
     'anchor_number' : UserNumber,
     'timestamp' : Timestamp,
   });
+  const Permissions = IDL.Variant({ 'all' : IDL.Null, 'queries' : IDL.Null });
   const AccountDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -519,16 +522,20 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
   });
+  const GetSsoDiscoveryStatusRequest = IDL.Record({
+    'target_app_origin' : IDL.Opt(FrontendHostname),
+    'org_domain' : IDL.Text,
+  });
   const SsoDiscovery = IDL.Record({
     'scopes' : IDL.Vec(IDL.Text),
     'name' : IDL.Opt(IDL.Text),
     'authorization_endpoint' : IDL.Text,
     'issuer' : IDL.Text,
+    'resolved_client_id' : IDL.Opt(IDL.Text),
     'discovery_domain' : IDL.Text,
     'client_id' : IDL.Text,
   });
-  const SsoDiscoveryState = IDL.Variant({
-    'NotAllowed' : IDL.Null,
+  const SsoDiscoveryStatus = IDL.Variant({
     'Resolved' : SsoDiscovery,
     'Pending' : IDL.Null,
   });
@@ -602,6 +609,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const IdRegFinishResult = IDL.Record({ 'identity_number' : IDL.Nat64 });
   const IdRegFinishError = IDL.Variant({
+    'SsoNormalLoginRequired' : IDL.Null,
     'NoRegistrationFlow' : IDL.Null,
     'UnexpectedCall' : IDL.Record({ 'next_step' : RegistrationFlowNextStep }),
     'InvalidAuthnMethod' : IDL.Text,
@@ -636,6 +644,10 @@ export const idlFactory = ({ IDL }) => {
     'account_number' : IDL.Opt(AccountNumber),
     'expiration' : Timestamp,
   });
+  const McpRegistrationV2 = IDL.Record({
+    'permissions' : Permissions,
+    'expiration' : Timestamp,
+  });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
@@ -660,6 +672,7 @@ export const idlFactory = ({ IDL }) => {
   const OpenIDRegFinishArg = IDL.Record({
     'jwt' : JWT,
     'name' : IDL.Text,
+    'origin' : IDL.Opt(IDL.Text),
     'salt' : Salt,
     'discovery_domain' : IDL.Opt(IDL.Text),
   });
@@ -723,6 +736,11 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
   });
+  const PrepareMcpRegistrationDelegation = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
+    'trusted_url' : IDL.Text,
+  });
   const PrepareSessionDelegation = IDL.Record({
     'user_key' : UserKey,
     'expiration' : Timestamp,
@@ -769,6 +787,32 @@ export const idlFactory = ({ IDL }) => {
   const SmtpResponse = IDL.Variant({
     'Ok' : IDL.Record({}),
     'Err' : SmtpRequestError,
+  });
+  const SsoGetDelegationRequest = IDL.Record({
+    'jwt' : JWT,
+    'session_key' : SessionKey,
+    'salt' : Salt,
+    'sso_attr_bundle' : IDL.Vec(IDL.Nat8),
+    'target_app_origin' : FrontendHostname,
+    'expiration' : Timestamp,
+    'org_domain' : IDL.Text,
+  });
+  const SsoGetDelegationResponse = IDL.Record({
+    'signed_delegation' : SignedDelegation,
+    'sso_attr_bundle_signature' : IDL.Vec(IDL.Nat8),
+  });
+  const SsoPrepareDelegationRequest = IDL.Record({
+    'jwt' : JWT,
+    'session_key' : SessionKey,
+    'salt' : Salt,
+    'target_app_origin' : FrontendHostname,
+    'org_domain' : IDL.Text,
+  });
+  const SsoPrepareDelegationResponse = IDL.Record({
+    'user_key' : UserKey,
+    'sso_attr_bundle' : IDL.Vec(IDL.Nat8),
+    'expiration' : Timestamp,
+    'anchor_number' : UserNumber,
   });
   const ArchiveInfo = IDL.Record({
     'archive_config' : IDL.Opt(ArchiveConfig),
@@ -984,6 +1028,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(AccountNumber),
           SessionKey,
           Timestamp,
+          IDL.Opt(Permissions),
         ],
         [
           IDL.Variant({
@@ -1044,6 +1089,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IdAliasCredentials, 'Err' : GetIdAliasError })],
         ['query'],
       ),
+    'get_mcp_registration_delegation' : IDL.Func(
+        [UserNumber, SessionKey, PublicKey, Timestamp],
+        [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : IDL.Text })],
+        ['query'],
+      ),
     'get_principal' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Principal],
@@ -1059,7 +1109,11 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
-    'get_sso_discovery' : IDL.Func([IDL.Text], [SsoDiscoveryState], ['query']),
+    'get_sso_discovery_status' : IDL.Func(
+        [GetSsoDiscoveryStatusRequest],
+        [SsoDiscoveryStatus],
+        ['query'],
+      ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'identity_authn_info' : IDL.Func(
         [IdentityNumber],
@@ -1128,12 +1182,18 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(DeviceKeyWithAnchor)],
         ['query'],
       ),
-    'mcp_access_enabled' : IDL.Func(
-        [UserNumber, FrontendHostname, IDL.Opt(AccountNumber)],
-        [IDL.Bool],
+    'mcp_get_accounts' : IDL.Func(
+        [FrontendHostname],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Vec(AccountInfo),
+            'Err' : AccountDelegationError,
+          }),
+        ],
         ['query'],
       ),
-    'mcp_get_account_delegation' : IDL.Func(
+    'mcp_get_config' : IDL.Func([UserNumber], [IDL.Opt(McpConfig)], ['query']),
+    'mcp_get_delegation' : IDL.Func(
         [FrontendHostname, IDL.Opt(AccountNumber), SessionKey, Timestamp],
         [
           IDL.Variant({
@@ -1143,8 +1203,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
-    'mcp_get_config' : IDL.Func([UserNumber], [McpConfig], ['query']),
-    'mcp_prepare_account_delegation' : IDL.Func(
+    'mcp_prepare_delegation' : IDL.Func(
         [
           FrontendHostname,
           IDL.Opt(AccountNumber),
@@ -1159,9 +1218,9 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'mcp_set_access' : IDL.Func(
-        [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), IDL.Bool],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+    'mcp_register_v2' : IDL.Func(
+        [SessionKey],
+        [IDL.Variant({ 'Ok' : McpRegistrationV2, 'Err' : IDL.Text })],
         [],
       ),
     'mcp_set_config' : IDL.Func(
@@ -1225,6 +1284,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(AccountNumber),
           SessionKey,
           IDL.Opt(IDL.Nat64),
+          IDL.Opt(Permissions),
         ],
         [
           IDL.Variant({
@@ -1264,6 +1324,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : PreparedIdAlias, 'Err' : PrepareIdAliasError })],
         [],
       ),
+    'prepare_mcp_registration_delegation' : IDL.Func(
+        [UserNumber, SessionKey, IDL.Opt(Permissions), IDL.Opt(IDL.Nat64)],
+        [
+          IDL.Variant({
+            'Ok' : PrepareMcpRegistrationDelegation,
+            'Err' : IDL.Text,
+          }),
+        ],
+        [],
+      ),
     'prepare_session_delegation' : IDL.Func(
         [UserNumber, SessionKey, IDL.Opt(IDL.Nat64)],
         [
@@ -1291,6 +1361,28 @@ export const idlFactory = ({ IDL }) => {
         [SmtpRequest],
         [SmtpResponse],
         ['query'],
+      ),
+    'sso_get_delegation' : IDL.Func(
+        [SsoGetDelegationRequest],
+        [
+          IDL.Variant({
+            'Ok' : SsoGetDelegationResponse,
+            'Err' : OpenIdDelegationError,
+            'Pending' : IDL.Null,
+          }),
+        ],
+        ['query'],
+      ),
+    'sso_prepare_delegation' : IDL.Func(
+        [SsoPrepareDelegationRequest],
+        [
+          IDL.Variant({
+            'Ok' : SsoPrepareDelegationResponse,
+            'Err' : OpenIdDelegationError,
+            'Pending' : IDL.Null,
+          }),
+        ],
+        [],
       ),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
@@ -1389,15 +1481,14 @@ export const init = ({ IDL }) => {
   });
   const InternetIdentityInit = IDL.Record({
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
-    'sso_allow_any_domain' : IDL.Opt(IDL.Bool),
     'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
+    'mcp_config_migration' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'dnssec_config' : IDL.Opt(IDL.Opt(DnssecConfig)),
-    'sso_discoverable_domains' : IDL.Opt(IDL.Vec(IDL.Text)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
@@ -1406,7 +1497,9 @@ export const init = ({ IDL }) => {
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),
     'backend_origin' : IDL.Opt(IDL.Text),
     'captcha_config' : IDL.Opt(CaptchaConfig),
+    'mcp_official_url' : IDL.Opt(IDL.Opt(IDL.Text)),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
+    'sso_allow_insecure_discovery' : IDL.Opt(IDL.Bool),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   return [IDL.Opt(InternetIdentityInit)];

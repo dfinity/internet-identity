@@ -38,8 +38,7 @@ pub struct StorablePersistentState {
     new_flow_origins: Option<Vec<String>>,
     openid_configs: Option<Vec<OpenIdConfig>>,
     oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
-    sso_discoverable_domains: Option<Vec<String>>,
-    sso_allow_any_domain: Option<bool>,
+    sso_allow_insecure_discovery: Option<bool>,
     analytics_config: Option<AnalyticsConfig>,
     enable_dapps_explorer: Option<bool>,
     is_production: Option<bool>,
@@ -47,6 +46,7 @@ pub struct StorablePersistentState {
     enable_dnssec_email_recovery: Option<bool>,
     dnssec_config: Option<DnssecConfig>,
     doh_config: Option<DohConfig>,
+    mcp_official_url: Option<String>,
 }
 
 impl Storable for StorablePersistentState {
@@ -89,8 +89,7 @@ impl From<PersistentState> for StorablePersistentState {
             new_flow_origins: s.new_flow_origins,
             openid_configs: s.openid_configs,
             oidc_configs: s.oidc_configs,
-            sso_discoverable_domains: s.sso_discoverable_domains,
-            sso_allow_any_domain: s.sso_allow_any_domain,
+            sso_allow_insecure_discovery: s.sso_allow_insecure_discovery,
             analytics_config: s.analytics_config,
             enable_dapps_explorer: s.enable_dapps_explorer,
             is_production: s.is_production,
@@ -98,6 +97,7 @@ impl From<PersistentState> for StorablePersistentState {
             enable_dnssec_email_recovery: s.enable_dnssec_email_recovery,
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
+            mcp_official_url: s.mcp_official_url,
         }
     }
 }
@@ -117,8 +117,7 @@ impl From<StorablePersistentState> for PersistentState {
             new_flow_origins: s.new_flow_origins,
             openid_configs: s.openid_configs,
             oidc_configs: s.oidc_configs,
-            sso_discoverable_domains: s.sso_discoverable_domains,
-            sso_allow_any_domain: s.sso_allow_any_domain,
+            sso_allow_insecure_discovery: s.sso_allow_insecure_discovery,
             analytics_config: s.analytics_config,
             event_stats_24h_start: s.event_stats_24h_start,
             enable_dapps_explorer: s.enable_dapps_explorer,
@@ -127,6 +126,7 @@ impl From<StorablePersistentState> for PersistentState {
             enable_dnssec_email_recovery: s.enable_dnssec_email_recovery,
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
+            mcp_official_url: s.mcp_official_url,
         }
     }
 }
@@ -175,8 +175,7 @@ mod tests {
             new_flow_origins: None,
             openid_configs: None,
             oidc_configs: None,
-            sso_discoverable_domains: None,
-            sso_allow_any_domain: None,
+            sso_allow_insecure_discovery: None,
             analytics_config: None,
             enable_dapps_explorer: None,
             is_production: None,
@@ -184,6 +183,7 @@ mod tests {
             enable_dnssec_email_recovery: None,
             dnssec_config: None,
             doh_config: None,
+            mcp_official_url: None,
         };
 
         pretty_assertions::assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -207,8 +207,7 @@ mod tests {
             new_flow_origins: None,
             openid_configs: None,
             oidc_configs: None,
-            sso_discoverable_domains: None,
-            sso_allow_any_domain: None,
+            sso_allow_insecure_discovery: None,
             event_stats_24h_start: None,
             analytics_config: None,
             enable_dapps_explorer: None,
@@ -217,6 +216,7 @@ mod tests {
             enable_dnssec_email_recovery: None,
             dnssec_config: None,
             doh_config: None,
+            mcp_official_url: None,
         };
         pretty_assertions::assert_eq!(PersistentState::default(), expected_defaults);
     }

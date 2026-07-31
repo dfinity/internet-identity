@@ -1222,13 +1222,14 @@ fn icrc3_test_vectors() {
     let expected_value: serde_json::Value = serde_json::from_str(&expected_raw)
         .unwrap_or_else(|e| panic!("failed to parse {}: {e}", snapshot_path.display()));
 
-    // Strip `certificate_cbor_hex` from both sides before comparing: the CBOR
-    // certificate's BLS signature is not stable across PocketIC versions /
-    // platforms, while the canister-produced `message_hex` and
-    // `signed_message_hex` bytes are fully deterministic and are what dapps
-    // actually rely on.
-    let generated_stable = serialize_snapshot_pretty(&strip_cert(&snapshot));
-    let expected_stable = serialize_snapshot_pretty(&strip_cert(&expected_value));
+    // Strip the environment-dependent fields from both sides before comparing:
+    // the per-vector CBOR certificate's BLS signature, the subnet `root_key_hex`,
+    // and the `canister_sig_pk_hex` (which embeds the PocketIC-assigned canister
+    // id) all vary across PocketIC versions / platforms. The canister-produced
+    // `message_hex` and `signed_message_hex` bytes are fully deterministic and
+    // are what dapps actually rely on.
+    let generated_stable = serialize_snapshot_pretty(&strip_unstable(&snapshot));
+    let expected_stable = serialize_snapshot_pretty(&strip_unstable(&expected_value));
 
     assert_eq!(
         generated_stable, expected_stable,
@@ -1248,11 +1249,20 @@ fn serialize_snapshot_pretty(value: &serde_json::Value) -> String {
     String::from_utf8(buf).expect("serde_json produced non-UTF8 output")
 }
 
-fn strip_cert(value: &serde_json::Value) -> serde_json::Value {
+fn strip_unstable(value: &serde_json::Value) -> serde_json::Value {
     let mut cloned = value.clone();
+    if let Some(obj) = cloned.as_object_mut() {
+        // Top-level environment-dependent fields: the subnet root key and the
+        // canister signature public key (which embeds the PocketIC-assigned
+        // canister id) both vary across PocketIC versions / platforms.
+        obj.remove("root_key_hex");
+        obj.remove("canister_sig_pk_hex");
+    }
     if let Some(vectors) = cloned.get_mut("vectors").and_then(|v| v.as_array_mut()) {
         for vector in vectors {
             if let Some(obj) = vector.as_object_mut() {
+                // The CBOR certificate embeds the subnet's BLS signature, which
+                // is non-deterministic across runs.
                 obj.remove("certificate_cbor_hex");
             }
         }
@@ -1355,6 +1365,7 @@ fn setup_icrc3_test_env_with_fake_openid() -> (
         email_verified: true,
         iat_secs,
         exp_secs,
+        extra_claims: &[],
     });
 
     // Install canister with a Google-flavoured OpenID config whose JWKS URL we override below.
@@ -1421,17 +1432,19 @@ fn setup_icrc3_test_env_with_fake_openid() -> (
     )
 }
 
-struct FakeJwtInput<'a> {
-    salt: &'a [u8; 32],
-    principal: &'a Principal,
-    issuer: &'a str,
-    aud: &'a str,
-    sub: &'a str,
-    email: &'a str,
-    name: &'a str,
-    email_verified: bool,
-    iat_secs: u64,
-    exp_secs: u64,
+pub(crate) struct FakeJwtInput<'a> {
+    pub salt: &'a [u8; 32],
+    pub principal: &'a Principal,
+    pub issuer: &'a str,
+    pub aud: &'a str,
+    pub sub: &'a str,
+    pub email: &'a str,
+    pub name: &'a str,
+    pub email_verified: bool,
+    pub iat_secs: u64,
+    pub exp_secs: u64,
+    /// Extra top-level claims merged into the JWT payload after the standard ones.
+    pub extra_claims: &'a [(&'a str, &'a str)],
 }
 
 /// Generates an RSA-2048 key pair from a fixed seed, signs a synthetic JWT, and returns both
@@ -1439,7 +1452,7 @@ struct FakeJwtInput<'a> {
 ///
 /// The JWT `nonce` is computed as `BASE64_URL_SAFE_NO_PAD(SHA256(salt || caller_principal_bytes))`,
 /// matching the binding that II's generic OpenID provider enforces.
-fn build_fake_google_jwt_and_jwks(input: FakeJwtInput) -> (String, String) {
+pub(crate) fn build_fake_google_jwt_and_jwks(input: FakeJwtInput) -> (String, String) {
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
     use rand_chacha::rand_core::SeedableRng;
     use rsa::pkcs1v15::SigningKey;
@@ -1470,7 +1483,7 @@ fn build_fake_google_jwt_and_jwks(input: FakeJwtInput) -> (String, String) {
         "kid": kid,
         "typ": "JWT",
     });
-    let claims = json!({
+    let mut claims = json!({
         "iss": input.issuer,
         "azp": input.aud,
         "aud": input.aud,
@@ -1486,6 +1499,11 @@ fn build_fake_google_jwt_and_jwks(input: FakeJwtInput) -> (String, String) {
         "exp": input.exp_secs,
         "jti": "icrc3-test-vectors-jti-0001",
     });
+    if let Some(map) = claims.as_object_mut() {
+        for (key, value) in input.extra_claims {
+            map.insert((*key).to_string(), json!(value));
+        }
+    }
 
     let header_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&header).unwrap());
     let claims_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());

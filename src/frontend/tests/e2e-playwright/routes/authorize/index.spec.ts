@@ -36,6 +36,12 @@ test("Authorize by signing in with an existing passkey", async ({
     await authPage
       .getByRole("button", { name: "Sign in with passkey" })
       .click();
+    // The read-only feature is flagged off, so the access-level selector is
+    // hidden and authorizations are full access (a queries-only delegation
+    // would fail closed in every current agent — see the READ_ONLY_MODE flag).
+    await expect(
+      authPage.getByRole("radio", { name: "Actions & questions" }),
+    ).toHaveCount(0);
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
       .click();
@@ -107,6 +113,9 @@ test("Authorize by signing in from another device", async ({
         .getByRole("heading", { level: 1, name: "Authorize new device" })
         .waitFor();
       await holdToConfirm(otherDevicePage);
+      await otherDevicePage
+        .getByRole("heading", { level: 1, name: "Enter the code" })
+        .waitFor();
       for (let i = 0; i < confirmationCodeArray.length; i++) {
         const code = confirmationCodeArray[i];
         await otherDevicePage.getByLabel(`Code input ${i}`).fill(code);

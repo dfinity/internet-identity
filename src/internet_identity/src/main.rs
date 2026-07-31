@@ -2,6 +2,7 @@ use crate::anchor_management::tentative_device_registration;
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::authz_utils::IdentityUpdateError;
+use crate::delegation::DelegationAccess;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
@@ -29,7 +30,8 @@ use internet_identity_interface::internet_identity::types::attributes::{
 };
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
-    OpenIdPrepareDelegationResponse, OpenIdResult,
+    OpenIdPrepareDelegationResponse, OpenIdResult, SsoGetDelegationResponse,
+    SsoPrepareDelegationResponse,
 };
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, GetIdAliasRequest, IdAliasCredentials, PrepareIdAliasError,
@@ -63,6 +65,7 @@ mod email_recovery;
 mod http;
 mod ii_domain;
 mod mcp;
+mod mcp_registration;
 
 mod openid;
 mod session_delegation;
@@ -181,6 +184,104 @@ fn init_sso_credential_migration_timer() {
         run_sso_credential_migration_batch,
     );
     SSO_CREDENTIAL_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(old_id) = id_slot.replace(timer_id) {
+            ic_cdk_timers::clear_timer(old_id);
+        }
+    });
+}
+
+// ---- MCP config migration (temporary; remove once every deployment has run
+// it) ----
+//
+// `enabled` on a stored `StorableMcpConfig` predates the official connector,
+// so a stored `false` only ever meant "no custom server of mine" — nobody
+// could have declined a connector that did not exist. This one-shot migration
+// rewrites every stored config to "enabled, official connector". Anchors with
+// no stored config are left alone: they trust nothing until the identity turns
+// the feature on in Settings, and an identity registered on a deployment with
+// an official connector starts out with a config already.
+//
+// Driven by the `mcp_config_migration` upgrade arg and batched via an interval
+// timer, using the same convention as the SSO credential migration above:
+// rewriting every config in `post_upgrade` would blow the instruction limit.
+
+/// How long to wait between migration batches.
+const MCP_CONFIG_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
+
+/// Maximum number of stored configs to examine per batch (= per ingress
+/// message). Matches the 2 000-per-batch convention used for previous
+/// migrations.
+const MCP_CONFIG_MIGRATION_BATCH_SIZE: u64 = 2_000;
+
+thread_local! {
+    // TODO: Remove these after the data migration is complete.
+    static MCP_CONFIG_MIGRATION_REQUESTED: RefCell<bool> = const { RefCell::new(false) };
+    static MCP_CONFIG_MIGRATION_CURSOR: RefCell<Option<AnchorNumber>> = const { RefCell::new(None) };
+    static MCP_CONFIG_MIGRATION_DONE: RefCell<bool> = const { RefCell::new(false) };
+    static MCP_CONFIG_MIGRATION_COUNT: RefCell<u64> = const { RefCell::new(0) };
+    static MCP_CONFIG_MIGRATION_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
+}
+
+/// Temporary hidden endpoint: returns `(migrated_configs, is_done)` so beta
+/// monitoring can watch the migration land before it is proposed for
+/// production. Both values are per-boot, and `(0, false)` is ambiguous between
+/// two cases: this upgrade didn't pass `mcp_config_migration`, or it did and
+/// the scan hasn't finished. Only `(_, true)` means a run completed, so a
+/// `(0, false)` that persists past the first few batches is the signal that
+/// the arg never arrived.
+#[query(hidden = true)]
+fn mcp_config_migration_status() -> (u64, bool) {
+    (
+        MCP_CONFIG_MIGRATION_COUNT.with_borrow(|c| *c),
+        MCP_CONFIG_MIGRATION_DONE.with_borrow(|d| *d),
+    )
+}
+
+/// Process one batch of the MCP config migration. Bound to the interval timer
+/// set up in [`init_mcp_config_migration_timer`]; clears the timer once the
+/// scan reaches the end.
+fn run_mcp_config_migration_batch() {
+    if MCP_CONFIG_MIGRATION_DONE.with_borrow(|done| *done) {
+        return;
+    }
+
+    let cursor = MCP_CONFIG_MIGRATION_CURSOR.with_borrow(|cursor| *cursor);
+    let outcome = state::storage_borrow_mut(|storage| {
+        storage.migrate_mcp_configs_batch(cursor, MCP_CONFIG_MIGRATION_BATCH_SIZE)
+    });
+
+    MCP_CONFIG_MIGRATION_COUNT.with_borrow_mut(|count| {
+        *count = count.saturating_add(outcome.migrated);
+    });
+    if let Some(next_cursor) = outcome.next_cursor {
+        MCP_CONFIG_MIGRATION_CURSOR.replace(Some(next_cursor));
+    }
+
+    if outcome.is_done {
+        MCP_CONFIG_MIGRATION_DONE.replace(true);
+        MCP_CONFIG_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
+            if let Some(timer_id) = id_slot.take() {
+                ic_cdk_timers::clear_timer(timer_id);
+            }
+        });
+        let migrated = MCP_CONFIG_MIGRATION_COUNT.with_borrow(|c| *c);
+        ic_cdk::println!("MCP config migration COMPLETED ({migrated} configs migrated).");
+    }
+}
+
+/// Start the interval timer driving [`run_mcp_config_migration_batch`], unless
+/// this upgrade didn't ask for the migration. Nothing about a completed run is
+/// persisted, so the upgrade arg is the only control: passing it again re-runs
+/// the migration, exactly like the SSO credential migration above.
+fn init_mcp_config_migration_timer() {
+    if !MCP_CONFIG_MIGRATION_REQUESTED.with_borrow(|requested| *requested) {
+        return;
+    }
+    let timer_id = ic_cdk_timers::set_timer_interval(
+        MCP_CONFIG_MIGRATION_BATCH_BACKOFF_SECONDS,
+        run_mcp_config_migration_batch,
+    );
+    MCP_CONFIG_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
         if let Some(old_id) = id_slot.replace(timer_id) {
             ic_cdk_timers::clear_timer(old_id);
         }
@@ -447,6 +548,9 @@ async fn prepare_delegation(
         None,
         session_key,
         max_time_to_live,
+        None,
+        // The legacy endpoint has no read-only option.
+        DelegationAccess::Unrestricted,
         &ii_domain,
     )
     .await
@@ -475,6 +579,8 @@ fn get_delegation(
         None,
         session_key,
         expiration,
+        // The legacy endpoint has no read-only option.
+        DelegationAccess::Unrestricted,
     )
     .map(GetDelegationResponse::SignedDelegation)
     .unwrap_or(GetDelegationResponse::NoSuchDelegation)
@@ -580,6 +686,7 @@ async fn prepare_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
+    permissions: Option<Permissions>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
     match check_authz_and_record_activity(anchor_number) {
         Ok(ii_domain) => {
@@ -589,6 +696,13 @@ async fn prepare_account_delegation(
                 account_number,
                 session_key,
                 max_ttl,
+                None,
+                // An omitted `permissions` argument means unrestricted (see
+                // `impl From<Option<Permissions>> for DelegationAccess`): this
+                // preserves the original behavior for callers of the
+                // (pre-feature) form. First-party callers always pass an explicit
+                // value (queries-only by default in the CLI and MCP flows).
+                DelegationAccess::from(permissions),
                 &ii_domain,
             )
             .await
@@ -604,6 +718,7 @@ fn get_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
+    permissions: Option<Permissions>,
 ) -> Result<SignedDelegation, AccountDelegationError> {
     match check_authorization(anchor_number) {
         Ok(_) => account_management::get_account_delegation(
@@ -612,53 +727,30 @@ fn get_account_delegation(
             account_number,
             session_key,
             expiration,
+            // See `prepare_account_delegation`: an omitted `permissions`
+            // argument means an unrestricted delegation (backwards-compatible
+            // with the original form).
+            DelegationAccess::from(permissions),
         ),
         Err(err) => Err(err.into()),
     }
 }
 
-/// Enable or disable the backend `/mcp` delegation path for `anchor_number` at
-/// `mcp_server_origin`, for the given account (the unreserved default when
-/// `account_number` is `None`). Enabling binds the principal II derives for that
-/// `(account, origin)` pair — the principal the MCP server's standing delegation
-/// carries — so it can later fetch per-app delegations as this anchor; disabling
-/// unbinds exactly that principal. The origin comes from the connect request, so
-/// each user trusts the MCP server they choose.
-#[update]
-fn mcp_set_access(
-    anchor_number: AnchorNumber,
-    mcp_server_origin: FrontendHostname,
-    account_number: Option<AccountNumber>,
-    enabled: bool,
-) -> Result<(), String> {
-    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
-    mcp::set_mcp_access(anchor_number, mcp_server_origin, account_number, enabled)
-}
-
-/// Whether `anchor_number` has MCP access enabled for the
-/// `(mcp_server_origin, account_number)` pair.
-#[query]
-fn mcp_access_enabled(
-    anchor_number: AnchorNumber,
-    mcp_server_origin: FrontendHostname,
-    account_number: Option<AccountNumber>,
-) -> bool {
-    if check_session_authorization(anchor_number).is_err() {
-        return false;
-    }
-    mcp::is_mcp_access_enabled(anchor_number, mcp_server_origin, account_number)
-}
-
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
 /// trusted server URL). Persisted on-chain, so it follows the identity across
 /// devices. Read by the Settings UI and by the `/mcp` connect flow, which
-/// verifies the connecting origin against it at connect time. Returns the
-/// disabled, no-server default for an unauthorized caller or an anchor that
-/// never wrote a config.
+/// verifies the connecting origin against it at connect time. `null` means the
+/// anchor has never written a config.
 #[query]
-fn mcp_get_config(anchor_number: AnchorNumber) -> McpConfig {
+fn mcp_get_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
     if check_session_authorization(anchor_number).is_err() {
-        return McpConfig::default();
+        // Deliberately the switched-off shape rather than `None`, so an
+        // unauthorized read neither leaks the real config nor reports an
+        // absence the caller could tell apart from a disabled config.
+        return Some(McpConfig {
+            enabled: false,
+            url: None,
+        });
     }
     mcp::get_mcp_config(anchor_number)
 }
@@ -666,35 +758,67 @@ fn mcp_get_config(anchor_number: AnchorNumber) -> McpConfig {
 /// Persist `anchor_number`'s trusted-MCP-server config so it syncs across the
 /// identity's devices. Authenticated as the identity (full authorization), so
 /// only the user — never a page that initiates a connect request — can change
-/// what their identity trusts.
+/// what their identity trusts. Disabling MCP or changing the trusted server
+/// URL revokes the identity's active MCP session in the same message.
 #[update]
 fn mcp_set_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), String> {
     check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
-    mcp::set_mcp_config(anchor_number, config);
-    Ok(())
+    mcp::set_mcp_config(anchor_number, config)
 }
 
-/// Called by the MCP server (authorized by `caller()` == the anchor's principal
-/// at `mcp_server_origin`): prepare a ≤5-minute delegation for the anchor's
-/// default account at `target_origin`.
+/// Called by the MCP server, signed with its registered session key: prepare a
+/// per-app delegation at `target_origin` for `account_number` — one of the
+/// anchor's accounts there (discover them with `mcp_get_accounts`), or the
+/// anchor's default account when `None`. `max_ttl` is the requested lifetime in
+/// ns, defaulting to and capped at 5 minutes, and never outliving the session
+/// grant. The resolved `account_number` is returned in `McpPrepareDelegation`
+/// to thread into `mcp_get_delegation`.
+///
+/// `mcp::authorize_mcp_session_for_update` is the authorization gate: it
+/// admits only the caller holding a live session grant (the registered session
+/// key) and hands back the `McpSession` the operation runs on, so there is no
+/// way to reach `prepare_delegation` without it.
 #[update]
-async fn mcp_prepare_account_delegation(
+async fn mcp_prepare_delegation(
     target_origin: FrontendHostname,
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
 ) -> Result<McpPrepareDelegation, AccountDelegationError> {
-    mcp::prepare_account_delegation(target_origin, account_number, session_key, max_ttl).await
+    mcp::authorize_mcp_session_for_update()?
+        .prepare_delegation(target_origin, account_number, session_key, max_ttl)
+        .await
 }
 
+/// Fetch the delegation prepared by `mcp_prepare_delegation`. The anchor is
+/// recovered from `caller()`'s grant; `account_number` and `expiration` must
+/// be the values returned by the matching prepare call, or this returns
+/// `NoSuchDelegation`. Gated by `mcp::authorize_mcp_session` (the registered
+/// session key), like the other server-facing methods.
 #[query]
-fn mcp_get_account_delegation(
+fn mcp_get_delegation(
     target_origin: FrontendHostname,
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> Result<SignedDelegation, AccountDelegationError> {
-    mcp::get_account_delegation(target_origin, account_number, session_key, expiration)
+    mcp::authorize_mcp_session()?.get_delegation(
+        target_origin,
+        account_number,
+        session_key,
+        expiration,
+    )
+}
+
+/// Called by the MCP server (anchor recovered from `caller()`): list the anchor's
+/// accounts at `target_origin` so the agent can pick which `account_number` to
+/// request a delegation for. Gated by `mcp::authorize_mcp_session` (the
+/// registered session key), like the other server-facing methods.
+#[query]
+fn mcp_get_accounts(
+    target_origin: FrontendHostname,
+) -> Result<Vec<AccountInfo>, AccountDelegationError> {
+    mcp::authorize_mcp_session()?.get_accounts(target_origin)
 }
 
 #[update]
@@ -719,6 +843,55 @@ fn get_session_delegation(
     internet_identity_interface::internet_identity::types::SessionDelegationError,
 > {
     session_delegation::get_session_delegation(anchor_number, session_key, expiration)
+}
+
+/// Mint an MCP *registration* delegation `P_reg -> registration_key` (see
+/// [`mcp_registration`]). Authenticated as the identity (full authorization):
+/// only the consenting user can create one. `registration_key` is an ephemeral
+/// key the II frontend generates for this connect (browser-held — never a key
+/// taken from the connect link; the frontend extends the chain to the MCP
+/// server's key browser-side). `P_reg` is derived from a fresh random nonce,
+/// and the whole consent — the anchor, `permissions` (read-only choice),
+/// `max_ttl` (session-grant lifetime), and the trusted server URL from the
+/// synced config — is recorded on an index entry keyed by `P_reg`, so
+/// `mcp_register_v2` recovers it server-side and the server cannot alter any
+/// of it.
+#[update]
+async fn prepare_mcp_registration_delegation(
+    anchor_number: AnchorNumber,
+    registration_key: SessionKey,
+    permissions: Option<Permissions>,
+    max_ttl: Option<u64>,
+) -> Result<PrepareMcpRegistrationDelegation, String> {
+    mcp_registration::prepare(anchor_number, registration_key, permissions, max_ttl).await
+}
+
+/// Fetch the signed registration delegation prepared above, to deliver to the
+/// trusted MCP server. `user_key` is the value the prepare call returned; the
+/// seed is recovered from it, so no consent parameters need re-passing.
+/// Authenticated as the identity, like the prepare call.
+#[query]
+fn get_mcp_registration_delegation(
+    anchor_number: AnchorNumber,
+    registration_key: SessionKey,
+    user_key: UserKey,
+    expiration: Timestamp,
+) -> Result<SignedDelegation, String> {
+    mcp_registration::get(anchor_number, registration_key, user_key, expiration)
+}
+
+/// Called by the trusted MCP server, authenticated by the registration
+/// delegation chain (so `caller()` is the registration principal): bind the
+/// server's long-lived `session_key` to the consenting anchor. The entire
+/// consent — anchor, read-only choice, grant lifetime — is recovered from the
+/// index entry keyed by `caller()`, so the server passes only `session_key`:
+/// it cannot name a different anchor, upgrade the access level, or stretch the
+/// grant, and never learns the anchor number. A trusted-server switch or
+/// disable since consent invalidates the delegation. Returns the grant
+/// expiration and the access level.
+#[update]
+fn mcp_register_v2(session_key: SessionKey) -> Result<McpRegistrationV2, String> {
+    mcp_registration::register_v2(session_key)
 }
 
 #[query]
@@ -784,8 +957,7 @@ fn config() -> InternetIdentityInit {
         related_origins: persistent_state.related_origins.clone(),
         new_flow_origins: persistent_state.new_flow_origins.clone(),
         openid_configs: persistent_state.openid_configs.clone(),
-        sso_discoverable_domains: persistent_state.sso_discoverable_domains.clone(),
-        sso_allow_any_domain: persistent_state.sso_allow_any_domain,
+        sso_allow_insecure_discovery: persistent_state.sso_allow_insecure_discovery,
         // One-shot upgrade arg driving the SSO credential backfill; not
         // persisted as config, so there is nothing to report back here.
         sso_credential_migration: None,
@@ -798,6 +970,10 @@ fn config() -> InternetIdentityInit {
         enable_dnssec_email_recovery: persistent_state.enable_dnssec_email_recovery,
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
+        mcp_official_url: Some(persistent_state.mcp_official_url.clone()),
+        // One-shot upgrade arg driving the MCP config migration; not persisted
+        // as config, so there is nothing to report back here.
+        mcp_config_migration: None,
     })
 }
 
@@ -856,6 +1032,7 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     // signals done (immediately, when no `sso_credential_migration` arg was
     // supplied).
     init_sso_credential_migration_timer();
+    init_mcp_config_migration_timer();
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
@@ -898,23 +1075,9 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.openid_configs = Some(openid_configs);
             })
         }
-        if let Some(sso_discoverable_domains) = arg.sso_discoverable_domains {
-            // Canonicalize at the boundary: trim whitespace and lowercase
-            // ASCII so allowlist lookups (case-insensitive on the canister
-            // via `eq_ignore_ascii_case`) and the value shipped through
-            // `/.config.did.bin` to the frontend (compared via case-
-            // sensitive `Set.has`) agree byte-for-byte.
-            let sso_discoverable_domains = sso_discoverable_domains
-                .into_iter()
-                .map(|domain| domain.trim().to_ascii_lowercase())
-                .collect();
+        if let Some(sso_allow_insecure_discovery) = arg.sso_allow_insecure_discovery {
             state::persistent_state_mut(|persistent_state| {
-                persistent_state.sso_discoverable_domains = Some(sso_discoverable_domains);
-            })
-        }
-        if let Some(sso_allow_any_domain) = arg.sso_allow_any_domain {
-            state::persistent_state_mut(|persistent_state| {
-                persistent_state.sso_allow_any_domain = Some(sso_allow_any_domain);
+                persistent_state.sso_allow_insecure_discovery = Some(sso_allow_insecure_discovery);
             })
         }
         if let Some(entries) = arg.sso_credential_migration {
@@ -965,6 +1128,15 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.doh_config = doh_config;
             })
         }
+        if arg.mcp_config_migration == Some(true) {
+            MCP_CONFIG_MIGRATION_REQUESTED.replace(true);
+        }
+        if let Some(mcp_official_url) = arg.mcp_official_url {
+            // Outer Some -> apply: inner None clears, inner Some replaces.
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.mcp_official_url = mcp_official_url;
+            })
+        }
     }
 }
 
@@ -998,8 +1170,10 @@ fn update_root_hash() {
     })
 }
 
-/// Calls raw rand to retrieve a random salt (32 bytes).
-async fn random_salt() -> Salt {
+/// Calls raw rand to retrieve 32 fresh random bytes. Named for its original
+/// use (the canister salt), but also reused by `mcp_registration::prepare` as a
+/// per-connect nonce — each call is an independent `raw_rand` draw.
+pub(crate) async fn random_salt() -> Salt {
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
         Ok((res,)) => res,
         Err((_, err)) => trap(&format!("failed to get salt: {err}")),
@@ -1413,7 +1587,8 @@ mod openid_api {
     use crate::{
         state, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
         OpenIdDelegationError, OpenIdPrepareDelegationResponse, OpenIdResult, SessionKey,
-        Timestamp,
+        SsoGetDelegationRequest, SsoGetDelegationResponse, SsoPrepareDelegationRequest,
+        SsoPrepareDelegationResponse, Timestamp,
     };
     use ic_cdk::caller;
     use ic_cdk_macros::{query, update};
@@ -1421,6 +1596,7 @@ mod openid_api {
         CreateIdentityData, IdRegFinishError, IdRegFinishResult, OpenIDRegFinishArg,
         SignedDelegation,
     };
+    use serde_bytes::ByteBuf;
 
     impl From<IdentityUpdateError> for OpenIdCredentialAddError {
         fn from(_: IdentityUpdateError) -> Self {
@@ -1440,19 +1616,37 @@ mod openid_api {
         // Canonicalize the untrusted discovery domain at the boundary so both
         // verification and the credential stored from `arg` see the same value.
         arg.discovery_domain = openid::canonical_discovery_domain_opt(arg.discovery_domain);
-        // Verify the JWT (driving the SSO discovery/JWKS fetches it may need)
-        // up front: a cold or evicted cache surfaces as the `Pending` retry arm
-        // instead of a terminal registration error. The verified credential is
-        // then handed to the shared flow so it isn't re-verified.
-        let verified =
-            match registration::registration_flow_v2::verify_openid_for_registration(&arg) {
+        // Verify the JWT up front (driving any SSO discovery/JWKS fetches): a
+        // cold or evicted cache surfaces as the `Pending` retry arm instead of a
+        // terminal error, and the verified credential is then handed to the
+        // shared flow so it isn't re-verified. A gated SSO login (discovery
+        // domain + origin) goes through the SSO gate; everything else (a direct
+        // provider or an ungated SSO login) through the plain OpenID verify —
+        // mirroring the `sso_`/`openid_prepare_delegation` split on the auth side.
+        let credential = match (arg.discovery_domain.as_deref(), arg.origin.as_deref()) {
+            (Some(domain), Some(origin)) => {
+                openid::prefetch_sso(Some(domain));
+                match openid::verify_sso_for_registration(&arg.jwt, &arg.salt, domain, origin) {
+                    Ok(openid::Cached::Ready(credential)) => credential,
+                    Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+                    Err(err) => return OpenIdResult::Err(err),
+                }
+            }
+            _ => match registration::registration_flow_v2::verify_openid_for_registration(&arg) {
+                Ok(openid::Cached::Ready(credential)) => credential,
                 Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
-                Ok(openid::Cached::Ready(verified)) => verified,
                 Err(err) => return OpenIdResult::Err(err),
-            };
+            },
+        };
+        // Config issuer for the authorization key / operation log: the
+        // configured provider's (template) issuer, or the concrete JWT issuer for
+        // an SSO credential, which carries its own `sso_domain` for scope routing.
+        let config_iss = credential
+            .config_issuer()
+            .unwrap_or_else(|| credential.iss.clone());
         match registration::registration_flow_v2::identity_registration_finish(
             CreateIdentityData::OpenID(arg),
-            Some(verified),
+            Some((credential, config_iss)),
         ) {
             Ok(result) => OpenIdResult::Ok(result),
             Err(err) => OpenIdResult::Err(err),
@@ -1527,7 +1721,9 @@ mod openid_api {
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
             Err(err) => return OpenIdResult::Err(err.into()),
         };
-
+        // The verified credential already carries the SSO stable identifier, so
+        // the anchor write below reconciles the stable-id index — an existing
+        // anchor self-heals on a normal sign-in.
         let prepared: Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> = async {
             let anchor_number = state::storage_borrow(|storage| {
                 storage.lookup_anchor_with_openid_credential(&openid_credential.key())
@@ -1605,20 +1801,161 @@ mod openid_api {
     }
 
     /// Drive the two-hop SSO discovery fetch for `domain`. The frontend calls
-    /// this when `get_sso_discovery` reads `Pending`, then keeps polling the
-    /// query until it returns `Resolved`.
+    /// this when `get_sso_discovery_status` reads `Pending`, then keeps polling
+    /// the query until it returns `Resolved`.
     #[update]
     fn discover_sso(domain: String) {
         openid::discover_sso(&openid::canonical_discovery_domain(&domain))
     }
 
-    /// Read the state of `domain`'s SSO discovery: `Resolved` with the config,
-    /// `Pending` while the fetch is in flight, or `NotAllowed`.
+    /// Read the status of `org_domain`'s SSO discovery: `Resolved` with the
+    /// config, or `Pending` while the fetch is in flight.
+    ///
+    /// With `target_app_origin`, the resolved `resolved_client_id` is the client
+    /// that origin must use.
     #[query]
-    fn get_sso_discovery(
-        domain: String,
-    ) -> internet_identity_interface::internet_identity::types::SsoDiscoveryState {
-        openid::get_sso_discovery(&openid::canonical_discovery_domain(&domain))
+    fn get_sso_discovery_status(
+        request: internet_identity_interface::internet_identity::types::GetSsoDiscoveryStatusRequest,
+    ) -> internet_identity_interface::internet_identity::types::SsoDiscoveryStatus {
+        openid::get_sso_discovery_status(
+            &openid::canonical_discovery_domain(&request.org_domain),
+            request.target_app_origin.as_deref(),
+        )
+    }
+
+    /// SSO sign-in: verify the JWT, enforce the per-app gate, resolve the II-client
+    /// identity, and mint the openid delegation plus a certified SSO attribute bundle.
+    #[update]
+    async fn sso_prepare_delegation(
+        request: SsoPrepareDelegationRequest,
+    ) -> OpenIdResult<SsoPrepareDelegationResponse, OpenIdDelegationError> {
+        let SsoPrepareDelegationRequest {
+            jwt,
+            salt,
+            session_key,
+            org_domain,
+            target_app_origin: origin,
+        } = request;
+        let discovery_domain = openid::canonical_discovery_domain(&org_domain);
+        openid::prefetch_sso(Some(&discovery_domain));
+
+        let verification = match openid::verify_sso_jwt(&jwt, &salt, &discovery_domain, &origin) {
+            Ok(openid::Cached::Ready(v)) => v,
+            Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
+
+        let identity = match openid::resolve_ii_client_identity(&verification) {
+            Ok(identity) => identity,
+            Err(err) => return OpenIdResult::Err(err),
+        };
+
+        let prepared: Result<SsoPrepareDelegationResponse, OpenIdDelegationError> = async {
+            let key = identity.credential.key();
+            let anchor_number =
+                state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
+                    .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+
+            // Refresh the II-client credential's metadata from the token; never adds a per-app credential.
+            let mut anchor = state::anchor(anchor_number);
+            update_openid_credential(&mut anchor, identity.credential.clone())
+                .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
+            state::storage_borrow_mut(|storage| storage.write(anchor))
+                .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
+
+            let (user_key, expiration) = identity
+                .credential
+                .prepare_jwt_delegation(session_key, anchor_number)
+                .await;
+
+            let (sso_attr_bundle, _bundle_expiration) = openid::prepare_sso_attr_bundle(
+                &identity.credential.iss,
+                &identity.credential.sub,
+                &identity.credential.aud,
+                anchor_number,
+                &discovery_domain,
+                &origin,
+            );
+
+            // The association could change during the `.await`.
+            let still_anchor_number =
+                state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
+                    .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            if anchor_number != still_anchor_number {
+                // The credential re-associated to a different anchor during the
+                // `.await` (a concurrent account change). Deliberately reported
+                // as the same coarse error as "no anchor": the client has no
+                // distinct recovery, and we don't surface backend
+                // state-transition detail on the wire.
+                return Err(OpenIdDelegationError::NoSuchAnchor);
+            }
+
+            Ok(SsoPrepareDelegationResponse {
+                user_key,
+                expiration,
+                anchor_number,
+                sso_attr_bundle: ByteBuf::from(sso_attr_bundle),
+            })
+        }
+        .await;
+
+        prepared.into()
+    }
+
+    /// Fetch the delegation and SSO attribute bundle signature prepared by `sso_prepare_delegation`.
+    #[query]
+    fn sso_get_delegation(
+        request: SsoGetDelegationRequest,
+    ) -> OpenIdResult<SsoGetDelegationResponse, OpenIdDelegationError> {
+        let SsoGetDelegationRequest {
+            jwt,
+            salt,
+            session_key,
+            expiration,
+            org_domain,
+            target_app_origin: origin,
+            sso_attr_bundle,
+        } = request;
+        let discovery_domain = openid::canonical_discovery_domain(&org_domain);
+        let verification = match openid::verify_sso_jwt(&jwt, &salt, &discovery_domain, &origin) {
+            Ok(openid::Cached::Ready(v)) => v,
+            Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
+        // Query context: `resolve_ii_client_identity` only reads the stable-id index.
+        let identity = match openid::resolve_ii_client_identity(&verification) {
+            Ok(identity) => identity,
+            Err(err) => return OpenIdResult::Err(err),
+        };
+        let key = identity.credential.key();
+        let Some(anchor_number) =
+            state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
+        else {
+            return OpenIdResult::Err(OpenIdDelegationError::NoSuchAnchor);
+        };
+        let signed_delegation =
+            match identity
+                .credential
+                .get_jwt_delegation(session_key, expiration, anchor_number)
+            {
+                Ok(signed) => signed,
+                Err(err) => return OpenIdResult::Err(err),
+            };
+        let sso_attr_bundle_signature = match openid::get_sso_attr_bundle_signature(
+            &identity.credential.iss,
+            &identity.credential.sub,
+            &identity.credential.aud,
+            anchor_number,
+            &sso_attr_bundle,
+        ) {
+            Ok(signature) => signature,
+            Err(err) => return OpenIdResult::Err(err),
+        };
+        let sso_attr_bundle_signature = ByteBuf::from(sso_attr_bundle_signature);
+        OpenIdResult::Ok(SsoGetDelegationResponse {
+            signed_delegation,
+            sso_attr_bundle_signature,
+        })
     }
 }
 
@@ -1936,6 +2273,7 @@ mod email_recovery_api {
                         pubkey: args.session_key,
                         expiration: args.expiration,
                         targets: None,
+                        permissions: None,
                     },
                     signature: serde_bytes::ByteBuf::from(signature),
                 })
@@ -2124,6 +2462,10 @@ mod attribute_sharing {
             nonce,
         } = request.try_into()?;
 
+        // SSO session iff a certified bundle for this origin is attached; gates `sso:<domain>` attributes.
+        let sso_session_domain = openid::read_certified_sso_bundle()
+            .filter(|bundle| bundle.origin == origin)
+            .map(|bundle| bundle.sso_domain);
         let (anchor, _) =
             check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
                 PrepareIcrc3AttributeError::AuthorizationError(principal)
@@ -2143,6 +2485,7 @@ mod attribute_sharing {
             unmapped_origin,
             issued_at_timestamp_ns,
             account,
+            sso_session_domain,
         )?;
 
         Ok(PrepareIcrc3AttributeResponse { message })
@@ -2181,12 +2524,15 @@ mod attribute_sharing {
             attributes,
         } = request.try_into()?;
 
+        // Gate `sso:<domain>` rows by the certified bundle; the bundle is the trusted source of the SSO domain.
+        let sso_session_domain =
+            openid::read_certified_sso_bundle().map(|bundle| bundle.sso_domain);
         let (anchor, _) =
             check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
                 ListAvailableAttributesError::AuthorizationError(principal)
             })?;
 
-        Ok(anchor.list_available_attributes(attributes))
+        Ok(anchor.list_available_attributes(attributes, sso_session_domain))
     }
 }
 

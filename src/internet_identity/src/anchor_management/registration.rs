@@ -108,6 +108,7 @@ pub fn register(
                 "failed to write data of anchor {anchor_number}: {err}"
             ))
         });
+        crate::mcp::init_config_for_new_identity(storage, anchor_number);
         storage.registration_rates.new_registration()
     });
 

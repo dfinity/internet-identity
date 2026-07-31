@@ -143,6 +143,12 @@ test("Generic CLI sign-in posts a two-hop delegation chain to the loopback callb
   await addVirtualAuthenticator(page);
   await page.goto(await cli.resolveAuthorizeUrl(page));
   await signUp(page);
+  // The read-only feature is flagged off, so the access-level selector is
+  // hidden and CLI sign-in is full access (a queries-only delegation would
+  // fail closed in every current agent — see the READ_ONLY_MODE flag).
+  await expect(
+    page.getByRole("radio", { name: "Actions & questions" }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
   const body = await cli.receivedDelegation;
@@ -209,7 +215,7 @@ test("Returning user opens on the Continue screen, not the method wizard", async
     page.getByRole("button", { name: "Continue", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Continue with passkey" }),
+    page.getByRole("button", { name: "Sign in with passkey" }),
   ).toBeHidden();
 
   // Continue authenticates the last-used identity and posts the delegation.

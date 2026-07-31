@@ -1,7 +1,8 @@
 use canister_tests::{
     api::internet_identity::{
         api_v2::{
-            create_account, get_account_delegation, get_accounts, prepare_account_delegation,
+            create_account, get_account_delegation, get_account_delegation_with_read_only,
+            get_accounts, prepare_account_delegation, prepare_account_delegation_with_read_only,
             update_account, AccountDelegationParams,
         },
         get_delegation, prepare_delegation,
@@ -505,6 +506,224 @@ fn should_only_update_owned_account() {
     )
     .unwrap()
     .unwrap();
+}
+
+/// Verifies that read-only account delegations carry the `permissions`
+/// field restricting the session to query calls, and that the signature
+/// binds to it (an explicitly unrestricted lookup of the same session key
+/// has no signature).
+#[test]
+fn should_get_read_only_account_delegation_with_queries_permissions() -> Result<(), RejectResponse>
+{
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number = flows::register_anchor(&env, canister_id);
+    let frontend_hostname = "https://some-dapp.com".to_string();
+    let pub_session_key = ByteBuf::from("session public key");
+
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+        None,
+        pub_session_key.clone(),
+    );
+
+    let PrepareAccountDelegation {
+        user_key,
+        expiration,
+    } = prepare_account_delegation_with_read_only(&params, None, Some(true))
+        .unwrap()
+        .unwrap();
+
+    let signed_delegation = get_account_delegation_with_read_only(&params, expiration, Some(true))
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        signed_delegation.delegation.permissions,
+        Some("queries".to_string())
+    );
+    assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
+    verify_delegation(&env, user_key, &signed_delegation, &env.root_key().unwrap());
+
+    // The signature binds to the permissions: looking up an explicitly
+    // unrestricted delegation for the same session key must fail.
+    let result = get_account_delegation_with_read_only(&params, expiration, Some(false))
+        .unwrap()
+        .unwrap_err();
+    assert!(matches!(result, AccountDelegationError::NoSuchDelegation));
+
+    Ok(())
+}
+
+/// Verifies that an omitted `read_only` argument yields an unrestricted
+/// delegation (no `permissions` field): this preserves the original behavior
+/// for callers of the pre-feature 5-argument form and matches the interface
+/// spec's default for an absent `permissions` field.
+#[test]
+fn should_default_to_unrestricted_account_delegation_when_unspecified() -> Result<(), RejectResponse>
+{
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number = flows::register_anchor(&env, canister_id);
+    let frontend_hostname = "https://some-dapp.com".to_string();
+    let pub_session_key = ByteBuf::from("session public key");
+
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+        None,
+        pub_session_key.clone(),
+    );
+
+    // Omitting `read_only` (the plain helper sends the 5-argument form, as a
+    // pre-feature caller would) must yield an unrestricted delegation.
+    let PrepareAccountDelegation {
+        user_key,
+        expiration,
+    } = prepare_account_delegation(&params, None).unwrap().unwrap();
+
+    let signed_delegation = get_account_delegation(&params, expiration)
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(signed_delegation.delegation.permissions, None);
+    assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
+    verify_delegation(&env, user_key, &signed_delegation, &env.root_key().unwrap());
+
+    Ok(())
+}
+
+// The account-delegation endpoints (`prepare_account_delegation` /
+// `get_account_delegation`) back BOTH the `/continue` (ICRC-34 authorize) and
+// `/cli` sign-in flows — they call the same methods, differing only in the
+// origin, account, and TTL they pass — so the `read_only` tests here cover both.
+// The `/mcp` flow has its own endpoints, covered in the `mcp` suite.
+
+/// An explicit `read_only = false` — the value the authorize flow sends for a
+/// normal sign-in and the CLI sends when the user opts out of read-only — yields
+/// an unrestricted delegation: no `permissions` field, and it verifies.
+#[test]
+fn should_issue_explicitly_unrestricted_account_delegation() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number = flows::register_anchor(&env, canister_id);
+    let pub_session_key = ByteBuf::from("session public key");
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        "https://some-dapp.com".to_string(),
+        None,
+        pub_session_key.clone(),
+    );
+
+    let PrepareAccountDelegation {
+        user_key,
+        expiration,
+    } = prepare_account_delegation_with_read_only(&params, None, Some(false))
+        .unwrap()
+        .unwrap();
+    let signed = get_account_delegation_with_read_only(&params, expiration, Some(false))
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(signed.delegation.permissions, None);
+    assert_eq!(signed.delegation.pubkey, pub_session_key);
+    verify_delegation(&env, user_key, &signed, &env.root_key().unwrap());
+
+    Ok(())
+}
+
+/// Read-only works for a specific (non-default) account too — the case the
+/// `/continue` flow hits when the user picks a named account: the minted
+/// delegation carries `permissions = "queries"` and verifies.
+#[test]
+fn should_issue_read_only_delegation_for_non_default_account() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number = flows::register_anchor(&env, canister_id);
+    let origin = "https://some-dapp.com".to_string();
+    let pub_session_key = ByteBuf::from("session public key");
+
+    let account_number = create_account(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        origin.clone(),
+        "work".to_string(),
+    )
+    .unwrap()
+    .unwrap()
+    .account_number;
+    assert!(
+        account_number.is_some(),
+        "a created account has a non-default account number"
+    );
+
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        origin,
+        account_number,
+        pub_session_key.clone(),
+    );
+
+    let PrepareAccountDelegation {
+        user_key,
+        expiration,
+    } = prepare_account_delegation_with_read_only(&params, None, Some(true))
+        .unwrap()
+        .unwrap();
+    let signed = get_account_delegation_with_read_only(&params, expiration, Some(true))
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(signed.delegation.permissions, Some("queries".to_string()));
+    assert_eq!(signed.delegation.pubkey, pub_session_key);
+    verify_delegation(&env, user_key, &signed, &env.root_key().unwrap());
+
+    Ok(())
+}
+
+/// `read_only` restricts which calls the delegation permits, not which principal
+/// it is for: the same account yields the same `user_key` (hence the same
+/// principal) whether or not read-only is requested.
+#[test]
+fn read_only_does_not_change_the_delegated_principal() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number = flows::register_anchor(&env, canister_id);
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        "https://some-dapp.com".to_string(),
+        None,
+        ByteBuf::from("session public key"),
+    );
+
+    let full = prepare_account_delegation_with_read_only(&params, None, Some(false))
+        .unwrap()
+        .unwrap();
+    let read_only = prepare_account_delegation_with_read_only(&params, None, Some(true))
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(full.user_key, read_only.user_key);
+
+    Ok(())
 }
 
 /// Verifies that valid account delegations are issued.

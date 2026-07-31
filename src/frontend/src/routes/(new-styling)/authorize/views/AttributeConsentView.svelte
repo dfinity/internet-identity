@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import type {
     AttributeConsent,
     AttributeConsentContext,
@@ -25,6 +26,10 @@
   } from "$lib/generated/internet_identity_types";
   import { MailPlusIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
+  import {
+    verifiedEmailConsentFunnel,
+    VerifiedEmailConsentEvents,
+  } from "$lib/utils/analytics/verifiedEmailConsentFunnel";
   import AttributePicker from "./AttributePicker.svelte";
   import {
     type MergedGroup,
@@ -146,6 +151,21 @@
   // fresh list_available_attributes can surface as a picker.
   let displayGroups = $state<MergedGroup[]>([]);
 
+  // A group is "unscoped" iff the original request carried no scope —
+  // tracked authoritatively by `MergedGroup.omitScope`. The wire keys of
+  // a group's options can still be scoped (an unscoped `email` request
+  // fans out into `openid:<issuer>:email` options); we must not infer
+  // scope from those keys.
+  const isUnscopedGroup = (group: MergedGroup): boolean => group.omitScope;
+
+  // Stable partition: unscoped first, then scoped; relative order
+  // within each tier preserved so we don't perturb the existing
+  // mergeGroups ordering for downstream rows.
+  const sortGroupsUnscopedFirst = (groups: MergedGroup[]): MergedGroup[] => [
+    ...groups.filter(isUnscopedGroup),
+    ...groups.filter((g) => !isUnscopedGroup(g)),
+  ];
+
   // For email-shaped groups, prefer the option whose displayed address
   // case-matches the saved last-shared email; fall back to index 0.
   const indexForSavedEmail = (
@@ -162,7 +182,7 @@
 
   const prepared = (async () => {
     const ctx = await context;
-    const groups = mergeGroups(ctx.groups);
+    const groups = sortGroupsUnscopedFirst(mergeGroups(ctx.groups));
     await Promise.all(ssoDomainsIn(groups).map(discoverSsoName));
     const savedEmail = lastSharedEmailsStore.get(
       $authenticatedStore.identityNumber,
@@ -176,12 +196,22 @@
       });
     }
     displayGroups = groups;
+    const emailRequested = ctx.requestedKeys.some(isEmailKey);
+    if (emailRequested) {
+      verifiedEmailConsentFunnel.init({ variant });
+      if (groups.length === 0) {
+        verifiedEmailConsentFunnel.trigger(
+          VerifiedEmailConsentEvents.EmptyStateShown,
+        );
+      }
+    }
     return {
       effectiveOrigin: ctx.effectiveOrigin,
       requestedKeys: ctx.requestedKeys,
-      emailRequested: ctx.requestedKeys.some(isEmailKey),
+      emailRequested,
       recoveryAddresses: ctx.recoveryAddresses,
       verifiedAddresses: ctx.verifiedAddresses,
+      openidAddresses: ctx.openidAddresses,
     };
   })();
 
@@ -225,8 +255,8 @@
           attributes: [],
         })
         .then(throwCanisterError);
-      const groups = mergeGroups(
-        resolveAttributeGroups(requestedKeys, available),
+      const groups = sortGroupsUnscopedFirst(
+        mergeGroups(resolveAttributeGroups(requestedKeys, available)),
       );
       await Promise.all(ssoDomainsIn(groups).map(discoverSsoName));
       selections.clear();
@@ -259,9 +289,38 @@
     await refetchGroups(requestedKeys, address);
   };
 
-  const handleSkip = () => onConsent({ attributes: [] });
+  const handleOpenVerifyWizard = () => {
+    void prepared.then(({ emailRequested }) => {
+      if (emailRequested) {
+        verifiedEmailConsentFunnel.trigger(
+          VerifiedEmailConsentEvents.VerifyClicked,
+        );
+      }
+    });
+    showVerifyWizard = true;
+  };
+
+  // Catches the abandon path — user closes the tab / navigates away
+  // without skip / deny / continue. Funnel.close() is idempotent so
+  // overlapping with the explicit terminal calls above is safe.
+  onDestroy(() => verifiedEmailConsentFunnel.close());
+
+  const sourceForKey = (key: string): "unscoped" | "openid" | "sso" => {
+    const scope = extractScope(key);
+    if (scope === undefined) return "unscoped";
+    if (scope.startsWith("openid:")) return "openid";
+    if (scope.startsWith("sso:")) return "sso";
+    return "unscoped";
+  };
+
+  const handleSkip = () => {
+    verifiedEmailConsentFunnel.trigger(VerifiedEmailConsentEvents.Skipped);
+    verifiedEmailConsentFunnel.close();
+    onConsent({ attributes: [] });
+  };
 
   const handleDenyAll = (groups: MergedGroup[]) => {
+    verifiedEmailConsentFunnel.trigger(VerifiedEmailConsentEvents.DeniedAll);
     for (const group of groups) {
       selections.set(groupId(group), { checked: false, selectedIndex: 0 });
     }
@@ -273,18 +332,22 @@
       if (selection === undefined || !selection.checked) return [];
       return group.options[selection.selectedIndex].originals;
     });
-    const sharedEmail = attributes.find((attr) => {
+    const sharedEmailAttr = attributes.find((attr) => {
       const name = extractAttributeName(attr.key);
       return name === "email" || name === "verified_email";
-    })?.displayValue;
-    if (sharedEmail !== undefined) {
+    });
+    if (sharedEmailAttr !== undefined) {
+      verifiedEmailConsentFunnel.trigger(VerifiedEmailConsentEvents.Shared, {
+        source: sourceForKey(sharedEmailAttr.key),
+      });
       const { effectiveOrigin } = await prepared;
       lastSharedEmailsStore.set(
         $authenticatedStore.identityNumber,
         effectiveOrigin,
-        sharedEmail,
+        sharedEmailAttr.displayValue,
       );
     }
+    verifiedEmailConsentFunnel.close();
     onConsent({ attributes });
   };
 
@@ -383,7 +446,7 @@
       </p>
       <button
         class="btn btn-primary btn-xl mb-3 w-full"
-        onclick={() => (showVerifyWizard = true)}
+        onclick={handleOpenVerifyWizard}
       >
         {$t`Verify an email address`}
       </button>
@@ -456,9 +519,10 @@
                   selectedIndex: index,
                 });
               }}
-              onVerifyNew={group.name === "email" ||
-              group.name === "verified_email"
-                ? () => (showVerifyWizard = true)
+              onVerifyNew={(group.name === "email" ||
+                group.name === "verified_email") &&
+              isUnscopedGroup(group)
+                ? handleOpenVerifyWizard
                 : undefined}
             />
           {/if}
@@ -494,6 +558,7 @@
         resolveViaDoh={resolveEmailViaDoh}
         recoveryAddresses={data.recoveryAddresses}
         verifiedAddresses={data.verifiedAddresses}
+        openidAddresses={data.openidAddresses}
         onSuccess={(address) =>
           handleVerifySuccess(address, data.requestedKeys)}
       />

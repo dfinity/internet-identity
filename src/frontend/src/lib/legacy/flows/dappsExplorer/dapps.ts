@@ -79,6 +79,7 @@ export const getDapps = (): KnownDapp[] => {
       new KnownDapp({
         name: "Test Dapp",
         website: "https://nice-name.com",
+        authOrigins: ["https://nice-name.com"],
         logo: nnsDappLogo?.descr.logo ?? "no-such-logo",
       }),
     );

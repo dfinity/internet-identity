@@ -33,7 +33,7 @@ ic-metrics-encoder = "1"
 ic-stable-structures = "0.6"
 ic-verifiable-credentials = { git = "https://github.com/dfinity/verifiable-credentials-sdk", rev = "b74c746ea5361af3da207a2c957be4a951f7a72c" }
 ic-canister-sig-creation = "1.1"
-pocket-ic = "9.0.2"
+pocket-ic = "15"
 pretty_assertions = "1.4.1"
 proptest = "1"
 base64 = "0.22"

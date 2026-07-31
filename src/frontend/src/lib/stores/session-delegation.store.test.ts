@@ -225,6 +225,7 @@ describe("actorForIdentity — IDB resolution", () => {
                   pubkey: Array.from(sessionKey),
                   expiration,
                   targets: [],
+                  permissions: [],
                 },
                 signature: Array.from(new Uint8Array(64)),
               },

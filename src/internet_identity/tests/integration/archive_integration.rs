@@ -45,6 +45,10 @@ mod deployment_tests {
 
     #[test]
     fn should_deploy_archive_with_cycles() {
+        // Charged to create the archive canister. Kept in one place so the init
+        // arg and the post-deploy assertion below cannot drift apart.
+        const ARCHIVE_CREATION_CYCLES_COST: u64 = 100_000_000_000; // current cost in application subnets
+
         let env = env();
         let arg = Some(InternetIdentityInit {
             archive_config: Some(ArchiveConfig {
@@ -53,17 +57,27 @@ mod deployment_tests {
                 polling_interval_ns: 0,
                 entries_fetch_limit: 0,
             }),
-            canister_creation_cycles_cost: Some(100_000_000_000), // current cost in application subnets
+            canister_creation_cycles_cost: Some(ARCHIVE_CREATION_CYCLES_COST),
             ..InternetIdentityInit::default()
         });
         let ii_canister = setup_ii(&env, arg);
         env.add_cycles(ii_canister, 150_000_000_000);
+        let balance_before = env.cycle_balance(ii_canister);
 
         let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)
             .expect("archive deployment failed");
 
         assert!(matches!(result, DeployArchiveResult::Success(_)));
-        assert_eq!(env.cycle_balance(ii_canister), 50_000_000_000);
+        // Deploying the archive spends exactly `canister_creation_cycles_cost` to
+        // create it. Assert the delta rather than an absolute balance: the latter
+        // is base-dependent, since newer PocketIC versions fund newly created
+        // canisters (II included) by default. A checked subtraction gives a clear
+        // failure if the deploy unexpectedly failed to spend cycles.
+        let balance_after = env.cycle_balance(ii_canister);
+        let spent = balance_before
+            .checked_sub(balance_after)
+            .expect("archive deployment did not decrease the II cycle balance");
+        assert_eq!(spent, ARCHIVE_CREATION_CYCLES_COST as u128);
     }
 
     #[test]
