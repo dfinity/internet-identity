@@ -119,7 +119,7 @@
 -->
 <div class="flex w-full justify-center py-8 max-sm:flex-1 sm:max-w-110">
   <AuthPanel class="overflow-visible!">
-    <McpHero mcpServer={mcpServerHost} />
+    <McpHero />
     <h1 class="text-text-primary mt-2 text-2xl font-medium">
       {$t`Connect ${mcpServerHost}`}
     </h1>
