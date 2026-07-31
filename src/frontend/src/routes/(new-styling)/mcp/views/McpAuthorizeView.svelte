@@ -1,13 +1,19 @@
 <script lang="ts">
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import McpHero from "../components/McpHero.svelte";
+  import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
+  import IdentityListItem from "$lib/components/ui/IdentityListItem.svelte";
+  import {
+    identitySwitcherTrigger,
+    connectScreenActive,
+  } from "../mcp-switcher.store";
   import SessionDurationSelect from "$lib/components/ui/SessionDurationSelect.svelte";
   import { MAX_SESSION_DURATION_SECONDS } from "$lib/utils/sessionDuration";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import AccessLevelSelector from "$lib/components/ui/AccessLevelSelector.svelte";
   import type { AccessLevel } from "$lib/utils/accessLevel";
   import { accessLevelStore } from "$lib/stores/access-level.store";
-  import { InfoIcon } from "@lucide/svelte";
+  import { ChevronDownIcon, InfoIcon } from "@lucide/svelte";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -36,9 +42,16 @@
   // which identity, and it only *selects* (it doesn't sign in). So "Allow access"
   // authenticates the selected identity unless it's already the live session.
   const authLastUsedFlow = new AuthLastUsedFlow();
-  const selectedIdentityNumber = $derived(
-    $lastUsedIdentitiesStore.selected?.identityNumber,
+  const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
+  const selectedIdentityNumber = $derived(selectedIdentity?.identityNumber);
+  const selectedIdentityLabel = $derived(
+    selectedIdentity?.name ?? `${selectedIdentity?.identityNumber}`,
   );
+
+  $effect(() => {
+    connectScreenActive.set(true);
+    return () => connectScreenActive.set(false);
+  });
   $effect(() => {
     if (selectedIdentityNumber !== undefined) {
       authLastUsedFlow.init([selectedIdentityNumber]);
@@ -104,20 +117,41 @@
   level. There is no account picker — accounts are per-app and the MCP server
   origin is just the connector; the server selects an app account per call later.
 -->
-<div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
-  <AuthPanel>
-    <McpHero mcpServer={mcpServerHost} />
+<div class="flex w-full justify-center py-8 max-sm:flex-1 sm:max-w-110">
+  <AuthPanel class="overflow-visible!">
+    <McpHero />
     <h1 class="text-text-primary mt-2 text-2xl font-medium">
       {$t`Connect ${mcpServerHost}`}
     </h1>
     <p class="text-text-tertiary mt-1 text-base text-pretty">
-      {$t`Acts on your behalf across your apps.`}
+      {$t`Let AI access your apps.`}
     </p>
 
+    {#if selectedIdentity !== undefined}
+      <div
+        class="border-border-tertiary bg-bg-primary sm:bg-bg-secondary sticky top-0 z-1 mt-4 flex flex-col border-t pt-4 pb-3"
+      >
+        <span class="text-text-primary mb-2 text-base font-medium">
+          {$t`Identity`}
+        </span>
+        <ButtonCard
+          class="w-full text-start"
+          onclick={() => identitySwitcherTrigger.set("row")}
+          disabled={isAuthorizing}
+          aria-label={$t`Choose identity, currently ${selectedIdentityLabel}`}
+        >
+          <div class="ms-0.5 me-2 flex w-full items-center gap-3">
+            <IdentityListItem identity={selectedIdentity} />
+            <ChevronDownIcon class="text-fg-tertiary ms-auto size-4 shrink-0" />
+          </div>
+        </ButtonCard>
+      </div>
+    {/if}
+
     <!-- Session: how long the connection lasts before the user must reconnect. -->
-    <div class="border-border-tertiary mt-4 mb-6 flex flex-col border-t pt-4">
+    <div class="mt-4 mb-5 flex flex-col">
       <span class="text-text-primary mb-0.5 text-base font-medium">
-        {$t`Session`}
+        {$t`Connection duration`}
       </span>
       <div class="flex flex-row items-center justify-between gap-2">
         <span class="text-text-tertiary text-base">
@@ -136,39 +170,40 @@
     <AccessLevelSelector
       bind:accessLevel
       disabled={isAuthorizing}
-      class="mb-6"
+      class="mb-5"
     />
 
     <!-- Fine print: the connection can be revoked from Settings at any time.
          Opens in a new tab so the connect request in this one isn't lost. -->
     <div
-      class="border-border-tertiary text-text-tertiary mb-6 flex items-start gap-2 border-t pt-5 text-sm"
+      class="border-border-tertiary bg-bg-primary sm:bg-bg-secondary sticky bottom-0 z-1 -mb-3 border-t pt-4 pb-3"
     >
-      <InfoIcon class="mt-0.5 size-4 shrink-0" />
-      <span>
-        <Trans>
-          Revoke access anytime in your <a
-            href="/manage/settings"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-text-primary font-medium underline-offset-2 hover:underline"
-            >settings</a
-          >.
-        </Trans>
-      </span>
+      <div class="text-text-tertiary mb-4 flex items-start gap-2 text-sm">
+        <InfoIcon class="mt-0.5 size-4 shrink-0" />
+        <span>
+          <Trans>
+            Revoke access anytime in your <a
+              href="/manage/settings"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-text-primary font-medium underline-offset-2 hover:underline"
+              >settings</a
+            >.
+          </Trans>
+        </span>
+      </div>
+      <button
+        class="btn btn-primary btn-xl w-full"
+        onclick={handleAllowAccess}
+        disabled={isAuthorizing ||
+          selectedIdentityNumber === undefined ||
+          accessLevel === undefined}
+      >
+        {#if isAuthorizing}
+          <ProgressRing class="size-5" />
+        {/if}
+        <span>{$t`Allow access`}</span>
+      </button>
     </div>
-
-    <button
-      class="btn btn-primary btn-xl w-full"
-      onclick={handleAllowAccess}
-      disabled={isAuthorizing ||
-        selectedIdentityNumber === undefined ||
-        accessLevel === undefined}
-    >
-      {#if isAuthorizing}
-        <ProgressRing class="size-5" />
-      {/if}
-      <span>{$t`Allow access`}</span>
-    </button>
   </AuthPanel>
 </div>

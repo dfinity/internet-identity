@@ -87,6 +87,45 @@ test("A user with no stored identity gets the sign-in picker, not the mode-less 
   ).toBeVisible();
 });
 
+test("The connect screen names the acting identity and keeps the consent in view", async ({
+  page,
+  mcp,
+}) => {
+  await addVirtualAuthenticator(page);
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await signUp(page);
+
+  const identityRow = page.getByRole("button", {
+    name: /^Choose identity/,
+  });
+  await expect(identityRow).toBeVisible();
+  await expect(identityRow).toContainText("Test User");
+
+  const allowAccess = page.getByRole("button", { name: "Allow access" });
+  const revokeNote = page.getByRole("link", { name: "settings" });
+  await expect(identityRow).toBeInViewport();
+  await expect(allowAccess).toBeInViewport();
+  await expect(revokeNote).toBeInViewport();
+
+  await page.mouse.wheel(0, 2000);
+  await expect(identityRow).toBeInViewport();
+  await expect(allowAccess).toBeInViewport();
+  await expect(revokeNote).toBeInViewport();
+
+  // The screen carries the identity and its control, so it has no header.
+  await expect(
+    page.getByRole("button", { name: "Switch identity" }),
+  ).toBeHidden();
+  await expect(
+    page.getByRole("link", { name: "Internet Identity" }),
+  ).toBeHidden();
+
+  await identityRow.click();
+  await expect(
+    page.getByRole("button", { name: "Add identity" }),
+  ).toBeVisible();
+});
+
 test("Signing up to an untrusted server prompts to add it in settings", async ({
   page,
   mcp,
@@ -461,17 +500,21 @@ test("Identity switcher shows while signing in and hides once connecting", async
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   const switcher = page.getByRole("button", { name: "Switch identity" });
+  // The connect screen names the identity itself, and drops the header button on
+  // viewports with no room for both — so the affordance is one or the other.
+  const identityRow = page.getByRole("button", { name: /^Choose identity/ });
   const allow = page.getByRole("button", { name: "Allow access" });
   await expect(allow).toBeVisible();
-  await expect(switcher).toBeVisible();
+  await expect(switcher.or(identityRow).first()).toBeVisible();
 
   // Pick an access level to enable "Allow access" (unselected on a first-time
   // connect), then connect.
   await page.getByRole("radio", { name: "Actions & questions" }).check();
   await allow.click();
-  // Once connecting, the switcher is gone — and it stays gone as the tab is
-  // handed to the server's declared callback (a different origin entirely).
+  // Once connecting, both are gone — and stay gone as the tab is handed to the
+  // server's declared callback (a different origin entirely).
   await expect(switcher).toBeHidden();
+  await expect(identityRow).toBeHidden();
 });
 
 test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {

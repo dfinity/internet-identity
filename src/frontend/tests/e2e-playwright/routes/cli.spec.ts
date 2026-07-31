@@ -25,10 +25,10 @@ const signUp = async (page: Page): Promise<void> => {
     name: "Create",
     exact: true,
   });
-  // Wait for whichever entry the surface renders: /cli's mode="both" picker
-  // exposes "Continue with passkey", while the homepage's mode="signin"
-  // picker exposes the "Create" toggle instead. We probe before branching,
-  // so the next .isVisible() needs at least one of them committed to the DOM.
+  // Wait for whichever entry the surface renders: a mode="signin" picker
+  // exposes the "Create" toggle, a mode-less one exposes "Continue with
+  // passkey". We probe before branching, so the next .isVisible() needs at
+  // least one of them committed to the DOM.
   await continueWithPasskey.or(signUpToggle).first().waitFor();
   if (await continueWithPasskey.isVisible()) {
     await continueWithPasskey.click();

@@ -194,7 +194,7 @@
       ) {
         return;
       }
-      anchorRef?.querySelector("button")?.focus();
+      (anchorRef?.querySelector("button") ?? anchorRef)?.focus();
       onClose?.();
     }}
     class="popover fixed overflow-visible bg-transparent"

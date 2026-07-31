@@ -15,7 +15,11 @@
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { ManageHandoffFlow } from "$lib/flows/manageHandoffFlow.svelte";
-  import { showIdentitySwitcher } from "./mcp-switcher.store";
+  import {
+    showIdentitySwitcher,
+    identitySwitcherTrigger,
+    connectScreenActive,
+  } from "./mcp-switcher.store";
 
   const { children }: LayoutProps = $props();
 
@@ -28,15 +32,23 @@
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 
   let identityButtonRef = $state<HTMLElement>();
-  let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
+
+  const closeIdentitySwitcher = (): void =>
+    identitySwitcherTrigger.set(undefined);
+
+  $effect(() => {
+    if (!$showIdentitySwitcher) {
+      closeIdentitySwitcher();
+    }
+  });
 
   // Authenticate the selected identity here, then open /manage in a new tab
   // carrying the session — so the user doesn't have to sign in again there.
   const manageHandoff = new ManageHandoffFlow();
   const handleManageIdentity = async (): Promise<void> => {
-    isIdentityPopoverOpen = false;
+    closeIdentitySwitcher();
     if (selectedIdentity === undefined) {
       return;
     }
@@ -52,7 +64,7 @@
   // for the selected identity, so the user always makes that explicit choice.
   const handleSelectIdentity = (identityNumber: bigint): Promise<void> => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    isIdentityPopoverOpen = false;
+    closeIdentitySwitcher();
     isAuthDialogOpen = false;
     return Promise.resolve();
   };
@@ -107,72 +119,25 @@
 
 <div class="flex min-h-[100dvh] flex-col" data-page="mcp-authorize-view">
   <div class="h-[env(safe-area-inset-top)]"></div>
-  <Header>
-    {#if selectedIdentity !== undefined && $showIdentitySwitcher}
-      <button
-        bind:this={identityButtonRef}
-        class="btn btn-tertiary ms-auto gap-2.5 pe-3 md:-me-3"
-        onclick={() => (isIdentityPopoverOpen = true)}
-        aria-label="Switch identity"
-      >
-        <Avatar size="xs">
-          <UserIcon class="size-4" />
-        </Avatar>
-        <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span>
-        <ChevronDownIcon class="size-4" />
-      </button>
-      {#if isIdentityPopoverOpen}
-        <Popover
-          anchor={identityButtonRef}
-          onClose={() => (isIdentityPopoverOpen = false)}
-          direction="down"
-          align="end"
-          distance="0.75rem"
-          class="!bg-bg-primary"
+  {#if !$connectScreenActive}
+    <Header>
+      {#if selectedIdentity !== undefined && $showIdentitySwitcher}
+        <button
+          bind:this={identityButtonRef}
+          class="btn btn-tertiary ms-auto gap-2.5 pe-3 md:-me-3"
+          onclick={() => identitySwitcherTrigger.set("header")}
+          aria-label="Switch identity"
         >
-          <IdentitySwitcher
-            selected={selectedIdentity.identityNumber}
-            identities={lastUsedIdentities}
-            onSwitchIdentity={(identityNumber) =>
-              handleSelectIdentity(identityNumber)}
-            onUseAnotherIdentity={() => {
-              isIdentityPopoverOpen = false;
-              isAuthDialogOpen = true;
-            }}
-            onManageIdentity={handleManageIdentity}
-            onManageIdentities={() => {
-              isIdentityPopoverOpen = false;
-              isManageIdentitiesDialogOpen = true;
-            }}
-            onError={(error) => {
-              isIdentityPopoverOpen = false;
-              handleError(error);
-            }}
-            onClose={() => (isIdentityPopoverOpen = false)}
-          />
-        </Popover>
-      {/if}
-      {#if isAuthDialogOpen}
-        <Dialog onClose={() => (isAuthDialogOpen = false)}>
-          <AuthWizard
-            onSignIn={handleSelectIdentity}
-            onSignUp={handleSignUp}
-            onError={(error) => {
-              isAuthDialogOpen = false;
-              handleError(error);
-            }}
+          <Avatar size="xs">
+            <UserIcon class="size-4" />
+          </Avatar>
+          <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span
           >
-            <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-              {$t`Sign in`}
-            </h1>
-            <p class="text-text-secondary mb-6 self-start text-sm">
-              {$t`Choose method to continue`}
-            </p>
-          </AuthWizard>
-        </Dialog>
+          <ChevronDownIcon class="size-4" />
+        </button>
       {/if}
-    {/if}
-  </Header>
+    </Header>
+  {/if}
 
   <div class="flex flex-1 flex-col items-center justify-center">
     {@render children()}
@@ -181,6 +146,72 @@
   <Footer />
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
+
+{#if selectedIdentity !== undefined && $showIdentitySwitcher}
+  {#snippet switcher()}
+    <IdentitySwitcher
+      selected={selectedIdentity.identityNumber}
+      identities={lastUsedIdentities}
+      onSwitchIdentity={(identityNumber) =>
+        handleSelectIdentity(identityNumber)}
+      onUseAnotherIdentity={() => {
+        closeIdentitySwitcher();
+        isAuthDialogOpen = true;
+      }}
+      onManageIdentity={handleManageIdentity}
+      onManageIdentities={() => {
+        closeIdentitySwitcher();
+        isManageIdentitiesDialogOpen = true;
+      }}
+      onError={(error) => {
+        closeIdentitySwitcher();
+        handleError(error);
+      }}
+      onClose={closeIdentitySwitcher}
+    />
+  {/snippet}
+  {#if $identitySwitcherTrigger === "row"}
+    <Dialog
+      onClose={closeIdentitySwitcher}
+      showCloseButton={false}
+      contentClass="!p-0"
+      class="!bg-bg-primary"
+    >
+      {@render switcher()}
+    </Dialog>
+  {:else if $identitySwitcherTrigger === "header"}
+    <Popover
+      anchor={identityButtonRef}
+      onClose={closeIdentitySwitcher}
+      direction="down"
+      align="end"
+      distance="0.75rem"
+      class="!bg-bg-primary"
+    >
+      {@render switcher()}
+    </Popover>
+  {/if}
+  {#if isAuthDialogOpen}
+    <Dialog onClose={() => (isAuthDialogOpen = false)}>
+      <AuthWizard
+        mode="signin"
+        onSignIn={handleSelectIdentity}
+        onSignUp={handleSignUp}
+        onError={(error) => {
+          isAuthDialogOpen = false;
+          handleError(error);
+        }}
+      >
+        <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
+          {$t`Sign in`}
+        </h1>
+        <p class="text-text-secondary mb-6 self-start text-sm">
+          {$t`Choose method to continue`}
+        </p>
+      </AuthWizard>
+    </Dialog>
+  {/if}
+{/if}
 
 {#if isManageIdentitiesDialogOpen}
   <Dialog onClose={() => (isManageIdentitiesDialogOpen = false)}>
