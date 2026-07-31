@@ -151,7 +151,7 @@
     <!-- Session: how long the connection lasts before the user must reconnect. -->
     <div class="mt-4 mb-5 flex flex-col">
       <span class="text-text-primary mb-0.5 text-base font-medium">
-        {$t`Session duration`}
+        {$t`Connection duration`}
       </span>
       <div class="flex flex-row items-center justify-between gap-2">
         <span class="text-text-tertiary text-base">
