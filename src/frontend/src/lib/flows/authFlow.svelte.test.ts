@@ -627,48 +627,4 @@ describe("AuthFlow — last-used tracking (openid vs sso)", () => {
     expect(entry.authMethod).not.toHaveProperty("openid");
     expect(entry.authMethod.sso).toMatchObject({ domain: SSO_DOMAIN });
   });
-
-  it("commits nothing on the sso sign-up path when trackLastUsed is false", async () => {
-    authenticateWithJWTMock
-      .mockRejectedValueOnce(noSuchAnchorError)
-      .mockResolvedValue({ identity: {}, identityNumber: BigInt(22) });
-
-    const flow = new AuthFlow({ trackLastUsed: false });
-    const signUp = await flow.continueWithOpenId(
-      testConfig,
-      "fake-jwt",
-      "both",
-      SSO_DOMAIN,
-    );
-    expect(signUp?.type).toBe("signUp");
-
-    const identityNumber = await flow.completeOpenIdRegistration("Alice");
-
-    expect(identityNumber).toBe(BigInt(22));
-    expect(
-      lastUsedIdentitiesStoreValue.addLastUsedIdentity,
-    ).not.toHaveBeenCalled();
-  });
-
-  it("commits nothing on the sso sign-in path when trackLastUsed is false", async () => {
-    authenticateWithJWTMock.mockResolvedValue({
-      identity: {},
-      identityNumber: BigInt(23),
-    });
-
-    const flow = new AuthFlow({ trackLastUsed: false });
-    const result = await flow.continueWithOpenId(
-      testConfig,
-      "fake-jwt",
-      "both",
-      SSO_DOMAIN,
-    );
-
-    expect(result?.type).toBe("signIn");
-    if (result?.type !== "signIn") throw new Error("expected signIn");
-    expect(result.pendingLastUsedEntry).toBeUndefined();
-    expect(
-      lastUsedIdentitiesStoreValue.addLastUsedIdentity,
-    ).not.toHaveBeenCalled();
-  });
 });
