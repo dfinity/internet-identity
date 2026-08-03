@@ -21,7 +21,7 @@
     }
   },
   "devDependencies": {
-    "@dfinity/utils": "^4.0.2",
+    "@dfinity/utils": "^4.2.1",
     "@types/html-minifier-terser": "^7.0.0",
     "html-minifier-terser": "^7.2.0",
     "typescript": "*",
