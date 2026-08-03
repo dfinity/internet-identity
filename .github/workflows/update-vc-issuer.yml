@@ -8,6 +8,11 @@ on:
     - cron: "0 6 * * MON"
   workflow_dispatch:
 
+# The branch push and the pull request are made with the app token, not
+# GITHUB_TOKEN, so this only needs to read the checkout.
+permissions:
+  contents: read
+
 jobs:
   vc-issuer-update:
     runs-on: ubuntu-latest
