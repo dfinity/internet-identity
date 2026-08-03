@@ -10,9 +10,9 @@
 #   .test-app/dist/           the frontend, loaded as an unpacked Chrome
 #                             extension by the Playwright e2e
 #
-# Assets are verified against the SHA256SUMS file published by the same release.
-# That detects a corrupted or truncated download; the pinned tag is the trust
-# anchor for *which* build is used.
+# Each asset is verified against the `.sha256` published beside it in the same
+# release. That detects a corrupted or truncated download; the pinned tag is the
+# trust anchor for *which* build is used.
 #
 # Re-running is cheap: a stamp file records the tag that is currently unpacked
 # and the download is skipped when it already matches.
@@ -26,7 +26,7 @@ REPO="dfinity/internet-identity-test-app"
 VERSION_FILE=".github/versions/test-app"
 DEST=".test-app"
 STAMP="$DEST/.version"
-ASSETS=(test_app.wasm test_app.did test_app_dist.tar.gz SHA256SUMS)
+ASSETS=(test_app.wasm test_app.did test_app_dist.tar.gz)
 
 tag=$(tr -d '[:space:]' < "$VERSION_FILE")
 if [ -z "$tag" ]; then
@@ -49,11 +49,13 @@ fi
 
 # macOS ships shasum rather than sha256sum; both read the sha256sum format.
 verify_checksums() {
+  local checker=(shasum -a 256 -c)
   if command -v sha256sum > /dev/null; then
-    sha256sum -c SHA256SUMS
-  else
-    shasum -a 256 -c SHA256SUMS
+    checker=(sha256sum -c)
   fi
+  for asset in "${ASSETS[@]}"; do
+    "${checker[@]}" "$asset.sha256"
+  done
 }
 
 rm -rf "$DEST"
@@ -62,7 +64,7 @@ mkdir -p "$DEST"
 echo "downloading $REPO release $tag"
 download_args=()
 for asset in "${ASSETS[@]}"; do
-  download_args+=(--pattern "$asset")
+  download_args+=(--pattern "$asset" --pattern "$asset.sha256")
 done
 
 # Each asset is a separate request, so a transient network or API failure can
