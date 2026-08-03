@@ -1067,6 +1067,39 @@ Sending them to the app means it boots, discovers it has no usable session and
 bounces — a visible flash on the way to a redirect that was always going to
 happen. Linking direct makes the journey tap → Internet Identity → the page.
 
+**Two journeys, and they want opposite things.** With a reusable session it is tap
+→ the page, and anything shown in between is pure friction. Without one it is up to
+three page loads and two interactions:
+
+```
+tap → /sign-in         (load)
+    → II /authorize     (load, possibly a passkey prompt)
+    → Continue          (a tap)
+    → /sign-in          (load)
+    → the page
+```
+
+The temptation is to soften that with an interstitial offering the user something
+to do. Resist putting it on II, for two reasons. The notification's own action
+buttons already _are_ that surface — a body tap for the destination, a reserved
+button for turning it off (see
+[action buttons](#action-buttons-navigation-only-never-silent-work)) — so the
+controls exist without spending a screen. And **only the dApp knows whether it has
+a session**; II cannot see across the origin boundary, so II would have to show its
+screen unconditionally, taxing the fast path to serve the slow one.
+
+If a waiting screen is wanted, it belongs on the dApp's sign-in route, shown only
+when a redirect is actually needed: reusable session → forward, render nothing;
+otherwise → the app's own branded "Signing you in", which is a fine place for a
+_Turn off notifications_ link because there is genuinely a moment to fill.
+
+And note which lever matters. The ugly journey is not a design problem to style
+away, it is a **session-lifetime** one: an app whose session survives a tab close
+takes the instant path most of the time and reaches the slow one rarely. Of the
+three loads, only II's Continue tap is irreducible — issuing a delegation silently
+on navigation would let any site obtain one by redirecting the user to II, so that
+tap _is_ the authorization.
+
 Four things this cost to get right, all learned the hard way:
 
 - **The sign-in route must be its own URL.** The flow journals state per route,
