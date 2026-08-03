@@ -1858,15 +1858,31 @@ this check, record allocations here and verify against `storage.rs` before
 adding one — a duplicate index silently interleaves two `StableBTreeMap`s into
 the same virtual memory and corrupts both.
 
-| Index | Region                                |
-| ----- | ------------------------------------- |
-| …     | (existing regions — see `storage.rs`) |
-| 31    | MCP registration                      |
-| 32    | SSO stable-id index                   |
-| 33    | push subscriptions                    |
-| 34    | push consent                          |
-| 35    | push principal index                  |
-| 36    | push sender registry                  |
+| Index | Region               | Key → value                                                       |
+| ----- | -------------------- | ----------------------------------------------------------------- |
+| …     | (existing regions)   | see `storage.rs`                                                  |
+| 31    | MCP registration     | —                                                                 |
+| 32    | SSO stable-id index  | —                                                                 |
+| 33    | push subscriptions   | `(anchor, endpoint_sha256)` → `{endpoint, p256dh, auth, created}` |
+| 34    | push consent         | `(anchor, origin_sha256)` → `{granted_at, origin}`                |
+| 35    | push principal index | `in_app_principal` → `anchor`                                     |
+| 36    | push sender registry | `origin_sha256` → registered sender canister                      |
+
+What each is for, since the names alone do not say:
+
+- **Subscriptions** hold exactly what RFC 8291 needs to seal for one device — the
+  relay `endpoint` plus that device's `p256dh` public key and `auth` secret. One
+  row per browser that ran `pushManager.subscribe()`; a browser resubscribing
+  overwrites in place. The endpoint URL is what makes this the largest row.
+- **Consent** is presence-as-grant: the key existing means this user allowed this
+  dApp on this identity, and revoking deletes it.
+- **The principal index** is the reverse lookup `notify_user` cannot work without.
+  A dApp knows the user only by its per-origin `in_app_principal`, never the
+  anchor, so this resolves one to the other before the two maps above can be read.
+  Written on grant, cleared on revoke — and the reason a consent costs ~140 B
+  rather than ~60 B.
+- **The sender registry** records which canister may send as a given origin.
+  Controller-written only, because `.well-known` verification does not exist yet.
 
 This is not hypothetical. An earlier revision of the PoC claimed 32, which `main`
 had meanwhile taken for the SSO stable-id index; the two `StableBTreeMap`s
