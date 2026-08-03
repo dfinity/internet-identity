@@ -48,6 +48,10 @@ fi
 
 echo "Fetching $ISSUER_REPO release $tag" >&2
 
+# Start from an empty directory so an interrupted earlier run cannot leave a
+# stale or partially downloaded asset behind: each asset is a separate request,
+# so a failed download can land some of the set.
+rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
 # Each asset is a separate request, so a transient network or API failure can
