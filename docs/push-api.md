@@ -10,9 +10,16 @@ document is reference material and assumes you have read at least
 
 
 
-One-time setup (~15 min): serve `.well-known/ii-push-senders`, call
-`push_register_sender(origin)` from the backend. Steady state: hand the client
-library a campaign — it chunks, paces, retries and reports:
+One-time setup: serve `.well-known/ii-push-senders` listing your backend canister
+principal. That is the whole of it — II verifies the file itself, on first consent
+or on your first send, so there is no registration call to remember. `push_send`
+returns `SenderUnverified` until it has, and the client library surfaces the hint
+and retries, so a correctly published file resolves on its own.
+(`push_register_sender(origin)` exists to force an immediate re-read after you edit
+the file, rather than waiting for the TTL.)
+
+Steady state: hand the client library a campaign — it chunks, paces, retries and
+reports:
 
 ```rust
 // Non-sensitive app: show the content.

@@ -351,18 +351,49 @@ not by server-side routing.
 One call has one `caller()`, so the per-user `caller == in_app_principal`
 model does not batch. Senders authenticate at the **origin** level:
 
-Registering, once per dApp. The order matters — the file has to exist before the
-call, because II fetches it during the call:
+The only thing a dApp must do is **publish the file**:
 
-1. The dApp **publishes** `https://myapp.com/.well-known/ii-push-senders`, listing
-   its backend canister principal(s).
-2. That **backend canister calls** `push_register_sender("https://myapp.com")`. It
-   must be the canister making the call: `caller()` is what is being claimed.
-3. **II fetches the file** over an HTTPS outcall, with a transform so every replica
-   agrees on the bytes.
-4. **II checks `caller() ∈ senders`.** On success it stores
-   `origin_hash → {principals, verified_at}`. If the file is absent, unparseable,
-   or does not list the caller, the call is refused and nothing is stored.
+```
+https://myapp.com/.well-known/ii-push-senders
+{ "senders": ["abcde-fghij-...-cai"] }
+```
+
+Registration itself should be automatic. Requiring an explicit setup call is
+boilerplate that adds no security — the file is the proof, and II can go and read
+it whenever it needs to.
+
+1. **On first consent.** When a user opts in for an origin in `/authorize`, II has
+   the origin and no registry row yet, so it fetches and verifies then. This is the
+   preferred trigger: it is user-paced, and by the time the dApp sends anything the
+   row already exists.
+2. **On a send, as a backstop.** If a row is still missing, II starts verification
+   and returns `SenderUnverified` with a hint naming the file to publish and the
+   principal to list. It does **not** block the send on an outcall — `push_send`
+   stays a cheap, no-await admission call, and the dApp's library retries.
+3. **`push_register_sender(origin)` stays**, as "check me again now": it forces a
+   re-read, bypassing the negative cache below, for a developer who has just fixed
+   their file and does not want to wait for the TTL.
+
+Verification itself is unchanged in substance: II fetches over an HTTPS outcall
+with a transform so replicas agree, then checks that the calling — or, for the
+consent-time path, the claimed — canister is listed, and stores
+`origin_hash → {principals, verified_at}`.
+
+**Only ever fetch for origins a user has already consented to.** Without that gate
+any canister could make II fetch a URL of its choosing by naming an arbitrary
+origin, which is an SSRF and DoS amplifier of exactly the kind the
+[endpoint allowlist](#open-items) exists to prevent. Consent requires a real user
+completing the II opt-in for that origin, so the fetchable set is bounded by
+grants that already happened — and it costs nothing, because a send to a user who
+has not consented is refused regardless. Add negative caching per origin so a
+misconfigured file is not re-fetched on every send, and a cap on concurrent
+verifications so a burst of new origins cannot crowd out authentication's outcall
+budget.
+
+The proof still needs **both halves** — a published file and a canister that the
+file names — so an impersonator needs control of the origin's content *and* of the
+canister. Making the check implicit changes when II reads the file, not what it
+proves.
 
 The proof needs **both halves**, which is what makes it a proof: publishing the
 file registers nothing on its own, and calling without the file is refused. A

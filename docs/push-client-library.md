@@ -144,6 +144,7 @@ is internal. A dApp author should never have to know what a chunk is.
 | Failure                            | What the library must do                                        |
 | ---------------------------------- | --------------------------------------------------------------- |
 | `ready = false`                    | back off with jitter; do **not** advance the cursor             |
+| `SenderUnverified`                 | surface the hint once, then retry with backoff — self-heals     |
 | `drain_epoch` moved (II upgraded)  | rewind to the oldest unconfirmed chunk and re-send              |
 | Its own host restarts mid-campaign | resume from `cursor`; re-send anything `InFlight`               |
 | `NoConsent` for a target           | mark terminal, stop retrying, surface to the dApp               |
@@ -153,4 +154,25 @@ is internal. A dApp author should never have to know what a chunk is.
 Because retries and epoch-recovery both re-send chunks, **duplicate delivery is
 expected by design** — which is the other half of why `msg_id` dedup on the
 device is a v1 requirement, not a nicety.
+
+### Sender verification is the library's job, not the dApp's
+
+A dApp should never write registration logic. Its only obligation is to publish
+`/.well-known/ii-push-senders` listing its backend canister; everything after that
+belongs here.
+
+On `SenderUnverified` the library logs the hint II returned — which names the file
+to publish and the principal to list — exactly once per origin, then keeps retrying
+with backoff. II verifies in the background, so a correctly published file makes
+the condition clear itself with no further action, and a missing one produces one
+actionable log line instead of a silent failure.
+
+The only case worth an explicit call is a developer who has just fixed their file
+and does not want to wait: expose `forceReverify()` over
+`push_register_sender(origin)`, which bypasses II's negative cache. It is a
+convenience, not part of the normal path.
+
+The failure this avoids is worth naming, because it is the one a dApp would
+otherwise hit on day one: publish the file, forget the setup call, and every send
+fails with an authorization error that looks like a bug in II.
 
