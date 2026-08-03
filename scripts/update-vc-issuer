@@ -19,6 +19,11 @@ ISSUER_REPO="dfinity/internet-identity-vc-demo-issuer"
 VERSION_FILE=".github/versions/vc-issuer"
 DID_FILE="src/vc-api/vc_demo_issuer.did"
 
+if ! command -v gh > /dev/null; then
+    echo "missing the 'gh' CLI, needed to query $ISSUER_REPO releases" >&2
+    exit 1
+fi
+
 current=$(sed <"$VERSION_FILE" 's/#.*$//' | sed '/^$/d' | tr -d '[:space:]')
 
 latest=$(gh release view --repo "$ISSUER_REPO" --json tagName --jq .tagName)
