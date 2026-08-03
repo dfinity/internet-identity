@@ -5,6 +5,10 @@ version: 2
 # separately per ecosystem via `groups` with `applies-to: security-updates`, so
 # advisory-driven bumps arrive as one grouped PR per ecosystem (across all
 # directories) instead of one PR per dependency.
+#
+# `commit-message` and `open-pull-requests-limit` belong to the multi-ecosystem
+# group: they describe the single consolidated PR, so Dependabot rejects them on
+# the individual ecosystem entries.
 multi-ecosystem-groups:
   weekly-version-updates:
     schedule:
@@ -14,6 +18,10 @@ multi-ecosystem-groups:
       timezone: Etc/UTC
     labels:
       - dependencies
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
 
 updates:
   # ── cargo ──────────────────────────────────────────────
@@ -28,10 +36,6 @@ updates:
       day: monday
       time: "08:00"
       timezone: Etc/UTC
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "chore(deps)"
-      include: scope
     ignore:
       - dependency-name: "*"
         update-types:
@@ -63,11 +67,6 @@ updates:
       day: monday
       time: "09:00"
       timezone: Etc/UTC
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "chore(deps)"
-      prefix-development: "chore(deps-dev)"
-      include: scope
     ignore:
       - dependency-name: "*"
         update-types:
@@ -89,10 +88,6 @@ updates:
       day: monday
       time: "10:00"
       timezone: Etc/UTC
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "chore(deps)"
-      include: scope
     ignore:
       - dependency-name: "*"
         update-types:
@@ -114,10 +109,6 @@ updates:
       day: monday
       time: "10:00"
       timezone: Etc/UTC
-    open-pull-requests-limit: 2
-    commit-message:
-      prefix: "chore(deps)"
-      include: scope
     ignore:
       - dependency-name: "*"
         update-types:
