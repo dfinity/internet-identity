@@ -32,15 +32,10 @@ jobs:
       # Needed for `npm run generate:*-issuer` and the formatter step
       - run: npm ci
 
-      # dfinity/internet-identity-vc-demo-issuer is an `internal` repository,
-      # which the app token minted above cannot read — it is scoped to this
-      # repository. Read its releases with an organisation member's token
-      # instead. Once that repository is public, `secrets.GITHUB_TOKEN` is
-      # enough.
       - name: Bump the pinned issuer release
         run: ./scripts/update-vc-issuer
         env:
-          GH_TOKEN: ${{ secrets.GIX_BOT_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Run the formatter so the regenerated bindings are formatted
       - run: npm run format

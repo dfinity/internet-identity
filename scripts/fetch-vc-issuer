@@ -15,9 +15,9 @@
 # `src/vc-api/vc_demo_issuer.did` so `npm run generate` works offline. The bump
 # workflow refreshes that copy when the pin moves.
 #
-# Auth: uses `gh`, so an existing `gh auth login` session or a `GH_TOKEN` in the
-# environment both work. A token is required while
-# dfinity/internet-identity-vc-demo-issuer is an `internal` repository.
+# Auth: uses `gh`, which requires a token even for a public repository. An
+# existing `gh auth login` session or a `GH_TOKEN` in the environment both work;
+# in CI the workflow's own token is passed as `GH_TOKEN`.
 
 set -euo pipefail
 
@@ -82,11 +82,8 @@ Error: could not read release '$tag' from $ISSUER_REPO.
 Likely causes, in order:
   * The release does not exist yet. Check
     https://github.com/$ISSUER_REPO/releases and update $VERSION_FILE.
-  * The release is not readable with the credentials available here.
-    $ISSUER_REPO is an 'internal' repository, so an anonymous request or a
-    workflow's default GITHUB_TOKEN cannot read its releases. In CI this is
-    expected on pull requests from forks, which receive no secrets — it will
-    stop being a problem once $ISSUER_REPO is public. Locally, run
+  * 'gh' could not authenticate. It needs a token even though $ISSUER_REPO is
+    public: in CI the workflow's own token is passed as GH_TOKEN; locally, run
     'gh auth login' or export GH_TOKEN.
 EOF
     rm -f "$OUT_DIR/.fetch-error"

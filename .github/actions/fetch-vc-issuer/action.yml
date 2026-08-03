@@ -1,24 +1,14 @@
 name: "fetch-vc-issuer"
 description: Download the VC demo issuer release pinned in .github/versions/vc-issuer into .vc-issuer/
 
-inputs:
-  token:
-    description: >-
-      Token used to read releases from
-      dfinity/internet-identity-vc-demo-issuer. That repository is internal, so
-      a workflow's default GITHUB_TOKEN cannot read it and a token belonging to
-      an organisation member is required. Once that repository is public the
-      default token is enough, and this input can be dropped along with the
-      `token:` argument at each call site. Resolves to an empty string on a pull
-      request from a fork, which receives no secrets; scripts/fetch-vc-issuer
-      reports that as the cause.
-    required: true
-
 runs:
   using: "composite"
   steps:
+    # The `gh` CLI requires a token to run at all. The release lives in a public
+    # repository, so the workflow's own token is enough — including on pull
+    # requests from forks, which get a token but no secrets.
     - name: Fetch VC issuer release
       shell: bash
       env:
-        GH_TOKEN: ${{ inputs.token }}
+        GH_TOKEN: ${{ github.token }}
       run: ./scripts/fetch-vc-issuer

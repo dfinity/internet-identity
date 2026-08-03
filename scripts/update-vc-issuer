@@ -6,9 +6,9 @@
 # Prints nothing to change and exits 0 when the pin is already current, so the
 # calling workflow's create-pull-request step simply finds no diff.
 #
-# Auth: uses `gh`, so an existing `gh auth login` session or a `GH_TOKEN` in the
-# environment both work. A token is required while
-# dfinity/internet-identity-vc-demo-issuer is an `internal` repository.
+# Auth: uses `gh`, which requires a token even for a public repository. An
+# existing `gh auth login` session or a `GH_TOKEN` in the environment both work;
+# in CI the workflow's own token is passed as `GH_TOKEN`.
 
 set -euo pipefail
 
