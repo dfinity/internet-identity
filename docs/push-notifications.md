@@ -1,166 +1,96 @@
 # Push notifications — design
 
-Internet Identity hosts a single Web Push pipeline that any dApp can send
-through. The user grants notification permission to id.ai **once**, subscribes
-per device, and consents per dApp; every consented dApp then delivers
-notifications via II rather than running its own service worker, VAPID
-keypair, and subscription.
+**How to read this.** It is long because it covers two independent scaling paths
+and a security model. If you only read one section, read
+[How it works, in plain terms](#how-it-works-in-plain-terms). Then:
 
-The value is a **single permission + delivery hub**, not an install: the user
-allows notifications for their identity provider once, and every consented
-dApp reaches them through it — instead of each dApp prompting for its own
-notification permission (which browsers increasingly bury) and running its own
-push stack. Installing II as a PWA is **optional** on Android and desktop
-(Web Push works in a plain tab there) and only **required on iOS Safari**,
-where it also earns its keep as "install one app, get every dApp's
-notifications." This doc captures the design across the two paths that decide
-scalability — **dApp → II** and **II → device** — plus the security model and
-the open items.
+- **Reviewing the design?** [Goals and non-goals](#goals-and-non-goals) →
+  [Architecture](#architecture) →
+  [Alternatives considered](#alternatives-considered) →
+  [Security model](#security-model) → [Open items](#open-items).
+- **Implementing it on II?** [dApp → II](#dapp--ii) →
+  [II's state model](#iis-state-model-stateless-for-campaigns) →
+  [Delivering to devices](#delivering-to-devices) →
+  [Push must never degrade authentication](#push-must-never-degrade-authentication).
+- **Integrating a dApp?**
+  [dApp developer integration](#dapp-developer-integration) →
+  [The Candid interface](#the-candid-interface) →
+  [The dApp-side client library](#the-dapp-side-client-library).
+- **Wondering what exists today?** [Status](#status), at the end.
 
-## What does the user experience?
+## Context and scope
 
-### How does a user turn notifications on? (first time signing into a dApp)
 
-1. On the dApp (e.g. `oisy.com`), the user clicks **Sign in with Internet
-   Identity**. II opens at `/authorize`.
-2. The user authenticates as usual (passkey, or an existing session for a
-   returning user).
-3. **Continue screen** (`ContinueView`): "Continue to `<dApp>`" with the
-   account picker and a **Continue** button. There is no notification toggle
-   here — the account choice is the only decision.
-4. The user taps **Continue**.
-5. **Notifications opt-in screen** (`NotifOptInView`): a preview illustration
-   of what a notification looks like (an "Example" lock-screen stack), the
-   heading "Let `<dApp>` notify you", two short reasons (instant alerts /
-   reachable anytime), and two buttons — **Enable notifications** and **Maybe
-   later**.
-   6a. **Enable** → if this browser has not granted permission yet, it shows
-   its **native permission prompt** ("`id.ai` wants to show notifications —
-   Allow / Block"). This dialog is the browser's own and cannot be restyled.
-   On **Allow** — or straight away, when permission was granted earlier — II
-   subscribes the device and records consent for this dApp, then redirects to
-   the dApp. No app install is required (Android/desktop); iOS Safari is the
-   exception.
-   6b. **Maybe later** → II redirects straight to the dApp; nothing is enabled.
+A dApp on the IC that wants to reach a user who is not currently looking at it
+has no good option. Web Push is the browser-native answer, but doing it yourself
+means prompting for your own notification permission, running your own service
+worker, holding your own VAPID keypair, and storing your own subscription
+endpoints — per dApp. Browsers increasingly bury that permission prompt, users
+decline it more often the more times they see it, and on iOS Safari it requires
+the site to be installed as a PWA at all. The result is that almost no dApp does
+it, and users get nothing.
 
-Two separate things are being asked, and only one of them repeats.
+Internet Identity is already the one origin every user of these apps has a
+relationship with, and already holds per-user state they have consented to. That
+makes it the one place where the permission can be asked **once** and reused.
 
-II's opt-in screen **is** shown for each new dApp, because consent is recorded
-per origin and no dApp inherits another's. It appears once per dApp per
-device: a device that has not subscribed yet sees it again even for a dApp
-already enabled on another device, with copy that asks about this device
-rather than repeating the original pitch.
+So: II hosts a single Web Push pipeline that any dApp can send through. The user
+grants notification permission to `id.ai` once, subscribes per device, and
+consents per dApp; a consented dApp then delivers through II rather than running
+a push stack of its own. Installing II as a PWA stays **optional** on Android and
+desktop, and is **required only on iOS Safari** — where "install one app, get
+every dApp's notifications" is a better trade than installing each dApp.
 
-The **browser's** permission prompt is the part that does not come back. It is
-granted to `id.ai`, not to the dApp, and every dApp's notifications are
-delivered through that one origin — so once the user has allowed it, the
-browser has nothing left to ask, and later opt-ins complete without a second
-dialog.
+This document covers the design of the two paths that decide whether it scales —
+**dApp → II** and **II → device** — the security and privacy model, and the open
+items. It is a design document, not an integration guide: the Candid interface
+and the client-library internals are here to show the design is buildable, not to
+serve as reference material.
 
-### What happens when a notification is sent?
+## Goals and non-goals
 
-7. The dApp's backend tells II to notify the user. At any real scale this runs
-   through the dApp's client library and the chunked `push_send` endpoint (see
-   below); the PoC has a simpler one-shot `notify_user` for a single recipient.
-8. The notification arrives on every device the user enabled — **even with the
-   tab closed / browser not running** (on Android). It shows the dApp's origin
-   as the source and the dApp's title/body as the text.
-9. The user **taps** it. When the dApp supplied a deep link — the normal case —
-   the service worker opens that URL directly and II is not visited at all. The
-   dApp lands the user on the page the notification was about, signing them in
-   on the way with the ICRC-167 top-level redirect if the session has lapsed,
-   which is the usual state when a notification is what brought them back.
-   Only a notification with no deep link falls back to II's `/notify` screen
-   ("Opening `<dApp>`" with the app's logo), which resolves the sender's origin
-   behind a consent gate and forwards to the dApp's home.
 
-### How does a user manage or turn them off?
+### Goals
 
-10. Either from the browser or from II.
+- **One permission, many apps.** A user allows notifications once, for their
+  identity provider, and every consented dApp reaches them through it.
+- **A dApp needs no push infrastructure.** No service worker, no VAPID keypair,
+  no subscription storage, no relay accounts.
+- **Consent is per dApp and per device, and revocable.** Revoking one dApp stops
+  its notifications immediately and affects no other.
+- **A 10k-user broadcast is a normal operation**, not an incident — with the
+  explicit constraint that it must never degrade authentication, which is what
+  this canister actually exists to do.
+- **II's durable storage does not grow with volume.** Storage is user-scoped;
+  sending more notifications must not make it larger.
+- **A tap lands the user where the notification was about**, in the sending app,
+  signed in.
+- **There is a path for apps that cannot let II read their content** — a
+  messenger should not hand message bodies to its identity provider.
 
-    In **II → Settings**, the user sees **Notifications on this device**
-    (a toggle to turn the whole device on/off) and **Allowed apps** — every
-    dApp that can notify them, each with a remove button. Revoking an app
-    stops its notifications immediately.
+### Non-goals
 
-    The **browser's own site settings** can also block notifications for
-    `id.ai`, which silences every dApp at once and cannot be overridden from
-    inside II — the permission belongs to the browser, not to us. II can only
-    observe the result: a blocked permission makes the opt-in screen
-    unofferable, so it is skipped rather than shown as a button that cannot
-    work. Re-enabling has to happen in the browser too; that is the one path
-    II cannot offer a control for.
+- **Not a messaging product.** No inbox, no history, no unread state, no
+  read receipts. II forgets a notification once it is handed off.
+- **Not exactly-once delivery.** Delivery is explicitly at-least-once, which is
+  why device-side deduplication ships with it rather than after it.
+- **Not guaranteed delivery.** The relays are best-effort and a device that never
+  comes online never receives; no part of this promises otherwise.
+- **Not per-notification billing, in v1.** Charging senders cycles is parked, not
+  designed — which has consequences for abuse limits, covered below.
+- **Not a way to reach "all II users".** There is no audience except users who
+  consented to a specific dApp; a sender cannot discover or address anyone else.
+- **Not universal browser support.** Web Push is browser-scoped. Browsers without
+  it (some vendor forks ship none) are out of reach, and that is not something
+  this design can fix.
+- **Not a replacement for in-app notification UI.** This reaches users who are
+  away; what an app shows a user who is present is the app's business.
 
-## Status
+## How it works, in plain terms
 
-### Built today (PoC on `feat/push-notifications-poc`)
 
-An inventory, not an explanation — each line links to the section that covers
-it. The last four exist because building the PoC proved they had to.
-
-- **Per-device subscribe/unsubscribe, `/authorize` opt-in, per-dApp consent** —
-  [the user flow](#how-does-a-user-turn-notifications-on-first-time-signing-into-a-dapp),
-  [consent lifecycle](#consent-lifecycle-it-must-not-outlive-the-sender).
-- **`notify_user(principal, alert)`** — one recipient per call. It does **not**
-  answer scale, and everything in this doc about throughput, cost and delivery
-  assumes the chunked `push_send` that supersedes it:
-  [chunked send and flow control](#sending-to-thousands-of-users-chunked-send--two-layer-flow-control).
-- **RFC 8291 payload encryption and RFC 8292 VAPID signing, both in-canister** —
-  [delivering to devices](#delivering-to-devices).
-- **VAPID key generated with `raw_rand`, held in stable memory** — not the
-  custody model we would choose. Web Push mandates P-256, the IC's threshold
-  ECDSA is secp256k1 only, so the subnet cannot hold the key for us:
-  [what that risks](#security-model),
-  [what changes if P-256 lands](#ic-capabilities-to-re-evaluate).
-- **Tap opens the dApp's deep link directly**, falling back to the consent-gated
-  `/notify` redirect when the sender supplied no target —
-  [where a notification opens](#can-the-app-choose-where-the-notification-opens),
-  [landing signed in](#can-the-tap-land-the-user-already-signed-in).
-- **Sender authorization by origin** — a registry keyed by origin hash. The
-  original `caller() == in_app_principal` rule could never match an
-  inter-canister call, so it admitted only self-sends:
-  [how II verifies a sender](#how-does-ii-verify-the-sender-is-really-that-dapp).
-- **Send-time `alert.url` validation** — what makes opening the deep link
-  directly safe:
-  [where a notification opens](#can-the-app-choose-where-the-notification-opens).
-- **`msg_id` dedup in the service worker, and `410`/`404` row cleanup** —
-  [duplicate and replay suppression](#duplicate-and-replay-suppression-msg_id).
-- **VAPID key rotation in the browser** — a subscription bound to a superseded
-  key is resubscribed rather than failing forever.
-
-### Not built, so the PoC isn't mistaken for a shippable subset
-
-- No `push_send`, so no batching, no chunking, and no client library — a send is
-  one `notify_user` per recipient.
-- No rate limiting or admission control of any kind — `notify_user` is unmetered.
-- No `.well-known/ii-push-senders` verification: senders are registered by an
-  operator, so nothing yet proves a canister owns the origin it sends as.
-- No endpoint host allowlist, and no per-anchor caps on subscription or consent
-  rows.
-- `Display` content only — no `Hidden`, which is the variant the design
-  recommends shipping first for E2E apps.
-- No `pushsubscriptionchange` handling, so a rotated endpoint still leaves a
-  stale row until a relay reports it gone.
-- Integration and E2E test coverage is thin (unit tests only).
-
-### Proposed (the rest of this doc)
-
-- Chunked `push_send` with two-layer flow control (II admission + client
-  pacing), a sender registry, a stateless-for-campaigns II (transient heap
-  buffer, storage O(users × origins)), a durable client library, and delivery
-  through a trusted web2 gateway (with direct per-device outcalls as the
-  documented alternative/fallback).
-- Promoted to v1 requirements by review, and still outstanding: a `drain_epoch`
-  acknowledgment signal, an endpoint host allowlist, per-anchor caps, drain
-  isolation and non-reentrancy, and a reserved outcall budget that protects
-  sign-in. (`msg_id` + device dedup was also promoted, and is now built.)
-- No cycles charging to senders in v1 — but a deployment that pays fees needs a
-  cycle budget with a circuit breaker regardless. Sender charging is parked as a
-  future exploration.
-
-## How does it work, in plain terms?
-
-Read this first; the sections after it just add detail.
+The whole design, in six bullets. Everything after this adds detail to one of
+them.
 
 - **A dApp never talks to phones directly.** It tells II "notify these users,"
   and II handles the actual delivery. The dApp only knows its users by an
@@ -195,6 +125,7 @@ Read this first; the sections after it just add detail.
 Everything below is the same story with the exact mechanisms and edge cases.
 
 ## Architecture
+
 
 ```
 ┌─ dApp side ────────────────────────┐        ┌─ II ────────────────────────────────┐
@@ -244,6 +175,7 @@ bind everywhere regardless of who pays.
 
 ## Deployment assumptions
 
+
 Numbers in this doc depend on where II runs, so state the deployment before
 quoting a cost:
 
@@ -268,7 +200,83 @@ quoting a cost:
 Rule of thumb for this doc: design to the **paying** case and treat the fee
 waiver as a property of one deployment, not a premise of the design.
 
+## The user experience
+
+
+### Turning notifications on (first time signing into a dApp)
+
+1. On the dApp (e.g. `oisy.com`), the user clicks **Sign in with Internet
+   Identity**. II opens at `/authorize`.
+2. The user authenticates as usual (passkey, or an existing session for a
+   returning user).
+3. **Continue screen** (`ContinueView`): "Continue to `<dApp>`" with the
+   account picker and a **Continue** button. There is no notification toggle
+   here — the account choice is the only decision.
+4. The user taps **Continue**.
+5. **Notifications opt-in screen** (`NotifOptInView`): a preview illustration
+   of what a notification looks like (an "Example" lock-screen stack), the
+   heading "Let `<dApp>` notify you", two short reasons (instant alerts /
+   reachable anytime), and two buttons — **Enable notifications** and **Maybe
+   later**.
+   6a. **Enable** → if this browser has not granted permission yet, it shows
+   its **native permission prompt** ("`id.ai` wants to show notifications —
+   Allow / Block"). This dialog is the browser's own and cannot be restyled.
+   On **Allow** — or straight away, when permission was granted earlier — II
+   subscribes the device and records consent for this dApp, then redirects to
+   the dApp. No app install is required (Android/desktop); iOS Safari is the
+   exception.
+   6b. **Maybe later** → II redirects straight to the dApp; nothing is enabled.
+
+Two separate things are being asked, and only one of them repeats.
+
+II's opt-in screen **is** shown for each new dApp, because consent is recorded
+per origin and no dApp inherits another's. It appears once per dApp per
+device: a device that has not subscribed yet sees it again even for a dApp
+already enabled on another device, with copy that asks about this device
+rather than repeating the original pitch.
+
+The **browser's** permission prompt is the part that does not come back. It is
+granted to `id.ai`, not to the dApp, and every dApp's notifications are
+delivered through that one origin — so once the user has allowed it, the
+browser has nothing left to ask, and later opt-ins complete without a second
+dialog.
+
+### What happens when a notification is sent
+
+7. The dApp's backend tells II to notify the user. At any real scale this runs
+   through the dApp's client library and the chunked `push_send` endpoint (see
+   below); the PoC has a simpler one-shot `notify_user` for a single recipient.
+8. The notification arrives on every device the user enabled — **even with the
+   tab closed / browser not running** (on Android). It shows the dApp's origin
+   as the source and the dApp's title/body as the text.
+9. The user **taps** it. When the dApp supplied a deep link — the normal case —
+   the service worker opens that URL directly and II is not visited at all. The
+   dApp lands the user on the page the notification was about, signing them in
+   on the way with the ICRC-167 top-level redirect if the session has lapsed,
+   which is the usual state when a notification is what brought them back.
+   Only a notification with no deep link falls back to II's `/notify` screen
+   ("Opening `<dApp>`" with the app's logo), which resolves the sender's origin
+   behind a consent gate and forwards to the dApp's home.
+
+### Managing them, and turning them off
+
+10. Either from the browser or from II.
+
+    In **II → Settings**, the user sees **Notifications on this device**
+    (a toggle to turn the whole device on/off) and **Allowed apps** — every
+    dApp that can notify them, each with a remove button. Revoking an app
+    stops its notifications immediately.
+
+    The **browser's own site settings** can also block notifications for
+    `id.ai`, which silences every dApp at once and cannot be overridden from
+    inside II — the permission belongs to the browser, not to us. II can only
+    observe the result: a blocked permission makes the opt-in screen
+    unofferable, so it is skipped rather than shown as a button that cannot
+    work. Re-enabling has to happen in the browser too; that is the one path
+    II cannot offer a control for.
+
 ## dApp → II
+
 
 ### Sending to thousands of users: chunked send + two-layer flow control
 
@@ -423,7 +431,7 @@ plaintext RFC 8030 headers the relay sees. A sender that wants E2E chooses the
 **not** wait for delivery; "admitted" means "accepted into II's in-flight
 buffer", nothing more.
 
-### How does II know which users to send to?
+### How II knows which users to send to
 
 The dApp only knows its users by their in-app principal (II's privacy model).
 `PRINCIPAL_INDEX` resolves `principal → (anchor, origin_hash)`, and the index
@@ -433,7 +441,7 @@ cannot target dApp B's users even with stolen principals. Audiences larger
 than one chunk are split across paced `push_send` calls by the client library,
 not by server-side routing.
 
-### How does II verify the sender is really that dApp?
+### How II verifies the sender is really that dApp
 
 One call has one `caller()`, so the per-user `caller == in_app_principal`
 model does not batch. Senders authenticate at the **origin** level:
@@ -483,7 +491,7 @@ pressure is the bounded in-flight buffer — which admission control caps
 directly. That, plus the fast drain (below), is what lets II sustain high
 throughput on a _small_ buffer.
 
-### What does this cost, and who pays?
+### What this costs, and who pays
 
 Costs split into what is _always_ scarce and what depends on the deployment
 (see [Deployment assumptions](#deployment-assumptions)).
@@ -496,7 +504,7 @@ Costs split into what is _always_ scarce and what depends on the deployment
   `(anchor, endpoint)`, consent and the principal index per `(anchor, origin)`.
   Never O(notification volume), because campaign state lives in the client
   library. That is the invariant the "stateless II" shape buys; see the
-  [bytes-per-user table](#what-does-this-actually-cost-per-user).
+  [bytes-per-user table](#what-this-actually-costs-per-user).
 - **Instructions** — sealing is not free at chunk scale; the drain must work in
   bounded slices.
 
@@ -564,6 +572,7 @@ the rate bucket — see
 [Operating it](#operating-it-controls-alerts-and-rollout).
 
 ## II's state model: stateless for campaigns
+
 
 > _In short: II accepts a chunk, briefly holds it in memory (not durable
 > storage), seals and sends it, then forgets it. The durable list lives with
@@ -681,7 +690,7 @@ grow it with attacker-chosen keys until the heap is exhausted (heap exhaustion
 traps the canister, which takes authentication down with it). Timers don't
 survive upgrades — re-arm in `post_upgrade` and `init`.
 
-### How big is the buffer, and how many origins can it serve at once?
+### Buffer size, and how many origins it serves at once
 
 **Sizing one entry.** A buffer entry is per _recipient_, not per device — devices
 are resolved at drain, not at admit. Recipient-scoped fields are small: anchor
@@ -769,6 +778,7 @@ user-scoped state and that deserves its own review. But it is the honest answer 
 off-platform.
 
 ## Delivering to devices
+
 
 The relay API is one POST per subscription endpoint (RFC 8030) — there is no
 multi-recipient send, so reaching N devices is fundamentally N sends. The
@@ -915,6 +925,7 @@ removes the fan-out and restores per-device status, making direct delivery a
 genuine peer of the gateway on correctness, still bounded by in-flight slots.
 
 ## The dApp-side client library
+
 
 > _In short: because II stores nothing per send, a small library on the dApp's
 > side keeps the list, sends it to II in paced pieces, retries failures, tracks
@@ -1063,6 +1074,7 @@ device is a v1 requirement, not a nicety.
 
 ## On the device: rendering and tap-through
 
+
 - **Subscribe** (Settings, or the `/authorize` opt-in): request permission,
   `pushManager.subscribe` with II's VAPID public key, store
   `(anchor, endpoint_hash) → {endpoint, p256dh, auth}`. A browser allows one
@@ -1086,7 +1098,7 @@ device is a v1 requirement, not a nicety.
   keyed by `category` ("New message from `<origin>`"), never app-supplied text.
 - **Click**: with a deep link, the service worker opens it **directly**. II
   validated at send time that `alert.url` is on the consented origin (see
-  [the deep-link question](#can-the-app-choose-where-the-notification-opens)),
+  [the deep-link question](#where-a-notification-opens)),
   so there is nothing left to check on the device — and routing through II
   would add a second visit in the middle of a journey the user expects to be
   one step. Without a deep link it opens `/notify?origin=<sender>`, which
@@ -1127,7 +1139,7 @@ endpoint_hash) → {endpoint, p256dh, auth, created_at}` — the endpoint URL
   row updated, but the SW can only act for the currently-signed-in identity —
   so each identity re-registers the next time it authenticates.
 
-### Can the app choose where the notification opens?
+### Where a notification opens
 
 The app may set `alert.url` to send the user to a specific page rather than the
 origin root. **II validates it at send time** and refuses the send otherwise:
@@ -1159,7 +1171,7 @@ it.
 No target → the tap opens `/notify?origin=<sender>`, which resolves the sender's
 origin from the anchor's consent list and fails closed if it cannot.
 
-### Can the tap land the user already signed in?
+### Landing the user already signed in
 
 Yes — and it needs **no II-side changes**, because it composes out of the
 ICRC-167 URL transport (top-level redirect sign-in) that II already supports.
@@ -1240,7 +1252,7 @@ top-level navigation onto the relying party's own origin — which is also what
 generates the session key. So the realistic goal is making that page invisible
 (the app's own background and no decision on it), not removing it.
 
-### What about apps with no URL routing (e.g. Caffeine)?
+### Apps with no URL routing (e.g. Caffeine)
 
 **This is a hard prerequisite that some app platforms do not currently meet, and
 it needs checking before we promise notifications to them.**
@@ -1296,7 +1308,7 @@ as "open the app" — no deep link, no authenticated landing. Worth stating plai
 to set expectations, and it pairs naturally with the `Hidden` content variant,
 which also shows a generic message and reveals context only after the tap.
 
-### Can a notification be updated or dismissed after it's shown?
+### Updating or dismissing a notification already shown
 
 Yes, via a dApp-chosen `notification_id`, which the service worker maps to the
 Web Notification `tag`:
@@ -1326,7 +1338,58 @@ Caveats:
   automatic hostname-collapse we rejected. Notifications without a
   `notification_id` never replace each other.
 
+## Alternatives considered
+
+### II hosts the pipeline, rather than each dApp running its own
+
+The alternative is the status quo: every dApp prompts for its own notification
+permission, runs its own service worker, holds its own VAPID keypair, and stores
+its own subscriptions. It has real advantages — no shared-fate coupling, no new
+responsibility for II, no trusted gateway, and each dApp's notification content
+never leaves it.
+
+Rejected because the permission is the scarce resource, not the plumbing. A user
+declines the *n*th notification prompt far more often than the first, browsers
+increasingly bury the prompt, and iOS Safari requires a PWA install per site — so
+the per-dApp model works in principle and almost never happens in practice. One
+permission at the identity provider is the only version of this that a user
+actually says yes to, and it is the one thing a dApp genuinely cannot build for
+itself.
+
+The cost of that choice is paid throughout this document and should be read as its
+price, not as incidental complexity: II becomes a shared-fate dependency (see
+[Shared fate: one permission for every dApp](#shared-fate-one-permission-for-every-dapp)),
+II sees notification content unless the app opts into
+[end-to-end encryption](#end-to-end-encrypted-apps), and a canister whose real job
+is authentication now carries a delivery pipeline — hence
+[Push must never degrade authentication](#push-must-never-degrade-authentication).
+
+### II hosts the service worker, rather than each dApp hosting one
+
+Web Push binds a subscription to the origin whose service worker created it. Had
+each dApp hosted its own, each would need its own permission grant, and the single
+prompt above would be impossible — the two decisions are the same decision. It
+also means notifications arrive attributed to `id.ai` rather than to the dApp,
+which the UX compensates for by naming the sending app in the body and title, and
+which the security model has to defend by forcing attribution to the sender origin
+at send time.
+
+### Decisions argued where they arise
+
+Three further alternatives are weighed in place rather than here, because each
+needs its surrounding detail to make sense:
+
+- **Gateway versus direct per-device outcalls** —
+  [the delivery path](#the-delivery-path-a-trusted-web2-gateway) and
+  [the alternative](#the-alternative-direct-per-device-outcalls).
+- **Where the sealing runs.** Moving it to the gateway is not merely disallowed
+  but useless, and the alternative that does help is a separate canister — see
+  [the way to lift that ceiling](#the-way-to-lift-that-ceiling-is-a-separate-canister).
+- **Two E2E designs**, vetKeys-sealed versus dApp-held keys, with a
+  [recommendation](#recommendation).
+
 ## Security model
+
 
 - **Origin pinning** — a sender can only target anchors that consented to
   _its_ origin; cross-dApp targeting is impossible even with leaked principals.
@@ -1506,6 +1569,7 @@ the sender.
 
 ## Privacy
 
+
 The doc's confidentiality story is about _content_. Metadata is a separate
 exposure and, for a notification hub, arguably the more sensitive one — `Hidden`
 protects the message text and does nothing for any of this.
@@ -1537,6 +1601,7 @@ operators each learn.
 
 ## Delivery semantics: what is actually guaranteed
 
+
 "Best-effort" is not a guarantee, and several features silently depend on which
 one holds. Stated explicitly:
 
@@ -1556,6 +1621,7 @@ the notification it dismisses and then be a no-op forever. Fix: carry a
 service worker drops out-of-order updates rather than applying them.
 
 ## Duplicate and replay suppression (`msg_id`)
+
 
 **Built.** Four independent mechanisms make duplicates the norm rather than the
 exception, and the fourth is the one that showed up first in practice:
@@ -1605,6 +1671,7 @@ Note `msg_id` is a **different thing** from the dApp-facing `notification_id`:
 shape, opposite behavior — keep them separate fields.
 
 ## End-to-end-encrypted apps
+
 
 Some apps (e.g. a chat using vetKeys) encrypt content so that only the
 recipient can read it — the app backend cannot. Our `Display` path is **not**
@@ -1742,6 +1809,7 @@ to send, admission, or storage.
 
 ## Open items
 
+
 Must-fix before a real deployment:
 
 - **Endpoint host allowlist.** The push endpoint is attacker-supplied. Validate
@@ -1814,7 +1882,7 @@ Must-decide (design, not code):
   can address a destination at all, in the builder sandbox _and_ published. If
   not, deep-linking and signed-in tap-through are both unavailable there and
   notifications degrade to "open the app". See
-  [What about apps with no URL routing](#what-about-apps-with-no-url-routing-eg-caffeine).
+  [What about apps with no URL routing](#apps-with-no-url-routing-eg-caffeine).
 - **iOS reality** — iOS Safari is the one platform where a PWA install is
   _mandatory_ for Web Push (Android/desktop work in a plain tab). It is also
   flakier and more throttled; "best-effort" is weakest there. Set expectations
@@ -1851,6 +1919,7 @@ Explicitly rejected:
 
 ## IC capabilities to re-evaluate
 
+
 Platform features that would change decisions in this doc. Worth re-checking
 before implementation, because two of them postdate the design:
 
@@ -1878,6 +1947,7 @@ before implementation, because two of them postdate the design:
 
 ## Push must never degrade authentication
 
+
 The invariant, stated separately because it is the one that makes this feature
 unshippable if violated: **no volume of push traffic may reduce the availability
 of sign-in.**
@@ -1903,6 +1973,7 @@ signal** with push throttling as the automatic response.
 
 ## Operating it: controls, alerts and rollout
 
+
 Metrics alone are not operability. Missing today:
 
 - **A per-origin kill switch.** `push_deregister_sender` is authenticated by the
@@ -1926,6 +1997,7 @@ Metrics alone are not operability. Missing today:
   P-256 in `dnssec/`, so this is a short exercise).
 
 ## dApp developer integration
+
 
 One-time setup (~15 min): serve `.well-known/ii-push-senders`, call
 `push_register_sender(origin)` from the backend. Steady state: hand the client
@@ -1956,6 +2028,7 @@ from auth (the library owns campaign status). Delivery is best-effort with no
 receipts; the only per-user signal is `NoConsent`.
 
 ## Feasibility and scale
+
 
 | Metric                               | Gateway (chosen)                                                   | Direct (alternative)    |
 | ------------------------------------ | ------------------------------------------------------------------ | ----------------------- |
@@ -1988,7 +2061,8 @@ fully on-chain and viable at low volume, but under replicated outcalls it also
 multiplies every POST by the subnet size and cannot observe `410`, so it is a
 degraded fallback rather than a transparent one.
 
-## What does this actually cost per user?
+## What this actually costs per user
+
 
 Storage is O(users × origins), not O(users) — worth being concrete, since the
 "flat with volume" claim is about _notification volume_ only:
@@ -2009,6 +2083,7 @@ bounds how large these maps can get before upgrades become a problem.
 
 ## Stable memory regions
 
+
 New regions must claim an unused `MemoryId`. Because nothing in the code forces
 this check, record allocations here and verify against `storage.rs` before
 adding one — a duplicate index silently interleaves two `StableBTreeMap`s into
@@ -2026,6 +2101,7 @@ the same virtual memory and corrupts both.
 A test asserting all indices are distinct is cheap and worth having.
 
 ## Future exploration
+
 
 Deliberately out of v1, kept here so the door stays open:
 
@@ -2045,3 +2121,71 @@ Deliberately out of v1, kept here so the door stays open:
 - **Delivery receipts / analytics** — Web Push has none; any per-user delivery
   signal would have to come from the app itself, and per-origin aggregates are
   the most II can offer without a per-user tracking surface.
+## Status
+
+
+### Built today (PoC on `feat/push-notifications-poc`)
+
+An inventory, not an explanation — each line links to the section that covers
+it. The last four exist because building the PoC proved they had to.
+
+- **Per-device subscribe/unsubscribe, `/authorize` opt-in, per-dApp consent** —
+  [the user flow](#turning-notifications-on-first-time-signing-into-a-dapp),
+  [consent lifecycle](#consent-lifecycle-it-must-not-outlive-the-sender).
+- **`notify_user(principal, alert)`** — one recipient per call. It does **not**
+  answer scale, and everything in this doc about throughput, cost and delivery
+  assumes the chunked `push_send` that supersedes it:
+  [chunked send and flow control](#sending-to-thousands-of-users-chunked-send--two-layer-flow-control).
+- **RFC 8291 payload encryption and RFC 8292 VAPID signing, both in-canister** —
+  [delivering to devices](#delivering-to-devices).
+- **VAPID key generated with `raw_rand`, held in stable memory** — not the
+  custody model we would choose. Web Push mandates P-256, the IC's threshold
+  ECDSA is secp256k1 only, so the subnet cannot hold the key for us:
+  [what that risks](#security-model),
+  [what changes if P-256 lands](#ic-capabilities-to-re-evaluate).
+- **Tap opens the dApp's deep link directly**, falling back to the consent-gated
+  `/notify` redirect when the sender supplied no target —
+  [where a notification opens](#where-a-notification-opens),
+  [landing signed in](#landing-the-user-already-signed-in).
+- **Sender authorization by origin** — a registry keyed by origin hash. The
+  original `caller() == in_app_principal` rule could never match an
+  inter-canister call, so it admitted only self-sends:
+  [how II verifies a sender](#how-ii-verifies-the-sender-is-really-that-dapp).
+- **Send-time `alert.url` validation** — what makes opening the deep link
+  directly safe:
+  [where a notification opens](#where-a-notification-opens).
+- **`msg_id` dedup in the service worker, and `410`/`404` row cleanup** —
+  [duplicate and replay suppression](#duplicate-and-replay-suppression-msg_id).
+- **VAPID key rotation in the browser** — a subscription bound to a superseded
+  key is resubscribed rather than failing forever.
+
+### Not built, so the PoC isn't mistaken for a shippable subset
+
+- No `push_send`, so no batching, no chunking, and no client library — a send is
+  one `notify_user` per recipient.
+- No rate limiting or admission control of any kind — `notify_user` is unmetered.
+- No `.well-known/ii-push-senders` verification: senders are registered by an
+  operator, so nothing yet proves a canister owns the origin it sends as.
+- No endpoint host allowlist, and no per-anchor caps on subscription or consent
+  rows.
+- `Display` content only — no `Hidden`, which is the variant the design
+  recommends shipping first for E2E apps.
+- No `pushsubscriptionchange` handling, so a rotated endpoint still leaves a
+  stale row until a relay reports it gone.
+- Integration and E2E test coverage is thin (unit tests only).
+
+### Proposed (designed above, not yet built)
+
+- Chunked `push_send` with two-layer flow control (II admission + client
+  pacing), a sender registry, a stateless-for-campaigns II (transient heap
+  buffer, storage O(users × origins)), a durable client library, and delivery
+  through a trusted web2 gateway (with direct per-device outcalls as the
+  documented alternative/fallback).
+- Promoted to v1 requirements by review, and still outstanding: a `drain_epoch`
+  acknowledgment signal, an endpoint host allowlist, per-anchor caps, drain
+  isolation and non-reentrancy, and a reserved outcall budget that protects
+  sign-in. (`msg_id` + device dedup was also promoted, and is now built.)
+- No cycles charging to senders in v1 — but a deployment that pays fees needs a
+  cycle budget with a circuit breaker regardless. Sender charging is parked as a
+  future exploration.
+
