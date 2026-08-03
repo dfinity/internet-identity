@@ -22,13 +22,15 @@ canisters:
     init_args:
       path: src/internet_identity/local_test_arg.did
 
+  # Built in dfinity/internet-identity-test-app; the pinned release is fetched
+  # rather than built from source.
   - name: test_app
     build:
       steps:
         - type: script
           commands:
-            - "demos/test-app/build.sh"
-            - "cp demos/test-app/test_app.wasm \"$ICP_WASM_OUTPUT_PATH\""
+            - "scripts/fetch-test-app"
+            - "cp .test-app/test_app.wasm \"$ICP_WASM_OUTPUT_PATH\""
 
   - name: issuer
     build:

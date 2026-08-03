@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# Downloads the pinned dfinity/internet-identity-test-app release into .test-app/.
+#
+# The test app is a relying party used by the e2e tests and deployed to mainnet
+# alongside II. It is built in its own repository; this script fetches the
+# release assets of the tag pinned in .github/versions/test-app:
+#
+#   .test-app/test_app.wasm   the canister module
+#   .test-app/test_app.did    the Candid interface
+#   .test-app/dist/           the frontend, loaded as an unpacked Chrome
+#                             extension by the Playwright e2e
+#
+# Each asset is verified against the `.sha256` published beside it in the same
+# release. That detects a corrupted or truncated download; the pinned tag is the
+# trust anchor for *which* build is used.
+#
+# Re-running is cheap: a stamp file records the tag that is currently unpacked
+# and the download is skipped when it already matches.
+
+set -euo pipefail
+
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPTS_DIR/.."
+
+REPO="dfinity/internet-identity-test-app"
+VERSION_FILE=".github/versions/test-app"
+DEST=".test-app"
+STAMP="$DEST/.version"
+ASSETS=(test_app.wasm test_app.did test_app_dist.tar.gz)
+
+tag=$(tr -d '[:space:]' < "$VERSION_FILE")
+if [ -z "$tag" ]; then
+  echo "no tag pinned in $VERSION_FILE" >&2
+  exit 1
+fi
+
+if [ "$(cat "$STAMP" 2>/dev/null || true)" = "$tag" ] \
+  && [ -f "$DEST/test_app.wasm" ] \
+  && [ -f "$DEST/test_app.did" ] \
+  && [ -f "$DEST/dist/manifest.json" ]; then
+  echo "test app $tag already present in $DEST"
+  exit 0
+fi
+
+if ! command -v gh > /dev/null; then
+  echo "missing the 'gh' CLI, needed to download $REPO releases" >&2
+  exit 1
+fi
+
+# macOS ships shasum rather than sha256sum; both read the sha256sum format.
+verify_checksums() {
+  local checker=(shasum -a 256 -c)
+  if command -v sha256sum > /dev/null; then
+    checker=(sha256sum -c)
+  fi
+  for asset in "${ASSETS[@]}"; do
+    "${checker[@]}" "$asset.sha256"
+  done
+}
+
+rm -rf "$DEST"
+mkdir -p "$DEST"
+
+echo "downloading $REPO release $tag"
+download_args=()
+for asset in "${ASSETS[@]}"; do
+  download_args+=(--pattern "$asset" --pattern "$asset.sha256")
+done
+
+# Each asset is a separate request, so a transient network or API failure can
+# leave the set incomplete. Retry the whole download before giving up.
+#
+# The output is captured so a permission failure can be reported with its cause
+# rather than gh's bare "release not found".
+attempts=3
+downloaded=
+for attempt in $(seq "$attempts"); do
+  if download_log=$(gh release download "$tag" \
+    --repo "$REPO" \
+    --dir "$DEST" \
+    --clobber \
+    "${download_args[@]}" 2>&1); then
+    downloaded=yes
+    break
+  fi
+  if [ "$attempt" -lt "$attempts" ]; then
+    echo "download attempt $attempt of $attempts failed, retrying" >&2
+    sleep $((attempt * 5))
+  fi
+done
+
+if [ -z "$downloaded" ]; then
+  echo "$download_log" >&2
+  echo >&2
+  case "$download_log" in
+    *"release not found"* | *"Not Found"* | *"HTTP 404"* | *"HTTP 401"* | *"HTTP 403"*)
+      cat >&2 << EOF
+Could not read release '$tag' of
+  $REPO
+
+That repository is public, so the most likely cause is that the pinned tag has
+no release: check https://github.com/$REPO/releases and either publish it there
+or pin an existing tag in $VERSION_FILE.
+
+Otherwise 'gh' could not authenticate. It needs a token even for a public
+repository — in CI the workflow's own token is passed as GH_TOKEN; locally, run
+'gh auth login' or export GH_TOKEN.
+EOF
+      ;;
+  esac
+  exit 1
+fi
+echo "$download_log"
+
+(
+  cd "$DEST"
+  verify_checksums
+  tar xzf test_app_dist.tar.gz
+  rm test_app_dist.tar.gz
+)
+
+test -f "$DEST/dist/manifest.json" \
+  || { echo "$DEST/dist/manifest.json missing after unpacking the frontend" >&2; exit 1; }
+
+echo "$tag" > "$STAMP"
+echo "test app $tag unpacked into $DEST"

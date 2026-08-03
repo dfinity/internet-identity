@@ -12,6 +12,9 @@
 # icp-cli temporary files
 .icp/
 
+# test app release assets downloaded by scripts/fetch-test-app
+.test-app/
+
 # frontend code
 node_modules/
 dist/

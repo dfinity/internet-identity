@@ -104,7 +104,8 @@ kill_tree() {
 ensure_prereqs() {
   # pgrep (procps-ng) backs collect_descendants — without it teardown can't
   # walk the process tree and stray vite/esbuild grandchildren leak.
-  for cmd in node npm cargo curl tar pgrep; do
+  # gh backs scripts/fetch-test-app, which downloads the test app release.
+  for cmd in node npm cargo curl tar pgrep gh; do
     command -v "$cmd" >/dev/null || die "Missing required tool: $cmd"
   done
 
@@ -198,6 +199,7 @@ needs_rebuild() {
 build_canisters() {
   REBUILT_II=0
   REBUILT_FE=0
+  REBUILT_TEST_APP=0
   if needs_rebuild src/internet_identity internet_identity.wasm.gz; then
     log "Building internet_identity (cargo)"
     II_FETCH_ROOT_KEY=1 ./scripts/build --internet-identity
@@ -216,9 +218,16 @@ build_canisters() {
   else
     log "internet_identity_frontend.wasm.gz up to date, skipping build"
   fi
-  if [[ ! -f demos/test-app/test_app.wasm ]]; then
-    log "Building demos/test-app"
-    ( cd demos/test-app && ./build.sh )
+  # The test app is not built from source; fetch the pinned release. This also
+  # unpacks .test-app/dist, which the chrome-extension e2e project loads as an
+  # unpacked extension. Compare the unpacked tag before and after so a moved pin
+  # triggers a reinstall.
+  local test_app_tag_before
+  test_app_tag_before=$(cat .test-app/.version 2> /dev/null || true)
+  log "Fetching the pinned test app release"
+  ./scripts/fetch-test-app
+  if [[ "$(cat .test-app/.version 2> /dev/null || true)" != "$test_app_tag_before" ]]; then
+    REBUILT_TEST_APP=1
   fi
 }
 
@@ -367,7 +376,7 @@ install_canisters() {
   for entry in \
       "internet_identity|internet_identity.wasm.gz|$II_ARGS_FILE|$REBUILT_II" \
       "internet_identity_frontend|internet_identity_frontend.wasm.gz|$FE_ARGS_FILE|$REBUILT_FE" \
-      "test_app|demos/test-app/test_app.wasm|$TEST_APP_ARGS_FILE|0"; do
+      "test_app|.test-app/test_app.wasm|$TEST_APP_ARGS_FILE|$REBUILT_TEST_APP"; do
     IFS='|' read -r name wasm args_file rebuilt <<<"$entry"
     if module_installed "$name" && [[ "$rebuilt" != 1 ]]; then
       log "Canister $name already installed and up to date"

@@ -182,11 +182,20 @@ icp deploy issuer
 This will deploy also `internet_identity`, and provision the issuer for the testing environment.
 See [VC issuer documentation](./demos/vc_issuer/README.md) for details.
 
-Our [`test-app`](./demos/test-app) offers a simple relying party functionality and can be deployed using
+Our [`test-app`](https://github.com/dfinity/internet-identity-test-app) offers a simple relying party functionality and can be deployed using
 
 ```bash
 icp deploy test_app
 ```
+
+The test app is not built from this repository. `icp deploy test_app` runs
+[`scripts/fetch-test-app`](./scripts/fetch-test-app), which downloads the
+release pinned in [`.github/versions/test-app`](./.github/versions/test-app)
+into `.test-app/` — the canister Wasm plus the frontend the Playwright
+chrome-extension tests load as an unpacked extension. It needs the `gh` CLI
+authenticated with an account that can read the repository. To pick up a new
+test app build, bump the tag in that file (a scheduled workflow opens that pull
+request automatically).
 
 Afterward one can serve the frontends locally via:
 

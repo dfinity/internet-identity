@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Bumps .github/versions/test-app to the latest dfinity/internet-identity-test-app
+# release, if there is a newer one.
+#
+# Writes the resulting tag to $GITHUB_OUTPUT as `version` so the calling
+# workflow can name the pull request after it.
+
+set -euo pipefail
+
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPTS_DIR/../.."
+
+REPO="dfinity/internet-identity-test-app"
+VERSION_FILE=".github/versions/test-app"
+
+for tool in curl jq; do
+  if ! command -v "$tool" > /dev/null; then
+    echo "missing '$tool', needed to query $REPO releases" >&2
+    exit 1
+  fi
+done
+
+current_release=$(tr -d '[:space:]' < "$VERSION_FILE")
+echo "current test app release '$current_release'"
+
+# Expanding an empty array under `set -u` is an error in bash 3.2, which is what
+# macOS ships, so give the array an element that is always safe to pass.
+curl_args=(-sSL -H "Accept: application/vnd.github+json")
+if [ -n "${GH_TOKEN:-}" ]; then
+  curl_args+=(-H "Authorization: Bearer $GH_TOKEN")
+fi
+latest_release=$(curl "${curl_args[@]}" \
+  "https://api.github.com/repos/$REPO/releases/latest" | jq -r '.tag_name')
+
+if [ -z "$latest_release" ] || [ "$latest_release" = "null" ]; then
+  echo "expected a $REPO release, got '$latest_release'" >&2
+  echo "note: check https://github.com/$REPO/releases for a published release" >&2
+  exit 1
+fi
+
+echo "latest test app release '$latest_release'"
+
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  echo "version=$latest_release" >> "$GITHUB_OUTPUT"
+fi
+
+if [ "$current_release" != "$latest_release" ]; then
+  echo "test app needs an update"
+  echo "$latest_release" > "$VERSION_FILE"
+  cat "$VERSION_FILE"
+else
+  echo "already up to date"
+fi
