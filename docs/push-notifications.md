@@ -1017,6 +1017,15 @@ in the hash) and `channel.origin` is the callback's origin — the RP initiates,
 II only answers. So the notification's job is not to carry a session; it is to
 land the user on a page that _starts_ sign-in immediately.
 
+Spelled out, because the opposite is the natural assumption: **a notification
+cannot take the user to `id.ai` and have II sign them into the app from there.**
+II would have no session key to delegate to, and one it generated itself would
+have its private half in `id.ai`'s storage, which the dApp cannot read across
+origins — the delegation would be useless. The flow has to begin where that
+private key lives, which is the dApp's own origin. This is the same property that
+stops II impersonating a user to a dApp, so it is a guarantee rather than a
+limitation, and no amount of protocol work removes it.
+
 The standard guarded-route pattern does exactly that:
 
 1. The notification deep-links to a restricted page,
