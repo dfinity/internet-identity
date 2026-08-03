@@ -20,8 +20,6 @@ and a security model. If you only read one section, read
 
 ## Context and scope
 
-
-
 A dApp on the IC that wants to reach a user who is not currently looking at it
 has no good option. Web Push is the browser-native answer, but doing it yourself
 means prompting for your own notification permission, running your own service
@@ -49,8 +47,6 @@ and the client-library internals are here to show the design is buildable, not t
 serve as reference material.
 
 ## Goals and non-goals
-
-
 
 ### Goals
 
@@ -90,8 +86,6 @@ serve as reference material.
 
 ## How it works, in plain terms
 
-
-
 The whole design, in six bullets. Everything after this adds detail to one of
 them.
 
@@ -128,8 +122,6 @@ them.
 Everything below is the same story with the exact mechanisms and edge cases.
 
 ## Architecture
-
-
 
 ```
 ┌─ dApp side ────────────────────────┐        ┌─ II ────────────────────────────────┐
@@ -179,8 +171,6 @@ bind everywhere regardless of who pays.
 
 ## Deployment assumptions
 
-
-
 Numbers in this doc depend on where II runs, so state the deployment before
 quoting a cost:
 
@@ -206,8 +196,6 @@ Rule of thumb for this doc: design to the **paying** case and treat the fee
 waiver as a property of one deployment, not a premise of the design.
 
 ## The user experience
-
-
 
 ### Turning notifications on (first time signing into a dApp)
 
@@ -282,8 +270,6 @@ dialog.
     II cannot offer a control for.
 
 ## dApp → II
-
-
 
 ### Sending to thousands of users: chunked send + two-layer flow control
 
@@ -492,8 +478,6 @@ the rate bucket — see
 
 ## II's state model: stateless for campaigns
 
-
-
 > _In short: II accepts a chunk, briefly holds it in memory (not durable
 > storage), seals and sends it, then forgets it. The durable list lives with
 > the dApp, so II's storage doesn't grow as more notifications are sent._
@@ -699,8 +683,6 @@ off-platform.
 
 ## Delivering to devices
 
-
-
 The relay API is one POST per subscription endpoint (RFC 8030) — there is no
 multi-recipient send, so reaching N devices is fundamentally N sends. The
 design routes those sends through a **trusted web2 gateway**. Doing them as
@@ -858,8 +840,6 @@ lives, which is what lets II stay stateless per send. See
 [II's state model](#iis-state-model-stateless-for-campaigns).
 
 ## On the device: rendering and tap-through
-
-
 
 - **Subscribe** (Settings, or the `/authorize` opt-in): request permission,
   `pushManager.subscribe` with II's VAPID public key, store
@@ -1126,7 +1106,6 @@ Caveats:
 
 ## Alternatives considered
 
-
 ### II hosts the pipeline, rather than each dApp running its own
 
 The alternative is the status quo: every dApp prompts for its own notification
@@ -1176,8 +1155,6 @@ needs its surrounding detail to make sense:
   [recommendation](#recommendation).
 
 ## Security model
-
-
 
 - **Origin pinning** — a sender can only target anchors that consented to
   _its_ origin; cross-dApp targeting is impossible even with leaked principals.
@@ -1357,8 +1334,6 @@ the sender.
 
 ## Privacy
 
-
-
 The doc's confidentiality story is about _content_. Metadata is a separate
 exposure and, for a notification hub, arguably the more sensitive one — `Hidden`
 protects the message text and does nothing for any of this.
@@ -1390,16 +1365,15 @@ operators each learn.
 
 ## Delivery semantics: what is actually guaranteed
 
-
-
 "Best-effort" is not a guarantee, and several features silently depend on which
 one holds. Stated explicitly:
 
-- **At-least-once, not at-most-once.** Retries, `drain_epoch` recovery, and
-  replicated outcalls all duplicate. `chunk_id` makes _chunk_ resends idempotent;
-  `msg_id` + device dedup is what makes duplicates invisible to the user.
-- **Unordered.** Nothing in the pipeline preserves order: replication, per-relay
-  queueing, and urgency's contribution to drain order all reorder freely.
+- **At-least-once, not at-most-once.** Retries and `drain_epoch` recovery both
+  duplicate; the non-replicated handoff removes the *n*×-fan-out source but not
+  these. `chunk_id` makes _chunk_ resends idempotent; `msg_id` + device dedup is
+  what makes duplicates invisible to the user.
+- **Unordered.** Nothing in the pipeline preserves order: per-relay queueing and
+  urgency's contribution to drain order both reorder freely.
 - **No delivery receipts.** The only per-target signal is `NoConsent`, returned
   at admission. `admitted` means "in II's buffer", never "on the device".
 
@@ -1412,14 +1386,15 @@ service worker drops out-of-order updates rather than applying them.
 
 ## Duplicate and replay suppression (`msg_id`)
 
-
-
 **Built.** Four independent mechanisms make duplicates the norm rather than the
 exception, and the fourth is the one that showed up first in practice:
 
 1. **Replicated outcalls** — 34 POSTs per push, no idempotency key in RFC 8030.
-2. **Timer duplicate execution** — `ic-cdk-timers` documents that under load
-   "timeouts may result in duplicate execution", and the drain is not idempotent.
+   The non-replicated handoff removes this one, which is why it is no longer the
+   headline reason.
+2. **Timer duplicate execution** — see
+   [II's state model](#iis-state-model-stateless-for-campaigns), where the drain's
+   claim-before-`await` step exists for exactly this.
 3. **Client retries and `drain_epoch` recovery** — by design, per the client
    library.
 4. **Accumulated subscription rows.** The fan-out sends one push per stored row,
@@ -1462,8 +1437,6 @@ Note `msg_id` is a **different thing** from the dApp-facing `notification_id`:
 shape, opposite behavior — keep them separate fields.
 
 ## End-to-end-encrypted apps
-
-
 
 Some apps (e.g. a chat using vetKeys) encrypt content so that only the
 recipient can read it — the app backend cannot. Our `Display` path is **not**
@@ -1539,14 +1512,11 @@ II-the-service, yet the real text still reaches the lock screen:
 - **Availability:** vetKeys is **live on mainnet** (since mid-2025), not a
   future capability — `vetkd_public_key` / `vetkd_derive_key` on curve
   `bls12_381_g2`, with IBE supported. So this design is buildable today.
-- **Cost — and this is the binding constraint.** `vetkd_derive_key` is
-  ~26.2 B cycles (**~$0.036 per call**) and chain-key fees are charged on
-  **every** deployment, system subnets included. So a derive _per notification
-  render_ would be **~$357 per 10k-notification blast** — roughly 400× the
-  entire outcall cost of the same blast, and the most expensive thing in the
-  whole design. Worse, the service worker calls in over **ingress, which carries
-  no cycles**, so **II pays** — making an uncached derive a user-triggerable
-  cycle drain.
+- **Cost — and this is the binding constraint.** Priced in
+  [what this costs, and who pays](#what-this-costs-and-who-pays): a derive per
+  notification render would be **~$357 per 10k blast**, roughly 400× the entire
+  outcall cost of the same blast and the most expensive thing in the design, and
+  II is the one billed.
 
   Therefore: derive **once per `(user, origin)`**, cache the key in the service
   worker, and rate-limit the derive endpoint per anchor. The per-`(user, origin)`
@@ -1600,8 +1570,6 @@ read) plus a vetKD derive-and-decrypt branch in the SW render path — no change
 to send, admission, or storage.
 
 ## Open items
-
-
 
 Must-fix before a real deployment:
 
@@ -1712,8 +1680,6 @@ Explicitly rejected:
 
 ## IC capabilities to re-evaluate
 
-
-
 Platform features that would change decisions in this doc. Worth re-checking
 before implementation, because two of them postdate the design:
 
@@ -1741,8 +1707,6 @@ before implementation, because two of them postdate the design:
 
 ## Push must never degrade authentication
 
-
-
 The invariant, stated separately because it is the one that makes this feature
 unshippable if violated: **no volume of push traffic may reduce the availability
 of sign-in.**
@@ -1767,8 +1731,6 @@ measurement, a cycle floor, and **authentication p99 latency as a monitored
 signal** with push throttling as the automatic response.
 
 ## Operating it: controls, alerts and rollout
-
-
 
 Metrics alone are not operability. Missing today:
 
@@ -1800,8 +1762,6 @@ origin, serve the callback allow-list, shape its deep links — is in
 
 ## Feasibility and scale
 
-
-
 | Metric                               | Gateway (chosen)                                                   | Direct (alternative)    |
 | ------------------------------------ | ------------------------------------------------------------------ | ----------------------- |
 | App → II for 10k users               | ~10 paced chunks (client-driven)                                   | ~10 paced chunks        |
@@ -1814,28 +1774,18 @@ origin, serve the callback allow-list, shape its deep links — is in
 | Cycles, 34-node **paying** subnet    | ~0.02 T (~$0.03) non-replicated; ~0.7 T (~$0.95) if replicated     | ~2.8 T (~$3.80)         |
 | Cycles, canonical II (system subnet) | fee-waived                                                         | fee-waived              |
 
-**Throughput has a global ceiling, and it is shared.** The buffer drains only as
-fast as its outcalls resolve, and outcalls take seconds. At a bounded slice per
-tick this puts II's sustained rate in the low hundreds of device-messages per
-second **across all dApps combined** — so a single 10k-user blast occupies the
-global budget for tens of seconds, during which every other origin sees
-`ready = false`. For a system positioned as the notification hub for every dApp
-on the network, this number is the most important capacity fact in the design and
-must be published — and derived from a real measurement, not from the estimates
-in this doc.
+**Throughput has a global ceiling and it is shared across all dApps** — the single
+most important capacity fact here, worked through in
+[buffer size, and how many origins it serves at once](#buffer-size-and-how-many-origins-it-serves-at-once).
+It must be published, and derived from a measurement rather than from this doc's
+estimates.
 
-App → II is feasible either way: the client library streams bounded chunks, II
-admits what it has capacity for, and its storage stays flat with volume. The
-**gateway is the chosen delivery path** because it turns ~13k in-flight outcalls
-into ~25, and that budget is shared with sign-in — a faster drain also recycles
-the small buffer sooner, raising admission throughput. Direct delivery remains
-fully on-chain and viable at low volume, but under replicated outcalls it also
-multiplies every POST by the subnet size and cannot observe `410`, so it is a
-degraded fallback rather than a transparent one.
+App → II is feasible either way. Direct delivery stays fully on-chain and viable at
+low volume, but under replicated outcalls it multiplies every POST by the subnet
+size and cannot observe `410`, so it is a degraded fallback rather than a
+transparent one.
 
 ## What this actually costs per user
-
-
 
 Storage is O(users × origins), not O(users) — worth being concrete, since the
 "flat with volume" claim is about _notification volume_ only:
@@ -1856,8 +1806,6 @@ bounds how large these maps can get before upgrades become a problem.
 
 ## Stable memory regions
 
-
-
 New regions must claim an unused `MemoryId`. Because nothing in the code forces
 this check, record allocations here and verify against `storage.rs` before
 adding one — a duplicate index silently interleaves two `StableBTreeMap`s into
@@ -1867,16 +1815,18 @@ the same virtual memory and corrupts both.
 | ----- | ------------------------------------- |
 | …     | (existing regions — see `storage.rs`) |
 | 31    | MCP registration                      |
-| 32    | push consent                          |
-| 33    | push principal index                  |
-| 34    | push subscriptions                    |
-| 35    | push sender registry (proposed)       |
+| 32    | SSO stable-id index                   |
+| 33    | push subscriptions                    |
+| 34    | push consent                          |
+| 35    | push principal index                  |
+| 36    | push sender registry                  |
 
-A test asserting all indices are distinct is cheap and worth having.
+This is not hypothetical. An earlier revision of the PoC claimed 32, which `main`
+had meanwhile taken for the SSO stable-id index; the two `StableBTreeMap`s
+interleaved and the canister trapped inside the B-tree on the first read. A test
+asserting all indices are distinct is cheap and worth having.
 
 ## Future exploration
-
-
 
 Deliberately out of v1, kept here so the door stays open:
 
@@ -1897,8 +1847,6 @@ Deliberately out of v1, kept here so the door stays open:
   signal would have to come from the app itself, and per-origin aggregates are
   the most II can offer without a per-user tracking surface.
 ## Status
-
-
 
 ### Built today (PoC on `feat/push-notifications-poc`)
 
@@ -1942,26 +1890,14 @@ it. The last four exist because building the PoC proved they had to.
 - No rate limiting or admission control of any kind — `notify_user` is unmetered.
 - No `.well-known/ii-push-senders` verification: senders are registered by an
   operator, so nothing yet proves a canister owns the origin it sends as.
-- No endpoint host allowlist, and no per-anchor caps on subscription or consent
-  rows.
 - `Display` content only — no `Hidden`, which is the variant the design
   recommends shipping first for E2E apps.
-- No `pushsubscriptionchange` handling, so a rotated endpoint still leaves a
-  stale row until a relay reports it gone.
 - Integration and E2E test coverage is thin (unit tests only).
 
-### Proposed (designed above, not yet built)
+Everything else the PoC lacks is a work item rather than a design gap, and is
+listed once in [Open items](#open-items) — endpoint allowlist, per-anchor caps,
+`drain_epoch`, drain isolation, `pushsubscriptionchange`, the reserved outcall
+budget for authentication. This section deliberately does not restate them.
 
-- Chunked `push_send` with two-layer flow control (II admission + client
-  pacing), a sender registry, a stateless-for-campaigns II (transient heap
-  buffer, storage O(users × origins)), a durable client library, and delivery
-  through a trusted web2 gateway (with direct per-device outcalls as the
-  documented alternative/fallback).
-- Promoted to v1 requirements by review, and still outstanding: a `drain_epoch`
-  acknowledgment signal, an endpoint host allowlist, per-anchor caps, drain
-  isolation and non-reentrancy, and a reserved outcall budget that protects
-  sign-in. (`msg_id` + device dedup was also promoted, and is now built.)
-- No cycles charging to senders in v1 — but a deployment that pays fees needs a
-  cycle budget with a circuit breaker regardless. Sender charging is parked as a
-  future exploration.
+The rest of this document is the proposal, so there is no separate list of it.
 
