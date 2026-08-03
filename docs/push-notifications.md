@@ -1220,6 +1220,46 @@ visibility in
 [alternatives considered](#ii-hosts-the-pipeline-rather-than-each-dapp-running-its-own)
 as part of what the single permission is bought with.
 
+#### One action II should always add: turning it off
+
+The same centralisation buys something a per-dApp design cannot offer. Because II
+owns the worker and composes the notification, **II can put an off-switch on every
+notification that the sender cannot remove, relabel or suppress.** An app that owned
+its own notifications would simply never ship that button. This is the strongest
+user-protection property available here, and it is available only because of the
+choice that costs silent actions.
+
+Note first what "overrides the default" cannot mean: `actions` are _additional_
+buttons, so the body tap stays the deep link. The real cost is a **slot** —
+platforms render about two — so reserving one for II leaves a sender one. Given
+that a sender's own actions can only navigate anyway, that is a good trade rather
+than a sacrifice.
+
+Three levels, and they differ in what authority the worker needs:
+
+- **Turn off on this device — free, silent, available today.**
+  `subscription.unsubscribe()` is a browser and push-service operation; the worker
+  needs no II call and no delegation. Delivery to this device stops at once, the
+  endpoint begins answering `410 Gone`, and
+  [stale-subscription cleanup](#stale-subscription-cleanup) reclaims the row. This
+  is worth having for its own sake: it works even if II's backend is unreachable or
+  misbehaving, so a user can always stop the noise from the notification itself.
+  Device-wide, though — every dApp, not one.
+- **Stop this app — one extra tap.** `push_revoke_consent` is authorized by the
+  anchor, and the worker holds no authority for it, so this is a navigation into
+  II's settings deep-linked to that app's row. Arguably where it belongs anyway:
+  revoking one app is worth confirming, and it lands the user somewhere they can
+  see everything else they have granted.
+- **Stop this app, silently — needs new machinery.** II could seal a short-lived
+  capability token scoped to `(anchor, origin)` into the payload and accept it back
+  on a token-authorized revoke. That buys one saved tap for a replay window, token
+  expiry and a second authorization path into consent state. Not worth it in a
+  first version.
+
+So: ship the device-level switch, since it costs nothing and cannot fail, and make
+the per-app one a deep link. II must own both labels — a sender that could rename
+"Turn off notifications" would defeat the point.
+
 ### Updating or dismissing a notification already shown
 
 Yes, via a dApp-chosen `notification_id`, which the service worker maps to the
@@ -1279,6 +1319,12 @@ and notification **action buttons can only navigate, never act**, because the
 worker that receives the tap belongs to II rather than to the app holding the
 user's session (see
 [action buttons](#action-buttons-navigation-only-never-silent-work)).
+
+The same property cuts the other way once, and it is worth weighing against the
+list above: because II composes the notification, **it can attach an off-switch no
+sender can remove or relabel** — a guarantee no per-dApp design can make, since an
+app that owned its notifications would never add that button. See
+[one action II should always add](#one-action-ii-should-always-add-turning-it-off).
 
 ### II hosts the service worker, rather than each dApp hosting one
 
