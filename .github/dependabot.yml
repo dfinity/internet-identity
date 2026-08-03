@@ -51,7 +51,6 @@ updates:
   - package-ecosystem: npm
     directories:
       - "/"
-      - "/demos/using-dev-build"
       - "/src/sig-verifier-js"
       - "/src/test_openid_provider"
       - "/src/vite-plugins"
