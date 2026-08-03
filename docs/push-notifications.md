@@ -1579,10 +1579,29 @@ Must-fix before a real deployment:
   ports, userinfo and non-`https` schemes, and reject private/loopback/link-local
   hosts. Without this, II is an SSRF and DDoS reflector with an *n*× multiplier —
   a free ingress call turns into 34 POSTs at a victim of the caller's choosing.
-- **Per-anchor caps.** Cap subscription rows (~10) and consent rows (~100) per
-  anchor, with LRU eviction. Nothing bounds them today, ingress is free to the
-  caller, and II pays the stable-memory cost — a direct attack on the resource
-  this design calls a hard constraint.
+- **Per-anchor caps.** Cap subscription rows at **20** and consent rows at
+  **100** per anchor, with LRU eviction. Nothing bounds either today, ingress is
+  free to the caller, and II pays the stable-memory cost — a direct attack on the
+  resource this design calls a hard constraint.
+
+  Against the row sizes in
+  [what this actually costs per user](#what-this-actually-costs-per-user), 20
+  subscriptions plus 100 consents (each consent also costing a principal-index
+  row, so 140 B a piece) is **~19.5 KB per anchor** on typical endpoints and
+  **~35 KB** on worst-case ones. 20 is chosen rather than 10 because a real user
+  plausibly has 4–5 devices and browsers rotate endpoints, so stale rows
+  accumulate between cleanups; 10 would start evicting live devices. The
+  worst-case figure is dominated by the endpoint URL at ~1.1 KB — 22 of those
+  35 KB — so bounding endpoint length is a bigger lever on the ceiling than the
+  row count is.
+
+  **Read the cap as anti-griefing, not as a storage bound.** If all 10M anchors
+  saturated it, that is 200–360 GB against a 537 GB canister limit, on a subnet
+  shared with anchor data — so the cap stops one anchor from mining II's storage,
+  while aggregate growth stays bounded by real usage (~20 GB) plus
+  [stale-subscription cleanup](#stale-subscription-cleanup). It buys roughly 10×
+  headroom over expected usage, which is the right order for a limit nobody
+  legitimate should ever reach.
 - **Reserved outcall budget for authentication.** See
   [Push must never degrade authentication](#push-must-never-degrade-authentication).
 - **Drain isolation and non-reentrancy.** Per-entry failure boundaries, an
@@ -1797,9 +1816,13 @@ Storage is O(users × origins), not O(users) — worth being concrete, since the
 | Principal index | `principal`               | ~80 B                                                       | users × dApps    |
 | Sender registry | `origin_hash`             | ~100 B                                                      | registered dApps |
 
-At 10M users × 2 devices × 10 consented dApps that is roughly **6 GB + 1 GB +
-1.2 GB ≈ 8 GB**, against a 500 GiB per-canister limit but sharing a 2 TiB subnet
-with anchor data — and **before** any dead rows, which is why
+At 10M users × 2 devices × 10 consented dApps: 20M subscription rows ≈ **6 GB**,
+100M consent rows ≈ **6 GB**, 100M principal-index rows ≈ **8 GB** — about
+**20 GB** in total, or ~2 KB per anchor. The two 100M-row maps dominate, because
+every consent costs a principal-index row as well; devices are the cheap axis.
+
+That is against a 500 GiB (537 GB) per-canister limit while sharing a 2 TiB subnet
+with anchor data, and it is **before** any dead rows — which is why
 [stale-subscription cleanup](#stale-subscription-cleanup) is a must-fix rather
 than housekeeping. Note also the 2 GiB stable-memory-per-upgrade ceiling, which
 bounds how large these maps can get before upgrades become a problem.
