@@ -652,7 +652,7 @@ jobs:
           icp canister install v2yvn-myaaa-aaaad-aad4q-cai \
             -e ic --proxy "$wallet" --mode upgrade \
             --wasm .vc-issuer/vc_demo_issuer.wasm.gz
-          ./.vc-issuer/provision \
+          ./scripts/provision-issuer \
             --ii-canister-id y2aaj-miaaa-aaaad-aacxq-cai \
             --icp-network ic \
             --issuer-canister v2yvn-myaaa-aaaad-aad4q-cai \

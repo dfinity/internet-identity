@@ -45,4 +45,4 @@ canisters:
     sync:
       steps:
         - type: script
-          command: ".vc-issuer/provision"
+          command: "scripts/provision-issuer"

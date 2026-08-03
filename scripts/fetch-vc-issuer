@@ -8,8 +8,7 @@
 #
 #   vc_demo_issuer.wasm.gz          the canister module (deployed by CI, and by
 #                                   `icp deploy issuer` for local development)
-#   vc_demo_issuer.wasm.gz.sha256   integrity check for the above
-#   provision                       configures a deployed issuer canister
+#   SHA256SUMS                      integrity check for the above
 #
 # `vc_demo_issuer.did` is *not* fetched here: it is vendored at
 # `src/vc-api/vc_demo_issuer.did` so `npm run generate` works offline. The bump
@@ -64,8 +63,7 @@ for attempt in $(seq "$attempts"); do
             --dir "$OUT_DIR" \
             --clobber \
             --pattern 'vc_demo_issuer.wasm.gz' \
-            --pattern 'vc_demo_issuer.wasm.gz.sha256' \
-            --pattern 'provision' 2>"$OUT_DIR/.fetch-error"
+            --pattern 'SHA256SUMS' 2>"$OUT_DIR/.fetch-error"
     then
         downloaded=yes
         break
@@ -95,10 +93,14 @@ EOF
 fi
 rm -f "$OUT_DIR/.fetch-error"
 
-# Verify the wasm against the published checksum. The .sha256 file records the
-# bare filename, so compare digests rather than running `shasum -c` from a
-# different directory.
-expected=$(cut -d ' ' -f1 <"$OUT_DIR/vc_demo_issuer.wasm.gz.sha256")
+# Verify the wasm against the published checksums. SHA256SUMS also covers
+# `vc_demo_issuer.did`, which is not downloaded here (II keeps a vendored copy),
+# so match the wasm's line rather than running `shasum -c` over the whole file.
+expected=$(awk '$2 ~ /vc_demo_issuer.wasm.gz$/ { print $1 }' "$OUT_DIR/SHA256SUMS")
+if [ -z "$expected" ]; then
+    echo "Error: SHA256SUMS has no entry for vc_demo_issuer.wasm.gz." >&2
+    exit 1
+fi
 actual=$(shasum -a 256 "$OUT_DIR/vc_demo_issuer.wasm.gz" | cut -d ' ' -f1)
 if [ "$expected" != "$actual" ]; then
     echo "Error: checksum mismatch for vc_demo_issuer.wasm.gz." >&2
@@ -107,9 +109,6 @@ if [ "$expected" != "$actual" ]; then
     rm -f "$OUT_DIR/vc_demo_issuer.wasm.gz"
     exit 1
 fi
-
-# Release assets do not carry the executable bit.
-chmod +x "$OUT_DIR/provision"
 
 echo "Issuer $tag ready in $OUT_DIR:" >&2
 ls -l "$OUT_DIR" >&2
