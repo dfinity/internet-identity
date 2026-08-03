@@ -1680,9 +1680,27 @@ Must-fix before a real deployment:
   chosen path; it does not remove the need for the allowlist, because one POST at
   a victim of the caller's choosing is still one too many.
 - **Per-anchor caps.** Cap subscription rows at **20** and consent rows at
-  **100** per anchor, with LRU eviction. Nothing bounds either today, ingress is
-  free to the caller, and II pays the stable-memory cost — a direct attack on the
-  resource this design calls a hard constraint.
+  **100** per anchor. Nothing bounds either today, ingress is free to the caller,
+  and II pays the stable-memory cost — a direct attack on the resource this design
+  calls a hard constraint.
+
+  Read the units carefully. 100 consents really is 100 distinct dApps. But 20
+  subscriptions is 20 **endpoints**, not 20 browsers: a browser resubscribing with
+  the same endpoint overwrites in place, but a browser that _rotates_ its endpoint
+  (expiry, cleared storage, `pushsubscriptionchange`) produces a new row and leaves
+  the old one behind until cleanup, and two profiles on one machine are two rows.
+  So the live-device budget is under 20, and the slack is there for stale
+  rotations — which is why 20 rather than 10.
+
+  **The two maps need different eviction, and neither wants plain LRU.**
+  Subscriptions are machine state and safe to reclaim, but evict **known-dead rows
+  first** — ones that already returned `404`/`410` — and only fall back to
+  recency, or a weekly-use laptop gets dropped while a dead rotated endpoint
+  survives. Consent is not machine state: silently evicting one **reverses a
+  decision the user made**, with no signal, so an app they allowed simply stops
+  reaching them. Refuse the 101st with an error the UI can explain instead, and let
+  the user revoke something if they want room. A cap that quietly discards user
+  intent is worse than a cap that says no.
 
   Against the row sizes in
   [what this actually costs per user](#what-this-actually-costs-per-user), 20
@@ -1969,9 +1987,10 @@ the same virtual memory and corrupts both.
 What each is for, since the names alone do not say:
 
 - **Subscriptions** hold exactly what RFC 8291 needs to seal for one device — the
-  relay `endpoint` plus that device's `p256dh` public key and `auth` secret. One
-  row per browser that ran `pushManager.subscribe()`; a browser resubscribing
-  overwrites in place. The endpoint URL is what makes this the largest row.
+  relay `endpoint` plus that device's `p256dh` public key and `auth` secret. One row
+  per _endpoint_, which is not quite one per browser: resubscribing with the same
+  endpoint overwrites in place, but a rotated endpoint is a new row and leaves the
+  old one behind until cleanup. The endpoint URL is what makes this the largest row.
 - **Consent** is presence-as-grant: the key existing means this user allowed this
   dApp on this identity, and revoking deletes it.
 - **The principal index** is the reverse lookup `notify_user` cannot work without.
