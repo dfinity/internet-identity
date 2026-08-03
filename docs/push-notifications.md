@@ -351,14 +351,50 @@ not by server-side routing.
 One call has one `caller()`, so the per-user `caller == in_app_principal`
 model does not batch. Senders authenticate at the **origin** level:
 
-1. The dApp serves `/.well-known/ii-push-senders` listing its backend
-   canister principal(s).
-2. The backend calls `push_register_sender(origin)`; II fetches the file via
-   HTTPS outcall (with a transform for consensus) and verifies
-   `caller ∈ senders`, storing `origin_hash → {principals, verified_at}`.
-3. II re-verifies on a TTL (~weekly, lazy) and deregisters when the file
-   disappears. This reuses the existing outcall / DoH machinery; IC custom
-   domains also carry a `_canister-id` DNS TXT record as a second path.
+Registering, once per dApp. The order matters — the file has to exist before the
+call, because II fetches it during the call:
+
+1. The dApp **publishes** `https://myapp.com/.well-known/ii-push-senders`, listing
+   its backend canister principal(s).
+2. That **backend canister calls** `push_register_sender("https://myapp.com")`. It
+   must be the canister making the call: `caller()` is what is being claimed.
+3. **II fetches the file** over an HTTPS outcall, with a transform so every replica
+   agrees on the bytes.
+4. **II checks `caller() ∈ senders`.** On success it stores
+   `origin_hash → {principals, verified_at}`. If the file is absent, unparseable,
+   or does not list the caller, the call is refused and nothing is stored.
+
+The proof needs **both halves**, which is what makes it a proof: publishing the
+file registers nothing on its own, and calling without the file is refused. A
+would-be impersonator needs control of the origin's content *and* of the canister.
+
+Then, per send: II hashes the claimed origin, requires `caller` to be the
+registered principal, and forces attribution to that origin so a dApp cannot label
+its notification as another app.
+
+To revoke, the dApp removes itself from the file. II re-verifies on a lazy TTL
+(~weekly) and deregisters when the entry or the file is gone, so no II call is
+needed to stop being a sender. That TTL is also what bounds the exposure if a
+domain changes hands — the old canister keeps sending until re-verification
+catches up, which is the window
+[sender deregistration & re-verification TTL](#open-items) exists to shorten.
+
+This reuses the existing outcall / DoH machinery; IC custom domains also carry a
+`_canister-id` DNS TXT record as a second proof path.
+
+The registry itself is permanent; only step 2's **write path** is provisional. The
+PoC has a controller register senders by hand, because without the `.well-known`
+check self-registration would let any canister claim any origin — and consent is
+per origin, so that would let a stranger's notification arrive wearing a consented
+app's name. The lookup in step 2 and the check on every send stay either way;
+verification changes who may write a row, not whether the row exists.
+
+**Treat the missing verification as a launch blocker, not a hardening step.** This
+document's premise is that any dApp can send through II and needs no push
+infrastructure of its own. An operator-maintained registry contradicts it: a dApp
+would trade a push stack for a support ticket, and adoption would be gated on
+someone at DFINITY inserting a row. Self-serve registration is what makes the goal
+true, so it belongs in the first shippable version rather than after it.
 
 ### Admission control (Layer 1): stopping one dApp from flooding II
 
@@ -1575,6 +1611,14 @@ to send, admission, or storage.
 
 Must-fix before a real deployment:
 
+- **`.well-known/ii-push-senders` verification**, so a dApp can register itself.
+  Specified in
+  [how II verifies the sender](#how-ii-verifies-the-sender-is-really-that-dapp)
+  but not built: today a controller inserts registry rows by hand. That is a
+  blocker for the goal rather than a rough edge — "any dApp can send through II"
+  is not true while onboarding means asking someone at DFINITY to add a row, and a
+  dApp would have traded a push stack for a support ticket. Pairs with the
+  deregistration and re-verification TTL below.
 - **Endpoint host allowlist.** The push endpoint is attacker-supplied. Validate
   it against the known push services at subscribe time (and **re-validate at
   drain**, so pre-existing rows can't bypass a tightened list), reject explicit
