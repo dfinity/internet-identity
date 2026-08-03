@@ -1231,13 +1231,15 @@ needs its surrounding detail to make sense:
   monotonic per-endpoint counter of pushes II issued so a service worker can
   flag pushes II did not send. Note there is currently **no detection story** —
   II cannot observe pushes it did not originate — and **no rotation story**:
-  rotating the VAPID key invalidates every subscription at once, so the
-  "re-enable on your devices" UX is a prerequisite for having a recovery path
-  at all, not a later nicety.
+  abandoning the leaked VAPID key invalidates every subscription signed under it,
+  so the "re-enable on your devices" UX is a prerequisite for having a recovery
+  path at all, not a later nicety. (A _planned_ key change does not need it — see
+  [VAPID rotation](#open-items) — but a compromise does, because the point is to
+  stop honouring the old key immediately.)
 
-  P-256 threshold ECDSA would remove the key from storage entirely, but the IC
-  supports only secp256k1 today (see
-  [IC capabilities to re-evaluate](#ic-capabilities-to-re-evaluate)).
+  P-256 threshold ECDSA would remove the key from storage entirely and delete this
+  whole risk rather than mitigating it, but the IC supports only secp256k1 today
+  (see [IC capabilities to re-evaluate](#ic-capabilities-to-re-evaluate)).
 
 - **VAPID key initialization must not race.** Generating the key lazily on first
   use puts an `await` on `raw_rand` between the "is it set?" check and the
@@ -1680,9 +1682,27 @@ Known-deferred:
   gates capture, so the practical risk is low" does **not** hold on the chosen
   path: the gateway legitimately receives the sealed bundle, so replay needs no
   network interception at all.
-- **VAPID rotation** — rotating invalidates every subscription at once; needs
-  a "re-enable on your devices" UX. Note this UX is also the only recovery path
-  from a VAPID key compromise, so deferring it means deferring recovery.
+- **VAPID rotation — the design intent is never to rotate.** There is no expiry
+  and no hygiene schedule; a rotation is an incident, not maintenance. Two cases,
+  and they want opposite mechanisms:
+
+  **Planned migration** (today's stored key → a subnet-held one, if P-256
+  threshold ECDSA ever ships) needs no user-visible event at all. A subscription
+  is bound to the `applicationServerKey` it was created with, so II can retain the
+  old private key for devices already on it while issuing new subscriptions under
+  the new one. Endpoints churn on their own as browsers rotate them, so the fleet
+  migrates without anyone being asked to re-enable anything. Support both keys at
+  verify time, stop issuing the old one, and let it age out.
+
+  **Compromise recovery** cannot do that, because the whole point is to stop
+  honouring the leaked key — so it does invalidate every subscription under it at
+  once, and it is the case that genuinely needs the "re-enable on your devices"
+  UX. Build that UX for the incident, not for the migration; deferring it means
+  having no recovery path, which is the actual argument for it.
+
+  The end state we want is **the subnet holding the key**, so that there is no
+  stored secret to leak and this open item mostly disappears — see
+  [IC capabilities to re-evaluate](#ic-capabilities-to-re-evaluate).
 - **Cleanup hooks** on device/anchor removal.
 - **Metadata-privacy mitigations** — endpoint blinding, batch shuffling/padding,
   per-origin VAPID subkeys. See [Privacy](#privacy).
@@ -1714,11 +1734,15 @@ before implementation, because two of them postdate the design:
   only interesting as a way to stop depending on an experimental flag. Unverified
   whether it is enabled on mainnet — settle by calling it or checking release
   notes.
-- **P-256 (secp256r1) threshold ECDSA** — would move the VAPID key out of
-  storage entirely via `sign_with_ecdsa`. Requested since 2024 with **no public
-  roadmap item or timeline**, so treat it as "if it ever ships", not "when".
-  Migration invalidates existing subscriptions (the public key changes), so it
-  pairs with the re-enable UX.
+- **P-256 (secp256r1) threshold ECDSA** — **the end state this design wants.** It
+  moves the VAPID key out of storage entirely via `sign_with_ecdsa`: the subnet
+  signs, there is no stored secret to extract, and the custody caveat that runs
+  through the security model goes away rather than being mitigated. Requested
+  since 2024 with **no public roadmap item or timeline**, so treat it as "if it
+  ever ships", not "when" — which is why the stored key is the design and not a
+  placeholder. Migrating changes the public key, but does **not** require a
+  fleet-wide re-enable: run both keys and let old subscriptions age out, per
+  [VAPID rotation](#open-items).
 - **vetKeys** — already live; see
   [Design A](#design-a--vetkeys-sealed-content-decrypted-in-iis-sw-preferred-richer-path).
   Client libraries are still pre-1.0 and the JS package was renamed, so pin
