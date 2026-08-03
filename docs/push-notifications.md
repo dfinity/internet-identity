@@ -1245,11 +1245,27 @@ Three levels, and they differ in what authority the worker needs:
   is worth having for its own sake: it works even if II's backend is unreachable or
   misbehaving, so a user can always stop the noise from the notification itself.
   Device-wide, though — every dApp, not one.
-- **Stop this app — one extra tap.** `push_revoke_consent` is authorized by the
-  anchor, and the worker holds no authority for it, so this is a navigation into
-  II's settings deep-linked to that app's row. Arguably where it belongs anyway:
-  revoking one app is worth confirming, and it lands the user somewhere they can
-  see everything else they have granted.
+- **Stop this app — a deep link into II's settings.** `push_revoke_consent` is
+  authorized by the anchor and the worker holds no authority for it, so this action
+  navigates rather than acting:
+
+  ```
+  actions: [{ action: "unsubscribe", title: "Turn off" }]
+  → clients.openWindow(`${II_ORIGIN}/manage/settings?app=<origin>`)
+  ```
+
+  The destination already exists — `PushNotificationsSection` on `/manage/settings`
+  lists every consented origin and revokes per app via `push_revoke_consent`. Two
+  small additions are needed: the action itself, and having the page accept the
+  origin so the user lands on that app's row rather than scanning a list. II owns
+  the label; the sender cannot rename or omit it.
+
+  Landing on an authenticated route means the user may have to sign in first. That
+  is correct rather than unfortunate — revoking a permission deserves proof of who
+  is asking, they have just demonstrated they hold the identity by tapping a
+  notification addressed to it, and it is the same Continue screen they already know
+  from opting in. It also puts them somewhere they can see every other app they have
+  granted, which a silent one-tap revoke would not.
 - **Stop this app, silently — needs new machinery.** II could seal a short-lived
   capability token scoped to `(anchor, origin)` into the payload and accept it back
   on a token-authorized revoke. That buys one saved tap for a replay window, token
