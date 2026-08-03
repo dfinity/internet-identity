@@ -34,16 +34,28 @@ the open items.
    heading "Let `<dApp>` notify you", two short reasons (instant alerts /
    reachable anytime), and two buttons — **Enable notifications** and **Maybe
    later**.
-   6a. **Enable** → the browser shows its **native permission prompt**
-   ("`id.ai` wants to show notifications — Allow / Block"). This dialog is
-   the browser's own and cannot be restyled. On **Allow**, II subscribes the
-   device and records consent for this dApp, then redirects to the dApp. No
-   app install is required (Android/desktop); iOS Safari is the exception.
+   6a. **Enable** → if this browser has not granted permission yet, it shows
+   its **native permission prompt** ("`id.ai` wants to show notifications —
+   Allow / Block"). This dialog is the browser's own and cannot be restyled.
+   On **Allow** — or straight away, when permission was granted earlier — II
+   subscribes the device and records consent for this dApp, then redirects to
+   the dApp. No app install is required (Android/desktop); iOS Safari is the
+   exception.
    6b. **Maybe later** → II redirects straight to the dApp; nothing is enabled.
 
-The permission prompt appears only the first time the user enables
-notifications on this browser; for later dApps the opt-in screen simply
-records consent (no second prompt).
+Two separate things are being asked, and only one of them repeats.
+
+II's opt-in screen **is** shown for each new dApp, because consent is recorded
+per origin and no dApp inherits another's. It appears once per dApp per
+device: a device that has not subscribed yet sees it again even for a dApp
+already enabled on another device, with copy that asks about this device
+rather than repeating the original pitch.
+
+The **browser's** permission prompt is the part that does not come back. It is
+granted to `id.ai`, not to the dApp, and every dApp's notifications are
+delivered through that one origin — so once the user has allowed it, the
+browser has nothing left to ask, and later opt-ins complete without a second
+dialog.
 
 ### What happens when a notification is sent?
 
@@ -53,59 +65,70 @@ records consent (no second prompt).
 8. The notification arrives on every device the user enabled — **even with the
    tab closed / browser not running** (on Android). It shows the dApp's origin
    as the source and the dApp's title/body as the text.
-9. The user **taps** it. II's `/notify` screen appears briefly — "Opening
-   `<dApp>`" with the app's logo — then forwards to the dApp (the specific
-   page if the dApp deep-linked, otherwise its home).
+9. The user **taps** it. When the dApp supplied a deep link — the normal case —
+   the service worker opens that URL directly and II is not visited at all. The
+   dApp lands the user on the page the notification was about, signing them in
+   on the way with the ICRC-167 top-level redirect if the session has lapsed,
+   which is the usual state when a notification is what brought them back.
+   Only a notification with no deep link falls back to II's `/notify` screen
+   ("Opening `<dApp>`" with the app's logo), which resolves the sender's origin
+   behind a consent gate and forwards to the dApp's home.
 
 ### How does a user manage or turn them off?
 
-10. In **II → Settings**, the user sees **Notifications on this device**
+10. Either from the browser or from II.
+
+    In **II → Settings**, the user sees **Notifications on this device**
     (a toggle to turn the whole device on/off) and **Allowed apps** — every
     dApp that can notify them, each with a remove button. Revoking an app
     stops its notifications immediately.
 
+    The **browser's own site settings** can also block notifications for
+    `id.ai`, which silences every dApp at once and cannot be overridden from
+    inside II — the permission belongs to the browser, not to us. II can only
+    observe the result: a blocked permission makes the opt-in screen
+    unofferable, so it is skipped rather than shown as a button that cannot
+    work. Re-enabling has to happen in the browser too; that is the one path
+    II cannot offer a control for.
+
 ## Status
 
-Built today (PoC on `feat/push-notifications-poc`):
+### Built today (PoC on `feat/push-notifications-poc`)
 
-- Device subscribe/unsubscribe, `/authorize` opt-in, per-dApp consent.
-- Single `notify_user(principal, alert)` update call — a one-shot for one
-  recipient. It does **not** answer scale; the design supersedes it with the
-  chunked `push_send` + client library described under "Proposed" below, and
-  everything in this doc about throughput, cost, and delivery assumes that
-  path, not this call.
-- RFC 8291 payload encryption + RFC 8292 VAPID JWT signing, both in-canister.
-- VAPID private key generated via `raw_rand` and persisted in stable memory.
-  This is not the ideal custody model, and we do it only because the ideal
-  one is unavailable: VAPID/Web Push mandate ECDSA on the **P-256
-  (secp256r1)** curve, but the IC's threshold ECDSA currently supports **only
-  secp256k1** — so we cannot let the subnet hold the key via `sign_with_ecdsa`
-  and must generate and store it ourselves. Custody posture matches the anchor
-  salt (node operators could extract it), but the blast radius is **not** just
-  spam — see the [security model](#security-model). If P-256 threshold ECDSA
-  ever lands, the key moves off storage entirely.
-- Notification click routes through the consent-gated `/notify` redirect.
+An inventory, not an explanation — each line links to the section that covers
+it. The last four exist because building the PoC proved they had to.
 
-Also built since, because using the PoC forced them:
+- **Per-device subscribe/unsubscribe, `/authorize` opt-in, per-dApp consent** —
+  [the user flow](#how-does-a-user-turn-notifications-on-first-time-signing-into-a-dapp),
+  [consent lifecycle](#consent-lifecycle-it-must-not-outlive-the-sender).
+- **`notify_user(principal, alert)`** — one recipient per call. It does **not**
+  answer scale, and everything in this doc about throughput, cost and delivery
+  assumes the chunked `push_send` that supersedes it:
+  [chunked send and flow control](#sending-to-thousands-of-users-chunked-send--two-layer-flow-control).
+- **RFC 8291 payload encryption and RFC 8292 VAPID signing, both in-canister** —
+  [delivering to devices](#delivering-to-devices).
+- **VAPID key generated with `raw_rand`, held in stable memory** — not the
+  custody model we would choose. Web Push mandates P-256, the IC's threshold
+  ECDSA is secp256k1 only, so the subnet cannot hold the key for us:
+  [what that risks](#security-model),
+  [what changes if P-256 lands](#ic-capabilities-to-re-evaluate).
+- **Tap opens the dApp's deep link directly**, falling back to the consent-gated
+  `/notify` redirect when the sender supplied no target —
+  [where a notification opens](#can-the-app-choose-where-the-notification-opens),
+  [landing signed in](#can-the-tap-land-the-user-already-signed-in).
+- **Sender authorization by origin** — a registry keyed by origin hash. The
+  original `caller() == in_app_principal` rule could never match an
+  inter-canister call, so it admitted only self-sends:
+  [how II verifies a sender](#how-does-ii-verify-the-sender-is-really-that-dapp).
+- **Send-time `alert.url` validation** — what makes opening the deep link
+  directly safe:
+  [where a notification opens](#can-the-app-choose-where-the-notification-opens).
+- **`msg_id` dedup in the service worker, and `410`/`404` row cleanup** —
+  [duplicate and replay suppression](#duplicate-and-replay-suppression-msg_id).
+- **VAPID key rotation in the browser** — a subscription bound to a superseded
+  key is resubscribed rather than failing forever.
 
-- **Sender authorization by origin.** `notify_user` originally required
-  `caller() == in_app_principal`, which cannot work: that principal is a
-  canister-signature principal derived from II's seed, so only the recipient's
-  own browser can present it — an inter-canister call always arrives as the
-  calling canister's principal. It admitted only self-sends, i.e. the one case
-  the endpoint is not for. A sender registry keyed by origin hash now authorizes
-  sends, with self-sends still allowed (the recipient asking to be notified needs
-  nothing further). `push_register_sender` is controller-only until the
-  `.well-known` verification below exists.
-- **`msg_id` + service-worker dedup**, and **`410`/`404` row cleanup** — see
-  [Duplicate and replay suppression](#duplicate-and-replay-suppression-msg_id).
-- **Send-time `alert.url` validation**, which is what lets a tap open the deep
-  link directly.
-- **VAPID key rotation handling** in the browser: an existing subscription bound
-  to a superseded key is replaced rather than failing forever.
-
-What it still deliberately does **not** have, so it isn't mistaken for a
-shippable subset:
+### Not built, so the PoC isn't mistaken for a shippable subset
 
 - No `push_send`, so no batching, no chunking, and no client library — a send is
   one `notify_user` per recipient.
@@ -120,7 +143,7 @@ shippable subset:
   stale row until a relay reports it gone.
 - Integration and E2E test coverage is thin (unit tests only).
 
-Proposed (this doc):
+### Proposed (the rest of this doc)
 
 - Chunked `push_send` with two-layer flow control (II admission + client
   pacing), a sender registry, a stateless-for-campaigns II (transient heap
@@ -156,8 +179,7 @@ Read this first; the sections after it just add detail.
   a small helper **library** that feeds II the list in bite-sized batches at a
   pace II can handle. II refuses more than it can take (so nobody can flood
   it), and the library slows down when asked. The big list lives with the
-  dApp — **II stores almost nothing per send**, which matters because storage
-  is II's resource we want to protect.
+  dApp — **II stores almost nothing per send**.
 - **How II sends the final messages.** II hands the sealed messages to a small
   **trusted helper server (the "gateway")** that makes the many little
   per-device sends on II's behalf over ordinary internet — far cheaper and
@@ -165,8 +187,10 @@ Read this first; the sections after it just add detail.
   each push service directly is the documented fallback, but one network call
   per device gets expensive at scale, so it isn't the default.) Either way II
   does the sealing; the helper only forwards messages it can't read.
-- **Tapping a notification** opens II briefly ("Opening \<app\>…") and forwards
-  the user to the app — only ever to the app that sent it.
+- **Tapping a notification** goes straight to the app's own deep link, which
+  signs the user in on arrival if their session has lapsed. Only a notification
+  without a deep link detours through II ("Opening \<app\>…"). Either way the
+  destination is only ever the app that sent it.
 
 Everything below is the same story with the exact mechanisms and edge cases.
 
@@ -192,7 +216,8 @@ Everything below is the same story with the exact mechanisms and edge cases.
                                     device SW decrypts → showNotification
                                                         │ tap
                                                         ▼
-                          II /notify?origin=…&to=… → consent-gated redirect → dApp
+                    deep link → dApp (signs in on arrival if the session lapsed)
+                          └── none → II /notify?origin=… → consent-gated → dApp home
 ```
 
 Three resources drive the architecture, and it is built to control all three:
@@ -203,8 +228,8 @@ Three resources drive the architecture, and it is built to control all three:
   for email recovery, JWKS and discovery for OIDC sign-in). One naive blast is
   ~13k outcalls, which would starve login. So delivery is batched through the
   gateway: ~25 outcalls instead of ~13k.
-- **Stable storage** — limited on every deployment (500 GiB per canister,
-  2 GiB per message, 8 GiB per upgrade) and it must not grow with how many
+- **Stable storage** — limited on every deployment (500 GiB per canister;
+  512 MiB touched per message, 2 GiB per upgrade) and it must not grow with how many
   notifications are sent. So the durable campaign lives in the dApp's client
   library and II keeps only user-scoped data plus a small transient working
   set.
@@ -480,33 +505,54 @@ outcall, execution and storage fees are waived. On any application subnet
 (self-hosted, fork, test net) they are fully charged, and the formula is:
 
 ```
-outcall cycles = (3_000_000 + 60_000·n)·n              ← per-call base
+replicated     = (3_000_000 + 60_000·n)·n              ← per-call base
                + (400·request_bytes + 800·max_response_bytes)·n
+
+non-replicated =  3_000_000 + 60_000·n                 ← base, one node only
+               +  400·request_bytes + 800·max_response_bytes
 ```
 
-At n = 34: base 171.4 M, 13,600 per request byte, 27,200 per reserved response
-byte. Worked example, a 10k-user broadcast (~13k device-messages) on a 34-node
-**application** subnet:
+The whole `·n` disappears from the per-byte terms, which is where the money is.
+At n = 34 replicated: base 171.4 M, 13,600 per request byte, 27,200 per reserved
+response byte. Non-replicated: base 5.04 M, 400 and 800. Worked example, a
+10k-user broadcast (~13k device-messages) on a 34-node **application** subnet:
 
-| Path                   | Outcalls | Cycles | ≈ USD  |
-| ---------------------- | -------- | ------ | ------ |
-| Direct, one per device | ~13,000  | ~2.8 T | ~$3.80 |
-| Gateway, ~2 MB batches | ~25      | ~0.7 T | ~$0.95 |
+| Path                                       | Outcalls | Cycles  | ≈ USD  |
+| ------------------------------------------ | -------- | ------- | ------ |
+| Direct, one per device, replicated         | ~13,000  | ~2.8 T  | ~$3.80 |
+| Gateway, ~2 MB batches, replicated         | ~25      | ~0.7 T  | ~$0.95 |
+| **Gateway, ~2 MB batches, non-replicated** | ~25      | ~0.02 T | ~$0.03 |
 
-Two things to read off that table. The gateway cuts outcall **count** ~500× but
-**cycles only ~4×**, because the per-byte fee is charged on the same sealed
-bytes either way — batching amortizes the base fee, not the payload. And
-`max_response_bytes` is charged whether used or not (at 1 KB it exceeds the
-request fee for small direct sends), so always set it tight. **The gateway's
-real justification is in-flight slots and drain latency, not cycles.**
+Three things to read off that table. Batching alone cuts outcall **count** ~500×
+but **cycles only ~4×**, because the per-byte fee is charged on the same sealed
+bytes either way — batching amortizes the base fee, not the payload. Dropping
+replication is what actually cuts the payload cost, by the full factor of n
+(~34×). And `max_response_bytes` is charged whether used or not, so always set it
+tight.
+
+Note what this does to the gateway's rationale. Once the batch handoff is
+non-replicated the cycle saving is ~44× against direct-replicated, but the honest
+justification is still **in-flight outcall slots and drain latency** — 13k
+concurrent outcalls would starve login on a subnet capped at 3,000 in flight,
+and that is a scheduling limit no pricing change touches.
+
+One cost belongs to a variant not described yet, and it is large enough to
+mention here rather than let it surprise anyone later. Everything above assumes
+II can read a notification's text, because it does the sealing. Some apps cannot
+accept that — a messenger should not hand its message bodies to II — so
+[End-to-end-encrypted apps](#end-to-end-encrypted-apps) sets out a variant where
+the content is encrypted such that only the user's own device can read it, and II
+forwards bytes it cannot see. Doing that needs a per-user key, and the IC's way
+to derive one is **vetKD**.
 
 **vetKD is charged on every deployment**, system subnets included:
-`vetkd_derive_key` is ~26.2 B cycles (~$0.036) per call. A derive _per
-notification render_ would be ~$357 per 10k blast — so the E2E design in
-[End-to-end-encrypted apps](#end-to-end-encrypted-apps) must derive **once per
-`(user, origin)`** and cache in the service worker, with a per-anchor rate
-limit. Because the service worker calls in over ingress, which carries no
-cycles, **II pays** — making an uncached derive a user-triggerable drain.
+`vetkd_derive_key` is ~26.2 B cycles (~$0.036) per call. That is fine once per
+user and ruinous per message: a derive _per notification render_ would be ~$357
+per 10k blast. So that design must derive **once per `(user, origin)`** and cache
+the result in the service worker, with a per-anchor rate limit. And the bill lands
+on II, not the app — the service worker calls in over ingress, which carries no
+cycles — so an uncached derive is a **user-triggerable drain**, not merely an
+inefficiency.
 
 On charging senders: **no cycles charging in v1.** Cycles can only be attached
 by canister senders, and per-notification fees bring real complexity
@@ -545,9 +591,29 @@ A timer (`ic_cdk_timers`, ~1s) drains the heap buffer:
   `ic-cdk-timers` documents that under load "timeouts may result in duplicate
   execution", and the drain is not idempotent.
 - Works a **bounded slice** (target 100–300 device-messages, tuned from a real
-  measurement), not a whole chunk. Sealing costs real instructions and this
-  canister also serves every login on the network; a whole 1000-recipient chunk
-  is a large fraction of an execution round.
+  measurement), not a whole chunk.
+
+  What costs instructions is **RFC 8291 encryption, and within it the elliptic
+  curve**: per device-message II generates an ephemeral P-256 keypair and does an
+  **ECDH** against that device's `p256dh`, so two scalar multiplications — one
+  fixed-base for the ephemeral public key, one **variable-base** for the shared
+  secret, which is the expensive one because the device's key differs every time
+  and nothing precomputes. HKDF-SHA256 and AES-128-GCM beside it are noise. The
+  RFC 8292 VAPID **signature** is not part of this budget at all: it is per
+  audience and cached up to 12h, so it amortises to nothing however many messages
+  are sent. Nor can the ECDH be amortised — RFC 8291 has no encrypt-once mode, so
+  the cost is strictly per device.
+
+  Two different ceilings follow, and only one of them is the platform's. The slice
+  is kept to a small fraction of a message's instruction budget because this
+  canister serves every login on the network, and spending most of a round sealing
+  notifications surfaces as login latency — see
+  [Push must never degrade authentication](#push-must-never-degrade-authentication).
+  The per-message instruction limit sits well above that as a hard wall, and
+  crossing it is worse than slow: the tick traps, the trap rolls back the tick's
+  heap mutations, and the same slice is retried and traps again — a permanently
+  wedged drain rather than a degraded one. That asymmetry is why the slice must be
+  set from a measured per-seal cost rather than an estimate.
 - One `raw_rand` per tick; ChaCha20 derives per-message ephemeral seeds. (Note
   the per-tick seed means the subnet's random tape, if observed, reveals that
   tick's ephemeral scalars — see the [security model](#security-model).)
@@ -615,6 +681,93 @@ grow it with attacker-chosen keys until the heap is exhausted (heap exhaustion
 traps the canister, which takes authentication down with it). Timers don't
 survive upgrades — re-arm in `post_upgrade` and `init`.
 
+### How big is the buffer, and how many origins can it serve at once?
+
+**Sizing one entry.** A buffer entry is per _recipient_, not per device — devices
+are resolved at drain, not at admit. Recipient-scoped fields are small: anchor
+(8 B), interned origin (4 B), `topic` (≤ 32 B), `msg_id` (16 B), `admitted_at`
+(8 B), `ttl` (4 B), urgency and attempt counter (2 B). Call it **~200 B** with
+Rust `String`/collection overhead.
+
+The text is the variable. `PushTarget.alert` is an _override_ that falls back to
+`default_alert`, so a broadcast stores one copy of title + body + url for the
+whole chunk and entries point at it. Fully personalized sends cannot: `title`
+(≤ 64 B) + `body` (≤ 256 B) + `url` (~256 B) plus string headers lands each entry
+near **~1 KB**. That five-fold difference is a reason to keep `default_alert` the
+common path, not merely a convenience.
+
+**Memory is not the constraint — by three orders of magnitude.** The heap ceiling
+is 4 GiB. A full 1,000-recipient chunk is ~200 KB broadcast, ~1 MB personalized.
+Even a hundred concurrent full chunks — 100,000 recipients in flight — is ~20 MB
+broadcast or ~100 MB personalized. Nothing about that is close to a limit.
+
+**Drain rate is the constraint.** At the drain's own target of 100–300
+device-messages per ~1s tick, take 200/s. With ~2 devices per user that is ~100
+recipients/s, and everything downstream follows from it:
+
+| Work                            | Device-messages | Time to drain at 200/s |
+| ------------------------------- | --------------- | ---------------------- |
+| One 1,000-recipient chunk       | ~2,000          | ~10 s                  |
+| One 10k-user blast (10 chunks)  | ~20,000         | ~100 s                 |
+| 5 origins blasting 10k at once  | ~100,000        | ~8 min                 |
+| 10 origins blasting 10k at once | ~200,000        | ~17 min                |
+| 50 origins blasting 10k at once | ~1,000,000      | ~83 min                |
+
+The rate is a fixed pie shared by every origin: II drains 200/s in total, not per
+sender. So concurrency does not degrade gracefully into slower delivery for the
+noisy origin — it degrades into slower delivery for _everyone_, which is why
+Layer 1 has to divide the rate rather than merely cap the buffer.
+
+**Which fixes the buffer size.** Depth should be the drain rate multiplied by the
+worst in-buffer latency worth accepting, not whatever the heap allows. Capping
+queue latency at 60 s gives 200/s × 60 = 12,000 device-messages ≈ 6,000
+recipients ≈ **~6 MB personalized, ~1.2 MB broadcast**. A buffer sized to memory
+instead would happily accept _hours_ of backlog and report `admitted` for
+messages whose `ttl` will expire before they are sent — the failure mode is a
+lying success, not an out-of-memory.
+
+So express the admission ceiling in **seconds of drain backlog**, with per-origin
+fair share as `total_rate / active_origins`; and set `ttl_seconds` defaults with
+the queue depth in mind, since a 60 s queue against the ~4 h default TTL is
+comfortable while a 1 h queue is not.
+
+**Everything above scales linearly with one unmeasured number.** The 200/s slice
+is this design's own target, not an observation. What has to be measured before
+these figures mean anything: instructions for one RFC 8291 seal (the P-256 ECDH
+dominates), how large a slice fits in a safe fraction of an execution round on a
+canister that also serves every login, and whether the ~1s timer holds under
+load. Measure those three and every row in that table moves together.
+
+### The way to lift that ceiling is a separate canister
+
+Note what the 200/s is actually a limit on. It is not the crypto and it is not the
+platform — it is **co-tenancy with authentication**. The slice is small because
+this canister serves every login on the network, so the only reason push cannot
+spend its whole execution round sealing is that logins are sharing that round.
+
+Which suggests the structural fix: run push in its **own canister**. It could then
+spend a full round on sealing — plausibly the same order as the 10–20× headroom
+between the self-imposed budget and the instruction limit — while keeping the
+trust boundary exactly where it is today. Still an IC canister under the same
+controllers, still no plaintext leaving the platform, so this buys throughput
+without the concession that moving sealing to the gateway would demand. It also
+turns [Push must never degrade authentication](#push-must-never-degrade-authentication)
+from a discipline that has to be maintained into a property that holds by
+construction.
+
+The real cost is state ownership. Subscriptions and consent are anchor-scoped, so
+a push canister has to **own** those maps rather than calling II per send —
+otherwise the load just moved back, with inter-canister latency added. Then
+`/authorize`'s opt-in becomes one inter-canister write at consent time, which is
+rare and cheap, and the service worker still lives on II's origin because that is
+where the notification permission is granted. What is genuinely new is
+two-canister upgrade coordination, and deciding where the VAPID key lives.
+
+Not proposed as the shipping path here, because it changes which canister holds
+user-scoped state and that deserves its own review. But it is the honest answer to
+"the throughput number looks low", and it is a better answer than moving crypto
+off-platform.
+
 ## Delivering to devices
 
 The relay API is one POST per subscription endpoint (RFC 8030) — there is no
@@ -642,17 +795,25 @@ being charged). Three consequences the rest of this section is built around:
   subscription just died). No transform can manufacture agreement about which
   POST was first; a transform can only collapse everything to one deterministic
   value. So `410`-driven subscription cleanup is **not implementable under
-  replicated outcalls** — see
+  replicated outcalls** — which is one of the reasons the next bullet is the
+  design, not a future option. See
   [stale-subscription cleanup](#stale-subscription-cleanup).
-- **Non-replicated outcalls change this.** `is_replicated = false` (in the
-  management-canister interface, on mainnet since 2025-08-04) has **one** node
-  make the request: no consensus, no transform, no 34× fan-out, and roughly two
-  orders of magnitude cheaper. The IC docs recommend it specifically for
-  rate-limited APIs, which is exactly Web Push. It is marked experimental and its
-  API may still change, so this doc does not build the shipping path on it — but
-  it is the single most consequential capability to re-evaluate, because it
-  removes the duplicate-delivery problem _and_ restores per-device status on the
-  direct path. See
+- **So II's outcall to the gateway is non-replicated, and that is the design.**
+  `is_replicated = false` (management-canister interface, on mainnet since
+  2025-08-04) has **one** node make the request: no consensus on the response, no
+  transform, no 34× fan-out, and roughly two orders of magnitude cheaper. The IC
+  docs recommend it precisely for rate-limited APIs, which is what Web Push is.
+  Applied to the one call II actually makes — the batch handoff to the gateway —
+  it removes all three consequences above: the gateway receives one copy of each
+  batch instead of 34, needs no idempotency window, and may return real per-device
+  status instead of a deterministic ack.
+
+  Two things this does not buy. The flag is marked **experimental** and its API
+  may still change, so the interface should be isolated behind one call site that
+  can be reverted to replicated with a transform. And a single node's reply is
+  **not consensus-verified** — for a trusted gateway that is no new concession,
+  since a dishonest gateway could always lie about delivery, but it does mean
+  status coming back is evidence rather than proof. See
   [IC capabilities to re-evaluate](#ic-capabilities-to-re-evaluate).
 
 ### The delivery path: a trusted web2 gateway
@@ -670,20 +831,35 @@ over ordinary (free) internet instead of on-chain:
   keys + plaintext (read all notifications). RFC 8291 has no encrypt-once mode,
   so II produces the N ciphertexts regardless; the gateway saves **outcall
   count, not crypto**.
+
+  It is worth being precise about why offloading the sealing is not merely
+  disallowed but useless, because the instinct to move expensive work to a server
+  with no instruction limit is a good one. The cost splits in the wrong place: the
+  **ECDH that derives the content key is the expensive half, and the AES-128-GCM
+  that uses it is noise**. Deriving the key and being able to decrypt are the same
+  capability, so the only part of the sealing that can be handed to the gateway is
+  the part that was already free. It would also defeat
+  [End-to-end-encrypted apps](#end-to-end-encrypted-apps) outright: that design
+  exists so *II* cannot read content, and a web2 relay holding plaintext is
+  strictly worse than the thing it was built to avoid.
 - The gateway holds **no keys, no subscriptions, and no plaintext at rest** — it
-  sees in-transit ciphertext, endpoints and timing. It is _not_, however,
-  stateless: it must keep a short **idempotency window keyed on batch id** so the
-  34 identical copies of each batch (replication, above) forward once rather than
-  34 times. "Keyless and no plaintext at rest" is the accurate claim; "stateless"
-  is not.
+  sees in-transit ciphertext, endpoints and timing. Because II sends each batch
+  with a **non-replicated** outcall (below), the gateway receives one copy rather
+  than 34 and needs no idempotency window to collapse them, so it is genuinely
+  stateless. Under replicated outcalls it would have had to keep a short window
+  keyed on batch id, and "stateless" would have been the wrong word.
 - II batches sealed bundles into **~1.5 MB** chunks: ~25 outcalls instead of
   ~13k. The 2 MB outcall ceiling counts **headers too**, so targeting exactly
   2 MB leaves no room for the VAPID `Authorization` headers each bundle carries.
 - II authenticates to the gateway with a bearer token (IC outcalls have no stable
-  source IP — replicated requests arrive from all 34 node addresses, and IPv4
-  destinations via a shared proxy pool). The gateway must return a
-  **deterministic ack**, so per-device results cannot come back through this
-  channel.
+  source IP — a non-replicated request comes from whichever node executed it, and
+  IPv4 destinations go via a shared proxy pool). Because the response is not put
+  to consensus, it does **not** have to be deterministic — so per-device results
+  _can_ come back through this channel, which is what makes `410`-driven
+  [stale-subscription cleanup](#stale-subscription-cleanup) implementable. Trust
+  that status only as far as the gateway is already trusted: it is a single
+  unverified reply, so treat a reported `410` as grounds to retire a subscription
+  opportunistically, never as an authority to delete user state on one word.
 - **The gateway sets II's admission capacity.** Throughput is bounded by how fast
   the small buffer drains; a batched drain empties it quickly, so II recovers
   capacity and admits the next chunk sooner. Fast drain → high sustained
@@ -1592,17 +1768,19 @@ Must-fix before a real deployment:
   client-side durability story does not work without it. See
   [II's state model](#iis-state-model-stateless-for-campaigns).
 - **Stale-subscription cleanup.** <a id="stale-subscription-cleanup"></a>
-  `404`/`410` row removal is **built** on the direct path; what follows still
-  applies to the gateway, where per-device status cannot come back at all.
-  Promoted from deferred, because on the _chosen_ path it is not merely missing
-  but structurally impossible: `410 Gone` cannot return through the gateway's
-  deterministic ack, and browsers rotate endpoints continuously. Left alone, the
-  subscription table grows monotonically — O(devices ever registered), not
-  O(users) — and II pays forever to send to dead endpoints. Options: have the
-  gateway expose dead endpoints via a separate authenticated **pull** that II
-  fetches (deterministic by construction), add a `push_gateway_report` update
-  the gateway calls, or fall back to TTL-based GC keyed on last successful
-  delivery. Pairs with `pushsubscriptionchange` below.
+  `404`/`410` row removal is **built** on the direct path. On the gateway path it
+  became possible only once the batch handoff went **non-replicated**: with no
+  consensus on the response, the gateway is no longer confined to a deterministic
+  ack and can return per-device status inline. Under replicated outcalls this was
+  structurally impossible, not merely unbuilt. It still has to be built, and it
+  still matters — browsers rotate endpoints continuously, so left alone the
+  subscription table grows as O(devices ever registered) rather than O(users) and
+  II pays forever to send to dead endpoints. Treat the returned status as
+  evidence, not proof: it is one unverified reply from a trusted party, so retire
+  a subscription opportunistically on a reported `410` rather than deleting user
+  state on a single word. A separate authenticated **pull**, a
+  `push_gateway_report` update, or TTL-based GC keyed on last successful delivery
+  all remain viable as corroboration. Pairs with `pushsubscriptionchange` below.
 - **`pushsubscriptionchange`** — browsers rotate/invalidate subscriptions; the
   service worker must re-subscribe and re-register with II, or delivery
   silently erodes over weeks. Invisible in short-lived testing.
@@ -1676,15 +1854,18 @@ Explicitly rejected:
 Platform features that would change decisions in this doc. Worth re-checking
 before implementation, because two of them postdate the design:
 
-- **Non-replicated outcalls (`is_replicated = false`)** — on mainnet since
-  2025-08-04, marked experimental. Removes the *n*× fan-out and restores
-  per-device delivery status, which would fix duplicate delivery and `410`
-  cleanup on the direct path and weaken the gateway's rationale to in-flight
-  slots alone. **The single highest-value thing to evaluate.**
-- **Per-node outcall results.** A newer management-canister API returning
-  per-node responses would contradict this doc's claim that per-device results
-  cannot come back. Unverified whether it is enabled on mainnet — settle by
-  calling it or checking release notes.
+- ~~**Non-replicated outcalls (`is_replicated = false`)**~~ — **adopted**: the
+  batch handoff to the gateway uses it, which is what makes `410` cleanup
+  possible there and drops the payload cost by the full factor of *n*. Still
+  marked experimental, so what remains to watch is the API changing under us —
+  keep it behind one call site that can revert to replicated plus a transform.
+  Field-tested outside II: multidex's price oracle has run on it since
+  2025-08-04, which is where the ~*n*× figure was measured.
+- **Per-node outcall results.** A management-canister API returning per-node
+  responses would give per-device status back on a *replicated* path, which is now
+  only interesting as a way to stop depending on an experimental flag. Unverified
+  whether it is enabled on mainnet — settle by calling it or checking release
+  notes.
 - **P-256 (secp256r1) threshold ECDSA** — would move the VAPID key out of
   storage entirely via `sign_with_ecdsa`. Requested since 2024 with **no public
   roadmap item or timeline**, so treat it as "if it ever ships", not "when".
@@ -1776,17 +1957,17 @@ receipts; the only per-user signal is `NoConsent`.
 
 ## Feasibility and scale
 
-| Metric                               | Gateway (chosen)                     | Direct (alternative)    |
-| ------------------------------------ | ------------------------------------ | ----------------------- |
-| App → II for 10k users               | ~10 paced chunks (client-driven)     | ~10 paced chunks        |
-| Outcalls per 10k blast               | ~25                                  | ~13k                    |
-| Requests actually reaching relays    | ~13k (gateway fans out off-chain)    | ~13k × 34 (replication) |
-| Per-device status (`410`) observable | no (deterministic ack)               | no under replication    |
-| II **stable storage**                | O(users × origins), flat with volume | same                    |
-| II in-flight buffer                  | bounded, transient heap              | same                    |
-| Full-delivery latency, 10k blast     | tens of seconds                      | minutes                 |
-| Cycles, 34-node **paying** subnet    | ~0.7 T (~$0.95)                      | ~2.8 T (~$3.80)         |
-| Cycles, canonical II (system subnet) | fee-waived                           | fee-waived              |
+| Metric                               | Gateway (chosen)                                                   | Direct (alternative)    |
+| ------------------------------------ | ------------------------------------------------------------------ | ----------------------- |
+| App → II for 10k users               | ~10 paced chunks (client-driven)                                   | ~10 paced chunks        |
+| Outcalls per 10k blast               | ~25                                                                | ~13k                    |
+| Requests actually reaching relays    | ~13k (gateway fans out off-chain)                                  | ~13k × 34 (replication) |
+| Per-device status (`410`) observable | yes — non-replicated handoff, so the ack need not be deterministic | no under replication    |
+| II **stable storage**                | O(users × origins), flat with volume                               | same                    |
+| II in-flight buffer                  | bounded, transient heap                                            | same                    |
+| Full-delivery latency, 10k blast     | tens of seconds                                                    | minutes                 |
+| Cycles, 34-node **paying** subnet    | ~0.02 T (~$0.03) non-replicated; ~0.7 T (~$0.95) if replicated     | ~2.8 T (~$3.80)         |
+| Cycles, canonical II (system subnet) | fee-waived                                                         | fee-waived              |
 
 **Throughput has a global ceiling, and it is shared.** The buffer drains only as
 fast as its outcalls resolve, and outcalls take seconds. At a bounded slice per
@@ -1823,7 +2004,7 @@ At 10M users × 2 devices × 10 consented dApps that is roughly **6 GB + 1 GB +
 1.2 GB ≈ 8 GB**, against a 500 GiB per-canister limit but sharing a 2 TiB subnet
 with anchor data — and **before** any dead rows, which is why
 [stale-subscription cleanup](#stale-subscription-cleanup) is a must-fix rather
-than housekeeping. Note also the 8 GiB stable-memory-per-upgrade ceiling, which
+than housekeeping. Note also the 2 GiB stable-memory-per-upgrade ceiling, which
 bounds how large these maps can get before upgrades become a problem.
 
 ## Stable memory regions
