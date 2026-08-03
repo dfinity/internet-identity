@@ -1183,6 +1183,43 @@ as "open the app" — no deep link, no authenticated landing. Worth stating plai
 to set expectations, and it pairs naturally with the `Hidden` content variant,
 which also shows a generic message and reveals context only after the tap.
 
+### Action buttons: navigation only, never silent work
+
+Web Notifications lets a notification carry `actions` — buttons rendered on it,
+with `notificationclick` reporting which was pressed. Platforms show about two,
+and **Safari and iOS support none at all**, so anything built on them has to
+degrade to a plain notification rather than depend on them.
+
+**Every action here can only navigate.** The service worker belongs to II's
+origin, so `notificationclick` fires on II's origin, and II's worker holds no
+session for the dApp — the delegation lives in the dApp's own origin storage,
+which is unreachable cross-origin by design. It cannot call the dApp's backend as
+the user. So an "Add margin" button opens the app on the add-margin screen; it
+cannot add margin.
+
+That makes actions a straightforward extension of the deep link already specified:
+
+```candid
+actions : opt vec record { id : text; title : text; url : text };   // ≤ 2
+```
+
+Each `url` is validated same-origin against the sender at send time, exactly as
+`alert.url` is, and the worker maps `event.action` back to one. Cap the count at
+two because that is what platforms render, cap `title` short because buttons
+truncate, and leave `icon` out of a first version — fetching a cross-origin image
+to decorate a notification on II's origin raises the same concern as the app logo
+on the `/notify` screen. This composes with `Hidden` content, since the worker
+builds the notification after decrypting.
+
+**Silent actions are the thing being given up, and it is a cost of the hub.** A
+dApp running its own service worker is same-origin with its own session, so
+"Archive", "Snooze" or "Mark read" work as a `fetch` with no window opened at all.
+Centralising the pipeline on II removes that: the worker that receives the tap is
+not the worker that could act. Worth listing alongside shared fate and content
+visibility in
+[alternatives considered](#ii-hosts-the-pipeline-rather-than-each-dapp-running-its-own)
+as part of what the single permission is bought with.
+
 ### Updating or dismissing a notification already shown
 
 Yes, via a dApp-chosen `notification_id`, which the service worker maps to the
@@ -1235,9 +1272,13 @@ The cost of that choice is paid throughout this document and should be read as i
 price, not as incidental complexity: II becomes a shared-fate dependency (see
 [Shared fate: one permission for every dApp](#shared-fate-one-permission-for-every-dapp)),
 II sees notification content unless the app opts into
-[end-to-end encryption](#end-to-end-encrypted-apps), and a canister whose real job
-is authentication now carries a delivery pipeline — hence
-[Push must never degrade authentication](#push-must-never-degrade-authentication).
+[end-to-end encryption](#end-to-end-encrypted-apps), a canister whose real job is
+authentication now carries a delivery pipeline — hence
+[Push must never degrade authentication](#push-must-never-degrade-authentication) —
+and notification **action buttons can only navigate, never act**, because the
+worker that receives the tap belongs to II rather than to the app holding the
+user's session (see
+[action buttons](#action-buttons-navigation-only-never-silent-work)).
 
 ### II hosts the service worker, rather than each dApp hosting one
 
