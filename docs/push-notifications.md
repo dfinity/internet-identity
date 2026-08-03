@@ -1063,12 +1063,23 @@ Four things this cost to get right, all learned the hard way:
 - **The sign-in route must be its own URL.** The flow journals state per route,
   so running it on the app root interleaves that journal with the app's whole
   boot path. The symptom is landing signed out with nothing explaining why.
-- **Do not short-circuit on `isAuthenticated()` there.** A delegation can sit in
-  storage while the app considers the session over — an app that ends its
-  session when every tab closes is in exactly that state when a notification
-  arrives. Forwarding on it returns the user to an app that then signs them out.
-  Calling `signIn()` unconditionally is correct: it starts the redirect on the
-  first pass and completes from journaled state on the return one.
+- **Reusing an existing session needs the app's own staleness rule, not just
+  `isAuthenticated()`.** A delegation can sit in storage while the app considers
+  the session over — an app that ends its session when every tab closes is in
+  exactly that state when a notification arrives, so forwarding on it returns the
+  user to an app that then signs them out. The fix is not to skip the check but to
+  record liveness first: **arriving from a notification is itself evidence the
+  user is present**, which is what such a rule is trying to measure. Stamp
+  whatever the app uses, then reuse the session if there is one and only redirect
+  otherwise.
+
+  An app that goes further and *deletes* its stored session on tab close cannot
+  reuse anything — a notification arrives long after that has run, so tap-through
+  will always re-authenticate. That is a legitimate posture, but it is a choice
+  being made about notifications, and it is worth making deliberately rather than
+  discovering it. Such an app should consider exempting users who granted push
+  consent: asking to be brought back later, and destroying the session that makes
+  returning cheap, are in tension.
 - **A loopback callback needs II's `dev_csp`.** Establishing the flow fetches
   the callback origin's allow-list, and that fetch is `connect-src`-bound, which
   production CSP limits to `https:`. So a dApp on `http://localhost` can only do
@@ -1079,11 +1090,42 @@ Four things this cost to get right, all learned the hard way:
   permission prompt ("access other apps and services on this device"). Expected
   on a local setup, absent once both sides are public https.
 
-Finally, the route is a page on the dApp's origin and **cannot be supplied by
-II or by the auth client**. The client is headless, and the redirect is a
-top-level navigation onto the relying party's own origin — which is also what
-generates the session key. So the realistic goal is making that page invisible
-(the app's own background and no decision on it), not removing it.
+The **page** has to live on the dApp's origin and cannot be supplied by II: the
+client is headless, and the redirect is a top-level navigation onto the relying
+party's own origin, which is also what generates the session key. So the goal is
+making that page invisible — the app's own background, no decision on it — not
+removing it.
+
+**Its contents are a different matter, and should not be the dApp's problem.**
+The four lessons above were each learned by writing this route by hand, and every
+one of them is boilerplate that every dApp would reproduce identically. Building
+it once for the PoC came to ~70 lines of logic, of which perhaps 15 were actually
+about that app — and two of the rest were security-relevant: validating an
+attacker-supplied `next` down to a same-origin fragment, and landing the user in
+the app rather than stranding them when sign-in fails. Leaving each dApp to
+reimplement the first of those is how an open redirect gets shipped.
+
+Almost all of it belongs in `@icp-sdk/auth`, because it is ICRC-167 plumbing
+rather than anything to do with push: journaling the destination through
+`memoize` (required, since the callback may carry no query or fragment),
+validating it on the way back, running the two legs of `signIn`, reusing an
+existing session, and falling back into the app on failure. The shape wanted is
+one call the dApp mounts on its own page —
+
+```
+handleRedirectSignIn({ identityProvider, nextParam, reuseExistingSession: true,
+                       onArrive, onBeforeLeave, onError })
+```
+
+— where the app supplies only what is genuinely its own. `onArrive` and
+`onBeforeLeave` are what let an app with its own session policy participate
+without the library knowing anything about it: they are where the liveness stamp
+and the tab-close exemption above would go.
+
+This matters for a stated goal, not just ergonomics. This design claims a dApp
+needs no push infrastructure. Until that helper exists, tap-through is the place
+where the claim is false — the one part of adopting push that still asks a dApp
+to write subtle, security-relevant code of its own.
 
 ### Apps with no URL routing (e.g. Caffeine)
 
@@ -1747,6 +1789,12 @@ Must-fix before a real deployment:
   state on a single word. A separate authenticated **pull**, a
   `push_gateway_report` update, or TTL-based GC keyed on last successful delivery
   all remain viable as corroboration. Pairs with `pushsubscriptionchange` below.
+- **A redirect-sign-in helper in `@icp-sdk/auth`.** Tap-through is the last place
+  a dApp still writes subtle security-relevant code by hand — see
+  [landing the user already signed in](#landing-the-user-already-signed-in) for
+  the shape. Not II-side work, and not push-specific, but it is on the critical
+  path for "a dApp needs no push infrastructure" being true, so it belongs on this
+  list rather than in someone else's backlog.
 - **`pushsubscriptionchange`** — browsers rotate/invalidate subscriptions; the
   service worker must re-subscribe and re-register with II, or delivery
   silently erodes over weeks. Invisible in short-lived testing.
