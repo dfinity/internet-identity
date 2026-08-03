@@ -28,7 +28,6 @@ updates:
   - package-ecosystem: cargo
     directories:
       - "/"
-      - "/demos/test-app"
       - "/demos/vc_issuer"
       - "/src/try-ii"
     schedule:
@@ -53,7 +52,6 @@ updates:
   - package-ecosystem: npm
     directories:
       - "/"
-      - "/demos/test-app"
       - "/demos/vc_issuer"
       - "/demos/using-dev-build"
       - "/src/sig-verifier-js"

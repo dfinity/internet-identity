@@ -2,7 +2,8 @@ import { chromium, type BrowserContext } from "@playwright/test";
 import path from "path";
 import { test } from "./";
 
-const pathToExtension = path.resolve("demos/test-app/dist");
+// Unpacked by scripts/fetch-test-app from the pinned test app release.
+const pathToExtension = path.resolve(".test-app/dist");
 
 export const chromeExtensionTest = test.extend<{
   context: BrowserContext;
