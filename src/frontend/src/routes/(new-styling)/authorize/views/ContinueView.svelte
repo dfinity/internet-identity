@@ -1,7 +1,13 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
+  import { onMount, type Snippet } from "svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { HelpCircleIcon, PlusIcon, PencilIcon } from "@lucide/svelte";
+  import {
+    HelpCircleIcon,
+    PlusIcon,
+    PencilIcon,
+    CheckIcon,
+  } from "@lucide/svelte";
+  import { notificationsEnabledFor } from "../notifOptIn";
   import { handleError } from "$lib/components/utils/error";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
@@ -191,6 +197,15 @@
     dapps.find((dapp) => dapp.hasOrigin(displayOrigin))?.name,
   );
   const dappName = $derived(application ?? new URL(displayOrigin).hostname);
+  // Keyed on `effectiveOrigin` because that's what consent is recorded against.
+  // Reused by /mcp, where no such record exists, so the row simply stays hidden.
+  const notificationsOn = $derived(
+    $lastUsedIdentitiesStore.selected !== undefined &&
+      notificationsEnabledFor(
+        $lastUsedIdentitiesStore.selected.identityNumber,
+        effectiveOrigin,
+      ),
+  );
   const primaryAccountName = $derived(
     application !== undefined ? $t`My ${application} account` : $t`My account`,
   );
@@ -618,7 +633,9 @@
     {@render header()}
   {:else}
     <AuthorizeHeader origin={displayOrigin} />
-    <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
+    <h1
+      class="text-text-primary mb-2 max-w-full min-w-0 self-start text-2xl font-medium break-words"
+    >
       {$t`Continue to ${dappName}`}
     </h1>
     <p class="text-text-secondary mb-6 self-start text-sm">
@@ -644,6 +661,27 @@
         />
       </div>
     </div>
+    <!-- Notifications: shown only once the user has turned them on for this
+         app, as confirmation that the one-time opt-in stuck. Managed in
+         Settings, so there is nothing to change here. -->
+    {#if notificationsOn}
+      <div class="border-border-tertiary mb-6 flex flex-col border-t pt-4">
+        <span class="text-text-primary mb-0.5 text-base font-medium">
+          {$t`Notifications`}
+        </span>
+        <div class="flex flex-row items-center justify-between gap-2">
+          <span class="text-text-tertiary text-base">
+            {$t`alerts from this app`}
+          </span>
+          <span
+            class="text-text-primary flex shrink-0 flex-row items-center gap-1.5 text-base"
+          >
+            <CheckIcon class="size-4" />
+            {$t`On`}
+          </span>
+        </div>
+      </div>
+    {/if}
     <span class="text-text-primary mb-3 self-start text-base font-medium">
       {$t`Available accounts`}
     </span>
@@ -692,7 +730,7 @@
     </Tooltip>
   </div>
   {#if $READ_ONLY_MODE}
-    <div class="border-border-tertiary mt-4 border-t pt-4">
+    <div class="border-border-tertiary mt-4 min-w-0 border-t pt-4">
       <AccessLevelSelector
         bind:accessLevel
         disabled={isAuthenticatingDefault}

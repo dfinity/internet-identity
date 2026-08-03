@@ -660,14 +660,6 @@ export interface EmailChallengeSubmitDkimLeafArg {
   'hops' : Array<SignedRRset>,
   'nonce' : string,
 }
-/**
- * Email-recovery types
- * ====================
- * See `docs/ongoing/email-recovery.md` for the full design. Covers
- * both halves of the flow: setup (binding a recovery email to an
- * anchor) and recovery (proving control of a previously-bound
- * address to obtain a signed delegation).
- */
 export interface EmailRecoveryCredential {
   'created_at' : Timestamp,
   'address' : string,
@@ -810,10 +802,6 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
-/**
- * ICRC-3 attribute sharing types
- * ==============================
- */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -1430,15 +1418,19 @@ export interface PrepareIdAliasRequest {
 }
 /**
  * Result of prepare_mcp_registration_delegation: the canister-signature public
- * key the registration delegation is rooted at (P_reg), and the (short)
- * expiration of that delegation. The frontend fetches the signed delegation via
- * get_mcp_registration_delegation and delivers the chain to the trusted MCP
+ * key the registration delegation is rooted at (P_reg), the (short) expiration
+ * of that delegation, and the identity's resolved trusted_url (the anchor's own
+ * server if set, else the official connector). trusted_url is certified (this
+ * is an update call), so the frontend can gate delivery on it - delivering the
+ * chain only when the connect link's origin matches - rather than trusting an
+ * uncertified mcp_get_config query. The frontend fetches the signed delegation
+ * via get_mcp_registration_delegation and delivers the chain to the trusted MCP
  * server, which redeems it with mcp_register_v2.
  */
 export interface PrepareMcpRegistrationDelegation {
   'user_key' : UserKey,
-  'expiration' : Timestamp,
   'trusted_url' : string,
+  'expiration' : Timestamp,
 }
 export interface PrepareSessionDelegation {
   'user_key' : UserKey,
@@ -1462,6 +1454,19 @@ export type PublicKey = Uint8Array | number[];
 export interface PublicKeyAuthn { 'pubkey' : PublicKey }
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
+/**
+ * Push notifications PoC (RFC 8291). `hostname` and `title` are what the
+ * Service Worker renders in the OS notification banner; `body` is the
+ * message text; `url` is an optional deep-link the SW opens on click.
+ * The whole record is CBOR-encoded, then RFC 8291-encrypted; single-record
+ * AES-GCM caps the encrypted payload at ~3 KiB.
+ */
+export interface PushAlert {
+  'url' : [] | [string],
+  'title' : string,
+  'body' : string,
+  'hostname' : string,
+}
 /**
  * Rate limit configuration.
  * Currently only used for `register`.
@@ -2284,6 +2289,29 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   /**
+   * Called by a dApp's backend on the user's behalf: encrypt + fan out a
+   * push notification to every device the target identity has subscribed
+   * with consent for that origin. Returns in milliseconds — outcalls to the
+   * relay are detached via `ic_cdk::spawn` and their success is observed by
+   * the browser, not by the caller.
+   * 
+   * The caller must be the origin's registered sender (see
+   * `push_register_sender`), or the recipient itself. Note it cannot be
+   * "prove you are the recipient" alone: `in_app_principal` is a
+   * canister-signature principal derived from II's seed, so only the user's
+   * browser can present it as caller() — an inter-canister call always
+   * arrives as the calling canister's own principal.
+   * 
+   * NOT rate-limited: there is no admission control yet, and
+   * `canister_inspect_message` could not provide it anyway (it is not
+   * invoked for inter-canister calls).
+   */
+  'notify_user' : ActorMethod<
+    [Principal, PushAlert],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
    * The trailing `opt text` is the SSO discovery domain (null for a direct
    * provider). For SSO sign-ins a cold discovery/JWKS cache yields the
    * `Pending` result arm — a retry signal, not an error: the caller re-calls
@@ -2393,6 +2421,83 @@ export interface _SERVICE {
     { 'Ok' : PrepareSessionDelegation } |
       { 'Err' : SessionDelegationError }
   >,
+  /**
+   * Debug helper: return each device's push-relay endpoint URL
+   * registered for `anchor_number`. Useful when the "Enable on this
+   * device" button looked like it succeeded but no notifications
+   * arrive — checking this tells us whether the phone's subscribe
+   * round-trip actually completed. Endpoint URLs are not secret;
+   * keys are omitted.
+   */
+  'push_debug_list_devices' : ActorMethod<[UserNumber], Array<string>>,
+  /**
+   * Grant `origin` permission to send push notifications for this
+   * identity. Also writes the reverse index so `notify_user` can find
+   * the anchor from the dApp's per-origin principal.
+   */
+  'push_grant_consent' : ActorMethod<
+    [UserNumber, FrontendHostname],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * List every origin `anchor_number` has granted push-notification
+   * consent to. Backs the Settings UI's permissions list. Returns an
+   * empty vec for an unauthorized caller or an anchor with no consents.
+   */
+  'push_list_consented_origins' : ActorMethod<[UserNumber], Array<string>>,
+  /**
+   * Register (or replace) the canister allowed to send notifications as
+   * `origin`; pass `null` to deregister. Controller-only: the design has
+   * senders self-register with II verifying ownership via
+   * `/.well-known/ii-push-senders`, and until that exists self-service
+   * would let any canister claim any origin.
+   */
+  'push_register_sender' : ActorMethod<
+    [string, [] | [Principal]],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * The canister currently registered to send as `origin`, if any.
+   */
+  'push_registered_sender' : ActorMethod<[string], [] | [Principal]>,
+  /**
+   * Revoke a previously-granted consent. Subscription rows are kept
+   * intact — a subsequent grant does not require re-subscribing.
+   */
+  'push_revoke_consent' : ActorMethod<
+    [UserNumber, FrontendHostname],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * Register a Web Push subscription for `anchor_number` on this
+   * device. Called from II's own frontend (Settings → Enable
+   * notifications on this device); authenticated as the anchor. Row
+   * is keyed by (anchor, sha256(endpoint)), so multiple devices per
+   * anchor are supported and notify_user fans out to all of them.
+   */
+  'push_subscribe_device' : ActorMethod<
+    [UserNumber, string, Uint8Array | number[], Uint8Array | number[]],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * Remove one of `anchor_number`'s subscriptions. `endpoint` picks
+   * which device row to remove — the anchor may have several.
+   */
+  'push_unsubscribe_device' : ActorMethod<
+    [UserNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * Return the VAPID public key (65-byte uncompressed SEC1 P-256 point)
+   * the frontend passes as `applicationServerKey` to
+   * `pushManager.subscribe()`. Same key used to sign the per-push JWT.
+   */
+  'push_vapid_public_key' : ActorMethod<[], Uint8Array | number[]>,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],
     RegisterResponse

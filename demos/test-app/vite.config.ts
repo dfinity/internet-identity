@@ -28,11 +28,15 @@ export default defineConfig(({ command, mode }) => ({
     outDir: "../dist",
     emptyOutDir: true,
     rollupOptions: {
-      // Two entries: the homepage and the ICRC-167 redirect callback page.
+      // The homepage, the ICRC-167 redirect callback page, and a sign-in-gated
+      // page used as a push-notification landing target.
       input: {
         index: fileURLToPath(new URL("./src/index.html", import.meta.url)),
         callback: fileURLToPath(
           new URL("./src/callback.html", import.meta.url),
+        ),
+        restricted: fileURLToPath(
+          new URL("./src/restricted.html", import.meta.url),
         ),
       },
       output: {

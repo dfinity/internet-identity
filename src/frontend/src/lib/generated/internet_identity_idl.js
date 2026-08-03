@@ -648,6 +648,12 @@ export const idlFactory = ({ IDL }) => {
     'permissions' : Permissions,
     'expiration' : Timestamp,
   });
+  const PushAlert = IDL.Record({
+    'url' : IDL.Opt(IDL.Text),
+    'title' : IDL.Text,
+    'body' : IDL.Text,
+    'hostname' : IDL.Text,
+  });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
@@ -738,8 +744,8 @@ export const idlFactory = ({ IDL }) => {
   });
   const PrepareMcpRegistrationDelegation = IDL.Record({
     'user_key' : UserKey,
-    'expiration' : Timestamp,
     'trusted_url' : IDL.Text,
+    'expiration' : Timestamp,
   });
   const PrepareSessionDelegation = IDL.Record({
     'user_key' : UserKey,
@@ -1228,6 +1234,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
+    'notify_user' : IDL.Func(
+        [IDL.Principal, PushAlert],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
     'openid_credential_add' : IDL.Func(
         [IdentityNumber, JWT, Salt, IDL.Opt(IDL.Text)],
         [
@@ -1344,6 +1355,47 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'push_debug_list_devices' : IDL.Func(
+        [UserNumber],
+        [IDL.Vec(IDL.Text)],
+        ['query'],
+      ),
+    'push_grant_consent' : IDL.Func(
+        [UserNumber, FrontendHostname],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'push_list_consented_origins' : IDL.Func(
+        [UserNumber],
+        [IDL.Vec(IDL.Text)],
+        ['query'],
+      ),
+    'push_register_sender' : IDL.Func(
+        [IDL.Text, IDL.Opt(IDL.Principal)],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'push_registered_sender' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(IDL.Principal)],
+        ['query'],
+      ),
+    'push_revoke_consent' : IDL.Func(
+        [UserNumber, FrontendHostname],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'push_subscribe_device' : IDL.Func(
+        [UserNumber, IDL.Text, IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Nat8)],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'push_unsubscribe_device' : IDL.Func(
+        [UserNumber, IDL.Text],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'push_vapid_public_key' : IDL.Func([], [IDL.Vec(IDL.Nat8)], []),
     'register' : IDL.Func(
         [DeviceData, ChallengeResult, IDL.Opt(IDL.Principal)],
         [RegisterResponse],

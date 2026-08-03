@@ -13,6 +13,7 @@ import {
   decodeSnapshot,
   encodeResults,
   inputsFromSnapshot,
+  safeNextPath,
   type RedirectResults,
 } from "./redirectFlow";
 
@@ -84,6 +85,16 @@ const run = async (): Promise<void> => {
     }
   } catch (error) {
     results.error = error instanceof Error ? error.message : String(error);
+  }
+
+  // With `next` set, this was the guarded-route flow: return the user to the
+  // page they were trying to reach rather than the homepage. Re-narrowed from
+  // the journaled snapshot, not from the live URL — `inputs` came through
+  // `memoize`, but the check is cheap and keeps the guarantee local.
+  const next = safeNextPath(inputs.next);
+  if (next !== undefined && results.error === undefined) {
+    window.location.assign(next);
+    return;
   }
 
   // Hand the results back to the homepage (in the hash). The identity itself is

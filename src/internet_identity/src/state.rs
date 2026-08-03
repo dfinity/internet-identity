@@ -152,6 +152,10 @@ pub struct PersistentState {
     /// `docs/ongoing/email-recovery.md` §7.6.
     pub doh_config: Option<DohConfig>,
     pub mcp_official_url: Option<String>,
+    /// VAPID P-256 private key (raw 32-byte scalar). Generated lazily via
+    /// `raw_rand` on the first push-related call after install; persists
+    /// across upgrades so existing subscriptions keep working.
+    pub push_vapid_private_key: Option<[u8; 32]>,
 }
 
 impl Default for PersistentState {
@@ -180,6 +184,7 @@ impl Default for PersistentState {
             dnssec_config: None,
             doh_config: None,
             mcp_official_url: None,
+            push_vapid_private_key: None,
         }
     }
 }

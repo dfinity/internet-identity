@@ -26,6 +26,8 @@
   import RedirectAnimationView from "./views/RedirectAnimationView.svelte";
   import UpgradeSuccessView from "./views/UpgradeSuccessView.svelte";
   import ContinueView from "./views/ContinueView.svelte";
+  import NotifOptInView from "./views/NotifOptInView.svelte";
+  import { shouldOfferNotifications } from "./notifOptIn";
   import type { AccessLevel } from "$lib/utils/accessLevel";
   import AuthWizardView from "./views/AuthWizardView.svelte";
   import AttributeConsentView from "./views/AttributeConsentView.svelte";
@@ -157,7 +159,10 @@
         throw new Error("Gated SSO sign-in did not resolve after normal login");
       }
       authorizationStore.setFlow({ type: "1-click-sso", domain });
-      authorizationStore.authorize(Promise.resolve(undefined), "full-access");
+      offerNotificationsThenAuthorize(
+        Promise.resolve(undefined),
+        "full-access",
+      );
     } catch (e) {
       ssoNormalLoginBusy = false;
       if (isOpenIdCancelError(e)) {
@@ -177,6 +182,73 @@
     maxTimeToLive?: bigint,
   ) => {
     authorizationStore.authorize(accountNumber, accessLevel, maxTimeToLive);
+  };
+
+  let pendingAuthorization = $state<
+    | {
+        accountNumberPromise: Promise<bigint | undefined>;
+        accessLevel: AccessLevel;
+        maxTimeToLive?: bigint;
+        /** Run after authorizing — the 1-click flows trigger their funnel here. */
+        after?: () => void;
+      }
+    | undefined
+  >(undefined);
+
+  /**
+   * Authorize, but first offer notifications when this identity hasn't yet
+   * answered for this origin.
+   *
+   * Every path that authorizes goes through here, not just the Continue screen:
+   * the 1-click OpenID and SSO flows authorize directly and never render
+   * ContinueView, so routing only that screen through the offer meant a
+   * one-click sign-in never saw the opt-in at all.
+   */
+  const offerNotificationsThenAuthorize = (
+    accountNumber: Promise<bigint | undefined>,
+    accessLevel: AccessLevel,
+    maxTimeToLive?: bigint,
+    after?: () => void,
+  ) => {
+    const identity = selectedIdentity;
+    // Only interrupt the redirect when there is something to ask. If this
+    // identity already answered for this origin (or the browser can't do push),
+    // authorize straight through as if the screen didn't exist.
+    if (
+      identity === undefined ||
+      !shouldOfferNotifications(
+        identity.identityNumber,
+        $authorizationContextStore.effectiveOrigin,
+      )
+    ) {
+      handleAuthorize(accountNumber, accessLevel, maxTimeToLive);
+      after?.();
+      return;
+    }
+    // The 1-click flows are mid-"resuming" when they get here; leaving that set
+    // would render the redirect animation over the opt-in, since it is matched
+    // first.
+    openIdResumeProcessing = false;
+    pendingAuthorization = {
+      accountNumberPromise: accountNumber,
+      accessLevel,
+      maxTimeToLive,
+      after,
+    };
+  };
+
+  const finalizePendingAuthorization = () => {
+    const pending = pendingAuthorization;
+    if (pending === undefined) return;
+    // Cleared first so the opt-in branch can't win the render race against the
+    // redirect animation once authorization is under way.
+    pendingAuthorization = undefined;
+    handleAuthorize(
+      pending.accountNumberPromise,
+      pending.accessLevel,
+      pending.maxTimeToLive,
+    );
+    pending.after?.();
   };
 
   const handleAttributeConsent = (consent: AttributeConsent) => {
@@ -444,9 +516,16 @@
         throw e;
       }
     }
-    // 1-click OpenID flow: no access-level toggle, always full access.
-    authorizationStore.authorize(Promise.resolve(undefined), "full-access");
-    directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToApp);
+    // 1-click OpenID flow: no access-level toggle, always full access. The
+    // funnel event fires after authorizing, so it rides along as `after` —
+    // otherwise it would report a redirect that hasn't happened yet while the
+    // user is still on the notifications opt-in.
+    offerNotificationsThenAuthorize(
+      Promise.resolve(undefined),
+      "full-access",
+      undefined,
+      () => directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToApp),
+    );
   };
 
   onMount(() => {
@@ -590,6 +669,9 @@
   <!-- 1-click SSO hit the normal-login-required fail-safe — show the one-step
        "First sign-in with X" dialog instead of proceeding. -->
   {@render panelWrapper(ssoNormalLoginContent)}
+{:else if pendingAuthorization !== undefined}
+  <!-- Post-Continue notifications opt-in, before the final redirect. -->
+  {@render panelWrapper(notifOptInContent)}
 {:else if selectedIdentity !== undefined}
   <!-- Returning user with a selected identity — show account selection. -->
   {@render panelWrapper(continueContent)}
@@ -619,7 +701,15 @@
     effectiveOrigin={$authorizationContextStore.effectiveOrigin}
     displayOrigin={$establishedChannelStore.origin}
     requestedMaxTimeToLive={$requestedMaxTimeToLiveStore}
-    onAuthorize={handleAuthorize}
+    onAuthorize={offerNotificationsThenAuthorize}
+  />
+{/snippet}
+
+{#snippet notifOptInContent()}
+  <NotifOptInView
+    effectiveOrigin={$authorizationContextStore.effectiveOrigin}
+    displayOrigin={$establishedChannelStore.origin}
+    onContinue={finalizePendingAuthorization}
   />
 {/snippet}
 

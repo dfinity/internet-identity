@@ -71,11 +71,11 @@
     {/if}
   </div>
   {#if label !== undefined || hint !== undefined}
-    <div class="flex flex-col">
+    <div class="flex min-w-0 flex-col">
       {#if label !== undefined}
         <p
           class={[
-            "text-text-secondary font-medium select-none",
+            "text-text-secondary font-medium break-words select-none",
             labelClass ?? { sm: "text-sm", md: "text-base" }[size],
           ]}
         >
@@ -85,7 +85,7 @@
       {#if hint !== undefined}
         <p
           class={[
-            "text-text-tertiary select-none",
+            "text-text-tertiary break-words select-none",
             { sm: "text-sm", md: "text-base" }[size],
           ]}
         >

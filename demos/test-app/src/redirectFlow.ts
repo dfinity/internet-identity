@@ -35,7 +35,35 @@ export interface RedirectInputs {
   attributeKeys: string[];
   /** Optional base64 ICRC-3 nonce; a random one is used when absent. */
   nonce?: string;
+  /** Same-origin path to land on once the flow completes, instead of the
+   *  homepage. Used by the guarded-route pattern: a restricted page sends the
+   *  user here with `next` set to itself, so sign-in returns them to the page
+   *  they were trying to reach. */
+  next?: string;
 }
+
+/** Snapshot key carrying {@link RedirectInputs.next}. */
+export const NEXT_KEY = "next";
+
+/**
+ * Narrows a `next` value to a same-origin path, or `undefined`.
+ *
+ * `next` reaches us through a URL, so it is attacker-craftable: without this
+ * the callback page would forward the user anywhere after sign-in, i.e. it
+ * would be an open redirect wearing this app's origin. Only a root-relative
+ * path is accepted — never a full URL, protocol-relative `//host`, or anything
+ * that could re-target the navigation to another origin.
+ */
+export const safeNextPath = (value: unknown): string | undefined => {
+  if (typeof value !== "string" || !value.startsWith("/")) {
+    return undefined;
+  }
+  // `//host` and `/\host` are protocol-relative — they navigate off-origin.
+  if (value.startsWith("//") || value.startsWith("/\\")) {
+    return undefined;
+  }
+  return value;
+};
 
 const text = (form: FormSnapshot, id: string): string => {
   const value = form[id];
@@ -58,6 +86,7 @@ export const inputsFromSnapshot = (form: FormSnapshot): RedirectInputs => {
       .map((s) => s.trim())
       .filter((s) => s.length > 0),
     nonce: nonce !== "" ? nonce : undefined,
+    next: safeNextPath(form[NEXT_KEY]),
   };
 };
 
