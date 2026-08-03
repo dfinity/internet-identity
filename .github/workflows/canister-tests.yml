@@ -565,8 +565,6 @@ jobs:
       # .test-app/dist.
       - name: "Fetch test app"
         uses: ./.github/actions/fetch-test-app
-        with:
-          token: ${{ secrets.GIX_BOT_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Create Canisters
         run: |
@@ -707,8 +705,6 @@ jobs:
 
       - name: "Fetch test app"
         uses: ./.github/actions/fetch-test-app
-        with:
-          token: ${{ secrets.GIX_BOT_PAT || secrets.GITHUB_TOKEN }}
 
       - name: "Deploy test app"
         run: |

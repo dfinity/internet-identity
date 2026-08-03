@@ -34,7 +34,7 @@ latest_release=$(curl "${curl_args[@]}" \
 
 if [ -z "$latest_release" ] || [ "$latest_release" = "null" ]; then
   echo "expected a $REPO release, got '$latest_release'" >&2
-  echo "note: $REPO is internal, so this needs a token that can read it" >&2
+  echo "note: check https://github.com/$REPO/releases for a published release" >&2
   exit 1
 fi
 

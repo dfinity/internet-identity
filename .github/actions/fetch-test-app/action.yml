@@ -1,23 +1,13 @@
 name: "fetch-test-app"
 description: Download the pinned dfinity/internet-identity-test-app release into .test-app/
-inputs:
-  token:
-    description: >-
-      Token used to read releases from dfinity/internet-identity-test-app. That
-      repository is internal, so reading it needs a token that can see it — a
-      workflow's default GITHUB_TOKEN cannot, and neither can a token scoped to
-      this repository alone. A caller that falls back to GITHUB_TOKEN therefore
-      passes a non-empty token that still 404s; scripts/fetch-test-app reports
-      that as the cause rather than as a missing release. The same applies on a
-      pull request from a fork, which receives no secrets at all. Once that
-      repository is public the default token is enough, and this input can be
-      dropped along with the `token:` argument at each call site.
-    required: true
 runs:
   using: "composite"
   steps:
+    # The `gh` CLI requires a token to run at all. The release lives in a public
+    # repository, so the workflow's own token is enough — including on pull
+    # requests from forks, which get a token but no secrets.
     - name: Fetch test app
       shell: bash
       env:
-        GH_TOKEN: ${{ inputs.token }}
+        GH_TOKEN: ${{ github.token }}
       run: scripts/fetch-test-app

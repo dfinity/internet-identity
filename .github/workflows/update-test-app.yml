@@ -31,14 +31,10 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
 
-      # dfinity/internet-identity-test-app is an internal repository, which the
-      # app token minted above cannot read — it is scoped to this repository.
-      # Read its releases with an organisation member's token instead. Once that
-      # repository is public, `secrets.GITHUB_TOKEN` is enough.
       - name: Check for a newer test app release
         id: update
         env:
-          GH_TOKEN: ${{ secrets.GIX_BOT_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/update-deps/update-test-app
 
       # This action creates a PR only if there are changes.

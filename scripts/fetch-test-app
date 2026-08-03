@@ -96,17 +96,13 @@ if [ -z "$downloaded" ]; then
 Could not read release '$tag' of
   $REPO
 
-That repository is internal, so reading its releases needs a token belonging to
-an organisation member:
-  - In CI, .github/actions/fetch-test-app takes one as its 'token' input,
-    supplied from the GIX_BOT_PAT secret. A pull request from a fork gets no
-    secrets at all, so this cannot succeed there until the artifact repository
-    is public.
-  - Locally, run 'gh auth login' with an account that can see it, or export
-    GH_TOKEN.
+That repository is public, so the most likely cause is that the pinned tag has
+no release: check https://github.com/$REPO/releases and either publish it there
+or pin an existing tag in $VERSION_FILE.
 
-If the tag is simply not published yet, release it there first, or pin an
-existing tag in $VERSION_FILE.
+Otherwise 'gh' could not authenticate. It needs a token even for a public
+repository — in CI the workflow's own token is passed as GH_TOKEN; locally, run
+'gh auth login' or export GH_TOKEN.
 EOF
       ;;
   esac
