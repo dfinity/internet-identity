@@ -13,15 +13,23 @@ cd "$SCRIPTS_DIR/../.."
 REPO="dfinity/internet-identity-test-app"
 VERSION_FILE=".github/versions/test-app"
 
+for tool in curl jq; do
+  if ! command -v "$tool" > /dev/null; then
+    echo "missing '$tool', needed to query $REPO releases" >&2
+    exit 1
+  fi
+done
+
 current_release=$(tr -d '[:space:]' < "$VERSION_FILE")
 echo "current test app release '$current_release'"
 
-auth_header=()
+# Expanding an empty array under `set -u` is an error in bash 3.2, which is what
+# macOS ships, so give the array an element that is always safe to pass.
+curl_args=(-sSL -H "Accept: application/vnd.github+json")
 if [ -n "${GH_TOKEN:-}" ]; then
-  auth_header=(-H "Authorization: Bearer $GH_TOKEN")
+  curl_args+=(-H "Authorization: Bearer $GH_TOKEN")
 fi
-latest_release=$(curl -sSL "${auth_header[@]}" \
-  -H "Accept: application/vnd.github+json" \
+latest_release=$(curl "${curl_args[@]}" \
   "https://api.github.com/repos/$REPO/releases/latest" | jq -r '.tag_name')
 
 if [ -z "$latest_release" ] || [ "$latest_release" = "null" ]; then

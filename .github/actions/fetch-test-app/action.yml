@@ -4,12 +4,14 @@ inputs:
   token:
     description: >-
       Token used to read releases from dfinity/internet-identity-test-app. That
-      repository is internal, so a workflow's default GITHUB_TOKEN cannot read
-      it and a token belonging to an organisation member is required. Once that
+      repository is internal, so reading it needs a token that can see it — a
+      workflow's default GITHUB_TOKEN cannot, and neither can a token scoped to
+      this repository alone. A caller that falls back to GITHUB_TOKEN therefore
+      passes a non-empty token that still 404s; scripts/fetch-test-app reports
+      that as the cause rather than as a missing release. The same applies on a
+      pull request from a fork, which receives no secrets at all. Once that
       repository is public the default token is enough, and this input can be
-      dropped along with the `token:` argument at each call site. Resolves to an
-      empty string on a pull request from a fork, which receives no secrets;
-      scripts/fetch-test-app reports that as the cause.
+      dropped along with the `token:` argument at each call site.
     required: true
 runs:
   using: "composite"
