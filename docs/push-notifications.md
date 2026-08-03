@@ -1650,12 +1650,35 @@ Must-fix before a real deployment:
   is not true while onboarding means asking someone at DFINITY to add a row, and a
   dApp would have traded a push stack for a support ticket. Pairs with the
   deregistration and re-verification TTL below.
-- **Endpoint host allowlist.** The push endpoint is attacker-supplied. Validate
-  it against the known push services at subscribe time (and **re-validate at
-  drain**, so pre-existing rows can't bypass a tightened list), reject explicit
-  ports, userinfo and non-`https` schemes, and reject private/loopback/link-local
-  hosts. Without this, II is an SSRF and DDoS reflector with an *n*× multiplier —
-  a free ingress call turns into 34 POSTs at a victim of the caller's choosing.
+- **Endpoint host allowlist.** The endpoint is a URL the **caller** supplies. A
+  browser gets it from its push service — `fcm.googleapis.com`,
+  `updates.push.services.mozilla.com`, `web.push.apple.com` — and passes it to
+  `push_subscribe_device`, but that call arrives over ingress and nothing proves
+  the string came from a push service. So a caller can subscribe with
+  `https://victim.example.com/something-expensive`, and every later send to that
+  anchor becomes traffic aimed wherever they chose: **reflection**, and **SSRF**
+  from the sending party's network position.
+
+  Validate the host against the known push services at subscribe time, and
+  **re-validate at drain** so rows written before the list was tightened cannot
+  keep using it. Reject non-`https`, explicit ports, `userinfo`, and
+  private/loopback/link-local hosts.
+
+  **II must be the validator, not the gateway.** On the chosen path II never POSTs
+  to the endpoint at all — it hands the endpoint to the gateway, which makes the
+  per-device sends. That relocates the abuse rather than removing it, and makes it
+  worse in one respect: the gateway is an ordinary server that may sit where
+  private addresses are reachable, whereas replica outcalls egress through a proxy.
+  If the gateway were the only place this is checked, II would be handing an
+  attacker-chosen URL to a component it has already declared trusted, and a buggy
+  or compromised gateway would turn that into clean SSRF. Check before handing it
+  over.
+
+  On the direct per-device alternative, II does POST itself, and under replicated
+  outcalls that carries an *n*× multiplier — one free ingress call becoming 34
+  POSTs at the victim. The non-replicated handoff removes the multiplier from the
+  chosen path; it does not remove the need for the allowlist, because one POST at
+  a victim of the caller's choosing is still one too many.
 - **Per-anchor caps.** Cap subscription rows at **20** and consent rows at
   **100** per anchor, with LRU eviction. Nothing bounds either today, ingress is
   free to the caller, and II pays the stable-memory cost — a direct attack on the
