@@ -36,6 +36,28 @@
   let originsLoaded = $state(false);
   let revoking = $state<string | undefined>(undefined);
 
+  // The unsubscribe button on a notification arrives as `?app=<origin>`. Sorting
+  // that app first means the user lands on the row they came to remove instead of
+  // hunting for it, which matters most on a phone where the list does not fit.
+  // Read once rather than reactively: it describes how the user got here, and
+  // re-ordering the list under them after a revoke would be worse than stale.
+  const highlighted = ((): string | undefined => {
+    try {
+      return new URL(window.location.href).searchParams.get("app") ?? undefined;
+    } catch {
+      return undefined;
+    }
+  })();
+
+  const ordered = $derived(
+    highlighted === undefined
+      ? origins
+      : [
+          ...origins.filter((o) => o === highlighted),
+          ...origins.filter((o) => o !== highlighted),
+        ],
+  );
+
   const hostOf = (url: string): string => {
     try {
       return new URL(url).host;
@@ -217,9 +239,12 @@
           </p>
         {:else}
           <ul class="flex flex-col gap-2" aria-labelledby={titleId}>
-            {#each origins as origin (origin)}
+            {#each ordered as origin (origin)}
               <li
-                class="border-border-tertiary bg-bg-primary flex flex-row items-center gap-3 rounded-lg border px-3 py-3 sm:px-4"
+                class="bg-bg-primary flex flex-row items-center gap-3 rounded-lg border px-3 py-3 sm:px-4 {origin ===
+                highlighted
+                  ? 'border-border-brand'
+                  : 'border-border-tertiary'}"
               >
                 <span
                   class="border-border-secondary bg-bg-secondary text-fg-tertiary flex size-10 shrink-0 items-center justify-center rounded-md border"

@@ -7,6 +7,13 @@
 // natively using the private half of the P-256 keypair generated at
 // subscription time, so `event.data.json()` below is already plaintext.
 
+// Identifies the off-switch button in `notificationclick`. Must match the
+// `action` given to showNotification.
+const ACTION_UNSUBSCRIBE = "ii-unsubscribe";
+// Where that button goes: the settings section listing every consented app, each
+// with a remove control, plus the per-device toggle.
+const SETTINGS_PATH = "/manage/settings";
+
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
@@ -102,6 +109,13 @@ self.addEventListener("push", (event) => {
         // unread notification. Distinct notifications must stack; collapsing
         // is something a sender opts into per message, never automatic.
         data: { origin: alert.hostname || null, url: alert.url || null },
+        // An off-switch on every notification, owned by II rather than by the
+        // sender — the one user protection a per-dApp push setup cannot offer,
+        // since an app that controlled its own notifications would never add
+        // this. Platforms render about two buttons and ignore the field
+        // entirely where unsupported (Safari, iOS), so this degrades to a plain
+        // notification rather than breaking it.
+        actions: [{ action: ACTION_UNSUBSCRIBE, title: "Unsubscribe" }],
       });
     })(),
   );
@@ -110,6 +124,20 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data || {};
+
+  // The unsubscribe button navigates rather than acting: revoking a consent is
+  // authorized by the anchor, and this worker holds no authority for it. Landing
+  // on the settings page is the better shape anyway — the user confirms, and sees
+  // every other app they have granted while they are there. `app` selects which
+  // row to surface; the page falls back to the plain list without it.
+  if (event.action === ACTION_UNSUBSCRIBE) {
+    const dest = new URL(SETTINGS_PATH, self.location.origin);
+    if (data.origin) {
+      dest.searchParams.set("app", data.origin);
+    }
+    event.waitUntil(self.clients.openWindow(dest.href));
+    return;
+  }
 
   // A deep link goes straight to the app. II validated at send time that it is
   // on the sender's own origin, so there is nothing left to check here — and
