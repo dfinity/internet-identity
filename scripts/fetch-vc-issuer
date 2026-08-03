@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# Download the VC demo issuer release pinned in `.github/versions/vc-issuer`
+# into `.vc-issuer/` (gitignored).
+#
+# The issuer is built and released by
+# https://github.com/dfinity/internet-identity-vc-demo-issuer and consumed here
+# as release assets:
+#
+#   vc_demo_issuer.wasm.gz          the canister module (deployed by CI, and by
+#                                   `icp deploy issuer` for local development)
+#   vc_demo_issuer.wasm.gz.sha256   integrity check for the above
+#   provision                       configures a deployed issuer canister
+#
+# `vc_demo_issuer.did` is *not* fetched here: it is vendored at
+# `src/vc-api/vc_demo_issuer.did` so `npm run generate` works offline. The bump
+# workflow refreshes that copy when the pin moves.
+#
+# Auth: uses `gh`, so an existing `gh auth login` session or a `GH_TOKEN` in the
+# environment both work. A token is required while
+# dfinity/internet-identity-vc-demo-issuer is an `internal` repository.
+
+set -euo pipefail
+
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+ISSUER_REPO="dfinity/internet-identity-vc-demo-issuer"
+VERSION_FILE=".github/versions/vc-issuer"
+OUT_DIR=".vc-issuer"
+
+if [ ! -f "$VERSION_FILE" ]; then
+    echo "Error: $VERSION_FILE missing — cannot tell which issuer release to fetch." >&2
+    exit 1
+fi
+
+# Strip comments and blank lines, matching the other pin files in this repo.
+tag=$(sed <"$VERSION_FILE" 's/#.*$//' | sed '/^$/d' | tr -d '[:space:]')
+if [ -z "$tag" ]; then
+    echo "Error: $VERSION_FILE is empty after stripping comments." >&2
+    exit 1
+fi
+
+if ! command -v gh >/dev/null 2>&1; then
+    echo "Error: the GitHub CLI (gh) is required to download the issuer release." >&2
+    echo "       See https://cli.github.com/ for installation instructions." >&2
+    exit 1
+fi
+
+echo "Fetching $ISSUER_REPO release $tag" >&2
+
+mkdir -p "$OUT_DIR"
+
+# Each asset is a separate request, so a transient network or API failure can
+# leave the set incomplete. Retry the whole download before giving up.
+attempts=3
+downloaded=
+for attempt in $(seq "$attempts"); do
+    if gh release download "$tag" \
+            --repo "$ISSUER_REPO" \
+            --dir "$OUT_DIR" \
+            --clobber \
+            --pattern 'vc_demo_issuer.wasm.gz' \
+            --pattern 'vc_demo_issuer.wasm.gz.sha256' \
+            --pattern 'provision' 2>"$OUT_DIR/.fetch-error"
+    then
+        downloaded=yes
+        break
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+        echo "Download attempt $attempt of $attempts failed, retrying." >&2
+        sleep $((attempt * 5))
+    fi
+done
+
+if [ -z "$downloaded" ]
+then
+    cat "$OUT_DIR/.fetch-error" >&2
+    cat >&2 <<EOF
+
+Error: could not read release '$tag' from $ISSUER_REPO.
+
+Likely causes, in order:
+  * The release does not exist yet. Check
+    https://github.com/$ISSUER_REPO/releases and update $VERSION_FILE.
+  * The release is not readable with the credentials available here.
+    $ISSUER_REPO is an 'internal' repository, so an anonymous request or a
+    workflow's default GITHUB_TOKEN cannot read its releases. In CI this is
+    expected on pull requests from forks, which receive no secrets — it will
+    stop being a problem once $ISSUER_REPO is public. Locally, run
+    'gh auth login' or export GH_TOKEN.
+EOF
+    rm -f "$OUT_DIR/.fetch-error"
+    exit 1
+fi
+rm -f "$OUT_DIR/.fetch-error"
+
+# Verify the wasm against the published checksum. The .sha256 file records the
+# bare filename, so compare digests rather than running `shasum -c` from a
+# different directory.
+expected=$(cut -d ' ' -f1 <"$OUT_DIR/vc_demo_issuer.wasm.gz.sha256")
+actual=$(shasum -a 256 "$OUT_DIR/vc_demo_issuer.wasm.gz" | cut -d ' ' -f1)
+if [ "$expected" != "$actual" ]; then
+    echo "Error: checksum mismatch for vc_demo_issuer.wasm.gz." >&2
+    echo "       expected $expected" >&2
+    echo "       actual   $actual" >&2
+    rm -f "$OUT_DIR/vc_demo_issuer.wasm.gz"
+    exit 1
+fi
+
+# Release assets do not carry the executable bit.
+chmod +x "$OUT_DIR/provision"
+
+echo "Issuer $tag ready in $OUT_DIR:" >&2
+ls -l "$OUT_DIR" >&2

@@ -176,75 +176,6 @@ jobs:
             exit 1
           fi
 
-  vc_demo_issuer-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            demos/vc_issuer/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}
-      - uses: ./.github/actions/bootstrap
-      - uses: ./.github/actions/setup-node
-      - run: npm ci
-      - name: "Build VC issuer canister"
-        working-directory: demos/vc_issuer
-        run: ./build.sh
-      - run: sha256sum vc_demo_issuer.wasm.gz
-        working-directory: demos/vc_issuer
-      - name: "Upload VC issuer"
-        uses: actions/upload-artifact@v4
-        with:
-          # name is the name used to display and retrieve the artifact
-          name: vc_demo_issuer.wasm.gz
-          # path is the name used as the file to upload and the name of the
-          # downloaded file
-          path: ./demos/vc_issuer/vc_demo_issuer.wasm.gz
-
-  #####################################
-  # The Rust vc issuer canister tests #
-  #####################################
-
-  vc-issuer-test:
-    runs-on: ubuntu-latest
-    needs: [docker-build-internet_identity, vc_demo_issuer-build]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            demos/vc_issuer/target
-          key: ${{ runner.os }}-cargo-vc-tests-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}
-      - uses: ./.github/actions/bootstrap
-      - name: "Download VC issuer wasm"
-        uses: actions/download-artifact@v4
-        with:
-          name: vc_demo_issuer.wasm.gz
-          path: demos/vc_issuer
-      - name: "Download II wasm"
-        uses: actions/download-artifact@v4
-        with:
-          name: internet_identity_backend.wasm.gz
-          path: .
-      - run: mv internet_identity_backend.wasm.gz internet_identity.wasm.gz
-      - name: Install PocketIC server
-        uses: dfinity/pocketic@main
-        with:
-          pocket-ic-server-version: "15.0.0"
-      - name: "Run VC issuer canister tests"
-        working-directory: demos/vc_issuer
-        run: |
-          # create dummy assets
-          mkdir dist
-          touch dist/index.{html,css,js}
-          touch dist/index2.js
-          cargo test
-
   ###########################
   # The Rust canister tests #
   ###########################
@@ -652,12 +583,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/release-')
-    needs:
-      [
-        docker-build-internet_identity,
-        docker-build-archive,
-        vc_demo_issuer-build,
-      ]
+    needs: [docker-build-internet_identity, docker-build-archive]
     steps:
       - uses: actions/checkout@v4
 
@@ -715,11 +641,10 @@ jobs:
             -e ic --proxy "$wallet" --mode upgrade \
             --wasm .test-app/test_app.wasm
 
-      - name: "Download VC issuer wasm"
-        uses: actions/download-artifact@v4
+      - name: "Fetch VC issuer release"
+        uses: ./.github/actions/fetch-vc-issuer
         with:
-          name: vc_demo_issuer.wasm.gz
-          path: .
+          token: ${{ secrets.GIX_BOT_PAT || secrets.GITHUB_TOKEN }}
 
       - name: "Deploy Issuer"
         run: |
@@ -728,8 +653,8 @@ jobs:
           export ICP_WARNING=-mainnet_plaintext_identity
           icp canister install v2yvn-myaaa-aaaad-aad4q-cai \
             -e ic --proxy "$wallet" --mode upgrade \
-            --wasm vc_demo_issuer.wasm.gz
-          ./demos/vc_issuer/provision \
+            --wasm .vc-issuer/vc_demo_issuer.wasm.gz
+          ./.vc-issuer/provision \
             --ii-canister-id y2aaj-miaaa-aaaad-aacxq-cai \
             --icp-network ic \
             --issuer-canister v2yvn-myaaa-aaaad-aad4q-cai \
@@ -751,7 +676,6 @@ jobs:
         docker-build-internet_identity,
         docker-build-archive,
         docker-build-internet_identity_frontend,
-        vc_demo_issuer-build,
       ]
 
     steps:
@@ -775,11 +699,18 @@ jobs:
           name: internet_identity_frontend.wasm.gz
           path: .
 
-      - name: "Download issuer"
-        uses: actions/download-artifact@v4
+      # The issuer is released from dfinity/internet-identity-vc-demo-issuer; we
+      # re-publish the pinned build here so the II release notes keep offering a
+      # matching issuer wasm. Only the "Publish release" step below consumes it,
+      # so this is gated on the same release tag.
+      - name: "Fetch VC issuer release"
+        if: startsWith(github.ref, 'refs/tags/release-')
+        uses: ./.github/actions/fetch-vc-issuer
         with:
-          name: vc_demo_issuer.wasm.gz
-          path: .
+          token: ${{ secrets.GIX_BOT_PAT || secrets.GITHUB_TOKEN }}
+
+      - if: startsWith(github.ref, 'refs/tags/release-')
+        run: cp .vc-issuer/vc_demo_issuer.wasm.gz vc_demo_issuer.wasm.gz
 
       - name: "Get GHA job IDs"
         uses: actions/github-script@v7

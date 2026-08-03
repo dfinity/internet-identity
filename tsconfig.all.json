@@ -10,9 +10,6 @@
       "path": "./src/sig-verifier-js"
     },
     {
-      "path": "./demos/vc_issuer"
-    },
-    {
       "path": "./src/vite-plugins"
     }
   ]

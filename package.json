@@ -21,8 +21,8 @@
     "generate:js": "didc bind ./src/internet_identity/internet_identity.did -t js | ./scripts/rewrite-dfinity-imports > src/frontend/src/lib/generated/internet_identity_idl.js",
     "generate:types-frontend": "didc bind ./src/internet_identity_frontend/internet_identity_frontend.did -t ts | ./scripts/rewrite-dfinity-imports > src/frontend/src/lib/generated/internet_identity_frontend_types.d.ts",
     "generate:js-frontend": "didc bind ./src/internet_identity_frontend/internet_identity_frontend.did -t js | ./scripts/rewrite-dfinity-imports > src/frontend/src/lib/generated/internet_identity_frontend_idl.js",
-    "generate:types-issuer": "didc bind ./demos/vc_issuer/vc_demo_issuer.did -t ts | ./scripts/rewrite-dfinity-imports > src/vc-api/src/generated/vc_issuer_types.ts",
-    "generate:js-issuer": "didc bind ./demos/vc_issuer/vc_demo_issuer.did -t js | ./scripts/rewrite-dfinity-imports > src/frontend/src/lib/generated/vc_issuer_idl.js",
+    "generate:types-issuer": "didc bind ./src/vc-api/vc_demo_issuer.did -t ts | ./scripts/rewrite-dfinity-imports > src/vc-api/src/generated/vc_issuer_types.ts",
+    "generate:js-issuer": "didc bind ./src/vc-api/vc_demo_issuer.did -t js | ./scripts/rewrite-dfinity-imports > src/frontend/src/lib/generated/vc_issuer_idl.js",
     "screenshots": "npm run opts -- ./src/frontend/screenshots.ts",
     "test": "vitest --config ./vitest.config.ts",
     "test:e2e": "VITEST_MAX_THREADS=1 vitest --mode e2e --config ./vitest.config.ts",
@@ -103,10 +103,5 @@
     "npm": ">=11.0.0 <12.0.0",
     "node": ">=24.0.0 <25.0.0"
   },
-  "workspaces": [
-    "src/vc-api",
-    "demos/vc_issuer",
-    "src/vite-plugins",
-    "src/sig-verifier-js"
-  ]
+  "workspaces": ["src/vc-api", "src/vite-plugins", "src/sig-verifier-js"]
 }
