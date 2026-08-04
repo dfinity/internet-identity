@@ -208,7 +208,14 @@
              chaining to the page; touch-pan-y re-enables native vertical
              scroll (the dialog itself is touch-none). -->
         <div
-          class="relative touch-pan-y overflow-y-auto overscroll-contain max-sm:max-h-(--max-content-height) sm:max-h-[min(var(--max-content-height),48rem)]"
+          class={[
+            "relative max-h-(--max-panel-height) touch-pan-y overflow-y-auto overscroll-contain",
+            // Published for children that need to know how much room they have,
+            // so they can scroll internally instead of adding a second
+            // scrollbar on top of this one.
+            "[--max-panel-height:calc(var(--max-content-height)-env(safe-area-inset-bottom))]",
+            "sm:[--max-panel-height:min(calc(var(--max-content-height)-env(safe-area-inset-bottom)),48rem)]",
+          ]}
         >
           <div
             class={[
