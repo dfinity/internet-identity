@@ -99,7 +99,7 @@ We recommend using the [`docker-build`](./scripts/docker-build) script. It extra
 
 ### Integration with Internet Identity
 
-The [`using-dev-build`](./demos/using-dev-build) demo shows a minimal example project that integrates Internet Identity using [agent-js](https://github.com/dfinity/agent-js). For the full integration protocol, refer to the [Client Authentication Protocol section](https://internetcomputer.org/docs/current/references/ii-spec#client-authentication-protocol) of the [Internet Identity Specification][spec].
+Client applications authenticate their users by opening the Internet Identity frontend and exchanging window messages with it to obtain a signed delegation. That exchange is described step by step, with a sequence diagram and the exact message payloads, in the [Client Authentication Protocol section](https://internetcomputer.org/docs/current/references/ii-spec#client-authentication-protocol) of the [Internet Identity Specification][spec] — also maintained in this repository at [`docs/ii-spec.mdx`](./docs/ii-spec.mdx). The [`@icp-sdk/auth`](https://www.npmjs.com/package/@icp-sdk/auth) package implements that exchange, so most applications do not need to handle the messages themselves.
 
 ## Key Features
 
