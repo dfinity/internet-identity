@@ -15,6 +15,8 @@
   import {
     notificationsGloballyGranted,
     recordNotifOptInDecision,
+    pushCapable,
+    applePushDeferred,
   } from "../notifOptIn";
 
   interface Props {
@@ -34,6 +36,14 @@
   let enabling = $state(false);
   let enableError = $state<string | undefined>(undefined);
 
+  // iOS in a tab: consent can be granted here, but the subscription has to be
+  // created later from II's installed app. When that is the situation, Enable
+  // grants consent and shows how to finish rather than trying to subscribe.
+  const deferred = applePushDeferred();
+  // After a deferred grant, the screen becomes the "finish on your device" step
+  // instead of continuing straight through.
+  let finishOnDevice = $state(false);
+
   // Whether this identity already allowed this app on some OTHER device.
   //
   // Consent lives with the identity and is shared by every device, but a push
@@ -43,17 +53,14 @@
   // as though the earlier answer was lost.
   let allowedOnAnotherDevice = $state(false);
 
-  const pushSupported =
-    typeof navigator !== "undefined" &&
-    "serviceWorker" in navigator &&
-    "PushManager" in window;
+  const canSubscribeHere = pushCapable();
 
   // Resolved after the screen is already up, deliberately: the decision to SHOW
   // it is local and synchronous so nothing is added to the pre-redirect path,
   // and only the wording depends on this.
   onMount(() => {
     void (async () => {
-      if (!pushSupported) return;
+      if (!canSubscribeHere) return;
       try {
         const { actor, identityNumber } = $authenticatedStore;
         const [origins, registration] = await Promise.all([
@@ -70,12 +77,20 @@
     })();
   });
 
-  const subscribeThisDevice = async (): Promise<void> => {
+  // Consent (per identity + origin) and a subscription (per device) are separate
+  // grants. Splitting them is what lets iOS grant consent in a tab now and
+  // subscribe from the installed app later.
+  const grantConsent = async (): Promise<void> => {
     const { actor, identityNumber } = $authenticatedStore;
-    await ensureDeviceSubscription(actor, identityNumber);
     await actor
       .push_grant_consent(identityNumber, effectiveOrigin)
       .then(throwTextCanisterError);
+  };
+
+  const subscribeThisDevice = async (): Promise<void> => {
+    const { actor, identityNumber } = $authenticatedStore;
+    await ensureDeviceSubscription(actor, identityNumber);
+    await grantConsent();
   };
 
   const remember = (decision: "enabled" | "dismissed") => {
@@ -93,13 +108,24 @@
   const globallyGranted = notificationsGloballyGranted();
 
   const handleEnable = async () => {
-    if (!pushSupported) {
+    if (!canSubscribeHere && !deferred) {
       onContinue();
       return;
     }
     enabling = true;
     enableError = undefined;
     try {
+      if (deferred) {
+        // iOS tab: record the consent, which is all this context can do, and
+        // turn the screen into the "finish on your device" step. The
+        // subscription is created later when they open II's installed app and
+        // turn notifications on there — consent is already waiting for it.
+        await grantConsent();
+        remember("enabled");
+        enabling = false;
+        finishOnDevice = true;
+        return;
+      }
       // Already-granted permission resolves immediately without prompting, but
       // skip the call entirely so the intent is explicit: nothing browser-native
       // happens on the per-app path.
@@ -299,27 +325,52 @@
     </div>
   {/if}
 
+  {#if finishOnDevice}
+    <!-- iOS: consent is granted; the subscription still has to be created from
+         II's installed app, which is the only place iOS exposes Web Push. -->
+    <div
+      class="border-border-secondary bg-bg-secondary mt-5 rounded-xl border p-4"
+    >
+      <div class="text-text-primary text-sm font-semibold">
+        {$t`One more step on your device`}
+      </div>
+      <p class="text-text-tertiary mt-1 text-sm leading-relaxed">
+        <Trans>
+          {dappName} can now notify you. To receive alerts on this iPhone or iPad,
+          add Internet Identity to your Home Screen, open it, and turn on notifications
+          under Settings.
+        </Trans>
+      </p>
+    </div>
+  {/if}
+
   <div class="mt-6 flex flex-col gap-2">
-    <button
-      class="btn btn-primary btn-xl w-full"
-      onclick={handleEnable}
-      disabled={enabling}
-    >
-      {#if enabling}
-        <ProgressRing />
-        <span>{$t`Turning on...`}</span>
-      {:else if allowedOnAnotherDevice}
-        <span>{$t`Enable on this device`}</span>
-      {:else}
-        <span>{$t`Enable notifications`}</span>
-      {/if}
-    </button>
-    <button
-      class="btn btn-tertiary btn-lg w-full"
-      onclick={handleMaybeLater}
-      disabled={enabling}
-    >
-      {$t`Maybe later`}
-    </button>
+    {#if finishOnDevice}
+      <button class="btn btn-primary btn-xl w-full" onclick={onContinue}>
+        <span>{$t`Continue`}</span>
+      </button>
+    {:else}
+      <button
+        class="btn btn-primary btn-xl w-full"
+        onclick={handleEnable}
+        disabled={enabling}
+      >
+        {#if enabling}
+          <ProgressRing />
+          <span>{$t`Turning on...`}</span>
+        {:else if allowedOnAnotherDevice}
+          <span>{$t`Enable on this device`}</span>
+        {:else}
+          <span>{$t`Enable notifications`}</span>
+        {/if}
+      </button>
+      <button
+        class="btn btn-tertiary btn-lg w-full"
+        onclick={handleMaybeLater}
+        disabled={enabling}
+      >
+        {$t`Maybe later`}
+      </button>
+    {/if}
   </div>
 </div>

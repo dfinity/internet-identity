@@ -20,12 +20,39 @@ type Decision = "enabled" | "dismissed";
 const storageKey = (identityNumber: bigint, origin: string): string =>
   `ii-push-optin:${identityNumber}:${origin}`;
 
-/** Whether this browser can receive Web Push at all. */
-const pushSupported = (): boolean =>
+/**
+ * Whether this context can create a push subscription **right now**.
+ *
+ * `Notification` is checked separately rather than assumed from `PushManager`:
+ * iOS exposes them independently, and every caller reads
+ * `Notification.permission` immediately after this guard.
+ */
+export const pushCapable = (): boolean =>
   typeof navigator !== "undefined" &&
   "serviceWorker" in navigator &&
   typeof window !== "undefined" &&
-  "PushManager" in window;
+  "PushManager" in window &&
+  "Notification" in window;
+
+/**
+ * iOS/iPadOS, where Web Push exists **only** inside a home-screen PWA — so a
+ * Safari tab (which is where a dApp's redirect sign-in lands) cannot subscribe,
+ * yet the identity can still grant consent now and subscribe later from II's own
+ * installed app. This is the case that makes consent and subscription separable:
+ * consent is a canister call that works anywhere; subscription needs the
+ * standalone context.
+ *
+ * iPadOS reports itself as a Mac, so the touch-point check catches it.
+ */
+export const applePushDeferred = (): boolean => {
+  if (pushCapable()) return false;
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent ?? "";
+  const iPhoneOrPad = /iP(hone|od|ad)/.test(ua);
+  const iPadAsMac =
+    navigator.platform === "MacIntel" && (navigator.maxTouchPoints ?? 0) > 1;
+  return iPhoneOrPad || iPadAsMac;
+};
 
 /**
  * Reads a stored decision. A `localStorage` failure (Safari private mode,
@@ -90,24 +117,26 @@ export const notificationsEnabledFor = (
  * so the remaining question is purely II's own: may *this app* reach you.
  */
 export const notificationsGloballyGranted = (): boolean =>
-  pushSupported() && Notification.permission === "granted";
+  pushCapable() && Notification.permission === "granted";
 
 /**
  * Whether to show the opt-in screen for this identity and origin.
  *
- * Skipped when the user already answered, when the browser cannot do push, and
- * when notification permission is already `denied` — a denied permission cannot
- * be re-requested from script, so the screen's primary action would silently do
- * nothing.
+ * Offered when this context can subscribe **or** when it is an iOS tab that can
+ * grant consent now and subscribe later — see {@link applePushDeferred}. Skipped
+ * when the user already answered, when neither is true, and when a subscribe-here
+ * context has permission `denied` (which cannot be re-requested from script, so
+ * the primary action would silently do nothing). The deferred path has no browser
+ * prompt to be denied, so that guard does not apply to it.
  */
 export const shouldOfferNotifications = (
   identityNumber: bigint,
   origin: string,
 ): boolean => {
-  if (!pushSupported()) {
+  if (!pushCapable() && !applePushDeferred()) {
     return false;
   }
-  if (Notification.permission === "denied") {
+  if (pushCapable() && Notification.permission === "denied") {
     return false;
   }
   return decisionFor(identityNumber, origin) === "unknown";

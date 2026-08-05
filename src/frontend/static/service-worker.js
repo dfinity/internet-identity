@@ -7,9 +7,37 @@
 // natively using the private half of the P-256 keypair generated at
 // subscription time, so `event.data.json()` below is already plaintext.
 
-// Identifies the off-switch button in `notificationclick`. Must match the
+// Identifies our own action button in `notificationclick`. Must match the
 // `action` given to showNotification.
-const ACTION_UNSUBSCRIBE = "ii-unsubscribe";
+const ACTION_MANAGE = "ii-manage";
+
+// The notification title is derived from the sender's origin and never from
+// anything the sender supplies, so one dApp cannot publish a notification wearing
+// another's name. Two consequences:
+//
+//  - the bare host reads better than the full URL and is just as unspoofable, so
+//    that is what gets shown;
+//  - a friendly name has to reach II over a channel tied to the origin. The right
+//    home is a `name` field in the sender's `/.well-known/ii-push-senders`, which
+//    only whoever controls the origin can publish. That field does not exist yet,
+//    so DEMO_NAMES stands in for it — demo scaffolding, not a design, and it must
+//    not grow into a sender-supplied display name.
+const DEMO_NAMES = {
+  "enlargement-their-dayton-aus.trycloudflare.com": "MULTI/DEX",
+  "frontend.local.localhost:8000": "MULTI/DEX",
+  "multidex.ai": "MULTI/DEX",
+};
+
+const senderLabel = (origin) => {
+  let host;
+  try {
+    const u = new URL(origin);
+    host = u.port === "" ? u.hostname : `${u.hostname}:${u.port}`;
+  } catch {
+    host = origin;
+  }
+  return DEMO_NAMES[host] ?? host;
+};
 // Where that button goes: the settings section listing every consented app, each
 // with a remove control, plus the per-device toggle.
 const SETTINGS_PATH = "/manage/settings";
@@ -88,6 +116,7 @@ self.addEventListener("push", (event) => {
   }
 
   const hostname = alert.hostname || "Internet Identity";
+  const sender = senderLabel(hostname);
   const title = alert.title || "";
   const body = alert.body || "";
 
@@ -101,7 +130,7 @@ self.addEventListener("push", (event) => {
         console.warn("[ii-sw] suppressed a duplicate notification");
         return;
       }
-      await self.registration.showNotification(hostname, {
+      await self.registration.showNotification(sender, {
         body:
           title !== "" && body !== "" ? `${title} — ${body}` : title || body,
         // Deliberately no `tag`: tagging by hostname made every notification
@@ -109,13 +138,19 @@ self.addEventListener("push", (event) => {
         // unread notification. Distinct notifications must stack; collapsing
         // is something a sender opts into per message, never automatic.
         data: { origin: alert.hostname || null, url: alert.url || null },
-        // An off-switch on every notification, owned by II rather than by the
-        // sender — the one user protection a per-dApp push setup cannot offer,
-        // since an app that controlled its own notifications would never add
-        // this. Platforms render about two buttons and ignore the field
+        // A route to the controls on every notification, owned by II rather than
+        // by the sender — the one user protection a per-dApp push setup cannot
+        // offer, since an app that controlled its own notifications would never
+        // add this. Platforms render about two buttons and ignore the field
         // entirely where unsupported (Safari, iOS), so this degrades to a plain
         // notification rather than breaking it.
-        actions: [{ action: ACTION_UNSUBSCRIBE, title: "Unsubscribe" }],
+        //
+        // "Manage" rather than "Unsubscribe" on purpose, for two reasons: Chrome
+        // already puts its own unsubscribe affordance on a notification, so a
+        // second one competing with it is confusing; and this button navigates
+        // to settings rather than revoking anything, so promising otherwise
+        // would be a lie.
+        actions: [{ action: ACTION_MANAGE, title: "Manage" }],
       });
     })(),
   );
@@ -125,12 +160,12 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data || {};
 
-  // The unsubscribe button navigates rather than acting: revoking a consent is
-  // authorized by the anchor, and this worker holds no authority for it. Landing
-  // on the settings page is the better shape anyway — the user confirms, and sees
-  // every other app they have granted while they are there. `app` selects which
-  // row to surface; the page falls back to the plain list without it.
-  if (event.action === ACTION_UNSUBSCRIBE) {
+  // Navigates rather than acting: revoking a consent is authorized by the anchor,
+  // and this worker holds no authority for it. Landing on the settings page is the
+  // better shape anyway — the user confirms, and sees every other app they have
+  // granted while they are there. `app` selects which row to surface; the page
+  // falls back to the plain list without it.
+  if (event.action === ACTION_MANAGE) {
     const dest = new URL(SETTINGS_PATH, self.location.origin);
     if (data.origin) {
       dest.searchParams.set("app", data.origin);
