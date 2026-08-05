@@ -73,7 +73,7 @@ Three limits shape the design, and they bind on every deployment:
 
 | Limit | Consequence in this design |
 | --- | --- |
-| **In-flight outcalls** — 3000 subnet-wide, shared with II's own login paths | batch through the gateway (~25 outcalls, not ~13k) so a blast can't starve sign-in |
+| **In-flight outcalls** — 3000 subnet-wide, shared across every canister on the subnet | batch through the gateway (~25 outcalls, not ~13k) so a blast can't exhaust the subnet's shared outcall pool |
 | **Stable storage** — 500 GiB/canister, must not grow with volume | durable campaign lives in the dApp's library; II keeps only user-scoped rows + a transient buffer |
 | **Instructions/round** — this canister also serves every login | drain in bounded slices, never whole chunks |
 
@@ -231,8 +231,9 @@ things:
   recipient with five devices counts as five, because that's five actual sends). It's
   applied per registered domain, not per origin, so a dApp can't multiply its quota by
   spinning up `a1.evil.com … a1000.evil.com`.
-- **How much of II push can ever take** — push draws on a slice of the outcall budget
-  well below the subnet's cap, and always yields to sign-in. Each origin also has a
+- **How much of II push can ever take** — push draws only a slice of the outcall budget,
+  well below the subnet's cap, and its drain is scheduled behind sign-in — so a blast
+  neither exhausts the shared outcall pool nor slows logins. Each origin also has a
   reserved share of the buffer, so one large sender running flat-out can't crowd out
   smaller ones.
 
@@ -243,7 +244,7 @@ client library paces itself in response.
 ### What this costs, and who pays
 
 We care about three costs on every deployment: outcall slots (3000 subnet-wide,
-shared with login — the reason the gateway exists), storage (kept O(users × origins),
+shared across the subnet — the reason the gateway exists), storage (kept O(users × origins),
 never O(volume)), and instructions (which force the bounded-slice drain).
 
 Cycles are the fourth cost, but only where they're charged — waived on canonical II,
@@ -341,19 +342,20 @@ not the recipient count, that the pipeline is really moving.
 An entry is **per recipient** (~200 B + text; ~1 KB personalized vs one shared copy
 for a broadcast — a reason to keep `default_alert` the common path). **Memory isn't
 the constraint** (4 GiB heap; 100k recipients in flight ≈ 20–100 MB). **Drain rate
-is**, and it's shared across every app — about **200 device-messages a second, total**:
+is**, and it's shared across every app — about **50 device-messages a second, total**
+(the central estimate derived below):
 
 | Send | Device-messages | Time to deliver all of them |
 | --- | --- | --- |
-| One 1,000-recipient chunk | ~2,000 | ~10 s |
-| One 10k-user blast | ~20,000 | ~100 s |
-| 10 apps each blasting 10k at once | ~200,000 | ~17 min |
+| One 1,000-recipient chunk | ~2,000 | ~40 s |
+| One 10k-user blast | ~20,000 | ~6.5 min |
+| 10 apps each blasting 10k at once | ~200,000 | ~67 min |
 
-So the buffer depth should be **drain rate × acceptable latency** (60 s → ~6 MB),
+So the buffer depth should be **drain rate × acceptable latency** (60 s → ~2 MB),
 not what the heap allows — a memory-sized buffer accepts hours of backlog and
 returns `admitted` for messages whose TTL expires first (a lying success). Express
 admission in *seconds of backlog*, fair-shared `total_rate / active_origins`. All of
-this scales off the unmeasured ~200/s — measure the per-seal cost first.
+this scales off the ~50/s estimate — measure the per-seal cost first.
 
 ### The way to lift that ceiling is a separate canister
 
@@ -411,7 +413,7 @@ turn those into ~25 batched outcalls off-chain instead of ~13k on-chain.
 
 **Why a gateway, not direct:** in-flight outcall slots, not cycles. A 10k-user
 blast is ~13k direct outcalls against the subnet's 3000 shared slots — it would
-starve login. The gateway needs ~25. This holds even on the fee-waived deployment,
+exhaust the pool the whole subnet draws from. The gateway needs ~25. This holds even on the fee-waived deployment,
 which is why it's the real reason (cycles only differ ~4×).
 
 **What stays on II:** all crypto. The gateway sees ciphertext, endpoints and timing
@@ -616,7 +618,7 @@ Explicit opt-in — no `notification_id` means notifications never replace each 
 | --- | --- | --- | --- |
 | 1 | [II hosts the pipeline](#a1) | Each dApp runs its own | The permission is the scarce resource, not the plumbing — a dApp can't win the *n*th prompt |
 | 2 | [II hosts the service worker](#a2) | Each dApp hosts its own | Same decision as #1 — Web Push binds the subscription to the SW's origin |
-| 3 | [Gateway delivery](#the-delivery-path-a-trusted-web2-gateway) | Direct per-device outcalls | 13k in-flight outcalls would starve login; gateway → ~25 |
+| 3 | [Gateway delivery](#the-delivery-path-a-trusted-web2-gateway) | Direct per-device outcalls | 13k in-flight outcalls would drain the subnet's outcall pool; gateway → ~25 |
 | 4 | [Sealing stays on II](#action-buttons-navigate-never-act) | Gateway seals | Deriving the key = ability to decrypt; useless to move. Real lever is a [separate canister](#the-way-to-lift-that-ceiling-is-a-separate-canister) |
 | 5 | [vetKeys-sealed E2E](#end-to-end-encrypted-apps) | dApp holds the keys | See E2E section |
 
@@ -831,7 +833,7 @@ PoC's job was to prove the shape, not to be complete).
 | --- | --- |
 | Endpoint allowlist | Only real push-service endpoints (FCM, Apple, Mozilla) may be stored — no other host. The endpoint is where II POSTs each notification and the caller supplies it, so a fake one would aim II at any server the attacker likes. Re-check at send; II validates, not the gateway. |
 | Per-anchor caps | ~20 device subscriptions and ~100 app consents per identity, so one anchor can't mine II's storage. Reclaim dead subscriptions first; never silently drop a consent — refuse the next one instead. |
-| Reserved outcall budget | Push gets a fixed slice of the outcall budget and always yields to sign-in — [detail](#push-must-never-degrade-authentication). |
+| Reserved outcall budget | Push gets a fixed slice of the subnet outcall budget, and its drain is scheduled behind sign-in — [detail](#push-must-never-degrade-authentication). |
 | Robust drain loop | The timer emptying the buffer must survive one bad entry — otherwise a single malformed notification crashes the batch, rolls back, and retries forever, blocking everyone. Needs per-entry error handling with an attempt limit, a watchdog for a stuck buffer, and marking entries in-flight before the send so two ticks can't double-send. |
 | `drain_epoch` ack signal | A counter that changes when II is upgraded, so the client knows the buffer was wiped and re-sends — client durability doesn't work without it ([state model](#iis-state-model-stateless-for-campaigns)). |
 | <a id="stale-subscription-cleanup"></a>Stale-subscription cleanup | Remove a device row when its relay returns `404`/`410` (the endpoint is dead), or the table grows forever. Possible on the gateway path only because the handoff is non-replicated; treat a `410` as a hint, not proof. |
@@ -905,17 +907,36 @@ flowchart LR
 | 1. Admit the send | II accepts the chunk into its buffer | Yes — the client just paces; raising the limit only weakens flood protection |
 | 2. Hold in buffer | the chunk waits in memory to be sent | Yes — 4 GiB is far more than needed; memory is never the limit |
 | **3. Encrypt** | II encrypts each message for its device (elliptic-curve crypto, one per device) | **No — the bottleneck.** This is CPU-heavy, and II may only spend a slice of each execution round on it before sign-in slows |
-| **4. Send to the gateway** | II makes the outbound HTTPS calls | **No — the bottleneck.** Only ~3,000 calls can be in flight across the whole subnet, and II's own login calls draw from the same pool |
+| **4. Send to the gateway** | II makes the outbound HTTPS calls | **No — the bottleneck.** Only ~3,000 calls can be in flight across the whole subnet, shared with every other canister on it — which is exactly why delivery batches through the gateway |
 | 5. Gateway → relays | the gateway fans out to FCM/Apple/Mozilla | Yes — ordinary web2, limited only by each relay's per-app rate |
 | 6. Store per-user rows | subscriptions and consent persist | Grows with users × apps, not with volume — [Storage below](#storage-can-ii-store-the-data) |
 
-**Both bottlenecks are the same root cause: II shares its execution round and its
-outcall budget with every sign-in on the network, so push only ever gets a slice.**
-That slice is the ceiling:
+**The two bottlenecks have different roots. Encryption shares II's execution round
+with every sign-in — one canister, one instruction budget per round. Delivery shares
+the subnet's ~3,000-outcall cap with every canister on the subnet, which is why it
+batches through the gateway. Push yields on both fronts, so it only ever gets a
+slice.** That slice is the ceiling, and it comes down to two numbers: the cost of one
+seal, and the share of the canister we let push take —
+`device-msg/sec = (instructions/sec allotted to push) ÷ (instructions per seal)`:
 
-> **≈ 200 device-msg/s ≈ 720k/hour ≈ 17M/day, across every dApp combined.**
-> (Estimate — one RFC 8291 seal is dominated by a P-256 ECDH; measure it, every
-> number scales off it.)
+- **Cost of a seal** — one RFC 8291 message is dominated by a single P-256 variable-base
+  scalar multiplication (the ECDH against the device's key); HKDF and AES-GCM are noise
+  beside it. In Wasm that is an estimated **~20 M instructions**, range ~10–30 M. This is
+  the one number to measure first — every figure below scales off it.
+- **Share of execution** — the drain is held to **~20 % of the canister**, a deliberate
+  cap so sign-in keeps ~80 % of every round even mid-blast. On a canister sustaining a
+  few billion instructions/sec that hands push **~1 B instructions/sec**.
+
+Plugging those in — the central column is the planning number:
+
+| per seal | 10 M (optimistic) | **20 M (central)** | 30 M (conservative) |
+| --- | --- | --- | --- |
+| device-msg/sec | ~100 | **~50** | ~33 |
+| per hour | ~360k | **~180k** | ~120k |
+| per day | ~8.6M | **~4.3M** | ~2.9M |
+
+> **≈ 50 device-msg/s ≈ 180k/hour ≈ 4.3M/day, across every dApp combined** — at a
+> deliberate 20 % execution share and ~20 M-instruction seal, both to confirm by measurement.
 
 - **Users aren't the limit** — a large base costs storage, not throughput.
 - **Simultaneous blasts are** — N origins serialise through one drain;
@@ -924,14 +945,14 @@ That slice is the ceiling:
   is the one move that lifts 3–4.
 
 Delivery time is linear in blast size and shared across dApps, crossing the one-hour
-budget at ~720k messages:
+budget at ~180k messages:
 
 ```mermaid
 xychart-beta
-    title "Minutes to drain a blast (shared ~200 msg/s)"
-    x-axis "Notifications in the hour" [10k, 100k, 500k, 720k, 1M]
-    y-axis "Minutes to deliver" 0 --> 90
-    bar [0.8, 8.3, 41.7, 60, 83.3]
+    title "Minutes to drain a blast (shared ~50 msg/s)"
+    x-axis "Notifications in the hour" [10k, 50k, 100k, 180k, 300k]
+    y-axis "Minutes to deliver" 0 --> 120
+    bar [3.3, 16.7, 33.3, 60, 100]
     line [60, 60, 60, 60, 60]
 ```
 
