@@ -824,27 +824,29 @@ fetch per notification. Murkier than A; the fallback for backend-trusted apps.
 
 ## Open items
 
-**Blockers** (before any real deployment):
+These are decided by the design above; a production build has to implement them (the
+PoC's job was to prove the shape, not to be complete).
 
-| Item | Why |
+**Security and correctness the design requires:**
+
+| Requirement | What and why |
 | --- | --- |
-| `.well-known/ii-push-senders` verification | self-serve registration — see [verification](#how-ii-verifies-the-sender-is-really-that-dapp) |
-| Endpoint host allowlist | endpoint is caller-supplied → SSRF/reflection. Allowlist known push hosts, re-validate at drain, **II validates not the gateway** |
-| Per-anchor caps | 20 subscriptions / 100 consents, anti-griefing not a storage bound. Evict dead rows first for subs; **refuse** (never silently evict) a consent |
-| Reserved outcall budget for auth | push must not spend login's slots — [detail](#push-must-never-degrade-authentication) |
-| Drain isolation & non-reentrancy | per-entry failure boundary, attempt counter, watchdog, claim-before-await, or one poison row wedges the feature |
-| `drain_epoch` ack signal | client durability doesn't work without it — [state model](#iis-state-model-stateless-for-campaigns) |
-| <a id="stale-subscription-cleanup"></a>Stale-subscription cleanup | `404`/`410` removal; possible on the gateway path only via the non-replicated handoff. Treat `410` as evidence, retire opportunistically |
-| Redirect-sign-in helper in `@icp-sdk/auth` | tap-through is the last place a dApp writes security-relevant code by hand — [shape](#landing-the-user-already-signed-in) |
-| `pushsubscriptionchange` | SW must re-subscribe + re-register or delivery erodes over weeks |
-| Sender deregistration & re-verification TTL | bound the window after a compromised sender / domain hand-off |
-| Origin canonicalization | punycode, lowercase, strip port, reject mixed-script, at registration and consent |
-| Input validation & caps | `title`≤64, `body`≤256, `topic`≤32, `url` bounded, `chunk_id` 16 B — validate, never trap; fixed error enum |
-| Cycle budget + freezing guard | per-origin/global daily burn cap + circuit breaker; disable push before spend nears the freezing threshold (past it, **logins fail while the frontend still loads**) |
-| Buffer sizing & drain fairness | round-robin across origins; urgency/age only within a slice |
-| Observability | buffer depth, drain lag, per-origin reject/410 counts, and **auth-path p99** (the signal push is stealing from login) |
+| Endpoint allowlist | Only real push-service endpoints (FCM, Apple, Mozilla) may be stored — no other host. The endpoint is where II POSTs each notification and the caller supplies it, so a fake one would aim II at any server the attacker likes. Re-check at send; II validates, not the gateway. |
+| Per-anchor caps | ~20 device subscriptions and ~100 app consents per identity, so one anchor can't mine II's storage. Reclaim dead subscriptions first; never silently drop a consent — refuse the next one instead. |
+| Reserved outcall budget | Push gets a fixed slice of the outcall budget and always yields to sign-in — [detail](#push-must-never-degrade-authentication). |
+| Robust drain loop | The timer emptying the buffer must survive one bad entry — otherwise a single malformed notification crashes the batch, rolls back, and retries forever, blocking everyone. Needs per-entry error handling with an attempt limit, a watchdog for a stuck buffer, and marking entries in-flight before the send so two ticks can't double-send. |
+| `drain_epoch` ack signal | A counter that changes when II is upgraded, so the client knows the buffer was wiped and re-sends — client durability doesn't work without it ([state model](#iis-state-model-stateless-for-campaigns)). |
+| <a id="stale-subscription-cleanup"></a>Stale-subscription cleanup | Remove a device row when its relay returns `404`/`410` (the endpoint is dead), or the table grows forever. Possible on the gateway path only because the handoff is non-replicated; treat a `410` as a hint, not proof. |
+| Redirect-sign-in helper | Ship the tap-through sign-in as a library, so each dApp doesn't hand-write security-sensitive redirect code ([shape](#landing-the-user-already-signed-in)). |
+| `pushsubscriptionchange` | Browsers rotate a device's endpoint periodically; the service worker must re-subscribe and tell II, or delivery quietly dies over weeks. |
+| Sender re-verification | Re-check the `.well-known` file on a schedule and drop a sender once it's gone, bounding the damage if a sender is compromised or a domain changes hands. |
+| Origin canonicalization | Normalise origins (lowercase, strip default port, punycode, reject look-alike scripts) at registration and consent, so `app.com` and `App.com` aren't two apps and a look-alike can't impersonate one. |
+| Input validation | Bound every field (`title` ≤64, `body` ≤256, `topic` ≤32, `url`, 16-byte `chunk_id`) and reject bad input with a fixed error rather than trapping. |
+| Cycle budget + freezing guard | On a paying deployment, cap daily spend per app and globally with a circuit breaker, and cut push off before spend nears the freezing threshold — past it, logins fail while the page still loads. |
+| Fair draining | Take turns between apps when draining, ordering by urgency and age only within one app's turn, so no single sender monopolises the queue. |
+| Observability | Track buffer depth, drain lag, per-app rejects/`410`s, and **sign-in p99 latency** — the last is the alarm that push is stealing from login. |
 
-**Decisions (design, not code):**
+**Still to decide (need a call or a measurement):**
 
 - **Apps without URL routing** (Caffeine) — confirm whether a builder-sandbox app can address a destination; if not, tap-through degrades to "open the app" — [detail](#apps-with-no-url-routing-eg-caffeine).
 - **iOS** — PWA install mandatory for Web Push, flakier and more throttled; a native app on APNs is the real fix, out of scope.
