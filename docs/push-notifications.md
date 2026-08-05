@@ -307,32 +307,47 @@ come from a measured per-seal cost, not an estimate.
 
 </details>
 
-`PushDelivery` shapes the buffer: **topic** replaces an un-drained same-key entry
-(collapses rapid updates); **ttl** skips the outcall once expired; **urgency** is
-one drain-order input, never the sole key — it's sender-supplied and everyone sets
-`High`, so origin fairness (round-robin) outranks it, with age/TTL preventing
-starvation.
+The three delivery fields a sender sets also shape how the buffer behaves:
 
-**Durability needs `drain_epoch`.** The buffer is heap, lost on upgrade; the client
-re-sends unacknowledged chunks — but `admitted` means "buffered", returned before
-an upgrade that would drop it, so today a client can't tell. A `drain_epoch`
-counter (bumped in `post_upgrade`) + `push_chunk_status(chunk_id)` closes it,
-making delivery explicitly **at-least-once** (hence `msg_id` ships with it). The
-only new **stable** regions are the user-scoped, volume-independent sender/subscription/consent
-maps; `chunk_id` dedup is a bounded heap set.
+- **`topic`** collapses rapid updates. If a newer notification with the same topic
+  arrives before the previous one has been sent, it replaces it in the buffer — so a
+  value that changes several times a second doesn't pile up into several notifications.
+- **`ttl`** lets a notification expire. If it has waited longer than its time-to-live
+  when II reaches it, II drops it rather than sending — the relay would drop it anyway.
+- **`urgency`** influences send order but never decides it alone. Senders set it
+  themselves, and in practice everyone marks everything `High`, so if urgency ruled the
+  queue one sender could jump ahead of everyone else forever. Instead II takes turns
+  between apps, weighing urgency and age only within a single app's turn.
+
+**What happens if II is upgraded mid-send.** The buffer lives in working memory, which
+an upgrade wipes, so anything still in it is lost. The intent is that the sender's
+library re-sends whatever wasn't confirmed — but II replies `admitted` the moment a
+chunk enters the buffer, which is *before* an upgrade could drop it, so a sender that
+got `admitted` has no way to know its messages vanished and never re-sends. The fix is
+a counter (`drain_epoch`) that changes whenever II restarts: the library watches it and
+re-sends anything from before the change. That makes delivery **at-least-once** — it
+may arrive twice, but never zero times — which is exactly why `msg_id`
+duplicate-suppression is part of v1. The only permanent storage this adds is the
+per-user maps (who's subscribed, who consented, which senders are registered), and none
+of it grows with how many notifications are sent.
 
 ### Buffer size, and how many origins it serves at once
+
+First, the unit. A **device-message** is one sealed notification sent to one device.
+A user with two devices counts as two, because that's two actual sends — so a 1,000-
+recipient send is roughly 2,000 device-messages, and it's the device-message count,
+not the recipient count, that the pipeline is really moving.
 
 An entry is **per recipient** (~200 B + text; ~1 KB personalized vs one shared copy
 for a broadcast — a reason to keep `default_alert` the common path). **Memory isn't
 the constraint** (4 GiB heap; 100k recipients in flight ≈ 20–100 MB). **Drain rate
-is**, and it's a *shared pie* — ~200 device-msg/s total across all origins:
+is**, and it's shared across every app — about **200 device-messages a second, total**:
 
-| Work | Device-msgs | Drain time |
+| Send | Device-messages | Time to deliver all of them |
 | --- | --- | --- |
-| 1k-recipient chunk | ~2k | ~10 s |
-| 10k blast | ~20k | ~100 s |
-| 10 origins × 10k | ~200k | ~17 min |
+| One 1,000-recipient chunk | ~2,000 | ~10 s |
+| One 10k-user blast | ~20,000 | ~100 s |
+| 10 apps each blasting 10k at once | ~200,000 | ~17 min |
 
 So the buffer depth should be **drain rate × acceptable latency** (60 s → ~6 MB),
 not what the heap allows — a memory-sized buffer accepts hours of backlog and
