@@ -425,8 +425,7 @@ The gateway can **drop, delay, replay**, and **forge sends** (the VAPID token, c
 won't decrypt, triggering the browser's "site updated" notice attributed to `id.ai`
 and burning the [shared permission](#shared-fate-one-permission-for-every-dapp).
 Mitigate: per-batch credentials, minutes-long JWT cache. The token is also
-node-operator-extractable from canister state. **Gateway = single point of failure**
-([Operating it](#operating-it-controls-alerts-and-rollout)).
+node-operator-extractable from canister state. **Gateway = single point of failure.**
 
 </details>
 
@@ -693,8 +692,7 @@ II-side:
   volume, with automatic suspension of an origin that exceeds it.
 - **Attributable throttling** — surface "app X was rate-limited" in Settings so
   blame lands on the sender rather than on II.
-- An **operator kill switch** per origin (see
-  [Operating it](#operating-it-controls-alerts-and-rollout)).
+- An **operator kill switch** per origin, to silence an abusive sender.
 
 ### Which origin is authoritative
 
@@ -877,22 +875,6 @@ every user, and push competes with that for three shared resources — outcall s
 (small drain slices), and cycles (never spend toward the freezing threshold). Enforce a
 hard push quota that always yields to login, and auto-throttle push if sign-in latency
 climbs.
-
-## Operating it: controls, alerts and rollout
-
-Missing today:
-
-- **Per-origin kill switch** — `push_deregister_sender` is dApp-authenticated, so
-  there's no operator way to silence an abusive sender. Need operator-gated
-  `push_set_origin_enabled` + a global feature flag to disable push without an upgrade.
-- **Alerts + ownership** on buffer depth, drain lag, per-origin reject rate, auth p99.
-- **Gateway ops** — who runs it, ≥2 independent instances, health/switchover.
-  **Gateway down = push down** (direct is a degraded fallback) — state it explicitly.
-- **Rollback discards the buffer** — silently drops in-flight campaigns unless
-  `drain_epoch` lands first.
-- **A load test** — every throughput/cost number here is derived. Run a 10k campaign
-  against a local replica measuring auth latency, and measure one seal's real cost
-  with `performance_counter`.
 
 ## dApp developer integration
 
