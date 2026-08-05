@@ -153,32 +153,39 @@ would be the real fix — out of scope here.
 
 ### Sending to thousands: chunked send + two-layer flow control
 
-A campaign is delivered as **bounded chunks** (≤~1000 targets, under the message
-size ceiling) — II must never hold a whole campaign, that's the storage that scales
-with volume. Two control layers, not to be confused:
+A campaign is delivered as a stream of bounded chunks (up to ~1000 targets each,
+within the message-size limit). II never holds the whole campaign, because that is
+exactly the storage that would scale with volume. Two control layers keep this safe,
+and it's important not to confuse them:
 
-- **Layer 1 — II admission (mandatory, adversarial).** Hard `recipients.len()`
-  ceiling + per-origin token bucket + global buffer cap. Over capacity, `push_send`
-  rejects (`ready=false`, `retry_after_ms`). **II never holds more than its bounded
-  buffer, whatever the client does** — this is the anti-spam property.
-- **Layer 2 — client pacing (cooperative, efficiency only).** The library reads the
-  same signal and paces; skipping it just delivers slower. Never an anti-spam layer.
+- **Layer 1 is II's own admission control** — mandatory, and it assumes a hostile
+  client. It enforces a hard recipient ceiling, a per-origin token bucket, and a
+  global cap on its buffer; over capacity, `push_send` simply rejects the chunk
+  (`ready = false`, plus a `retry_after_ms` hint). The guarantee is that II never
+  holds more than its bounded buffer no matter what the client does. This is the
+  anti-spam property, and it lives entirely on II.
+- **Layer 2 is the client library pacing itself** — cooperative, and only about
+  efficiency. It reads the same `ready` signal and avoids wasting calls that would
+  be rejected. A client that skips it just delivers more slowly; nothing breaks for
+  II.
 
-The rule: **II protects itself; the client optimizes itself.**
+The short version: II protects itself, the client optimises itself — never rely on
+client pacing to prevent spam.
+
+A single `push_send` covers both broadcast and personalised sends: it takes a shared
+`default_alert` plus a list of recipients, each of which may override it. A broadcast
+sets the default and leaves the overrides empty; a personalised send gives each
+recipient its own alert, templated on the client side so II never holds a template.
 
 <details><summary>Two caveats on Layer 1</summary>
 
-- The reject is O(1) but happens *after* the 2 MB chunk is decoded — cap accepted
-  size well below 2 MB so the pre-decision cost is bounded.
-- `inspect_message` **can't** help — it isn't invoked for inter-canister calls, and
-  `push_send` is called by canisters. The ≤1000 bound is enforced server-side
-  (2 MB of recipients ≈ 65k, whose per-recipient lookups would trap).
+The reject is O(1), but it happens *after* the 2 MB chunk has been decoded, so cap
+the accepted size well below 2 MB to bound even the cost of refusing a flood. And
+`inspect_message` can't help here — it isn't invoked for inter-canister calls, and
+`push_send` is called by canisters. The ~1000 ceiling is enforced server-side, since
+2 MB of recipients is roughly 65,000, whose per-recipient lookups would trap.
 
 </details>
-
-Broadcast and personalized share one `push_send`: a `default_alert` plus recipients
-that may override it. Broadcast = default + empty overrides; personalized = per-
-recipient alert (templated client-side, II holds no template).
 
 ### The Candid interface
 
@@ -251,13 +258,13 @@ directly.
 
 ### What this costs, and who pays
 
-**Always scarce** (every deployment): outcall slots (3000 subnet-wide, shared with
-login — why the gateway exists), storage (kept O(users × origins), never O(volume)),
-instructions (bounded-slice drain).
+Three things are scarce on every deployment: outcall slots (3000 subnet-wide, shared
+with login — the reason the gateway exists), storage (kept O(users × origins), never
+O(volume)), and instructions (which force the bounded-slice drain).
 
-**Cycles** are waived on canonical II, charged elsewhere. The per-byte fee carries
-the `·n` replication factor, so non-replicated is where the money is — a 10k-user
-blast on a paying subnet:
+Cycles are the fourth cost, but only where they're charged — waived on canonical II,
+real everywhere else. The per-byte fee carries the `·n` replication factor, so
+non-replicated delivery is where the money is. For a 10k-user blast on a paying subnet:
 
 | Path | Outcalls | Cycles | ≈ USD |
 | --- | --- | --- | --- |
@@ -644,19 +651,21 @@ forcing sender-origin attribution at send time.
 | **`/notify` icon** | curated registry only + globe fallback — never fetch arbitrary/remote icons into II's chrome |
 | **vetKD derive drain** | the SW triggers a derive over ingress (no cycles attached), so the bill lands on II — an uncached derive is a user-triggerable cycle drain. Derive once per `(user, origin)`, cache in the SW, rate-limit per anchor |
 
-**The VAPID-key risk is larger than "spam".** The same stable memory holds the
-VAPID key *and* every device's `p256dh`/`auth`, so an attacker reading it can forge
-**fully-readable notifications to any device, attributed to any consented origin** —
-whose tap-through then passes `/notify` and deep-links into the real dApp. That's
-phishing capability, not spam, and there's currently **no detection or rotation
-story**. Mitigate: per-device transport secrets (extracting one ≠ the other), a
-signed per-endpoint counter so a SW can flag pushes II didn't send. Real fix:
-[P-256 threshold ECDSA](#ic-capabilities-to-re-evaluate) removes the stored key
+**The VAPID-key risk is larger than "spam".** The same stable memory holds the VAPID
+key and every device's `p256dh`/`auth` secrets, so an attacker who reads it can forge
+fully-readable notifications to any device, attributed to any origin the user actually
+consented to. The tap-through then passes `/notify` and deep-links into the real dApp,
+which makes this a phishing capability rather than spam — and there is no detection or
+rotation story today. The mitigations worth doing regardless of custody are per-device
+transport secrets, so that extracting one doesn't yield the other, and a signed
+per-endpoint counter so a service worker can flag pushes II never sent. The real fix is
+[P-256 threshold ECDSA](#ic-capabilities-to-re-evaluate), which removes the stored key
 entirely.
 
-**Key init must not race** — a lazy `await raw_rand` between check and write lets
-two callers generate; the loser's subscribers become silently undeliverable.
-Initialize eagerly behind a guard.
+One subtle bug to avoid: if the key is generated lazily, the `await raw_rand` between
+checking "is it set?" and writing it lets two concurrent first-callers both generate,
+and whichever loses leaves its subscribers silently undeliverable. Generate it eagerly,
+behind a guard.
 
 ### Shared fate: one permission for every dApp
 
