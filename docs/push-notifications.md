@@ -69,7 +69,7 @@ sequenceDiagram
     SW->>Lib: tap → deep link (signs in if session lapsed)
 ```
 
-Three limits bind on every deployment:
+Three limits shape the design, and they bind on every deployment:
 
 | Limit | Consequence in this design |
 | --- | --- |
@@ -242,9 +242,9 @@ client library paces itself in response.
 
 ### What this costs, and who pays
 
-Three things are scarce on every deployment: outcall slots (3000 subnet-wide, shared
-with login — the reason the gateway exists), storage (kept O(users × origins), never
-O(volume)), and instructions (which force the bounded-slice drain).
+We care about three costs on every deployment: outcall slots (3000 subnet-wide,
+shared with login — the reason the gateway exists), storage (kept O(users × origins),
+never O(volume)), and instructions (which force the bounded-slice drain).
 
 Cycles are the fourth cost, but only where they're charged — waived on canonical II,
 real everywhere else. The per-byte fee carries the `·n` replication factor, so
