@@ -1,13 +1,7 @@
 # Push notifications — design
 
-Start with [How it works, in plain terms](#how-it-works-in-plain-terms). Then:
-**reviewing** → [Goals](#goals-and-non-goals) · [Architecture](#architecture) ·
-[Alternatives](#alternatives-considered) · [Security](#security-model) ·
-[Open items](#open-items); **implementing** → [dApp → II](#dapp--ii) ·
-[state model](#iis-state-model-stateless-for-campaigns) ·
-[delivery](#delivering-to-devices) ·
-[Scaling](#scaling); **integrating** → [push-api.md](push-api.md),
-[push-client-library.md](push-client-library.md); **today** → [Status](#status).
+Start with [How it works, in plain terms](#how-it-works-in-plain-terms). **Reviewing:**
+[Goals](#goals-and-non-goals) · [Architecture](#architecture) · [Alternatives](#alternatives-considered) · [Security](#security-model) · [Open items](#open-items). **Implementing:** [dApp → II](#dapp--ii) · [state model](#iis-state-model-stateless-for-campaigns) · [delivery](#delivering-to-devices) · [Scaling](#scaling). **Integrating:** [push-api.md](push-api.md) · [push-client-library.md](push-client-library.md).
 
 ## Context and scope
 
@@ -123,31 +117,20 @@ would be the real fix — out of scope here.
 8. The notification arrives on every device the user enabled — **even with the
    tab closed / browser not running** (on Android). It shows the dApp's origin
    as the source and the dApp's title/body as the text.
-9. The user **taps** it. When the dApp supplied a deep link — the normal case —
-   the service worker opens that URL directly and II is not visited at all. The
-   dApp lands the user on the page the notification was about, signing them in
-   on the way with the ICRC-167 top-level redirect if the session has lapsed,
-   which is the usual state when a notification is what brought them back.
-   Only a notification with no deep link falls back to II's `/notify` screen
-   ("Opening `<dApp>`" with the app's logo), which resolves the sender's origin
-   behind a consent gate and forwards to the dApp's home.
+9. The user **taps** it. With a deep link (the normal case) the service worker opens
+   that URL directly — II isn't visited — landing them on the page it was about and
+   signing them in via the ICRC-167 redirect if their session lapsed. A link-less
+   notification instead detours through II's `/notify` screen, which resolves the
+   sender behind a consent gate and forwards to the dApp's home.
 
 ### Managing them, and turning them off
 
-10. Either from the browser or from II.
-
-    In **II → Settings**, the user sees **Notifications on this device**
-    (a toggle to turn the whole device on/off) and **Allowed apps** — every
-    dApp that can notify them, each with a remove button. Revoking an app
-    stops its notifications immediately.
-
-    The **browser's own site settings** can also block notifications for
-    `id.ai`, which silences every dApp at once and cannot be overridden from
-    inside II — the permission belongs to the browser, not to us. II can only
-    observe the result: a blocked permission makes the opt-in screen
-    unofferable, so it is skipped rather than shown as a button that cannot
-    work. Re-enabling has to happen in the browser too; that is the one path
-    II cannot offer a control for.
+10. From either the browser or II. In **II → Settings**, a device toggle plus an
+    **Allowed apps** list, each with a remove button that stops that app immediately.
+    The **browser's own site settings** can also block `id.ai` — which silences every
+    dApp at once and can't be overridden from inside II, since the permission belongs
+    to the browser. II only observes the result: a blocked permission makes the opt-in
+    unofferable, so it's skipped rather than shown as a dead button.
 
 ## dApp → II
 
@@ -934,8 +917,8 @@ global ceiling:**
   the shared rate. The [separate-canister split](#the-way-to-lift-that-ceiling-is-a-separate-canister)
   is the one move that lifts 3–4.
 
-Delivery time is linear in blast size and shared across dApps — it crosses the
-one-hour budget at ~720k messages, beyond which some notifications outlive their TTL:
+Delivery time is linear in blast size and shared across dApps, crossing the one-hour
+budget at ~720k messages:
 
 ```mermaid
 xychart-beta
