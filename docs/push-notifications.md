@@ -342,20 +342,20 @@ not the recipient count, that the pipeline is really moving.
 An entry is **per recipient** (~200 B + text; ~1 KB personalized vs one shared copy
 for a broadcast — a reason to keep `default_alert` the common path). **Memory isn't
 the constraint** (4 GiB heap; 100k recipients in flight ≈ 20–100 MB). **Drain rate
-is**, and it's shared across every app — about **50 device-messages a second, total**
-(the central estimate derived below):
+is**, and it's shared across every app — about **29 device-messages a second, total**
+(the central figure derived below):
 
 | Send | Device-messages | Time to deliver all of them |
 | --- | --- | --- |
-| One 1,000-recipient chunk | ~2,000 | ~40 s |
-| One 10k-user blast | ~20,000 | ~6.5 min |
-| 10 apps each blasting 10k at once | ~200,000 | ~67 min |
+| One 1,000-recipient chunk | ~2,000 | ~70 s |
+| One 10k-user blast | ~20,000 | ~11.5 min |
+| 10 apps each blasting 10k at once | ~200,000 | ~1.9 h |
 
-So the buffer depth should be **drain rate × acceptable latency** (60 s → ~2 MB),
+So the buffer depth should be **drain rate × acceptable latency** (60 s → ~1 MB),
 not what the heap allows — a memory-sized buffer accepts hours of backlog and
 returns `admitted` for messages whose TTL expires first (a lying success). Express
 admission in *seconds of backlog*, fair-shared `total_rate / active_origins`. All of
-this scales off the ~50/s estimate — measure the per-seal cost first.
+this follows from the measured ~34.6 M-instruction seal (~29/s).
 
 ### The way to lift that ceiling is a separate canister
 
@@ -912,24 +912,29 @@ slice.** That slice is the ceiling, and it comes down to two numbers: the cost o
 seal, and the share of the canister we let push take —
 `device-msg/sec = (instructions/sec allotted to push) ÷ (instructions per seal)`:
 
-- **Cost of a seal** — one RFC 8291 message is dominated by a single P-256 variable-base
-  scalar multiplication (the ECDH against the device's key); HKDF and AES-GCM are noise
-  beside it. In Wasm that is an estimated **~20 M instructions**, range ~10–30 M. This is
-  the one number to measure first — every figure below scales off it.
+- **Cost of a seal** — **measured at ~34.6 M instructions** (canbench, against the exact
+  production `encrypt` and its pinned crate versions, built at the canister's release
+  profile). Two P-256 scalar multiplications dominate — the ephemeral keygen and the
+  ECDH against the device's key — with HKDF and AES-GCM negligible beside them. Every
+  figure below scales off this.
 - **Share of execution** — the drain is held to **~20 % of the canister**, a deliberate
   cap so sign-in keeps ~80 % of every round even mid-blast. On a canister sustaining a
   few billion instructions/sec that hands push **~1 B instructions/sec**.
 
-Plugging those in (M = million instructions; the central column is the planning number):
+With the seal cost pinned by measurement, the remaining lever is push's execution
+share, and throughput scales linearly with it — raising the share buys a proportional
+lift, straight into sign-in's headroom:
 
-| Seal cost | 10 M (optimistic) | **20 M (central)** | 30 M (conservative) |
-| --- | --- | --- | --- |
-| device-msg/sec | ~100 | **~50** | ~33 |
-| per hour | ~360k | **~180k** | ~120k |
-| per day | ~8.6M msg | **~4.3M msg** | ~2.9M msg |
+```mermaid
+xychart-beta
+    title "Hourly throughput vs push's execution share (seal = 34.6M ins)"
+    x-axis "Execution share of the canister" ["10%", "20%", "30%", "40%"]
+    y-axis "Device-messages / hour (thousands)" 0 --> 220
+    bar [52, 104, 156, 208]
+```
 
-> **≈ 50 device-msg/s ≈ 180k/hour ≈ 4.3M/day, across every dApp combined** — at a
-> deliberate 20 % execution share and ~20 M-instruction seal, both to confirm by measurement.
+> **≈ 29 device-msg/s ≈ 104k/hour ≈ 2.5M/day, across every dApp combined** — at a
+> deliberate 20 % execution share and the measured ~34.6 M-instruction seal.
 
 - **Users aren't the limit** — a large base costs storage, not throughput.
 - **Simultaneous blasts are** — N origins serialise through one drain;
@@ -938,15 +943,15 @@ Plugging those in (M = million instructions; the central column is the planning 
   is the one move that lifts 3–4.
 
 Delivery time is linear in blast size and shared across dApps, crossing the one-hour
-budget at ~180k messages:
+budget at ~105k messages:
 
 ```mermaid
 xychart-beta
-    title "Minutes to drain a blast (shared ~50 msg/s)"
-    x-axis "Notifications in the hour" [10k, 50k, 100k, 180k, 300k]
-    y-axis "Minutes to deliver" 0 --> 120
-    bar [3.3, 16.7, 33.3, 60, 100]
-    line [60, 60, 60, 60, 60]
+    title "Minutes to drain a blast (shared ~29 msg/s)"
+    x-axis "Notifications in the hour" [10k, 50k, 105k, 200k]
+    y-axis "Minutes to deliver" 0 --> 130
+    bar [5.7, 28.7, 60, 114.9]
+    line [60, 60, 60, 60]
 ```
 
 ### Storage: can II store the data
