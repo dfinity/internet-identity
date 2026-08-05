@@ -1960,8 +1960,12 @@ flowchart LR
 | 6. Storage | 537 GB/canister | O(users × origins) | [see below](#storage-can-ii-store-the-data) |
 
 **The binding constraint is stages 3–4 — II's own execution round, shared with
-every sign-in on the network.** That caps sustained throughput at *low hundreds of
-device-messages/second across all dApps combined* (≈ tens of millions/day). So:
+every sign-in on the network.** It sets a single global ceiling:
+
+> **≈ 200 device-messages/second — ≈ 720k/hour — ≈ 17M/day — across every dApp
+> combined.** (Estimated; see the caveat below.)
+
+So:
 
 - **Total users isn't the limit** — a large consented base costs storage, not throughput.
 - **Simultaneous blasts are** — N origins each blasting 10k serialise through one
