@@ -1970,9 +1970,26 @@ device-messages/second across all dApps combined* (≈ tens of millions/day). So
 - The [separate-canister split](#the-way-to-lift-that-ceiling-is-a-separate-canister)
   is the one move that lifts stages 3–4, by not sharing the round with login.
 
-> The stage-3 number is this design's **estimate**, not a measurement. One RFC 8291
-> seal is dominated by a P-256 ECDH; measure it before trusting any throughput
-> figure — every number above scales off it.
+At the estimated ~200 device-msg/s shared drain, delivery time is linear in blast
+size — and because the rate is shared, the line is the **total across all dApps**.
+It crosses the one-hour budget at ~720k messages: beyond that, some notifications
+outlive their TTL before they are sent.
+
+```mermaid
+xychart-beta
+    title "Minutes to drain a blast (shared ~200 msg/s)"
+    x-axis "Notifications in the hour" [10k, 100k, 500k, 720k, 1M]
+    y-axis "Minutes to deliver" 0 --> 90
+    bar [0.8, 8.3, 41.7, 60, 83.3]
+    line [60, 60, 60, 60, 60]
+```
+
+The flat line is the 60-minute budget; where the bars cross it is the ceiling. Two
+origins blasting at once share the same bars — the ceiling is not per-dApp.
+
+> The ~200 msg/s is this design's **estimate**, not a measurement. One RFC 8291
+> seal is dominated by a P-256 ECDH; measure it before trusting any figure — every
+> number here scales off it.
 
 Gateway vs direct, per 10k-user blast:
 
