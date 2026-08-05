@@ -918,17 +918,18 @@ flowchart LR
     classDef bn fill:#c0392b,color:#fff
 ```
 
-| Stage | Hard limit | Elastic? | Push it → |
-| --- | --- | --- | --- |
-| 1. Admit | Layer-1 bucket | client-paced | bigger bucket = weaker flood protection |
-| 2. Heap buffer | 4 GiB | not the limit | oversizing accepts backlog whose TTL expires |
-| **3. Seal** | instructions/round, **shared with login** | **no** | bigger slice → login latency |
-| **4. Outcall** | 3000 in-flight, 500-deep queue | **no** | more in flight → starves auth outcalls |
-| 5. → relays | web2 | yes | relay per-app rate limits |
-| 6. Storage | 537 GB | O(users×origins) | [below](#storage-can-ii-store-the-data) |
+| Stage | What happens | Can it scale? |
+| --- | --- | --- |
+| 1. Admit the send | II accepts the chunk into its buffer | Yes — the client just paces; raising the limit only weakens flood protection |
+| 2. Hold in buffer | the chunk waits in memory to be sent | Yes — 4 GiB is far more than needed; memory is never the limit |
+| **3. Encrypt** | II encrypts each message for its device (elliptic-curve crypto, one per device) | **No — the bottleneck.** This is CPU-heavy, and II may only spend a slice of each execution round on it before sign-in slows |
+| **4. Send to the gateway** | II makes the outbound HTTPS calls | **No — the bottleneck.** Only ~3,000 calls can be in flight across the whole subnet, and II's own login calls draw from the same pool |
+| 5. Gateway → relays | the gateway fans out to FCM/Apple/Mozilla | Yes — ordinary web2, limited only by each relay's per-app rate |
+| 6. Store per-user rows | subscriptions and consent persist | Grows with users × apps, not with volume — [Storage below](#storage-can-ii-store-the-data) |
 
-**Stages 3–4 bind — II's execution round, shared with every login. The single
-global ceiling:**
+**Both bottlenecks are the same root cause: II shares its execution round and its
+outcall budget with every sign-in on the network, so push only ever gets a slice.**
+That slice is the ceiling:
 
 > **≈ 200 device-msg/s ≈ 720k/hour ≈ 17M/day, across every dApp combined.**
 > (Estimate — one RFC 8291 seal is dominated by a P-256 ECDH; measure it, every
