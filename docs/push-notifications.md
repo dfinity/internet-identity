@@ -1,92 +1,42 @@
 # Push notifications — design
 
-**How to read this.** It is long because it covers two independent scaling paths
-and a security model. If you only read one section, read
-[How it works, in plain terms](#how-it-works-in-plain-terms). Then:
-
-- **Reviewing the design?** [Goals and non-goals](#goals-and-non-goals) →
-  [Architecture](#architecture) →
-  [Alternatives considered](#alternatives-considered) →
-  [Security model](#security-model) → [Open items](#open-items).
-- **Implementing it on II?** [dApp → II](#dapp--ii) →
-  [II's state model](#iis-state-model-stateless-for-campaigns) →
-  [Delivering to devices](#delivering-to-devices) →
-  [Push must never degrade authentication](#push-must-never-degrade-authentication).
-- **Integrating a dApp?** Reference material lives in separate files:
-  [push-api.md](push-api.md) (Candid + integration steps) and
-  [push-client-library.md](push-client-library.md) (the client library).
-- **Wondering what exists today?** [Status](#status), at the end.
+Start with [How it works, in plain terms](#how-it-works-in-plain-terms). Then:
+**reviewing** → [Goals](#goals-and-non-goals) · [Architecture](#architecture) ·
+[Alternatives](#alternatives-considered) · [Security](#security-model) ·
+[Open items](#open-items); **implementing** → [dApp → II](#dapp--ii) ·
+[state model](#iis-state-model-stateless-for-campaigns) ·
+[delivery](#delivering-to-devices) ·
+[Scaling](#scaling); **integrating** → [push-api.md](push-api.md),
+[push-client-library.md](push-client-library.md); **today** → [Status](#status).
 
 ## Context and scope
 
-A dApp on the IC that wants to reach a user who is not currently looking at it
-has no good option. Web Push is the browser-native answer, but doing it yourself
-means prompting for your own notification permission, running your own service
-worker, holding your own VAPID keypair, and storing your own subscription
-endpoints — per dApp. Browsers increasingly bury that permission prompt, users
-decline it more often the more times they see it, and on iOS Safari it requires
-the site to be installed as a PWA at all. The result is that almost no dApp does
-it, and users get nothing.
+A dApp that wants to reach a user who isn't looking at it has no good option: doing
+Web Push yourself means your own permission prompt, service worker, VAPID keypair and
+subscription storage — **per dApp**. Browsers bury repeat prompts, users decline them,
+and iOS needs a PWA install. So almost no dApp does it.
 
-Internet Identity is already the one origin every user of these apps has a
-relationship with, and already holds per-user state they have consented to. That
-makes it the one place where the permission can be asked **once** and reused.
+II is already the one origin every user of these apps has a relationship with. So it
+hosts a single Web Push pipeline: grant permission to `id.ai` **once**, subscribe per
+device, consent per dApp. PWA install stays optional except on iOS Safari.
 
-So: II hosts a single Web Push pipeline that any dApp can send through. The user
-grants notification permission to `id.ai` once, subscribes per device, and
-consents per dApp; a consented dApp then delivers through II rather than running
-a push stack of its own. Installing II as a PWA stays **optional** on Android and
-desktop, and is **required only on iOS Safari** — where "install one app, get
-every dApp's notifications" is a better trade than installing each dApp.
-
-This document covers the design of the two paths that decide whether it scales —
-**dApp → II** and **II → device** — the security and privacy model, and the open
-items. It is a design document, not an integration guide: the Candid interface
-and the client-library internals are here to show the design is buildable, not to
-serve as reference material.
+This doc covers the two scaling paths (**dApp → II**, **II → device**), the
+security/privacy model, and open items. Design doc, not an integration guide — the Candid surface and library internals live in [separate files](push-api.md).
 
 ## Goals and non-goals
 
-### Goals
+**Goals:** one permission across all consented dApps; a dApp needs **no push
+infrastructure**; consent per dApp + per device, revocable; a 10k-user broadcast is
+normal (and must never degrade auth); II's durable storage doesn't grow with volume;
+a tap lands where the notification was about, signed in; **E2E possible** for apps
+that can't let II read content ([E2E](#end-to-end-encrypted-apps)).
 
-- **One permission, many apps.** A user allows notifications once, for their
-  identity provider, and every consented dApp reaches them through it.
-- **A dApp needs no push infrastructure.** No service worker, no VAPID keypair,
-  no subscription storage, no relay accounts.
-- **Consent is per dApp and per device, and revocable.** Revoking one dApp stops
-  its notifications immediately and affects no other.
-- **A 10k-user broadcast is a normal operation**, not an incident — with the
-  explicit constraint that it must never degrade authentication, which is what
-  this canister actually exists to do.
-- **II's durable storage does not grow with volume.** Storage is user-scoped;
-  sending more notifications must not make it larger.
-- **A tap lands the user where the notification was about**, in the sending app,
-  signed in.
-- **End-to-end encryption is possible** for apps that can't let II see message
-  text — a messenger shouldn't hand its message bodies to its identity provider.
-  See [End-to-end-encrypted apps](#end-to-end-encrypted-apps).
-
-### Non-goals
-
-- **Not a messaging product.** No inbox, no history, no unread state, no
-  read receipts. II forgets a notification once it is handed off.
-- **Not exactly-once delivery.** Delivery is explicitly at-least-once, which is
-  why device-side deduplication ships with it rather than after it.
-- **Not guaranteed delivery.** The relays are best-effort and a device that never
-  comes online never receives; no part of this promises otherwise.
-- **Not per-notification billing, in v1.** Charging senders cycles is parked, not
-  designed — which has consequences for abuse limits, covered below.
-- **Not a way to reach "all II users".** There is no audience except users who
-  consented to a specific dApp; a sender cannot discover or address anyone else.
-- **Not universal browser support.** Web Push is browser-scoped. Browsers without
-  it (some vendor forks ship none) are out of reach, and that is not something
-  this design can fix.
-- **Not a replacement for in-app notification UI.** This reaches users who are
-  away; what an app shows a user who is present is the app's business.
+**Non-goals:** not a messaging product (no inbox/history/receipts); not exactly-once
+(at-least-once + device dedup); not guaranteed delivery (relays are best-effort); no
+per-notification billing in v1; no "reach all II users" (only consenters); not
+universal (Web Push is browser-scoped); not a replacement for in-app UI.
 
 ## How it works, in plain terms
-
-The whole design in six points; everything after adds detail.
 
 1. **A dApp never talks to phones.** It tells II "notify these users" (by opaque
    per-app id — it can't reach anyone it wasn't given); II delivers.
@@ -125,7 +75,7 @@ sequenceDiagram
     SW->>Lib: tap → deep link (signs in if session lapsed)
 ```
 
-Three limits shape everything and bind on every deployment:
+Three limits bind on every deployment:
 
 | Limit | Consequence in this design |
 | --- | --- |
@@ -402,74 +352,43 @@ this scales off the unmeasured ~200/s — measure the per-seal cost first.
 
 ### The way to lift that ceiling is a separate canister
 
-Note what the 200/s is actually a limit on. It is not the crypto and it is not the
-platform — it is **co-tenancy with authentication**. The slice is small because
-this canister serves every login on the network, so the only reason push cannot
-spend its whole execution round sealing is that logins are sharing that round.
+The 200/s limit is **co-tenancy with authentication** — the slice is small only
+because this canister serves every login. So run push in its **own canister**: it
+could spend a full round sealing (the ~10–20× headroom), keeping the trust boundary
+(same controllers, no plaintext off-platform) and turning "must not degrade login"
+into a property that holds by construction.
 
-Which suggests the structural fix: run push in its **own canister**. It could then
-spend a full round on sealing — plausibly the same order as the 10–20× headroom
-between the self-imposed budget and the instruction limit — while keeping the
-trust boundary exactly where it is today. Still an IC canister under the same
-controllers, still no plaintext leaving the platform, so this buys throughput
-without the concession that moving sealing to the gateway would demand. It also
-turns [Push must never degrade authentication](#push-must-never-degrade-authentication)
-from a discipline that has to be maintained into a property that holds by
-construction.
-
-The real cost is state ownership. Subscriptions and consent are anchor-scoped, so
-a push canister has to **own** those maps rather than calling II per send —
-otherwise the load just moved back, with inter-canister latency added. Then
-`/authorize`'s opt-in becomes one inter-canister write at consent time, which is
-rare and cheap, and the service worker still lives on II's origin because that is
-where the notification permission is granted. What is genuinely new is
-two-canister upgrade coordination, and deciding where the VAPID key lives.
-
-Not proposed as the shipping path here, because it changes which canister holds
-user-scoped state and that deserves its own review. But it is the honest answer to
-"the throughput number looks low", and it is a better answer than moving crypto
-off-platform.
+Cost: state ownership. The push canister must **own** the subscription/consent maps
+(else the load just moves back with added latency), making `/authorize` opt-in one
+inter-canister write. New: two-canister upgrade coordination, and where the VAPID
+key lives. Not the shipping path — it deserves its own review — but the honest
+answer to "the throughput looks low", better than moving crypto off-platform.
 
 ## Delivering to devices
 
-The relay API is one POST per subscription endpoint (RFC 8030) — there is no
-multi-recipient send, so reaching N devices is fundamentally N sends. The
-design routes those sends through a **trusted web2 gateway**. Doing them as
-per-device outcalls straight from the canister ("direct") is the documented
-**alternative** — kept for context and as a possible low-volume or
-fully-on-chain fallback, but not the shipping path.
+The relay API is one POST per endpoint (RFC 8030) — reaching N devices is N sends.
+The design routes them through a **trusted gateway**; per-device outcalls straight
+from the canister ("direct") are the documented low-volume/on-chain **alternative**.
 
 ### The outcall to the gateway is non-replicated
 
-**Decision:** II's batch handoff uses `is_replicated = false` (mainnet since
-2025-08-04). One node makes the call — no 34× fan-out, no response consensus,
-~2 orders of magnitude cheaper — which is why the gateway can stay stateless,
-return real per-device status, and enable `410` cleanup.
-
-Two caveats: the flag is **experimental**, so isolate it behind one call site that
-can revert to replicated + transform; and a single node's reply isn't
-consensus-verified, so returned status is evidence, not proof (no new concession —
-a trusted gateway could always lie).
+**Decision:** the batch handoff uses `is_replicated = false` (mainnet since
+2025-08-04). One node calls — no 34× fan-out, no response consensus, ~2 orders
+cheaper — which is what lets the gateway stay stateless, return per-device status,
+and enable `410` cleanup. Caveats: **experimental** (isolate behind one revertible
+call site), and a single node's reply isn't consensus-verified (status is evidence,
+not proof — no new concession).
 
 <details><summary>Why replicated outcalls don't work here</summary>
 
-A replicated outcall runs on every node (34 on II's subnet), so the target sees 34
-identical POSTs and responses must be byte-identical or consensus fails. That
-breaks Web Push two ways:
-
-- **Duplicate delivery** — RFC 8030 has no idempotency key, so 34 POSTs = up to 34
-  banners. (`msg_id` + SW dedup is a v1 requirement regardless, as a belt-and-braces.)
-- **Per-device status can't survive consensus** — the 34 POSTs legitimately get
-  different answers (`201`, `429`, `410`), and a transform can only collapse them to
-  one value. So `410`-driven [cleanup](#stale-subscription-cleanup) is impossible
-  under replication.
+Replicated = every node POSTs (34×), responses must be byte-identical or consensus
+fails. That gives **duplicate delivery** (RFC 8030 has no idempotency key) and makes
+**per-device status unrecoverable** (the 34 answers differ; a transform collapses
+them to one) — so `410` [cleanup](#stale-subscription-cleanup) is impossible.
 
 </details>
 
 ### The delivery path: a trusted web2 gateway
-
-II seals every message, then hands the ready-to-send bundles to a small trusted
-helper that fans them out over ordinary internet:
 
 ```mermaid
 flowchart LR
@@ -486,20 +405,17 @@ which is why it's the real reason (cycles only differ ~4×).
 
 **What stays on II:** all crypto. The gateway sees ciphertext, endpoints and timing
 — never keys or plaintext. Sealing can't be offloaded: the ECDH that derives the
-content key *is* the ability to decrypt, so the only movable part is the AES that
-was already free.
+content key *is* the ability to decrypt.
 
 <details><summary>Trust delta — the deliberate cost</summary>
 
-The gateway can **drop, delay or replay**, and **forge sends**: each bundle carries
-a VAPID token relays accept without validating the body, cached ≤12 h. A compromised
-gateway can harvest `(endpoint, token)` pairs and POST junk that won't decrypt — the
-browser then shows its generic "site updated" notice attributed to `id.ai`, burning
-the [shared permission](#shared-fate-one-permission-for-every-dapp). Mitigations:
-scope credentials per batch, cut the JWT cache to minutes. The token is also
-extractable from canister state by node operators, so this isn't the operator's
-alone. It's a **single point of failure** — see
-[Operating it](#operating-it-controls-alerts-and-rollout).
+The gateway can **drop, delay, replay**, and **forge sends** (the VAPID token, cached
+≤12 h, is accepted without body validation) — a compromised one can POST junk that
+won't decrypt, triggering the browser's "site updated" notice attributed to `id.ai`
+and burning the [shared permission](#shared-fate-one-permission-for-every-dapp).
+Mitigate: per-batch credentials, minutes-long JWT cache. The token is also
+node-operator-extractable from canister state. **Gateway = single point of failure**
+([Operating it](#operating-it-controls-alerts-and-rollout)).
 
 </details>
 
@@ -555,87 +471,64 @@ endpoint. So:
   identity still wants notifications.
 - On rotation, each identity re-registers next time it authenticates.
 
-### Where a notification opens### Where a notification opens
+### Where a notification opens
 
-The app may set `alert.url` to send the user to a specific page rather than the
-origin root. **II validates it at send time** and refuses the send otherwise:
+`alert.url` deep-links within the sender's own app; **II validates it at send time**
+and refuses otherwise:
 
-- **The target must be on the sender's own application.** The sender origin is
-  II-derived, not a field on `PushAlert`: the backend forces it to this sender's
-  consented origin, so a dApp cannot set or spoof it. A notification can
-  deep-link anywhere within the sender's own site
-  (`https://app.com/thread/42`) but never to another origin — not `evil.com`,
-  and not another consented dApp.
-- **Both sides are canonicalised** before comparing, because consent is recorded
-  against the _effective_ origin (already remapped to the legacy boundary
-  domain) while a dApp's links use whichever domain the user is browsing.
-  Without that, every real deep link is refused. It stays safe rather than
-  loose: only the same subdomain collapses, and that subdomain is the canister
-  id, so two different canisters can never normalise to one origin.
-- **Only `https`, or `http` on loopback** — the secure-context rule browsers
-  use. `javascript:` and `data:` URLs report their origin as the string
-  `"null"`, so without a scheme check two of them compare equal, pass an
-  origin test, and reach a navigation.
+- **Same-origin only.** The sender origin is II-derived (not a `PushAlert` field), so
+  a link can go anywhere on `app.com` but never to `evil.com` or another consented
+  dApp.
+- **Both sides canonicalised** — consent keys the *effective* origin, links use
+  whichever domain is browsed; without this every real deep link is refused. Safe:
+  only the same canister-id subdomain collapses.
+- **`https`, or `http` on loopback** only — `javascript:`/`data:` report origin
+  `"null"` and would compare equal without a scheme check.
 
-Validating on the send side rather than on the device is what lets the service
-worker open the link directly, removing a hop from the tap-through. It is also
-simply the better place: this is the only party that knows authoritatively which
-origin the user consented to, whereas the device-side check sat on a publicly
-craftable URL and every future consumer of `alert.url` would have had to repeat
-it.
-
-No target → the tap opens `/notify?origin=<sender>`, which resolves the sender's
-origin from the anchor's consent list and fails closed if it cannot.
+Validating on send (not device) removes a tap-through hop and puts the check on the
+only party that authoritatively knows the consented origin. No target → `/notify?origin=`
+resolves the sender and fails closed.
 
 ### Landing the user already signed in
 
-Yes, with **no II-side changes** — it composes out of the ICRC-167 redirect
-transport II already supports.
-
-**II cannot push a signed-in session.** A delegation targets a session key the
-_dApp_ generates and II never sees, so the flow must *begin* on the dApp's origin —
-a notification cannot bounce through `id.ai` and have II sign the user in from
-there. This is the same property that stops II impersonating a user, so it's a
-guarantee, not a limitation.
+Yes, **no II-side changes** — it composes out of the ICRC-167 redirect transport.
+**II cannot push a signed-in session** (the delegation targets a key the dApp
+generates and II never sees), so the flow must *begin* on the dApp's origin — a
+notification can't bounce through `id.ai` and be signed in from there. Same property
+that stops II impersonating a user.
 
 ```mermaid
 flowchart LR
     N[Tap notification] --> S["/sign-in?next=…<br/>(dApp origin)"]
-    S -->|session reusable| P[Destination page — signed in]
+    S -->|session reusable| P[Destination — signed in]
     S -->|not| A[II /authorize → Continue tap]
-    A --> S2["/sign-in return leg"] --> P
+    A --> S2[return leg] --> P
 ```
 
-Notifications link straight at the sign-in route (not the app, which would boot,
-find no session and bounce — a visible flash). The dApp provides `transport:
-"redirect"`, a `/.well-known/ii-auth-callbacks` file declaring the exact callback
-(protocol+host+path only — the destination rides in memoized flow state), and a
-callback origin whose identity derivation matches the push-consent `effectiveOrigin`.
+Notifications link at the sign-in route (not the app, which would boot, find no
+session and flash). The dApp provides `transport: "redirect"`, a
+`/.well-known/ii-auth-callbacks` (callback is protocol+host+path only; destination
+rides in memoized state), and a callback origin whose derivation matches the
+consent `effectiveOrigin`.
 
-**This should be a library, not per-dApp code.** Building it by hand is ~70 lines
-of ICRC-167 plumbing, ~15 of them app-specific and two security-relevant (narrowing
-an attacker-supplied `next` to a same-origin fragment; landing in the app on
-failure not stranding). It belongs in `@icp-sdk/auth` as one call —
-`handleRedirectSignIn({ nextParam, reuseExistingSession, onArrive, onError })` —
-with hooks for an app's own session policy. Until it exists, tap-through is the one
-place "a dApp needs no push infrastructure" is false.
+**This should be a library.** By hand it's ~70 lines of ICRC-167 plumbing, two of
+them security-relevant (narrow an attacker-supplied `next` to a same-origin
+fragment; land in the app on failure). Belongs in `@icp-sdk/auth` as
+`handleRedirectSignIn({ nextParam, reuseExistingSession, onArrive, onError })`.
+Until then, tap-through is the one place "a dApp needs no push infrastructure" is false.
 
-<details><summary>Lessons that shaped the helper's design</summary>
+<details><summary>Lessons that shaped it</summary>
 
-- **Its own route** — the flow journals state per route; on the app root it
-  interleaves with boot and lands signed out.
-- **Reuse needs the app's staleness rule, not just `isAuthenticated()`** — a
-  delegation can be valid while the app considers the session dead (session ends on
-  last-tab-close, exactly a notification's state). Stamp liveness first (arrival =
-  presence), then reuse. An app that *deletes* its session on tab close always
-  re-auths; it should exempt push-consenting users.
-- **Only II's Continue tap is irreducible** — silent delegation issuance would let
-  any site obtain one by redirect. The ugly signed-out path is a session-lifetime
-  problem, not one to style away; don't add an II-side interstitial (only the dApp
-  knows if it has a session).
-- **Local dev:** a loopback callback needs II's `dev_csp` (the allow-list fetch is
-  `connect-src`-bound to `https:`), and Chrome prompts for local-network access —
-  both absent once both sides are public https.
+- **Own route** — the flow journals state per route; on the app root it lands signed out.
+- **Reuse needs the app's staleness rule, not `isAuthenticated()`** — a delegation
+  can be valid while the app considers the session dead (last-tab-close). Stamp
+  liveness first (arrival = presence). An app that *deletes* its session on tab close
+  should exempt push-consenting users.
+- **Only II's Continue tap is irreducible** — silent issuance would let any site get
+  a delegation by redirect. Don't add an II-side interstitial (only the dApp knows if
+  it has a session).
+- **Local dev:** loopback callback needs `dev_csp`; Chrome prompts for local-network
+  access — both gone once public https.
 
 </details>
 
@@ -690,33 +583,15 @@ II owns both labels — a sender able to rename them would defeat the point.
 
 ### Updating or dismissing a notification already shown
 
-Yes, via a dApp-chosen `notification_id`, which the service worker maps to the
-Web Notification `tag`:
+Via a dApp-chosen `notification_id` mapped to the Web Notification `tag`: send again
+with the same id to **replace** in place ("Order shipped"→"delivered"); send
+`content = Dismiss` to **close** it. Complementary to `topic` (which collapses
+*undelivered* messages at the relay) — this acts on *delivered* ones.
 
-- **Update / replace** — send again with the same `notification_id`; the device
-  replaces the shown notification in place rather than stacking a second (e.g.
-  "Order shipped" → "Order delivered", or a live score ticking up).
-- **Dismiss** — send `content = Dismiss` with that `notification_id`; the SW
-  finds notifications with the matching tag and calls `.close()`, showing
-  nothing new.
-
-This is complementary to the `topic` delivery header, and the two act at
-different stages: `topic` collapses _undelivered_ messages at the relay
-(before they reach the device), while `notification_id` updates or dismisses an
-_already-delivered_ one on the device.
-
-Caveats:
-
-- **`userVisibleOnly` fights a silent dismiss.** Browsers require every push to
-  show _something_; a pure "close and show nothing" push can trigger the
-  browser's generic "site updated in background" notification and, if abused, a
-  permission penalty. So **update-with-a-new-state is the robust pattern**;
-  pure dismiss is best-effort.
-- It only works if the device is online to receive the follow-up and the
-  notification is still present (the user may have dismissed it already).
-- This is **explicit, opt-in** grouping the dApp controls — the opposite of the
-  automatic hostname-collapse we rejected. Notifications without a
-  `notification_id` never replace each other.
+Caveats: `userVisibleOnly` means a pure silent dismiss can trigger the browser's
+"site updated" notice, so **update-with-new-state is robust, pure dismiss
+best-effort**; only works if the device is online and the notification still present.
+Explicit opt-in — no `notification_id` means notifications never replace each other.
 
 ## Alternatives considered
 
@@ -817,80 +692,48 @@ as `app.com` — intentional, document it.
 
 ### Consent lifecycle: it must not outlive the sender
 
-Consent rows keyed only by `(anchor, origin_hash)` carry no reference to _which
-sender_ was registered for that origin. That makes consent survive events it
-should not:
+Consent keyed only by `(anchor, origin_hash)` carries no sender reference, so it
+survives events it shouldn't: a domain expires, someone buys it, serves their own
+`.well-known`, registers — and **every prior consenter is reachable**, attributed as
+the old brand. Fix: stamp consent with the **sender registration epoch**;
+invalidate when the registered principals change or the sender deregisters; expire
+after long no-delivery; surface "this app re-registered — re-confirm?".
 
-- A dApp shuts down, its domain expires, someone else buys it, serves their own
-  `.well-known/ii-push-senders`, and registers. **Every user who ever consented
-  to that origin is immediately reachable** — attributed as the old brand, with
-  tap-through deep-linking into the new owner's site.
-- Sender deregistration and re-verification TTLs do not bound this, because they
-  govern _sender verification_, not _consent validity_.
-
-Fixes: stamp each consent row with the **sender registration epoch**; invalidate
-consent when the registered principal set for an origin changes or the sender is
-deregistered, requiring a fresh opt-in; expire consent after a long period with
-no delivery; and surface "this app re-registered — re-confirm?" in Settings.
-
-Relatedly, `.well-known` re-verification must not become a **deregistration
-primitive**: a competitor who can cause a single 404 or timeout on a sender's
-`.well-known` during one lazy re-verify would silently strip its notification
-capability. Require K consecutive failures across a multi-day window, and never
-deregister on a 5xx or timeout — only on a well-formed file that no longer lists
-the sender.
+Also: re-verification must not be a **deregistration primitive** — a single induced
+404 shouldn't strip capability. Require K failures over days, never deregister on
+5xx/timeout, only on a well-formed file that no longer lists the sender.
 
 ## Privacy
 
-The doc's confidentiality story is about _content_. Metadata is a separate
-exposure and, for a notification hub, arguably the more sensitive one — `Hidden`
-protects the message text and does nothing for any of this.
+Confidentiality covers *content*; **metadata is the bigger exposure for a
+notification hub, and `Hidden` does nothing for it.** New here isn't the
+anchor↔origin link (II already stores that) but the **temporal** dimension and an
+**off-chain, device-linkable** identifier:
 
-**What is genuinely new here.** II already stores which origins an anchor uses
-(`StorableApplication`), so the anchor↔origin association is not new. What this
-feature adds is the **temporal** dimension — _when_ each app notified each user,
-continuously — and the **off-chain export** of a device-linkable identifier.
+- **The gateway sees a join key.** Grouping bundles by `endpoint` reveals, per
+  device: which origins notify it, when, sizes, and cleartext `Urgency`/`Topic`.
+  Since one browser = one endpoint across identities, this **links a user's anchors
+  and dApps** — the exact linkage per-origin derivation prevents. No decryption.
+- **Relays too:** one shared VAPID key lets FCM/APNs isolate II traffic and count
+  per-user dApp diversity. Per-dApp keys were an unlinkability property this design
+  removes.
 
-- **The gateway sees a join key.** Every bundle is
-  `{endpoint, headers, authorization, body}`. Grouping by `endpoint` yields, per
-  physical device: the set of sender origins notifying it, exact timestamps,
-  message sizes, and `Urgency`/`Topic` in cleartext headers. Because one browser
-  has one endpoint shared across a user's identities, that set links **a user's
-  anchors to each other and their dApps to each other** — precisely the linkage
-  per-origin principal derivation exists to prevent. No decryption required.
-- **The relays get it too, and more easily than before.** All II-mediated push
-  carries **one shared VAPID public key**, so FCM/APNs/Mozilla can isolate II
-  traffic and count per-user dApp diversity trivially. Per-dApp VAPID keys — which
-  this design frames as a burden it removes — were an unlinkability property.
-- **Timing is content.** "Which dApp notified this user at 03:00" is sensitive
-  even when the body is opaque.
-
-Mitigations to evaluate: give the gateway per-batch pseudonymous endpoint handles
-rather than raw endpoints; shuffle and pad batches so per-origin timing is not
-directly readable; and consider per-origin VAPID subkeys to restore relay-side
-unlinkability. At minimum, state plainly what the gateway, the relays and node
-operators each learn.
+Mitigations to evaluate: per-batch pseudonymous endpoint handles, batch
+shuffling/padding, per-origin VAPID subkeys. At minimum, state what the gateway,
+relays and node operators each learn.
 
 ## Delivery semantics: what is actually guaranteed
 
-"Best-effort" is not a guarantee, and several features silently depend on which
-one holds. Stated explicitly:
+- **At-least-once** — retries and `drain_epoch` duplicate; `chunk_id` makes chunk
+  resends idempotent, `msg_id` + device dedup hides the rest.
+- **Unordered** — per-relay queueing and urgency reorder freely.
+- **No receipts** — the only per-target signal is `NoConsent` at admission;
+  `admitted` ≠ "on the device".
 
-- **At-least-once, not at-most-once.** Retries and `drain_epoch` recovery both
-  duplicate; the non-replicated handoff removes the *n*×-fan-out source but not
-  these. `chunk_id` makes _chunk_ resends idempotent; `msg_id` + device dedup is
-  what makes duplicates invisible to the user.
-- **Unordered.** Nothing in the pipeline preserves order: per-relay queueing and
-  urgency's contribution to drain order both reorder freely.
-- **No delivery receipts.** The only per-target signal is `NoConsent`, returned
-  at admission. `admitted` means "in II's buffer", never "on the device".
-
-The ordering gap has teeth, because `notification_id` update/replace is defined
-in terms of it: "Order delivered" can land before "Order shipped" and leave the
-**stale** text on the lock screen permanently, and a `Dismiss` can arrive before
-the notification it dismisses and then be a no-op forever. Fix: carry a
-**monotonic sequence number per `(origin, anchor, notification_id)`** so the
-service worker drops out-of-order updates rather than applying them.
+The ordering gap has teeth: `notification_id` replace is order-dependent, so "Order
+delivered" can land before "shipped" and leave stale text forever, and a `Dismiss`
+can precede its notification. Fix: a **monotonic sequence per `(origin, anchor,
+notification_id)`** so the SW drops out-of-order updates.
 
 ## Duplicate and replay suppression (`msg_id`)
 
@@ -924,10 +767,6 @@ that (a messenger), the axis is *who decrypts and where*:
 | **Design B** — dApp-fetch | II's SW, on device | real text | II client code (+ dApp) |
 | `Display` | II service | full | full |
 | App's own SW | app's SW | full | none (II not in loop) |
-
-Key correction: "II can never show decrypted content" is too strong. II's *service
-worker* decrypting on the user's own device — with a key II-the-service never sees
-in clear — is viable, and only a small step past the trust of signing in with II.
 
 **Ship `Hidden` first** — content-hidden notification + tap-through reveal (the
 industry-standard E2E UX; `/notify` is the reveal path). Zero extra trust, today.
@@ -995,83 +834,42 @@ fetch per notification. Murkier than A; the fallback for backend-trusted apps.
 
 ## IC capabilities to re-evaluate
 
-Platform features that would change decisions in this doc. Worth re-checking
-before implementation, because two of them postdate the design:
-
-- ~~**Non-replicated outcalls (`is_replicated = false`)**~~ — **adopted**: the
-  batch handoff to the gateway uses it, which is what makes `410` cleanup
-  possible there and drops the payload cost by the full factor of *n*. Still
-  marked experimental, so what remains to watch is the API changing under us —
-  keep it behind one call site that can revert to replicated plus a transform.
-  Field-tested outside II: multidex's price oracle has run on it since
-  2025-08-04, which is where the ~*n*× figure was measured.
-- **Per-node outcall results.** A management-canister API returning per-node
-  responses would give per-device status back on a *replicated* path, which is now
-  only interesting as a way to stop depending on an experimental flag. Unverified
-  whether it is enabled on mainnet — settle by calling it or checking release
-  notes.
-- **P-256 (secp256r1) threshold ECDSA** — **the end state this design wants.** It
-  moves the VAPID key out of storage entirely via `sign_with_ecdsa`: the subnet
-  signs, there is no stored secret to extract, and the custody caveat that runs
-  through the security model goes away rather than being mitigated. Requested
-  since 2024 with **no public roadmap item or timeline**, so treat it as "if it
-  ever ships", not "when" — which is why the stored key is the design and not a
-  placeholder. Migrating changes the public key, but does **not** require a
-  fleet-wide re-enable: run both keys and let old subscriptions age out, per
-  [VAPID rotation](#open-items).
-- **vetKeys** — already live; see
-  [Design A](#end-to-end-encrypted-apps).
-  Client libraries are still pre-1.0 and the JS package was renamed, so pin
-  deliberately.
+- ~~**Non-replicated outcalls**~~ — **adopted** (batch handoff); still experimental,
+  so keep it behind one revertible call site. Field-tested on multidex's oracle.
+- **Per-node outcall results** — would give per-device status on a *replicated* path;
+  only interesting to stop depending on the experimental flag. Verify on mainnet.
+- **P-256 threshold ECDSA** — **the end state.** Moves the VAPID key out of storage
+  (subnet signs, no stored secret), deleting the custody caveat rather than mitigating
+  it. No roadmap, so the stored key is the design, not a placeholder. Migration is
+  dual-key, no fleet re-enable.
+- **vetKeys** — live; [Design A](#end-to-end-encrypted-apps). Pin the pre-1.0 client.
 
 ## Push must never degrade authentication
 
-The invariant, stated separately because it is the one that makes this feature
-unshippable if violated: **no volume of push traffic may reduce the availability
-of sign-in.**
-
-II is not a dedicated push canister. It authenticates every user of the network,
-and push shares three resources with that job:
-
-- **The in-flight outcall budget** (3000, subnet-wide). II's own auth paths spend
-  from it: DoH for email recovery, JWKS and discovery for OIDC. Push must hold a
-  quota well below the cap and **fail closed** — return `ready = false` — rather
-  than compete. Note the queue to the management canister is also 500-deep per
-  canister pair, so a burst can exhaust the queue and make II's _own_ auth
-  outcalls fail synchronously.
-- **Instructions per round.** A drain slice must be a small fraction of a round,
-  never a whole chunk.
-- **Cycles** (on paying deployments), because the freezing threshold is shared:
-  push spend must never be able to push II toward the state where updates stop
-  and only queries serve.
-
-Concretely: a semaphore with a push-only quota, a drain slice sized from
-measurement, a cycle floor, and **authentication p99 latency as a monitored
-signal** with push throttling as the automatic response.
+The unshippable-if-violated invariant: **no volume of push may reduce sign-in
+availability.** II authenticates every user, and push shares three resources with
+that job — the in-flight outcall budget (push holds a quota well below 3000 and
+**fails closed**, not competing; the 500-deep queue can otherwise fail II's *own*
+auth outcalls synchronously), instructions/round (small drain slice), and cycles
+(push spend must never approach the freezing threshold). Enforce with a push-only
+semaphore, a measured slice, a cycle floor, and **auth p99 as a monitored signal**
+that auto-throttles push.
 
 ## Operating it: controls, alerts and rollout
 
-Metrics alone are not operability. Missing today:
+Missing today:
 
-- **A per-origin kill switch.** `push_deregister_sender` is authenticated by the
-  _dApp_, so there is no operator-side way to silence an abusive sender. Needs an
-  operator-gated `push_set_origin_enabled(origin, bool)` plus a **global feature
-  flag** in persistent state to disable push entirely without an upgrade.
-- **Alert thresholds and ownership** — on buffer depth (stuck-timer canary),
-  drain lag, per-origin reject rate, and auth-path p99. Define who is paged.
-- **Gateway operations** — who runs it, how many independent instances (≥2 with
-  distinct operators), health probes, automatic switchover, and what happens to
-  batches already handed over when one dies. Since the gateway is the shipping
-  path and the direct path is a degraded fallback, **gateway down = push down**;
-  that needs to be an explicit, accepted statement rather than an implication.
-- **Rollout and rollback.** Rollback is an upgrade, which discards the in-flight
-  buffer — so a rollback silently drops in-flight campaigns unless `drain_epoch`
-  is in place first.
-- **A load test.** Every throughput and cost number in this doc is derived, not
-  measured. Before deployment: run a 10k-recipient campaign against a local
-  replica while measuring authentication latency, and measure the real
-  instruction cost of one seal with `performance_counter` (II already runs
-  P-256 in `dnssec/`, so this is a short exercise).
+- **Per-origin kill switch** — `push_deregister_sender` is dApp-authenticated, so
+  there's no operator way to silence an abusive sender. Need operator-gated
+  `push_set_origin_enabled` + a global feature flag to disable push without an upgrade.
+- **Alerts + ownership** on buffer depth, drain lag, per-origin reject rate, auth p99.
+- **Gateway ops** — who runs it, ≥2 independent instances, health/switchover.
+  **Gateway down = push down** (direct is a degraded fallback) — state it explicitly.
+- **Rollback discards the buffer** — silently drops in-flight campaigns unless
+  `drain_epoch` lands first.
+- **A load test** — every throughput/cost number here is derived. Run a 10k campaign
+  against a local replica measuring auth latency, and measure one seal's real cost
+  with `performance_counter`.
 
 ## dApp developer integration
 
@@ -1081,9 +879,8 @@ origin, serve the callback allow-list, shape its deep links — is in
 
 ## Scaling
 
-Two questions: **how fast can II push**, and **can II store the data**. The honest
-answer to the first is per-stage — a send crosses six stages and only two actually
-bound scale.
+Two questions: **how fast can II push** (per-stage — six stages, two bind), and
+**can II store the data**.
 
 ### Where the bottleneck is, stage by stage
 
@@ -1135,8 +932,8 @@ xychart-beta
 
 ### Storage: can II store the data
 
-Storage is **O(users × origins)** — flat with notification *volume*, but it grows
-with users and the apps they consent to.
+Storage is **O(users × origins)** — flat with notification *volume*, grows with
+users × consented apps.
 
 | Row | Key | Size | Grows with |
 | --- | --- | --- | --- |
@@ -1168,24 +965,15 @@ cheap.)
 
 ## Future exploration
 
-Deliberately out of v1, kept here so the door stays open:
+- **Cycles-based charging** — per-notification cycles (canister senders) or a prepaid
+  per-origin balance (also lets off-chain senders pay). Out of v1: the design already
+  controls storage and outcalls and admission bounds abuse, so billing adds complexity
+  without solving a present problem. Retrofittable, kept visible.
+- **Off-chain senders** (web2 via ingress) — needs a self-auth challenge and, if paid,
+  the prepaid balance.
+- **Delivery receipts** — Web Push has none; per-origin aggregates are the most II can
+  offer without per-user tracking.
 
-- **Cycles-based charging.** Attach cycles per notification (canister senders
-  only — ingress calls can't carry cycles), or a prepaid per-origin balance
-  (which would also let off-chain senders pay). Dropped from v1 because the
-  design already controls the real costs (storage via the stateless model,
-  outcalls via the gateway) and admission control bounds abuse — so billing
-  adds complexity without solving an immediate problem. Worth revisiting at
-  scale to make senders pay for the outcalls/storage they drive, or as an extra
-  fairness/abuse lever. Retrofitting payment later is possible (the endpoint
-  would check attached cycles or a prepaid balance) but easier to design in
-  than bolt on, so keep the option visible.
-- **Off-chain senders** (a web2 backend calling via ingress) — needs a
-  self-auth challenge flow for sender identity and, if paid, the prepaid
-  balance above.
-- **Delivery receipts / analytics** — Web Push has none; any per-user delivery
-  signal would have to come from the app itself, and per-origin aggregates are
-  the most II can offer without a per-user tracking surface.
 ## Status
 
 ### Built today (PoC on `feat/push-notifications-poc`)
@@ -1204,21 +992,8 @@ the PoC proved it necessary.
 - **`msg_id` dedup + `410`/`404` cleanup**, **`alert.url` validation**, **browser
   VAPID-key resubscribe**
 
-### Not built, so the PoC isn't mistaken for a shippable subset
+### Not built (so the PoC isn't mistaken for shippable)
 
-- No `push_send`, so no batching, no chunking, and no client library — a send is
-  one `notify_user` per recipient.
-- No rate limiting or admission control of any kind — `notify_user` is unmetered.
-- No `.well-known/ii-push-senders` verification: senders are registered by an
-  operator, so nothing yet proves a canister owns the origin it sends as.
-- `Display` content only — no `Hidden`, which is the variant the design
-  recommends shipping first for E2E apps.
-- Integration and E2E test coverage is thin (unit tests only).
-
-Everything else the PoC lacks is a work item rather than a design gap, and is
-listed once in [Open items](#open-items) — endpoint allowlist, per-anchor caps,
-`drain_epoch`, drain isolation, `pushsubscriptionchange`, the reserved outcall
-budget for authentication. This section deliberately does not restate them.
-
-The rest of this document is the proposal, so there is no separate list of it.
-
+No `push_send` (one `notify_user` per recipient), no rate limiting, no `.well-known`
+verification (operator-registered), `Display` only (no `Hidden`), thin test coverage.
+Everything else is a work item listed once in [Open items](#open-items).
