@@ -271,10 +271,9 @@ tight — it's charged whether used or not. The gateway's real justification sta
 **outcall slots**, which no pricing change touches.
 
 **vetKD** (for [E2E](#end-to-end-encrypted-apps)) is charged everywhere: ~26.2 B
-cycles/call — fine once per user, ruinous per message (~$357/10k blast). So derive
-**once per `(user, origin)`**, cache in the SW, rate-limit per anchor; the bill
-lands on **II** (ingress carries no cycles), so an uncached derive is a
-user-triggerable drain.
+cycles/call — fine once per user, ruinous per message (~$357/10k blast). Derive
+**once per `(user, origin)`** and cache in the SW. (It's also a DoS vector — the
+bill lands on II — see [Security](#security-model).)
 
 **No sender charging in v1** — parked (accept/refund complexity). But a rate limit
 × time is unbounded spend, so a paying deployment needs a **cycle budget +
@@ -550,38 +549,45 @@ authenticated landing. Pairs naturally with `Hidden` content.
 
 ### Action buttons: navigate, never act
 
-`actions` are extra buttons (`notificationclick` reports which); platforms show ~2,
-**Safari/iOS none**, so they must degrade. Every action here can only **navigate** —
-the SW is on II's origin and holds no dApp session, so "Add margin" opens the
-add-margin screen, it can't add margin. It's just an extension of the deep link:
+A notification can carry up to about two action buttons (Safari and iOS show none,
+so anything built on them has to degrade gracefully). Here, every button can only
+navigate — never act. The service worker runs on II's origin and has no session for
+the dApp, so an "Add margin" button can open the add-margin screen, but it cannot
+actually add margin. In other words, an action is just another deep link:
 
 ```candid
 actions : opt vec record { id : text; title : text; url : text };   // ≤ 2, same-origin
 ```
 
-**Cost of the hub:** silent actions. A dApp's own SW could Archive/Snooze via a
-`fetch` with no window; the II-hosted worker can't. Listed in
-[alternatives](#a1) as part of what the single permission buys.
+Losing silent actions is a genuine cost of centralising on II. A dApp that ran its
+own service worker could Archive or Snooze with a background fetch and no window
+opened; because our worker lives on II's origin instead, it can't. This is one of
+the trade-offs the single permission buys, alongside the others in
+[alternatives](#a1).
 
-**What it buys back: a sender-proof off-switch.** Because II composes every
-notification it can attach an off-switch no sender can remove or relabel — a
-guarantee no per-dApp design can make. It spends one of the two slots (worth it,
-since a sender's own actions only navigate anyway). Three levels:
+In return, II can do something no per-dApp design can: put an off-switch on every
+notification that the sender is unable to remove or relabel, because II composes the
+notification itself. It costs one of the two button slots, which is a good trade
+given a sender's own actions could only navigate anyway. There are three levels:
 
-- **Turn off on this device** — free, silent, today. `subscription.unsubscribe()`
-  needs no II call, works even if II's backend is down; endpoint then `410`s and
-  [cleanup](#stale-subscription-cleanup) reclaims it. Device-wide, not per-app.
-- **Stop this app** — `{ action: "ii-manage", title: "Manage" }` deep-links to
-  `/manage/settings?app=<origin>` (revoke is anchor-authorized, so it navigates).
-  **"Manage" not "Unsubscribe"**: Chrome already shows its own unsubscribe, and the
-  button navigates rather than revoking. Lands on the app's row where every other
-  grant is visible; the destination already exists in `PushNotificationsSection`.
-- **Stop this app silently** — would need a sealed capability token; not worth one
-  saved tap in v1.
+- **Turn off on this device.** Free and immediate: `subscription.unsubscribe()`
+  needs no call to II and works even if II's backend is down. The endpoint then
+  returns `410` and [cleanup](#stale-subscription-cleanup) reclaims the row. This is
+  device-wide, though, not per-app.
+- **Stop a single app.** Revoking consent is authorised by the anchor, which the
+  worker can't do itself, so the button navigates:
+  `{ action: "ii-manage", title: "Manage" }` opens `/manage/settings?app=<origin>`.
+  We call it "Manage" rather than "Unsubscribe" for two reasons — Chrome already
+  shows its own unsubscribe control, and the button navigates rather than revoking,
+  so a stronger word would overpromise. It lands the user on that app's row, where
+  they can see everything else they've granted; the page already exists.
+- **Stop a single app silently** would need a sealed capability token in the
+  payload, which isn't worth the one saved tap for now.
 
-II owns both labels — a sender able to rename them would defeat the point.
+Either way II owns the labels — a sender that could rename "Manage" or "Turn off"
+would defeat the whole point.
 
-### Updating or dismissing a notification already shown
+### Updating or dismissing a notification already shown### Updating or dismissing a notification already shown
 
 Via a dApp-chosen `notification_id` mapped to the Web Notification `tag`: send again
 with the same id to **replace** in place ("Order shipped"→"delivered"); send
@@ -636,6 +642,7 @@ forcing sender-origin attribution at send time.
 | **Relay/gateway reads content** | RFC 8291 encrypted per device. Scope: *transport* only — II sees `Display` plaintext (it seals); `Hidden`/vetKeys keep it from II too |
 | **Probing II state** | Rejections are coarse (`NoConsent` only); randomize `retry_after_ms` (it reflects aggregate load); reject reasons a fixed enum; endpoint URLs never logged |
 | **`/notify` icon** | curated registry only + globe fallback — never fetch arbitrary/remote icons into II's chrome |
+| **vetKD derive drain** | the SW triggers a derive over ingress (no cycles attached), so the bill lands on II — an uncached derive is a user-triggerable cycle drain. Derive once per `(user, origin)`, cache in the SW, rate-limit per anchor |
 
 **The VAPID-key risk is larger than "spam".** The same stable memory holds the
 VAPID key *and* every device's `p256dh`/`auth`, so an attacker reading it can forge
