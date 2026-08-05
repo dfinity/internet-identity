@@ -1,33 +1,22 @@
 # Push notifications — the dApp-side client library
 
-The helper a dApp runs to feed II a large send at a pace II can accept,
-retry safely, and keep the durable campaign state that lets II stay stateless.
+The helper a dApp runs to feed II a large send at a pace it accepts, retry safely, and
+hold the durable campaign state that keeps II stateless. Reference material — rationale
+is in [push-notifications.md](push-notifications.md).
 
-Design rationale lives in [push-notifications.md](push-notifications.md); this
-document is reference material and assumes you have read at least
-[how it works, in plain terms](push-notifications.md#how-it-works-in-plain-terms).
+Because II stores nothing per send, the durable coordination is a library the dApp
+runs: it keeps the list, sends it in paced pieces, retries failures, tracks who was
+notified, and personalises text. The dApp calls one "notify these users" method.
 
-
-
-> _In short: because II stores nothing per send, a small library on the dApp's
-> side keeps the list, sends it to II in paced pieces, retries failures, tracks
-> who got notified, and personalizes text. The dApp calls one simple
-> "notify these users" method; the library handles the rest._
-
-Since II is stateless for campaigns, the durable coordination is a library the
-dApp runs. This is where the heavy list and its bookkeeping live — where the
-volume originates.
-
-Security is unaffected by moving this out: II re-validates sender-origin,
-consent and origin-pinning on **every** chunk, so a buggy or malicious library
-cannot fake consent, target another dApp's users, or exceed admission limits —
-it can only mismanage its own campaign. **The library is a convenience, never a
-control.**
+Moving this out costs no security: II re-validates sender-origin, consent and
+origin-pinning on **every** chunk, so a buggy or malicious library can only mismanage
+its own campaign — never fake consent, target another dApp's users, or exceed limits.
+**The library is a convenience, never a control.**
 
 ### Where it runs, and the one real choice
 
-The library must live somewhere with durable state and a scheduler, because it
-owns a campaign that outlives any single call. Two viable hosts:
+It needs durable state and a scheduler, since a campaign outlives any single call. Two
+hosts:
 
 |                 | dApp **canister** (recommended)                 | dApp **web2 backend**                       |
 | --------------- | ----------------------------------------------- | ------------------------------------------- |
@@ -37,10 +26,9 @@ owns a campaign that outlives any single call. Two viable hosts:
 | Sender identity | its own canister principal — registers directly | needs a canister to call on its behalf      |
 | Fits            | on-chain apps, the default                      | apps whose audience already lives off-chain |
 
-The canister host is the recommended shape: it is the only one that can attach
-cycles (relevant if sender-pays ever lands) and the only one whose sender
-identity is a principal II can register directly. A web2 backend still needs a
-small companion canister to be the registered sender, so it ends up running both.
+Prefer the canister: it's the only host that can attach cycles (for a future
+sender-pays) and whose principal II can register directly. A web2 backend needs a
+companion canister as the registered sender anyway, so it runs both.
 
 ### State it must keep
 
@@ -66,15 +54,12 @@ Target {                              // one row per recipient
 }
 ```
 
-Two things worth being precise about, because they are where implementations go
-wrong:
+Two things implementations get wrong:
 
-- **`status = Admitted` means "II accepted it into its buffer", not
-  "delivered".** There are no delivery receipts. The library must not present
-  `Admitted` to the dApp as "the user got it"; the honest label is "sent".
-- **`cursor` + `last_drain_epoch` together are the recovery state.** On restart,
-  or when II's `drain_epoch` moves, everything `InFlight`/`Admitted` since that
-  epoch is suspect and must be re-sent (see below).
+- **`Admitted` means "in II's buffer", not "delivered"** — there are no receipts, so
+  present it to the dApp as "sent", never "the user got it".
+- **`cursor` + `last_drain_epoch` are the recovery state** — on restart or when II's
+  `drain_epoch` moves, everything `InFlight`/`Admitted` since that epoch must be re-sent.
 
 ### The send loop
 
@@ -126,8 +111,8 @@ status(campaign_id) -> { total, sent, no_consent, pending, state }
 pause(campaign_id) / resume(campaign_id) / cancel(campaign_id)
 ```
 
-Everything else — chunking, pacing, retry, epoch recovery, backoff, templating —
-is internal. A dApp author should never have to know what a chunk is.
+Everything else — chunking, pacing, retry, epoch recovery, backoff, templating — is
+internal; a dApp author never needs to know what a chunk is.
 
 - **Templating / personalization** — expand `template + per-user data` into a
   per-recipient `alert` override entirely client-side. **II never sees a
@@ -157,22 +142,13 @@ device is a v1 requirement, not a nicety.
 
 ### Sender verification is the library's job, not the dApp's
 
-A dApp should never write registration logic. Its only obligation is to publish
-`/.well-known/ii-push-senders` listing its backend canister; everything after that
-belongs here.
+The dApp's only obligation is to publish `/.well-known/ii-push-senders`; registration
+logic belongs here. On `SenderUnverified`, log the hint II returns (the file and
+principal) once per origin, then retry with backoff — II verifies in the background, so
+a correct file self-heals and a missing one gives one actionable log line instead of a
+silent failure. Expose `forceReverify()` (over `push_register_sender`) for a developer
+who just fixed their file and doesn't want to wait.
 
-On `SenderUnverified` the library logs the hint II returned — which names the file
-to publish and the principal to list — exactly once per origin, then keeps retrying
-with backoff. II verifies in the background, so a correctly published file makes
-the condition clear itself with no further action, and a missing one produces one
-actionable log line instead of a silent failure.
-
-The only case worth an explicit call is a developer who has just fixed their file
-and does not want to wait: expose `forceReverify()` over
-`push_register_sender(origin)`, which bypasses II's negative cache. It is a
-convenience, not part of the normal path.
-
-The failure this avoids is worth naming, because it is the one a dApp would
-otherwise hit on day one: publish the file, forget the setup call, and every send
-fails with an authorization error that looks like a bug in II.
+This avoids the day-one failure: publish the file, forget the setup call, and every
+send fails with an error that looks like an II bug.
 

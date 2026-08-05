@@ -1,25 +1,18 @@
 # Push notifications — II interface and dApp integration
 
-The Candid surface a dApp sends through, and the steps to integrate one.
+The Candid surface a dApp sends through, and how to integrate one. Reference material
+— rationale is in [push-notifications.md](push-notifications.md).
 
-Design rationale lives in [push-notifications.md](push-notifications.md); this
-document is reference material and assumes you have read at least
-[how it works, in plain terms](push-notifications.md#how-it-works-in-plain-terms).
+## Integrating a dApp
 
-## dApp developer integration
+Setup is one step: serve `.well-known/ii-push-senders` listing your backend canister
+principal. II verifies the file itself (on first consent, or on your first send), so
+there's no registration call to remember — `push_send` just returns `SenderUnverified`
+until it does, and the client library retries until a correctly published file
+resolves. (`push_register_sender` only forces an immediate re-check after you edit the
+file.)
 
-
-
-One-time setup: serve `.well-known/ii-push-senders` listing your backend canister
-principal. That is the whole of it — II verifies the file itself, on first consent
-or on your first send, so there is no registration call to remember. `push_send`
-returns `SenderUnverified` until it has, and the client library surfaces the hint
-and retries, so a correctly published file resolves on its own.
-(`push_register_sender(origin)` exists to force an immediate re-read after you edit
-the file, rather than waiting for the TTL.)
-
-Steady state: hand the client library a campaign — it chunks, paces, retries and
-reports:
+Then hand the client library a campaign; it chunks, paces, retries and reports:
 
 ```rust
 // Non-sensitive app: show the content.
@@ -37,23 +30,18 @@ push.broadcast(
 ).await?;
 ```
 
-Under the hood the library splits the audience into ≤ ~1000-target chunks,
-calls `push_send` per chunk, **paces on `ready` / `retry_after_ms`**, retries
-with a stable `chunk_id`, and aggregates per-target results into campaign
-status. The dApp sees a campaign API; II sees paced, bounded chunks. No keys,
-no crypto, no Web Push knowledge, and no per-user state beyond the principals
-from auth (the library owns campaign status). Delivery is best-effort with no
-receipts; the only per-user signal is `NoConsent`.
+The library splits the audience into ≤1000-target chunks, calls `push_send` per chunk,
+paces on `ready`/`retry_after_ms`, retries with a stable `chunk_id`, and aggregates
+results into campaign status. The dApp handles no keys, no crypto, no Web Push, and no
+per-user state. Delivery is best-effort with no receipts — the only per-user signal is
+`NoConsent`.
 
 
 ## The Candid interface
 
-The exact API a dApp's backend calls, written in Candid (the IC's interface
-language). There is a single send entry point, `push_send`: it carries a
-shared `default_alert` plus a list of recipients, each of which may override
-that alert with its own — so the same call does both "same text for everyone"
-and "different text per user." The rest are the types it uses; skim the
-comments — each explains what the field is for.
+One send entry point, `push_send`: a shared `default_alert` plus recipients that may
+each override it, so the same call does broadcast and per-user text. The inline
+comments cover the rest.
 
 ```candid
 type PushCategory = variant { Message; Transfer; Update; Generic };
@@ -132,13 +120,9 @@ service : {
 }
 ```
 
-The `content` / `PushDelivery` split mirrors the trust boundaries. `Display`
-content is transport-encrypted (the relay can't read it) but **II can** —
-acceptable for non-sensitive notifications. `Hidden` content is never sent to
-II, which is what preserves end-to-end encryption. `PushDelivery` fields are
-plaintext RFC 8030 headers the relay sees. A sender that wants E2E chooses the
-`Hidden` variant and, by construction, has no field to put message text in.
-`push_send` returns as soon as the chunk is admitted (or rejected) — it does
-**not** wait for delivery; "admitted" means "accepted into II's in-flight
-buffer", nothing more.
+The `content`/`PushDelivery` split mirrors the trust boundaries: `Display` is
+transport-encrypted but II-readable (fine for non-sensitive text); `Hidden` never
+reaches II (preserving E2E — an E2E sender simply has no field for message text);
+`PushDelivery` headers are plaintext the relay sees. `push_send` returns on admission,
+not delivery — "admitted" means "in II's buffer", nothing more.
 

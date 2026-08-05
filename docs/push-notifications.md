@@ -692,15 +692,17 @@ as `app.com` — intentional, document it.
 ### Consent lifecycle: it must not outlive the sender
 
 Consent keyed only by `(anchor, origin_hash)` carries no sender reference, so it
-survives events it shouldn't: a domain expires, someone buys it, serves their own
-`.well-known`, registers — and **every prior consenter is reachable**, attributed as
-the old brand. Fix: stamp consent with the **sender registration epoch**;
-invalidate when the registered principals change or the sender deregisters; expire
-after long no-delivery; surface "this app re-registered — re-confirm?".
+survives events it shouldn't. If a domain expires and someone else buys it, serves
+their own `.well-known`, and registers, every prior consenter is suddenly reachable —
+attributed as the old brand. The fix is to stamp each consent with the sender's
+registration epoch, invalidate it when the registered principals change or the sender
+deregisters, expire it after a long stretch with no delivery, and surface a "this app
+re-registered — re-confirm?" prompt.
 
-Also: re-verification must not be a **deregistration primitive** — a single induced
-404 shouldn't strip capability. Require K failures over days, never deregister on
-5xx/timeout, only on a well-formed file that no longer lists the sender.
+Re-verification also mustn't become a deregistration primitive: a single induced 404
+shouldn't strip a sender's capability. Require several failures over days, and only
+ever deregister on a well-formed file that no longer lists the sender — never on a
+5xx or a timeout.
 
 ## Privacy
 
@@ -736,11 +738,11 @@ notification_id)`** so the SW drops out-of-order updates.
 
 ## Duplicate and replay suppression (`msg_id`)
 
-**Built.** Duplicates are the norm from four sources: replicated outcalls (removed
-by the non-replicated handoff), timer duplicate execution (claim-before-`await`),
-client retries + `drain_epoch`, and **accumulated subscription rows** — the one
-that actually produced duplicate banners in testing, when a rotated endpoint left
-two live rows for one browser.
+**Built.** Duplicates come from four sources: replicated outcalls (removed by the
+non-replicated handoff), timer duplicate execution (claim-before-`await`), client
+retries + `drain_epoch`, and **accumulated subscription rows** — the one that actually
+produced duplicate banners in testing, when a rotated endpoint left two live rows for
+one browser.
 
 II assigns a `msg_id` **once per admitted message**, inside the payload *before*
 RFC 8291 encryption — so no dApp supplies it and no relay can read or forge it. The
@@ -749,10 +751,11 @@ between pushes) and drops repeats; a payload with **no id is always shown**
 (failing open beats dropping a real notification). The drain now **removes a row on
 `404`/`410`**, the only signal a row is dead.
 
-**To harden:** a bounded recency set can be flushed by flooding, so a replayed
-capture looks new — replace with a per-origin high-water mark + a short `msg_id`
-validity window. Note `msg_id` (II-generated, suppress duplicates) differs from
-`notification_id` (dApp-chosen, *replaces* a shown notification).
+One thing left to harden: a bounded recency set can be flushed by flooding, after
+which a replayed capture looks new — so replace it with a per-origin high-water mark
+and a short `msg_id` validity window. Note that `msg_id` (II-generated, suppresses
+duplicates) is a different thing from `notification_id` (dApp-chosen, *replaces* a
+shown notification).
 
 ## End-to-end-encrypted apps
 
@@ -872,9 +875,8 @@ Missing today:
 
 ## dApp developer integration
 
-What a dApp must do to send its first notification — register as a sender for its
-origin, serve the callback allow-list, shape its deep links — is in
-[push-api.md](push-api.md#dapp-developer-integration).
+What a dApp does to send its first notification — publish the sender file, serve the
+callback allow-list, shape its deep links — is in [push-api.md](push-api.md#integrating-a-dapp).
 
 ## Scaling
 
