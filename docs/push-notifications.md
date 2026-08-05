@@ -539,8 +539,6 @@ Until then, tap-through is the one place "a dApp needs no push infrastructure" i
 - **Only II's Continue tap is irreducible** — silent issuance would let any site get
   a delegation by redirect. Don't add an II-side interstitial (only the dApp knows if
   it has a session).
-- **Local dev:** loopback callback needs `dev_csp`; Chrome prompts for local-network
-  access — both gone once public https.
 
 </details>
 
@@ -860,7 +858,7 @@ PoC's job was to prove the shape, not to be complete).
 ## IC capabilities to re-evaluate
 
 - ~~**Non-replicated outcalls**~~ — **adopted** (batch handoff); still experimental,
-  so keep it behind one revertible call site. Field-tested on multidex's oracle.
+  so keep it behind one revertible call site.
 - **Per-node outcall results** — would give per-device status on a *replicated* path;
   only interesting to stop depending on the experimental flag. Verify on mainnet.
 - **P-256 threshold ECDSA** — **the end state.** Moves the VAPID key out of storage
@@ -877,11 +875,6 @@ every user, and push competes with that for three shared resources — outcall s
 (small drain slices), and cycles (never spend toward the freezing threshold). Enforce a
 hard push quota that always yields to login, and auto-throttle push if sign-in latency
 climbs.
-
-## dApp developer integration
-
-What a dApp does to send its first notification — publish the sender file, serve the
-callback allow-list, shape its deep links — is in [push-api.md](push-api.md#integrating-a-dapp).
 
 ## Scaling
 
@@ -927,13 +920,13 @@ seal, and the share of the canister we let push take —
   cap so sign-in keeps ~80 % of every round even mid-blast. On a canister sustaining a
   few billion instructions/sec that hands push **~1 B instructions/sec**.
 
-Plugging those in — the central column is the planning number:
+Plugging those in (M = million instructions; the central column is the planning number):
 
-| per seal | 10 M (optimistic) | **20 M (central)** | 30 M (conservative) |
+| Seal cost | 10 M (optimistic) | **20 M (central)** | 30 M (conservative) |
 | --- | --- | --- | --- |
 | device-msg/sec | ~100 | **~50** | ~33 |
 | per hour | ~360k | **~180k** | ~120k |
-| per day | ~8.6M | **~4.3M** | ~2.9M |
+| per day | ~8.6M msg | **~4.3M msg** | ~2.9M msg |
 
 > **≈ 50 device-msg/s ≈ 180k/hour ≈ 4.3M/day, across every dApp combined** — at a
 > deliberate 20 % execution share and ~20 M-instruction seal, both to confirm by measurement.
