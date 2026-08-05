@@ -577,7 +577,7 @@ given a sender's own actions could only navigate anyway. There are three levels:
 Either way II owns the labels — a sender that could rename "Manage" or "Turn off"
 would defeat the whole point.
 
-### Updating or dismissing a notification already shown### Updating or dismissing a notification already shown
+### Updating or dismissing a notification already shown
 
 Via a dApp-chosen `notification_id` mapped to the Web Notification `tag`: send again
 with the same id to **replace** in place ("Order shipped"→"delivered"); send
