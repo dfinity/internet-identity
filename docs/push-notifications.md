@@ -395,13 +395,19 @@ them to one) — so `410` [cleanup](#stale-subscription-cleanup) is impossible.
 
 ### The delivery path: a trusted web2 gateway
 
+Numbers below are for one 10k-user blast — about 13k devices, so ~13k messages to
+deliver:
+
 ```mermaid
 flowchart LR
-    II[II canister<br/>seals: RFC 8291 + VAPID] -->|~25 batched<br/>non-replicated outcalls| GW[Gateway<br/>no keys, no plaintext]
-    GW -->|1 POST/device| R[FCM / Mozilla / APNs]
-    R --> D[Device]
+    II[II canister<br/>seals ~13k messages] -->|~25 batched outcalls<br/>non-replicated| GW[Gateway<br/>no keys, no plaintext]
+    GW -->|~13k POSTs<br/>one per device| R[FCM / Mozilla / APNs]
+    R --> D[13k devices]
     II -.->|"direct: ~13k outcalls<br/>(alt / fallback)"| R
 ```
+
+II always produces one sealed message per device (~13k here); the gateway's job is to
+turn those into ~25 batched outcalls off-chain instead of ~13k on-chain.
 
 **Why a gateway, not direct:** in-flight outcall slots, not cycles. A 10k-user
 blast is ~13k direct outcalls against the subnet's 3000 shared slots — it would
