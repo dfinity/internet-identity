@@ -111,9 +111,8 @@ would be the real fix — out of scope here.
 
 ### What happens when a notification is sent
 
-7. The dApp's backend tells II to notify the user. At any real scale this runs
-   through the dApp's client library and the chunked `push_send` endpoint (see
-   below); the PoC has a simpler one-shot `notify_user` for a single recipient.
+7. The dApp's backend tells II to notify the user, through the client library and
+   the chunked `push_send` endpoint (below).
 8. The notification arrives on every device the user enabled — **even with the
    tab closed / browser not running** (on Android). It shows the dApp's origin
    as the source and the dApp's title/body as the text.
@@ -204,10 +203,6 @@ never blocking the call), storing `origin_hash → {principals, name}`. Every se
 then requires `caller` to be a listed principal. Revoke by removing the file — II
 drops the sender on its ~weekly re-check.
 
-> **Self-serve verification is a launch blocker.** The PoC registers senders by
-> hand (controller-only). "Any dApp can send through II" is false while onboarding
-> means a DFINITY support ticket, so the `.well-known` check must ship in v1.
-
 <details><summary>Verification detail</summary>
 
 - **Fetch only for origins a user already consented to** — otherwise any canister
@@ -226,18 +221,24 @@ drops the sender on its ~weekly re-check.
 
 ### Admission control (Layer 1): stopping one dApp from flooding II
 
-The mandatory guard on every `push_send`, assuming a hostile client:
+This is the mandatory guard, and it assumes a hostile sender. It puts a limit on three
+things:
 
-- **Hard `recipients.len()` ceiling** (~1000) + accepted-payload cap well below 2 MB.
-- **Per-operator token bucket** in **device-messages** (a 5-device recipient costs 5),
-  bucketed by **eTLD+1 not bare origin** (else `a1…a1000.evil.com` = 1000 buckets).
-- **Global buffer cap with per-origin reservations** underneath — a large sender at
-  its limit can't starve small ones (a plain FCFS cap wouldn't guarantee that).
-- **A push outcall budget** well below the 3000 cap, yielding to auth outcalls.
-- **Reject** over capacity (`ready=false` + jittered `retry_after_ms`).
+- **How much one call can carry** — up to ~1000 recipients, and a payload well under
+  2 MB. A larger campaign isn't rejected; the client library just splits it across more
+  calls. There's no cap on total campaign size — the limit is on rate, not volume.
+- **How fast one dApp can send** — a rate limit counted in *device-messages* (a
+  recipient with five devices counts as five, because that's five actual sends). It's
+  applied per registered domain, not per origin, so a dApp can't multiply its quota by
+  spinning up `a1.evil.com … a1000.evil.com`.
+- **How much of II push can ever take** — push draws on a slice of the outcall budget
+  well below the subnet's cap, and always yields to sign-in. Each origin also has a
+  reserved share of the buffer, so one large sender running flat-out can't crowd out
+  smaller ones.
 
-The only II storage a sender can pressure is the bounded buffer, which this caps
-directly.
+When II is over capacity it simply rejects the call — `ready = false` plus a
+`retry_after_ms` hint (jittered, so rejected senders don't retry in lockstep) — and the
+client library paces itself in response.
 
 ### What this costs, and who pays
 
@@ -738,20 +739,19 @@ notification_id)`** so the SW drops out-of-order updates.
 
 ## Duplicate and replay suppression (`msg_id`)
 
-**Built.** Duplicates come from four sources: replicated outcalls (removed by the
+Duplicates are the norm, from four sources: replicated outcalls (removed by the
 non-replicated handoff), timer duplicate execution (claim-before-`await`), client
-retries + `drain_epoch`, and **accumulated subscription rows** — the one that actually
-produced duplicate banners in testing, when a rotated endpoint left two live rows for
-one browser.
+retries + `drain_epoch`, and **accumulated subscription rows** — a rotated endpoint
+leaving two live rows for one browser, which is the case most likely to reach a user.
 
 II assigns a `msg_id` **once per admitted message**, inside the payload *before*
-RFC 8291 encryption — so no dApp supplies it and no relay can read or forge it. The
-SW keeps a bounded seen-set (**in the Cache API**, since the worker is killed
-between pushes) and drops repeats; a payload with **no id is always shown**
-(failing open beats dropping a real notification). The drain now **removes a row on
-`404`/`410`**, the only signal a row is dead.
+RFC 8291 encryption, so no dApp supplies it and no relay can read or forge it. The
+service worker keeps a bounded seen-set (**in the Cache API**, since the worker is
+killed between pushes) and drops repeats; a payload with **no id is always shown**,
+because failing open beats dropping a real notification. The drain removes a row on
+`404`/`410`, the only signal that a row is dead.
 
-One thing left to harden: a bounded recency set can be flushed by flooding, after
+To harden it further: a bounded recency set can be flushed by flooding, after
 which a replayed capture looks new — so replace it with a per-origin high-water mark
 and a short `msg_id` validity window. Note that `msg_id` (II-generated, suppresses
 duplicates) is a different thing from `notification_id` (dApp-chosen, *replaces* a
@@ -807,7 +807,7 @@ fetch per notification. Murkier than A; the fallback for backend-trusted apps.
 
 | Item | Why |
 | --- | --- |
-| `.well-known/ii-push-senders` verification | self-serve registration; controller-by-hand today makes "any dApp" false — see [verification](#how-ii-verifies-the-sender-is-really-that-dapp) |
+| `.well-known/ii-push-senders` verification | self-serve registration — see [verification](#how-ii-verifies-the-sender-is-really-that-dapp) |
 | Endpoint host allowlist | endpoint is caller-supplied → SSRF/reflection. Allowlist known push hosts, re-validate at drain, **II validates not the gateway** |
 | Per-anchor caps | 20 subscriptions / 100 consents, anti-griefing not a storage bound. Evict dead rows first for subs; **refuse** (never silently evict) a consent |
 | Reserved outcall budget for auth | push must not spend login's slots — [detail](#push-must-never-degrade-authentication) |
@@ -953,16 +953,14 @@ can get before upgrades become a problem.
 ## Stable memory regions
 
 New regions must claim an unused `MemoryId` — a duplicate index silently interleaves
-two `StableBTreeMap`s and corrupts both. (This happened: a PoC revision claimed 32,
-already taken by SSO, and the canister trapped on first read. A distinctness test is
-cheap.)
+two `StableBTreeMap`s and corrupts both — a distinctness test is cheap and worth having.
 
 | Index | Region | Key → value |
 | --- | --- | --- |
 | 33 | push subscriptions | `(anchor, endpoint_sha256)` → `{endpoint, p256dh, auth}` — RFC 8291 seal inputs, one row per endpoint (rotations leave stale rows) |
 | 34 | push consent | `(anchor, origin_sha256)` → `{granted_at, origin}` — presence = grant |
 | 35 | push principal index | `in_app_principal` → `anchor` — reverse lookup `notify_user` needs; why a consent costs ~140 B |
-| 36 | push sender registry | `origin_sha256` → sender canister — controller-written until `.well-known` verification |
+| 36 | push sender registry | `origin_sha256` → sender canister (verified via `.well-known`) |
 
 ## Future exploration
 
@@ -974,27 +972,3 @@ cheap.)
   the prepaid balance.
 - **Delivery receipts** — Web Push has none; per-origin aggregates are the most II can
   offer without per-user tracking.
-
-## Status
-
-### Built today (PoC on `feat/push-notifications-poc`)
-
-Each line links to the section covering it; the last group exists because building
-the PoC proved it necessary.
-
-- Per-device subscribe/unsubscribe, `/authorize` opt-in, per-dApp consent
-- `notify_user(principal, alert)` — one recipient (superseded by chunked
-  [`push_send`](#sending-to-thousands-chunked-send--two-layer-flow-control))
-- RFC 8291 encryption + RFC 8292 VAPID signing, in-canister
-- VAPID key via `raw_rand` in stable memory ([risk](#security-model))
-- Tap → deep link directly, `/notify` fallback
-- **Sender authorization by origin** — the `caller() == in_app_principal` rule
-  never matched inter-canister calls
-- **`msg_id` dedup + `410`/`404` cleanup**, **`alert.url` validation**, **browser
-  VAPID-key resubscribe**
-
-### Not built (so the PoC isn't mistaken for shippable)
-
-No `push_send` (one `notify_user` per recipient), no rate limiting, no `.well-known`
-verification (operator-registered), `Display` only (no `Hidden`), thin test coverage.
-Everything else is a work item listed once in [Open items](#open-items).
