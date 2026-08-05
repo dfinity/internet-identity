@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Bump `.github/versions/vc-issuer` to the latest release of the VC demo issuer,
+# refresh the vendored Candid interface and regenerate the bindings II derives
+# from it.
+#
+# Prints nothing to change and exits 0 when the pin is already current, so the
+# calling workflow's create-pull-request step simply finds no diff.
+#
+# Auth: uses `gh`, which requires a token even for a public repository. An
+# existing `gh auth login` session or a `GH_TOKEN` in the environment both work;
+# in CI the workflow's own token is passed as `GH_TOKEN`.
+
+set -euo pipefail
+
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+ISSUER_REPO="dfinity/internet-identity-vc-demo-issuer"
+VERSION_FILE=".github/versions/vc-issuer"
+DID_FILE="src/vc-api/vc_demo_issuer.did"
+
+if ! command -v gh > /dev/null; then
+    echo "missing the 'gh' CLI, needed to query $ISSUER_REPO releases" >&2
+    exit 1
+fi
+
+current=$(sed <"$VERSION_FILE" 's/#.*$//' | sed '/^$/d' | tr -d '[:space:]')
+
+latest=$(gh release view --repo "$ISSUER_REPO" --json tagName --jq .tagName)
+if [ -z "$latest" ]; then
+    echo "Error: could not determine the latest release of $ISSUER_REPO." >&2
+    exit 1
+fi
+
+echo "current pin: $current" >&2
+echo "latest release: $latest" >&2
+
+if [ "$current" = "$latest" ]; then
+    echo "Already up to date." >&2
+    exit 0
+fi
+
+# Refresh the vendored Candid interface first: if the download fails we leave the
+# pin alone rather than pointing at a release whose interface we didn't copy.
+tmp_did=$(mktemp)
+trap 'rm -f "$tmp_did"' EXIT
+gh release download "$latest" \
+    --repo "$ISSUER_REPO" \
+    --pattern 'vc_demo_issuer.did' \
+    --output "$tmp_did" \
+    --clobber
+mv "$tmp_did" "$DID_FILE"
+trap - EXIT
+
+printf '%s\n' "$latest" > "$VERSION_FILE"
+
+# The generated bindings are committed, so they have to be refreshed in the same
+# pull request as the .did they are derived from.
+npm run generate:types-issuer
+npm run generate:js-issuer
+
+echo "Bumped $VERSION_FILE from $current to $latest." >&2

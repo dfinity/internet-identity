@@ -180,7 +180,13 @@ icp deploy issuer
 ```
 
 This will deploy also `internet_identity`, and provision the issuer for the testing environment.
-See [VC issuer documentation](./demos/vc_issuer/README.md) for details.
+The issuer canister is not built from this repository: `icp deploy issuer` runs
+`scripts/fetch-vc-issuer`, which downloads the release pinned in
+[`.github/versions/vc-issuer`](./.github/versions/vc-issuer) from
+[dfinity/internet-identity-vc-demo-issuer](https://github.com/dfinity/internet-identity-vc-demo-issuer).
+The `gh` CLI needs to be authenticated to download it — run `gh auth login` (or
+export `GH_TOKEN`) first.
+See the [VC issuer documentation](https://github.com/dfinity/internet-identity-vc-demo-issuer#readme) for details.
 
 Our [`test-app`](https://github.com/dfinity/internet-identity-test-app) offers a simple relying party functionality and can be deployed using
 

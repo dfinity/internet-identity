@@ -3,7 +3,6 @@
 # invalidate the layer cache.
 backend-tests
 node_modules
-demos
 docs
 dist
 screenshots
