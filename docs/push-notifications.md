@@ -871,14 +871,12 @@ PoC's job was to prove the shape, not to be complete).
 
 ## Push must never degrade authentication
 
-The unshippable-if-violated invariant: **no volume of push may reduce sign-in
-availability.** II authenticates every user, and push shares three resources with
-that job — the in-flight outcall budget (push holds a quota well below 3000 and
-**fails closed**, not competing; the 500-deep queue can otherwise fail II's *own*
-auth outcalls synchronously), instructions/round (small drain slice), and cycles
-(push spend must never approach the freezing threshold). Enforce with a push-only
-semaphore, a measured slice, a cycle floor, and **auth p99 as a monitored signal**
-that auto-throttles push.
+Non-negotiable: no amount of push traffic may slow or block sign-in. II authenticates
+every user, and push competes with that for three shared resources — outcall slots
+(stay well under the 3,000 cap and fail closed rather than compete), compute per round
+(small drain slices), and cycles (never spend toward the freezing threshold). Enforce a
+hard push quota that always yields to login, and auto-throttle push if sign-in latency
+climbs.
 
 ## Operating it: controls, alerts and rollout
 
