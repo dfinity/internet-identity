@@ -22,6 +22,7 @@ const DISCOVERY: SsoDiscovery = {
   scopes: ["openid", "profile", "email"],
   name: ["DFINITY"],
   resolved_client_id: ["dfinity-sso-client-id"],
+  session_max_age_ns: BigInt(28_800_000_000_000),
 };
 
 describe("ssoDiscovery", () => {
@@ -108,6 +109,7 @@ describe("ssoDiscovery", () => {
         clientId: "dfinity-sso-client-id",
         resolvedClientId: "dfinity-sso-client-id",
         name: "DFINITY",
+        sessionMaxAgeNs: BigInt(28_800_000_000_000),
         discovery: {
           issuer: "https://dfinity.okta.com",
           authorization_endpoint:

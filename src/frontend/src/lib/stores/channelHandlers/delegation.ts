@@ -1,4 +1,5 @@
 import { toPermissionsArg } from "$lib/utils/accessLevel";
+import { cappedMaxTimeToLive } from "$lib/utils/sessionDuration";
 import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 import {
   DelegationParamsCodec,
@@ -117,10 +118,11 @@ export const handleDelegationRequest =
 
         // Read the identity *after* authorization so we capture whichever
         // identity the user settled on (they may have switched mid-flow).
-        const [accountNumber, { identityNumber, actor }] = await Promise.all([
-          authorized.accountNumberPromise,
-          waitForStore(authenticationStore),
-        ]);
+        const [accountNumber, { identityNumber, actor, ssoSessionMaxAgeNs }] =
+          await Promise.all([
+            authorized.accountNumberPromise,
+            waitForStore(authenticationStore),
+          ]);
 
         const sessionPublicKey = new Uint8Array(params.publicKey.toDer());
 
@@ -144,7 +146,12 @@ export const handleDelegationRequest =
         // capped at the app's request. Fall back to the app's requested value
         // for flows without a picker (e.g. 1-click OpenID/SSO), and to the
         // backend default when neither is set.
-        const maxTimeToLive = authorized.maxTimeToLive ?? params.maxTimeToLive;
+        // An SSO organization caps how long its sign-ins stay valid, so the
+        // delegation must not outlive that.
+        const maxTimeToLive = cappedMaxTimeToLive(
+          authorized.maxTimeToLive ?? params.maxTimeToLive,
+          ssoSessionMaxAgeNs,
+        );
 
         const { user_key, expiration } = await actor
           .prepare_account_delegation(

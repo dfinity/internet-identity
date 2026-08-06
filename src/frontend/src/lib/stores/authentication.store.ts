@@ -24,6 +24,12 @@ export interface Authenticated {
     | { openid: { iss: string; sub: string } }
     | { recoveryPhrase: { principal: Principal } }
     | { emailRecovery: { principal: Principal } };
+  /**
+   * For an SSO sign-in, how long the org allows the session to stay valid, in
+   * nanoseconds. The delegation handler caps the account delegation it requests
+   * at this value; `undefined` for every other sign-in method.
+   */
+  ssoSessionMaxAgeNs?: bigint;
 }
 
 // `agent`/`actor` are created once in `init()` and shared by the store;
