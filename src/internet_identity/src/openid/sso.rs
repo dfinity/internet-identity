@@ -18,6 +18,7 @@ use super::verify::{Descriptor, SsoProvider};
 use super::OpenIDJWTVerificationError;
 use crate::openid::AudClaim;
 use crate::single_flight_cache::{self, CacheConfig, Cached, RetryBackoff, SingleFlightCache};
+use crate::HOUR_NS;
 use identity_jose::jwk::Jwk;
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
@@ -34,6 +35,11 @@ pub(super) const DEFAULT_STABLE_IDENTIFIER_CLAIM: &str = "sub";
 pub(super) fn non_default_stable_claim(claim: &str) -> Option<String> {
     (claim != DEFAULT_STABLE_IDENTIFIER_CLAIM).then(|| claim.to_string())
 }
+
+/// Default session length for an org that doesn't set `session_max_age_seconds`
+/// in its well-known: how long II's assertions about a user stay valid before
+/// they authenticate against the org's IdP again.
+pub(super) const DEFAULT_SESSION_MAX_AGE_NS: u64 = 8 * HOUR_NS;
 
 /// Max `app_clients` entries accepted from an org's well-known. The parsed map
 /// is retained in the in-memory SSO discovery cache (one per cached domain), so
@@ -132,6 +138,10 @@ pub(super) struct DiscoveredConfig {
     pub gate_all_apps: bool,
     /// Claim holding the cross-client-stable identifier (default `sub`).
     pub stable_identifier_claim: String,
+    /// How long a sign-in through this domain stays valid, in nanoseconds.
+    /// Seconds exist only in the well-known and its parser; everything from
+    /// here on is nanoseconds.
+    pub session_max_age_ns: u64,
 }
 
 /// One `origin -> client_id` entry from `app_clients`.
@@ -445,6 +455,10 @@ struct IIOpenIdConfiguration {
     /// Cross-client-stable identifier claim (default `sub`).
     #[serde(default)]
     stable_identifier_claim: Option<String>,
+    /// How long a sign-in stays valid, in seconds. The only place seconds
+    /// appear: `validate_session_max_age` converts once, to nanoseconds.
+    #[serde(default)]
+    session_max_age_seconds: Option<u64>,
 }
 
 /// OIDC discovery document — only the fields the canister needs.
@@ -474,6 +488,32 @@ fn validate_ii_config(config: &IIOpenIdConfiguration) -> Result<(), String> {
         return Err(format!("SSO name exceeds {MAX_SSO_NAME_LENGTH} bytes"));
     }
     Ok(())
+}
+
+/// Convert `session_max_age_seconds` from the well-known into nanoseconds,
+/// rejecting a value that is zero or over the delegation ceiling. This is the
+/// only seconds-to-nanoseconds conversion in the SSO path: an invalid value is
+/// rejected here, so it never reaches the cache as a nanosecond number.
+fn validate_session_max_age(seconds: Option<u64>) -> Result<u64, String> {
+    const NS_PER_SECOND: u64 = 1_000_000_000;
+    let Some(seconds) = seconds else {
+        return Ok(DEFAULT_SESSION_MAX_AGE_NS);
+    };
+    if seconds == 0 {
+        return Err("SSO session_max_age_seconds must be greater than zero".to_string());
+    }
+    // `checked_mul` rather than saturating: a garbage value must be rejected,
+    // not silently clamped to the ceiling.
+    let max_age_ns = seconds
+        .checked_mul(NS_PER_SECOND)
+        .ok_or_else(|| format!("SSO session_max_age_seconds is out of range: {seconds}"))?;
+    if max_age_ns > crate::delegation::MAX_EXPIRATION_PERIOD_NS {
+        return Err(format!(
+            "SSO session_max_age_seconds exceeds the {} second maximum",
+            crate::delegation::MAX_EXPIRATION_PERIOD_NS / NS_PER_SECOND
+        ));
+    }
+    Ok(max_age_ns)
 }
 
 /// Reject over-length values from the untrusted OIDC discovery document.
@@ -527,6 +567,7 @@ async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
 
     validate_ii_config(&ii_config)?;
     validate_discovery_document(&doc)?;
+    let session_max_age_ns = validate_session_max_age(ii_config.session_max_age_seconds)?;
 
     let mut scopes = doc
         .scopes_supported
@@ -555,6 +596,7 @@ async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
         app_clients,
         gate_all_apps,
         stable_identifier_claim,
+        session_max_age_ns,
     })
 }
 
@@ -790,6 +832,38 @@ mod tests {
         JWKS_CACHE.with(|c| *c.borrow_mut() = new_jwks_cache());
     }
 
+    #[test]
+    fn session_max_age_defaults_when_absent() {
+        assert_eq!(
+            validate_session_max_age(None),
+            Ok(DEFAULT_SESSION_MAX_AGE_NS)
+        );
+    }
+
+    #[test]
+    fn session_max_age_converts_seconds_once() {
+        assert_eq!(validate_session_max_age(Some(28_800)), Ok(8 * HOUR_NS));
+        assert_eq!(validate_session_max_age(Some(1)), Ok(1_000_000_000));
+    }
+
+    #[test]
+    fn session_max_age_rejects_zero() {
+        assert!(validate_session_max_age(Some(0)).is_err());
+    }
+
+    #[test]
+    fn session_max_age_rejects_above_the_delegation_ceiling() {
+        let max_seconds = crate::delegation::MAX_EXPIRATION_PERIOD_NS / 1_000_000_000;
+        assert!(validate_session_max_age(Some(max_seconds)).is_ok());
+        assert!(validate_session_max_age(Some(max_seconds + 1)).is_err());
+    }
+
+    #[test]
+    fn session_max_age_rejects_a_value_that_overflows_nanoseconds() {
+        // Rejected outright rather than saturated to the ceiling.
+        assert!(validate_session_max_age(Some(u64::MAX)).is_err());
+    }
+
     fn sample_config() -> DiscoveredConfig {
         DiscoveredConfig {
             issuer: "https://idp.example.org".to_string(),
@@ -801,6 +875,7 @@ mod tests {
             app_clients: vec![],
             gate_all_apps: false,
             stable_identifier_claim: DEFAULT_STABLE_IDENTIFIER_CLAIM.to_string(),
+            session_max_age_ns: DEFAULT_SESSION_MAX_AGE_NS,
         }
     }
 

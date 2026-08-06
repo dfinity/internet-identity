@@ -501,6 +501,10 @@ type SsoDiscovery = record {
     name : opt text;
     // Client the target origin runs its ceremony against; `null` when denied.
     resolved_client_id : opt text;
+    // How long a sign-in through this domain stays valid, in nanoseconds, from
+    // the domain's optional `session_max_age_seconds` (8 hours when unset). The
+    // sign-in flow caps the account delegation it requests at this value.
+    session_max_age_ns : nat64;
 };
 
 // Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A

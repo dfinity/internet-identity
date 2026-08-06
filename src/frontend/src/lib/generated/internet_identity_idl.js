@@ -534,6 +534,7 @@ export const idlFactory = ({ IDL }) => {
     'resolved_client_id' : IDL.Opt(IDL.Text),
     'discovery_domain' : IDL.Text,
     'client_id' : IDL.Text,
+    'session_max_age_ns' : IDL.Nat64,
   });
   const SsoDiscoveryStatus = IDL.Variant({
     'Resolved' : SsoDiscovery,
@@ -738,8 +739,8 @@ export const idlFactory = ({ IDL }) => {
   });
   const PrepareMcpRegistrationDelegation = IDL.Record({
     'user_key' : UserKey,
-    'expiration' : Timestamp,
     'trusted_url' : IDL.Text,
+    'expiration' : Timestamp,
   });
   const PrepareSessionDelegation = IDL.Record({
     'user_key' : UserKey,
