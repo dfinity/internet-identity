@@ -23,11 +23,9 @@ pub struct StorableOpenIdCredential {
     pub metadata: HashMap<String, StorableMetadataEntryV2>,
     /// SSO discovery domain this credential was created through, stamped at
     /// verification time. `None` for direct-provider credentials (Google /
-    /// Microsoft / Apple) and for SSO credentials written before this field
-    /// existed — the latter are backfilled by the `sso_credential_migration`
-    /// upgrade arg (see `docs/ongoing/openid-sso-prod-readiness.md` §8.6).
-    /// `Option` so credentials written under the previous schema decode
-    /// cleanly — same pattern as the optional fields on `StorableAnchor`.
+    /// Microsoft / Apple). `Option` so credentials written under the previous
+    /// schema decode cleanly — same pattern as the optional fields on
+    /// `StorableAnchor`.
     #[n(5)]
     pub sso_domain: Option<String>,
     /// Human-readable SSO label from the domain's hop-1

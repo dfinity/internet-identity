@@ -51,7 +51,6 @@ const DEFAULT_INIT: InternetIdentityInit = {
   captcha_config: [],
   openid_configs: [],
   sso_allow_insecure_discovery: [],
-  sso_credential_migration: [],
   register_rate_limit: [],
   related_origins: [
     [

@@ -5,12 +5,6 @@ export const idlFactory = ({ IDL }) => {
     'max_cache_age_secs' : IDL.Opt(IDL.Nat64),
     'allowed_domains' : IDL.Vec(IDL.Text),
   });
-  const SsoCredentialMigrationEntry = IDL.Record({
-    'name' : IDL.Opt(IDL.Text),
-    'issuer' : IDL.Text,
-    'discovery_domain' : IDL.Text,
-    'client_id' : IDL.Text,
-  });
   const DnssecRootAnchor = IDL.Record({
     'algorithm' : IDL.Nat8,
     'key_tag' : IDL.Nat16,
@@ -72,7 +66,6 @@ export const idlFactory = ({ IDL }) => {
   });
   const InternetIdentityInit = IDL.Record({
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
-    'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
     'mcp_config_migration' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
@@ -738,8 +731,8 @@ export const idlFactory = ({ IDL }) => {
   });
   const PrepareMcpRegistrationDelegation = IDL.Record({
     'user_key' : UserKey,
-    'expiration' : Timestamp,
     'trusted_url' : IDL.Text,
+    'expiration' : Timestamp,
   });
   const PrepareSessionDelegation = IDL.Record({
     'user_key' : UserKey,
@@ -1414,12 +1407,6 @@ export const init = ({ IDL }) => {
     'max_cache_age_secs' : IDL.Opt(IDL.Nat64),
     'allowed_domains' : IDL.Vec(IDL.Text),
   });
-  const SsoCredentialMigrationEntry = IDL.Record({
-    'name' : IDL.Opt(IDL.Text),
-    'issuer' : IDL.Text,
-    'discovery_domain' : IDL.Text,
-    'client_id' : IDL.Text,
-  });
   const DnssecRootAnchor = IDL.Record({
     'algorithm' : IDL.Nat8,
     'key_tag' : IDL.Nat16,
@@ -1481,7 +1468,6 @@ export const init = ({ IDL }) => {
   });
   const InternetIdentityInit = IDL.Record({
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
-    'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
     'mcp_config_migration' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
