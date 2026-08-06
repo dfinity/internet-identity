@@ -324,6 +324,32 @@ fn insert_certified_attribute(
     }
 }
 
+/// The SSO session deadline entry for a certified bundle, or `None` when the
+/// bundle carries no attribute for that SSO domain.
+///
+/// The deadline is scoped to the domain whose policy set it rather than living
+/// under `implicit:`, because one bundle can carry attributes from several
+/// scopes with different lifetimes and a verifier must enforce the deadline
+/// belonging to the scope it reads.
+fn sso_session_expiry_entry(
+    certified_pairs: &BTreeMap<String, Icrc3Value>,
+    sso_session_domain: Option<&str>,
+    sso_session_expiry_ns: Option<u64>,
+) -> Option<(String, Icrc3Value)> {
+    let domain = sso_session_domain?;
+    let expiry_ns = sso_session_expiry_ns?;
+    let scope_prefix = format!("sso:{domain}:");
+    certified_pairs
+        .keys()
+        .any(|key| key.starts_with(&scope_prefix))
+        .then(|| {
+            (
+                format!("{scope_prefix}expires_at_timestamp_ns"),
+                Icrc3Value::Nat(candid::Nat::from(expiry_ns)),
+            )
+        })
+}
+
 impl Anchor {
     /// Resolves an unscoped `email` / `verified_email` spec to a stored
     /// verified-email entry. The user picked the address in the consent
@@ -377,6 +403,9 @@ impl Anchor {
         // SSO domain this session signed in through, or `None` for non-SSO
         // sessions; `sso:<domain>` attributes certify only when it matches.
         sso_session_domain: Option<String>,
+        // When the session signed in through SSO, the instant its assertions
+        // stop being valid, from the domain's `session_max_age_seconds`.
+        sso_session_expiry_ns: Option<u64>,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
         let mut certified_pairs: BTreeMap<String, Icrc3Value> = BTreeMap::new();
         let mut problems = Vec::new();
@@ -489,6 +518,14 @@ impl Anchor {
 
         if !problems.is_empty() {
             return Err(PrepareIcrc3AttributeError::AttributeMismatch { problems });
+        }
+
+        if let Some((key, value)) = sso_session_expiry_entry(
+            &certified_pairs,
+            sso_session_domain.as_deref(),
+            sso_session_expiry_ns,
+        ) {
+            certified_pairs.insert(key, value);
         }
 
         certified_pairs.insert("implicit:nonce".to_string(), Icrc3Value::Blob(nonce));
@@ -759,6 +796,77 @@ mod tests {
                 attribute_name: name,
             },
             value: value.as_bytes().to_vec(),
+        }
+    }
+
+    mod sso_session_expiry_entry_tests {
+        use super::super::sso_session_expiry_entry;
+        use candid::Nat;
+        use internet_identity_interface::internet_identity::types::icrc3::Icrc3Value;
+        use std::collections::BTreeMap;
+
+        const DOMAIN: &str = "acme.example";
+        const EXPIRES_AT: u64 = 1_700_028_800_000_000_000;
+
+        fn pairs(keys: &[&str]) -> BTreeMap<String, Icrc3Value> {
+            keys.iter()
+                .map(|k| ((*k).to_string(), Icrc3Value::Text("v".to_string())))
+                .collect()
+        }
+
+        #[test]
+        fn stamps_the_deadline_scoped_to_the_domain() {
+            let entry = sso_session_expiry_entry(
+                &pairs(&["sso:acme.example:email"]),
+                Some(DOMAIN),
+                Some(EXPIRES_AT),
+            );
+            assert_eq!(
+                entry,
+                Some((
+                    "sso:acme.example:expires_at_timestamp_ns".to_string(),
+                    Icrc3Value::Nat(Nat::from(EXPIRES_AT))
+                ))
+            );
+        }
+
+        #[test]
+        fn skips_a_bundle_without_attributes_for_that_domain() {
+            let entry = sso_session_expiry_entry(
+                &pairs(&["openid:https://accounts.google.com:email"]),
+                Some(DOMAIN),
+                Some(EXPIRES_AT),
+            );
+            assert_eq!(entry, None);
+        }
+
+        #[test]
+        fn stamps_only_the_signed_in_domain() {
+            let entry = sso_session_expiry_entry(
+                &pairs(&["sso:other.example:email", "sso:acme.example:name"]),
+                Some(DOMAIN),
+                Some(EXPIRES_AT),
+            );
+            assert_eq!(
+                entry.map(|(key, _)| key),
+                Some("sso:acme.example:expires_at_timestamp_ns".to_string())
+            );
+        }
+
+        #[test]
+        fn skips_a_non_sso_session() {
+            assert_eq!(
+                sso_session_expiry_entry(
+                    &pairs(&["sso:acme.example:email"]),
+                    None,
+                    Some(EXPIRES_AT)
+                ),
+                None
+            );
+            assert_eq!(
+                sso_session_expiry_entry(&pairs(&["sso:acme.example:email"]), Some(DOMAIN), None),
+                None
+            );
         }
     }
 
@@ -1932,6 +2040,7 @@ mod tests {
                 1_000_000_000,
                 account,
                 None,
+                None,
             );
 
             match result {
@@ -1971,6 +2080,7 @@ mod tests {
                 1_000_000_000,
                 account,
                 None,
+                None,
             );
 
             match result {
@@ -2009,6 +2119,7 @@ mod tests {
                 1_000_000_000,
                 account,
                 None,
+                None,
             );
 
             match result {
@@ -2040,6 +2151,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
                 None,
             );
 
@@ -2490,6 +2602,7 @@ mod tests {
                 account,
                 // SSO session for this domain, so the request reaches the verified_email branch.
                 Some(SSO_DOMAIN.to_string()),
+                None,
             );
             match res {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2539,6 +2652,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
                 None,
             );
             match res {
@@ -2770,6 +2884,7 @@ mod tests {
                 1_000_000_000,
                 account,
                 None,
+                None,
             );
             match result {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2808,6 +2923,7 @@ mod tests {
                 1_000_000_000,
                 account,
                 None,
+                None,
             );
             match result {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2843,6 +2959,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
                 None,
             );
             match result {
@@ -2886,6 +3003,7 @@ mod tests {
                     None,
                     1_000_000_000,
                     account,
+                    None,
                     None,
                 )
             }));
