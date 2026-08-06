@@ -334,10 +334,10 @@ fn insert_certified_attribute(
 fn sso_session_expiry_entry(
     certified_pairs: &BTreeMap<String, Icrc3Value>,
     sso_session_domain: Option<&str>,
-    sso_session_expires_at_ns: Option<u64>,
+    sso_session_expiry_ns: Option<u64>,
 ) -> Option<(String, Icrc3Value)> {
     let domain = sso_session_domain?;
-    let expires_at_ns = sso_session_expires_at_ns?;
+    let expiry_ns = sso_session_expiry_ns?;
     let scope_prefix = format!("sso:{domain}:");
     certified_pairs
         .keys()
@@ -345,7 +345,7 @@ fn sso_session_expiry_entry(
         .then(|| {
             (
                 format!("{scope_prefix}expires_at_timestamp_ns"),
-                Icrc3Value::Nat(candid::Nat::from(expires_at_ns)),
+                Icrc3Value::Nat(candid::Nat::from(expiry_ns)),
             )
         })
 }
@@ -405,7 +405,7 @@ impl Anchor {
         sso_session_domain: Option<String>,
         // When the session signed in through SSO, the instant its assertions
         // stop being valid, from the domain's `session_max_age_seconds`.
-        sso_session_expires_at_ns: Option<u64>,
+        sso_session_expiry_ns: Option<u64>,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
         let mut certified_pairs: BTreeMap<String, Icrc3Value> = BTreeMap::new();
         let mut problems = Vec::new();
@@ -523,7 +523,7 @@ impl Anchor {
         if let Some((key, value)) = sso_session_expiry_entry(
             &certified_pairs,
             sso_session_domain.as_deref(),
-            sso_session_expires_at_ns,
+            sso_session_expiry_ns,
         ) {
             certified_pairs.insert(key, value);
         }

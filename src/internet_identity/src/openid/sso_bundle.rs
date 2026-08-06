@@ -6,7 +6,7 @@
 //! u64-BE len || sso_domain bytes       SSO discovery domain
 //! u64-BE len || origin bytes           certified dapp origin
 //! u64-BE len || expiry_ns (u64 BE)     bundle expiry, ns since epoch
-//! u64-BE len || session_expires_at_ns  session deadline, ns since epoch
+//! u64-BE len || session_expiry_ns  session deadline, ns since epoch
 //! ```
 
 use super::{calculate_delegation_seed, SSO_ATTR_BUNDLE_TTL_NS};
@@ -39,7 +39,7 @@ pub struct SsoAttrBundle {
     /// org's `session_max_age_seconds`. Computed at the ceremony, where the
     /// discovery cache is warm, and carried here so attribute certification
     /// never has to re-read it. Outlives `expiry_ns`.
-    pub session_expires_at_ns: u64,
+    pub session_expiry_ns: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,14 +63,14 @@ pub fn encode_sso_attr_bundle(
     sso_domain: &str,
     origin: &str,
     expiry_ns: u64,
-    session_expires_at_ns: u64,
+    session_expiry_ns: u64,
 ) -> Vec<u8> {
     let mut blob: Vec<u8> = Vec::new();
     blob.extend_from_slice(SSO_ATTR_BUNDLE_DOMAIN);
     write_field(&mut blob, sso_domain.as_bytes());
     write_field(&mut blob, origin.as_bytes());
     write_field(&mut blob, &expiry_ns.to_be_bytes());
-    write_field(&mut blob, &session_expires_at_ns.to_be_bytes());
+    write_field(&mut blob, &session_expiry_ns.to_be_bytes());
     blob
 }
 
@@ -140,13 +140,13 @@ pub fn decode_sso_attr_bundle(bytes: &[u8]) -> Result<SsoAttrBundle, SsoBundleDe
     let session_expiry_arr: [u8; 8] = session_expiry_bytes
         .try_into()
         .map_err(|_| SsoBundleDecodeError::BadSessionExpiryWidth)?;
-    let session_expires_at_ns = u64::from_be_bytes(session_expiry_arr);
+    let session_expiry_ns = u64::from_be_bytes(session_expiry_arr);
 
     Ok(SsoAttrBundle {
         sso_domain,
         origin,
         expiry_ns,
-        session_expires_at_ns,
+        session_expiry_ns,
     })
 }
 
@@ -203,10 +203,10 @@ pub fn prepare_sso_attr_bundle(
     anchor_number: AnchorNumber,
     sso_domain: &str,
     origin: &str,
-    session_expires_at_ns: Timestamp,
+    session_expiry_ns: Timestamp,
 ) -> (Vec<u8>, Timestamp) {
     let expiration = time().saturating_add(SSO_ATTR_BUNDLE_TTL_NS);
-    let message = encode_sso_attr_bundle(sso_domain, origin, expiration, session_expires_at_ns);
+    let message = encode_sso_attr_bundle(sso_domain, origin, expiration, session_expiry_ns);
     let seed = calculate_delegation_seed(
         &(iss.to_string(), sub.to_string(), aud.to_string()),
         anchor_number,
@@ -256,13 +256,13 @@ mod tests {
             sso_domain: "idp.example.com".to_string(),
             origin: "https://nice-name.com".to_string(),
             expiry_ns: 1_700_000_000_000_000_000,
-            session_expires_at_ns: 1_700_028_800_000_000_000,
+            session_expiry_ns: 1_700_028_800_000_000_000,
         };
         let encoded = encode_sso_attr_bundle(
             &bundle.sso_domain,
             &bundle.origin,
             bundle.expiry_ns,
-            bundle.session_expires_at_ns,
+            bundle.session_expiry_ns,
         );
         assert_eq!(decode_sso_attr_bundle(&encoded), Ok(bundle));
     }
@@ -279,7 +279,7 @@ mod tests {
             assert_eq!(decoded.sso_domain, sso_domain);
             assert_eq!(decoded.origin, origin);
             assert_eq!(decoded.expiry_ns, 0);
-            assert_eq!(decoded.session_expires_at_ns, 0);
+            assert_eq!(decoded.session_expiry_ns, 0);
         }
     }
 

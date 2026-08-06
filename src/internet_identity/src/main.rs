@@ -1927,7 +1927,7 @@ mod openid_api {
             // policy captured while the discovery cache was warm. Everything
             // downstream reads this value rather than the cache, so an evicted
             // entry or a refreshed policy can't move a live session's deadline.
-            let session_expires_at_ns = ic_cdk::api::time().saturating_add(session_max_age_ns);
+            let session_expiry_ns = ic_cdk::api::time().saturating_add(session_max_age_ns);
 
             let (sso_attr_bundle, _bundle_expiration) = openid::prepare_sso_attr_bundle(
                 &identity.credential.iss,
@@ -1936,7 +1936,7 @@ mod openid_api {
                 anchor_number,
                 &discovery_domain,
                 &origin,
-                session_expires_at_ns,
+                session_expiry_ns,
             );
 
             // The association could change during the `.await`.
@@ -2527,9 +2527,7 @@ mod attribute_sharing {
         // SSO session iff a certified bundle for this origin is attached; gates `sso:<domain>` attributes.
         let sso_session =
             openid::read_certified_sso_bundle().filter(|bundle| bundle.origin == origin);
-        let sso_session_expires_at_ns = sso_session
-            .as_ref()
-            .map(|bundle| bundle.session_expires_at_ns);
+        let sso_session_expiry_ns = sso_session.as_ref().map(|bundle| bundle.session_expiry_ns);
         let sso_session_domain = sso_session.map(|bundle| bundle.sso_domain);
         let (anchor, _) =
             check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
@@ -2551,7 +2549,7 @@ mod attribute_sharing {
             issued_at_timestamp_ns,
             account,
             sso_session_domain,
-            sso_session_expires_at_ns,
+            sso_session_expiry_ns,
         )?;
 
         Ok(PrepareIcrc3AttributeResponse { message })

@@ -472,11 +472,29 @@ struct DiscoveryDocument {
     scopes_supported: Option<Vec<String>>,
 }
 
-/// Reject over-length values from the untrusted well-known configuration, and
-/// return its session length in nanoseconds — the one value from this document
-/// that needs converting rather than only bounding.
+/// The hop-1 document once every field has been checked, bounded, defaulted and
+/// converted. Produced only by [`validate_ii_config`], which consumes the raw
+/// [`IIOpenIdConfiguration`], so nothing downstream can reach an unvalidated
+/// field by accident.
 #[cfg(not(test))]
-fn validate_ii_config(config: &IIOpenIdConfiguration) -> Result<u64, String> {
+struct ValidatedIIOpenIdConfiguration {
+    client_id: String,
+    /// The hop-2 URL, checked before it is fetched.
+    openid_configuration: String,
+    name: Option<String>,
+    app_clients: Vec<AppClient>,
+    gate_all_apps: bool,
+    stable_identifier_claim: String,
+    session_max_age_ns: u64,
+}
+
+/// Validate the untrusted well-known configuration: bound its lengths, parse its
+/// `app_clients` keys, default its stable-identifier claim, and convert its
+/// session length to nanoseconds.
+#[cfg(not(test))]
+fn validate_ii_config(
+    config: IIOpenIdConfiguration,
+) -> Result<ValidatedIIOpenIdConfiguration, String> {
     if config.client_id.len() > MAX_CLIENT_ID_LENGTH {
         return Err(format!(
             "SSO client_id exceeds {MAX_CLIENT_ID_LENGTH} bytes"
@@ -489,7 +507,23 @@ fn validate_ii_config(config: &IIOpenIdConfiguration) -> Result<u64, String> {
     {
         return Err(format!("SSO name exceeds {MAX_SSO_NAME_LENGTH} bytes"));
     }
-    validate_session_max_age(config.session_max_age_seconds)
+    let openid_configuration = validate_discovery_url(config.openid_configuration)?;
+    let app_clients = validate_app_clients(&config.app_clients)?;
+    let session_max_age_ns = validate_session_max_age(config.session_max_age_seconds)?;
+    let stable_identifier_claim = config
+        .stable_identifier_claim
+        .filter(|claim| !claim.is_empty())
+        .unwrap_or_else(|| DEFAULT_STABLE_IDENTIFIER_CLAIM.to_string());
+
+    Ok(ValidatedIIOpenIdConfiguration {
+        client_id: config.client_id,
+        openid_configuration,
+        name: config.name,
+        app_clients,
+        gate_all_apps: config.gate_all_apps,
+        stable_identifier_claim,
+        session_max_age_ns,
+    })
 }
 
 /// Convert `session_max_age_seconds` from the well-known into nanoseconds,
@@ -518,16 +552,59 @@ fn validate_session_max_age(seconds: Option<u64>) -> Result<u64, String> {
     Ok(max_age_ns)
 }
 
-/// Reject over-length values from the untrusted OIDC discovery document.
+/// The hop-2 document once its URLs have been checked against each other and
+/// against the hop-1 URL, its lengths bounded and its scopes defaulted. Produced
+/// only by [`validate_discovery_document`], which consumes the raw
+/// [`DiscoveryDocument`].
 #[cfg(not(test))]
-fn validate_discovery_document(doc: &DiscoveryDocument) -> Result<(), String> {
+struct ValidatedDiscoveryDocument {
+    issuer: String,
+    jwks_uri: String,
+    authorization_endpoint: String,
+    scopes: Vec<String>,
+}
+
+/// Validate the untrusted OIDC discovery document against the hop-1 document it
+/// was fetched from: bound its lengths, enforce the host relationships, and
+/// default its scopes. Takes the validated hop-1 document, so the URL the
+/// self-assertion checks compare against is itself already checked.
+#[cfg(not(test))]
+fn validate_discovery_document(
+    doc: DiscoveryDocument,
+    ii_config: &ValidatedIIOpenIdConfiguration,
+) -> Result<ValidatedDiscoveryDocument, String> {
+    let openid_configuration = &ii_config.openid_configuration;
     if doc.issuer.len() > MAX_ISSUER_LENGTH {
         return Err(format!("SSO issuer exceeds {MAX_ISSUER_LENGTH} bytes"));
     }
     if doc.jwks_uri.len() > MAX_JWKS_URI_LENGTH {
         return Err(format!("SSO jwks_uri exceeds {MAX_JWKS_URI_LENGTH} bytes"));
     }
-    Ok(())
+    // The discovered issuer's host must match the openid_configuration host
+    // (standard OIDC self-assertion; defends against a compromised hop-1 that
+    // points jwks_uri at an unrelated issuer). The discovery domain itself is
+    // allowed to differ — it hosts a custom SSO indirection.
+    validate_issuer_host(openid_configuration, &doc.issuer)?;
+    let jwks_uri = validate_discovery_url(doc.jwks_uri)?;
+    // The authorization_endpoint must live on the same host as the issuer, so a
+    // tampered discovery doc can't bounce the user's auth off-host after we've
+    // committed to a provider.
+    validate_same_host(&doc.issuer, &doc.authorization_endpoint)?;
+    let authorization_endpoint = validate_discovery_url(doc.authorization_endpoint)?;
+
+    let mut scopes = doc
+        .scopes_supported
+        .filter(|scopes| !scopes.is_empty())
+        .unwrap_or_else(|| DEFAULT_SCOPES.iter().map(|s| (*s).to_string()).collect());
+    // Bound the only unbounded field stored per discovery entry.
+    scopes.truncate(DISCOVERY_MAX_SCOPES);
+
+    Ok(ValidatedDiscoveryDocument {
+        issuer: doc.issuer,
+        jwks_uri,
+        authorization_endpoint,
+        scopes,
+    })
 }
 
 /// The discovery cache fill: hop 1 (`ii-openid-configuration`) then hop 2 (the
@@ -541,50 +618,28 @@ async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
     // (the e2e mock provider, which can't serve TLS).
     let hop1_scheme = scheme_for_host(&domain);
     let hop1_url = format!("{hop1_scheme}://{domain}/.well-known/ii-openid-configuration");
-    let ii_config = fetch_ii_openid_configuration(hop1_url).await?;
-    validate_discovery_url(&ii_config.openid_configuration)?;
-
-    let app_clients = validate_app_clients(&ii_config.app_clients)?;
-    let stable_identifier_claim = ii_config
-        .stable_identifier_claim
-        .clone()
-        .filter(|c| !c.is_empty())
-        .unwrap_or_else(|| DEFAULT_STABLE_IDENTIFIER_CLAIM.to_string());
-    let gate_all_apps = ii_config.gate_all_apps;
+    let ii_config = validate_ii_config(fetch_ii_openid_configuration(hop1_url).await?)?;
 
     // Hop 2: fetch the standard OIDC discovery document.
-    let doc = fetch_discovery(ii_config.openid_configuration.clone()).await?;
+    let doc = validate_discovery_document(
+        fetch_discovery(ii_config.openid_configuration.clone()).await?,
+        &ii_config,
+    )?;
 
-    // The discovered issuer's host must match the openid_configuration host
-    // (standard OIDC self-assertion; defends against a compromised hop-1 that
-    // points jwks_uri at an unrelated issuer). The discovery domain itself is
-    // allowed to differ — it hosts a custom SSO indirection.
-    validate_issuer_host(&ii_config.openid_configuration, &doc.issuer)?;
-    validate_discovery_url(&doc.jwks_uri)?;
-    // The authorization_endpoint must live on the same host as the issuer, so a
-    // tampered discovery doc can't bounce the user's auth off-host after we've
-    // committed to a provider.
-    validate_same_host(&doc.issuer, &doc.authorization_endpoint)?;
-    validate_discovery_url(&doc.authorization_endpoint)?;
-
-    let session_max_age_ns = validate_ii_config(&ii_config)?;
-    validate_discovery_document(&doc)?;
-
-    let mut scopes = doc
-        .scopes_supported
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| DEFAULT_SCOPES.iter().map(|s| (*s).to_string()).collect());
-    // Bound the only unbounded field stored per discovery entry.
-    scopes.truncate(DISCOVERY_MAX_SCOPES);
-
-    let DiscoveryDocument {
+    let ValidatedDiscoveryDocument {
         issuer,
         jwks_uri,
         authorization_endpoint,
-        ..
+        scopes,
     } = doc;
-    let IIOpenIdConfiguration {
-        client_id, name, ..
+    let ValidatedIIOpenIdConfiguration {
+        client_id,
+        name,
+        app_clients,
+        gate_all_apps,
+        stable_identifier_claim,
+        session_max_age_ns,
+        ..
     } = ii_config;
 
     Ok(DiscoveredConfig {
@@ -712,17 +767,18 @@ fn transform_discovery(
     }
 }
 
-/// Ensure a URL is syntactically valid and uses an acceptable scheme. `https`
-/// is always accepted; `http` only when the host is on the SSO allowlist.
+/// Check that a URL is syntactically valid and uses an acceptable scheme, and
+/// hand it back so the caller uses the checked value rather than the input.
+/// `https` is always accepted; `http` only when the host is on the SSO allowlist.
 #[cfg(not(test))]
-fn validate_discovery_url(url: &str) -> Result<(), String> {
-    let parsed = url::Url::parse(url).map_err(|e| format!("parse error: {e}"))?;
+fn validate_discovery_url(url: String) -> Result<String, String> {
+    let parsed = url::Url::parse(&url).map_err(|e| format!("parse error: {e}"))?;
     match parsed.scheme() {
-        "https" => Ok(()),
+        "https" => Ok(url),
         "http" => {
             let host = host_with_port(&parsed).ok_or_else(|| format!("URL has no host: {url}"))?;
             if allow_insecure_scheme(&host) {
-                Ok(())
+                Ok(url)
             } else {
                 Err(format!(
                     "http scheme not allowed for non-allowlisted host '{host}'"
