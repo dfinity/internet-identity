@@ -23,8 +23,7 @@ export interface SsoDiscoveryResult {
   resolvedClientId: string;
   /**
    * How long a sign-in through this domain stays valid, in nanoseconds, from the
-   * domain's `session_max_age_seconds`. The sign-in flow caps the account
-   * delegation it requests at this value.
+   * domain's `session_max_age_seconds`, defaulting to eight hours.
    */
   sessionMaxAgeNs: bigint;
   /**
