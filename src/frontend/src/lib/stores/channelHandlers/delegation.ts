@@ -1,5 +1,4 @@
 import { toPermissionsArg } from "$lib/utils/accessLevel";
-import { cappedMaxTimeToLive } from "$lib/utils/sessionDuration";
 import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 import {
   DelegationParamsCodec,
@@ -149,10 +148,12 @@ export const handleDelegationRequest =
         // delegation must not outlive that, so an SSO session sends a duration
         // even when neither the picker nor the app asked for one. The backend
         // applies its own default only when nothing constrains it at all.
-        const maxTimeToLive = cappedMaxTimeToLive(
-          authorized.maxTimeToLive ?? params.maxTimeToLive,
-          ssoSessionMaxAgeNs,
-        );
+        const requested = authorized.maxTimeToLive ?? params.maxTimeToLive;
+        const maxTimeToLive =
+          ssoSessionMaxAgeNs !== undefined &&
+          (requested === undefined || requested > ssoSessionMaxAgeNs)
+            ? ssoSessionMaxAgeNs
+            : requested;
 
         const { user_key, expiration } = await actor
           .prepare_account_delegation(

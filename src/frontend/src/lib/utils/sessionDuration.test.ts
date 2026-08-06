@@ -4,7 +4,6 @@ import {
   sessionDurationBreakdown,
   sessionDurationCeilingSeconds,
   sessionDurationToNanos,
-  cappedMaxTimeToLive,
 } from "./sessionDuration";
 
 const MINUTE = 60;
@@ -123,28 +122,5 @@ describe("sessionDurationToNanos", () => {
       sessionDurationToNanos(8 * HOUR),
     );
     expect(seconds).toBe(8 * HOUR);
-  });
-});
-
-describe("cappedMaxTimeToLive", () => {
-  const EIGHT_HOURS = BigInt(8 * HOUR) * NANOS_PER_SECOND;
-  const THIRTY_DAYS = BigInt(30 * DAY) * NANOS_PER_SECOND;
-
-  it("returns the requested duration when the session is not SSO", () => {
-    expect(cappedMaxTimeToLive(THIRTY_DAYS, undefined)).toBe(THIRTY_DAYS);
-    expect(cappedMaxTimeToLive(undefined, undefined)).toBeUndefined();
-  });
-
-  it("caps a longer request at the organization's session length", () => {
-    expect(cappedMaxTimeToLive(THIRTY_DAYS, EIGHT_HOURS)).toBe(EIGHT_HOURS);
-  });
-
-  it("leaves a shorter request alone", () => {
-    const oneHour = BigInt(HOUR) * NANOS_PER_SECOND;
-    expect(cappedMaxTimeToLive(oneHour, EIGHT_HOURS)).toBe(oneHour);
-  });
-
-  it("applies the organization's session length when nothing was requested", () => {
-    expect(cappedMaxTimeToLive(undefined, EIGHT_HOURS)).toBe(EIGHT_HOURS);
   });
 });

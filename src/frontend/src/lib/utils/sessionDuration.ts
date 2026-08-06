@@ -94,30 +94,3 @@ export const sessionDurationCeilingSeconds = (
 /** Convert a duration in seconds to the nanoseconds the canister expects. */
 export const sessionDurationToNanos = (seconds: number): bigint =>
   BigInt(seconds) * NANOS_PER_SECOND;
-
-/**
- * The `maxTimeToLive` to request for an account delegation, in nanoseconds: the
- * duration the app (or the picker) asked for, bounded by the SSO organization's
- * session length when the user signed in through SSO.
- *
- * `undefined` in means "no limit of our own", so the org's value becomes the
- * limit; `undefined` out means the backend applies its own default.
- *
- * This is a UX cap rather than a security boundary: it lets the frontend's
- * delegation-expiry check drive re-authentication. The org's deadline is
- * enforced by the expiry inside the certified attribute bundle.
- */
-export const cappedMaxTimeToLive = (
-  requestedNanos: bigint | undefined,
-  ssoSessionMaxAgeNanos: bigint | undefined,
-): bigint | undefined => {
-  if (ssoSessionMaxAgeNanos === undefined) {
-    return requestedNanos;
-  }
-  if (requestedNanos === undefined) {
-    return ssoSessionMaxAgeNanos;
-  }
-  return requestedNanos > ssoSessionMaxAgeNanos
-    ? ssoSessionMaxAgeNanos
-    : requestedNanos;
-};
