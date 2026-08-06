@@ -47,7 +47,6 @@
   let switchingToIdentity = $state<bigint>();
   let isNavigatingToManage = $state(false);
   let isSigningOut = $state(false);
-  let windowHeight = $state(window.innerHeight);
 
   const selectedIdentity = $derived(
     initialIdentities.find(
@@ -109,7 +108,7 @@
 
 {#snippet selectedIdentityCard(identity: LastUsedIdentity)}
   <div
-    class="bg-bg-secondary border-border-secondary relative -mx-px -my-px flex flex-col items-center rounded-b-2xl border-x border-b p-8"
+    class="bg-bg-secondary border-border-secondary relative -mx-px -my-px flex shrink-0 flex-col items-center rounded-b-2xl border-x border-b p-8"
   >
     <div class="mb-2">
       <IdentityAvatar {identity} size="lg" />
@@ -165,7 +164,7 @@
      always recover from this state. -->
 {#snippet orphanedSessionCard()}
   <div
-    class="bg-bg-secondary border-border-secondary relative -mx-px -my-px flex flex-col items-center rounded-b-2xl border-x border-b p-8"
+    class="bg-bg-secondary border-border-secondary relative -mx-px -my-px flex shrink-0 flex-col items-center rounded-b-2xl border-x border-b p-8"
   >
     <p class="text-text-primary mb-6 text-sm font-semibold">
       {$t`You're signed in`}
@@ -217,8 +216,8 @@
 {/snippet}
 
 {#snippet otherIdentitiesList()}
-  <div>
-    <div class="mt-4 mb-2 flex h-9 flex-row items-center">
+  <div class="flex min-h-0 flex-col">
+    <div class="mt-4 mb-2 flex h-9 shrink-0 flex-row items-center">
       <h2 class="text-text-primary mx-4 text-sm font-semibold">
         {$t`Sign in with another identity`}
       </h2>
@@ -232,10 +231,7 @@
         </button>
       {/if}
     </div>
-    <ul
-      class="flex flex-col gap-2 overflow-y-auto"
-      style={`max-height: ${Math.max(2, Math.floor((windowHeight - 380) / 74)) * 74 - 41}px`}
-    >
+    <ul class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
       {#each otherIdentities as identity (identity.identityNumber)}
         {@render identityListItem(identity)}
       {/each}
@@ -243,15 +239,18 @@
   </div>
 {/snippet}
 
-<svelte:window bind:innerHeight={windowHeight} />
-
 <fieldset
   disabled={switchingToIdentity !== undefined ||
     isNavigatingToManage ||
     isSigningOut}
   class="contents"
 >
-  <div class="flex flex-col overflow-x-hidden">
+  <!-- Capped at the room the surrounding dialog or popover reports, so the
+       identity list is the only thing that scrolls — otherwise the wrapper
+       scrolls too and the user gets two scrollbars. -->
+  <div
+    class="flex max-h-[var(--max-panel-height,100dvh)] flex-col overflow-x-hidden"
+  >
     {#if selectedIdentity !== undefined}
       {@render selectedIdentityCard(selectedIdentity)}
     {:else}
@@ -260,7 +259,10 @@
     {#if otherIdentities.length > 0}
       {@render otherIdentitiesList()}
     {/if}
-    <button onclick={onUseAnotherIdentity} class="btn btn-tertiary m-4">
+    <button
+      onclick={onUseAnotherIdentity}
+      class="btn btn-tertiary m-4 shrink-0"
+    >
       <PlusIcon class="size-4" />
       {$t`Add identity`}
     </button>
