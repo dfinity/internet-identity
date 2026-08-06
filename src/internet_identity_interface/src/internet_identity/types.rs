@@ -517,9 +517,7 @@ pub struct SsoDiscovery {
     /// `None` when the origin is denied.
     pub resolved_client_id: Option<String>,
     /// How long a sign-in through this domain stays valid, in nanoseconds, from
-    /// the domain's `session_max_age_seconds`, defaulting to eight hours.
-    /// Nanoseconds, like every other duration on this interface: seconds exist
-    /// only in the well-known itself.
+    /// the domain's optional `session_max_age_seconds` (8 hours when unset).
     pub session_max_age_ns: u64,
 }
 
