@@ -655,8 +655,7 @@ export class AuthFlow {
       await authenticationStore.set({
         identity,
         identityNumber,
-        authMethod: { openid: { iss, sub } },
-        ssoSessionMaxAgeNs,
+        authMethod: { openid: { iss, sub, ssoSessionMaxAgeNs } },
       });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);

@@ -117,11 +117,15 @@ export const handleDelegationRequest =
 
         // Read the identity *after* authorization so we capture whichever
         // identity the user settled on (they may have switched mid-flow).
-        const [accountNumber, { identityNumber, actor, ssoSessionMaxAgeNs }] =
+        const [accountNumber, { identityNumber, actor, authMethod }] =
           await Promise.all([
             authorized.accountNumberPromise,
             waitForStore(authenticationStore),
           ]);
+        const ssoSessionMaxAgeNs =
+          "openid" in authMethod
+            ? authMethod.openid.ssoSessionMaxAgeNs
+            : undefined;
 
         const sessionPublicKey = new Uint8Array(params.publicKey.toDer());
 
