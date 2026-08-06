@@ -334,12 +334,6 @@ type InternetIdentityInit = record {
     // set/clear pattern as `dnssec_config`: null keeps the previously stored
     // value, `opt null` clears it, `opt opt "https://..."` sets it.
     mcp_official_url : opt opt text;
-    // One-shot upgrade arg driving the MCP config migration: `opt true` gives
-    // every anchor "enabled, official connector", since neither a value stored
-    // before the official connector existed nor an absent config was ever a
-    // choice about it. Unset means no migration, and the migration is refused
-    // when the deployment ships no `mcp_official_url`.
-    mcp_config_migration : opt bool;
 };
 
 // DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
