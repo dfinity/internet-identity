@@ -472,9 +472,11 @@ struct DiscoveryDocument {
     scopes_supported: Option<Vec<String>>,
 }
 
-/// Reject over-length values from the untrusted well-known configuration.
+/// Reject over-length values from the untrusted well-known configuration, and
+/// return its session length in nanoseconds — the one value from this document
+/// that needs converting rather than only bounding.
 #[cfg(not(test))]
-fn validate_ii_config(config: &IIOpenIdConfiguration) -> Result<(), String> {
+fn validate_ii_config(config: &IIOpenIdConfiguration) -> Result<u64, String> {
     if config.client_id.len() > MAX_CLIENT_ID_LENGTH {
         return Err(format!(
             "SSO client_id exceeds {MAX_CLIENT_ID_LENGTH} bytes"
@@ -487,7 +489,7 @@ fn validate_ii_config(config: &IIOpenIdConfiguration) -> Result<(), String> {
     {
         return Err(format!("SSO name exceeds {MAX_SSO_NAME_LENGTH} bytes"));
     }
-    Ok(())
+    validate_session_max_age(config.session_max_age_seconds)
 }
 
 /// Convert `session_max_age_seconds` from the well-known into nanoseconds,
@@ -565,9 +567,8 @@ async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
     validate_same_host(&doc.issuer, &doc.authorization_endpoint)?;
     validate_discovery_url(&doc.authorization_endpoint)?;
 
-    validate_ii_config(&ii_config)?;
+    let session_max_age_ns = validate_ii_config(&ii_config)?;
     validate_discovery_document(&doc)?;
-    let session_max_age_ns = validate_session_max_age(ii_config.session_max_age_seconds)?;
 
     let mut scopes = doc
         .scopes_supported
