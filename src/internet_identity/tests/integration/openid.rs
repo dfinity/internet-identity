@@ -1603,8 +1603,22 @@ mod sso_gating {
 
     /// Assemble the well-known (`app_clients` map JSON, gate flag, stable claim).
     fn well_known(app_clients_json: &str, gate_all_apps: bool, stable_claim: &str) -> String {
+        well_known_with_session_max_age(app_clients_json, gate_all_apps, stable_claim, None)
+    }
+
+    /// Like [`well_known`] but declares `session_max_age_seconds`. `None` omits
+    /// the field, so the canister's eight-hour default applies.
+    fn well_known_with_session_max_age(
+        app_clients_json: &str,
+        gate_all_apps: bool,
+        stable_claim: &str,
+        session_max_age_seconds: Option<u64>,
+    ) -> String {
+        let session_max_age = session_max_age_seconds
+            .map(|seconds| format!(r#","session_max_age_seconds":{seconds}"#))
+            .unwrap_or_default();
         format!(
-            r#"{{"client_id":"{II_CLIENT}","openid_configuration":"{GATE_ISSUER}/.well-known/openid-configuration","name":"Gate","app_clients":{app_clients_json},"gate_all_apps":{gate_all_apps},"stable_identifier_claim":"{stable_claim}"}}"#
+            r#"{{"client_id":"{II_CLIENT}","openid_configuration":"{GATE_ISSUER}/.well-known/openid-configuration","name":"Gate","app_clients":{app_clients_json},"gate_all_apps":{gate_all_apps},"stable_identifier_claim":"{stable_claim}"{session_max_age}}}"#
         )
     }
 
@@ -2938,6 +2952,110 @@ mod sso_gating {
         assert!(
             with_bundle.iter().any(|(k, _)| *k == sso_email_key),
             "an SSO session with a certified bundle must be offered sso:<domain> rows, got {with_bundle:?}"
+        );
+        Ok(())
+    }
+
+    /// Reads `sso:<domain>:expires_at_timestamp_ns` out of a certified bundle.
+    fn session_expiry_from_message(message: &[u8]) -> u64 {
+        use candid::Decode;
+        use internet_identity_interface::internet_identity::types::icrc3::Icrc3Value;
+        let key = format!("sso:{GATE_DOMAIN}:expires_at_timestamp_ns");
+        let value: Icrc3Value =
+            candid::Decode!(message, Icrc3Value).expect("failed to decode ICRC-3 value");
+        let Icrc3Value::Map(entries) = value else {
+            panic!("expected a map, got {value:?}");
+        };
+        let (_, expiry) = entries
+            .iter()
+            .find(|(k, _)| *k == key)
+            .unwrap_or_else(|| panic!("expected {key} in {entries:?}"));
+        match expiry {
+            Icrc3Value::Nat(nat) => u64::try_from(nat.0.clone()).expect("expiry fits in u64"),
+            other => panic!("expected {key} to be a Nat, got {other:?}"),
+        }
+    }
+
+    /// The certified bundle carries the domain's session deadline, and it is the
+    /// org's value rather than the bundle's own five-minute freshness window.
+    #[test]
+    fn sso_attributes_carry_the_domains_session_deadline() -> Result<(), RejectResponse> {
+        const SESSION_MAX_AGE_SECONDS: u64 = 15 * 60;
+        let env = env();
+        let canister_id = install(&env);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(
+            well_known_with_session_max_age(
+                &app_clients,
+                false,
+                "sub",
+                Some(SESSION_MAX_AGE_SECONDS),
+            ),
+            jwks,
+        );
+
+        // The deadline is stamped from the ceremony's clock, so bracket it.
+        let before_ns = env.get_time().as_nanos_since_unix_epoch();
+        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &ii_client_jwt);
+        let after_ns = env.get_time().as_nanos_since_unix_epoch();
+
+        let prepared = api::prepare_icrc3_attributes_with_bundle(
+            &env,
+            canister_id,
+            test_principal(),
+            sso_attr_request(identity_number, GATED_ORIGIN),
+            &bundle,
+            canister_id,
+        )?
+        .expect("prepare_icrc3_attributes succeeds");
+
+        let expiry = session_expiry_from_message(&prepared.message);
+        let max_age_ns = SESSION_MAX_AGE_SECONDS * 1_000_000_000;
+        assert!(
+            expiry >= before_ns + max_age_ns && expiry <= after_ns + max_age_ns,
+            "expected a deadline {max_age_ns}ns after the ceremony (between {} and {}), got {expiry}",
+            before_ns + max_age_ns,
+            after_ns + max_age_ns
+        );
+        // Distinct from the bundle's own freshness window, which is five minutes.
+        assert!(
+            expiry > after_ns + 5 * 60 * 1_000_000_000,
+            "the session deadline must outlive the bundle's freshness window, got {expiry}"
+        );
+        Ok(())
+    }
+
+    /// A domain that declares no `session_max_age_seconds` gets the eight-hour default.
+    #[test]
+    fn sso_attributes_default_to_an_eight_hour_session() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "sub"), jwks);
+
+        let before_ns = env.get_time().as_nanos_since_unix_epoch();
+        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &ii_client_jwt);
+        let after_ns = env.get_time().as_nanos_since_unix_epoch();
+
+        let prepared = api::prepare_icrc3_attributes_with_bundle(
+            &env,
+            canister_id,
+            test_principal(),
+            sso_attr_request(identity_number, GATED_ORIGIN),
+            &bundle,
+            canister_id,
+        )?
+        .expect("prepare_icrc3_attributes succeeds");
+
+        let expiry = session_expiry_from_message(&prepared.message);
+        let eight_hours_ns = 8 * 60 * 60 * 1_000_000_000;
+        assert!(
+            expiry >= before_ns + eight_hours_ns && expiry <= after_ns + eight_hours_ns,
+            "expected the eight-hour default (between {} and {}), got {expiry}",
+            before_ns + eight_hours_ns,
+            after_ns + eight_hours_ns
         );
         Ok(())
     }
