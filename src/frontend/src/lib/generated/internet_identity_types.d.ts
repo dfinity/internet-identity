@@ -1027,10 +1027,11 @@ export interface InternetIdentityInit {
    */
   'is_production' : [] | [boolean],
   /**
-   * One-shot upgrade arg driving the MCP config migration: `opt true`
-   * rewrites every stored config to "enabled, official connector", since a
-   * value stored before the official connector existed was never a choice
-   * about it. Runs at most once per deployment; unset means no migration.
+   * One-shot upgrade arg driving the MCP config migration: `opt true` gives
+   * every anchor "enabled, official connector", since neither a value stored
+   * before the official connector existed nor an absent config was ever a
+   * choice about it. Unset means no migration, and the migration is refused
+   * when the deployment ships no `mcp_official_url`.
    */
   'mcp_config_migration' : [] | [boolean],
   /**
@@ -1430,15 +1431,19 @@ export interface PrepareIdAliasRequest {
 }
 /**
  * Result of prepare_mcp_registration_delegation: the canister-signature public
- * key the registration delegation is rooted at (P_reg), and the (short)
- * expiration of that delegation. The frontend fetches the signed delegation via
- * get_mcp_registration_delegation and delivers the chain to the trusted MCP
+ * key the registration delegation is rooted at (P_reg), the (short) expiration
+ * of that delegation, and the identity's resolved trusted_url (the anchor's own
+ * server if set, else the official connector). trusted_url is certified (this
+ * is an update call), so the frontend can gate delivery on it - delivering the
+ * chain only when the connect link's origin matches - rather than trusting an
+ * uncertified mcp_get_config query. The frontend fetches the signed delegation
+ * via get_mcp_registration_delegation and delivers the chain to the trusted MCP
  * server, which redeems it with mcp_register_v2.
  */
 export interface PrepareMcpRegistrationDelegation {
   'user_key' : UserKey,
-  'expiration' : Timestamp,
   'trusted_url' : string,
+  'expiration' : Timestamp,
 }
 export interface PrepareSessionDelegation {
   'user_key' : UserKey,
@@ -1665,6 +1670,12 @@ export interface SsoDiscovery {
    * The org's primary OIDC client.
    */
   'client_id' : string,
+  /**
+   * How long a sign-in through this domain stays valid, in nanoseconds, from
+   * the domain's optional `session_max_age_seconds` (8 hours when unset). The
+   * sign-in flow caps the account delegation it requests at this value.
+   */
+  'session_max_age_ns' : bigint,
 }
 /**
  * Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A

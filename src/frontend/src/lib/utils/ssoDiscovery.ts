@@ -22,6 +22,12 @@ export interface SsoDiscoveryResult {
   /** The client to run the ceremony against for the target origin; equals {@link clientId} when no origin was passed. */
   resolvedClientId: string;
   /**
+   * How long a sign-in through this domain stays valid, in nanoseconds, from the
+   * domain's `session_max_age_seconds`. The sign-in flow caps the account
+   * delegation it requests at this value.
+   */
+  sessionMaxAgeNs: bigint;
+  /**
    * Human-readable name for the SSO, if the domain publishes one. Used by the
    * consent UI to render `sso:<domain>:<key>` attribute rows with a friendly
    * prefix (e.g. "DFINITY email:"); falls back to `domain` when absent.
@@ -121,6 +127,7 @@ const toResult = (discovery: SsoDiscovery): SsoDiscoveryResult => {
     domain: discovery.discovery_domain,
     clientId: discovery.client_id,
     resolvedClientId,
+    sessionMaxAgeNs: discovery.session_max_age_ns,
     name: discovery.name[0],
     discovery: {
       issuer: discovery.issuer,

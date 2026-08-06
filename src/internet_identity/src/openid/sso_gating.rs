@@ -292,6 +292,7 @@ mod tests {
             app_clients,
             gate_all_apps,
             stable_identifier_claim: "sub".to_string(),
+            session_max_age_ns: sso::DEFAULT_SESSION_MAX_AGE_NS,
         }
     }
 

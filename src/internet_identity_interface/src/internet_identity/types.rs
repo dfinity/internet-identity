@@ -516,6 +516,11 @@ pub struct SsoDiscovery {
     /// Client the frontend runs the ceremony against for the requested origin;
     /// `None` when the origin is denied.
     pub resolved_client_id: Option<String>,
+    /// How long a sign-in through this domain stays valid, in nanoseconds, from
+    /// the domain's `session_max_age_seconds`. The sign-in flow caps the account
+    /// delegation it requests at this value. Nanoseconds, like every other
+    /// duration on this interface: seconds exist only in the well-known itself.
+    pub session_max_age_ns: u64,
 }
 
 /// Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
