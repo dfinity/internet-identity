@@ -271,7 +271,13 @@ export class AuthFlow {
       }
     | undefined
   > => {
-    const { resolvedClientId, discovery, domain, name: ssoName } = ssoResult;
+    const {
+      resolvedClientId,
+      discovery,
+      domain,
+      name: ssoName,
+      sessionMaxAgeNs,
+    } = ssoResult;
     authenticationV2Funnel.addProperties({ provider: "SSO" });
     const sso = dappOrigin !== undefined ? { origin: dappOrigin } : undefined;
     const result = await this.#openIdJwtSignIn(
@@ -283,6 +289,7 @@ export class AuthFlow {
       undefined,
       domain,
       sso,
+      sessionMaxAgeNs,
     );
     if (result.type === "signIn") {
       const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
@@ -585,6 +592,10 @@ export class AuthFlow {
     discoveryDomain?: string,
     // Dapp SSO context; when set, redeems the JWT via the SSO gate path (`discoveryDomain` is always present alongside).
     sso?: { origin: string },
+    // The org's session length, from its discovery document. Carried onto the
+    // authenticated session so the delegation handler can cap the account
+    // delegation it requests.
+    ssoSessionMaxAgeNs?: bigint,
   ): Promise<
     | {
         type: "signIn";
@@ -645,6 +656,7 @@ export class AuthFlow {
         identity,
         identityNumber,
         authMethod: { openid: { iss, sub } },
+        ssoSessionMaxAgeNs,
       });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);

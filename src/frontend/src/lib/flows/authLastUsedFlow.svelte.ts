@@ -124,16 +124,21 @@ export class AuthLastUsedFlow {
         // the popup shows about:blank, then navigates to the IdP. Awaiting
         // discovery before `window.open` would let Safari block the popup.
         const { domain, loginHint } = lastUsedIdentity.authMethod.sso;
+        // Captured out of the discovery promise so it survives to
+        // `authenticationStore.set` below; the popup must open in the same task
+        // as the click, so discovery can't be awaited before this call.
+        let ssoSessionMaxAgeNs: bigint | undefined;
         const jwt = await requestWithPopup(
-          discoverSsoConfig(domain, undefined, dappOrigin).then(
-            (ssoResult) => ({
+          discoverSsoConfig(domain, undefined, dappOrigin).then((ssoResult) => {
+            ssoSessionMaxAgeNs = ssoResult.sessionMaxAgeNs;
+            return {
               clientId: ssoResult.resolvedClientId,
               authURL: ssoResult.discovery.authorization_endpoint,
               authScope: selectAuthScopes(
                 ssoResult.discovery.scopes_supported,
               ).join(" "),
-            }),
-          ),
+            };
+          }),
           {
             nonce: get(sessionStore).nonce,
             mediation: "optional",
@@ -161,6 +166,7 @@ export class AuthLastUsedFlow {
           identity,
           identityNumber,
           authMethod: { openid: { iss, sub } },
+          ssoSessionMaxAgeNs,
         });
         // Re-record the original entry so it stays SSO-tagged; the session's `authMethod` has no `sso` variant.
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
