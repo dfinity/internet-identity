@@ -1299,6 +1299,73 @@ fn finalize_fails_after_prepare_device_removed() {
     );
 }
 
+/// Prepare a second challenge while a recovery credential is already
+/// bound, then remove that credential. Pending challenges for the
+/// anchor must be dropped (`Expired`) — complements the device-removal
+/// test for the recovery-authenticated rebind path.
+#[test]
+fn prepare_challenge_expires_after_recovery_credential_remove() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    // 1. Bind a recovery email end-to-end (DoH path).
+    let bound = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+        .expect("prepare_add call failed")
+        .expect("prepare_add failed");
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let signed = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &bound.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+    let dkim_txt = signer.public_txt_record();
+    let resp = api::smtp_request(&env, canister_id, &signed.request).expect("smtp_request call");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+    let status = drive_doh_resolution(&env, canister_id, &bound.nonce, &dkim_txt);
+    assert!(
+        matches!(status, EmailChallengeStatus::RegistrationSucceeded),
+        "expected RegistrationSucceeded for initial bind, got {status:?}",
+    );
+
+    // 2. Start a new in-flight prepare (rebind / second wizard) while
+    //    the credential is still bound.
+    let pending = api::email_recovery_credential_prepare_add(
+        &env,
+        canister_id,
+        p,
+        id,
+        EmailChallengeDnsInput {
+            address: TEST_ADDRESS_2.into(),
+            dns_proof: None,
+        },
+    )
+    .expect("second prepare_add call failed")
+    .expect("second prepare_add failed");
+    let status =
+        api::email_challenge_status(&env, canister_id, &pending.nonce).expect("status call failed");
+    assert!(
+        matches!(status, EmailChallengeStatus::Pending),
+        "second challenge should be Pending before remove; got {status:?}",
+    );
+
+    // 3. Remove the bound recovery credential — drops all pending
+    //    setup/verify challenges for this anchor.
+    api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
+        .expect("remove call failed")
+        .expect("remove should succeed");
+
+    let status =
+        api::email_challenge_status(&env, canister_id, &pending.nonce).expect("status call failed");
+    assert!(
+        matches!(status, EmailChallengeStatus::Expired),
+        "pending challenge must be dropped on recovery-credential remove; got {status:?}",
+    );
+}
+
 /// Register an anchor with a temporary key (same helper shape as the
 /// dedicated temp-key suite, kept local so this file stays standalone).
 fn register_identity_with_temp_key(

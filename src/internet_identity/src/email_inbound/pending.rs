@@ -412,12 +412,13 @@ fn is_expired_at(c: &PendingChallenge, now_secs: u64) -> bool {
 /// Drop every in-flight email challenge (recovery setup *and*
 /// verified-email) that targets `anchor`.
 ///
-/// Called at the start of any security-relevant mutation of the
-/// anchor's control set (authn-method remove/replace, OpenID remove,
-/// email-recovery / verified-email remove, registration-mode exit
-/// that adds a device) so a prepare started under a now-revoked
-/// method can't complete, and so the pending map doesn't keep
+/// Called at the start of security-relevant *shrinks* of the anchor's
+/// control set (authn-method remove/replace, OpenID remove,
+/// email-recovery / verified-email remove) so a prepare started under a
+/// now-revoked method can't complete, and so the pending map doesn't keep
 /// "zombie" entries that only the finalize-time re-auth would reject.
+/// Method *additions* (including registration-mode confirm) do not drop:
+/// they leave the pinned AuthorizationKey valid.
 ///
 /// Recovery-flow entries (`PendingKind::Recover`) are *not* keyed by
 /// anchor (the anchor is resolved from the verified `From:` later)

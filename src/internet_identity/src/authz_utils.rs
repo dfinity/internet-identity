@@ -184,10 +184,14 @@ pub fn authorization_key_is_valid(
     let anchor = state::anchor(anchor_number);
     match authorization_key {
         AuthorizationKey::DeviceKey(device_key) => anchor.device(device_key).is_some(),
-        AuthorizationKey::OpenIdCredentialKey((key, _)) => anchor
+        AuthorizationKey::OpenIdCredentialKey(((iss, sub, aud), _)) => anchor
             .openid_credentials()
             .iter()
-            .any(|credential| &credential.key() == key),
+            // Compare fields in place — avoid `credential.key()` which clones
+            // the three strings on every iteration.
+            .any(|credential| {
+                &credential.iss == iss && &credential.sub == sub && &credential.aud == aud
+            }),
         AuthorizationKey::EmailRecoveryAddress(address) => anchor
             .email_recovery
             .iter()

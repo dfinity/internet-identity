@@ -261,14 +261,15 @@ pub fn remove_openid_credential(
     // Fail closed on a missing key *before* wiping pending challenges so a
     // mistyped remove doesn't kill a legitimate in-flight prepare.
     // Then drop challenges and remove — same update message, no interleaving.
+    // Compare fields in place to avoid cloning `(iss, sub, aud)` via `key()`.
+    let (iss, sub, aud) = key;
     let _ = anchor
         .openid_credentials()
         .iter()
-        .find(|c| &c.key() == key)
+        .find(|c| &c.iss == iss && &c.sub == sub && &c.aud == aud)
         .ok_or(AnchorError::OpenIdCredentialNotFound)?;
     crate::email_inbound::drop_challenges_for_anchor(anchor.anchor_number());
     anchor.remove_openid_credential(key)?;
-    let (iss, _, _) = key;
     Ok(Operation::RemoveOpenIdCredential { iss: iss.clone() })
 }
 

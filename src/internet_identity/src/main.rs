@@ -416,10 +416,11 @@ fn verify_tentative_device(
     ) {
         Ok(maybe_confirmed_device) => {
             if let Some(confirmed_device) = maybe_confirmed_device {
-                // Registration-mode exit that adds a method changes the
-                // control set — drop in-flight email challenges first.
-                email_inbound::drop_challenges_for_anchor(anchor_number);
-                // Add device to anchor with bookkeeping if it has been confirmed
+                // Add device to anchor with bookkeeping if it has been confirmed.
+                // Adding a method does not invalidate a pinned prepare-time
+                // AuthorizationKey; finalize re-auth remains the gate. (Eager
+                // drop is reserved for remove/replace paths — same as
+                // authn_method_add / OpenID add.)
                 anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
                 let operation = anchor_management::add_device(&mut anchor, confirmed_device);
                 if let Err(err) = state::storage_borrow_mut(|storage| storage.write(anchor)) {
@@ -1611,10 +1612,9 @@ mod v2_api {
             )?;
 
         if let Some(confirmed_device) = maybe_confirmed_device {
-            // Registration-mode exit that adds a method changes the
-            // control set — drop in-flight email challenges first.
-            crate::email_inbound::drop_challenges_for_anchor(identity_number);
-            // Add device to anchor with bookkeeping if it has been confirmed
+            // Adding a method does not invalidate a pinned prepare-time
+            // AuthorizationKey (see verify_tentative_device). No pending
+            // email-challenge drop here — match authn_method_add / OpenID add.
             anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
             let operation = anchor_management::add_device(&mut anchor, confirmed_device);
             state::storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| {
