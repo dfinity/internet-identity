@@ -148,6 +148,10 @@ pub fn replace_device(
     old_device: DeviceKey,
     new_device: DeviceData,
 ) -> Operation {
+    // Drop pending email challenges before mutating the auth set so a
+    // prepare started under the replaced device cannot finalize.
+    crate::email_inbound::drop_challenges_for_anchor(anchor_number);
+
     anchor
         .remove_device(&old_device)
         .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
@@ -170,6 +174,10 @@ pub fn remove_device(
     anchor: &mut Anchor,
     device_key: DeviceKey,
 ) -> Operation {
+    // Drop pending email challenges before mutating the auth set so a
+    // prepare started under the removed device cannot finalize.
+    crate::email_inbound::drop_challenges_for_anchor(anchor_number);
+
     anchor
         .remove_device(&device_key)
         .unwrap_or_else(|err| trap(&format!("failed to remove device: {err}")));
@@ -250,6 +258,15 @@ pub fn remove_openid_credential(
     anchor: &mut Anchor,
     key: &OpenIdCredentialKey,
 ) -> Result<Operation, AnchorError> {
+    // Fail closed on a missing key *before* wiping pending challenges so a
+    // mistyped remove doesn't kill a legitimate in-flight prepare.
+    // Then drop challenges and remove — same update message, no interleaving.
+    let _ = anchor
+        .openid_credentials()
+        .iter()
+        .find(|c| &c.key() == key)
+        .ok_or(AnchorError::OpenIdCredentialNotFound)?;
+    crate::email_inbound::drop_challenges_for_anchor(anchor.anchor_number());
     anchor.remove_openid_credential(key)?;
     let (iss, _, _) = key;
     Ok(Operation::RemoveOpenIdCredential { iss: iss.clone() })

@@ -416,6 +416,9 @@ fn verify_tentative_device(
     ) {
         Ok(maybe_confirmed_device) => {
             if let Some(confirmed_device) = maybe_confirmed_device {
+                // Registration-mode exit that adds a method changes the
+                // control set — drop in-flight email challenges first.
+                email_inbound::drop_challenges_for_anchor(anchor_number);
                 // Add device to anchor with bookkeeping if it has been confirmed
                 anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
                 let operation = anchor_management::add_device(&mut anchor, confirmed_device);
@@ -1608,6 +1611,9 @@ mod v2_api {
             )?;
 
         if let Some(confirmed_device) = maybe_confirmed_device {
+            // Registration-mode exit that adds a method changes the
+            // control set — drop in-flight email challenges first.
+            crate::email_inbound::drop_challenges_for_anchor(identity_number);
             // Add device to anchor with bookkeeping if it has been confirmed
             anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
             let operation = anchor_management::add_device(&mut anchor, confirmed_device);
@@ -2271,11 +2277,14 @@ mod email_recovery_api {
         identity_number: IdentityNumber,
         dns_input: EmailChallengeDnsInput,
     ) -> Result<EmailChallenge, EmailChallengeError> {
-        check_authorization(identity_number)
+        // Pin the authorization *method* (device pubkey / OpenID key /
+        // recovery address), not `caller()`: a temp-key principal expires
+        // in 10 minutes while the challenge lives 30.
+        let (_anchor, authorization_key) = check_authorization(identity_number)
             .map_err(|err| EmailChallengeError::Unauthorized(err.principal))?;
 
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        email_recovery::prepare_add(identity_number, dns_input, now_secs).await
+        email_recovery::prepare_add(identity_number, dns_input, now_secs, authorization_key).await
     }
 
     /// Anonymous. The FE-side counterpart of `prepare_add` for the
@@ -2388,12 +2397,19 @@ mod verified_email_api {
         identity_number: IdentityNumber,
         dns_input: EmailChallengeDnsInput,
     ) -> Result<EmailChallenge, EmailChallengeError> {
-        check_authorization(identity_number)
+        // Pin the authorization *method*, not `caller()` — see
+        // `email_recovery_credential_prepare_add`.
+        let (_anchor, authorization_key) = check_authorization(identity_number)
             .map_err(|err| EmailChallengeError::Unauthorized(err.principal))?;
 
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        crate::verified_emails::prepare_add_verified_email(identity_number, dns_input, now_secs)
-            .await
+        crate::verified_emails::prepare_add_verified_email(
+            identity_number,
+            dns_input,
+            now_secs,
+            authorization_key,
+        )
+        .await
     }
 
     #[update]

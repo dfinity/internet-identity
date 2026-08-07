@@ -28,16 +28,19 @@ use crate::email_inbound::{PendingKind, MAX_SESSION_KEY_BYTES, NONCE_PREFIX};
 use internet_identity_interface::internet_identity::types::email_challenge::{
     EmailChallenge, EmailChallengeDnsInput, EmailChallengeError,
 };
-use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};
+use internet_identity_interface::internet_identity::types::{
+    AnchorNumber, AuthorizationKey, SessionKey,
+};
 
 /// Body of the canister method
 /// `email_recovery_credential_prepare_add(anchor, dns_input)`.
 ///
-/// `caller_authorized` is the result of the same authentication +
-/// activity-tracking check used elsewhere in the canister — only the
-/// owner of `anchor` may bind a recovery email to it. The caller has
-/// already been validated by `main.rs`; this function only sees the
-/// happy-path arguments.
+/// `authorization_key` is the method that passed `check_authorization`
+/// at the canister method. It is pinned on the pending challenge so
+/// finalize can re-auth that the same device/OpenID/recovery credential
+/// is still on the anchor — independent of temp-key lifetime.
+/// The caller has already been validated by `main.rs`; this function
+/// only sees the happy-path arguments.
 ///
 /// `now_secs` is `ic_cdk::api::time() / 1_000_000_000`, hoisted out
 /// for testability.
@@ -45,11 +48,15 @@ pub async fn prepare_add(
     anchor: AnchorNumber,
     dns_input: EmailChallengeDnsInput,
     now_secs: u64,
+    authorization_key: AuthorizationKey,
 ) -> Result<EmailChallenge, EmailChallengeError> {
     prepare_common(
         dns_input,
         now_secs,
-        PendingKind::Register { anchor },
+        PendingKind::Register {
+            anchor,
+            authorization_key,
+        },
         NONCE_PREFIX,
     )
     .await
@@ -171,18 +178,32 @@ mod tests {
     fn rejects_non_allowlisted_domain() {
         crate::email_inbound::pending::reset_for_tests();
         install_doh_allowlist(&["gmail.com"]);
-        let result = block_on(prepare_add(1, doh_input("alice@example.com"), 100));
+        let result = block_on(prepare_add(
+            1,
+            doh_input("alice@example.com"),
+            100,
+            test_auth_key(),
+        ));
         match result {
             Err(EmailChallengeError::DomainNotAllowlisted(d)) => assert_eq!(d, "example.com"),
             other => panic!("expected DomainNotAllowlisted, got {other:?}"),
         }
     }
 
+    fn test_auth_key() -> AuthorizationKey {
+        AuthorizationKey::DeviceKey(serde_bytes::ByteBuf::from(vec![0xde, 0xad, 0xbe, 0xef]))
+    }
+
     #[test]
     fn rejects_when_doh_config_unset() {
         crate::email_inbound::pending::reset_for_tests();
         crate::state::persistent_state_mut(|p| p.doh_config = None);
-        let result = block_on(prepare_add(1, doh_input("alice@gmail.com"), 100));
+        let result = block_on(prepare_add(
+            1,
+            doh_input("alice@gmail.com"),
+            100,
+            test_auth_key(),
+        ));
         assert!(matches!(
             result,
             Err(EmailChallengeError::DomainNotAllowlisted(_))
@@ -198,7 +219,12 @@ mod tests {
         crate::email_inbound::pending::reset_for_tests();
         set_dnssec_flag(false);
         install_doh_allowlist(&["gmail.com"]);
-        let result = block_on(prepare_add(1, dnssec_input("alice@example.com"), 100));
+        let result = block_on(prepare_add(
+            1,
+            dnssec_input("alice@example.com"),
+            100,
+            test_auth_key(),
+        ));
         match result {
             Err(EmailChallengeError::DomainNotAllowlisted(d)) => assert_eq!(d, "example.com"),
             other => panic!("expected DomainNotAllowlisted, got {other:?}"),
@@ -214,7 +240,12 @@ mod tests {
         crate::email_inbound::rng::tests::seed_for_tests([9u8; 32]);
         set_dnssec_flag(false);
         install_doh_allowlist(&["gmail.com"]);
-        let result = block_on(prepare_add(1, dnssec_input("alice@gmail.com"), 100));
+        let result = block_on(prepare_add(
+            1,
+            dnssec_input("alice@gmail.com"),
+            100,
+            test_auth_key(),
+        ));
         assert!(result.is_ok(), "expected DoH success, got {result:?}");
     }
 
@@ -227,7 +258,12 @@ mod tests {
         crate::email_inbound::pending::reset_for_tests();
         set_dnssec_flag(true);
         crate::state::persistent_state_mut(|p| p.dnssec_config = None);
-        let result = block_on(prepare_add(1, dnssec_input("alice@example.com"), 100));
+        let result = block_on(prepare_add(
+            1,
+            dnssec_input("alice@example.com"),
+            100,
+            test_auth_key(),
+        ));
         match result {
             Err(EmailChallengeError::DomainNotSupported(msg)) => {
                 assert!(msg.contains("trust anchors"), "unexpected message: {msg}")
@@ -248,7 +284,7 @@ mod tests {
             "nolocal@",
             "a b@c.com",
         ] {
-            let result = block_on(prepare_add(1, doh_input(bad), 100));
+            let result = block_on(prepare_add(1, doh_input(bad), 100, test_auth_key()));
             assert!(
                 matches!(result, Err(EmailChallengeError::InvalidEmailAddress(_))),
                 "expected InvalidEmailAddress for {bad:?}, got {result:?}"
@@ -274,7 +310,7 @@ mod tests {
             oversized_local.as_str(),
             oversized_domain.as_str(),
         ] {
-            let result = block_on(prepare_add(1, doh_input(bad), 100));
+            let result = block_on(prepare_add(1, doh_input(bad), 100, test_auth_key()));
             assert!(
                 matches!(result, Err(EmailChallengeError::InvalidEmailAddress(_))),
                 "expected InvalidEmailAddress for oversized {bad:?}, got {result:?}"
@@ -288,7 +324,13 @@ mod tests {
         crate::email_inbound::rng::tests::seed_for_tests([7u8; 32]);
         install_doh_allowlist(&["gmail.com"]);
 
-        let result = block_on(prepare_add(42, doh_input("Alice@Gmail.COM"), 1_000));
+        let authorization_key = test_auth_key();
+        let result = block_on(prepare_add(
+            42,
+            doh_input("Alice@Gmail.COM"),
+            1_000,
+            authorization_key.clone(),
+        ));
         let challenge = result.expect("expected Ok");
 
         assert!(challenge.nonce.starts_with(super::NONCE_PREFIX));
@@ -300,14 +342,18 @@ mod tests {
         );
 
         // The pending entry stores the lowercased address (input was
-        // mixed case) and the registered domain.
+        // mixed case), the registered domain, and the prepare-time
+        // authorization method so finalize can re-auth.
         crate::email_inbound::pending::with_mut(&challenge.nonce, 1_001, |c| {
             assert_eq!(c.claimed_address, "alice@gmail.com");
             assert_eq!(c.registered_domain, "gmail.com");
-            matches!(
-                c.kind,
-                crate::email_inbound::pending::PendingKind::Register { anchor: 42 }
-            );
+            assert!(matches!(
+                &c.kind,
+                crate::email_inbound::pending::PendingKind::Register {
+                    anchor: 42,
+                    authorization_key: k,
+                } if k == &authorization_key
+            ));
         })
         .expect("entry should exist");
     }
@@ -319,7 +365,12 @@ mod tests {
         // Operator stored the domain in caps; user typed it lowercase.
         // We accept either side mixed-case.
         install_doh_allowlist(&["GMAIL.COM"]);
-        let result = block_on(prepare_add(1, doh_input("alice@gmail.com"), 1_000));
+        let result = block_on(prepare_add(
+            1,
+            doh_input("alice@gmail.com"),
+            1_000,
+            test_auth_key(),
+        ));
         assert!(result.is_ok(), "expected Ok, got {result:?}");
     }
 }
