@@ -307,14 +307,6 @@ pub struct InternetIdentityInit {
     /// require `https` for every discovery host. Never enable in production —
     /// non-loopback hosts always require `https` regardless of this flag.
     pub sso_allow_insecure_discovery: Option<bool>,
-    /// One-shot backfill of the `sso_domain` / `sso_name` fields on stored
-    /// `OpenIdCredential`s (see `docs/ongoing/openid-sso-prod-readiness.md`
-    /// §8.6). When `Some`, a batched timer-driven migration stamps every
-    /// stored credential whose `(iss, aud)` matches an entry and whose
-    /// `sso_domain` is not set yet. Idempotent — already-stamped credentials
-    /// are skipped, so re-submitting (e.g. with a corrected list) is safe.
-    /// When `None`, no backfill runs.
-    pub sso_credential_migration: Option<Vec<SsoCredentialMigrationEntry>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
@@ -348,22 +340,6 @@ pub struct InternetIdentityInit {
     /// (the deployment then has no official connector), `Some(Some(url))`
     /// points it at `url`.
     pub mcp_official_url: Option<Option<String>>,
-    pub mcp_config_migration: Option<bool>,
-}
-
-/// One entry of the `sso_credential_migration` backfill (see
-/// `InternetIdentityInit::sso_credential_migration`). Maps the `(iss, aud)`
-/// pair of a stored SSO credential to the discovery domain and optional
-/// human-readable name it resolves to.
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct SsoCredentialMigrationEntry {
-    pub discovery_domain: String,
-    /// Matches the stored credential's `iss`.
-    pub issuer: String,
-    /// Matches the stored credential's `aud`.
-    pub client_id: String,
-    /// Human-readable SSO label; stamped onto the credential's `sso_name`.
-    pub name: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -516,6 +492,9 @@ pub struct SsoDiscovery {
     /// Client the frontend runs the ceremony against for the requested origin;
     /// `None` when the origin is denied.
     pub resolved_client_id: Option<String>,
+    /// How long a sign-in through this domain stays valid, in nanoseconds, from
+    /// the domain's optional `session_max_age_seconds` (8 hours when unset).
+    pub session_max_age_ns: u64,
 }
 
 /// Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A

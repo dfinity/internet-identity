@@ -35,6 +35,9 @@ pub struct VerifiedSsoLogin {
     pub stable_identifier_claim: String,
     /// The cross-client-stable identifier; `None` when the claim is `sub`.
     pub stable_id: Option<String>,
+    /// The org's session length in nanoseconds, captured here while the
+    /// discovery cache is warm so later paths never have to re-read it.
+    pub session_max_age_ns: u64,
 }
 
 impl VerifiedSsoLogin {
@@ -95,6 +98,7 @@ pub fn verify_sso_jwt(
         credential,
         ii_client_id: discovery_config.client_id,
         stable_identifier_claim: discovery_config.stable_identifier_claim,
+        session_max_age_ns: discovery_config.session_max_age_ns,
     }))
 }
 
@@ -292,6 +296,7 @@ mod tests {
             app_clients,
             gate_all_apps,
             stable_identifier_claim: "sub".to_string(),
+            session_max_age_ns: sso::DEFAULT_SESSION_MAX_AGE_NS,
         }
     }
 
@@ -364,6 +369,7 @@ mod tests {
             ii_client_id: ii_client_id.to_string(),
             stable_identifier_claim: claim.to_string(),
             stable_id: stable_id.map(str::to_string),
+            session_max_age_ns: sso::DEFAULT_SESSION_MAX_AGE_NS,
         }
     }
 

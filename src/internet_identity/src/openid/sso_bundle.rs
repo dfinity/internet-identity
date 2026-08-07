@@ -6,6 +6,7 @@
 //! u64-BE len || sso_domain bytes       SSO discovery domain
 //! u64-BE len || origin bytes           certified dapp origin
 //! u64-BE len || expiry_ns (u64 BE)     bundle expiry, ns since epoch
+//! u64-BE len || session_expiry_ns  session deadline, ns since epoch
 //! ```
 
 use super::{calculate_delegation_seed, SSO_ATTR_BUNDLE_TTL_NS};
@@ -32,7 +33,13 @@ pub struct SsoAttrBundle {
     /// The dapp origin II certified this session for.
     pub origin: String,
     /// Nanoseconds since the Unix epoch after which the bundle is invalid.
+    /// Short-lived: this marks the sign-in ceremony as fresh.
     pub expiry_ns: u64,
+    /// Nanoseconds since the Unix epoch at which the SSO session ends, from the
+    /// org's `session_max_age_seconds`. Computed at the ceremony, where the
+    /// discovery cache is warm, and carried here so attribute certification
+    /// never has to re-read it. Outlives `expiry_ns`.
+    pub session_expiry_ns: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,6 +48,7 @@ pub enum SsoBundleDecodeError {
     Truncated,
     TrailingBytes,
     BadExpiryWidth,
+    BadSessionExpiryWidth,
     InvalidOriginUtf8,
     InvalidSsoDomainUtf8,
 }
@@ -51,12 +59,18 @@ fn write_field(blob: &mut Vec<u8>, data: &[u8]) {
     blob.extend_from_slice(data);
 }
 
-pub fn encode_sso_attr_bundle(sso_domain: &str, origin: &str, expiry_ns: u64) -> Vec<u8> {
+pub fn encode_sso_attr_bundle(
+    sso_domain: &str,
+    origin: &str,
+    expiry_ns: u64,
+    session_expiry_ns: u64,
+) -> Vec<u8> {
     let mut blob: Vec<u8> = Vec::new();
     blob.extend_from_slice(SSO_ATTR_BUNDLE_DOMAIN);
     write_field(&mut blob, sso_domain.as_bytes());
     write_field(&mut blob, origin.as_bytes());
     write_field(&mut blob, &expiry_ns.to_be_bytes());
+    write_field(&mut blob, &session_expiry_ns.to_be_bytes());
     blob
 }
 
@@ -109,6 +123,7 @@ pub fn decode_sso_attr_bundle(bytes: &[u8]) -> Result<SsoAttrBundle, SsoBundleDe
     let sso_domain_bytes = reader.read_field()?;
     let origin_bytes = reader.read_field()?;
     let expiry_bytes = reader.read_field()?;
+    let session_expiry_bytes = reader.read_field()?;
 
     if !reader.is_exhausted() {
         return Err(SsoBundleDecodeError::TrailingBytes);
@@ -122,11 +137,16 @@ pub fn decode_sso_attr_bundle(bytes: &[u8]) -> Result<SsoAttrBundle, SsoBundleDe
         .try_into()
         .map_err(|_| SsoBundleDecodeError::BadExpiryWidth)?;
     let expiry_ns = u64::from_be_bytes(expiry_arr);
+    let session_expiry_arr: [u8; 8] = session_expiry_bytes
+        .try_into()
+        .map_err(|_| SsoBundleDecodeError::BadSessionExpiryWidth)?;
+    let session_expiry_ns = u64::from_be_bytes(session_expiry_arr);
 
     Ok(SsoAttrBundle {
         sso_domain,
         origin,
         expiry_ns,
+        session_expiry_ns,
     })
 }
 
@@ -173,8 +193,9 @@ pub fn read_certified_sso_bundle() -> Option<SsoAttrBundle> {
 }
 
 /// Prepare the certified SSO attribute bundle: encode `(sso_domain, origin,
-/// expiry)` and sign it under the credential seed. Returns the message bytes and
-/// its expiry; [`get_sso_attr_bundle_signature`] witnesses the signature.
+/// expiry, session deadline)` and sign it under the credential seed. Returns the
+/// message bytes and its expiry; [`get_sso_attr_bundle_signature`] witnesses the
+/// signature.
 pub fn prepare_sso_attr_bundle(
     iss: &str,
     sub: &str,
@@ -182,9 +203,10 @@ pub fn prepare_sso_attr_bundle(
     anchor_number: AnchorNumber,
     sso_domain: &str,
     origin: &str,
+    session_expiry_ns: Timestamp,
 ) -> (Vec<u8>, Timestamp) {
     let expiration = time().saturating_add(SSO_ATTR_BUNDLE_TTL_NS);
-    let message = encode_sso_attr_bundle(sso_domain, origin, expiration);
+    let message = encode_sso_attr_bundle(sso_domain, origin, expiration, session_expiry_ns);
     let seed = calculate_delegation_seed(
         &(iss.to_string(), sub.to_string(), aud.to_string()),
         anchor_number,
@@ -234,8 +256,14 @@ mod tests {
             sso_domain: "idp.example.com".to_string(),
             origin: "https://nice-name.com".to_string(),
             expiry_ns: 1_700_000_000_000_000_000,
+            session_expiry_ns: 1_700_028_800_000_000_000,
         };
-        let encoded = encode_sso_attr_bundle(&bundle.sso_domain, &bundle.origin, bundle.expiry_ns);
+        let encoded = encode_sso_attr_bundle(
+            &bundle.sso_domain,
+            &bundle.origin,
+            bundle.expiry_ns,
+            bundle.session_expiry_ns,
+        );
         assert_eq!(decode_sso_attr_bundle(&encoded), Ok(bundle));
     }
 
@@ -246,24 +274,25 @@ mod tests {
             ("xn--tst-6la.example", "https://xn--tst-6la.example"),
             ("a", "b"),
         ] {
-            let encoded = encode_sso_attr_bundle(sso_domain, origin, 0);
+            let encoded = encode_sso_attr_bundle(sso_domain, origin, 0, 0);
             let decoded = decode_sso_attr_bundle(&encoded).unwrap();
             assert_eq!(decoded.sso_domain, sso_domain);
             assert_eq!(decoded.origin, origin);
             assert_eq!(decoded.expiry_ns, 0);
+            assert_eq!(decoded.session_expiry_ns, 0);
         }
     }
 
     #[test]
     fn distinct_fields_do_not_alias() {
-        let a = encode_sso_attr_bundle("ab", "c", 0);
-        let b = encode_sso_attr_bundle("a", "bc", 0);
+        let a = encode_sso_attr_bundle("ab", "c", 0, 0);
+        let b = encode_sso_attr_bundle("a", "bc", 0, 0);
         assert_ne!(a, b);
     }
 
     #[test]
     fn rejects_unknown_domain() {
-        let mut encoded = encode_sso_attr_bundle("idp", "https://a.com", 1);
+        let mut encoded = encode_sso_attr_bundle("idp", "https://a.com", 1, 2);
         encoded[0] ^= 0xff;
         assert_eq!(
             decode_sso_attr_bundle(&encoded),
@@ -271,7 +300,7 @@ mod tests {
         );
         let mut wrong_domain = b"xx-sso-attr".to_vec();
         wrong_domain.extend_from_slice(
-            &encode_sso_attr_bundle("idp", "https://a.com", 1)[SSO_ATTR_BUNDLE_DOMAIN.len()..],
+            &encode_sso_attr_bundle("idp", "https://a.com", 1, 2)[SSO_ATTR_BUNDLE_DOMAIN.len()..],
         );
         assert_eq!(
             decode_sso_attr_bundle(&wrong_domain),
@@ -281,7 +310,7 @@ mod tests {
 
     #[test]
     fn rejects_trailing_bytes() {
-        let mut encoded = encode_sso_attr_bundle("idp", "https://a.com", 1);
+        let mut encoded = encode_sso_attr_bundle("idp", "https://a.com", 1, 2);
         encoded.push(0);
         assert_eq!(
             decode_sso_attr_bundle(&encoded),
@@ -291,7 +320,7 @@ mod tests {
 
     #[test]
     fn rejects_truncated_field() {
-        let encoded = encode_sso_attr_bundle("idp", "https://a.com", 1);
+        let encoded = encode_sso_attr_bundle("idp", "https://a.com", 1, 2);
         let truncated = &encoded[..encoded.len() - 1];
         assert_eq!(
             decode_sso_attr_bundle(truncated),
@@ -337,9 +366,23 @@ mod tests {
         write_field(&mut buf, b"idp");
         write_field(&mut buf, b"https://a.com");
         write_field(&mut buf, &[0, 0, 0, 1]);
+        write_field(&mut buf, &0u64.to_be_bytes());
         assert_eq!(
             decode_sso_attr_bundle(&buf),
             Err(SsoBundleDecodeError::BadExpiryWidth)
+        );
+    }
+
+    #[test]
+    fn rejects_bad_session_expiry_width() {
+        let mut buf = SSO_ATTR_BUNDLE_DOMAIN.to_vec();
+        write_field(&mut buf, b"idp");
+        write_field(&mut buf, b"https://a.com");
+        write_field(&mut buf, &0u64.to_be_bytes());
+        write_field(&mut buf, &[0, 0, 0, 1]);
+        assert_eq!(
+            decode_sso_attr_bundle(&buf),
+            Err(SsoBundleDecodeError::BadSessionExpiryWidth)
         );
     }
 
@@ -348,6 +391,7 @@ mod tests {
         let mut buf = SSO_ATTR_BUNDLE_DOMAIN.to_vec();
         write_field(&mut buf, &[0xff, 0xfe]);
         write_field(&mut buf, b"https://a.com");
+        write_field(&mut buf, &0u64.to_be_bytes());
         write_field(&mut buf, &0u64.to_be_bytes());
         assert_eq!(
             decode_sso_attr_bundle(&buf),
@@ -360,6 +404,7 @@ mod tests {
         let mut buf = SSO_ATTR_BUNDLE_DOMAIN.to_vec();
         write_field(&mut buf, b"idp");
         write_field(&mut buf, &[0xff, 0xfe]);
+        write_field(&mut buf, &0u64.to_be_bytes());
         write_field(&mut buf, &0u64.to_be_bytes());
         assert_eq!(
             decode_sso_attr_bundle(&buf),
