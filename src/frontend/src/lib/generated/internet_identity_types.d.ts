@@ -1629,6 +1629,11 @@ export interface SsoDiscovery {
    * The org's primary OIDC client.
    */
   'client_id' : string,
+  /**
+   * How long a sign-in through this domain stays valid, in nanoseconds, from
+   * the domain's optional `session_max_age_seconds` (8 hours when unset).
+   */
+  'session_max_age_ns' : bigint,
 }
 /**
  * Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A

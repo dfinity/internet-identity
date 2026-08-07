@@ -527,6 +527,7 @@ export const idlFactory = ({ IDL }) => {
     'resolved_client_id' : IDL.Opt(IDL.Text),
     'discovery_domain' : IDL.Text,
     'client_id' : IDL.Text,
+    'session_max_age_ns' : IDL.Nat64,
   });
   const SsoDiscoveryStatus = IDL.Variant({
     'Resolved' : SsoDiscovery,
