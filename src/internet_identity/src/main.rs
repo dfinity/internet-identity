@@ -15,8 +15,6 @@ use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-
-use ic_cdk_timers::TimerId;
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
@@ -39,11 +37,8 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::time::Duration;
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
-use storage::storable::openid_credential_key::StorableOpenIdCredentialKey;
 use storage::{Salt, Storage};
 
 mod account_management;
@@ -92,255 +87,6 @@ const INTERNETCOMPUTER_ORG_DOMAIN: &str = "identity.internetcomputer.org";
 const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org";
 const ID_AI_DOMAIN: &str = "id.ai";
 const ID_AI_ORIGIN: &str = "https://id.ai";
-
-// ---- SSO credential migration (temporary, see PR-M of
-// `docs/ongoing/openid-sso-prod-readiness.md` §8.6) ----
-//
-// Stored `OpenIdCredential`s grew `sso_domain` / `sso_name` fields. New
-// credentials are stamped at verification time, but existing SSO credentials
-// in stable storage must be backfilled from the `sso_credential_migration`
-// upgrade arg. Backfilling all credentials synchronously in `post_upgrade`
-// would blow the instruction limit on II's production canister, so we batch
-// the work via an interval timer using the same convention as the prior
-// OpenID credential key migration (#3784) and anchor migration (#3713).
-
-/// How long to wait between migration batches.
-const SSO_CREDENTIAL_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
-
-/// Maximum number of credential index keys to examine per batch (= per
-/// ingress message). Matches the 2 000-per-batch convention used for
-/// previous migrations.
-const SSO_CREDENTIAL_MIGRATION_BATCH_SIZE: u64 = 2_000;
-
-thread_local! {
-    // TODO: Remove these after the data migration is complete.
-    static SSO_CREDENTIAL_MIGRATION_ENTRIES: RefCell<Vec<SsoCredentialMigrationEntry>> = const { RefCell::new(Vec::new()) };
-    static SSO_CREDENTIAL_MIGRATION_CURSOR: RefCell<Option<StorableOpenIdCredentialKey>> = const { RefCell::new(None) };
-    static SSO_CREDENTIAL_MIGRATION_DONE: RefCell<bool> = const { RefCell::new(false) };
-    static SSO_CREDENTIAL_MIGRATION_STAMPED: RefCell<u64> = const { RefCell::new(0) };
-    static SSO_CREDENTIAL_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
-    static SSO_CREDENTIAL_MIGRATION_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
-}
-
-/// Temporary hidden endpoint: returns any per-entry errors encountered
-/// during the SSO credential migration.
-#[update(hidden = true)]
-fn list_sso_credential_migration_errors() -> Vec<String> {
-    SSO_CREDENTIAL_MIGRATION_ERRORS.with_borrow(|errors| errors.clone())
-}
-
-/// Temporary hidden endpoint: returns `(stamped_credentials, is_done)` so
-/// monitoring can track migration progress.
-#[query(hidden = true)]
-fn sso_credential_migration_status() -> (u64, bool) {
-    (
-        SSO_CREDENTIAL_MIGRATION_STAMPED.with_borrow(|c| *c),
-        SSO_CREDENTIAL_MIGRATION_DONE.with_borrow(|d| *d),
-    )
-}
-
-/// Process one batch of the SSO credential migration. Bound to the interval
-/// timer set up in [`init_sso_credential_migration_timer`]; clears the timer
-/// once the migration signals completion.
-fn run_sso_credential_migration_batch() {
-    if SSO_CREDENTIAL_MIGRATION_DONE.with_borrow(|done| *done) {
-        return;
-    }
-
-    let entries = SSO_CREDENTIAL_MIGRATION_ENTRIES.with_borrow(|entries| entries.clone());
-    let cursor = SSO_CREDENTIAL_MIGRATION_CURSOR.with_borrow(|cursor| cursor.clone());
-    let outcome = state::storage_borrow_mut(|storage| {
-        storage.migrate_sso_credentials_batch(&entries, cursor, SSO_CREDENTIAL_MIGRATION_BATCH_SIZE)
-    });
-
-    SSO_CREDENTIAL_MIGRATION_STAMPED.with_borrow_mut(|count| {
-        *count = count.saturating_add(outcome.stamped);
-    });
-    if !outcome.errors.is_empty() {
-        SSO_CREDENTIAL_MIGRATION_ERRORS.with_borrow_mut(|errors| errors.extend(outcome.errors));
-    }
-    if let Some(next_cursor) = outcome.next_cursor {
-        SSO_CREDENTIAL_MIGRATION_CURSOR.replace(Some(next_cursor));
-    }
-
-    if outcome.is_done {
-        SSO_CREDENTIAL_MIGRATION_DONE.replace(true);
-        SSO_CREDENTIAL_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
-            if let Some(timer_id) = id_slot.take() {
-                ic_cdk_timers::clear_timer(timer_id);
-            }
-        });
-        let stamped = SSO_CREDENTIAL_MIGRATION_STAMPED.with_borrow(|c| *c);
-        ic_cdk::println!("SSO credential migration COMPLETED ({stamped} credentials stamped).");
-    }
-}
-
-/// Start the interval timer driving [`run_sso_credential_migration_batch`].
-/// Safe to call from both `init` (the first batch will immediately see an
-/// empty entry list or index and mark the migration done) and `post_upgrade`.
-fn init_sso_credential_migration_timer() {
-    let timer_id = ic_cdk_timers::set_timer_interval(
-        SSO_CREDENTIAL_MIGRATION_BATCH_BACKOFF_SECONDS,
-        run_sso_credential_migration_batch,
-    );
-    SSO_CREDENTIAL_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
-        if let Some(old_id) = id_slot.replace(timer_id) {
-            ic_cdk_timers::clear_timer(old_id);
-        }
-    });
-}
-
-// ---- MCP config migration (temporary; remove once every deployment has run
-// it) ----
-//
-// `enabled` on a stored `StorableMcpConfig` predates the official connector,
-// so a stored `false` only ever meant "no custom server of mine" — nobody
-// could have declined a connector that did not exist. This one-shot migration
-// gives AI access on the official connector to *every* anchor: it walks the
-// anchor map, so anchors that never wrote a config get a row too. Those are the
-// anchors that registered before configs were seeded at registration time, and
-// nothing else would ever switch them on.
-//
-// Driven by the `mcp_config_migration` upgrade arg and batched via an interval
-// timer, using the same convention as the SSO credential migration above:
-// writing a config for every anchor in `post_upgrade` would blow the
-// instruction limit.
-
-/// How long to wait between migration batches.
-const MCP_CONFIG_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
-
-/// Maximum number of anchors to examine per batch (= per ingress message).
-/// Matches the 2 000-per-batch convention used for previous migrations.
-const MCP_CONFIG_MIGRATION_BATCH_SIZE: u64 = 2_000;
-
-/// Largest window [`list_mcp_config_migration_errors`] serves in one call, so a
-/// wide `lo`/`hi` range can't push the response past the 2 MiB limit. The full
-/// set is accumulated regardless — even the pathological case of every anchor
-/// erroring is a few hundred MB of strings, which fits the heap — so paging is
-/// only about the response size, not about bounding what is kept.
-const MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT: u64 = 500;
-
-thread_local! {
-    // TODO: Remove these after the data migration is complete.
-    static MCP_CONFIG_MIGRATION_REQUESTED: RefCell<bool> = const { RefCell::new(false) };
-    static MCP_CONFIG_MIGRATION_CURSOR: RefCell<Option<AnchorNumber>> = const { RefCell::new(None) };
-    static MCP_CONFIG_MIGRATION_DONE: RefCell<bool> = const { RefCell::new(false) };
-    static MCP_CONFIG_MIGRATION_COUNT: RefCell<u64> = const { RefCell::new(0) };
-    static MCP_CONFIG_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
-    static MCP_CONFIG_MIGRATION_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
-}
-
-/// Temporary hidden endpoint: per-anchor errors encountered during the MCP
-/// config migration, as the half-open range `[lo, hi)`. The strings name an
-/// anchor number and the anomaly, never a principal.
-///
-/// Every error is collected, but paginated on read because this migration
-/// touches every anchor: returning the whole list at once could exceed the
-/// 2 MiB response limit and fail exactly when it is needed. `hi` is clamped to
-/// the number stored and to [`MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT`] past `lo`,
-/// so page until a call returns fewer than requested. An out-of-range `lo`
-/// yields an empty vector rather than trapping.
-#[update(hidden = true)]
-fn list_mcp_config_migration_errors(lo: u64, hi: u64) -> Vec<String> {
-    MCP_CONFIG_MIGRATION_ERRORS.with_borrow(|errors| {
-        let len = errors.len() as u64;
-        if lo >= len || hi <= lo {
-            return vec![];
-        }
-        let end = hi.min(len).min(lo + MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT);
-        errors[lo as usize..end as usize].to_vec()
-    })
-}
-
-/// Temporary hidden endpoint: returns `(migrated_configs, is_done)` so beta
-/// monitoring can watch the migration land before it is proposed for
-/// production. Both values are per-boot, and `(0, false)` is ambiguous between
-/// two cases: this upgrade didn't pass `mcp_config_migration`, or it did and
-/// the scan hasn't finished. Only `(_, true)` means a run completed, so a
-/// `(0, false)` that persists past the first few batches is the signal that
-/// the arg never arrived.
-///
-/// `(0, true)` alone does not mean success: a migration refused for want of an
-/// official connector also lands there. [`list_mcp_config_migration_errors`]
-/// carries the refusal, so check it before reading `true` as "done".
-#[query(hidden = true)]
-fn mcp_config_migration_status() -> (u64, bool) {
-    (
-        MCP_CONFIG_MIGRATION_COUNT.with_borrow(|c| *c),
-        MCP_CONFIG_MIGRATION_DONE.with_borrow(|d| *d),
-    )
-}
-
-/// Process one batch of the MCP config migration. Bound to the interval timer
-/// set up in [`init_mcp_config_migration_timer`]; clears the timer once the
-/// scan reaches the end.
-fn run_mcp_config_migration_batch() {
-    if MCP_CONFIG_MIGRATION_DONE.with_borrow(|done| *done) {
-        return;
-    }
-
-    let cursor = MCP_CONFIG_MIGRATION_CURSOR.with_borrow(|cursor| *cursor);
-    let outcome = state::storage_borrow_mut(|storage| {
-        storage.migrate_mcp_configs_batch(cursor, MCP_CONFIG_MIGRATION_BATCH_SIZE)
-    });
-
-    MCP_CONFIG_MIGRATION_COUNT.with_borrow_mut(|count| {
-        *count = count.saturating_add(outcome.migrated);
-    });
-    if !outcome.errors.is_empty() {
-        MCP_CONFIG_MIGRATION_ERRORS.with_borrow_mut(|errors| errors.extend(outcome.errors));
-    }
-    if let Some(next_cursor) = outcome.next_cursor {
-        MCP_CONFIG_MIGRATION_CURSOR.replace(Some(next_cursor));
-    }
-
-    if outcome.is_done {
-        MCP_CONFIG_MIGRATION_DONE.replace(true);
-        MCP_CONFIG_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
-            if let Some(timer_id) = id_slot.take() {
-                ic_cdk_timers::clear_timer(timer_id);
-            }
-        });
-        let migrated = MCP_CONFIG_MIGRATION_COUNT.with_borrow(|c| *c);
-        ic_cdk::println!("MCP config migration COMPLETED ({migrated} configs migrated).");
-    }
-}
-
-/// Start the interval timer driving [`run_mcp_config_migration_batch`], unless
-/// this upgrade didn't ask for the migration. Nothing about a completed run is
-/// persisted, so the upgrade arg is the only control: passing it again re-runs
-/// the migration, exactly like the SSO credential migration above.
-///
-/// Without an official connector the migration is refused outright: the shape it
-/// writes resolves to no trusted URL at all, so it would leave every identity
-/// with AI access reading on and nothing behind it. Same rule as
-/// `mcp::init_config_for_new_identity`.
-fn init_mcp_config_migration_timer() {
-    if !MCP_CONFIG_MIGRATION_REQUESTED.with_borrow(|requested| *requested) {
-        return;
-    }
-    if mcp::official_url().is_none() {
-        // Record the refusal, not just the log line: `mcp_config_migration_status`
-        // would otherwise report `(0, true)`, indistinguishable from a run that
-        // completed with nothing to do.
-        let err = "migration refused: mcp_config_migration was requested but this deployment has \
-                   no official connector"
-            .to_string();
-        ic_cdk::println!("WARNING: MCP config migration: {err}");
-        MCP_CONFIG_MIGRATION_ERRORS.with_borrow_mut(|errors| errors.push(err));
-        MCP_CONFIG_MIGRATION_DONE.replace(true);
-        return;
-    }
-    let timer_id = ic_cdk_timers::set_timer_interval(
-        MCP_CONFIG_MIGRATION_BATCH_BACKOFF_SECONDS,
-        run_mcp_config_migration_batch,
-    );
-    MCP_CONFIG_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
-        if let Some(old_id) = id_slot.replace(timer_id) {
-            ic_cdk_timers::clear_timer(old_id);
-        }
-    });
-}
 
 #[update]
 async fn init_salt() {
@@ -1016,9 +762,6 @@ fn config() -> InternetIdentityInit {
         new_flow_origins: persistent_state.new_flow_origins.clone(),
         openid_configs: persistent_state.openid_configs.clone(),
         sso_allow_insecure_discovery: persistent_state.sso_allow_insecure_discovery,
-        // One-shot upgrade arg driving the SSO credential backfill; not
-        // persisted as config, so there is nothing to report back here.
-        sso_credential_migration: None,
         analytics_config: Some(persistent_state.analytics_config.clone()),
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
         is_production: persistent_state.is_production,
@@ -1029,9 +772,6 @@ fn config() -> InternetIdentityInit {
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
         mcp_official_url: Some(persistent_state.mcp_official_url.clone()),
-        // One-shot upgrade arg driving the MCP config migration; not persisted
-        // as config, so there is nothing to report back here.
-        mcp_config_migration: None,
     })
 }
 
@@ -1083,14 +823,6 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
     }
-
-    // Kick off the SSO credential batch migration. Examines at most
-    // `SSO_CREDENTIAL_MIGRATION_BATCH_SIZE` index keys per tick so each batch
-    // fits in one ingress message; timer self-clears once the migration
-    // signals done (immediately, when no `sso_credential_migration` arg was
-    // supplied).
-    init_sso_credential_migration_timer();
-    init_mcp_config_migration_timer();
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
@@ -1138,12 +870,6 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.sso_allow_insecure_discovery = Some(sso_allow_insecure_discovery);
             })
         }
-        if let Some(entries) = arg.sso_credential_migration {
-            // One-shot arg, not persisted: the entries only need to live
-            // until the batch migration kicked off in `initialize()` has
-            // walked the credential index once.
-            SSO_CREDENTIAL_MIGRATION_ENTRIES.replace(entries);
-        }
         if let Some(new_flow_origins) = arg.new_flow_origins {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.new_flow_origins = Some(new_flow_origins);
@@ -1185,9 +911,6 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.doh_config = doh_config;
             })
-        }
-        if arg.mcp_config_migration == Some(true) {
-            MCP_CONFIG_MIGRATION_REQUESTED.replace(true);
         }
         if let Some(mcp_official_url) = arg.mcp_official_url {
             // Outer Some -> apply: inner None clears, inner Some replaces.
@@ -1905,6 +1628,7 @@ mod openid_api {
             Err(err) => return OpenIdResult::Err(err.into()),
         };
 
+        let session_max_age_ns = verification.session_max_age_ns;
         let identity = match openid::resolve_ii_client_identity(&verification) {
             Ok(identity) => identity,
             Err(err) => return OpenIdResult::Err(err),
@@ -1928,6 +1652,12 @@ mod openid_api {
                 .prepare_jwt_delegation(session_key, anchor_number)
                 .await;
 
+            // The session deadline is fixed here, at the ceremony, from the
+            // policy captured while the discovery cache was warm. Everything
+            // downstream reads this value rather than the cache, so an evicted
+            // entry or a refreshed policy can't move a live session's deadline.
+            let session_expiry_ns = ic_cdk::api::time().saturating_add(session_max_age_ns);
+
             let (sso_attr_bundle, _bundle_expiration) = openid::prepare_sso_attr_bundle(
                 &identity.credential.iss,
                 &identity.credential.sub,
@@ -1935,6 +1665,7 @@ mod openid_api {
                 anchor_number,
                 &discovery_domain,
                 &origin,
+                session_expiry_ns,
             );
 
             // The association could change during the `.await`.
@@ -2533,9 +2264,10 @@ mod attribute_sharing {
         } = request.try_into()?;
 
         // SSO session iff a certified bundle for this origin is attached; gates `sso:<domain>` attributes.
-        let sso_session_domain = openid::read_certified_sso_bundle()
-            .filter(|bundle| bundle.origin == origin)
-            .map(|bundle| bundle.sso_domain);
+        let sso_session =
+            openid::read_certified_sso_bundle().filter(|bundle| bundle.origin == origin);
+        let sso_session_expiry_ns = sso_session.as_ref().map(|bundle| bundle.session_expiry_ns);
+        let sso_session_domain = sso_session.map(|bundle| bundle.sso_domain);
         let (anchor, _) =
             check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
                 PrepareIcrc3AttributeError::AuthorizationError(principal)
@@ -2556,6 +2288,7 @@ mod attribute_sharing {
             issued_at_timestamp_ns,
             account,
             sso_session_domain,
+            sso_session_expiry_ns,
         )?;
 
         Ok(PrepareIcrc3AttributeResponse { message })
@@ -2665,66 +2398,5 @@ mod test {
         .unwrap_or_else(|e| {
             panic!("the canister code interface is not equal to the did file: {e:?}")
         });
-    }
-}
-
-#[cfg(test)]
-mod list_mcp_config_migration_errors_tests {
-    use super::*;
-
-    fn seed(count: usize) {
-        MCP_CONFIG_MIGRATION_ERRORS.with_borrow_mut(|errors| {
-            *errors = (0..count).map(|i| format!("anchor {i}")).collect();
-        });
-    }
-
-    #[test]
-    fn serves_the_requested_half_open_range() {
-        seed(10);
-        assert_eq!(
-            list_mcp_config_migration_errors(2, 5),
-            vec!["anchor 2", "anchor 3", "anchor 4"]
-        );
-    }
-
-    #[test]
-    fn clamps_hi_to_what_is_retained() {
-        seed(3);
-        assert_eq!(
-            list_mcp_config_migration_errors(1, u64::MAX),
-            vec!["anchor 1", "anchor 2"]
-        );
-    }
-
-    #[test]
-    fn caps_the_window_at_the_page_limit() {
-        let total = MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT as usize + 10;
-        seed(total);
-        assert_eq!(
-            list_mcp_config_migration_errors(0, total as u64).len(),
-            MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT as usize
-        );
-    }
-
-    #[test]
-    fn returns_empty_for_out_of_range_or_inverted_bounds() {
-        seed(3);
-        // Past the end, and an empty or backwards window: empty, never a trap.
-        assert!(list_mcp_config_migration_errors(3, 9).is_empty());
-        assert!(list_mcp_config_migration_errors(u64::MAX, u64::MAX).is_empty());
-        assert!(list_mcp_config_migration_errors(2, 2).is_empty());
-        assert!(list_mcp_config_migration_errors(2, 1).is_empty());
-    }
-
-    #[test]
-    fn empty_error_list_never_slices() {
-        seed(0);
-        // The `lo >= len` guard catches this because `lo` is a `u64`, so it can't
-        // be below an empty list's length of 0 — the slice is never reached.
-        assert!(list_mcp_config_migration_errors(0, 0).is_empty());
-        assert!(list_mcp_config_migration_errors(0, u64::MAX).is_empty());
-        assert!(
-            list_mcp_config_migration_errors(0, MCP_CONFIG_MIGRATION_ERROR_PAGE_LIMIT).is_empty()
-        );
     }
 }

@@ -19,7 +19,6 @@
     related_origins: frontendCanisterConfig.related_origins,
     openid_configs: [],
     sso_allow_insecure_discovery: [],
-    sso_credential_migration: [],
     backend_origin: [frontendCanisterConfig.backend_origin],
     captcha_config: [],
     dummy_auth: [],
@@ -28,7 +27,6 @@
     doh_config: [],
     dnssec_config: [],
     mcp_official_url: [],
-    mcp_config_migration: [],
   });
 </script>
 
