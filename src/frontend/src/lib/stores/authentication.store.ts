@@ -21,7 +21,18 @@ export interface Authenticated {
   actor: ActorSubclass<_SERVICE>;
   authMethod:
     | { passkey: { credentialId: Uint8Array } }
-    | { openid: { iss: string; sub: string } }
+    | {
+        openid: {
+          iss: string;
+          sub: string;
+          /**
+           * Set when the sign-in went through an organization's SSO: how long
+           * that organization allows the session to stay valid, in nanoseconds.
+           * Absent for the built-in providers, which publish no such policy.
+           */
+          ssoSessionMaxAgeNs?: bigint;
+        };
+      }
     | { recoveryPhrase: { principal: Principal } }
     | { emailRecovery: { principal: Principal } };
 }
