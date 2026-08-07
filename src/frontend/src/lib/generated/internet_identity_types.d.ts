@@ -1006,14 +1006,6 @@ export interface InternetIdentityInit {
    */
   'is_production' : [] | [boolean],
   /**
-   * One-shot upgrade arg driving the MCP config migration: `opt true` gives
-   * every anchor "enabled, official connector", since neither a value stored
-   * before the official connector existed nor an absent config was ever a
-   * choice about it. Unset means no migration, and the migration is refused
-   * when the deployment ships no `mcp_official_url`.
-   */
-  'mcp_config_migration' : [] | [boolean],
-  /**
    * Backend canister ID, needed for backward compatibility.
    */
   'backend_canister_id' : [] | [Principal],

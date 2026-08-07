@@ -323,32 +323,6 @@ impl Storable for BufferedEntryWrapper {
     const BOUND: Bound = Bound::Unbounded;
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct McpConfigMigrationBatchOutcome {
-    /// Number of MCP configs written this batch, counting both rewritten rows
-    /// and rows created for anchors that had none.
-    pub migrated: u64,
-    /// `true` when the scan has reached the end of the anchor map — caller
-    /// should stop the interval timer.
-    pub is_done: bool,
-    /// Per-anchor errors encountered this batch (e.g. a registration pointer
-    /// that could not be resolved to an entry this anchor owns).
-    pub errors: Vec<String>,
-    /// Last anchor examined this batch; pass back as `cursor` of the next
-    /// batch to resume the scan. `None` when the batch examined nothing.
-    pub next_cursor: Option<StorableAnchorNumber>,
-}
-
-impl McpConfigMigrationBatchOutcome {
-    /// Record a per-anchor error, mirroring the SSO credential migration: every
-    /// error goes to the canister log as well as the returned vector, so the
-    /// bound the caller applies to the vector can never lose one.
-    fn push_error(&mut self, err: String) {
-        ic_cdk::println!("WARNING: MCP config migration: {err}");
-        self.errors.push(err);
-    }
-}
-
 /// Data type responsible for managing anchor data in stable memory.
 pub struct Storage<M: Memory> {
     header: Header,
@@ -1060,124 +1034,6 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&principal)
     }
 
-    /// Give up to `batch_size` anchors AI access on the official connector, by
-    /// writing `{ enabled: true, url: None }` for every anchor the scan reaches.
-    /// The pre-official-connector meaning of a stored `enabled` was "no custom
-    /// server of mine", never a choice about a connector that did not exist yet
-    /// — and an anchor with no stored config never expressed a choice either, it
-    /// simply registered before configs were seeded at registration time.
-    ///
-    /// The scan therefore walks the anchor map, not the config map: anchors that
-    /// never wrote a config are the whole reason this runs, and a config-map
-    /// scan cannot see them. Every anchor reached is written unconditionally,
-    /// including rows already in the target shape and rows enabled with a custom
-    /// server — the latter have to re-add their server if they still want it.
-    ///
-    /// Unlike the SSO credential migration this is therefore **not** idempotent.
-    /// A healthy identity on the official connector sits at exactly the target
-    /// shape with a live `session_principal`, so a second run rewrites its row
-    /// and drops that session along with everyone else's. Re-running is a
-    /// deliberate "drop every MCP session" operation, not a cheap retry, and
-    /// nothing but withholding the upgrade arg prevents it.
-    ///
-    /// Rewriting the row is what invalidates a live session: `session_principal`
-    /// goes back to `None`, and `authorize_mcp_session` only authorizes a caller
-    /// the config still points at. The grant row itself is left to the lazy
-    /// expiry cleanup on the update path — it can no longer authorize anything.
-    ///
-    /// An in-flight registration is removed explicitly, because it is not covered
-    /// by that: redemption resolves the entry from the registration index by
-    /// `p_reg` and compares its hash against the *current* trusted URL, never
-    /// consulting the config. Switching AI access off leaves the entry in place
-    /// and relies on `trusted_url` being `None` to refuse it, so re-pointing the
-    /// identity at the official connector would make an entry minted under that
-    /// connector redeemable again.
-    ///
-    /// A registration pointer that cannot be resolved to an entry this anchor
-    /// owns is reported in `errors` and logged, following the SSO credential
-    /// migration: the row is rewritten regardless, so the entry it pointed at
-    /// would otherwise be left redeemable with no trace. Like there, the strings
-    /// carry the anchor number only and never a principal.
-    ///
-    /// The bad pointer itself is cleaned up either way — the rewrite resets it to
-    /// `None`. Nothing further can be: an undecodable pointer yields no key, and
-    /// the registration index is keyed by principal with no anchor reverse
-    /// lookup, so an entry it may have referenced can't be located without
-    /// scanning the whole index. Those entries expire in five minutes and are
-    /// reclaimed by the amortized sweep.
-    pub fn migrate_mcp_configs_batch(
-        &mut self,
-        cursor: Option<StorableAnchorNumber>,
-        batch_size: u64,
-    ) -> McpConfigMigrationBatchOutcome {
-        let mut outcome = McpConfigMigrationBatchOutcome::default();
-        if batch_size == 0 {
-            outcome.is_done = true;
-            return outcome;
-        }
-
-        // `keys_range` avoids decoding a `StorableAnchor` per anchor: the scan
-        // only needs the number, and the records are large. Writing as we go is
-        // fine because the scan reads the anchor map while the writes land in the
-        // config and registration maps — no aliasing, unlike the config-map scan
-        // this replaced. The registration index is reached by field rather than
-        // through `lookup`/`remove_mcp_registration`, which would borrow all of
-        // `self` and conflict with the iterator.
-        use std::ops::Bound as RangeBound;
-        let range = match cursor {
-            Some(cursor) => (RangeBound::Excluded(cursor), RangeBound::Unbounded),
-            None => (RangeBound::Unbounded, RangeBound::Unbounded),
-        };
-        let mut examined: u64 = 0;
-        for anchor_number in self
-            .stable_anchor_memory
-            .keys_range(range)
-            .take(batch_size as usize)
-        {
-            examined += 1;
-            outcome.next_cursor = Some(anchor_number);
-
-            let pending_registration = self
-                .mcp_config_memory
-                .get(&anchor_number)
-                .and_then(|config| config.pending_registration);
-            if let Some(bytes) = pending_registration {
-                match Principal::try_from_slice(&bytes) {
-                    // Only remove an entry this anchor actually owns, so a stale
-                    // pointer can't evict another identity's registration.
-                    Ok(principal) => match self.mcp_registration_memory.get(&principal) {
-                        Some(entry) if entry.anchor_number == anchor_number => {
-                            self.mcp_registration_memory.remove(&principal);
-                        }
-                        Some(_) => outcome.push_error(format!(
-                            "anchor {anchor_number}: registration pointer resolves to an entry \
-                             held by another anchor; left in place"
-                        )),
-                        None => {}
-                    },
-                    Err(_) => outcome.push_error(format!(
-                        "anchor {anchor_number}: registration pointer is not a valid principal; \
-                         entry could not be removed"
-                    )),
-                }
-            }
-            self.mcp_config_memory.insert(
-                anchor_number,
-                StorableMcpConfig {
-                    enabled: true,
-                    ..Default::default()
-                },
-            );
-            outcome.migrated += 1;
-        }
-
-        // A short batch means the scan has reached the end of the map.
-        if examined < batch_size {
-            outcome.is_done = true;
-        }
-        outcome
-    }
-
     /// Look up the MCP session grant registered for `principal` (the caller
     /// of the server-facing `mcp_*` methods). Callers are responsible for
     /// checking `expires_at_ns`; the map itself never authorizes anything.
@@ -1333,10 +1189,9 @@ impl<M: Memory + Clone> Storage<M> {
         self.mcp_config_memory.insert(anchor_number, config);
     }
 
-    /// Give `anchor_number` AI access on the official connector, the same shape
-    /// `migrate_mcp_configs_batch` gives identities that registered earlier.
-    /// Call it through `mcp::init_config_for_new_identity`, which holds the rule
-    /// that this is only written when the deployment has a connector to trust.
+    /// Give `anchor_number` AI access on the official connector. Call it through
+    /// `mcp::init_config_for_new_identity`, which holds the rule that this is
+    /// only written when the deployment has a connector to trust.
     pub fn init_mcp_config(&mut self, anchor_number: AnchorNumber) {
         self.mcp_config_memory.insert(
             anchor_number,
