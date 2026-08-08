@@ -57,6 +57,11 @@ pub fn remove_credential(anchor: &mut Anchor, address: &str) -> Result<Operation
         .position(|c| c.address.eq_ignore_ascii_case(address))
         .ok_or(RemoveError::NotRegistered)?;
 
+    // Drop pending email challenges before clearing the credential so
+    // a prepare started under recovery-delegation auth cannot finalize
+    // after the recovery email is detached.
+    crate::email_inbound::drop_challenges_for_anchor(anchor.anchor_number());
+
     anchor.email_recovery.remove(position);
 
     Ok(Operation::RemoveEmailRecovery)

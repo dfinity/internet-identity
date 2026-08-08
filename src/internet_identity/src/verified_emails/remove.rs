@@ -13,6 +13,11 @@ pub fn remove(anchor: &mut Anchor, address: &str) -> Result<Operation, RemoveErr
         .position(|c| c.address.eq_ignore_ascii_case(address))
         .ok_or(RemoveError::NotRegistered)?;
 
+    // Drop pending email challenges before clearing the verified email
+    // so in-flight prepare/finalize for this anchor is invalidated with
+    // the control-set change (same policy as recovery-credential remove).
+    crate::email_inbound::drop_challenges_for_anchor(anchor.anchor_number());
+
     anchor.verified_emails.remove(position);
 
     Ok(Operation::RemoveVerifiedEmail)

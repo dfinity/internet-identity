@@ -29,15 +29,18 @@
 use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, sample_webauthn_authn_method, test_authn_method,
 };
+use candid::Principal;
+use canister_tests::api::internet_identity::api_v2;
 use canister_tests::{api::internet_identity as api, framework::*};
 use internet_identity_interface::internet_identity::types::email_challenge::{
-    EmailChallengeDnsInput, EmailChallengeError, EmailChallengeStatus, VerificationPath,
+    EmailChallenge, EmailChallengeDnsInput, EmailChallengeError, EmailChallengeStatus,
+    VerificationPath,
 };
 use internet_identity_interface::internet_identity::types::smtp::{
     SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage, SmtpRequest, SmtpResponse,
 };
 use internet_identity_interface::internet_identity::types::{
-    DnsProofBundle, DohConfig, InternetIdentityInit,
+    ChallengeAttempt, DeviceData, DnsProofBundle, DohConfig, InternetIdentityInit, RegisterResponse,
 };
 use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse};
 use pocket_ic::PocketIc;
@@ -1140,6 +1143,317 @@ fn full_setup_flow_binds_credential_to_anchor() {
     api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
         .expect("remove call failed")
         .expect("remove should succeed");
+}
+
+// ===================================================================
+// Regression: pinned AuthorizationKey vs temp-key TTL / device revoke
+// ===================================================================
+//
+// Prepare pins the *authn method* (`AuthorizationKey`), not the live
+// caller principal. These two tests guard the failure modes that
+// motivated that design:
+//
+// 1. A registration temp key expires after 10 minutes; the email
+//    challenge lives 30. Finalize must still succeed if the underlying
+//    device remains on the anchor.
+// 2. If the prepare-time device is removed mid-flow, finalize must
+//    not bind a recovery credential (pending challenges are dropped
+//    on remove, and the pinned key is no longer on the anchor).
+
+/// Prepare via a registration temp key, advance past the 10-minute
+/// temp-key TTL, then complete the DoH setup flow. Succeeds because
+/// finalize re-auths the device pubkey pinned at prepare — not the
+/// expired temp principal.
+#[test]
+fn finalize_succeeds_after_temp_key_expires() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+
+    let temp_key = test_principal(42);
+    let device = device_data_1();
+    let id = register_identity_with_temp_key(&env, canister_id, temp_key, &device);
+
+    // 1. prepare_add as the temp-key principal (maps to `device` via
+    //    check_temp_key; AuthorizationKey::DeviceKey is what gets pinned).
+    let challenge =
+        api::email_recovery_credential_prepare_add(&env, canister_id, temp_key, id, dns_input())
+            .expect("prepare_add call failed")
+            .expect("prepare_add via temp key should succeed");
+
+    // 2. Expire the temp key (10 min). Challenge TTL is 30 min, so the
+    //    pending entry remains.
+    env.advance_time(Duration::from_secs(11 * 60));
+    // Temp key must no longer authenticate (sanity check of the fixture).
+    let temp_authz = api::get_anchor_info(&env, canister_id, temp_key, id);
+    assert!(
+        temp_authz.is_err(),
+        "temp key should be expired after 11 minutes"
+    );
+
+    // 3. Complete the inbound + DoH path. No authenticated caller on
+    //    these steps — re-auth is against the pinned device key only.
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let signed = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+    let dkim_txt = signer.public_txt_record();
+    let resp = api::smtp_request(&env, canister_id, &signed.request).expect("smtp_request call");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+
+    let status = drive_doh_resolution(&env, canister_id, &challenge.nonce, &dkim_txt);
+    assert!(
+        matches!(status, EmailChallengeStatus::RegistrationSucceeded),
+        "finalize must succeed after temp-key expiry while the prepare device remains; got {status:?}",
+    );
+
+    // 4. Binding is real and removable under the device principal.
+    api::email_recovery_credential_remove(&env, canister_id, device.principal(), id, TEST_ADDRESS)
+        .expect("remove call failed")
+        .expect("remove should succeed");
+}
+
+/// Prepare with device A, remove A (identity still has device B), then
+/// try to complete the flow. No recovery credential must be bound:
+/// remove drops in-flight challenges and the pinned AuthorizationKey
+/// is no longer on the anchor.
+#[test]
+fn finalize_fails_after_prepare_device_removed() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+
+    let authn_a = sample_webauthn_authn_method(10);
+    let authn_b = sample_webauthn_authn_method(11);
+    let id = create_identity_with_authn_method(&env, canister_id, &authn_a);
+    api_v2::authn_method_add(&env, canister_id, authn_a.principal(), id, &authn_b)
+        .expect("authn_method_add call failed")
+        .expect("authn_method_add should succeed");
+
+    // 1. prepare under device A.
+    let challenge = api::email_recovery_credential_prepare_add(
+        &env,
+        canister_id,
+        authn_a.principal(),
+        id,
+        dns_input(),
+    )
+    .expect("prepare_add call failed")
+    .expect("prepare_add should succeed");
+
+    // 2. Remove the prepare-time device (auth as B). This invalidates
+    //    pending email challenges for the anchor.
+    api_v2::authn_method_remove(
+        &env,
+        canister_id,
+        authn_b.principal(),
+        id,
+        &authn_a.public_key(),
+    )
+    .expect("authn_method_remove call failed")
+    .expect("authn_method_remove should succeed");
+
+    // Challenge is gone from the pending map.
+    let status = api::email_challenge_status(&env, canister_id, &challenge.nonce)
+        .expect("status call failed");
+    assert!(
+        matches!(status, EmailChallengeStatus::Expired),
+        "pending challenge must be dropped when the prepare device is removed; got {status:?}",
+    );
+
+    // 3. Even if a matching email still arrives, smtp_request is a
+    //    silent no-op for an unknown nonce — no bind.
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let signed = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+    let resp = api::smtp_request(&env, canister_id, &signed.request).expect("smtp_request call");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+
+    let status = api::email_challenge_status(&env, canister_id, &challenge.nonce)
+        .expect("status call failed");
+    assert!(
+        matches!(status, EmailChallengeStatus::Expired),
+        "status must stay Expired after smtp for a dropped challenge; got {status:?}",
+    );
+
+    // 4. No credential on the anchor.
+    let remove = api::email_recovery_credential_remove(
+        &env,
+        canister_id,
+        authn_b.principal(),
+        id,
+        TEST_ADDRESS,
+    )
+    .expect("remove call failed");
+    assert!(
+        matches!(remove, Err(EmailChallengeError::AddressNotRegistered)),
+        "recovery email must not be bound after prepare-device removal; got {remove:?}",
+    );
+}
+
+/// Prepare a second challenge while a recovery credential is already
+/// bound, then remove that credential. Pending challenges for the
+/// anchor must be dropped (`Expired`) — complements the device-removal
+/// test for the recovery-authenticated rebind path.
+#[test]
+fn prepare_challenge_expires_after_recovery_credential_remove() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    // 1. Bind a recovery email end-to-end (DoH path).
+    let bound = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+        .expect("prepare_add call failed")
+        .expect("prepare_add failed");
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let signed = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &bound.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+    let dkim_txt = signer.public_txt_record();
+    let resp = api::smtp_request(&env, canister_id, &signed.request).expect("smtp_request call");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+    let status = drive_doh_resolution(&env, canister_id, &bound.nonce, &dkim_txt);
+    assert!(
+        matches!(status, EmailChallengeStatus::RegistrationSucceeded),
+        "expected RegistrationSucceeded for initial bind, got {status:?}",
+    );
+
+    // 2. Start a new in-flight prepare (rebind / second wizard) while
+    //    the credential is still bound.
+    let pending = api::email_recovery_credential_prepare_add(
+        &env,
+        canister_id,
+        p,
+        id,
+        EmailChallengeDnsInput {
+            address: TEST_ADDRESS_2.into(),
+            dns_proof: None,
+        },
+    )
+    .expect("second prepare_add call failed")
+    .expect("second prepare_add failed");
+    let status =
+        api::email_challenge_status(&env, canister_id, &pending.nonce).expect("status call failed");
+    assert!(
+        matches!(status, EmailChallengeStatus::Pending),
+        "second challenge should be Pending before remove; got {status:?}",
+    );
+
+    // 3. Remove the bound recovery credential — drops all pending
+    //    setup/verify challenges for this anchor.
+    api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
+        .expect("remove call failed")
+        .expect("remove should succeed");
+
+    let status =
+        api::email_challenge_status(&env, canister_id, &pending.nonce).expect("status call failed");
+    assert!(
+        matches!(status, EmailChallengeStatus::Expired),
+        "pending challenge must be dropped on recovery-credential remove; got {status:?}",
+    );
+}
+
+/// First prepare after install hits a cold email-challenge PRNG
+/// (`ensure_seeded` → `raw_rand`). Interleaves a **different-key** device
+/// replace while that call is suspended on `raw_rand`.
+///
+/// Eager `drop_challenges_for_anchor` finds nothing (entry not inserted yet).
+///
+/// - **New code** (seed → authz → insert): after `raw_rand` the caller is
+///   no longer authorized (pubkey A replaced by B) → prepare returns
+///   `Unauthorized`, no challenge is inserted.
+/// - **Old code** (authz → seed → insert): authz already pinned A; after
+///   resume it would insert a challenge and return `Ok` — so this test
+///   fails closed on a regression of that ordering.
+///
+/// A same-key replace would *not* distinguish the two: membership still
+/// holds either way.
+#[test]
+fn first_unseeded_prepare_unauthorized_after_concurrent_key_replace() {
+    use pocket_ic::common::rest::RawEffectivePrincipal;
+
+    let env = env();
+    let canister_id = setup_canister(&env);
+    // Fresh canister ⇒ EMAIL_RECOVERY_RNG is unseeded (independent of salt).
+    // Do not call any email prepare before this — that would seed the PRNG
+    // and close the raw_rand window this test needs.
+    let device_a = device_data_1();
+    let device_b = device_data_2();
+    let id = canister_tests::flows::register_anchor_with_device(&env, canister_id, &device_a);
+    let p_a = device_a.principal();
+
+    // Ingress prepare without waiting — first email-challenge seed pays raw_rand.
+    let args = candid::encode_args((id, dns_input())).expect("encode prepare args");
+    let msg_id = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            RawEffectivePrincipal::None,
+            p_a,
+            "email_recovery_credential_prepare_add",
+            args,
+        )
+        .expect("submit prepare_add");
+
+    // One round: start prepare and suspend on management-canister raw_rand.
+    // (A second tick would deliver the response and could finish prepare
+    // before replace — that would make the race unobservable.)
+    env.tick();
+
+    // Different-key replace while prepare is in-flight on raw_rand.
+    // drop_challenges cannot remove a not-yet-inserted entry.
+    // After this, only device_b remains; p_a is no longer authorized.
+    api::replace(&env, canister_id, p_a, id, &device_a.pubkey, &device_b)
+        .expect("different-key replace during first prepare seed await");
+
+    let raw = env.await_call(msg_id).expect("await prepare_add");
+    let (outcome,): (Result<EmailChallenge, EmailChallengeError>,) =
+        candid::decode_args(&raw).expect("decode prepare_add result");
+    assert!(
+        matches!(outcome, Err(EmailChallengeError::Unauthorized(_))),
+        "seed-before-authz must re-auth after raw_rand and reject when the \
+         prepare device was replaced; got {outcome:?}",
+    );
+}
+
+/// Register an anchor with a temporary key (same helper shape as the
+/// dedicated temp-key suite, kept local so this file stays standalone).
+fn register_identity_with_temp_key(
+    env: &PocketIc,
+    canister_id: Principal,
+    temp_key: Principal,
+    device: &DeviceData,
+) -> u64 {
+    let challenge = api::create_challenge(env, canister_id).expect("create_challenge");
+    let response = api::register(
+        env,
+        canister_id,
+        temp_key,
+        device,
+        &ChallengeAttempt {
+            chars: "a".to_string(),
+            key: challenge.challenge_key,
+        },
+        Some(temp_key),
+    )
+    .expect("register with temp key");
+    match response {
+        RegisterResponse::Registered { user_number } => user_number,
+        other => panic!("expected Registered, got {other:?}"),
+    }
 }
 
 #[test]
