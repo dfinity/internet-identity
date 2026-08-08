@@ -39,6 +39,11 @@ use internet_identity_interface::internet_identity::types::{
 /// at the canister method. It is pinned on the pending challenge so
 /// finalize can re-auth that the same device/OpenID/recovery credential
 /// is still on the anchor — independent of temp-key lifetime.
+///
+/// **Callers must** `ensure_seeded().await` *before* obtaining
+/// `authorization_key` (see `email_recovery_credential_prepare_add`), so
+/// `prepare_common` does not await between the authz snapshot and insert.
+///
 /// The caller has already been validated by `main.rs`; this function
 /// only sees the happy-path arguments.
 ///

@@ -33,7 +33,8 @@ use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::{api::internet_identity as api, framework::*};
 use internet_identity_interface::internet_identity::types::email_challenge::{
-    EmailChallengeDnsInput, EmailChallengeError, EmailChallengeStatus, VerificationPath,
+    EmailChallenge, EmailChallengeDnsInput, EmailChallengeError, EmailChallengeStatus,
+    VerificationPath,
 };
 use internet_identity_interface::internet_identity::types::smtp::{
     SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage, SmtpRequest, SmtpResponse,
@@ -1363,6 +1364,68 @@ fn prepare_challenge_expires_after_recovery_credential_remove() {
     assert!(
         matches!(status, EmailChallengeStatus::Expired),
         "pending challenge must be dropped on recovery-credential remove; got {status:?}",
+    );
+}
+
+/// First prepare after install hits a cold email-challenge PRNG
+/// (`ensure_seeded` → `raw_rand`). Interleaves a **different-key** device
+/// replace while that call is suspended on `raw_rand`.
+///
+/// Eager `drop_challenges_for_anchor` finds nothing (entry not inserted yet).
+///
+/// - **New code** (seed → authz → insert): after `raw_rand` the caller is
+///   no longer authorized (pubkey A replaced by B) → prepare returns
+///   `Unauthorized`, no challenge is inserted.
+/// - **Old code** (authz → seed → insert): authz already pinned A; after
+///   resume it would insert a challenge and return `Ok` — so this test
+///   fails closed on a regression of that ordering.
+///
+/// A same-key replace would *not* distinguish the two: membership still
+/// holds either way.
+#[test]
+fn first_unseeded_prepare_unauthorized_after_concurrent_key_replace() {
+    use pocket_ic::common::rest::RawEffectivePrincipal;
+
+    let env = env();
+    let canister_id = setup_canister(&env);
+    // Fresh canister ⇒ EMAIL_RECOVERY_RNG is unseeded (independent of salt).
+    // Do not call any email prepare before this — that would seed the PRNG
+    // and close the raw_rand window this test needs.
+    let device_a = device_data_1();
+    let device_b = device_data_2();
+    let id = canister_tests::flows::register_anchor_with_device(&env, canister_id, &device_a);
+    let p_a = device_a.principal();
+
+    // Ingress prepare without waiting — first email-challenge seed pays raw_rand.
+    let args = candid::encode_args((id, dns_input())).expect("encode prepare args");
+    let msg_id = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            RawEffectivePrincipal::None,
+            p_a,
+            "email_recovery_credential_prepare_add",
+            args,
+        )
+        .expect("submit prepare_add");
+
+    // One round: start prepare and suspend on management-canister raw_rand.
+    // (A second tick would deliver the response and could finish prepare
+    // before replace — that would make the race unobservable.)
+    env.tick();
+
+    // Different-key replace while prepare is in-flight on raw_rand.
+    // drop_challenges cannot remove a not-yet-inserted entry.
+    // After this, only device_b remains; p_a is no longer authorized.
+    api::replace(&env, canister_id, p_a, id, &device_a.pubkey, &device_b)
+        .expect("different-key replace during first prepare seed await");
+
+    let raw = env.await_call(msg_id).expect("await prepare_add");
+    let (outcome,): (Result<EmailChallenge, EmailChallengeError>,) =
+        candid::decode_args(&raw).expect("decode prepare_add result");
+    assert!(
+        matches!(outcome, Err(EmailChallengeError::Unauthorized(_))),
+        "seed-before-authz must re-auth after raw_rand and reject when the \
+         prepare device was replaced; got {outcome:?}",
     );
 }
 

@@ -2008,6 +2008,16 @@ mod email_recovery_api {
         identity_number: IdentityNumber,
         dns_input: EmailChallengeDnsInput,
     ) -> Result<EmailChallenge, EmailChallengeError> {
+        // Seed the email-challenge PRNG *before* pinning AuthorizationKey.
+        // `prepare_common` also calls `ensure_seeded`; if we snapshot authz
+        // first, the first prepare after install/upgrade yields on
+        // `raw_rand` and a concurrent remove/replace can finish while no
+        // pending entry exists for `drop_challenges_for_anchor` — then this
+        // call resumes and inserts a stale challenge. Seeding first makes
+        // that await a no-op, so authz → insert runs without yielding
+        // (IC only interleaves at await points).
+        crate::email_inbound::rng::ensure_seeded().await;
+
         // Pin the authorization *method* (device pubkey / OpenID key /
         // recovery address), not `caller()`: a temp-key principal expires
         // in 10 minutes while the challenge lives 30.
@@ -2128,6 +2138,11 @@ mod verified_email_api {
         identity_number: IdentityNumber,
         dns_input: EmailChallengeDnsInput,
     ) -> Result<EmailChallenge, EmailChallengeError> {
+        // Same linearization as `email_recovery_credential_prepare_add`:
+        // seed before authz snapshot so prepare does not await between
+        // pinning AuthorizationKey and inserting the pending challenge.
+        crate::email_inbound::rng::ensure_seeded().await;
+
         // Pin the authorization *method*, not `caller()` — see
         // `email_recovery_credential_prepare_add`.
         let (_anchor, authorization_key) = check_authorization(identity_number)
