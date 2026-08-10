@@ -1558,12 +1558,6 @@ type ListAvailableAttributesError = variant {
     AuthorizationError : principal;
 };
 
-// Notifications
-// =============
-// Deliberately channel-neutral: nothing a dApp touches says "push", so another
-// delivery channel can be added later without breaking the sender contract. The
-// Web Push specifics live in the `webpush_*` methods instead.
-
 type NotificationUrgency = variant { low; normal; high };
 
 // Transport headers. Unlike the payload these are free to vary per send.
@@ -1580,19 +1574,16 @@ type NotificationContent = record {
     url : opt text;                       // deep link, same-origin as the sender
 };
 
-// A record rather than a bare principal on purpose: Candid allows adding an
-// `opt` field to a record later, but `principal` -> `record { ... }` is a
-// breaking change. See the commented field below.
 type NotificationRecipient = record {
     user : principal;                     // per-origin principal. no text, the device fetches it from the dApp
     // message : opt NotificationContent; // reserved for email/SMS, which cannot fetch
 };
 
 type NotificationRejection = variant {
-    // Unknown user, not consented, or no devices subscribed. Merged on purpose:
-    // the sender's action is the same in every case, and it avoids revealing
-    // whether an identity exists or has a device.
+    // Unknown identity, or it has not consented to this origin. The two are
+    // merged so a sender cannot use this to discover whether an identity exists.
     no_consent;
+    not_subscribed;                       // consented, but has no devices subscribed right now
     invalid;                              // malformed request. sender bug
 };
 
