@@ -310,15 +310,26 @@ export const handleDelegationRequest =
         // Have the canister delegate to a key this frontend holds, then extend
         // that to the app's session key below. Storing the pair is what lets a
         // later request skip the ceremony, and routing through it costs no extra
-        // canister call. When the key cannot be created the delegation goes
-        // straight to the app's key as before, simply without a cache.
-        // Non-extractable so the private half cannot be read back out of
-        // storage, which also means it can only be stored by structured clone. A
-        // browser that refuses either is a reason to sign in without a cache,
-        // not a reason to fail the sign-in.
-        const ownKey = await ECDSAKeyIdentity.generate({
-          extractable: false,
-        }).catch(() => undefined);
+        // canister call.
+        //
+        // Only for an app that sent a `prompt`. An app that has never heard of
+        // the param has no way to call `ii-forget-delegation` either, so caching
+        // for it would leave a delegation nothing clears until it expires — and
+        // one it can never use, since re-issue needs `prompt=none`. Keeping the
+        // cache opt-in also means an app that has not adopted this gets the
+        // delegation shape it always got.
+        //
+        // The key is non-extractable so its private half cannot be read back out
+        // of storage, which also means it can only be stored by structured
+        // clone. A browser that refuses either is a reason to sign in without a
+        // cache, not a reason to fail the sign-in, so the delegation then goes
+        // straight to the app's key.
+        const ownKey =
+          prompt === undefined
+            ? undefined
+            : await ECDSAKeyIdentity.generate({ extractable: false }).catch(
+                () => undefined,
+              );
         const delegationTarget =
           ownKey === undefined
             ? sessionPublicKey

@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { authorize } from "../../utils";
+import { authorizeWithUrl, II_URL, TEST_APP_URL } from "../../utils";
 
 test.describe("Re-issue a delegation with ?prompt=none", () => {
   // The principal the priming sign-in produced. A silent re-issue has to
@@ -11,13 +11,24 @@ test.describe("Re-issue a delegation with ?prompt=none", () => {
   // A normal sign-in first. That ceremony is what leaves Internet Identity
   // holding a delegation for this app, so the round under test has something to
   // re-issue. Runs before the `authorizePage` fixture performs that round.
+  //
+  // `prompt=login` rather than no param, because sending `prompt` at all is what
+  // opts an app into having its delegation kept. Driven through
+  // `authorizeWithUrl` since this priming round needs its own query param and
+  // the fixture performs exactly one round, the one under test.
   test.beforeEach(async ({ page, identities, signInWithIdentity }) => {
-    expectedPrincipal = await authorize(page, async (authPage) => {
-      await signInWithIdentity(authPage, identities[0].identityNumber);
-      await authPage
-        .getByRole("button", { name: "Continue", exact: true })
-        .click();
-    });
+    expectedPrincipal = await authorizeWithUrl(
+      page,
+      TEST_APP_URL,
+      `${II_URL}/authorize?prompt=login`,
+      async (authPage) => {
+        await signInWithIdentity(authPage, identities[0].identityNumber);
+        await authPage
+          .getByRole("button", { name: "Continue", exact: true })
+          .click();
+      },
+      true,
+    );
   });
 
   // Read here rather than in the test body: `authorizedPrincipal` resolves only

@@ -41,7 +41,12 @@ export type Authorized = {
  *  and the sign-in screen stays where a user can switch identity or account.
  *  Room is left for an `auto` value meaning "re-issue when unambiguous,
  *  otherwise show the sign-in screen". Unrecognised values are ignored and
- *  behave as absent. */
+ *  behave as absent.
+ *
+ *  Sending the param at all is also what opts an app into having its delegation
+ *  kept for re-issue: an app that has never heard of `prompt` cannot call
+ *  `ii-forget-delegation` either, so keeping one for it would leave something
+ *  nothing clears until it expires. */
 export type AuthorizationPrompt = "none" | "login";
 
 export type AuthorizationPromptContext = {
