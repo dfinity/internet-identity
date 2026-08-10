@@ -496,7 +496,13 @@ export class UrlChannel implements Channel {
 
     this.#delivered = true;
     this.#onDelivered();
-    window.location.assign(deliveryUrl.href);
+    // `replace`, not `assign`: this navigation is machine-driven, so it has no
+    // business in the user's history (the legacy transport's redirect does the
+    // same). Going back to it could not work anyway — delivery deletes the
+    // persisted flow, so the authorize URL behind us is spent. It matters most
+    // under `?prompt=none`, where an app probes on every page load: with
+    // `assign` each probe would leave an entry and make the back button useless.
+    window.location.replace(deliveryUrl.href);
   }
 
   close(): Promise<void> {
