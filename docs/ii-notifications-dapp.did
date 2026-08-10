@@ -1,60 +1,22 @@
-// The interface a dApp implements to send notifications through Internet Identity.
-//
-// This is not a canister we build. It is the contract a sending dApp has to
-// satisfy, the same way it has to serve /.well-known/ii-notification-senders.
-// II's side of the protocol is in src/internet_identity/internet_identity.did.
-//
-// Why the dApp serves the text at all: the notification II delivers carries no
-// content, only "app X has something for you". The device then comes here for
-// the message. That keeps II out of the content entirely, which is what makes
-// the notifications end-to-end private without any extra cryptography.
+// Implemented by a dApp that sends notifications through Internet Identity.
+// II's side is in src/internet_identity/internet_identity.did.
 
 type Notification = record {
-    // The dApp's own id for this notification. The device dedups on it, so the
-    // same id must not describe two different messages.
     id : text;
     title : text;
     body : text;
-    url : opt text;    // deep link. must be same-origin as the dApp
-    created_at : nat64; // ns since epoch
+    url : opt text;
+    created_at : nat64;
 };
 
 service : {
-    // Return the notifications pending for the caller.
-    //
-    // Called by II's service worker, authenticated as the user through a
-    // queries-only delegation scoped to this canister. There are no arguments
-    // on purpose: the caller IS the identity, so read `caller()` and serve that
-    // user. Nothing to leak in a parameter and no bearer token to pass around.
-    //
-    // MUST be a query. The service worker has to put a notification on screen
-    // almost immediately, and an update call takes seconds, which blows that
-    // deadline and leaves the user with a generic "you have a notification".
-    //
-    // Also called by II itself, with the identity's own principal for this
-    // origin, if the user has chosen a delivery channel that cannot fetch for
-    // itself. Same method, different caller.
+    // Called by II's service worker as the user. Must be a query.
     ii_pending_notifications : () -> (vec Notification) query;
 
-    // Called after the notifications have been shown, so the dApp can stop
-    // serving them. Best-effort and off the critical path: the device shows the
-    // notification first and calls this afterwards.
-    //
-    // It is separate from the fetch because a query cannot mutate state.
+    // Called after display, so the dApp can stop serving them.
     ii_notifications_delivered : (ids : vec text) -> ();
 
-    // Optional, and only needed once a delivery channel exists that cannot fetch
-    // for itself (email, SMS). Callable by II's canister only.
-    //
-    // Batched so the call count is O(apps) rather than O(users), and it is an
-    // inter-canister call, so it never consumes the subnet's HTTPS outcall budget.
+    // Only needed for channels that cannot fetch for themselves. II-only caller.
     ii_pending_notifications_batch : (users : vec principal)
         -> (vec record { principal; vec Notification }) query;
 };
-
-// Versioning
-// ==========
-// There is no version field. If this interface has to change, a new method name
-// is added (`ii_pending_notifications_2`), II tries it first and falls back when
-// the canister rejects it as not found. That is how II already evolves its own
-// interface: `prepare_delegation` became `prepare_account_delegation`.

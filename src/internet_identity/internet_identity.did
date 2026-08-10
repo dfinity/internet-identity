@@ -1560,39 +1560,34 @@ type ListAvailableAttributesError = variant {
 
 type NotificationUrgency = variant { low; normal; high };
 
-// Transport headers. Unlike the payload these are free to vary per send.
 type NotificationHeaders = record {
-    urgency : opt NotificationUrgency;    // default normal
-    expires_at : opt nat64;               // ns. drop if still undelivered by then
-    coalesce_key : opt text;              // supersede an undelivered notification with the same key
+    urgency : opt NotificationUrgency;
+    expires_at : opt nat64;
+    coalesce_key : opt text;
 };
 
-// Only used by channels that cannot fetch for themselves. Web Push ignores it.
 type NotificationContent = record {
     title : text;
     body : text;
-    url : opt text;                       // deep link, same-origin as the sender
+    url : opt text;
 };
 
 type NotificationRecipient = record {
-    user : principal;                     // per-origin principal. no text, the device fetches it from the dApp
-    // message : opt NotificationContent; // reserved for email/SMS, which cannot fetch
+    user : principal;
+    // message : opt NotificationContent;
 };
 
 type NotificationRejection = variant {
-    // Unknown identity, or it has not consented to this origin. The two are
-    // merged so a sender cannot use this to discover whether an identity exists.
     no_consent;
-    not_subscribed;                       // consented, but has no devices subscribed right now
-    invalid;                              // malformed request. sender bug
+    not_subscribed;
+    invalid;
 };
 
 type NotificationSendResult = record {
-    accepted : nat32;                     // queued, NOT delivered. Web Push has no receipts
-    // `index` is the position in the `recipients` array that was passed.
-    rejected : vec record { index : nat32; reason : NotificationRejection };
-    retry_after_ms : opt nat32;           // set = II is at capacity, wait this long before the next chunk. add jitter
-    queue_id : nat64;                     // changed since the last call? II was upgraded and lost the queue, re-send anything unconfirmed
+    accepted : nat32;                // queued, not delivered
+    rejected : vec record { user : principal; reason : NotificationRejection };
+    retry_after_ms : opt nat32;      // at capacity, wait this long before the next chunk
+    queue_id : nat64;                // changed? II lost the queue, re-send anything unconfirmed
 };
 
 service : (opt InternetIdentityInit) -> {
@@ -2041,53 +2036,21 @@ service : (opt InternetIdentityInit) -> {
     // Looks up identity number when called with a recovery phrase
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
 
-    // Notifications: sender side
-    // ==========================
-    // Ask II to notify these users. The caller must be the canister registered
-    // for the origin. ~1000 recipients per call; the client library chunks,
-    // paces on `retry_after_ms` and retries with a stable `chunk_id`.
-    //
-    // The notification carries no text. II delivers a content-free ping and the
-    // device fetches the message from the sender, so II never sees it. The
-    // methods the sender must implement for that are specified in
-    // docs/ii-notifications-dapp.did.
     notification_send : (
-        chunk_id : blob,                  // idempotency. the same id on retry is not sent twice
+        chunk_id : blob,
         headers : NotificationHeaders,
         recipients : vec NotificationRecipient,
     ) -> (NotificationSendResult);
 
-    // Lets a sender filter its audience before spending calls on it. Caller must
-    // be the registered sender; it learns nothing it would not learn from the
-    // `rejected` list of a send.
-    notification_consent_status : (vec principal) -> (vec bool) query;
+    notification_consent_status : (principal) -> (bool) query;
 
-    // Register the canister allowed to send as `origin`. II verifies the origin
-    // really lists it at /.well-known/ii-notification-senders. Pass `null` to
-    // deregister. II registers itself this way too, so there is no special case
-    // for its own notifications.
     notification_register_sender : (origin : text, sender : opt principal) -> (variant { Ok; Err : text });
     notification_registered_sender : (origin : text) -> (opt principal) query;
 
-    // Notifications: user side
-    // ========================
-    // Consent to hear from an app, not to hear from it by any particular
-    // channel, so it survives a later change of delivery method.
-    //
-    // Authenticated as the identity AND only accepted from II's own frontend
-    // origin: `origin` is a parameter, so a dApp calling these could otherwise
-    // grant or revoke consent on behalf of a different dApp.
     notification_grant_consent : (origin : text) -> (variant { Ok; Err : text });
     notification_revoke_consent : (origin : text) -> (variant { Ok; Err : text });
-
-    // The apps the caller has consented to. Derived from `caller()` rather than
-    // taking an anchor, so it cannot be used to enumerate another identity's apps.
     notification_consented_origins : () -> (vec text) query;
 
-    // Notifications: Web Push transport
-    // =================================
-    // Channel-specific, and called by II's own frontend only. A second channel
-    // gets its own prefix alongside these and `notification_send` is unaffected.
     webpush_subscribe_device : (endpoint : text, p256dh : blob, auth : blob) -> (variant { Ok; Err : text });
     webpush_unsubscribe_device : (endpoint : text) -> (variant { Ok; Err : text });
     webpush_vapid_public_key : () -> (blob) query;
