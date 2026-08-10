@@ -35,11 +35,13 @@ export type Authorized = {
  *
  *  - `none`: answer from a cached delegation or fail; never show the user
  *    anything. The app is promising it can handle the failure.
- *  - `login`: ignore any cached delegation and run a full ceremony.
+ *  - `login`: run a full ceremony, ignoring any cached delegation.
  *
- *  Absent means "do the best you can": re-issue silently when that is
- *  unambiguous, otherwise sign in interactively. Unrecognised values are
- *  ignored and behave as absent. */
+ *  Absent behaves as `login`, so an app that has not opted in sees no change
+ *  and the sign-in screen stays where a user can switch identity or account.
+ *  Room is left for an `auto` value meaning "re-issue when unambiguous,
+ *  otherwise show the sign-in screen". Unrecognised values are ignored and
+ *  behave as absent. */
 export type AuthorizationPrompt = "none" | "login";
 
 export type AuthorizationPromptContext = {

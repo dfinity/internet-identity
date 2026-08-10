@@ -116,11 +116,16 @@
     window.location.replace("/");
   };
 
-  const handleConfirmSignOutAndRemove = () => {
+  const handleConfirmSignOutAndRemove = async () => {
     const identityNumber = $authenticatedStore.identityNumber;
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void purgeSession(identityNumber);
-    void purgeAppDelegations(identityNumber);
+    // Awaited, unlike the other call sites: navigating away can cancel a pending
+    // IndexedDB delete, and a surviving app delegation would let an app be
+    // signed in again silently after the user chose to sign out.
+    await Promise.all([
+      purgeSession(identityNumber),
+      purgeAppDelegations(identityNumber),
+    ]);
     sessionStore.reset();
     window.location.replace("/");
   };

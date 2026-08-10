@@ -166,10 +166,16 @@ export const handleDelegationRequest =
 
         // Re-issue from a delegation this frontend already holds for the origin,
         // so an app that has signed in before does not spend another passkey.
-        // Deliberately ahead of `setRequestContext`: that is what makes the
-        // sign-in UI render, and a silent answer must not paint anything.
-        let denial: SilentDenial | undefined;
-        if (prompt !== "login") {
+        //
+        // Only when the app asks for it. An absent `prompt` runs the ceremony it
+        // always has, so nothing changes for an app that has not opted in, and
+        // the sign-in screen stays the place a user can switch identity or
+        // account. A future `auto` can mean "re-issue when unambiguous,
+        // otherwise show the sign-in screen".
+        //
+        // Ahead of `setRequestContext`, which is what makes the sign-in UI
+        // render: a silent answer must not paint anything.
+        if (prompt === "none") {
           const outcome = chooseSilentDelegation({
             records: await appDelegationsForOrigin(effectiveOrigin),
             hint,
@@ -177,6 +183,7 @@ export const handleDelegationRequest =
               .length,
             isMultipleAccountsEnabled: readMultipleAccountsToggle,
           });
+
           if ("record" in outcome) {
             try {
               const { keyPair, chainJson, expiresAtMillis } = outcome.record;
@@ -198,33 +205,30 @@ export const handleDelegationRequest =
               return;
             } catch (error) {
               // The record did not survive storage (its key pair or chain is
-              // unusable). Drop it and sign in the ordinary way rather than
-              // failing a request a ceremony can still answer.
+              // unusable). Drop it, and report it as nothing being stored,
+              // which is now true.
               console.error(error);
               await discardAppDelegation(
                 effectiveOrigin,
                 outcome.record.principal,
               );
-              denial = "login_required";
             }
-          } else {
-            denial = outcome.denial;
           }
-        }
 
-        if (prompt === "none") {
           // No `onError` here: it sets `channelErrorStore`, which renders the
           // channel-error view — the interstitial `prompt=none` exists to
           // promise the user will never be shown. Answering on the channel lets
           // the app close the popup, or the redirect return, and decide for
           // itself whether to escalate to an interactive request.
+          const reason: SilentDenial =
+            "record" in outcome ? "login_required" : outcome.denial;
           await channel.send({
             jsonrpc: "2.0",
             id: requestId,
             error: {
               code: INTERACTION_REQUIRED_ERROR_CODE,
               message: "Interaction required",
-              data: { reason: denial ?? "login_required" },
+              data: { reason },
             },
           });
           return;

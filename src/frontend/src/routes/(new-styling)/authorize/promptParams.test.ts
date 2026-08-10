@@ -81,7 +81,7 @@ describe("resolvePromptParams", () => {
     ).toBeUndefined();
   });
 
-  it("prefers the URL over a stored value when resuming with both", () => {
+  it("prefers the stored value over the URL when resuming with both", () => {
     resolvePromptParams(authorizeUrl("?prompt=login"), NOT_RESUMING);
 
     expect(
