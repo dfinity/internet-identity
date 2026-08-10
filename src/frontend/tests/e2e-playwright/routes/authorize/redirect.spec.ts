@@ -35,27 +35,25 @@ const decodeIcrc3TextEntries = (base64Data: string): Record<string, string> => {
 };
 
 test.describe("Authorize over the redirect transport", () => {
-  // Every redirect flow must hand back the two-hop intermediate-key chain
-  // (canister → intermediate → RP session key), never a one-hop chain signed
-  // directly to the RP key: what the canister certifies transits the IC and
-  // must be inert on its own, so the RP key is only ever reached via the second
-  // hop assembled in the browser.
+  // Every redirect flow must reach the RP session key through browser-signed
+  // hops, never as the key the canister certified directly: what the canister
+  // certifies transits the IC and must be inert on its own.
   test.afterEach(({ authorizedDelegation }) => {
     expect(authorizedDelegation).toBeDefined();
     if (authorizedDelegation === undefined) {
       return;
     }
-    // The chain runs root (user identity) → intermediate key → RP session key.
-    // Two hops, never one: a one-hop chain would be the canister signing
-    // directly to the RP key, but what the canister certifies transits the IC
-    // and must be inert on its own.
+    // The chain runs root (user identity) → app-delegation key → intermediate
+    // key → RP session key. Three hops on this transport: the delegation
+    // handler certifies to a key Internet Identity keeps (so a later
+    // `?prompt=none` can re-issue without a ceremony) and extends it, and the
+    // redirect transport adds its own per-flow intermediate key on top.
     const { delegations } = authorizedDelegation;
-    expect(delegations).toHaveLength(2);
-    // The canister-certified inner hop (delegations[0]) targets the intermediate
-    // key; the RP session key is only the chain's leaf (delegations[1]), reached
-    // via the second, browser-signed hop — so the two hops target distinct keys.
+    expect(delegations).toHaveLength(3);
+    // The canister-certified hop (delegations[0]) must not target the RP session
+    // key, which is only ever the chain's leaf.
     expect(delegations[0].delegation.pubkey).not.toBe(
-      delegations[1].delegation.pubkey,
+      delegations[delegations.length - 1].delegation.pubkey,
     );
   });
 
