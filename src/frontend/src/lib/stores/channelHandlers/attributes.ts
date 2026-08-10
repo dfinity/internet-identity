@@ -2,6 +2,7 @@ import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 import {
   AttributesParamsSchema,
   Icrc3AttributesParamsSchema,
+  INTERACTION_REQUIRED_ERROR_CODE,
   INVALID_PARAMS_ERROR_CODE,
 } from "$lib/utils/transport/utils";
 import { frontendCanisterConfig } from "$lib/globals";
@@ -14,6 +15,7 @@ import {
 } from "$lib/stores/authentication.store";
 import {
   type Authorized,
+  authorizationPromptStore,
   authorizationStore,
   authorizedStore,
 } from "$lib/stores/authorization.store";
@@ -27,6 +29,7 @@ import {
   attributeConsentResultStore,
   attributeConsentStore,
 } from "$lib/stores/attributeConsent.store";
+import { get } from "svelte/store";
 
 /** Extract the attribute name from a fully scoped key.
  *  e.g., "openid:https://accounts.google.com:email" → "email" */
@@ -641,6 +644,26 @@ export const handleIcrc3ConsentAttributes =
         error: {
           code: INVALID_PARAMS_ERROR_CODE,
           message: z.prettifyError(paramsResult.error),
+        },
+      });
+      return;
+    }
+
+    // Attributes are certified by the canister over a nonce the app picks per
+    // request, so there is nothing cached that could answer this without the
+    // user. Under `?prompt=none` every path below would block on authorization
+    // that is never going to happen, and on the redirect transport a batch that
+    // never completes leaves the user parked on Internet Identity — the one
+    // outcome `prompt=none` promises to avoid. Fail fast instead, and let the app
+    // come back interactively for attributes.
+    if (get(authorizationPromptStore).prompt === "none") {
+      await channel.send({
+        jsonrpc: "2.0",
+        id: requestId,
+        error: {
+          code: INTERACTION_REQUIRED_ERROR_CODE,
+          message: "Interaction required",
+          data: { reason: "consent_required" },
         },
       });
       return;

@@ -7,6 +7,13 @@ import { Principal } from "@icp-sdk/core/principal";
 export const INVALID_PARAMS_ERROR_CODE = -32602;
 // See: https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_25_signer_interaction_standard.md#errors-3
 export const GENERIC_ERROR_CODE = 1000;
+// The request cannot be completed without asking the user something, which
+// `?prompt=none` forbade. An Internet Identity extension rather than an
+// ICRC-25 code: the working group covers the protocol, not sign-in UX. Placed
+// in ICRC-25's 3xxx "user action" range (3001 is "action aborted"), so a client
+// that categorises by range reads it correctly even without knowing the code.
+// The specific reason travels in the error's `data.reason`.
+export const INTERACTION_REQUIRED_ERROR_CODE = 3002;
 
 export interface ChannelOptions {
   allowedOrigin?: string;
@@ -398,6 +405,13 @@ export type AuthResponse = z.output<typeof AuthResponseCodec>;
 // Parameters schema for "ii_attributes" request
 export const AttributesParamsSchema = z.object({
   attributes: z.array(z.string()),
+  icrc95DerivationOrigin: z.optional(OriginSchema),
+});
+
+// Parameters schema for "ii-forget-delegation" request. The origin is the only
+// input: which delegations exist for it is Internet Identity's business, and the
+// app has nothing else to say about them.
+export const ForgetDelegationParamsSchema = z.object({
   icrc95DerivationOrigin: z.optional(OriginSchema),
 });
 

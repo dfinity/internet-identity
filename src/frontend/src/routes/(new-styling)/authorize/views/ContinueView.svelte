@@ -44,6 +44,10 @@
     sessionDurationCeilingSeconds,
     sessionDurationToNanos,
   } from "$lib/utils/sessionDuration";
+  import {
+    readMultipleAccountsToggle,
+    writeMultipleAccountsToggle,
+  } from "$lib/utils/multipleAccounts";
 
   interface Props {
     effectiveOrigin: string;
@@ -99,28 +103,6 @@
     sessionDurationToNanos(selectedTtlSeconds),
   );
 
-  // Browser-local, per-anchor persistence for the multi-accounts toggle.
-  // Per-anchor (not per-dapp) because the toggle is a mental-mode switch:
-  // a user who self-identifies as a multi-accounts user wants the
-  // affordance everywhere, not separately for each dapp.
-  const TOGGLE_STORAGE_PREFIX = "ii:multi-accounts:";
-  const readToggle = (anchor: bigint): boolean => {
-    if (typeof localStorage === "undefined") return false;
-    return (
-      localStorage.getItem(`${TOGGLE_STORAGE_PREFIX}${anchor.toString()}`) ===
-      "1"
-    );
-  };
-  const writeToggle = (anchor: bigint, enabled: boolean): void => {
-    if (typeof localStorage === "undefined") return;
-    const key = `${TOGGLE_STORAGE_PREFIX}${anchor.toString()}`;
-    if (enabled) {
-      localStorage.setItem(key, "1");
-    } else {
-      localStorage.removeItem(key);
-    }
-  };
-
   let defaultAccountNumber = $state<
     AccountNumber | PRIMARY_ACCOUNT_NUMBER | null
   >(null);
@@ -163,7 +145,9 @@
     }
   };
   let isMultipleAccountsEnabled = $state(
-    readToggle($lastUsedIdentitiesStore.selected!.identityNumber),
+    readMultipleAccountsToggle(
+      $lastUsedIdentitiesStore.selected!.identityNumber,
+    ),
   );
   // Clear old accounts data when user toggles switch off
   $effect(() => {
@@ -209,7 +193,7 @@
   // overwrite the new value back from stale localStorage.
   $effect(() => {
     authLastUsedFlow.init([selectedIdentityNumber]);
-    const hydrated = readToggle(selectedIdentityNumber);
+    const hydrated = readMultipleAccountsToggle(selectedIdentityNumber);
     isMultipleAccountsEnabled = hydrated;
     accessLevel = accessLevelStore.getPreference(
       "continue",
@@ -223,7 +207,10 @@
 
   // Persist the toggle whenever it (or the identity) changes.
   $effect(() => {
-    writeToggle(selectedIdentityNumber, isMultipleAccountsEnabled);
+    writeMultipleAccountsToggle(
+      selectedIdentityNumber,
+      isMultipleAccountsEnabled,
+    );
   });
 
   const handleContinueDefault = async () => {

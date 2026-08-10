@@ -24,6 +24,7 @@
   import { canisterId } from "$lib/globals";
   import { authenticationStore } from "$lib/stores/authentication.store";
   import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { purgeAppDelegations } from "$lib/stores/app-delegation.store";
   import { authenticateWithPasskey } from "$lib/utils/authentication/passkey";
   import { authenticateWithJWT } from "$lib/utils/authentication/jwt";
   import {
@@ -394,6 +395,7 @@
         const identityNumber = $authenticatedStore.identityNumber;
         lastUsedIdentitiesStore.removeIdentity(identityNumber);
         void purgeSession(identityNumber);
+        void purgeAppDelegations(identityNumber);
         sessionStore.reset();
         location.replace("/login");
         return;
