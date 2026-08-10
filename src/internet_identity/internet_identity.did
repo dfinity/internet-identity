@@ -1589,9 +1589,7 @@ type NotificationRejection = variant {
 
 type NotificationSendResult = record {
     accepted : nat32;                     // queued, NOT delivered. Web Push has no receipts
-    // Recipients II would not take, by their position in the `recipients` array
-    // that was passed. Principals are not echoed back: the caller has the list,
-    // and an index is 4 bytes against ~29.
+    // `index` is the position in the `recipients` array that was passed.
     rejected : vec record { index : nat32; reason : NotificationRejection };
     retry_after_ms : opt nat32;           // set = II is at capacity, wait this long before the next chunk. add jitter
     queue_id : nat64;                     // changed since the last call? II was upgraded and lost the queue, re-send anything unconfirmed
