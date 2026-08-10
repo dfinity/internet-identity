@@ -30,7 +30,7 @@ sequenceDiagram
     participant R as relays (Apple / Google / Mozilla)
     participant Dev as 3. user device + II SW
 
-    D->>II: push_send(recipients), no text
+    D->>II: notification_send(recipients), no text
     Note over II: check consent · read the pre-sealed wake
     II->>R: POST the cached bytes
     R->>Dev: wake
@@ -48,16 +48,16 @@ How II actually reaches the relays (Stage 2) isn't decided yet. Options are belo
 
 ## Stage 1: The dApp (sender)
 
-### The send API: `push_send`
+### The send API: `notification_send`
 
 One call, one batch:
 
 ```
-push_send(chunk_id, delivery, recipients)
+notification_send(chunk_id, headers, recipients)
 ```
 
 - **`chunk_id`** - an id for the batch, so a retry doesn't send twice.
-- **`delivery`** - relay headers (RFC 8030): `urgency`; `ttl` (how long the relay holds it if the device is offline); `topic` (a newer message with the same topic replaces an older, undelivered one).
+- **`headers`** - delivery preferences: `urgency`; `expires_at` (drop it if still undelivered by then); `coalesce_key` (a newer notification with the same key supersedes an older, undelivered one). Deliberately not Web Push's own words, so another channel can map them later.
 - **`recipients`** - the target users. Nothing else, no text.
 
 There's deliberately no field for content. If II can't be handed the text, it can't read it,
@@ -77,7 +77,7 @@ being throttled itself.
 Chunking, pacing and retrying is fiddly stuff. Two ways to hand it over:
 
 - **Ship a library.** It owns the list, chunks, paces, retries, and personalizes text. *Pro:* easier to onboard dApps, and we know the tricky part is done right so nobody accidentally hammers us. *Con:* another thing we build and maintain, in some language (probably Motoko first, maybe a Rust crate).
-- **No library.** dApps call `push_send` raw and do the chunking, pacing and retrying themselves. *Pro:* nothing for us to build. *Con:* everyone rebuilds the same thing, and a sloppy integration hammers us.
+- **No library.** dApps call `notification_send` raw and do the chunking, pacing and retrying themselves. *Pro:* nothing for us to build. *Con:* everyone rebuilds the same thing, and a sloppy integration hammers us.
 
 ### Where the library runs
 
@@ -87,12 +87,12 @@ Chunking, pacing and retrying is fiddly stuff. Two ways to hand it over:
 ### Being a verified sender
 
 II only accepts a send from the canister listed at the dApp's
-`/.well-known/ii-push-senders`.
+`/.well-known/ii-notification-senders`.
 
 ### Limitations & bottlenecks
 
 - **The dApp is the source of truth.** II keeps no send list, so the dApp has to track who's done and who isn't, and pick up from there if its backend restarts.
-- **An II upgrade drops in-flight pings.** Our queue is transient. II returns a version counter, and if it changed the dApp re-sends whatever it hadn't heard back on.
+- **An II upgrade drops in-flight pings.** Our queue is transient. II returns a `queue_id`, and if it changed the dApp re-sends whatever it hadn't heard back on.
 - **One dApp can only push so fast.** ≤1000 recipients per call, and the queue between canisters holds about 500 calls. So it has to pace itself rather than blast. II throttles too when it's busy.
 - **The dApp now has to serve the text.** The notification doesn't carry it, so the dApp needs an endpoint the device can query, and it has to answer fast (under a second) or the user just gets a generic notification. This is real new work for the dApp, and it's the main cost of keeping II out of the content.
 
@@ -336,123 +336,48 @@ Apple, Google, Mozilla. The last hop. Not ours to build.
 
 ## Interfaces
 
-Two of them, and they're different kinds of thing. The first is II's candid, which we own.
-The second is a contract dApps implement and we only specify, like the `.well-known` file.
+Two of them, and they are different kinds of thing.
 
-Nothing a dApp touches mentions push, so it can't tell how the user actually gets notified
-and can't influence it. The Web Push specifics sit in their own corner.
+- **[`src/internet_identity/internet_identity.did`](../src/internet_identity/internet_identity.did)** is II's own candid, which we own. Look for the `notification_*` and `webpush_*` methods.
+- **[`docs/ii-notifications-dapp.did`](ii-notifications-dapp.did)** is the contract a sending dApp implements. We only specify it, like the `.well-known` file.
 
-### dApp to II
+The candid lives in those files rather than being pasted here, so there is one copy to
+review and it cannot drift from the doc. What follows is why it looks the way it does.
 
-```candid
-type NotificationUrgency = variant { low; normal; high };
+**Nothing a dApp touches mentions push.** No delivery channel appears in `notification_send`,
+its headers are channel-neutral (`urgency`, `expires_at`, `coalesce_key` rather than Web
+Push's `ttl` and `topic`), and consent is to hear from an app, not to hear from it by push.
+So another channel can be added later without breaking any sender. The Web Push specifics
+sit in `webpush_*`, called by II's frontend only.
 
-type NotificationHeaders = record {        // transport headers
-  urgency      : opt NotificationUrgency;  // default normal
-  expires_at   : opt nat64;                // ns. drop if still undelivered by then
-  coalesce_key : opt text;                 // supersede an undelivered notification with the same key
-};
+**`recipients` is a one-field record on purpose.** Candid lets us add an `opt` field to a
+record later, but `principal` to `record { ... }` is a breaking change. The reserved
+`message` field is how a channel that cannot fetch for itself would eventually work, and
+Web Push would ignore it even when present, so the seal cache stays valid and we never build
+a second sealing path.
 
-type NotificationContent = record {        // only used by channels that can't fetch
-  title : text;
-  body  : text;
-  url   : opt text;                        // deep link, same-origin as the sender
-};
+**The fetch takes no arguments.** The caller is the identity, so the dApp reads `caller()`.
+Nothing to leak in a parameter, no bearer token to pass around. It has to be a query,
+because the service worker must show something almost immediately and an update call takes
+seconds.
 
-type NotificationRecipient = record {
-  user : principal;                        // per-origin principal. no text, see the other interface
-  // message : opt NotificationContent;    // reserved. web push ignores it; email/SMS use it instead of pulling
-};
+**There is no version field.** If the dApp-side interface has to change we add
+`ii_pending_notifications_2` and fall back when a canister rejects it as not found, which is
+how II already evolves its own interface.
 
-type NotificationRejection = variant {
-  no_consent;                              // unknown user, not consented, or no devices. merged on purpose: same action for you, no leak
-  invalid;                                 // malformed. sender bug
-};
+### What is inside the sealed payload
 
-type NotificationSendResult = record {
-  accepted       : nat32;                  // queued, not delivered. no receipts exist
-  rejected       : vec record { index : nat32; reason : NotificationRejection };
-                                           // index = position in the recipients array you sent
-  retry_after_ms : opt nat32;              // if set, then II has no capacity to send now so wait until retry
-  queue_id       : nat64;                  // different from your last call? new queue id on II cause of an upgrade, so re-send anything unconfirmed
-};
-
-// Caller must be the canister registered for the origin. ~1000 recipients max.
-notification_send : (
-  chunk_id   : blob,                       // idempotency. same id on retry = not sent twice
-  headers    : NotificationHeaders,
-  recipients : vec NotificationRecipient,
-) -> (NotificationSendResult);
-
-// Caller must be the registered sender. Lets a dApp filter its audience before
-// sending. Learns nothing it wouldn't learn from `rejected`.
-notification_consent_status : (vec principal) -> (vec bool) query;
-
-// II verifies the origin really lists this canister at /.well-known/ii-notification-senders.
-// Pass null as sender to deregister. II registers itself the same way, no special case.
-notification_register_sender : (origin : text, sender : opt principal) -> (variant { ok; err : text });
-
-// User consent management. Called by the user from II's own UI. NOT callable by a
-// dApp: origin is a parameter, so a dApp could otherwise grant or revoke for another app.
-notification_grant_consent     : (origin : text) -> (variant { ok; err : text });
-notification_revoke_consent    : (origin : text) -> (variant { ok; err : text });
-notification_consented_origins : () -> (vec text) query;   // from caller(), so nobody can enumerate others
-```
-
-`recipients` is a record with one field on purpose. Candid lets us add an `opt` field to a
-record later, but `principal` to `record {...}` is a breaking change, so the wrapper is free
-today and impossible to retrofit.
-
-### The fetch (dApps implement this)
-
-```candid
-type Notification = record {
-  id         : text;                       // the dApp's own id. the device dedups on this
-  title      : text;
-  body       : text;
-  url        : opt text;                   // deep link, same-origin as the dApp
-  created_at : nat64;                      // ns
-};
-
-ii_pending_notifications   : () -> (vec Notification) query;  // caller() is the user. must be a query, the SW is on a deadline
-ii_notifications_delivered : (vec text) -> ();                // ids, after display. a query can't mutate, hence separate
-
-// Later, for channels that can't fetch for themselves (email, SMS). II-only caller.
-// Batched, so O(apps) not O(users), and inter-canister so it never touches the outcall cap.
-ii_pending_notifications_batch : (vec principal) -> (vec record { principal; vec Notification }) query;
-```
-
-No arguments on the fetch: the caller *is* the identity, so there's nothing to leak in a
-parameter and no token to pass around.
-
-No version field either. If this shape ever changes we add `ii_pending_notifications_2`, try
-it first, and fall back when the canister rejects with "method not found". That's how II
-already evolves (`prepare_delegation` became `prepare_account_delegation`).
-
-### The Web Push corner
-
-Genuinely channel-specific, called by II's frontend only.
-
-```candid
-webpush_subscribe_device   : (endpoint : text, p256dh : blob, auth : blob) -> (variant { ok; err : text });
-webpush_unsubscribe_device : (endpoint : text) -> (variant { ok; err : text });
-webpush_vapid_public_key   : () -> (blob) query;
-```
-
-A second channel gets its own prefix next to this, and `notification_send` doesn't change.
-
-### What's inside the sealed payload
-
-Not candid, but it's part of the contract and it's frozen at approval time, so it belongs here.
+Not candid, but part of the contract, and frozen at approval time so it belongs here.
 
 ```json
 {"c":"4xhad-gd777-77775-aaacq-cai","o":"multidex.ai"}
 ```
 
 `c` is the canister the service worker queries, `o` is the label on the notification. About
-60 bytes, and both are stable for the life of the app, which is what makes the seal cacheable.
+60 bytes, and both are stable for the life of the app, which is what makes the seal
+cacheable.
 
-There's deliberately no callback URL. The method name is fixed by the spec, so the canister
+There is deliberately no callback URL. The method name is fixed by the spec, so the canister
 id is the only variable. A URL would invalidate every device's seal on any path change, and
 would mean a CORS'd web fetch instead of a canister query. The only thing that does
 invalidate a seal is the app moving to a new canister id, which needs a re-registration
@@ -461,7 +386,7 @@ anyway, so we re-seal that app's devices then.
 ### The sender's loop
 
 ```
-for each chunk of ≤1000 recipients:
+for each chunk of <=1000 recipients:
     r = notification_send(chunk_id, headers, recipients)
 
     if r.queue_id != last_queue_id:        # II upgraded, queue lost
