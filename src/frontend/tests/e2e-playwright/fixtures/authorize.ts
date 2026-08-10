@@ -26,6 +26,17 @@ export type AuthorizeConfig = {
        * page rather than picking one silently.
        */
       sso?: string;
+      /**
+       * Sets `?prompt=`. `"none"` asks II to answer from a delegation it
+       * already holds for this app and to error rather than render anything;
+       * `"login"` forces a ceremony. Omitted behaves as `"login"`.
+       */
+      prompt?: "none" | "login";
+      /**
+       * Sets `?hint=<principal>`, naming which stored delegation to re-issue
+       * when the user has more than one for this app.
+       */
+      hint?: string;
       attributes?: string[];
       useIcrc3Attributes?: boolean;
       icrc3Nonce?: Uint8Array;
@@ -43,6 +54,120 @@ class AuthorizePage {
     return this.#page;
   }
 }
+
+/**
+ * Drives one authorize round on `page`: points the test app at Internet
+ * Identity per `config`, clicks Sign In, hands the resulting page to
+ * `interact`, and waits for the flow to finish (the popup closing, or the
+ * redirect returning).
+ *
+ * Exported because a round is not always the whole test. Anything about
+ * re-authorizing — a delegation Internet Identity already holds, a session it
+ * does not — needs a first round to establish the state and a second to
+ * exercise it, and both should go through the same code path the
+ * {@link test.authorizePage} fixture uses.
+ *
+ * `interact` may do nothing: under `prompt=none` there is nothing to click,
+ * and the flow completes on its own.
+ */
+export const performAuthorize = async (
+  page: Page,
+  config: Partial<AuthorizeConfig>,
+  interact: (authorizePage: Page) => Promise<void>,
+): Promise<void> => {
+  await page.goto(config.testAppURL ?? "https://nice-name.com");
+  const testAppPage = page;
+
+  const internetIdentityURL = config.internetIdentityURL ?? "https://id.ai";
+  const protocol = config.protocol ?? "legacy";
+
+  if (protocol === "icrc25") {
+    const queryParams: string[] = [];
+    if ("openid" in config && config.openid !== undefined) {
+      queryParams.push(`openid=${encodeURIComponent(config.openid)}`);
+    }
+    if ("sso" in config && config.sso !== undefined) {
+      queryParams.push(`sso=${encodeURIComponent(config.sso)}`);
+    }
+    if ("prompt" in config && config.prompt !== undefined) {
+      queryParams.push(`prompt=${encodeURIComponent(config.prompt)}`);
+    }
+    if ("hint" in config && config.hint !== undefined) {
+      queryParams.push(`hint=${encodeURIComponent(config.hint)}`);
+    }
+    const querySuffix =
+      queryParams.length > 0 ? `?${queryParams.join("&")}` : "";
+    await testAppPage
+      .getByRole("textbox", { name: "Identity Provider" })
+      .fill(internetIdentityURL + "/authorize" + querySuffix);
+    await testAppPage
+      .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
+      .setChecked(true);
+    if ("useIcrc3Attributes" in config && config.useIcrc3Attributes === true) {
+      await testAppPage
+        .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
+        .setChecked(true);
+    }
+    if ("icrc3Nonce" in config && config.icrc3Nonce !== undefined) {
+      await testAppPage
+        .getByRole("textbox", { name: "ICRC-3 nonce (base64):" })
+        .fill(toBase64(config.icrc3Nonce));
+    }
+    if (
+      "attributes" in config &&
+      config.attributes !== undefined &&
+      config.attributes.length > 0
+    ) {
+      await testAppPage
+        .getByRole("textbox", { name: "Request attributes:" })
+        .fill(config.attributes.join("\n"));
+    }
+  } else {
+    await testAppPage
+      .getByRole("textbox", { name: "Identity Provider" })
+      .fill(internetIdentityURL + "#authorize");
+  }
+
+  await expect(testAppPage.locator("#principal")).toBeHidden();
+
+  const transport = config.transport ?? "window";
+  switch (transport) {
+    case "redirect": {
+      // Redirect flow: clicking "Sign In" navigates THIS tab to /callback → II
+      // /authorize. The authenticate interaction runs on the same page, and II
+      // delivers the response back by navigation — no popup.
+      await testAppPage.locator("#transport").selectOption("redirect");
+      await testAppPage.getByRole("button", { name: "Sign In" }).click();
+
+      await interact(testAppPage);
+
+      // On the return load the homepage renders the principal.
+      await expect(testAppPage.locator("#principal")).toBeVisible({
+        timeout: 15_000,
+      });
+      break;
+    }
+    case "window": {
+      // Window flow: clicking "Sign In" opens II in a new tab; the response
+      // comes back over postMessage and the tab closes.
+      const authPagePromise = testAppPage.context().waitForEvent("page");
+      await testAppPage.getByRole("button", { name: "Sign In" }).click();
+      const authPage = await authPagePromise;
+      const closePromise = authPage.waitForEvent("close", {
+        timeout: 15_000,
+      });
+
+      await interact(authPage);
+
+      await closePromise;
+      break;
+    }
+    default: {
+      transport satisfies never;
+      throw new Error(`Unhandled transport: ${String(transport)}`);
+    }
+  }
+};
 
 export const test = base.extend<{
   authorizeConfig: Partial<AuthorizeConfig> | undefined;
@@ -90,101 +215,9 @@ export const test = base.extend<{
       throw new Error("authorizeConfig must be defined");
     }
 
-    await page.goto(authorizeConfig.testAppURL ?? "https://nice-name.com");
-    const testAppPage = page;
-
-    const internetIdentityURL =
-      authorizeConfig.internetIdentityURL ?? "https://id.ai";
-    const protocol = authorizeConfig.protocol ?? "legacy";
-
-    if (protocol === "icrc25") {
-      const queryParams: string[] = [];
-      if ("openid" in authorizeConfig && authorizeConfig.openid !== undefined) {
-        queryParams.push(
-          `openid=${encodeURIComponent(authorizeConfig.openid)}`,
-        );
-      }
-      if ("sso" in authorizeConfig && authorizeConfig.sso !== undefined) {
-        queryParams.push(`sso=${encodeURIComponent(authorizeConfig.sso)}`);
-      }
-      const querySuffix =
-        queryParams.length > 0 ? `?${queryParams.join("&")}` : "";
-      await testAppPage
-        .getByRole("textbox", { name: "Identity Provider" })
-        .fill(internetIdentityURL + "/authorize" + querySuffix);
-      await testAppPage
-        .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
-        .setChecked(true);
-      if (
-        "useIcrc3Attributes" in authorizeConfig &&
-        authorizeConfig.useIcrc3Attributes === true
-      ) {
-        await testAppPage
-          .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
-          .setChecked(true);
-      }
-      if (
-        "icrc3Nonce" in authorizeConfig &&
-        authorizeConfig.icrc3Nonce !== undefined
-      ) {
-        await testAppPage
-          .getByRole("textbox", { name: "ICRC-3 nonce (base64):" })
-          .fill(toBase64(authorizeConfig.icrc3Nonce));
-      }
-      if (
-        "attributes" in authorizeConfig &&
-        authorizeConfig.attributes !== undefined &&
-        authorizeConfig.attributes.length > 0
-      ) {
-        await testAppPage
-          .getByRole("textbox", { name: "Request attributes:" })
-          .fill(authorizeConfig.attributes.join("\n"));
-      }
-    } else {
-      await testAppPage
-        .getByRole("textbox", { name: "Identity Provider" })
-        .fill(internetIdentityURL + "#authorize");
-    }
-
-    await expect(testAppPage.locator("#principal")).toBeHidden();
-
-    const transport = authorizeConfig.transport ?? "window";
-    switch (transport) {
-      case "redirect": {
-        // Redirect flow: clicking "Sign In" navigates THIS tab to /callback → II
-        // /authorize. The authenticate interaction runs on the same page, and II
-        // delivers the response back by navigation — no popup.
-        await testAppPage.locator("#transport").selectOption("redirect");
-        await testAppPage.getByRole("button", { name: "Sign In" }).click();
-
-        await use(new AuthorizePage(testAppPage));
-
-        // On the return load the homepage renders the principal.
-        await expect(testAppPage.locator("#principal")).toBeVisible({
-          timeout: 15_000,
-        });
-        break;
-      }
-      case "window": {
-        // Window flow: clicking "Sign In" opens II in a new tab; the response
-        // comes back over postMessage and the tab closes.
-        const authPagePromise = testAppPage.context().waitForEvent("page");
-        await testAppPage.getByRole("button", { name: "Sign In" }).click();
-        const authPage = await authPagePromise;
-        const closePromise = authPage.waitForEvent("close", {
-          timeout: 15_000,
-        });
-
-        await use(new AuthorizePage(authPage));
-
-        await closePromise;
-        break;
-      }
-      default: {
-        transport satisfies never;
-        throw new Error(`Unhandled transport: ${String(transport)}`);
-      }
-    }
+    await performAuthorize(page, authorizeConfig, (authorizePage) =>
+      use(new AuthorizePage(authorizePage)),
+    );
   },
   authorizedPrincipal: async ({ page, authorizeConfig }, use) => {
     const [testAppPage, authPage] = page.context().pages();
