@@ -422,6 +422,14 @@ impl Anchor {
         let mut certified_pairs: BTreeMap<String, Icrc3Value> = BTreeMap::new();
         let mut problems = Vec::new();
 
+        // Rendered once, outside the loop. `to_data_url` base64-encodes up to
+        // 100 KiB, and a request may legally carry `MAX_ATTRIBUTES_PER_REQUEST`
+        // specs — so doing it per spec would let a ~2 KB authenticated request
+        // trigger 100 encodings of the same picture. The duplicate-key check in
+        // `insert_certified_attribute` only fires *after* resolution, so it is
+        // no defence against that.
+        let profile_picture_data_url = profile_picture.as_ref().map(ProfilePicture::to_data_url);
+
         for spec in &attribute_specs {
             match &spec.key.scope {
                 Some(AttributeScope::OpenId { issuer }) => {
@@ -514,19 +522,18 @@ impl Anchor {
                     // certification fails the call instead of silently
                     // certifying a different image.
                     AttributeName::ProfilePicture => {
-                        let Some(picture) = profile_picture.as_ref() else {
+                        let Some(stored) = profile_picture_data_url.as_ref() else {
                             problems.push("No profile picture is set on this identity".to_string());
                             continue;
                         };
-                        let stored = picture.to_data_url();
-                        if !validate_spec_value(spec, &stored, &mut problems) {
+                        if !validate_spec_value(spec, stored, &mut problems) {
                             continue;
                         }
                         insert_certified_attribute(
                             &mut certified_pairs,
                             &mut problems,
                             spec,
-                            stored,
+                            stored.clone(),
                         );
                     }
                     // OIDC/SSO emails always arrive with their source scope,
