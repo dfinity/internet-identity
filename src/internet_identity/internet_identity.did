@@ -1560,20 +1560,17 @@ type ListAvailableAttributesError = variant {
 
 type NotificationUrgency = variant { low; normal; high };
 
-type NotificationHeaders = record {
-    urgency : opt NotificationUrgency;
-    expires_at : opt nat64;
-    coalesce_key : opt text;
-};
-
 type NotificationContent = record {
     title : text;
     body : text;
     url : opt text;
 };
 
-type NotificationRecipient = record {
-    user : principal;
+type Notification = record {
+    id : blob;                       // sender's id. also the coalesce and dedup key
+    recipient : principal;
+    urgency : opt NotificationUrgency;
+    expires_at : opt nat64;          // ns. drop if still undelivered by then
     // message : opt NotificationContent;
 };
 
@@ -1585,9 +1582,8 @@ type NotificationRejection = variant {
 
 type NotificationSendResult = record {
     accepted : nat32;                // queued, not delivered
-    rejected : vec record { user : principal; reason : NotificationRejection };
+    rejected : vec record { id : blob; reason : NotificationRejection };
     retry_after_ms : opt nat32;      // at capacity, wait this long before the next chunk
-    queue_id : nat64;                // changed? II lost the queue, re-send anything unconfirmed
 };
 
 service : (opt InternetIdentityInit) -> {
@@ -2037,9 +2033,8 @@ service : (opt InternetIdentityInit) -> {
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
 
     notification_send : (
-        chunk_id : blob,
-        headers : NotificationHeaders,
-        recipients : vec NotificationRecipient,
+        chunk_id : blob,             // batch idempotency. a network retry is O(1) to reject
+        notifications : vec Notification,
     ) -> (NotificationSendResult);
 
     notification_consent_status : (principal) -> (bool) query;
