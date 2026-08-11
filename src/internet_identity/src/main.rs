@@ -63,6 +63,7 @@ mod mcp;
 mod mcp_registration;
 
 mod openid;
+mod profile_picture;
 mod session_delegation;
 mod single_flight_cache;
 mod state;
@@ -1074,6 +1075,13 @@ mod v2_api {
             Some(stored_verified_emails)
         };
 
+        // Metadata only — never the bytes. `identity_info` is fetched on
+        // every manage-screen load, and a picture is up to 100 KB against a
+        // response that is otherwise well under a kilobyte. The manage UI
+        // renders the picture from a separate `profile_picture_get`, which it
+        // can cache on the size + timestamp reported here.
+        let profile_picture = crate::profile_picture::get_metadata(identity_number);
+
         let identity_info = IdentityInfo {
             authn_methods: anchor_info
                 .devices
@@ -1089,6 +1097,7 @@ mod v2_api {
             created_at: anchor_info.created_at,
             email_recovery,
             verified_emails,
+            profile_picture,
         };
         Ok(identity_info)
     }
@@ -2151,6 +2160,68 @@ mod verified_email_api {
     }
 }
 
+mod profile_picture_api {
+    use super::*;
+    use internet_identity_interface::internet_identity::types::profile_picture::{
+        ProfilePicture, ProfilePictureError, ProfilePictureSetArg,
+    };
+
+    /// `identity_number`'s profile picture, or `None` when it has none.
+    ///
+    /// An `update` rather than a `query` so the response is certified — the
+    /// manage screen renders these bytes as the user's own avatar, and a
+    /// replica shouldn't be able to swap them unnoticed. Unlike
+    /// `identity_info` it does not record activity: the manage screen already
+    /// called `identity_info` to learn a picture exists, and this fetch is
+    /// part of the same page load.
+    ///
+    /// The picture is shareable info rather than a secret, but it is only ever
+    /// handed to the identity itself here; relying parties get it through
+    /// attribute certification, with consent.
+    #[update]
+    fn profile_picture_get(
+        identity_number: IdentityNumber,
+    ) -> Result<Option<ProfilePicture>, ProfilePictureError> {
+        crate::authz_utils::check_authorization(identity_number)
+            .map_err(|err| ProfilePictureError::Unauthorized(err.principal))?;
+
+        Ok(crate::profile_picture::get(identity_number))
+    }
+
+    /// Set `identity_number`'s profile picture, replacing any previous one.
+    ///
+    /// The caller sends only bytes: the media type is sniffed from them (a
+    /// caller-supplied one would end up in the `data:` URL relying parties
+    /// feed to an `<img>` tag) and the timestamp is the canister's.
+    ///
+    /// The picture itself lives in its own stable map, not on the anchor — the
+    /// anchor write `anchor_operation_with_authz_check` performs is what
+    /// persists the activity bookkeeping, which is why the closure below
+    /// leaves the anchor untouched.
+    #[update]
+    fn profile_picture_set(
+        identity_number: IdentityNumber,
+        arg: ProfilePictureSetArg,
+    ) -> Result<(), ProfilePictureError> {
+        let now_ns = ic_cdk::api::time();
+        anchor_operation_with_authz_check(identity_number, |_anchor| {
+            crate::profile_picture::set(identity_number, arg.bytes, now_ns)
+                .map(|operation| ((), operation))
+        })
+    }
+
+    /// Drop `identity_number`'s profile picture.
+    ///
+    /// [`ProfilePictureError::NotSet`] when there was none, so the UI can tell
+    /// a real removal from a no-op instead of reporting success either way.
+    #[update]
+    fn profile_picture_remove(identity_number: IdentityNumber) -> Result<(), ProfilePictureError> {
+        anchor_operation_with_authz_check(identity_number, |_anchor| {
+            crate::profile_picture::remove(identity_number).map(|operation| ((), operation))
+        })
+    }
+}
+
 mod attribute_sharing {
     use internet_identity_interface::internet_identity::types::attributes::{
         Attribute, CertifiedAttributes, GetAttributesError, GetAttributesRequest,
@@ -2266,6 +2337,7 @@ mod attribute_sharing {
         let issued_at_timestamp_ns = ic_cdk::api::time();
         let message = anchor.prepare_icrc3_attributes(
             attributes,
+            crate::profile_picture::get(identity_number),
             nonce,
             origin,
             unmapped_origin,
@@ -2319,7 +2391,11 @@ mod attribute_sharing {
                 ListAvailableAttributesError::AuthorizationError(principal)
             })?;
 
-        Ok(anchor.list_available_attributes(attributes, sso_session_domain))
+        Ok(anchor.list_available_attributes(
+            attributes,
+            sso_session_domain,
+            crate::profile_picture::get(identity_number),
+        ))
     }
 }
 

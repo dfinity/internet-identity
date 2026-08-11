@@ -136,6 +136,7 @@ use storable::mcp_registration::StorableMcpRegistration;
 use storable::openid_credential::StorableOpenIdCredential;
 use storable::openid_credential_key::StorableOpenIdCredentialKey;
 use storable::openid_jwks::StorableJwks;
+use storable::profile_picture::StorableProfilePicture;
 use storable::sso_stable_id_key::StorableSsoStableIdKey;
 use storable::storable_persistent_state::StorablePersistentState;
 
@@ -209,6 +210,7 @@ const MCP_GRANT_MEMORY_INDEX: u8 = 29u8;
 // const DEPRECATED_MCP_REGISTRATION_URL_MEMORY_INDEX: u8 = 30u8;
 const MCP_REGISTRATION_MEMORY_INDEX: u8 = 31u8;
 const SSO_STABLE_ID_INDEX_MEMORY_INDEX: u8 = 32u8;
+const PROFILE_PICTURE_MEMORY_INDEX: u8 = 33u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -287,6 +289,15 @@ const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
 /// SSO stable-id bridge:
 /// `SHA-256(sso_domain, iss, ii_client_id, stable_id) -> AnchorNumber`.
 const SSO_STABLE_ID_INDEX_MEMORY_ID: MemoryId = MemoryId::new(SSO_STABLE_ID_INDEX_MEMORY_INDEX);
+
+/// Per-anchor profile picture (up to 100 KB of image bytes), keyed by anchor
+/// number. Written by the authenticated `profile_picture_set` method and read
+/// by `profile_picture_get`, the Settings UI, and attribute certification.
+/// Kept in its own map — rather than on the anchor record, which is sized
+/// against `DEFAULT_ENTRY_SIZE` and deserialized on every authenticated call —
+/// so an identity that has a picture doesn't pay for it on unrelated
+/// operations. Same reasoning as [`MCP_CONFIG_MEMORY_ID`].
+const PROFILE_PICTURE_MEMORY_ID: MemoryId = MemoryId::new(PROFILE_PICTURE_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -440,6 +451,11 @@ pub struct Storage<M: Memory> {
     /// [`SSO_STABLE_ID_INDEX_MEMORY_ID`].
     sso_stable_id_index_memory:
         StableBTreeMap<StorableSsoStableIdKey, StorableAnchorNumberList, ManagedMemory<M>>,
+
+    profile_picture_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// Per-anchor profile picture. See [`PROFILE_PICTURE_MEMORY_ID`].
+    profile_picture_memory:
+        StableBTreeMap<StorableAnchorNumber, StorableProfilePicture, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -530,6 +546,7 @@ impl<M: Memory + Clone> Storage<M> {
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
         let sso_stable_id_index_memory = memory_manager.get(SSO_STABLE_ID_INDEX_MEMORY_ID);
+        let profile_picture_memory = memory_manager.get(PROFILE_PICTURE_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -648,6 +665,8 @@ impl<M: Memory + Clone> Storage<M> {
                 sso_stable_id_index_memory.clone(),
             ),
             sso_stable_id_index_memory: StableBTreeMap::init(sso_stable_id_index_memory),
+            profile_picture_memory_wrapper: MemoryWrapper::new(profile_picture_memory.clone()),
+            profile_picture_memory: StableBTreeMap::init(profile_picture_memory),
         }
     }
 
@@ -1187,6 +1206,44 @@ impl<M: Memory + Clone> Storage<M> {
     /// previous value), so it syncs across the identity's devices.
     pub fn write_mcp_config(&mut self, anchor_number: AnchorNumber, config: StorableMcpConfig) {
         self.mcp_config_memory.insert(anchor_number, config);
+    }
+
+    /// The number of identities that currently have a profile picture — the
+    /// growth surface this map adds, surfaced through the memory stats.
+    pub fn profile_picture_count(&self) -> u64 {
+        self.profile_picture_memory.len()
+    }
+
+    /// `anchor_number`'s profile picture, or `None` when it has none.
+    pub fn lookup_profile_picture(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> Option<StorableProfilePicture> {
+        self.profile_picture_memory.get(&anchor_number)
+    }
+
+    /// Set `anchor_number`'s profile picture, replacing any previous one.
+    ///
+    /// An identity has zero or one picture, so this is a replace rather than
+    /// an append — which is also what keeps the map's per-identity footprint
+    /// bounded by `PROFILE_PICTURE_MAX_BYTES` no matter how often the user
+    /// changes their picture.
+    pub fn write_profile_picture(
+        &mut self,
+        anchor_number: AnchorNumber,
+        picture: StorableProfilePicture,
+    ) {
+        self.profile_picture_memory.insert(anchor_number, picture);
+    }
+
+    /// Drop `anchor_number`'s profile picture. Returns the removed entry, or
+    /// `None` when there was none — which is how the endpoint tells "removed"
+    /// from "nothing to remove" without a preceding read.
+    pub fn remove_profile_picture(
+        &mut self,
+        anchor_number: AnchorNumber,
+    ) -> Option<StorableProfilePicture> {
+        self.profile_picture_memory.remove(&anchor_number)
     }
 
     /// Give `anchor_number` AI access on the official connector. Call it through
@@ -2443,6 +2500,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "sso_stable_id_index_memory".to_string(),
                 self.sso_stable_id_index_memory_wrapper.size(),
+            ),
+            (
+                "profile_picture_memory".to_string(),
+                self.profile_picture_memory_wrapper.size(),
             ),
         ])
     }

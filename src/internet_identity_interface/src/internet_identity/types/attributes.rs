@@ -1,3 +1,4 @@
+use crate::internet_identity::types::profile_picture::PROFILE_PICTURE_MAX_BYTES;
 use crate::internet_identity::types::{
     AccountNumber, AnchorNumber, FrontendHostname, GetAccountError, Timestamp,
 };
@@ -10,7 +11,21 @@ pub const FRONTEND_HOSTNAME_MAX_BYTES: usize = 255;
 
 pub const MAX_ATTRIBUTES_PER_REQUEST: usize = 100;
 
+/// Default upper bound on an attribute's value. `profile_picture` overrides
+/// it — see [`AttributeName::max_value_bytes`].
 pub const ATTRIBUTE_VALUE_MAX_BYTES: usize = 50_000;
+
+/// Upper bound on the `profile_picture` attribute value, which is the stored
+/// picture rendered as a `data:` URL rather than the raw bytes.
+///
+/// `data:` + the longest accepted media type + `;base64,` + base64 of at most
+/// [`PROFILE_PICTURE_MAX_BYTES`] bytes. base64 emits 4 characters per 3 input
+/// bytes, rounded up to a whole quantum.
+pub const PROFILE_PICTURE_ATTRIBUTE_VALUE_MAX_BYTES: usize = {
+    const PREFIX_MAX_BYTES: usize = "data:".len() + "image/jpeg".len() + ";base64,".len();
+    const BASE64_MAX_BYTES: usize = 4 * PROFILE_PICTURE_MAX_BYTES.div_ceil(3);
+    PREFIX_MAX_BYTES + BASE64_MAX_BYTES
+};
 
 pub const OPENID_ISSUER_MAX_BYTES: usize = 1024;
 
@@ -60,6 +75,7 @@ pub fn remap_to_legacy_domain(origin: &str) -> String {
 pub enum AttributeName {
     Email,
     Name,
+    ProfilePicture,
     VerifiedEmail,
 }
 
@@ -69,8 +85,26 @@ impl AttributeName {
         &[
             AttributeName::Email,
             AttributeName::Name,
+            AttributeName::ProfilePicture,
             AttributeName::VerifiedEmail,
         ]
+    }
+
+    /// Upper bound on this attribute's value, in bytes.
+    ///
+    /// Per-name rather than one global cap because `profile_picture` is
+    /// binary and three orders of magnitude larger than every textual
+    /// attribute. Raising [`ATTRIBUTE_VALUE_MAX_BYTES`] for everyone to
+    /// accommodate it would widen what an `email` or `name` may carry — and
+    /// that constant also feeds [`ICRC3_MESSAGE_MAX_BYTES`], which is
+    /// multiplied by [`MAX_ATTRIBUTES_PER_REQUEST`].
+    pub const fn max_value_bytes(self) -> usize {
+        match self {
+            AttributeName::ProfilePicture => PROFILE_PICTURE_ATTRIBUTE_VALUE_MAX_BYTES,
+            AttributeName::Email | AttributeName::Name | AttributeName::VerifiedEmail => {
+                ATTRIBUTE_VALUE_MAX_BYTES
+            }
+        }
     }
 }
 
@@ -81,6 +115,7 @@ impl TryFrom<&str> for AttributeName {
         match value {
             "email" => Ok(AttributeName::Email),
             "name" => Ok(AttributeName::Name),
+            "profile_picture" => Ok(AttributeName::ProfilePicture),
             "verified_email" => Ok(AttributeName::VerifiedEmail),
             _ => Err(format!("Unknown attribute: {}", value)),
         }
@@ -92,6 +127,7 @@ impl std::fmt::Display for AttributeName {
         match self {
             AttributeName::Email => write!(f, "email"),
             AttributeName::Name => write!(f, "name"),
+            AttributeName::ProfilePicture => write!(f, "profile_picture"),
             AttributeName::VerifiedEmail => write!(f, "verified_email"),
         }
     }
@@ -460,11 +496,12 @@ impl TryFrom<(String, Vec<u8>)> for Attribute {
 
         let key = AttributeKey::try_from(key)?;
 
-        if value.len() > ATTRIBUTE_VALUE_MAX_BYTES {
+        let max_value_bytes = key.attribute_name.max_value_bytes();
+        if value.len() > max_value_bytes {
             return Err(format!(
                 "Attribute value length {} exceeds limit of {} bytes",
                 value.len(),
-                ATTRIBUTE_VALUE_MAX_BYTES
+                max_value_bytes
             ));
         }
 
@@ -569,10 +606,15 @@ pub enum GetAttributesError {
 
 /// Maximum length (in bytes) of an `AttributeName` when rendered as a string.
 ///
-/// Currently, this is the length of `"VerifiedEmail"`, the longest variant.
-/// If new, longer variants are added to `AttributeName`, this constant must be
-/// updated accordingly.
-pub const ATTRIBUTE_NAME_MAX_BYTES: usize = "VerifiedEmail".len();
+/// This is the *wire* form — what `Display` emits and what actually appears in
+/// an attribute key — not the Rust variant identifier. It previously named the
+/// identifier (`"VerifiedEmail"`, 13 bytes) while the wire name
+/// `verified_email` is 14, so the bound it fed was one byte short; adding
+/// `profile_picture` (15 bytes) is the occasion to fix that.
+///
+/// A new, longer variant must bump this —
+/// `attribute_name_max_bytes_covers_every_variant` fails otherwise.
+pub const ATTRIBUTE_NAME_MAX_BYTES: usize = "profile_picture".len();
 
 /// Additional bytes added when an attribute name is scoped as an OpenID-style
 /// key of the form: `"openid:" + <issuer> + ":" + <attribute_name>`.
@@ -609,8 +651,13 @@ pub const ICRC3_MESSAGE_CANDID_OVERHEAD_BYTES: usize = 1024;
 ///  * up to `MAX_ATTRIBUTES_PER_REQUEST` attributes
 ///  * each attribute's key (up to `ICRC3_ATTRIBUTE_KEY_MAX_BYTES` bytes)
 ///  * each attribute's value (up to `ATTRIBUTE_VALUE_MAX_BYTES` bytes)
-///  * per-attribute and per-message Candid encoding overhead.
+///  * per-attribute and per-message Candid encoding overhead
+///  * one `profile_picture`, whose value bound is much larger than the
+///    textual attributes'. One is enough: `profile_picture` is certified
+///    unscoped only, and the certified map is keyed by attribute name, so a
+///    bundle can carry at most a single picture.
 pub const ICRC3_MESSAGE_MAX_BYTES: usize = ICRC3_MESSAGE_CANDID_OVERHEAD_BYTES
+    + PROFILE_PICTURE_ATTRIBUTE_VALUE_MAX_BYTES
     + MAX_ATTRIBUTES_PER_REQUEST
         * (ICRC3_ATTRIBUTE_KEY_MAX_BYTES
             + ATTRIBUTE_VALUE_MAX_BYTES
@@ -728,11 +775,12 @@ impl TryFrom<PrepareIcrc3AttributeRequest> for ValidatedPrepareIcrc3AttributeReq
             };
 
             if let Some(ref value) = spec.value {
-                if value.len() > ATTRIBUTE_VALUE_MAX_BYTES {
+                let max_value_bytes = key.attribute_name.max_value_bytes();
+                if value.len() > max_value_bytes {
                     problems.push(format!(
                         "Attribute value length {} exceeds limit of {} bytes",
                         value.len(),
-                        ATTRIBUTE_VALUE_MAX_BYTES
+                        max_value_bytes
                     ));
                     continue;
                 }
@@ -911,6 +959,9 @@ pub enum ListAvailableAttributesError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::internet_identity::types::profile_picture::{
+        ProfilePicture, ProfilePictureMediaType,
+    };
     use pretty_assertions::assert_eq as pretty_assert_eq;
 
     mod ellipsized_tests {
@@ -1033,6 +1084,122 @@ mod tests {
         #[test]
         fn test_ordering() {
             assert!(AttributeName::Email < AttributeName::Name);
+        }
+
+        /// `all()` is what `list_available_attributes` iterates, so a variant
+        /// missing from it is invisible to relying parties. Checked by
+        /// round-tripping every variant's `Display` form through `try_from`
+        /// and confirming `all()` holds one of each.
+        #[test]
+        fn every_variant_round_trips_and_is_listed() {
+            for &name in AttributeName::all() {
+                let rendered = name.to_string();
+                pretty_assert_eq!(
+                    AttributeName::try_from(rendered.as_str()),
+                    Ok(name),
+                    "`{}` did not round-trip",
+                    rendered
+                );
+            }
+            // A variant absent from `all()` would make this shorter than the
+            // number of parseable wire names.
+            for wire in ["email", "name", "profile_picture", "verified_email"] {
+                let name = AttributeName::try_from(wire).expect("known wire name must parse");
+                assert!(
+                    AttributeName::all().contains(&name),
+                    "`{}` parses but is missing from AttributeName::all()",
+                    wire
+                );
+            }
+        }
+
+        /// `ATTRIBUTE_NAME_MAX_BYTES` bounds the wire name of the longest
+        /// variant, which is the term `ICRC3_ATTRIBUTE_KEY_MAX_BYTES` budgets
+        /// for. A newly added longer variant must bump it.
+        #[test]
+        fn attribute_name_max_bytes_covers_every_variant() {
+            for &name in AttributeName::all() {
+                let wire_len = name.to_string().len();
+                assert!(
+                    wire_len <= ATTRIBUTE_NAME_MAX_BYTES,
+                    "`{}` is {} bytes, over ATTRIBUTE_NAME_MAX_BYTES ({})",
+                    name,
+                    wire_len,
+                    ATTRIBUTE_NAME_MAX_BYTES
+                );
+            }
+        }
+
+        /// The picture is transported as a `data:` URL, so its value bound
+        /// has to leave room for base64's inflation over the raw byte cap —
+        /// otherwise a picture at exactly the storage limit would be
+        /// rejected at certification time.
+        #[test]
+        fn profile_picture_value_bound_fits_a_max_size_picture() {
+            let max_picture = ProfilePicture {
+                media_type: ProfilePictureMediaType::Jpeg,
+                bytes: serde_bytes::ByteBuf::from(vec![0u8; PROFILE_PICTURE_MAX_BYTES]),
+                uploaded_at: 0,
+            };
+            let data_url_len = max_picture.to_data_url().len();
+            assert!(
+                data_url_len <= AttributeName::ProfilePicture.max_value_bytes(),
+                "a {}-byte picture renders as a {}-byte data URL, over the {}-byte bound",
+                PROFILE_PICTURE_MAX_BYTES,
+                data_url_len,
+                AttributeName::ProfilePicture.max_value_bytes()
+            );
+        }
+
+        /// Textual attributes must not inherit the picture's larger bound.
+        #[test]
+        fn only_profile_picture_gets_the_larger_value_bound() {
+            for &name in AttributeName::all() {
+                let expected = if name == AttributeName::ProfilePicture {
+                    PROFILE_PICTURE_ATTRIBUTE_VALUE_MAX_BYTES
+                } else {
+                    ATTRIBUTE_VALUE_MAX_BYTES
+                };
+                pretty_assert_eq!(
+                    name.max_value_bytes(),
+                    expected,
+                    "unexpected value bound for {:?}",
+                    name
+                );
+            }
+        }
+
+        /// The per-name bound is what `Attribute::try_from` enforces — a
+        /// data-URL-sized `email` must still be rejected.
+        #[test]
+        fn value_bound_is_enforced_per_attribute_name() {
+            let big = vec![b'x'; ATTRIBUTE_VALUE_MAX_BYTES + 1];
+
+            pretty_assert_eq!(
+                Attribute::try_from(("email".to_string(), big.clone())),
+                Err(format!(
+                    "Attribute value length {} exceeds limit of {} bytes",
+                    big.len(),
+                    ATTRIBUTE_VALUE_MAX_BYTES
+                )),
+                "email must stay on the default bound"
+            );
+
+            assert!(
+                Attribute::try_from(("profile_picture".to_string(), big)).is_ok(),
+                "profile_picture must accept a value over the default bound"
+            );
+
+            let too_big_picture = vec![b'x'; PROFILE_PICTURE_ATTRIBUTE_VALUE_MAX_BYTES + 1];
+            pretty_assert_eq!(
+                Attribute::try_from(("profile_picture".to_string(), too_big_picture.clone())),
+                Err(format!(
+                    "Attribute value length {} exceeds limit of {} bytes",
+                    too_big_picture.len(),
+                    PROFILE_PICTURE_ATTRIBUTE_VALUE_MAX_BYTES
+                )),
+                "profile_picture must still be bounded"
+            );
         }
     }
 

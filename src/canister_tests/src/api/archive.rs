@@ -134,7 +134,9 @@ pub mod compat {
                 | Operation::AddEmailRecovery
                 | Operation::RemoveEmailRecovery
                 | Operation::AddVerifiedEmail
-                | Operation::RemoveVerifiedEmail => {
+                | Operation::RemoveVerifiedEmail
+                | Operation::SetProfilePicture
+                | Operation::RemoveProfilePicture => {
                     panic!("not available in compat type")
                 }
                 Operation::CreateAccount { name } => CompatOperation::CreateAccount { name },

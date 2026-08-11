@@ -99,6 +99,14 @@ pub struct IdentityInfo {
     /// `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
     pub verified_emails:
         Option<Vec<crate::internet_identity::types::verified_email::VerifiedEmail>>,
+    /// Summary of this anchor's profile picture — media type, size and
+    /// upload time — or `None` when it has none. Deliberately not the bytes:
+    /// `identity_info` is fetched on every manage-screen load, and a picture
+    /// is up to 100 KB against a response that is otherwise under a
+    /// kilobyte. Callers that render the picture fetch it with
+    /// `profile_picture_get` and can cache it on the fields reported here.
+    pub profile_picture:
+        Option<crate::internet_identity::types::profile_picture::ProfilePictureMetadata>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

@@ -605,6 +605,64 @@ type VerifiedEmail = record {
     verified_at : Timestamp;
 };
 
+// The picture formats an identity may store. Derived by the canister
+// from the uploaded bytes' magic number, never taken from the caller —
+// a caller-supplied media type would end up in the `data:` URL that
+// relying parties feed to an `<img>` tag.
+type ProfilePictureMediaType = variant {
+    Png;
+    Jpeg;
+    Webp;
+};
+
+// An identity's profile picture. Zero or one per identity, at most
+// 100 KiB of image bytes.
+type ProfilePicture = record {
+    media_type : ProfilePictureMediaType;
+    bytes : blob;
+    // When the picture was uploaded.
+    uploaded_at : Timestamp;
+};
+
+// What `identity_info` reports about the picture: everything except the
+// bytes. `identity_info` is fetched on every manage-screen load, and a
+// picture is up to 100 KiB against a response that is otherwise well
+// under a kilobyte — so callers that render the picture fetch it with
+// `profile_picture_get` and cache it on the fields reported here.
+type ProfilePictureMetadata = record {
+    media_type : ProfilePictureMediaType;
+    size_bytes : nat64;
+    uploaded_at : Timestamp;
+};
+
+// Argument to `profile_picture_set`: only the bytes. The media type is
+// sniffed from them and the timestamp is the canister's.
+type ProfilePictureSetArg = record {
+    bytes : blob;
+};
+
+type ProfilePictureError = variant {
+    // The principal is not authorized to call this method with the given arguments.
+    Unauthorized : principal;
+    // The bytes exceed the 100 KiB cap.
+    TooLarge : record {
+        size_bytes : nat64;
+        max_bytes : nat64;
+    };
+    // The bytes are too short to be any accepted format — a truncated
+    // upload rather than a picture.
+    TooSmall : record {
+        size_bytes : nat64;
+        min_bytes : nat64;
+    };
+    // The bytes' magic number matches none of the accepted formats.
+    UnsupportedMediaType;
+    // No picture is set on this identity (from `profile_picture_remove`).
+    NotSet;
+    // Internal canister error. See the error message for details.
+    InternalCanisterError : text;
+};
+
 type EmailChallenge = record {
     nonce : text;
     expires_at : Timestamp;
@@ -1026,6 +1084,9 @@ type IdentityInfo = record {
     // shows a "limit reached" notice in the wizard when adding
     // beyond the cap.
     verified_emails : opt vec VerifiedEmail;
+    // Summary of this anchor's profile picture (absent when none is
+    // set). Deliberately not the bytes — see ProfilePictureMetadata.
+    profile_picture : opt ProfilePictureMetadata;
 };
 
 type IdentityInfoError = variant {
@@ -1784,6 +1845,22 @@ service : (opt InternetIdentityInit) -> {
     // Capped at MAX_VERIFIED_EMAILS_PER_ANCHOR (5) addresses per anchor.
     verified_email_prepare_add : (IdentityNumber, EmailChallengeDnsInput) -> (variant { Ok : EmailChallenge; Err : EmailChallengeError });
     verified_email_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailChallengeError });
+
+    // ===================================================================
+    // Profile picture (attribute source)
+    // ===================================================================
+    // Zero or one picture per identity, at most 100 KiB, shareable with
+    // apps that request the `profile_picture` attribute key. Stored in
+    // its own stable map keyed by identity number rather than on the
+    // anchor record, which is deserialized on every authenticated call.
+    //
+    // `profile_picture_get` is an update, not a query, so the response is
+    // certified: the manage screen renders these bytes as the user's own
+    // avatar. Setting replaces any previous picture, so an identity's
+    // footprint stays bounded however often the user changes it.
+    profile_picture_get : (IdentityNumber) -> (variant { Ok : opt ProfilePicture; Err : ProfilePictureError });
+    profile_picture_set : (IdentityNumber, ProfilePictureSetArg) -> (variant { Ok; Err : ProfilePictureError });
+    profile_picture_remove : (IdentityNumber) -> (variant { Ok; Err : ProfilePictureError });
 
     // ===================================================================
     // DEPRECATED — remove in a follow-up PR

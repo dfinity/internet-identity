@@ -2298,6 +2298,7 @@ dependencies = [
 name = "internet_identity_interface"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "candid",
  "ic-cdk 0.16.1",
  "ic-http-certification",

@@ -13,6 +13,7 @@ use internet_identity_interface::internet_identity::types::{
         PrepareIcrc3AttributeError, ValidatedAttributeSpec,
     },
     icrc3::Icrc3Value,
+    profile_picture::ProfilePicture,
     verified_email::VerifiedEmail,
     Timestamp,
 };
@@ -188,6 +189,12 @@ impl Anchor {
                             Name => openid_credential.get_name()?,
                             Email => openid_credential.get_email()?,
                             VerifiedEmail => openid_credential.get_verified_email()?,
+                            // The picture is II-native user data, not a claim
+                            // an identity provider can vouch for, so it has no
+                            // scoped form. It is also unavailable through this
+                            // deprecated flow entirely — see
+                            // `prepare_icrc3_attributes`.
+                            ProfilePicture => return None,
                         };
 
                         let key = AttributeKey {
@@ -389,6 +396,11 @@ impl Anchor {
     pub fn prepare_icrc3_attributes(
         &self,
         attribute_specs: Vec<ValidatedAttributeSpec>,
+        // This anchor's profile picture, or `None` when it has none. Passed in
+        // rather than read from storage here: it lives in its own stable map
+        // (see [`crate::storage`]), and keeping `Anchor` free of that lookup
+        // keeps this method a pure function of its inputs.
+        profile_picture: Option<ProfilePicture>,
         nonce: Vec<u8>,
         origin: String,
         // The relying party's actual origin, before the legacy `icp0.io →
@@ -432,6 +444,10 @@ impl Anchor {
                         AttributeName::Email => credential.get_email(),
                         AttributeName::Name => credential.get_name(),
                         AttributeName::VerifiedEmail => credential.get_verified_email(),
+                        // No scoped form: the picture is II-native user data,
+                        // not an IdP claim. Surfaces as "not available" for
+                        // this issuer.
+                        AttributeName::ProfilePicture => None,
                     };
                     let Some(stored) = stored_value else {
                         problems.push(format!(
@@ -472,6 +488,8 @@ impl Anchor {
                         AttributeName::Email => credential.get_email(),
                         AttributeName::Name => credential.get_name(),
                         AttributeName::VerifiedEmail => None,
+                        // Unscoped-only, same as under `openid:`.
+                        AttributeName::ProfilePicture => None,
                     };
                     let Some(stored) = stored_value else {
                         problems.push(format!(
@@ -486,33 +504,56 @@ impl Anchor {
                     }
                     insert_certified_attribute(&mut certified_pairs, &mut problems, spec, stored);
                 }
-                None => {
-                    // Unscoped specs are reserved for verified-email entries:
-                    // OIDC/SSO emails always arrive with their source scope.
-                    if !matches!(
-                        spec.key.attribute_name,
-                        AttributeName::Email | AttributeName::VerifiedEmail
-                    ) {
+                None => match spec.key.attribute_name {
+                    // The picture is unscoped-only, and an identity has at
+                    // most one — so unlike the verified emails below there is
+                    // nothing to select between. A `spec.value`, when the
+                    // caller sends one, is an equality pin: it makes the
+                    // certified bundle carry exactly the picture the user saw
+                    // on the consent screen, so a change between listing and
+                    // certification fails the call instead of silently
+                    // certifying a different image.
+                    AttributeName::ProfilePicture => {
+                        let Some(picture) = profile_picture.as_ref() else {
+                            problems.push("No profile picture is set on this identity".to_string());
+                            continue;
+                        };
+                        let stored = picture.to_data_url();
+                        if !validate_spec_value(spec, &stored, &mut problems) {
+                            continue;
+                        }
+                        insert_certified_attribute(
+                            &mut certified_pairs,
+                            &mut problems,
+                            spec,
+                            stored,
+                        );
+                    }
+                    // OIDC/SSO emails always arrive with their source scope,
+                    // so an unscoped email spec is a verified-email entry.
+                    AttributeName::Email | AttributeName::VerifiedEmail => {
+                        let entry = match self.resolve_verified_email(spec) {
+                            Ok(entry) => entry,
+                            Err(problem) => {
+                                problems.push(problem);
+                                continue;
+                            }
+                        };
+                        insert_certified_attribute(
+                            &mut certified_pairs,
+                            &mut problems,
+                            spec,
+                            entry.address.clone(),
+                        );
+                    }
+                    AttributeName::Name => {
                         problems.push(format!(
                             "Attribute {} has no scope; only scoped attributes are supported",
                             spec.key
                         ));
                         continue;
                     }
-                    let entry = match self.resolve_verified_email(spec) {
-                        Ok(entry) => entry,
-                        Err(problem) => {
-                            problems.push(problem);
-                            continue;
-                        }
-                    };
-                    insert_certified_attribute(
-                        &mut certified_pairs,
-                        &mut problems,
-                        spec,
-                        entry.address.clone(),
-                    );
-                }
+                },
             }
         }
 
@@ -611,6 +652,8 @@ impl Anchor {
         &self,
         requested: Option<Vec<AttributeKey>>,
         sso_session_domain: Option<String>,
+        // See [`Anchor::prepare_icrc3_attributes`] for why this is a parameter.
+        profile_picture: Option<ProfilePicture>,
     ) -> Vec<(String, Vec<u8>)> {
         let all_attribute_names = AttributeName::all();
         let mut result: Vec<(String, Vec<u8>)> = Vec::new();
@@ -653,6 +696,8 @@ impl Anchor {
                     AttributeName::Email => credential.get_email(),
                     AttributeName::Name => credential.get_name(),
                     AttributeName::VerifiedEmail => credential.get_verified_email(),
+                    // Unscoped-only; listed below, outside the credential loop.
+                    AttributeName::ProfilePicture => None,
                 };
                 let Some(value) = value else {
                     continue;
@@ -701,6 +746,27 @@ impl Anchor {
                 if matches {
                     result.push((attr_name.to_string(), entry.address.clone().into_bytes()));
                 }
+            }
+        }
+
+        // The profile picture surfaces unscoped too, as the same `data:` URL
+        // that certification will hand the relying party — so the consent
+        // screen renders exactly the bytes it is about to share, and the
+        // frontend can pin them back as `spec.value`. Zero or one per
+        // identity, so there is no dedup to do and no scoped row to shadow it.
+        if let Some(picture) = &profile_picture {
+            let matches = match &requested {
+                None => true,
+                Some(keys) => keys.iter().any(|k| {
+                    k.attribute_name == AttributeName::ProfilePicture && k.scope.is_none()
+                }),
+            };
+
+            if matches {
+                result.push((
+                    AttributeName::ProfilePicture.to_string(),
+                    picture.to_data_url().into_bytes(),
+                ));
             }
         }
 
@@ -2034,6 +2100,7 @@ mod tests {
                     google_spec(AttributeName::Email, Some(b"user@example.com"), false), // correct
                     google_spec(AttributeName::Name, Some(b"Wrong Name"), false),        // wrong
                 ],
+                None,
                 vec![0u8; 32],
                 "https://dapp.com".to_string(),
                 None,
@@ -2074,6 +2141,7 @@ mod tests {
                     value: None,
                     omit_scope: false,
                 }],
+                None,
                 vec![0u8; 32],
                 "https://dapp.com".to_string(),
                 None,
@@ -2113,6 +2181,7 @@ mod tests {
                     value: Some(b"alice@example.com".to_vec()),
                     omit_scope: true,
                 }],
+                None,
                 vec![0u8; 32],
                 "https://dapp.com".to_string(),
                 None,
@@ -2146,6 +2215,7 @@ mod tests {
                     google_spec(AttributeName::Email, None, true),
                     google_spec(AttributeName::Email, None, true),
                 ],
+                None,
                 vec![0u8; 32],
                 "https://dapp.com".to_string(),
                 None,
@@ -2300,7 +2370,7 @@ mod tests {
             setup_google_provider();
             let anchor = google_anchor();
 
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, None);
 
             // Should have email and name (verified_email requires email_verified=true in metadata)
             pretty_assert_eq!(result.len(), 2);
@@ -2322,6 +2392,7 @@ mod tests {
                     attribute_name: AttributeName::Email,
                 }]),
                 None,
+                None,
             );
 
             pretty_assert_eq!(result.len(), 1);
@@ -2340,6 +2411,7 @@ mod tests {
                     scope: None,
                     attribute_name: AttributeName::Email,
                 }]),
+                None,
                 None,
             );
 
@@ -2361,6 +2433,7 @@ mod tests {
                     attribute_name: AttributeName::VerifiedEmail,
                 }]),
                 None,
+                None,
             );
 
             // verified_email is not available because email_verified is not "true" in metadata
@@ -2372,7 +2445,7 @@ mod tests {
             setup_google_provider();
             let anchor = Anchor::new(ANCHOR_NUMBER, 0); // no credentials
 
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, None);
             pretty_assert_eq!(result.len(), 0);
         }
 
@@ -2382,7 +2455,7 @@ mod tests {
             let anchor = google_anchor();
 
             // Some(vec![]) means "filter by these keys" with no keys → nothing matches
-            let result = anchor.list_available_attributes(Some(vec![]), None);
+            let result = anchor.list_available_attributes(Some(vec![]), None, None);
             pretty_assert_eq!(result.len(), 0);
         }
 
@@ -2398,6 +2471,7 @@ mod tests {
                     }),
                     attribute_name: AttributeName::Email,
                 }]),
+                None,
                 None,
             );
 
@@ -2535,7 +2609,7 @@ mod tests {
                     sso_credential_with(email_and_name_metadata()),
                 ]);
 
-            let listed = anchor.list_available_attributes(None, Some(SSO_DOMAIN.to_string()));
+            let listed = anchor.list_available_attributes(None, Some(SSO_DOMAIN.to_string()), None);
             let keys: BTreeSet<String> = listed.iter().map(|(k, _)| k.clone()).collect();
 
             pretty_assert_eq!(
@@ -2554,10 +2628,10 @@ mod tests {
                     sso_credential_with(email_and_name_metadata()),
                 ]);
 
-            pretty_assert_eq!(anchor.list_available_attributes(None, None), vec![]);
+            pretty_assert_eq!(anchor.list_available_attributes(None, None, None), vec![]);
 
             pretty_assert_eq!(
-                anchor.list_available_attributes(None, Some("other.example".to_string())),
+                anchor.list_available_attributes(None, Some("other.example".to_string()), None),
                 vec![]
             );
         }
@@ -2595,6 +2669,7 @@ mod tests {
             };
             let res = anchor.prepare_icrc3_attributes(
                 vec![verified_spec],
+                None,
                 vec![0u8; 32],
                 "https://rp.example".to_string(),
                 None,
@@ -2647,6 +2722,7 @@ mod tests {
             };
             let res = anchor.prepare_icrc3_attributes(
                 vec![openid_spec],
+                None,
                 vec![0u8; 32],
                 "https://rp.example".to_string(),
                 None,
@@ -2734,7 +2810,7 @@ mod tests {
         #[test]
         fn lists_email_and_verified_email_for_each_entry() {
             let anchor = anchor_with_verified(&["alice@example.com"]);
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, None);
 
             let entries: Vec<(String, String)> = result
                 .iter()
@@ -2762,7 +2838,7 @@ mod tests {
         #[test]
         fn lists_multiple_verified_emails() {
             let anchor = anchor_with_verified(&["alice@example.com", "bob@example.com"]);
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, None);
             pretty_assert_eq!(result.len(), 4);
 
             let emails: Vec<&str> = result
@@ -2783,6 +2859,7 @@ mod tests {
                     attribute_name: AttributeName::Email,
                 }]),
                 None,
+                None,
             );
 
             pretty_assert_eq!(result.len(), 1);
@@ -2798,7 +2875,7 @@ mod tests {
                 created_at: 1_000,
                 last_used: None,
             }];
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, None);
             pretty_assert_eq!(result.len(), 0, "recovery email leaked: {result:?}");
         }
 
@@ -2808,7 +2885,7 @@ mod tests {
             let mut anchor = anchor_with_verified(&["user@gmail.com"]);
             anchor.openid_credentials = vec![google_credential_with("user@gmail.com", true)];
 
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, None);
             let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
 
             assert!(
@@ -2830,7 +2907,7 @@ mod tests {
             anchor.openid_credentials =
                 vec![google_credential_with("alice.personal@gmail.com", true)];
 
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, None);
             let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
 
             assert!(
@@ -2849,7 +2926,7 @@ mod tests {
             let mut anchor = anchor_with_verified(&["alice@gmail.com"]);
             anchor.openid_credentials = vec![google_credential_with("Alice@Gmail.com", true)];
 
-            let result = anchor.list_available_attributes(None, None);
+            let result = anchor.list_available_attributes(None, None, None);
             let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
             assert!(
                 !keys.iter().any(|k| *k == "email" || *k == "verified_email"),
@@ -2878,6 +2955,7 @@ mod tests {
 
             let result = anchor.prepare_icrc3_attributes(
                 vec![spec],
+                None,
                 vec![0u8; 32],
                 "https://dapp.com".to_string(),
                 None,
@@ -2917,6 +2995,7 @@ mod tests {
 
             let result = anchor.prepare_icrc3_attributes(
                 vec![spec],
+                None,
                 vec![0u8; 32],
                 "https://dapp.com".to_string(),
                 None,
@@ -2954,6 +3033,7 @@ mod tests {
 
             let result = anchor.prepare_icrc3_attributes(
                 vec![spec],
+                None,
                 vec![0u8; 32],
                 "https://dapp.com".to_string(),
                 None,
@@ -2998,6 +3078,7 @@ mod tests {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 anchor.prepare_icrc3_attributes(
                     vec![spec],
+                    None,
                     vec![0u8; 32],
                     "https://dapp.com".to_string(),
                     None,
@@ -3013,6 +3094,285 @@ mod tests {
                 result.is_err(),
                 "expected case-folded match to reach signature store"
             );
+        }
+    }
+    /// The unscoped `profile_picture` attribute: an II-native, zero-or-one
+    /// piece of shareable info, certified as the same `data:` URL that
+    /// `list_available_attributes` shows the consent screen.
+    mod profile_picture_attributes_tests {
+        use super::*;
+        use internet_identity_interface::internet_identity::types::profile_picture::{
+            ProfilePicture, ProfilePictureMediaType,
+        };
+        use internet_identity_interface::internet_identity::types::OpenIdConfig;
+        use serde_bytes::ByteBuf;
+
+        /// Register `ISSUER` as a configured OpenID provider so a credential
+        /// for it is addressable under `openid:<ISSUER>`. Without this the
+        /// scoped arms bail out earlier with "No credential found for issuer"
+        /// and never reach the `ProfilePicture` arm under test.
+        fn setup_provider_for_test_issuer() {
+            crate::openid::setup(vec![OpenIdConfig {
+                name: "Test".to_string(),
+                logo: String::new(),
+                issuer: ISSUER.to_string(),
+                client_id: "https://audience.example".to_string(),
+                jwks_uri: String::new(),
+                auth_uri: String::new(),
+                auth_scope: vec![],
+                fedcm_uri: None,
+                email_verification: None,
+                seed_jwks: None,
+            }]);
+        }
+
+        /// A tiny but well-formed PNG: magic number plus filler. The canister
+        /// only sniffs the magic number, so this is enough.
+        fn png(fill: u8) -> ProfilePicture {
+            let mut bytes = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
+            bytes.resize(64, fill);
+            ProfilePicture {
+                media_type: ProfilePictureMediaType::Png,
+                bytes: ByteBuf::from(bytes),
+                uploaded_at: 1_700_000_000_000_000_000,
+            }
+        }
+
+        fn unscoped_picture_spec(value: Option<Vec<u8>>) -> ValidatedAttributeSpec {
+            ValidatedAttributeSpec {
+                key: AttributeKey {
+                    scope: None,
+                    attribute_name: AttributeName::ProfilePicture,
+                },
+                value,
+                omit_scope: true,
+            }
+        }
+
+        fn prepare(
+            anchor: &Anchor,
+            picture: Option<ProfilePicture>,
+            spec: ValidatedAttributeSpec,
+        ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+            anchor.prepare_icrc3_attributes(
+                vec![spec],
+                picture,
+                vec![0u8; 32],
+                "https://dapp.com".to_string(),
+                None,
+                1_000_000_000,
+                account,
+                None,
+                None,
+            )
+        }
+
+        fn problems_of(result: Result<Vec<u8>, PrepareIcrc3AttributeError>) -> Vec<String> {
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => problems,
+                other => panic!("expected AttributeMismatch, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn listing_surfaces_the_picture_as_a_data_url() {
+            let anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            let picture = png(1);
+
+            let listed = anchor.list_available_attributes(None, None, Some(picture.clone()));
+
+            pretty_assert_eq!(
+                listed,
+                vec![(
+                    "profile_picture".to_string(),
+                    picture.to_data_url().into_bytes()
+                )]
+            );
+            // The value must be the renderable URL, not raw bytes — the
+            // consent screen puts it straight into an `<img src>`.
+            let value = String::from_utf8(listed[0].1.clone()).expect("data URL must be UTF-8");
+            assert!(
+                value.starts_with("data:image/png;base64,"),
+                "unexpected value prefix: {}",
+                &value[..value.len().min(40)]
+            );
+        }
+
+        #[test]
+        fn listing_omits_the_picture_when_none_is_set() {
+            let anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            pretty_assert_eq!(anchor.list_available_attributes(None, None, None), vec![]);
+        }
+
+        #[test]
+        fn listing_respects_an_explicit_request_filter() {
+            let anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            let picture = png(2);
+
+            // Asked for by name: listed.
+            let requested = vec![AttributeKey {
+                scope: None,
+                attribute_name: AttributeName::ProfilePicture,
+            }];
+            pretty_assert_eq!(
+                anchor
+                    .list_available_attributes(Some(requested), None, Some(picture.clone()))
+                    .len(),
+                1
+            );
+
+            // Asked for something else: not listed.
+            let requested = vec![AttributeKey {
+                scope: None,
+                attribute_name: AttributeName::Email,
+            }];
+            pretty_assert_eq!(
+                anchor.list_available_attributes(Some(requested), None, Some(picture)),
+                vec![]
+            );
+        }
+
+        /// The picture has no scoped form, so a `profile_picture` request
+        /// scoped to an issuer must not be satisfied by the stored picture.
+        #[test]
+        fn an_openid_scoped_request_is_never_satisfied_by_the_picture() {
+            setup_provider_for_test_issuer();
+            let anchor = anchor_with_credential(HashMap::from([(
+                "email".to_string(),
+                MetadataEntryV2::String("user@example.com".to_string()),
+            )]));
+            let picture = png(3);
+
+            let scoped = vec![AttributeKey {
+                scope: openid_attribute_scope(),
+                attribute_name: AttributeName::ProfilePicture,
+            }];
+            pretty_assert_eq!(
+                anchor.list_available_attributes(Some(scoped), None, Some(picture.clone())),
+                vec![],
+                "a scoped profile_picture request must not list the unscoped picture"
+            );
+
+            let spec = ValidatedAttributeSpec {
+                key: AttributeKey {
+                    scope: openid_attribute_scope(),
+                    attribute_name: AttributeName::ProfilePicture,
+                },
+                value: None,
+                omit_scope: false,
+            };
+            let problems = problems_of(prepare(&anchor, Some(picture), spec));
+            assert!(
+                problems
+                    .iter()
+                    .any(|p| p.contains("profile_picture not available for issuer")),
+                "expected a not-available-for-issuer rejection in {problems:?}"
+            );
+        }
+
+        #[test]
+        fn certification_is_rejected_when_no_picture_is_set() {
+            let anchor = Anchor::new(ANCHOR_NUMBER, 0);
+
+            let problems = problems_of(prepare(&anchor, None, unscoped_picture_spec(None)));
+            assert!(
+                problems
+                    .iter()
+                    .any(|p| p.contains("No profile picture is set on this identity")),
+                "expected a no-picture rejection in {problems:?}"
+            );
+        }
+
+        /// The pinned value is what the user consented to on the consent
+        /// screen. If the picture changed in between, certifying the new one
+        /// would share bytes the user never saw — so the call fails instead.
+        #[test]
+        fn certification_is_rejected_when_the_pinned_value_no_longer_matches() {
+            let anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            let consented_to = png(4);
+            let stored_now = png(5);
+            assert_ne!(
+                consented_to.to_data_url(),
+                stored_now.to_data_url(),
+                "the two fixtures must differ for this test to mean anything"
+            );
+
+            let spec = unscoped_picture_spec(Some(consented_to.to_data_url().into_bytes()));
+            let problems = problems_of(prepare(&anchor, Some(stored_now), spec));
+            assert!(
+                problems
+                    .iter()
+                    .any(|p| p.contains("Attribute value mismatch for profile_picture")),
+                "expected a value-mismatch rejection in {problems:?}"
+            );
+        }
+
+        /// An unpinned spec (`value: None`) is accepted — there is only ever
+        /// one picture, so nothing has to be selected. Reaching the signature
+        /// store, which unit tests have no canister state for, is the signal
+        /// that resolution succeeded; the same trick as
+        /// `verified_email_attributes_tests`.
+        #[test]
+        fn an_unpinned_spec_resolves_and_reaches_the_signature_store() {
+            let anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                prepare(&anchor, Some(png(6)), unscoped_picture_spec(None))
+            }));
+            assert!(
+                result.is_err(),
+                "expected resolution to succeed and reach the signature store"
+            );
+        }
+
+        /// A pinned value that still matches likewise resolves.
+        #[test]
+        fn a_matching_pinned_spec_resolves_and_reaches_the_signature_store() {
+            let anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            let picture = png(7);
+            let spec = unscoped_picture_spec(Some(picture.to_data_url().into_bytes()));
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                prepare(&anchor, Some(picture), spec)
+            }));
+            assert!(
+                result.is_err(),
+                "expected resolution to succeed and reach the signature store"
+            );
+        }
+
+        /// The legacy (deprecated) flow gains nothing: it only serves
+        /// `openid:`-scoped attributes, and the picture has no scoped form.
+        /// Tested on `prepare_openid_attributes`, the state-free half of that
+        /// flow — the public `prepare_attributes` updates the root hash and so
+        /// needs canister state.
+        #[test]
+        fn the_legacy_flow_never_serves_the_picture() {
+            setup_provider_for_test_issuer();
+            let anchor = anchor_with_credential(HashMap::from([(
+                "email".to_string(),
+                MetadataEntryV2::String("user@example.com".to_string()),
+            )]));
+
+            // `prepare_openid_attributes` returns one entry per credential,
+            // each holding the attributes resolved for it — so count the
+            // attributes, not the entries.
+            let resolved_count = |names: &[AttributeName]| {
+                let mut requested = requested_attribute_map(names);
+                anchor
+                    .prepare_openid_attributes(&mut requested)
+                    .values()
+                    .map(Vec::len)
+                    .sum::<usize>()
+            };
+
+            // Sanity check that the fixture resolves at all: `email` is served.
+            assert_eq!(
+                resolved_count(&[AttributeName::Email]),
+                1,
+                "fixture must resolve a scoped email, or the assertion below is vacuous"
+            );
+
+            pretty_assert_eq!(resolved_count(&[AttributeName::ProfilePicture]), 0);
         }
     }
 }

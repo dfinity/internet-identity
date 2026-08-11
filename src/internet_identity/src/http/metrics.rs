@@ -95,6 +95,11 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             storage.mcp_config_count() as f64,
             "Number of stored per-anchor MCP configs. Configs never expire; after the MCP config migration this is one row per anchor.",
         )?;
+        w.encode_gauge(
+            "internet_identity_profile_picture_count",
+            storage.profile_picture_count() as f64,
+            "Number of identities with a profile picture stored. Each row holds at most PROFILE_PICTURE_MAX_BYTES (100 KiB) of image bytes, so this bounds the feature's stable-memory footprint.",
+        )?;
         if let Some(registration_rates) = storage.registration_rates.registration_rates() {
             w.gauge_vec(
                 "internet_identity_registrations_per_second",

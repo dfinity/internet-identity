@@ -22,6 +22,7 @@ pub mod openid_credential;
 pub mod openid_credential_key;
 pub mod openid_jwks;
 pub mod passkey_credential;
+pub mod profile_picture;
 pub mod recovery_key;
 pub mod special_device_migration;
 pub mod sso_stable_id_key;

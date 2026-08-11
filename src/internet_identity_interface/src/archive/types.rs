@@ -59,6 +59,18 @@ pub enum Operation {
     #[serde(rename = "remove_verified_email")]
     RemoveVerifiedEmail,
 
+    // Profile picture — zero or one per identity, shareable with apps
+    // that request the `profile_picture` attribute. Payload-free for the
+    // same reason as the email operations above: the anchor + timestamp on
+    // the surrounding entry answers "who changed their picture when?",
+    // while emitting anything about the image itself (its size, its media
+    // type) would hand an archive consumer a fingerprint it could match
+    // against a picture it already has.
+    #[serde(rename = "set_profile_picture")]
+    SetProfilePicture,
+    #[serde(rename = "remove_profile_picture")]
+    RemoveProfilePicture,
+
     // Identity name, set for new users in new discoverable passkeys flow
     #[serde(rename = "add_name")]
     AddName,

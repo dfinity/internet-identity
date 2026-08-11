@@ -68,6 +68,10 @@ type Operation = variant {
     // the surrounding entry.
     add_verified_email;
     remove_verified_email;
+    // Profile picture — same privacy rationale again: no payload, so the
+    // entry can't be matched against a known image by its size or format.
+    set_profile_picture;
+    remove_profile_picture;
     add_name;
     update_name;
     remove_name;
