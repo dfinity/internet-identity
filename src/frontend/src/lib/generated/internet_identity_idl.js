@@ -559,6 +559,16 @@ export const idlFactory = ({ IDL }) => {
     'address' : IDL.Text,
     'last_used' : IDL.Opt(Timestamp),
   });
+  const ProfilePictureMediaType = IDL.Variant({
+    'Png' : IDL.Null,
+    'Jpeg' : IDL.Null,
+    'Webp' : IDL.Null,
+  });
+  const ProfilePictureMetadata = IDL.Record({
+    'media_type' : ProfilePictureMediaType,
+    'size_bytes' : IDL.Nat64,
+    'uploaded_at' : Timestamp,
+  });
   const AuthnMethodRegistrationInfo = IDL.Record({
     'expiration' : Timestamp,
     'session' : IDL.Opt(IDL.Principal),
@@ -567,6 +577,7 @@ export const idlFactory = ({ IDL }) => {
   const IdentityInfo = IDL.Record({
     'authn_methods' : IDL.Vec(AuthnMethodData),
     'verified_emails' : IDL.Opt(IDL.Vec(VerifiedEmail)),
+    'profile_picture' : IDL.Opt(ProfilePictureMetadata),
     'metadata' : MetadataMapV2,
     'name' : IDL.Opt(IDL.Text),
     'email_recovery' : IDL.Opt(IDL.Vec(EmailRecoveryCredential)),
@@ -834,6 +845,27 @@ export const idlFactory = ({ IDL }) => {
     'wrong_code' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
     'no_device_to_verify' : IDL.Null,
   });
+  const ProfilePicture = IDL.Record({
+    'media_type' : ProfilePictureMediaType,
+    'bytes' : IDL.Vec(IDL.Nat8),
+    'uploaded_at' : Timestamp,
+  });
+  const ProfilePictureError = IDL.Variant({
+    'UnsupportedMediaType' : IDL.Null,
+    'TooLarge' : IDL.Record({
+      'size_bytes' : IDL.Nat64,
+      'max_bytes' : IDL.Nat64,
+    }),
+    'TooSmall' : IDL.Record({
+      'size_bytes' : IDL.Nat64,
+      'min_bytes' : IDL.Nat64,
+    }),
+    'InternalCanisterError' : IDL.Text,
+    'NotSet' : IDL.Null,
+    'Unauthorized' : IDL.Principal,
+  });
+  const ProfilePictureSetArg = IDL.Record({ 'bytes' : IDL.Vec(IDL.Nat8) });
+
   return IDL.Service({
     'acknowledge_entries' : IDL.Func([IDL.Nat64], [], []),
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
@@ -1382,6 +1414,26 @@ export const idlFactory = ({ IDL }) => {
     'update_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), AccountUpdate],
         [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : UpdateAccountError })],
+        [],
+      ),
+    'profile_picture_get' : IDL.Func(
+        [IdentityNumber],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Opt(ProfilePicture),
+            'Err' : ProfilePictureError,
+          }),
+        ],
+        [],
+      ),
+    'profile_picture_remove' : IDL.Func(
+        [IdentityNumber],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : ProfilePictureError })],
+        [],
+      ),
+    'profile_picture_set' : IDL.Func(
+        [IdentityNumber, ProfilePictureSetArg],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : ProfilePictureError })],
         [],
       ),
     'verified_email_prepare_add' : IDL.Func(

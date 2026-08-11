@@ -20,6 +20,10 @@
     id: string;
     value: string;
     providerLabel?: string;
+    /** Set for image-valued attributes (`profile_picture`): a `data:` URL
+     *  rendered as a thumbnail in place of `value`. `value` there is a short
+     *  content fingerprint, not something to show the user. */
+    imageSrc?: string;
   }
 
   interface Props {
@@ -121,7 +125,11 @@
     <span class="shrink-0 text-sm" style:min-width="{maxLabelWidth}px"
       >{label}</span
     >
-    <span class="text-sm font-medium">{options[selectedIndex].value}</span>
+    {#if options[selectedIndex].imageSrc !== undefined}
+      <span class="size-8 shrink-0"></span>
+    {:else}
+      <span class="text-sm font-medium">{options[selectedIndex].value}</span>
+    {/if}
     {#if expandable}
       <span class="ms-auto size-6 shrink-0"></span>
     {/if}
@@ -168,7 +176,15 @@
           !expandable && "col-span-2 me-3",
         ]}
       >
-        {options[selectedIndex].value}
+        {#if options[selectedIndex].imageSrc !== undefined}
+          <img
+            src={options[selectedIndex].imageSrc}
+            alt=""
+            class="bg-bg-tertiary size-8 shrink-0 rounded-full object-cover"
+          />
+        {:else}
+          {options[selectedIndex].value}
+        {/if}
       </span>
     {/if}
 
@@ -198,7 +214,15 @@
       <span
         class="text-text-primary col-span-3 col-start-2 row-start-2 me-3 -mt-2 mb-3 text-sm font-medium break-all"
       >
-        {options[selectedIndex].value}
+        {#if options[selectedIndex].imageSrc !== undefined}
+          <img
+            src={options[selectedIndex].imageSrc}
+            alt=""
+            class="bg-bg-tertiary size-8 shrink-0 rounded-full object-cover"
+          />
+        {:else}
+          {options[selectedIndex].value}
+        {/if}
       </span>
     {/if}
   </div>
@@ -223,9 +247,17 @@
             role="option"
             aria-selected={index === selectedIndex}
           >
-            <span class="text-text-primary text-sm font-medium">
-              {option.value}
-            </span>
+            {#if option.imageSrc !== undefined}
+              <img
+                src={option.imageSrc}
+                alt=""
+                class="bg-bg-tertiary size-8 shrink-0 rounded-full object-cover"
+              />
+            {:else}
+              <span class="text-text-primary text-sm font-medium">
+                {option.value}
+              </span>
+            {/if}
             {#if option.providerLabel !== undefined}
               <span class="text-text-tertiary text-sm">
                 {option.providerLabel}

@@ -914,6 +914,11 @@ export interface IdentityInfo {
    */
   'verified_emails' : [] | [Array<VerifiedEmail>],
   /**
+   * Summary of this anchor's profile picture (absent when none is
+   * set). Deliberately not the bytes — see ProfilePictureMetadata.
+   */
+  'profile_picture' : [] | [ProfilePictureMetadata],
+  /**
    * Authentication method independent metadata
    */
   'metadata' : MetadataMapV2,
@@ -1429,6 +1434,71 @@ export interface PreparedIdAlias {
   'issuer_id_alias_jwt' : string,
   'canister_sig_pk_der' : PublicKey,
 }
+/**
+ * An identity's profile picture. Zero or one per identity, at most
+ * 100 KiB of image bytes.
+ */
+export interface ProfilePicture {
+  'media_type' : ProfilePictureMediaType,
+  'bytes' : Uint8Array | number[],
+  /**
+   * When the picture was uploaded.
+   */
+  'uploaded_at' : Timestamp,
+}
+export type ProfilePictureError = { 'UnsupportedMediaType' : null } |
+  {
+    /**
+     * The bytes exceed the 100 KiB cap.
+     */
+    'TooLarge' : { 'size_bytes' : bigint, 'max_bytes' : bigint }
+  } |
+  {
+    /**
+     * The bytes are too short to be any accepted format — a truncated
+     * upload rather than a picture.
+     */
+    'TooSmall' : { 'size_bytes' : bigint, 'min_bytes' : bigint }
+  } |
+  {
+    /**
+     * Internal canister error. See the error message for details.
+     */
+    'InternalCanisterError' : string
+  } |
+  { 'NotSet' : null } |
+  {
+    /**
+     * The principal is not authorized to call this method with the given arguments.
+     */
+    'Unauthorized' : Principal
+  };
+/**
+ * The picture formats an identity may store. Derived by the canister
+ * from the uploaded bytes' magic number, never taken from the caller —
+ * a caller-supplied media type would end up in the `data:` URL that
+ * relying parties feed to an `<img>` tag.
+ */
+export type ProfilePictureMediaType = { 'Png' : null } |
+  { 'Jpeg' : null } |
+  { 'Webp' : null };
+/**
+ * What `identity_info` reports about the picture: everything except the
+ * bytes. `identity_info` is fetched on every manage-screen load, and a
+ * picture is up to 100 KiB against a response that is otherwise well
+ * under a kilobyte — so callers that render the picture fetch it with
+ * `profile_picture_get` and cache it on the fields reported here.
+ */
+export interface ProfilePictureMetadata {
+  'media_type' : ProfilePictureMediaType,
+  'size_bytes' : bigint,
+  'uploaded_at' : Timestamp,
+}
+/**
+ * Argument to `profile_picture_set`: only the bytes. The media type is
+ * sniffed from them and the timestamp is the canister's.
+ */
+export interface ProfilePictureSetArg { 'bytes' : Uint8Array | number[] }
 export type PublicKey = Uint8Array | number[];
 /**
  * Authentication method using generic signatures
@@ -2428,6 +2498,21 @@ export interface _SERVICE {
    * challenge can never be cross-applied between the two flows.
    * Capped at MAX_VERIFIED_EMAILS_PER_ANCHOR (5) addresses per anchor.
    */
+  'profile_picture_get' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : [] | [ProfilePicture] } |
+      { 'Err' : ProfilePictureError }
+  >,
+  'profile_picture_remove' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : null } |
+      { 'Err' : ProfilePictureError }
+  >,
+  'profile_picture_set' : ActorMethod<
+    [IdentityNumber, ProfilePictureSetArg],
+    { 'Ok' : null } |
+      { 'Err' : ProfilePictureError }
+  >,
   'verified_email_prepare_add' : ActorMethod<
     [IdentityNumber, EmailChallengeDnsInput],
     { 'Ok' : EmailChallenge } |

@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { VerifiedEmailsPanel } from "$lib/components/settings";
+  import {
+    ProfilePicturePanel,
+    VerifiedEmailsPanel,
+  } from "$lib/components/settings";
   import { getMetadataString } from "$lib/utils/openID";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -14,6 +17,7 @@
   let recoveryAddresses = $derived(
     (data.identityInfo.email_recovery[0] ?? []).map((c) => c.address),
   );
+  let profilePicture = $derived(data.identityInfo.profile_picture[0]);
   let openidAddresses = $derived(
     (data.identityInfo.openid_credentials[0] ?? [])
       .map((c) => getMetadataString(c.metadata, "email"))
@@ -31,7 +35,8 @@
   </p>
 </header>
 
-<div class="mt-10 max-w-3xl">
+<div class="mt-10 flex max-w-3xl flex-col gap-10">
+  <ProfilePicturePanel metadata={profilePicture} />
   <VerifiedEmailsPanel
     {verifiedEmails}
     {recoveryAddresses}

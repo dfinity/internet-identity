@@ -3,7 +3,17 @@ import { type Readable, writable } from "svelte/store";
 /** A single available attribute option resolved from the canister. */
 export interface AvailableAttribute {
   key: string;
+  /** The option's user-visible text, and its identity for deduplication,
+   *  `{#each}` keying and selection. For image-valued attributes this is a
+   *  short content fingerprint rather than the value — the value there is a
+   *  `data:` URL up to ~137 KB, which has no business being rendered as
+   *  text, lowercased into a Map key, or interpolated into a DOM key. Those
+   *  rows are rendered from {@link AvailableAttribute.imageSrc} instead. */
   displayValue: string;
+  /** Set only for image-valued attributes (`profile_picture`): the `data:`
+   *  URL to render. Its presence is what tells the consent UI to show a
+   *  thumbnail in place of `displayValue`. */
+  imageSrc?: string;
   rawValue: Uint8Array;
   omitScope: boolean;
 }

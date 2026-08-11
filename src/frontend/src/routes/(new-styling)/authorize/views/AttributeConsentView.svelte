@@ -94,9 +94,15 @@
   };
 
   const getProviderName = (key: string): string | undefined => {
-    // No scope = unscoped wire row from `Anchor.verified_emails`.
     const scope = extractScope(key);
-    if (scope === undefined) return $t`Verified email`;
+    if (scope === undefined) {
+      // No scope: an II-native row rather than an IdP claim. For emails that
+      // means `Anchor.verified_emails`, whose provenance tag is "Verified
+      // email". Other unscoped attributes (`profile_picture`) have exactly one
+      // source, so there is no provenance worth tagging — and falling through
+      // to the email string would mislabel them.
+      return isEmailKey(key) ? $t`Verified email` : undefined;
+    }
     if (scope.startsWith("openid:")) {
       const issuer = scope.slice("openid:".length);
       return backendCanisterConfig.openid_configs[0]?.find(
@@ -390,6 +396,11 @@
           return $t`${providerName} email:`;
         case "name":
           return $t`${providerName} name:`;
+        // The picture has no scoped form today (it is II-native user data,
+        // not an IdP claim), so this arm is unreachable in practice — kept so
+        // a future scoped source doesn't fall through to the generic format.
+        case "profile_picture":
+          return $t`${providerName} profile picture:`;
         default:
           // The attribute name itself isn't in the translation catalog, but
           // the format (word order, colon convention) still is.
@@ -402,6 +413,8 @@
         return $t`Email:`;
       case "name":
         return $t`Name:`;
+      case "profile_picture":
+        return $t`Profile picture:`;
       default:
         return $t`${attribute}:`;
     }
@@ -485,9 +498,13 @@
             <span class="shrink-0 text-sm" data-label
               >{labelForGroup(group)}</span
             >
-            <span class="shrink-0 text-sm font-medium">
-              {group.options[0].display.displayValue}
-            </span>
+            {#if group.options[0].display.imageSrc !== undefined}
+              <span class="size-8 shrink-0"></span>
+            {:else}
+              <span class="shrink-0 text-sm font-medium">
+                {group.options[0].display.displayValue}
+              </span>
+            {/if}
             {#if group.options.length > 1 || group.name === "email" || group.name === "verified_email"}
               <span class="ms-auto size-6 shrink-0"></span>
             {/if}
@@ -507,6 +524,7 @@
                 id: `${o.display.key}|${o.display.displayValue}`,
                 value: o.display.displayValue,
                 providerLabel: scopedProviderLabel(o.display.key),
+                imageSrc: o.display.imageSrc,
               }))}
               selectedIndex={selection.selectedIndex}
               checked={selection.checked}

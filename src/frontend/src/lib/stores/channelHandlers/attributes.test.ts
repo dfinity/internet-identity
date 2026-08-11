@@ -408,4 +408,77 @@ describe("resolveAttributeGroups", () => {
       expect(arrayOf(groups[0].options[0].rawValue)).toEqual(arrayOf(utf8));
     });
   });
+
+  // `profile_picture` is the one attribute whose value is binary rather than
+  // text: the canister sends it as a `data:` URL, which must reach the
+  // consent UI as something to render — never as display text, a Map key or
+  // a `{#each}` key. See `AvailableAttribute.imageSrc`.
+  describe("image-valued attributes", () => {
+    const DATA_URL = "data:image/png;base64,iVBORw0KGgo=";
+
+    it("exposes the data URL as `imageSrc` rather than as display text", () => {
+      const groups = resolveAttributeGroups(
+        ["profile_picture"],
+        [["profile_picture", bytes(DATA_URL)]],
+      );
+      expect(groups).toHaveLength(1);
+      expect(groups[0].name).toBe("profile_picture");
+      const option = groups[0].options[0];
+      expect(option.imageSrc).toBe(DATA_URL);
+      expect(option.displayValue).not.toBe(DATA_URL);
+      expect(option.omitScope).toBe(true);
+    });
+
+    it("keeps `displayValue` short so it is safe as a key", () => {
+      // A realistically-sized picture: ~100 KiB of raw bytes is ~137 KB of
+      // data URL. `displayValue` must not scale with it.
+      const big = `data:image/jpeg;base64,${"A".repeat(136_000)}`;
+      const groups = resolveAttributeGroups(
+        ["profile_picture"],
+        [["profile_picture", bytes(big)]],
+      );
+      const option = groups[0].options[0];
+      expect(option.imageSrc).toBe(big);
+      expect(option.displayValue.length).toBeLessThan(32);
+    });
+
+    it("gives different pictures different `displayValue`s", () => {
+      const optionFor = (url: string) =>
+        resolveAttributeGroups(
+          ["profile_picture"],
+          [["profile_picture", bytes(url)]],
+        )[0].options[0];
+
+      expect(optionFor("data:image/png;base64,AAAA").displayValue).not.toBe(
+        optionFor("data:image/png;base64,BBBB").displayValue,
+      );
+    });
+
+    it("gives the same picture a stable `displayValue`", () => {
+      const optionFor = () =>
+        resolveAttributeGroups(
+          ["profile_picture"],
+          [["profile_picture", bytes(DATA_URL)]],
+        )[0].options[0];
+
+      expect(optionFor().displayValue).toBe(optionFor().displayValue);
+    });
+
+    it("preserves the raw bytes so the value can be pinned back to the canister", () => {
+      const raw = bytes(DATA_URL);
+      const groups = resolveAttributeGroups(
+        ["profile_picture"],
+        [["profile_picture", raw]],
+      );
+      expect(arrayOf(groups[0].options[0].rawValue)).toEqual(arrayOf(raw));
+    });
+
+    it("leaves textual attributes' `imageSrc` unset", () => {
+      const groups = resolveAttributeGroups(
+        [`openid:${GOOGLE_ISSUER}:email`],
+        fullyAvailable,
+      );
+      expect(groups[0].options[0].imageSrc).toBeUndefined();
+    });
+  });
 });

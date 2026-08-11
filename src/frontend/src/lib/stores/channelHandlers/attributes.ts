@@ -75,6 +75,29 @@ const isOneClickOpenIdKey = (key: string, configIssuer: string): boolean =>
 const isOneClickSsoKey = (key: string, domain: string): boolean =>
   key === `sso:${domain}:name` || key === `sso:${domain}:email`;
 
+/** Attribute names whose value is an image `data:` URL rather than text.
+ *  The canister renders the stored picture into a self-describing
+ *  `data:<media-type>;base64,…` URL, so the value drops straight into an
+ *  `<img src>` — but it must never be treated as display text. */
+const IMAGE_ATTRIBUTE_NAMES = new Set(["profile_picture"]);
+
+/** A short, stable identity for an attribute's bytes.
+ *
+ *  Used as the `displayValue` of image-valued attributes, which stand in for
+ *  a value far too large to use as a Map or `{#each}` key. djb2 rather than a
+ *  real digest because this only has to be stable and collision-unlikely
+ *  within a single consent screen's handful of options — it is never a
+ *  security boundary, and `crypto.subtle` is async. */
+const fingerprint = (bytes: Uint8Array): string => {
+  let hash = 5381;
+  for (const byte of bytes) {
+    // `| 0` keeps the intermediate in int32 range so the result is stable
+    // across engines instead of drifting into float territory.
+    hash = ((hash << 5) + hash + byte) | 0;
+  }
+  return `${(hash >>> 0).toString(36)}:${bytes.byteLength}`;
+};
+
 /** Resolve a single requested key against available attributes.
  *  A scoped request (e.g. `openid:google:email`) matches only the exact
  *  wire row. An unscoped request (e.g. `email`) fans out across every
@@ -92,9 +115,19 @@ const resolveKey = (
     omitScope: boolean,
   ): AvailableAttribute => {
     const rawValue = new Uint8Array(value);
+    const decoded = decoder.decode(rawValue);
+    if (IMAGE_ATTRIBUTE_NAMES.has(extractAttributeName(key))) {
+      return {
+        key,
+        displayValue: fingerprint(rawValue),
+        imageSrc: decoded,
+        rawValue,
+        omitScope,
+      };
+    }
     return {
       key,
-      displayValue: decoder.decode(rawValue),
+      displayValue: decoded,
       rawValue,
       omitScope,
     };
