@@ -2037,7 +2037,7 @@ service : (opt InternetIdentityInit) -> {
         notifications : vec Notification,
     ) -> (NotificationSendResult);
 
-    notification_consent_status : (principal) -> (bool) query;
+    notification_consent_status : (sender : principal) -> (bool) query;
 
     notification_register_sender : (origin : text, sender : opt principal) -> (variant { Ok; Err : text });
     notification_registered_sender : (origin : text) -> (opt principal) query;
