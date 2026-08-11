@@ -31,6 +31,7 @@ use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, FrontendHostname};
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
+use std::cell::RefCell;
 
 /// Endpoint URLs from Apple/Google/Mozilla are ~200-300 bytes in practice;
 /// we cap at 1 KiB to bound the per-row footprint. Anything longer is
@@ -41,6 +42,48 @@ const MAX_ENDPOINT_LEN: usize = 1024;
 /// in-app principal. Checked rather than trapped on: this is reachable from a
 /// caller-supplied string, and canister code must not trap on user input.
 const MAX_ORIGIN_LEN: usize = 255;
+
+thread_local! {
+    /// Sealed RFC 8291 bytes for the frozen `{c, o}` routing payload, keyed by
+    /// `(anchor, endpoint_hash, origin_hash)` — one entry per (device, app).
+    ///
+    /// Heap, not stable memory, on purpose: it is a pure cache. A miss (a new
+    /// pair, or the whole map dropped on upgrade) just re-seals on the next
+    /// send, so there is nothing to migrate and no layout to version. The one
+    /// correctness rule is that stale entries must be dropped when the thing
+    /// they were sealed against changes — the device's keys (re-subscribe) or
+    /// the registered sender for the origin (see the invalidation helpers).
+    static SEAL_CACHE: RefCell<
+        std::collections::HashMap<(AnchorNumber, [u8; 32], [u8; 32]), Vec<u8>>,
+    > = RefCell::new(std::collections::HashMap::new());
+}
+
+fn cached_seal(key: &(AnchorNumber, [u8; 32], [u8; 32])) -> Option<Vec<u8>> {
+    SEAL_CACHE.with(|c| c.borrow().get(key).cloned())
+}
+
+fn store_seal(key: (AnchorNumber, [u8; 32], [u8; 32]), blob: Vec<u8>) {
+    SEAL_CACHE.with(|c| {
+        c.borrow_mut().insert(key, blob);
+    });
+}
+
+/// Drop every cached seal for one device. Called when its keys may have
+/// changed (re-subscribe) or it is gone (unsubscribe, or a relay 410), since a
+/// seal made for the old keys can no longer be decrypted.
+fn invalidate_seals_for_device(anchor: AnchorNumber, endpoint_hash: &[u8; 32]) {
+    SEAL_CACHE.with(|c| {
+        c.borrow_mut()
+            .retain(|(a, e, _), _| !(*a == anchor && e == endpoint_hash))
+    });
+}
+
+/// Drop every cached seal for one origin. Called when its registered sender
+/// changes, since the sealed payload names that canister and would otherwise
+/// point every device at the old one.
+fn invalidate_seals_for_origin(origin_hash: &[u8; 32]) {
+    SEAL_CACHE.with(|c| c.borrow_mut().retain(|(_, _, o), _| o != origin_hash));
+}
 
 /// Register a browser subscription for `anchor_number` on this device.
 ///
@@ -85,6 +128,7 @@ pub fn subscribe_device(
     }
 
     let endpoint_hash = StorableEndpointSha256::from_endpoint(&endpoint);
+    let endpoint_hash_raw = crate::utils::sha256sum(endpoint.as_bytes());
     let subscription = StorablePushSubscription {
         anchor: anchor_number,
         endpoint,
@@ -98,6 +142,9 @@ pub fn subscribe_device(
             .push_subscriptions_memory
             .insert((anchor_number, endpoint_hash), subscription);
     });
+    // Keys may have changed on a re-subscribe; drop any seal cached for the old
+    // ones so the next send re-seals against the new device.
+    invalidate_seals_for_device(anchor_number, &endpoint_hash_raw);
     Ok(())
 }
 
@@ -107,11 +154,13 @@ pub fn subscribe_device(
 /// can be several under one anchor).
 pub fn unsubscribe_device(anchor_number: AnchorNumber, endpoint: String) -> Result<(), String> {
     let endpoint_hash = StorableEndpointSha256::from_endpoint(&endpoint);
+    let endpoint_hash_raw = crate::utils::sha256sum(endpoint.as_bytes());
     storage_borrow_mut(|storage| {
         storage
             .push_subscriptions_memory
             .remove(&(anchor_number, endpoint_hash));
     });
+    invalidate_seals_for_device(anchor_number, &endpoint_hash_raw);
     Ok(())
 }
 
@@ -240,6 +289,7 @@ pub fn register_sender(origin: FrontendHostname, sender: Option<Principal>) -> R
         ));
     }
     let origin_hash = StorableOriginSha256::from_origin(&origin);
+    let origin_hash_raw = crate::utils::sha256sum(origin.as_bytes());
     storage_borrow_mut(|storage| match sender {
         Some(principal) => {
             storage.push_sender_memory.insert(
@@ -251,6 +301,10 @@ pub fn register_sender(origin: FrontendHostname, sender: Option<Principal>) -> R
             storage.push_sender_memory.remove(&origin_hash);
         }
     });
+    // The sealed payload names the sender canister, so a changed (or cleared)
+    // registration makes every cached seal for this origin point at the wrong
+    // place. Drop them; the next send re-seals with the new canister.
+    invalidate_seals_for_origin(&origin_hash_raw);
     Ok(())
 }
 
@@ -359,15 +413,14 @@ pub async fn notify_user(
         );
     }
 
-    // 5. Derive a per-device RNG from the single `raw_rand` seed via a
-    //    counter-mode ChaCha20 stream so each encryption gets distinct
-    //    ephemeral P-256 key material without another async round-trip.
-    // One id per admitted message, shared by every device in this fan-out. It
-    // rides inside the encrypted payload, so no relay or gateway can read or
-    // forge it. Derived from the same `raw_rand` seed rather than a counter,
-    // which keeps it unguessable and needs no stored state.
-    let msg_id = hex_prefix(&entropy_seed, 16);
-    let plaintext = routing_to_json(&canister, &origin, &msg_id);
+    // 5. The routing payload is frozen for this (device, app) pair, so its
+    //    sealed bytes are cached and re-sent: the RFC 8291 encryption — two
+    //    P-256 scalar multiplications, the dominant cost — runs once per pair on
+    //    the first send, not per message. `root_rng` seeds only cache misses,
+    //    derived from the single `raw_rand` seed via a ChaCha20 stream so each
+    //    miss gets distinct ephemeral key material without another round-trip.
+    let plaintext = routing_to_json(&canister, &origin);
+    let origin_hash_raw = sender.origin_hash;
     let mut root_rng = ChaCha20Rng::from_seed(entropy_seed);
     let now_secs = time() / 1_000_000_000;
     let exp = now_secs + vapid::VAPID_JWT_MAX_LIFETIME_SECS;
@@ -403,15 +456,29 @@ pub async fn notify_user(
             continue;
         }
 
-        let mut rng = ChaCha20Rng::from_seed(per_device_seed);
-        let ciphertext =
-            match rfc8291::encrypt(&plaintext, &subscription.p256dh, &auth_arr, &mut rng) {
-                Ok(c) => c,
-                Err(e) => {
-                    ic_cdk::println!("push: encrypt failed: {e:?}");
-                    continue;
+        // Seal cache, keyed by (device, app). A hit re-sends the stored bytes
+        // with no crypto at all; a miss seals once and stores it. Reusing the
+        // exact same sealed bytes is safe precisely because the plaintext never
+        // varies — it is the same message re-sent, not a new one under a reused
+        // key and nonce.
+        let endpoint_hash = crate::utils::sha256sum(subscription.endpoint.as_bytes());
+        let cache_key = (anchor, endpoint_hash, origin_hash_raw);
+        let ciphertext = match cached_seal(&cache_key) {
+            Some(blob) => blob,
+            None => {
+                let mut rng = ChaCha20Rng::from_seed(per_device_seed);
+                match rfc8291::encrypt(&plaintext, &subscription.p256dh, &auth_arr, &mut rng) {
+                    Ok(blob) => {
+                        store_seal(cache_key, blob.clone());
+                        blob
+                    }
+                    Err(e) => {
+                        ic_cdk::println!("push: encrypt failed: {e:?}");
+                        continue;
+                    }
                 }
-            };
+            }
+        };
 
         let audience = match vapid::origin_of_endpoint(&subscription.endpoint) {
             Ok(a) => a,
@@ -471,6 +538,7 @@ pub async fn notify_user(
                         storage_borrow_mut(|storage| {
                             storage.push_subscriptions_memory.remove(&dead_row);
                         });
+                        invalidate_seals_for_device(anchor, &endpoint_hash);
                         ic_cdk::println!("push: dropped a subscription the relay reports gone");
                     } else if !status.starts_with('2') {
                         ic_cdk::println!("push outcall non-2xx status: {status}");
@@ -486,32 +554,19 @@ pub async fn notify_user(
     Ok(())
 }
 
-/// Lowercase hex of the first `n` bytes. Used for `msg_id`; avoids pulling in a
-/// hex crate for one 16-byte value.
-fn hex_prefix(bytes: &[u8], n: usize) -> String {
-    let mut out = String::with_capacity(n * 2);
-    for byte in bytes.iter().take(n) {
-        out.push_str(&format!("{byte:02x}"));
-    }
-    out
-}
-
 /// Serializes the routing ping the service worker receives. It carries no
-/// content: `c` is the canister the worker pulls the notification from, `o` is
-/// the origin it labels the notification with and looks its delegation up under,
-/// and `msg_id` dedups.
-///
-/// `msg_id` must be identical for every device in one fan-out — that is what
-/// lets the worker collapse duplicates, two subscription rows pointing at the
-/// same browser carrying the same id so the second wake is suppressed.
-fn routing_to_json(canister: &Principal, origin: &str, msg_id: &str) -> Vec<u8> {
+/// content and, deliberately, nothing that varies per message: `c` is the
+/// canister the worker pulls the notification from, `o` is the origin it labels
+/// the notification with and looks its delegation up under. Both are stable for
+/// the life of the (device, app) pair, which is what lets the sealed bytes be
+/// cached once and re-sent (see the seal cache in `notify_user`). The worker
+/// dedups on the dApp's own notification ids, so no id is needed here.
+fn routing_to_json(canister: &Principal, origin: &str) -> Vec<u8> {
     // Manual formatting rather than serde_json — the shape is fixed and
     // avoiding another serialization crate keeps the wasm smaller. We
     // escape `"` and `\` in the string fields per JSON grammar.
     let mut buf = String::with_capacity(128);
     buf.push('{');
-    push_json_field(&mut buf, "msg_id", msg_id);
-    buf.push(',');
     push_json_field(&mut buf, "c", &canister.to_text());
     buf.push(',');
     push_json_field(&mut buf, "o", origin);
@@ -545,35 +600,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn msg_id_is_stable_for_one_seed_and_differs_across_seeds() {
-        // Every device in one fan-out must get the SAME id — that is what lets
-        // the service worker collapse two rows pointing at one browser. Two
-        // different sends must not collide, or a genuine notification would be
-        // suppressed as a duplicate.
-        let seed_a = [7u8; 32];
-        let seed_b = [8u8; 32];
-
-        assert_eq!(hex_prefix(&seed_a, 16), hex_prefix(&seed_a, 16));
-        assert_ne!(hex_prefix(&seed_a, 16), hex_prefix(&seed_b, 16));
-        assert_eq!(hex_prefix(&seed_a, 16).len(), 32);
-    }
-
-    #[test]
-    fn routing_payload_carries_id_canister_and_origin() {
+    fn routing_payload_carries_only_canister_and_origin() {
         let canister = Principal::from_text("aaaaa-aa").unwrap();
-        let json =
-            String::from_utf8(routing_to_json(&canister, "https://app.example", "abc123")).unwrap();
+        let json = String::from_utf8(routing_to_json(&canister, "https://app.example")).unwrap();
 
-        assert!(json.contains(r#""msg_id":"abc123""#), "got {json}");
         assert!(json.contains(r#""c":"aaaaa-aa""#), "got {json}");
         assert!(json.contains(r#""o":"https://app.example""#), "got {json}");
+        // Nothing that varies per message — that is what makes it cacheable.
+        assert!(!json.contains("msg_id"), "got {json}");
     }
 
     #[test]
     fn payload_escapes_string_fields() {
         let canister = Principal::from_text("aaaaa-aa").unwrap();
-        let json = String::from_utf8(routing_to_json(&canister, r#"https://a"b\c"#, "id")).unwrap();
+        let json = String::from_utf8(routing_to_json(&canister, r#"https://a"b\c"#)).unwrap();
 
         assert!(json.contains(r#"a\"b\\c"#), "got {json}");
+    }
+
+    #[test]
+    fn seal_cache_stores_reads_and_invalidates() {
+        let dev_a = [1u8; 32];
+        let dev_b = [2u8; 32];
+        let origin_x = [9u8; 32];
+        let key = (7u64, dev_a, origin_x);
+
+        assert_eq!(cached_seal(&key), None);
+        store_seal(key, vec![0xAB, 0xCD]);
+        assert_eq!(cached_seal(&key), Some(vec![0xAB, 0xCD]));
+
+        // A different device under the same anchor is a different entry.
+        store_seal((7u64, dev_b, origin_x), vec![0xEE]);
+
+        // Invalidating one device leaves the other, and other anchors, intact.
+        invalidate_seals_for_device(7u64, &dev_a);
+        assert_eq!(cached_seal(&key), None);
+        assert_eq!(cached_seal(&(7u64, dev_b, origin_x)), Some(vec![0xEE]));
+
+        // Invalidating the origin drops every device sealed against it.
+        invalidate_seals_for_origin(&origin_x);
+        assert_eq!(cached_seal(&(7u64, dev_b, origin_x)), None);
     }
 }

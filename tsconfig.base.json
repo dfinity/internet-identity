@@ -18,5 +18,5 @@
     "verbatimModuleSyntax": false,
     "types": ["node", "vite/client", "vitest/globals"]
   },
-  "exclude": ["src/frontend/src/lib/generated/*"]
+  "exclude": ["src/frontend/src/lib/generated/*", "src/frontend/sw-src/**"]
 }

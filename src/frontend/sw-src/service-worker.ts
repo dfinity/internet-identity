@@ -3,12 +3,14 @@
 // agent-js — the worker now authenticates to the sending dApp and fetches the
 // notification content itself, rather than receiving it in the push.
 //
-// The push carries only routing: {msg_id, c, o}. `c` is the dApp canister to
-// query, `o` is the origin (the notification label, and the key the delegation
-// is stored under). The worker loads a read-only delegation for `o`, queries
-// `c`'s ii_pending_notifications as the user, and renders the result. If it
-// can't (no delegation, expired, dApp slow or down), it shows a generic
-// notification so the permission isn't wasted on a silent push.
+// The push carries only routing: {c, o}, and nothing that varies per message
+// (so II can cache the sealed bytes). `c` is the dApp canister to query, `o` is
+// the origin (the notification label, and the key the delegation is stored
+// under). The worker loads a read-only delegation for `o`, queries `c`'s
+// ii_pending_notifications as the user, and renders the result — deduping by
+// each item's id via the notification tag. If it can't (no delegation, expired,
+// dApp slow or down), it shows a generic notification so the permission isn't
+// wasted on a silent push.
 
 import { get as idbGet, createStore } from "idb-keyval";
 import { Actor, HttpAgent } from "@icp-sdk/core/agent";
@@ -101,40 +103,9 @@ self.addEventListener("install", () => {
   void self.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
+self.addEventListener("activate", (event: ExtendableEvent) => {
   event.waitUntil(self.clients.claim());
 });
-
-// ── dedup, unchanged ─────────────────────────────────────────────────────────
-const SEEN_CACHE = "ii-push-seen-v1";
-const SEEN_CAP = 200;
-
-const alreadyShown = async (msgId: string | undefined): Promise<boolean> => {
-  if (msgId === undefined || msgId === "") {
-    return false;
-  }
-  try {
-    const cache = await caches.open(SEEN_CACHE);
-    const key = new URL(
-      `/__ii-push-seen/${encodeURIComponent(msgId)}`,
-      self.location.origin,
-    );
-    if (await cache.match(key)) {
-      return true;
-    }
-    await cache.put(key, new Response(""));
-    const keys = await cache.keys();
-    if (keys.length > SEEN_CAP) {
-      await Promise.all(
-        keys.slice(0, keys.length - SEEN_CAP).map((stale) => cache.delete(stale)),
-      );
-    }
-    return false;
-  } catch (err) {
-    console.warn("[ii-sw] dedup unavailable:", err);
-    return false;
-  }
-};
 
 // ── the pull ─────────────────────────────────────────────────────────────────
 
@@ -181,13 +152,13 @@ const pullNotifications = async (
   }
 };
 
-self.addEventListener("push", (event) => {
+self.addEventListener("push", (event: PushEvent) => {
   if (!event.data) {
     console.warn("[ii-sw] push event with no data");
     return;
   }
 
-  let routing: { msg_id?: string; c?: string; o?: string };
+  let routing: { c?: string; o?: string };
   try {
     routing = event.data.json();
   } catch (err) {
@@ -201,11 +172,6 @@ self.addEventListener("push", (event) => {
 
   event.waitUntil(
     (async () => {
-      if (await alreadyShown(routing.msg_id)) {
-        console.warn("[ii-sw] suppressed a duplicate notification");
-        return;
-      }
-
       const pending =
         canisterId !== "" && origin !== ""
           ? await pullNotifications(canisterId, origin)
@@ -239,7 +205,7 @@ self.addEventListener("push", (event) => {
   );
 });
 
-self.addEventListener("notificationclick", (event) => {
+self.addEventListener("notificationclick", (event: NotificationEvent) => {
   event.notification.close();
   const data = (event.notification.data ?? {}) as {
     origin?: string;
