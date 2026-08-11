@@ -656,22 +656,17 @@ pub(super) fn extract_from_address(
         .iter()
         .find(|h| h.name.eq_ignore_ascii_case("From"))
         .ok_or(EmailChallengeError::AddressMismatch)?;
-    let value = from_header.value.trim();
-    // `From:` is RFC 5322 `address-list` in the general case, but
-    // DMARC requires exactly one mailbox. The DMARC verifier already
-    // enforced that, so by the time we're here the value is a
-    // single mailbox in either `addr-spec` or `name-addr` form.
-    let addr_spec = if let Some(start) = value.rfind('<') {
-        let end = value
-            .rfind('>')
-            .ok_or(EmailChallengeError::AddressMismatch)?;
-        if end <= start + 1 {
-            return Err(EmailChallengeError::AddressMismatch);
-        }
-        &value[start + 1..end]
-    } else {
-        value
-    };
+    // `From:` is RFC 5322 `address-list` in the general case, but the
+    // recovery flow needs exactly one mailbox. Parse it with the same
+    // single-mailbox parser DMARC alignment uses (`dmarc::from_header`)
+    // rather than a second, looser scan here — one parser, one set of
+    // rules for what counts as a single mailbox (no address-list, no
+    // group syntax, display name tolerated). Any parse failure maps to
+    // `AddressMismatch`: by this point DKIM verify has accepted the
+    // message, so a `From:` we can't resolve to one mailbox is
+    // observably "doesn't match".
+    let addr_spec = crate::dmarc::parse_single_mailbox_addr_spec(&from_header.value)
+        .map_err(|_| EmailChallengeError::AddressMismatch)?;
     // Apply the same RFC 5321 §4.5.3.1 caps as `prepare_add` did
     // when accepting the claimed address. Defense in depth: a real
     // SMTP path won't deliver an oversized address (RFC 5321 line
@@ -1101,6 +1096,29 @@ mod tests {
             body: ByteBuf::new(),
         };
         assert_eq!(extract_from_address(&msg).unwrap(), "alice@gmail.com");
+    }
+
+    #[test]
+    fn extract_from_single_mailbox() {
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpHeader, SmtpMessage,
+        };
+        use serde_bytes::ByteBuf;
+        let msg = |value: &str| SmtpMessage {
+            headers: vec![SmtpHeader {
+                name: "From".into(),
+                value: value.into(),
+            }],
+            body: ByteBuf::new(),
+        };
+        assert!(matches!(
+            extract_from_address(&msg("Alice <alice@example.com>, Bob <bob@example.com>")),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+        assert!(matches!(
+            extract_from_address(&msg("group: alice@example.com;")),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
     }
 
     fn smtp_envelope(user: &str, domain: &str) -> SmtpRequest {
