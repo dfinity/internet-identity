@@ -56,7 +56,6 @@
     "@vitest/browser": "^4.1.10",
     "@zag-js/svelte": "^1.43.0",
     "@zag-js/toast": "^1.43.0",
-    "devtools-protocol": "^0.0.1672245",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-svelte": "^3.22.0",
