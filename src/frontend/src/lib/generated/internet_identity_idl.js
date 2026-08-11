@@ -648,12 +648,6 @@ export const idlFactory = ({ IDL }) => {
     'permissions' : Permissions,
     'expiration' : Timestamp,
   });
-  const PushAlert = IDL.Record({
-    'url' : IDL.Opt(IDL.Text),
-    'title' : IDL.Text,
-    'body' : IDL.Text,
-    'hostname' : IDL.Text,
-  });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
@@ -1235,7 +1229,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'notify_user' : IDL.Func(
-        [IDL.Principal, PushAlert],
+        [IDL.Principal],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),

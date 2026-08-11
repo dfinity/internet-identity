@@ -903,14 +903,6 @@ fn mcp_register_v2(session_key: SessionKey) -> Result<McpRegistrationV2, String>
 // authorises via the reverse principal-index rather than the anchor, and
 // stubs the outcall for Phase 5+.
 
-#[derive(candid::CandidType, candid::Deserialize, Debug, Clone)]
-pub struct PushAlert {
-    pub hostname: String,
-    pub title: String,
-    pub body: String,
-    pub url: Option<String>,
-}
-
 /// Register a Web Push subscription for `anchor_number` on this device.
 /// Called from II's own frontend (`/manage → Settings → Enable
 /// notifications on this device`); the caller is authenticated as the
@@ -1001,10 +993,11 @@ fn push_debug_list_devices(anchor_number: AnchorNumber) -> Vec<String> {
     push::api::debug_list_devices(anchor_number)
 }
 
-/// Send an encrypted push notification to `in_app_principal`'s subscribed
-/// browser SW, if the caller's origin has consent. Returns in ms — the
-/// outcall to the relay is detached via `ic_cdk::spawn` (see
-/// [`push::api::notify_user`]).
+/// Ping `in_app_principal`'s subscribed browser SWs to pull a pending
+/// notification, if the caller's origin has consent. Returns in ms — the outcall
+/// to the relay is detached via `ic_cdk::spawn` (see [`push::api::notify_user`]).
+/// Carries no content: the ping names the origin and the canister to pull from,
+/// and the device fetches the text itself.
 ///
 /// Called by a dApp's backend on behalf of the user. No
 /// `check_authz_and_record_activity` here: the sender doesn't authenticate as
@@ -1012,19 +1005,9 @@ fn push_debug_list_devices(anchor_number: AnchorNumber) -> Vec<String> {
 /// resolves `in_app_principal` to its origin and checks that `caller()` is the
 /// registered sender for it (or the recipient itself).
 #[update]
-async fn notify_user(in_app_principal: Principal, alert: PushAlert) -> Result<(), String> {
+async fn notify_user(in_app_principal: Principal) -> Result<(), String> {
     let entropy = random_salt().await;
-    push::api::notify_user(
-        in_app_principal,
-        push::api::PushAlert {
-            hostname: alert.hostname,
-            title: alert.title,
-            body: alert.body,
-            url: alert.url,
-        },
-        entropy,
-    )
-    .await
+    push::api::notify_user(in_app_principal, entropy).await
 }
 
 /// Return the VAPID public key (65-byte uncompressed SEC1 P-256 point)

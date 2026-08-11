@@ -9,7 +9,9 @@
   "scripts": {
     "dev": "II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 vite",
     "host": "II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 vite --host",
-    "build": "npm run extract && tsc --noEmit && vite build",
+    "build:sw": "node scripts/build-sw.mjs",
+    "watch:sw": "node scripts/build-sw.mjs --watch",
+    "build": "npm run build:sw && npm run extract && tsc --noEmit && vite build",
     "preview": "vite preview",
     "postinstall": "scripts/render-local-init-args",
     "prepare": "svelte-kit sync || echo ''",

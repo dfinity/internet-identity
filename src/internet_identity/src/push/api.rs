@@ -32,17 +32,6 @@ use internet_identity_interface::internet_identity::types::{AnchorNumber, Fronte
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 
-/// The alert record `notify_user` accepts. Mirrors the `PushAlert`
-/// Candid record in `main.rs` — kept here so `api.rs` has no cross-
-/// module dependency for the payload shape.
-#[derive(Clone, Debug)]
-pub struct PushAlert {
-    pub hostname: String,
-    pub title: String,
-    pub body: String,
-    pub url: Option<String>,
-}
-
 /// Endpoint URLs from Apple/Google/Mozilla are ~200-300 bytes in practice;
 /// we cap at 1 KiB to bound the per-row footprint. Anything longer is
 /// almost certainly malformed and rejected up front.
@@ -226,16 +215,17 @@ pub fn debug_list_devices(anchor_number: AnchorNumber) -> Vec<String> {
 /// budget 3x to leave headroom for slow relays.
 const PUSH_OUTCALL_CYCLES: u128 = 3_000_000_000;
 
-/// Encrypt `alert` under each of the anchor's registered devices' keys
-/// and detach one HTTPS outcall per subscription.
+/// Seal a content-free routing ping under each of the anchor's registered
+/// devices' keys and detach one HTTPS outcall per subscription. The ping names
+/// the origin and the canister to pull from; the device fetches the actual
+/// content itself, so no notification text passes through II.
 ///
 /// Called by dApps — the caller authenticates as an in-app principal
 /// which we reverse-lookup via `PRINCIPAL_INDEX` to recover the target
 /// anchor. Subscriptions live on II's SW (Option A), so all of them —
-/// phone, laptop, whatever — get pinged. The SW is responsible for
-/// showing the notification attributed to the caller's origin, which we
-/// override into `alert.hostname` here so a malicious dApp can't lie
-/// about who sent it.
+/// phone, laptop, whatever — get pinged. The origin in the ping is the one the
+/// user consented to, resolved here rather than taken from the caller, so a
+/// malicious dApp can't lie about who sent it.
 ///
 /// `entropy_seed` is 32 bytes pre-fetched from `raw_rand`; we HKDF-
 /// expand it per-device so each RFC 8291 encryption gets a fresh
@@ -299,7 +289,6 @@ fn authorize_sender(
 /// ephemeral scalar + salt without another async round-trip.
 pub async fn notify_user(
     in_app_principal: Principal,
-    mut alert: PushAlert,
     entropy_seed: [u8; 32],
 ) -> Result<(), String> {
     let vapid_key = vapid::get_or_init_signing_key()
@@ -339,29 +328,19 @@ pub async fn notify_user(
     })
     .ok_or_else(|| "consent has been revoked".to_string())?;
 
-    // 3. Force the alert's `hostname` field to the origin the user
-    //    actually consented to — a dApp that owns `foo.app` can't send
-    //    a notification labelled as `bar.app`. The SW displays this
-    //    string verbatim. Legacy consent rows without an origin
-    //    plaintext (see StorablePushConsent's schema-evolution note)
-    //    fail closed — the user has to re-grant.
-    alert.hostname = consent
+    // 3. The routing payload names two things: the origin the user consented to
+    //    (the notification label, and the key the service worker looks the
+    //    delegation up under) and the canister the worker pulls the content
+    //    from — the registered sender for that origin. Legacy consent rows
+    //    without an origin plaintext fail closed; the user re-grants. No sender
+    //    registered means there is nowhere to pull from, so the send is rejected
+    //    rather than delivering a ping the device can't resolve.
+    let origin = consent
         .origin
         .ok_or_else(|| "consent row is missing its origin; re-grant to fix".to_string())?;
-
-    // 3b. The deep link must be on the sender's own application.
-    //
-    //     Checked here rather than on the device because this is the only place
-    //     that knows, authoritatively, which origin the user consented to. With
-    //     it, `alert.url` is trustworthy by construction and the service worker
-    //     can open it directly — which is what removes a hop from the
-    //     tap-through. Left to the client, the check would sit on a publicly
-    //     craftable URL and every consumer would have to repeat it.
-    if let Some(url) = &alert.url {
-        if !url_is_on_origin(url, &alert.hostname) {
-            return Err("alert.url must be on the sender's own origin".to_string());
-        }
-    }
+    let canister = storage_borrow(|storage| storage.push_sender_memory.get(&origin_hash))
+        .and_then(|registration| registration.sender_principal())
+        .ok_or_else(|| "no registered sender to pull notifications from".to_string())?;
 
     // 4. Collect every subscription for the anchor. Bounded per-anchor
     //    by the number of devices the user has enabled II push on — a
@@ -388,7 +367,7 @@ pub async fn notify_user(
     // forge it. Derived from the same `raw_rand` seed rather than a counter,
     // which keeps it unguessable and needs no stored state.
     let msg_id = hex_prefix(&entropy_seed, 16);
-    let plaintext = alert_to_json(&alert, &msg_id);
+    let plaintext = routing_to_json(&canister, &origin, &msg_id);
     let mut root_rng = ChaCha20Rng::from_seed(entropy_seed);
     let now_secs = time() / 1_000_000_000;
     let exp = now_secs + vapid::VAPID_JWT_MAX_LIFETIME_SECS;
@@ -507,59 +486,6 @@ pub async fn notify_user(
     Ok(())
 }
 
-/// Serialize a PushAlert as JSON for the encrypted body. The Service
-/// Worker parses this in its `onpush` handler.
-/// The `scheme://host[:port]` of an absolute URL, or `None` when it isn't one.
-///
-/// Only `https` and `http` are accepted, which is what makes the comparison in
-/// [`url_is_on_origin`] meaningful: a `javascript:` or `data:` URL has no host
-/// to compare and must never reach a navigation.
-fn origin_of_url(url: &str) -> Option<String> {
-    let (scheme, rest) = if let Some(rest) = url.strip_prefix("https://") {
-        ("https", rest)
-    } else if let Some(rest) = url.strip_prefix("http://") {
-        ("http", rest)
-    } else {
-        return None;
-    };
-    let host_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
-    if host_end == 0 {
-        return None;
-    }
-    Some(format!("{scheme}://{}", &rest[..host_end]))
-}
-
-/// Collapses the boundary-node domains onto the legacy one, mirroring the
-/// frontend's `remapToLegacyDomain`.
-///
-/// Needed because consent is recorded against the *effective* origin, which the
-/// frontend has already remapped — a canister served at `<id>.icp0.io` is
-/// consented as `<id>.ic0.app`. A dApp's own deep links use whichever domain the
-/// user is actually browsing, so comparing verbatim would reject legitimate
-/// links. Safe rather than loose: only the same subdomain collapses, and that
-/// subdomain is the canister id.
-fn canonical_origin(origin: &str) -> String {
-    for suffix in [".icp0.io", ".icp.net"] {
-        if let Some(host) = origin
-            .strip_prefix("https://")
-            .and_then(|rest| rest.strip_suffix(suffix))
-        {
-            if !host.is_empty() && !host.contains('/') {
-                return format!("https://{host}.ic0.app");
-            }
-        }
-    }
-    origin.to_string()
-}
-
-/// Whether `url` points at `origin`'s own application.
-fn url_is_on_origin(url: &str, origin: &str) -> bool {
-    match origin_of_url(url) {
-        Some(url_origin) => canonical_origin(&url_origin) == canonical_origin(origin),
-        None => false,
-    }
-}
-
 /// Lowercase hex of the first `n` bytes. Used for `msg_id`; avoids pulling in a
 /// hex crate for one 16-byte value.
 fn hex_prefix(bytes: &[u8], n: usize) -> String {
@@ -570,30 +496,25 @@ fn hex_prefix(bytes: &[u8], n: usize) -> String {
     out
 }
 
-/// Serializes the payload the service worker receives, including `msg_id`.
+/// Serializes the routing ping the service worker receives. It carries no
+/// content: `c` is the canister the worker pulls the notification from, `o` is
+/// the origin it labels the notification with and looks its delegation up under,
+/// and `msg_id` dedups.
 ///
-/// `msg_id` is deliberately not a field on `PushAlert`: no dApp supplies it, and
-/// it must be identical for every device in one fan-out. That is what lets the
-/// service worker collapse duplicates — two subscription rows pointing at the
-/// same browser (an endpoint rotation that left a stale row, a second
-/// registration) carry the same id, so the second banner is suppressed.
-fn alert_to_json(alert: &PushAlert, msg_id: &str) -> Vec<u8> {
+/// `msg_id` must be identical for every device in one fan-out — that is what
+/// lets the worker collapse duplicates, two subscription rows pointing at the
+/// same browser carrying the same id so the second wake is suppressed.
+fn routing_to_json(canister: &Principal, origin: &str, msg_id: &str) -> Vec<u8> {
     // Manual formatting rather than serde_json — the shape is fixed and
     // avoiding another serialization crate keeps the wasm smaller. We
     // escape `"` and `\` in the string fields per JSON grammar.
-    let mut buf = String::with_capacity(256);
+    let mut buf = String::with_capacity(128);
     buf.push('{');
     push_json_field(&mut buf, "msg_id", msg_id);
     buf.push(',');
-    push_json_field(&mut buf, "hostname", &alert.hostname);
+    push_json_field(&mut buf, "c", &canister.to_text());
     buf.push(',');
-    push_json_field(&mut buf, "title", &alert.title);
-    buf.push(',');
-    push_json_field(&mut buf, "body", &alert.body);
-    if let Some(url) = &alert.url {
-        buf.push(',');
-        push_json_field(&mut buf, "url", url);
-    }
+    push_json_field(&mut buf, "o", origin);
     buf.push('}');
     buf.into_bytes()
 }
@@ -638,95 +559,20 @@ mod tests {
     }
 
     #[test]
-    fn payload_carries_the_msg_id_the_worker_dedups_on() {
-        let alert = PushAlert {
-            hostname: "https://app.example".to_string(),
-            title: "t".to_string(),
-            body: "b".to_string(),
-            url: None,
-        };
-
-        let json = String::from_utf8(alert_to_json(&alert, "abc123")).unwrap();
+    fn routing_payload_carries_id_canister_and_origin() {
+        let canister = Principal::from_text("aaaaa-aa").unwrap();
+        let json =
+            String::from_utf8(routing_to_json(&canister, "https://app.example", "abc123")).unwrap();
 
         assert!(json.contains(r#""msg_id":"abc123""#), "got {json}");
-    }
-
-    #[test]
-    fn deep_link_must_be_on_the_senders_own_app() {
-        let consented = "https://app.example";
-
-        assert!(url_is_on_origin("https://app.example/thread/42", consented));
-        assert!(url_is_on_origin("https://app.example", consented));
-        // Another origin, a subdomain, and a suffix trick are all rejected.
-        assert!(!url_is_on_origin("https://evil.example/x", consented));
-        assert!(!url_is_on_origin("https://sub.app.example/x", consented));
-        assert!(!url_is_on_origin(
-            "https://app.example.evil.co/x",
-            consented
-        ));
-    }
-
-    #[test]
-    fn deep_link_may_use_the_apps_other_boundary_domain() {
-        // Consent is recorded against the effective origin, already remapped to
-        // ic0.app; the dApp's own links use the domain the user is browsing. If
-        // this failed, every real deep link would be refused.
-        let consented = "https://vt36r-2qaaa-aaaad-aad5a-cai.ic0.app";
-
-        assert!(url_is_on_origin(
-            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io/#markets/ICP",
-            consented
-        ));
-        assert!(url_is_on_origin(
-            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net/",
-            consented
-        ));
-        // A different canister must never collapse onto this one.
-        assert!(!url_is_on_origin(
-            "https://aaaaa-2qaaa-aaaad-aad5a-cai.icp0.io/",
-            consented
-        ));
-    }
-
-    #[test]
-    fn deep_link_rejects_schemes_that_are_not_web_pages() {
-        // These have no host to compare, and must never reach a navigation:
-        // in a browser their origin is the string "null", which would otherwise
-        // compare equal to another such URL.
-        let consented = "https://app.example";
-
-        assert!(!url_is_on_origin("javascript:alert(1)", consented));
-        assert!(!url_is_on_origin(
-            "data:text/html,<script></script>",
-            consented
-        ));
-        assert!(!url_is_on_origin("app.example/x", consented));
-        assert!(!url_is_on_origin("https://", consented));
-    }
-
-    #[test]
-    fn loopback_deep_link_is_matched_verbatim() {
-        // A locally served dApp consents and links on the same http origin, so
-        // no remapping applies and it must simply match.
-        let consented = "http://frontend.local.localhost:8000";
-
-        assert!(url_is_on_origin(
-            "http://frontend.local.localhost:8000/#markets/ICP",
-            consented
-        ));
-        assert!(!url_is_on_origin("http://evil.localhost:8000/", consented));
+        assert!(json.contains(r#""c":"aaaaa-aa""#), "got {json}");
+        assert!(json.contains(r#""o":"https://app.example""#), "got {json}");
     }
 
     #[test]
     fn payload_escapes_string_fields() {
-        let alert = PushAlert {
-            hostname: "https://app.example".to_string(),
-            title: r#"a"b\c"#.to_string(),
-            body: "b".to_string(),
-            url: None,
-        };
-
-        let json = String::from_utf8(alert_to_json(&alert, "id")).unwrap();
+        let canister = Principal::from_text("aaaaa-aa").unwrap();
+        let json = String::from_utf8(routing_to_json(&canister, r#"https://a"b\c"#, "id")).unwrap();
 
         assert!(json.contains(r#"a\"b\\c"#), "got {json}");
     }

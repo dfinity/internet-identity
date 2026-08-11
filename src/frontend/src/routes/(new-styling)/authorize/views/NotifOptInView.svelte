@@ -12,6 +12,8 @@
     ensureDeviceSubscription,
     listConsentedOrigins,
   } from "$lib/utils/pushConsent";
+  import { mintPushDelegation } from "$lib/utils/authentication/pushDelegation";
+  import { storePushDelegation } from "$lib/stores/push-delegation.store";
   import {
     notificationsGloballyGranted,
     recordNotifOptInDecision,
@@ -91,6 +93,19 @@
     const { actor, identityNumber } = $authenticatedStore;
     await ensureDeviceSubscription(actor, identityNumber);
     await grantConsent();
+    // Mint the read-only delegation the service worker will use to pull this
+    // app's notification content, and store it where the worker can read it.
+    // Non-fatal: without it the worker falls back to a generic notification.
+    try {
+      const record = await mintPushDelegation({
+        identityNumber,
+        origin: effectiveOrigin,
+        actor,
+      });
+      await storePushDelegation(record);
+    } catch (err) {
+      console.warn("[push] could not mint pull delegation:", err);
+    }
   };
 
   const remember = (decision: "enabled" | "dismissed") => {

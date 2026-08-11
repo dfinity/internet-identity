@@ -1455,19 +1455,6 @@ export interface PublicKeyAuthn { 'pubkey' : PublicKey }
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
 /**
- * Push notifications PoC (RFC 8291). `hostname` and `title` are what the
- * Service Worker renders in the OS notification banner; `body` is the
- * message text; `url` is an optional deep-link the SW opens on click.
- * The whole record is CBOR-encoded, then RFC 8291-encrypted; single-record
- * AES-GCM caps the encrypted payload at ~3 KiB.
- */
-export interface PushAlert {
-  'url' : [] | [string],
-  'title' : string,
-  'body' : string,
-  'hostname' : string,
-}
-/**
  * Rate limit configuration.
  * Currently only used for `register`.
  */
@@ -2289,11 +2276,13 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   /**
-   * Called by a dApp's backend on the user's behalf: encrypt + fan out a
-   * push notification to every device the target identity has subscribed
-   * with consent for that origin. Returns in milliseconds — outcalls to the
-   * relay are detached via `ic_cdk::spawn` and their success is observed by
-   * the browser, not by the caller.
+   * Called by a dApp's backend on the user's behalf: fan out a content-free
+   * routing ping to every device the target identity has subscribed with
+   * consent for that origin. The ping names the origin and the canister to
+   * pull from; the device fetches the actual notification itself, so no
+   * content passes through II. Returns in milliseconds — outcalls to the relay
+   * are detached via `ic_cdk::spawn` and their success is observed by the
+   * browser, not by the caller.
    * 
    * The caller must be the origin's registered sender (see
    * `push_register_sender`), or the recipient itself. Note it cannot be
@@ -2307,7 +2296,7 @@ export interface _SERVICE {
    * invoked for inter-canister calls).
    */
   'notify_user' : ActorMethod<
-    [Principal, PushAlert],
+    [Principal],
     { 'Ok' : null } |
       { 'Err' : string }
   >,
