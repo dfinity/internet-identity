@@ -2,7 +2,7 @@
 // II's side is in src/internet_identity/internet_identity.did.
 
 type Notification = record {
-    id : text;
+    id : blob;
     title : text;
     body : text;
     url : opt text;
