@@ -1570,7 +1570,7 @@ type Notification = record {
     id : blob;                       // sender's id. also the coalesce and dedup key
     recipient : principal;
     urgency : opt NotificationUrgency;
-    expires_at : opt nat64;          // ns. drop if still undelivered by then
+    expires_at : opt Timestamp;      // ns. drop if still undelivered by then
     // message : opt NotificationContent;
 };
 
