@@ -5,8 +5,9 @@
 //! user uploaded, plus the sniffed media type) and rendered into a `data:`
 //! URL at certification time, which is what a relying party receives for the
 //! `profile_picture` attribute key. See
-//! [`crate::internet_identity::types::attributes`] for the attribute plumbing
-//! and `docs/ongoing/profile-pictures.md` for the design.
+//! [`crate::internet_identity::types::attributes`] for the attribute plumbing,
+//! and the `profile_picture_*` section of `internet_identity.did` — which
+//! `docs/ii-spec.mdx` embeds verbatim — for the caller-facing contract.
 
 use crate::internet_identity::types::Timestamp;
 use base64::engine::general_purpose::STANDARD as BASE64;
