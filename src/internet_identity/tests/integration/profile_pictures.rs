@@ -17,24 +17,40 @@ use internet_identity_interface::internet_identity::types::attributes::{
     PrepareIcrc3AttributeError, PrepareIcrc3AttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::profile_picture::{
-    ProfilePictureError, ProfilePictureMediaType, PROFILE_PICTURE_MAX_BYTES,
+    ProfilePictureError, PROFILE_PICTURE_MAX_BYTES, PROFILE_PICTURE_MEDIA_TYPE,
     PROFILE_PICTURE_MIN_BYTES,
 };
 use pocket_ic::PocketIc;
 
 const ORIGIN: &str = "https://some-dapp.com";
 
-/// Bytes that sniff as PNG, padded to `len` with `fill` so different calls
-/// produce different pictures of a chosen size.
-fn png(len: usize, fill: u8) -> Vec<u8> {
-    let mut bytes = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
+/// A WebP container header with the given coding chunk, padded to `len` with
+/// `fill` so different calls produce different pictures of a chosen size.
+fn webp_with(fourcc: &[u8; 4], len: usize, fill: u8) -> Vec<u8> {
+    let mut bytes = b"RIFF".to_vec();
+    bytes.extend_from_slice(&[0, 0, 0, 0]);
+    bytes.extend_from_slice(b"WEBP");
+    bytes.extend_from_slice(fourcc);
     bytes.resize(len.max(bytes.len()), fill);
     bytes
 }
 
-fn jpeg(len: usize, fill: u8) -> Vec<u8> {
-    let mut bytes = vec![0xff, 0xd8, 0xff, 0xe0];
-    bytes.resize(len.max(bytes.len()), fill);
+/// Lossy WebP — the coding the frontend's canvas re-encode produces.
+fn webp(len: usize, fill: u8) -> Vec<u8> {
+    webp_with(b"VP8 ", len, fill)
+}
+
+/// Lossless WebP: the "uncompressed" case a client may upload directly, which
+/// standardising on WebP is meant to keep possible.
+fn webp_lossless(len: usize, fill: u8) -> Vec<u8> {
+    webp_with(b"VP8L", len, fill)
+}
+
+/// Bytes of `magic` padded out to a plausible picture size, for asserting that
+/// a format is rejected on its header rather than on its length.
+fn padded(magic: &[u8]) -> Vec<u8> {
+    let mut bytes = magic.to_vec();
+    bytes.resize(4096, 0);
     bytes
 }
 
@@ -47,12 +63,12 @@ fn setup() -> (PocketIc, candid::Principal) {
 /// The `data:` URL the canister certifies for `bytes` — the same string
 /// `ProfilePicture::to_data_url` builds, so a test can assert on the wire
 /// value without duplicating the encoder.
-fn data_url(media_type: ProfilePictureMediaType, bytes: &[u8]) -> String {
+fn data_url(bytes: &[u8]) -> String {
     use base64::engine::general_purpose::STANDARD as BASE64;
     use base64::Engine;
     format!(
         "data:{};base64,{}",
-        media_type.as_str(),
+        PROFILE_PICTURE_MEDIA_TYPE,
         BASE64.encode(bytes)
     )
 }
@@ -76,7 +92,7 @@ fn should_set_get_and_remove_a_picture() {
         .expect("identity_info error");
     assert_eq!(info.profile_picture, None);
 
-    let bytes = png(4096, 0x11);
+    let bytes = webp(4096, 0x11);
     api::profile_picture_set(&env, canister_id, principal, identity_number, bytes.clone())
         .expect("failed to call profile_picture_set")
         .expect("profile_picture_set error");
@@ -86,8 +102,6 @@ fn should_set_get_and_remove_a_picture() {
         .expect("profile_picture_get error")
         .expect("a picture must be set");
     assert_eq!(stored.bytes.as_ref(), bytes.as_slice());
-    // The media type is derived from the bytes, never supplied.
-    assert_eq!(stored.media_type, ProfilePictureMediaType::Png);
 
     // `identity_info` reports the summary, and deliberately not the bytes.
     let info = api::api_v2::identity_info(&env, canister_id, principal, identity_number)
@@ -95,7 +109,6 @@ fn should_set_get_and_remove_a_picture() {
         .expect("identity_info error");
     let metadata = info.profile_picture.expect("metadata must be reported");
     assert_eq!(metadata.size_bytes, bytes.len() as u64);
-    assert_eq!(metadata.media_type, ProfilePictureMediaType::Png);
     assert_eq!(metadata.uploaded_at, stored.uploaded_at);
 
     api::profile_picture_remove(&env, canister_id, principal, identity_number)
@@ -124,12 +137,12 @@ fn should_replace_rather_than_accumulate() {
         canister_id,
         principal,
         identity_number,
-        png(2048, 0x22),
+        webp(2048, 0x22),
     )
     .expect("failed to call profile_picture_set")
     .expect("first set must succeed");
 
-    let replacement = jpeg(3072, 0x33);
+    let replacement = webp_lossless(3072, 0x33);
     api::profile_picture_set(
         &env,
         canister_id,
@@ -145,7 +158,6 @@ fn should_replace_rather_than_accumulate() {
         .expect("profile_picture_get error")
         .expect("a picture must be set");
     assert_eq!(stored.bytes.as_ref(), replacement.as_slice());
-    assert_eq!(stored.media_type, ProfilePictureMediaType::Jpeg);
 }
 
 #[test]
@@ -161,7 +173,7 @@ fn should_reject_a_picture_over_the_cap() {
         canister_id,
         principal,
         identity_number,
-        png(PROFILE_PICTURE_MAX_BYTES, 0x44),
+        webp(PROFILE_PICTURE_MAX_BYTES, 0x44),
     )
     .expect("failed to call profile_picture_set")
     .expect("a picture of exactly the maximum size must be accepted");
@@ -172,7 +184,7 @@ fn should_reject_a_picture_over_the_cap() {
         canister_id,
         principal,
         identity_number,
-        png(PROFILE_PICTURE_MAX_BYTES + 1, 0x44),
+        webp(PROFILE_PICTURE_MAX_BYTES + 1, 0x44),
     )
     .expect("failed to call profile_picture_set");
     assert_eq!(
@@ -210,23 +222,39 @@ fn should_reject_bytes_that_are_not_an_accepted_image() {
             b"<!DOCTYPE html><html><body>hi</body></html>".to_vec(),
         ),
         ("gif", b"GIF89a\0\0\0\0\0\0\0\0\0\0\0\0".to_vec()),
+        // PNG and JPEG are rejected too, now that WebP is the only stored
+        // format: converting is the client's job, and accepting them would
+        // mean labelling bytes with a media type they are not.
+        (
+            "png",
+            padded(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]),
+        ),
+        ("jpeg", padded(&[0xff, 0xd8, 0xff, 0xe0])),
+        // A RIFF container that is not WebP at all.
+        ("wav", padded(b"RIFF\0\0\0\0WAVEfmt ")),
+        // RIFF/WEBP carrying a coding chunk we don't recognise.
+        ("webp with unknown chunk", webp_with(b"XXXX", 4096, 0)),
     ] {
         let result = api::profile_picture_set(&env, canister_id, principal, identity_number, bytes)
             .expect("failed to call profile_picture_set");
         assert_eq!(
             result,
-            Err(ProfilePictureError::UnsupportedMediaType),
+            Err(ProfilePictureError::NotWebp),
             "should have rejected {label}"
         );
     }
 
-    let result =
-        api::profile_picture_set(&env, canister_id, principal, identity_number, png(8, 0x55))
-            .expect("failed to call profile_picture_set");
+    // A truncated WebP: the RIFF/WEBP magic with no coding chunk. Shorter than
+    // a complete header, so this is reported as too small rather than as the
+    // wrong format — the size check runs first.
+    let truncated = b"RIFF\0\0\0\0WEBP".to_vec();
+    let truncated_len = truncated.len() as u64;
+    let result = api::profile_picture_set(&env, canister_id, principal, identity_number, truncated)
+        .expect("failed to call profile_picture_set");
     assert_eq!(
         result,
         Err(ProfilePictureError::TooSmall {
-            size_bytes: 8,
+            size_bytes: truncated_len,
             min_bytes: PROFILE_PICTURE_MIN_BYTES as u64,
         })
     );
@@ -250,7 +278,7 @@ fn should_report_not_set_when_removing_nothing() {
         canister_id,
         principal,
         identity_number,
-        png(1024, 0x66),
+        webp(1024, 0x66),
     )
     .expect("failed to call profile_picture_set")
     .expect("set must succeed");
@@ -279,7 +307,7 @@ fn should_require_authorization() {
         canister_id,
         principal,
         identity_number,
-        png(1024, 0x77),
+        webp(1024, 0x77),
     )
     .expect("failed to call profile_picture_set")
     .expect("set must succeed");
@@ -304,7 +332,7 @@ fn should_require_authorization() {
                 canister_id,
                 stranger,
                 identity_number,
-                png(1024, 0x88),
+                webp(1024, 0x88),
             )
             .expect("failed to call profile_picture_set"),
         ),
@@ -321,7 +349,7 @@ fn should_require_authorization() {
         .expect("failed to call profile_picture_get")
         .expect("profile_picture_get error")
         .expect("the picture must survive unauthorized calls");
-    assert_eq!(stored.bytes.as_ref(), png(1024, 0x77).as_slice());
+    assert_eq!(stored.bytes.as_ref(), webp(1024, 0x77).as_slice());
 }
 
 /// The whole point of the feature: a relying party can obtain the picture as
@@ -335,12 +363,12 @@ fn should_certify_a_max_size_picture_for_a_relying_party() {
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
     let principal = authn_method.principal();
 
-    let bytes = png(PROFILE_PICTURE_MAX_BYTES, 0x99);
+    let bytes = webp(PROFILE_PICTURE_MAX_BYTES, 0x99);
     api::profile_picture_set(&env, canister_id, principal, identity_number, bytes.clone())
         .expect("failed to call profile_picture_set")
         .expect("set must succeed");
 
-    let expected_url = data_url(ProfilePictureMediaType::Png, &bytes);
+    let expected_url = data_url(&bytes);
 
     // The listing shows the consent screen exactly what will be certified.
     let listed = api::list_available_attributes(
@@ -417,7 +445,7 @@ fn should_reject_a_stale_pinned_picture() {
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
     let principal = authn_method.principal();
 
-    let consented_to = png(2048, 0xaa);
+    let consented_to = webp(2048, 0xaa);
     api::profile_picture_set(
         &env,
         canister_id,
@@ -434,7 +462,7 @@ fn should_reject_a_stale_pinned_picture() {
         canister_id,
         principal,
         identity_number,
-        png(2048, 0xbb),
+        webp(2048, 0xbb),
     )
     .expect("failed to call profile_picture_set")
     .expect("replacement must succeed");
@@ -450,7 +478,7 @@ fn should_reject_a_stale_pinned_picture() {
             account_number: None,
             attributes: vec![AttributeSpec {
                 key: "profile_picture".into(),
-                value: Some(data_url(ProfilePictureMediaType::Png, &consented_to).into_bytes()),
+                value: Some(data_url(&consented_to).into_bytes()),
                 omit_scope: true,
             }],
             nonce: vec![0u8; 32],
@@ -530,7 +558,7 @@ fn should_survive_an_upgrade() {
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
     let principal = authn_method.principal();
 
-    let bytes = png(8192, 0xcc);
+    let bytes = webp(8192, 0xcc);
     api::profile_picture_set(&env, canister_id, principal, identity_number, bytes.clone())
         .expect("failed to call profile_picture_set")
         .expect("set must succeed");
@@ -560,8 +588,8 @@ fn should_keep_pictures_independent_per_identity() {
     let second_method = sample_webauthn_authn_method(1);
     let second = create_identity_with_authn_method(&env, canister_id, &second_method);
 
-    let first_bytes = png(1024, 0x01);
-    let second_bytes = jpeg(2048, 0x02);
+    let first_bytes = webp(1024, 0x01);
+    let second_bytes = webp_lossless(2048, 0x02);
     api::profile_picture_set(
         &env,
         canister_id,

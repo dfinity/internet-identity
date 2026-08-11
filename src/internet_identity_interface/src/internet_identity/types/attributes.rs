@@ -1,4 +1,6 @@
-use crate::internet_identity::types::profile_picture::PROFILE_PICTURE_MAX_BYTES;
+use crate::internet_identity::types::profile_picture::{
+    PROFILE_PICTURE_MAX_BYTES, PROFILE_PICTURE_MEDIA_TYPE,
+};
 use crate::internet_identity::types::{
     AccountNumber, AnchorNumber, FrontendHostname, GetAccountError, Timestamp,
 };
@@ -18,13 +20,13 @@ pub const ATTRIBUTE_VALUE_MAX_BYTES: usize = 50_000;
 /// Upper bound on the `profile_picture` attribute value, which is the stored
 /// picture rendered as a `data:` URL rather than the raw bytes.
 ///
-/// `data:` + the longest accepted media type + `;base64,` + base64 of at most
+/// `data:` + [`PROFILE_PICTURE_MEDIA_TYPE`] + `;base64,` + base64 of at most
 /// [`PROFILE_PICTURE_MAX_BYTES`] bytes. base64 emits 4 characters per 3 input
 /// bytes, rounded up to a whole quantum.
 pub const PROFILE_PICTURE_ATTRIBUTE_VALUE_MAX_BYTES: usize = {
-    const PREFIX_MAX_BYTES: usize = "data:".len() + "image/jpeg".len() + ";base64,".len();
+    const PREFIX_BYTES: usize = "data:".len() + PROFILE_PICTURE_MEDIA_TYPE.len() + ";base64,".len();
     const BASE64_MAX_BYTES: usize = 4 * PROFILE_PICTURE_MAX_BYTES.div_ceil(3);
-    PREFIX_MAX_BYTES + BASE64_MAX_BYTES
+    PREFIX_BYTES + BASE64_MAX_BYTES
 };
 
 pub const OPENID_ISSUER_MAX_BYTES: usize = 1024;
@@ -984,9 +986,7 @@ pub enum ListAvailableAttributesError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::internet_identity::types::profile_picture::{
-        ProfilePicture, ProfilePictureMediaType,
-    };
+    use crate::internet_identity::types::profile_picture::ProfilePicture;
     use pretty_assertions::assert_eq as pretty_assert_eq;
 
     mod ellipsized_tests {
@@ -1162,7 +1162,6 @@ mod tests {
         #[test]
         fn profile_picture_value_bound_fits_a_max_size_picture() {
             let max_picture = ProfilePicture {
-                media_type: ProfilePictureMediaType::Jpeg,
                 bytes: serde_bytes::ByteBuf::from(vec![0u8; PROFILE_PICTURE_MAX_BYTES]),
                 uploaded_at: 0,
             };

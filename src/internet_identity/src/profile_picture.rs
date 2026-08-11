@@ -8,9 +8,8 @@
 //! [`crate::storage::PROFILE_PICTURE_MEMORY_ID`].
 //!
 //! The bytes are never trusted: [`validate_profile_picture`] bounds their size
-//! and derives the media type from their magic number, so the `data:` URL a
-//! relying party receives can only ever claim a format we actually
-//! recognised.
+//! and checks the WebP container header, so the `data:` URL a relying party
+//! receives can only ever claim a format the bytes actually are.
 
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::storable::profile_picture::StorableProfilePicture;
@@ -25,7 +24,7 @@ use serde_bytes::ByteBuf;
 pub fn get(anchor_number: AnchorNumber) -> Option<ProfilePicture> {
     storage_borrow(|storage| storage.lookup_profile_picture(anchor_number))
         .as_ref()
-        .and_then(StorableProfilePicture::to_profile_picture)
+        .map(StorableProfilePicture::to_profile_picture)
 }
 
 /// The summary `identity_info` reports, without the bytes.
@@ -38,7 +37,7 @@ pub fn get(anchor_number: AnchorNumber) -> Option<ProfilePicture> {
 pub fn get_metadata(anchor_number: AnchorNumber) -> Option<ProfilePictureMetadata> {
     storage_borrow(|storage| storage.lookup_profile_picture(anchor_number))
         .as_ref()
-        .and_then(StorableProfilePicture::metadata)
+        .map(StorableProfilePicture::metadata)
 }
 
 /// Validate `bytes` and store them as `anchor_number`'s picture, replacing any

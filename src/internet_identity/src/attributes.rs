@@ -3113,9 +3113,7 @@ mod tests {
     /// `list_available_attributes` shows the consent screen.
     mod profile_picture_attributes_tests {
         use super::*;
-        use internet_identity_interface::internet_identity::types::profile_picture::{
-            ProfilePicture, ProfilePictureMediaType,
-        };
+        use internet_identity_interface::internet_identity::types::profile_picture::ProfilePicture;
         use internet_identity_interface::internet_identity::types::OpenIdConfig;
         use serde_bytes::ByteBuf;
 
@@ -3138,13 +3136,15 @@ mod tests {
             }]);
         }
 
-        /// A tiny but well-formed PNG: magic number plus filler. The canister
-        /// only sniffs the magic number, so this is enough.
-        fn png(fill: u8) -> ProfilePicture {
-            let mut bytes = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
+        /// A tiny but well-formed lossy WebP: RIFF container header plus
+        /// filler. The canister only checks the header, so this is enough.
+        fn webp(fill: u8) -> ProfilePicture {
+            let mut bytes = b"RIFF".to_vec();
+            bytes.extend_from_slice(&[0, 0, 0, 0]);
+            bytes.extend_from_slice(b"WEBP");
+            bytes.extend_from_slice(b"VP8 ");
             bytes.resize(64, fill);
             ProfilePicture {
-                media_type: ProfilePictureMediaType::Png,
                 bytes: ByteBuf::from(bytes),
                 uploaded_at: 1_700_000_000_000_000_000,
             }
@@ -3190,7 +3190,7 @@ mod tests {
         #[test]
         fn listing_surfaces_the_picture_as_a_data_url() {
             let anchor = Anchor::new(ANCHOR_NUMBER, 0);
-            let picture = png(1);
+            let picture = webp(1);
 
             let listed = anchor.list_available_attributes(None, None, Some(picture.clone()));
 
@@ -3205,7 +3205,7 @@ mod tests {
             // consent screen puts it straight into an `<img src>`.
             let value = String::from_utf8(listed[0].1.clone()).expect("data URL must be UTF-8");
             assert!(
-                value.starts_with("data:image/png;base64,"),
+                value.starts_with("data:image/webp;base64,"),
                 "unexpected value prefix: {}",
                 &value[..value.len().min(40)]
             );
@@ -3220,7 +3220,7 @@ mod tests {
         #[test]
         fn listing_respects_an_explicit_request_filter() {
             let anchor = Anchor::new(ANCHOR_NUMBER, 0);
-            let picture = png(2);
+            let picture = webp(2);
 
             // Asked for by name: listed.
             let requested = vec![AttributeKey {
@@ -3254,7 +3254,7 @@ mod tests {
                 "email".to_string(),
                 MetadataEntryV2::String("user@example.com".to_string()),
             )]));
-            let picture = png(3);
+            let picture = webp(3);
 
             let scoped = vec![AttributeKey {
                 scope: openid_attribute_scope(),
@@ -3302,8 +3302,8 @@ mod tests {
         #[test]
         fn certification_is_rejected_when_the_pinned_value_no_longer_matches() {
             let anchor = Anchor::new(ANCHOR_NUMBER, 0);
-            let consented_to = png(4);
-            let stored_now = png(5);
+            let consented_to = webp(4);
+            let stored_now = webp(5);
             assert_ne!(
                 consented_to.to_data_url(),
                 stored_now.to_data_url(),
@@ -3329,7 +3329,7 @@ mod tests {
         fn an_unpinned_spec_resolves_and_reaches_the_signature_store() {
             let anchor = Anchor::new(ANCHOR_NUMBER, 0);
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                prepare(&anchor, Some(png(6)), unscoped_picture_spec(None))
+                prepare(&anchor, Some(webp(6)), unscoped_picture_spec(None))
             }));
             assert!(
                 result.is_err(),
@@ -3341,7 +3341,7 @@ mod tests {
         #[test]
         fn a_matching_pinned_spec_resolves_and_reaches_the_signature_store() {
             let anchor = Anchor::new(ANCHOR_NUMBER, 0);
-            let picture = png(7);
+            let picture = webp(7);
             let spec = unscoped_picture_spec(Some(picture.to_data_url().into_bytes()));
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 prepare(&anchor, Some(picture), spec)

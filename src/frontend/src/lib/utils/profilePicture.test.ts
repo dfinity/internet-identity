@@ -6,67 +6,39 @@ import {
 } from "./profilePicture";
 
 describe("profilePictureDataUrl", () => {
-  it("renders each media type with its IANA name", () => {
-    const bytes = new Uint8Array([1, 2, 3]);
-    expect(profilePictureDataUrl({ media_type: { Png: null }, bytes })).toMatch(
-      /^data:image\/png;base64,/,
+  it("labels every picture as WebP, the only stored format", () => {
+    expect(profilePictureDataUrl({ bytes: new Uint8Array([1, 2, 3]) })).toMatch(
+      /^data:image\/webp;base64,/,
     );
-    expect(
-      profilePictureDataUrl({ media_type: { Jpeg: null }, bytes }),
-    ).toMatch(/^data:image\/jpeg;base64,/);
-    expect(
-      profilePictureDataUrl({ media_type: { Webp: null }, bytes }),
-    ).toMatch(/^data:image\/webp;base64,/);
   });
 
   // The canister builds the same string from the same bytes
   // (`ProfilePicture::to_data_url`); this pins the encoding both sides agree
   // on, so a picture pinned as `spec.value` still matches at certification.
+  // The expected value is the one the Rust unit test asserts.
   it("matches the canister's encoding of the same bytes", () => {
     expect(
       profilePictureDataUrl({
-        media_type: { Png: null },
-        bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+        bytes: new Uint8Array([0x52, 0x49, 0x46, 0x46]),
       }),
-    ).toBe("data:image/png;base64,iVBORw==");
-  });
-
-  // The compile-time half of this guard is an exhaustiveness check that makes
-  // a newly added candid variant a `npm run check` failure (verified by
-  // temporarily adding one). This is the runtime half, for a value that
-  // reached us without passing through the type system — it must fail loudly
-  // rather than mislabel the bytes, because the MIME type in the URL is what a
-  // consumer's `<img>` tag trusts.
-  it("throws on an unknown media type instead of guessing one", () => {
-    const unknown = { Avif: null } as unknown as Parameters<
-      typeof profilePictureDataUrl
-    >[0]["media_type"];
-    expect(() =>
-      profilePictureDataUrl({
-        media_type: unknown,
-        bytes: new Uint8Array([1, 2, 3]),
-      }),
-    ).toThrow(/Unknown profile picture media type/);
+    ).toBe("data:image/webp;base64,UklGRg==");
   });
 
   it("accepts `number[]` bytes (the Candid wire shape)", () => {
-    expect(
-      profilePictureDataUrl({
-        media_type: { Png: null },
-        bytes: [0x89, 0x50, 0x4e, 0x47],
-      }),
-    ).toBe("data:image/png;base64,iVBORw==");
+    expect(profilePictureDataUrl({ bytes: [0x52, 0x49, 0x46, 0x46] })).toBe(
+      "data:image/webp;base64,UklGRg==",
+    );
   });
 
   // A 100 KiB picture is well past the argument limit of `String.fromCharCode`
   // applied in one go, which is why the encoder chunks. Guard the chunking.
   it("encodes a picture at the storage cap without blowing the call stack", () => {
     const bytes = new Uint8Array(100 * 1024).fill(0xab);
-    const url = profilePictureDataUrl({ media_type: { Jpeg: null }, bytes });
+    const url = profilePictureDataUrl({ bytes });
     // base64 is 4 characters per 3 bytes, rounded up to a whole quantum.
     const expectedBase64Length = 4 * Math.ceil(bytes.length / 3);
     expect(url.length).toBe(
-      "data:image/jpeg;base64,".length + expectedBase64Length,
+      "data:image/webp;base64,".length + expectedBase64Length,
     );
   });
 });

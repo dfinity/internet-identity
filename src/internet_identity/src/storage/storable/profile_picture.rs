@@ -1,7 +1,7 @@
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::profile_picture::{
-    ProfilePicture, ProfilePictureMediaType, ProfilePictureMetadata,
+    ProfilePicture, ProfilePictureMetadata,
 };
 use internet_identity_interface::internet_identity::types::Timestamp;
 use minicbor::{Decode, Encode};
@@ -17,78 +17,46 @@ use std::borrow::Cow;
 /// Keeping it out of anchor serialization means the cost of having a picture
 /// is paid only by the calls that actually read one — the same reasoning as
 /// [`crate::storage::storable::mcp_config::StorableMcpConfig`].
+///
+/// No media type is stored: every picture is WebP. Should a second format ever
+/// be supported, it takes a fresh CBOR key as an `Option` — `#[cbor(map)]`
+/// decodes an absent key as `None`, so existing records keep loading.
 #[derive(Encode, Decode, Clone, Debug, Eq, PartialEq)]
 #[cbor(map)]
 pub struct StorableProfilePicture {
-    /// Discriminant of [`ProfilePictureMediaType`], sniffed from the bytes
-    /// when the picture was accepted. Encoded as a small integer rather than
-    /// the string form so a rename of the IANA type never rewrites stored
-    /// records; [`StorableProfilePicture::media_type`] maps it back.
-    #[n(0)]
-    pub media_type: u8,
-    /// The raw picture, at most `PROFILE_PICTURE_MAX_BYTES`.
-    #[cbor(n(1), with = "minicbor::bytes")]
+    /// The raw WebP image, at most `PROFILE_PICTURE_MAX_BYTES`.
+    #[cbor(n(0), with = "minicbor::bytes")]
     pub bytes: Vec<u8>,
     /// Nanoseconds since the Unix epoch.
-    #[n(2)]
+    #[n(1)]
     pub uploaded_at: Timestamp,
 }
 
-/// Stored discriminants for [`ProfilePictureMediaType`]. Append-only: an
-/// existing value must never be reused for a different media type, or stored
-/// pictures would start being labelled with the wrong one.
-const MEDIA_TYPE_PNG: u8 = 0;
-const MEDIA_TYPE_JPEG: u8 = 1;
-const MEDIA_TYPE_WEBP: u8 = 2;
-
 impl StorableProfilePicture {
-    /// The stored discriminant as a media type.
-    ///
-    /// `None` for a discriminant this wasm doesn't know — which can only
-    /// happen on a rollback to a version that predates a newly added format.
-    /// The caller treats it as "no picture" rather than trapping, so a
-    /// rollback degrades to a missing avatar instead of a broken identity.
-    pub fn media_type(&self) -> Option<ProfilePictureMediaType> {
-        match self.media_type {
-            MEDIA_TYPE_PNG => Some(ProfilePictureMediaType::Png),
-            MEDIA_TYPE_JPEG => Some(ProfilePictureMediaType::Jpeg),
-            MEDIA_TYPE_WEBP => Some(ProfilePictureMediaType::Webp),
-            _ => None,
+    /// The API shape.
+    pub fn to_profile_picture(&self) -> ProfilePicture {
+        ProfilePicture {
+            bytes: ByteBuf::from(self.bytes.clone()),
+            uploaded_at: self.uploaded_at,
         }
     }
 
     /// The summary shape, read straight off the stored record.
     ///
     /// Exists so `identity_info` — which runs on every manage-screen load —
-    /// can report the picture's media type, size and age without cloning up to
-    /// 100 KiB of image bytes it would immediately discard.
-    pub fn metadata(&self) -> Option<ProfilePictureMetadata> {
-        Some(ProfilePictureMetadata {
-            media_type: self.media_type()?,
+    /// can report the picture's size and age without cloning up to 100 KiB of
+    /// image bytes it would immediately discard.
+    pub fn metadata(&self) -> ProfilePictureMetadata {
+        ProfilePictureMetadata {
             size_bytes: self.bytes.len() as u64,
             uploaded_at: self.uploaded_at,
-        })
-    }
-
-    /// The API shape, or `None` when the stored media type is unknown to this
-    /// wasm (see [`StorableProfilePicture::media_type`]).
-    pub fn to_profile_picture(&self) -> Option<ProfilePicture> {
-        Some(ProfilePicture {
-            media_type: self.media_type()?,
-            bytes: ByteBuf::from(self.bytes.clone()),
-            uploaded_at: self.uploaded_at,
-        })
+        }
     }
 }
 
 impl From<ProfilePicture> for StorableProfilePicture {
     fn from(value: ProfilePicture) -> Self {
         Self {
-            media_type: match value.media_type {
-                ProfilePictureMediaType::Png => MEDIA_TYPE_PNG,
-                ProfilePictureMediaType::Jpeg => MEDIA_TYPE_JPEG,
-                ProfilePictureMediaType::Webp => MEDIA_TYPE_WEBP,
-            },
             bytes: value.bytes.into_vec(),
             uploaded_at: value.uploaded_at,
         }
@@ -114,44 +82,28 @@ mod tests {
     use super::*;
     use internet_identity_interface::internet_identity::types::profile_picture::PROFILE_PICTURE_MAX_BYTES;
 
-    fn sample(media_type: ProfilePictureMediaType) -> ProfilePicture {
+    fn sample(len: usize) -> ProfilePicture {
         ProfilePicture {
-            media_type,
-            bytes: ByteBuf::from(vec![7u8; 1024]),
+            bytes: ByteBuf::from(vec![7u8; len]),
             uploaded_at: 1_700_000_000_000_000_000,
         }
     }
 
     #[test]
-    fn should_roundtrip_every_media_type_through_storable() {
-        for media_type in [
-            ProfilePictureMediaType::Png,
-            ProfilePictureMediaType::Jpeg,
-            ProfilePictureMediaType::Webp,
-        ] {
-            let picture = sample(media_type);
-            let storable = StorableProfilePicture::from(picture.clone());
-            let decoded = StorableProfilePicture::from_bytes(storable.to_bytes());
-            assert_eq!(decoded, storable);
-            assert_eq!(
-                decoded.to_profile_picture(),
-                Some(picture),
-                "round-trip lost data for {:?}",
-                media_type
-            );
-        }
+    fn should_roundtrip_through_storable() {
+        let picture = sample(1024);
+        let storable = StorableProfilePicture::from(picture.clone());
+        let decoded = StorableProfilePicture::from_bytes(storable.to_bytes());
+        assert_eq!(decoded, storable);
+        assert_eq!(decoded.to_profile_picture(), picture);
     }
 
     #[test]
     fn should_roundtrip_a_max_size_picture() {
-        let picture = ProfilePicture {
-            media_type: ProfilePictureMediaType::Png,
-            bytes: ByteBuf::from(vec![0xabu8; PROFILE_PICTURE_MAX_BYTES]),
-            uploaded_at: 1,
-        };
+        let picture = sample(PROFILE_PICTURE_MAX_BYTES);
         let storable = StorableProfilePicture::from(picture.clone());
         let decoded = StorableProfilePicture::from_bytes(storable.to_bytes());
-        assert_eq!(decoded.to_profile_picture(), Some(picture));
+        assert_eq!(decoded.to_profile_picture(), picture);
     }
 
     /// `metadata()` skips the byte clone, so it must still report exactly what
@@ -159,33 +111,27 @@ mod tests {
     /// `profile_picture_get` could disagree about the same stored picture.
     #[test]
     fn metadata_agrees_with_the_full_round_trip() {
-        for media_type in [
-            ProfilePictureMediaType::Png,
-            ProfilePictureMediaType::Jpeg,
-            ProfilePictureMediaType::Webp,
-        ] {
-            let storable = StorableProfilePicture::from(sample(media_type));
-            assert_eq!(
-                storable.metadata(),
-                storable.to_profile_picture().map(|p| p.metadata()),
-                "metadata diverged from the round trip for {:?}",
-                media_type
-            );
-        }
+        let storable = StorableProfilePicture::from(sample(1024));
+        assert_eq!(
+            storable.metadata(),
+            storable.to_profile_picture().metadata()
+        );
     }
 
-    /// A media-type discriminant written by a newer wasm must not trap this
-    /// one — it reads as "no picture" instead.
+    /// A key added by a future wasm (e.g. a media type, once a second format
+    /// exists) must not trap this one — `#[cbor(map)]` skips unknown keys.
     #[test]
-    fn should_treat_an_unknown_media_type_as_absent() {
-        let forward = StorableProfilePicture {
-            media_type: 200,
-            bytes: vec![1, 2, 3],
-            uploaded_at: 5,
-        };
-        let decoded = StorableProfilePicture::from_bytes(forward.to_bytes());
-        assert_eq!(decoded.media_type(), None);
-        assert_eq!(decoded.to_profile_picture(), None);
-        assert_eq!(decoded.metadata(), None);
+    fn should_ignore_an_unknown_future_key() {
+        let mut buffer = Vec::new();
+        let mut encoder = minicbor::Encoder::new(&mut buffer);
+        encoder.map(3).unwrap();
+        encoder.u8(0).unwrap().bytes(&[1, 2, 3]).unwrap();
+        encoder.u8(1).unwrap().u64(42).unwrap();
+        // A key this wasm has never heard of.
+        encoder.u8(7).unwrap().u8(9).unwrap();
+
+        let decoded = StorableProfilePicture::from_bytes(Cow::Borrowed(&buffer));
+        assert_eq!(decoded.bytes, vec![1, 2, 3]);
+        assert_eq!(decoded.uploaded_at, 42);
     }
 }

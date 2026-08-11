@@ -1,19 +1,21 @@
 /**
  * Turning a file the user picked into bytes the canister will accept.
  *
- * The canister caps a picture at {@link PROFILE_PICTURE_MAX_BYTES} and accepts
- * only PNG, JPEG and WebP, sniffed from the magic number. Phone camera output
- * is routinely several megabytes, so handing the raw file over would reject
- * almost every real upload. Instead we decode it, downscale to a square
- * thumbnail, and re-encode — stepping the quality down until the result fits.
+ * The canister caps a picture at {@link PROFILE_PICTURE_MAX_BYTES} and stores
+ * WebP only. Phone camera output is routinely several megabytes of JPEG, so
+ * handing the raw file over would reject almost every real upload. Instead we
+ * decode it, downscale to a square, and re-encode as WebP — stepping the
+ * quality down until the result fits.
+ *
+ * The user still picks any common image format; converting is our job. That is
+ * what {@link PROFILE_PICTURE_ACCEPT} advertises, and it is deliberately wider
+ * than what the canister stores.
  *
  * Everything here runs in the browser, and none of it is a security boundary:
- * the canister re-checks the size and re-derives the media type from the bytes
- * it receives. This exists to make a 100 KiB cap something a user can actually
+ * the canister re-checks the size and the WebP header on the bytes it
+ * receives. This exists to make a 100 KiB cap something a user can actually
  * meet, not to enforce it.
  */
-
-import type { ProfilePictureMediaType } from "$lib/generated/internet_identity_types";
 
 /** Mirrors `PROFILE_PICTURE_MAX_BYTES` on the canister. Keep in sync with
  *  `internet_identity_interface::internet_identity::types::profile_picture`. */
@@ -24,10 +26,14 @@ export const PROFILE_PICTURE_MAX_BYTES = 100 * 1024;
  *  device pixel ratio) while leaving room under the byte cap. */
 export const PROFILE_PICTURE_EDGE_PX = 512;
 
-/** What the file picker advertises. WebP is encodable everywhere we run, so a
- *  user can also supply one directly; the animated case collapses to its first
- *  frame, which is what `drawImage` gives us. */
+/** What the file picker advertises — the formats a user may *choose*, which is
+ *  wider than the single format we store. An animated source collapses to its
+ *  first frame, which is what `drawImage` gives us. */
 export const PROFILE_PICTURE_ACCEPT = "image/png,image/jpeg,image/webp";
+
+/** The only format the canister stores. Mirrors `PROFILE_PICTURE_MEDIA_TYPE`
+ *  on the canister side. */
+export const PROFILE_PICTURE_MEDIA_TYPE = "image/webp";
 
 /** Upper bound on the file we are willing to decode at all. Decoding is done
  *  by the browser on the main thread, and a deliberately enormous file is a
@@ -40,6 +46,7 @@ export type ProfilePicturePrepareError =
   | { kind: "source-too-large"; sizeBytes: number; maxBytes: number }
   | { kind: "decode-failed" }
   | { kind: "encode-failed" }
+  | { kind: "webp-unsupported" }
   | { kind: "still-too-large"; sizeBytes: number; maxBytes: number };
 
 export class ProfilePictureError extends Error {
@@ -56,12 +63,13 @@ export interface PreparedProfilePicture {
   /** For an `<img src>` preview, so the user sees the downscaled result they
    *  are about to store rather than the file they picked. */
   dataUrl: string;
-  mediaType: string;
 }
 
-/** Quality ladder for the lossy re-encode. Descending, and the last rung is
- *  low enough that a 512×512 photograph always lands under the cap. */
-const QUALITY_LADDER = [0.9, 0.8, 0.7, 0.55, 0.4] as const;
+/** Quality ladder for the WebP re-encode. Descending, and the last rung is low
+ *  enough that a 512×512 photograph always lands under the cap. The first rung
+ *  is near-lossless so a flat-colour avatar or a logo — the case a PNG source
+ *  used to cover — keeps its crisp edges when it comfortably fits. */
+const QUALITY_LADDER = [1, 0.9, 0.8, 0.7, 0.55, 0.4] as const;
 
 const readAsDataUrl = (file: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -116,10 +124,16 @@ const drawSquare = (
   return canvas;
 };
 
-const encode = (
+/** Encode `canvas` as WebP.
+ *
+ *  `toBlob` does not fail on a media type the browser cannot encode — it
+ *  silently falls back to PNG (Safari before 16.4 does exactly this for WebP).
+ *  Uploading that fallback would be rejected by the canister as "not WebP",
+ *  which tells the user nothing, so the produced `blob.type` is checked and a
+ *  distinguishable error raised instead. */
+const encodeWebp = (
   canvas: HTMLCanvasElement,
-  mediaType: string,
-  quality?: number,
+  quality: number,
 ): Promise<Blob> =>
   new Promise((resolve, reject) => {
     canvas.toBlob(
@@ -128,9 +142,13 @@ const encode = (
           reject(new ProfilePictureError({ kind: "encode-failed" }));
           return;
         }
+        if (blob.type !== PROFILE_PICTURE_MEDIA_TYPE) {
+          reject(new ProfilePictureError({ kind: "webp-unsupported" }));
+          return;
+        }
         resolve(blob);
       },
-      mediaType,
+      PROFILE_PICTURE_MEDIA_TYPE,
       quality,
     );
   });
@@ -160,23 +178,12 @@ export const prepareProfilePicture = async (
 
   const canvas = drawSquare(await decode(file), PROFILE_PICTURE_EDGE_PX);
 
-  // PNG is lossless and has no quality knob, so a re-encoded photograph can
-  // easily exceed the cap. Keep PNG only when the source was PNG *and* it
-  // fits — that preserves crisp logos and flat-colour avatars — and fall back
-  // to JPEG otherwise.
-  if (file.type === "image/png") {
-    const png = await encode(canvas, "image/png");
-    if (png.size <= PROFILE_PICTURE_MAX_BYTES) {
-      return toPrepared(png, "image/png");
-    }
-  }
-
   let smallest: Blob | undefined;
   for (const quality of QUALITY_LADDER) {
-    const encoded = await encode(canvas, "image/jpeg", quality);
+    const encoded = await encodeWebp(canvas, quality);
     smallest = encoded;
     if (encoded.size <= PROFILE_PICTURE_MAX_BYTES) {
-      return toPrepared(encoded, "image/jpeg");
+      return toPrepared(encoded);
     }
   }
 
@@ -187,45 +194,18 @@ export const prepareProfilePicture = async (
   });
 };
 
-const toPrepared = async (
-  blob: Blob,
-  mediaType: string,
-): Promise<PreparedProfilePicture> => {
+const toPrepared = async (blob: Blob): Promise<PreparedProfilePicture> => {
   const bytes = new Uint8Array(await blob.arrayBuffer());
-  return { bytes, dataUrl: await readAsDataUrl(blob), mediaType };
-};
-
-/** The IANA media type for a candid `ProfilePictureMediaType`.
- *
- *  Every variant is matched explicitly and the fall-through is a compile
- *  error, not a guess: if the canister gains a format and the generated
- *  bindings are regenerated without updating this function, `variant` is no
- *  longer `never` and `npm run check` fails. Were this a chain ending in a
- *  default, a new format would instead be silently mislabelled — and the
- *  label is what a relying party's `<img>` tag trusts.
- *
- *  The throw is the runtime half of the same guard, for a value that reached
- *  us without passing through the type system. Callers render the picture
- *  inside an `{#await}`, so it surfaces as the placeholder rather than as an
- *  image with the wrong MIME type. */
-const ianaMediaType = (variant: ProfilePictureMediaType): string => {
-  if ("Png" in variant) return "image/png";
-  if ("Jpeg" in variant) return "image/jpeg";
-  if ("Webp" in variant) return "image/webp";
-  const unhandled: never = variant;
-  throw new Error(
-    `Unknown profile picture media type: ${JSON.stringify(unhandled)}`,
-  );
+  return { bytes, dataUrl: await readAsDataUrl(blob) };
 };
 
 /** The `data:` URL for a picture fetched from the canister, so it can be
  *  rendered without another round trip. Mirrors `ProfilePicture::to_data_url`
- *  on the canister side. */
+ *  on the canister side, including the media type — which is a constant on
+ *  both sides because WebP is the only format stored. */
 export const profilePictureDataUrl = (picture: {
-  media_type: ProfilePictureMediaType;
   bytes: Uint8Array | number[];
 }): string => {
-  const mediaType = ianaMediaType(picture.media_type);
   const bytes =
     picture.bytes instanceof Uint8Array
       ? picture.bytes
@@ -236,5 +216,5 @@ export const profilePictureDataUrl = (picture: {
   for (let i = 0; i < bytes.length; i += CHUNK) {
     binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
   }
-  return `data:${mediaType};base64,${btoa(binary)}`;
+  return `data:${PROFILE_PICTURE_MEDIA_TYPE};base64,${btoa(binary)}`;
 };

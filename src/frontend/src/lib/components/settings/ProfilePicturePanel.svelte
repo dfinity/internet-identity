@@ -64,6 +64,8 @@
         return $t`That image is too large to open. Choose one under 20 MB.`;
       case "decode-failed":
         return $t`That file couldn't be opened as an image.`;
+      case "webp-unsupported":
+        return $t`This browser can't save pictures in the required format. Try updating it, or use a different browser.`;
       case "encode-failed":
       case "still-too-large":
         return $t`That image couldn't be resized to fit. Try a different one.`;

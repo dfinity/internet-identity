@@ -605,20 +605,19 @@ type VerifiedEmail = record {
     verified_at : Timestamp;
 };
 
-// The picture formats an identity may store. Derived by the canister
-// from the uploaded bytes' magic number, never taken from the caller —
-// a caller-supplied media type would end up in the `data:` URL that
-// relying parties feed to an `<img>` tag.
-type ProfilePictureMediaType = variant {
-    Png;
-    Jpeg;
-    Webp;
-};
-
 // An identity's profile picture. Zero or one per identity, at most
-// 100 KiB of image bytes.
+// 100 KiB of image bytes, always WebP.
+//
+// WebP is the only stored format because it subsumes the alternatives:
+// it encodes both lossily and losslessly and carries alpha in either
+// mode, so it covers everything PNG and JPEG would have been kept for
+// while being smaller than both at equivalent quality — which buys real
+// picture quality under a 100 KiB cap. The canister checks the WebP
+// container header rather than trusting a caller-supplied media type,
+// which would otherwise end up in the `data:` URL that relying parties
+// feed to an `<img>` tag. Clients may still let a user pick a PNG or a
+// JPEG; converting is the client's job.
 type ProfilePicture = record {
-    media_type : ProfilePictureMediaType;
     bytes : blob;
     // When the picture was uploaded.
     uploaded_at : Timestamp;
@@ -630,7 +629,6 @@ type ProfilePicture = record {
 // under a kilobyte — so callers that render the picture fetch it with
 // `profile_picture_get` and cache it on the fields reported here.
 type ProfilePictureMetadata = record {
-    media_type : ProfilePictureMediaType;
     size_bytes : nat64;
     uploaded_at : Timestamp;
 };
@@ -655,8 +653,9 @@ type ProfilePictureError = variant {
         size_bytes : nat64;
         min_bytes : nat64;
     };
-    // The bytes' magic number matches none of the accepted formats.
-    UnsupportedMediaType;
+    // The bytes are not a WebP image. Clients converting from another
+    // format should encode to WebP before calling.
+    NotWebp;
     // No picture is set on this identity (from `profile_picture_remove`).
     NotSet;
     // Internal canister error. See the error message for details.

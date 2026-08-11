@@ -559,13 +559,7 @@ export const idlFactory = ({ IDL }) => {
     'address' : IDL.Text,
     'last_used' : IDL.Opt(Timestamp),
   });
-  const ProfilePictureMediaType = IDL.Variant({
-    'Png' : IDL.Null,
-    'Jpeg' : IDL.Null,
-    'Webp' : IDL.Null,
-  });
   const ProfilePictureMetadata = IDL.Record({
-    'media_type' : ProfilePictureMediaType,
     'size_bytes' : IDL.Nat64,
     'uploaded_at' : Timestamp,
   });
@@ -846,12 +840,11 @@ export const idlFactory = ({ IDL }) => {
     'no_device_to_verify' : IDL.Null,
   });
   const ProfilePicture = IDL.Record({
-    'media_type' : ProfilePictureMediaType,
     'bytes' : IDL.Vec(IDL.Nat8),
     'uploaded_at' : Timestamp,
   });
   const ProfilePictureError = IDL.Variant({
-    'UnsupportedMediaType' : IDL.Null,
+    'NotWebp' : IDL.Null,
     'TooLarge' : IDL.Record({
       'size_bytes' : IDL.Nat64,
       'max_bytes' : IDL.Nat64,

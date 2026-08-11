@@ -1439,14 +1439,13 @@ export interface PreparedIdAlias {
  * 100 KiB of image bytes.
  */
 export interface ProfilePicture {
-  'media_type' : ProfilePictureMediaType,
   'bytes' : Uint8Array | number[],
   /**
    * When the picture was uploaded.
    */
   'uploaded_at' : Timestamp,
 }
-export type ProfilePictureError = { 'UnsupportedMediaType' : null } |
+export type ProfilePictureError = { 'NotWebp' : null } |
   {
     /**
      * The bytes exceed the 100 KiB cap.
@@ -1474,15 +1473,6 @@ export type ProfilePictureError = { 'UnsupportedMediaType' : null } |
     'Unauthorized' : Principal
   };
 /**
- * The picture formats an identity may store. Derived by the canister
- * from the uploaded bytes' magic number, never taken from the caller —
- * a caller-supplied media type would end up in the `data:` URL that
- * relying parties feed to an `<img>` tag.
- */
-export type ProfilePictureMediaType = { 'Png' : null } |
-  { 'Jpeg' : null } |
-  { 'Webp' : null };
-/**
  * What `identity_info` reports about the picture: everything except the
  * bytes. `identity_info` is fetched on every manage-screen load, and a
  * picture is up to 100 KiB against a response that is otherwise well
@@ -1490,7 +1480,6 @@ export type ProfilePictureMediaType = { 'Png' : null } |
  * `profile_picture_get` and cache it on the fields reported here.
  */
 export interface ProfilePictureMetadata {
-  'media_type' : ProfilePictureMediaType,
   'size_bytes' : bigint,
   'uploaded_at' : Timestamp,
 }
