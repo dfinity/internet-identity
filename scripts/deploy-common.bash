@@ -706,7 +706,6 @@ prompt_be_extra_args() {
     BE_RELATED_ORIGINS_ARG=$(prompt_default   "related_origins (opt vec text)"  "null")
     # `opt opt text`: `opt null` clears the official connector, `opt opt "…"` sets it.
     BE_MCP_OFFICIAL_URL_ARG=$(prompt_default  "mcp_official_url (opt opt text)" "null")
-    BE_MCP_CONFIG_MIGRATION_ARG=$(prompt_default "mcp_config_migration (opt bool)" "null")
 }
 
 # -------------------------
@@ -797,7 +796,7 @@ EXTRA
         fi
         local managed
         for managed in backend_canister_id backend_origin related_origins \
-                       mcp_official_url mcp_config_migration \
+                       mcp_official_url \
                        openid_configs dnssec_config doh_config; do
             # Match the field name only as a record-field key: at a line start
             # (ignoring leading whitespace) and followed by `=`. This avoids
@@ -822,7 +821,6 @@ EXTRA
     backend_origin = $BE_BACKEND_ORIGIN_ARG;
     related_origins = $BE_RELATED_ORIGINS_ARG;
     mcp_official_url = $BE_MCP_OFFICIAL_URL_ARG;
-    mcp_config_migration = $BE_MCP_CONFIG_MIGRATION_ARG;
     openid_configs = $openid_configs_arg;
 $extra
 $extra_user

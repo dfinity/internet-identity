@@ -43,7 +43,6 @@ const mockDelegationIdentity = {
 
 const DEFAULT_INIT: InternetIdentityInit = {
   mcp_official_url: [],
-  mcp_config_migration: [],
   analytics_config: [],
   archive_config: [],
   assigned_user_number_range: [],
@@ -51,7 +50,6 @@ const DEFAULT_INIT: InternetIdentityInit = {
   captcha_config: [],
   openid_configs: [],
   sso_allow_insecure_discovery: [],
-  sso_credential_migration: [],
   register_rate_limit: [],
   related_origins: [
     [

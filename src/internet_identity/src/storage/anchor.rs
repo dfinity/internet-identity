@@ -139,9 +139,6 @@ impl From<Device> for DeviceDataWithoutAlias {
 
 impl From<OpenIdCredential> for OpenIdCredentialData {
     fn from(openid_credential: OpenIdCredential) -> Self {
-        // The `sso_credential_migration` backfill has completed, so every SSO
-        // credential carries its own `sso_domain` / `sso_name` stamp; read them
-        // directly (see `docs/ongoing/openid-sso-prod-readiness.md` §8.6).
         Self {
             iss: openid_credential.iss,
             sub: openid_credential.sub,

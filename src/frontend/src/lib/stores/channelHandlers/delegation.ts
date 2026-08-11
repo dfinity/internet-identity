@@ -117,10 +117,15 @@ export const handleDelegationRequest =
 
         // Read the identity *after* authorization so we capture whichever
         // identity the user settled on (they may have switched mid-flow).
-        const [accountNumber, { identityNumber, actor }] = await Promise.all([
-          authorized.accountNumberPromise,
-          waitForStore(authenticationStore),
-        ]);
+        const [accountNumber, { identityNumber, actor, authMethod }] =
+          await Promise.all([
+            authorized.accountNumberPromise,
+            waitForStore(authenticationStore),
+          ]);
+        const ssoSessionMaxAgeNs =
+          "openid" in authMethod
+            ? authMethod.openid.ssoSessionMaxAgeNs
+            : undefined;
 
         const sessionPublicKey = new Uint8Array(params.publicKey.toDer());
 
@@ -141,10 +146,18 @@ export const handleDelegationRequest =
         const permissions = toPermissionsArg(authorized.accessLevel);
 
         // Prefer the duration the user chose on the sign-in screen; it's already
-        // capped at the app's request. Fall back to the app's requested value
-        // for flows without a picker (e.g. 1-click OpenID/SSO), and to the
-        // backend default when neither is set.
-        const maxTimeToLive = authorized.maxTimeToLive ?? params.maxTimeToLive;
+        // capped at the app's request. Flows without a picker (e.g. 1-click
+        // OpenID/SSO) fall back to the app's requested value. An SSO
+        // organization also caps how long its sign-ins stay valid, and the
+        // delegation must not outlive that, so an SSO session sends a duration
+        // even when neither the picker nor the app asked for one. The backend
+        // applies its own default only when nothing constrains it at all.
+        const requested = authorized.maxTimeToLive ?? params.maxTimeToLive;
+        const maxTimeToLive =
+          ssoSessionMaxAgeNs !== undefined &&
+          (requested === undefined || requested > ssoSessionMaxAgeNs)
+            ? ssoSessionMaxAgeNs
+            : requested;
 
         const { user_key, expiration } = await actor
           .prepare_account_delegation(

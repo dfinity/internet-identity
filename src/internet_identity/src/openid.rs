@@ -372,6 +372,7 @@ pub fn get_sso_discovery_status(domain: &str, origin: Option<&str>) -> SsoDiscov
                 scopes: discovery_config.scopes,
                 name: discovery_config.name,
                 resolved_client_id,
+                session_max_age_ns: discovery_config.session_max_age_ns,
             })
         }
         Cached::Pending => SsoDiscoveryStatus::Pending,
