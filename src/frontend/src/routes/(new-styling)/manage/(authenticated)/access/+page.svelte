@@ -272,8 +272,7 @@
               : undefined;
         let jwt: string;
         let ssoDiscoveryPromise:
-          | ReturnType<typeof discoverSsoConfig>
-          | undefined;
+          ReturnType<typeof discoverSsoConfig> | undefined;
         if (ssoDomain !== undefined) {
           ssoDiscoveryPromise = discoverSsoConfig(ssoDomain);
           jwt = await requestWithPopup(

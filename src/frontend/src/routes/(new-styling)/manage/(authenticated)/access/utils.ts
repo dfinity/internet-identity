@@ -7,8 +7,7 @@ import { Authenticated } from "$lib/stores/authentication.store";
 import { toHex } from "$lib/utils/utils";
 
 export type AccessMethod =
-  | { passkey: AuthnMethodData }
-  | { openid: OpenIdCredential };
+  { passkey: AuthnMethodData } | { openid: OpenIdCredential };
 
 /**
  * Compares two access methods for sorting.

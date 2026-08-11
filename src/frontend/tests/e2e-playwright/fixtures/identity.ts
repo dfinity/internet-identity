@@ -8,9 +8,9 @@ import {
   II_URL,
   removeCredentialFromVirtualAuthenticator,
   removeVirtualAuthenticator,
+  type WebAuthnCredential,
 } from "../utils";
 import { Principal } from "@icp-sdk/core/principal";
-import Protocol from "devtools-protocol";
 
 export const DEFAULT_HOST = "https://localhost:5173"; // Vite dev server
 export const DEFAULT_NAME = "Test User";
@@ -27,7 +27,7 @@ interface Identity {
   canisterId: Principal;
   identityNumber: bigint;
   name: string;
-  credentials: Protocol.WebAuthn.Credential[];
+  credentials: WebAuthnCredential[];
   discoverableCredentialId: string | undefined;
   authenticatorIds: Map<Page, string>;
 }
@@ -363,7 +363,7 @@ export const test = base.extend<{
   removeAuthenticatorForIdentity: (identityNumber: bigint) => Promise<void>;
   setCredentialsForIdentity: (
     identityNumber: bigint,
-    credentials: Protocol.WebAuthn.Credential[],
+    credentials: WebAuthnCredential[],
   ) => Promise<void>;
   setDiscoverableCredentialForIdentity: (
     identityNumber: bigint,

@@ -5,7 +5,7 @@
 #
 # The docker image. To update, run `docker pull ubuntu` locally, and update the
 # sha256:... accordingly.
-FROM --platform=linux/amd64 ubuntu@sha256:bbf3d1baa208b7649d1d0264ef7d522e1dc0deeeaaf6085bf8e4618867f03494 as deps
+FROM --platform=linux/amd64 ubuntu@sha256:678c6550cc43645e08669028bc177f50be4e7c5b8cca677067b1914d4afc7a03 as deps
 
 ENV TZ=UTC
 

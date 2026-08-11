@@ -11,7 +11,7 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { AuthWizard, SignUpHero } from "$lib/components/wizards/auth";
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
-  import { afterNavigate, beforeNavigate, preloadData } from "$app/navigation";
+  import { beforeNavigate, preloadData } from "$app/navigation";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { purgeSession } from "$lib/stores/session-delegation.store";
   import { goto } from "$app/navigation";
@@ -138,8 +138,11 @@
 
   // When another page (e.g. `/login`) redirects here with a `next`
   // target in `page.state.login`, capture it so post-auth navigation
-  // returns the user where they were headed.
-  afterNavigate(() => {
+  // returns the user where they were headed. Read `page.state` reactively:
+  // this component mounts as part of the navigation that carries the state,
+  // and an `afterNavigate` callback registered during that mount does not
+  // see it.
+  $effect(() => {
     if ("login" in page.state && typeof page.state.login === "string") {
       next = page.state.login;
     }

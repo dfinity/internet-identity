@@ -45,10 +45,7 @@ interface StoredInBrowser {
 }
 
 export type Provider = { name: string } & (
-  | StoredInCloud
-  | StoredInOperatingSystem
-  | StoredOnDevice
-  | StoredInBrowser
+  StoredInCloud | StoredInOperatingSystem | StoredOnDevice | StoredInBrowser
 );
 
 // Passkey providers are listed from least to most common (top to bottom),
