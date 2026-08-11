@@ -48,9 +48,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     readonly rpId: string | undefined,
     readonly iframe: boolean | undefined,
     readonly userVerification:
-      | "discouraged"
-      | "required"
-      | "preferred" = "discouraged",
+      "discouraged" | "required" | "preferred" = "discouraged",
     readonly attachElement?: HTMLElement,
   ) {
     super();

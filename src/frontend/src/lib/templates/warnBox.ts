@@ -42,7 +42,9 @@ export const warnBox = ({
     ${slot}
   `;
 
-  return html`${htmlElement === "aside"
-    ? html`<aside class="${cssClasses.join(" ")}">${contents}</aside>`
-    : html`<div class="${cssClasses.join(" ")}">${contents}</div> `}`;
+  return html`${
+    htmlElement === "aside"
+      ? html`<aside class="${cssClasses.join(" ")}">${contents}</aside>`
+      : html`<div class="${cssClasses.join(" ")}">${contents}</div> `
+  }`;
 };

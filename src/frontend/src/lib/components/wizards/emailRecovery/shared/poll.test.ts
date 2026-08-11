@@ -90,8 +90,8 @@ const harness = (
     status: statusFn,
     submitDkimLeaf,
     resolveViaDoh,
-    diagnostics: vi.fn(
-      (): Promise<[] | [EmailChallengeDiagnostics]> => Promise.resolve([]),
+    diagnostics: vi.fn((): Promise<[] | [EmailChallengeDiagnostics]> =>
+      Promise.resolve([]),
     ),
     funnel,
     events: {
@@ -177,9 +177,8 @@ describe("runEmailRecoveryPoll", () => {
 
   it("routes a canister Err thrown by resolveViaDoh as a terminal failure", async () => {
     const h = harness([RESOLVING, REG_OK], {
-      resolveViaDoh: vi.fn(
-        (): Promise<void> =>
-          Promise.reject(canisterErr({ EmailVerificationFailed: "bad sig" })),
+      resolveViaDoh: vi.fn((): Promise<void> =>
+        Promise.reject(canisterErr({ EmailVerificationFailed: "bad sig" })),
       ),
     });
     await run(h.deps);
@@ -192,9 +191,8 @@ describe("runEmailRecoveryPoll", () => {
 
   it("routes a DomainNotAllowlisted canister Err from resolveViaDoh to the unsupported view", async () => {
     const h = harness([RESOLVING], {
-      resolveViaDoh: vi.fn(
-        (): Promise<void> =>
-          Promise.reject(canisterErr({ DomainNotAllowlisted: DOMAIN })),
+      resolveViaDoh: vi.fn((): Promise<void> =>
+        Promise.reject(canisterErr({ DomainNotAllowlisted: DOMAIN })),
       ),
     });
     await run(h.deps);
@@ -250,9 +248,8 @@ describe("runEmailRecoveryPoll", () => {
   it("routes a canister Err thrown by submitDkimLeaf as a terminal failure", async () => {
     walkMock.mockResolvedValue({ hops: [], extraChains: [] });
     const h = harness([NEED_LEAF, REG_OK], {
-      submitDkimLeaf: vi.fn(
-        (): Promise<void> =>
-          Promise.reject(canisterErr({ DkimLeafMismatch: null })),
+      submitDkimLeaf: vi.fn((): Promise<void> =>
+        Promise.reject(canisterErr({ DkimLeafMismatch: null })),
       ),
     });
     await run(h.deps);
@@ -264,8 +261,8 @@ describe("runEmailRecoveryPoll", () => {
   it("surfaces a retryable failure when submitDkimLeaf throws a transport error", async () => {
     walkMock.mockResolvedValue({ hops: [], extraChains: [] });
     const h = harness([NEED_LEAF, REG_OK], {
-      submitDkimLeaf: vi.fn(
-        (): Promise<void> => Promise.reject(transportErr()),
+      submitDkimLeaf: vi.fn((): Promise<void> =>
+        Promise.reject(transportErr()),
       ),
     });
     await run(h.deps);
@@ -317,8 +314,8 @@ describe("runEmailRecoveryPoll", () => {
   });
 
   it("gives up with a retryable failure after MAX consecutive poll errors", async () => {
-    const statusFn = vi.fn(
-      (): Promise<EmailChallengeStatus> => Promise.reject(transportErr()),
+    const statusFn = vi.fn((): Promise<EmailChallengeStatus> =>
+      Promise.reject(transportErr()),
     );
     const h = harness([REG_OK], { status: statusFn });
     await run(h.deps);
