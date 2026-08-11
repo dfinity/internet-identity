@@ -281,9 +281,14 @@ fn icrc3_attribute_message(certified_pairs: &BTreeMap<String, Icrc3Value>) -> Ve
 }
 
 /// Validates `spec.value` (if any) byte-equals `stored`. Returns
-/// `false` and pushes a problem on mismatch; `true` otherwise. Used by
-/// the scoped arms — the unscoped arm uses `spec.value` as a selector,
-/// not as an equality check.
+/// `false` and pushes a problem on mismatch; `true` otherwise.
+///
+/// Used by the scoped arms, and by the unscoped `profile_picture` arm — an
+/// identity has at most one picture, so there is nothing to select between and
+/// `spec.value` is a pin on the bytes the user consented to. The unscoped
+/// `email` / `verified_email` arms are the exception: there `spec.value` is a
+/// *selector* over several stored addresses, matched case-insensitively by
+/// `Anchor::resolve_verified_email` rather than compared here.
 fn validate_spec_value(
     spec: &ValidatedAttributeSpec,
     stored: &str,

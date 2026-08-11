@@ -28,9 +28,17 @@ pub fn get(anchor_number: AnchorNumber) -> Option<ProfilePicture> {
         .and_then(StorableProfilePicture::to_profile_picture)
 }
 
-/// The cheap summary `identity_info` reports, without the bytes.
+/// The summary `identity_info` reports, without the bytes.
+///
+/// Deliberately not `get(..).map(|p| p.metadata())`: that would clone up to
+/// 100 KiB out of the stored record only to throw the copy away, on a call
+/// that runs on every manage-screen load. Reading the fields off the stored
+/// record directly keeps the cost to the one `StableBTreeMap` deserialize the
+/// lookup needs either way.
 pub fn get_metadata(anchor_number: AnchorNumber) -> Option<ProfilePictureMetadata> {
-    get(anchor_number).map(|picture| picture.metadata())
+    storage_borrow(|storage| storage.lookup_profile_picture(anchor_number))
+        .as_ref()
+        .and_then(StorableProfilePicture::metadata)
 }
 
 /// Validate `bytes` and store them as `anchor_number`'s picture, replacing any

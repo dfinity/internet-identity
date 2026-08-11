@@ -1,7 +1,7 @@
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::profile_picture::{
-    ProfilePicture, ProfilePictureMediaType,
+    ProfilePicture, ProfilePictureMediaType, ProfilePictureMetadata,
 };
 use internet_identity_interface::internet_identity::types::Timestamp;
 use minicbor::{Decode, Encode};
@@ -55,6 +55,19 @@ impl StorableProfilePicture {
             MEDIA_TYPE_WEBP => Some(ProfilePictureMediaType::Webp),
             _ => None,
         }
+    }
+
+    /// The summary shape, read straight off the stored record.
+    ///
+    /// Exists so `identity_info` — which runs on every manage-screen load —
+    /// can report the picture's media type, size and age without cloning up to
+    /// 100 KiB of image bytes it would immediately discard.
+    pub fn metadata(&self) -> Option<ProfilePictureMetadata> {
+        Some(ProfilePictureMetadata {
+            media_type: self.media_type()?,
+            size_bytes: self.bytes.len() as u64,
+            uploaded_at: self.uploaded_at,
+        })
     }
 
     /// The API shape, or `None` when the stored media type is unknown to this
@@ -141,6 +154,26 @@ mod tests {
         assert_eq!(decoded.to_profile_picture(), Some(picture));
     }
 
+    /// `metadata()` skips the byte clone, so it must still report exactly what
+    /// the full round trip would — otherwise `identity_info` and
+    /// `profile_picture_get` could disagree about the same stored picture.
+    #[test]
+    fn metadata_agrees_with_the_full_round_trip() {
+        for media_type in [
+            ProfilePictureMediaType::Png,
+            ProfilePictureMediaType::Jpeg,
+            ProfilePictureMediaType::Webp,
+        ] {
+            let storable = StorableProfilePicture::from(sample(media_type));
+            assert_eq!(
+                storable.metadata(),
+                storable.to_profile_picture().map(|p| p.metadata()),
+                "metadata diverged from the round trip for {:?}",
+                media_type
+            );
+        }
+    }
+
     /// A media-type discriminant written by a newer wasm must not trap this
     /// one — it reads as "no picture" instead.
     #[test]
@@ -153,5 +186,6 @@ mod tests {
         let decoded = StorableProfilePicture::from_bytes(forward.to_bytes());
         assert_eq!(decoded.media_type(), None);
         assert_eq!(decoded.to_profile_picture(), None);
+        assert_eq!(decoded.metadata(), None);
     }
 }
