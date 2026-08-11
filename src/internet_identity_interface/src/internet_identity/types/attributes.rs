@@ -808,6 +808,31 @@ impl TryFrom<PrepareIcrc3AttributeRequest> for ValidatedPrepareIcrc3AttributeReq
     }
 }
 
+/// Whether `specs` ask for the unscoped `profile_picture` attribute.
+///
+/// Lets a caller skip loading the picture — up to 100 KiB read out of stable
+/// memory and cloned — for the overwhelming majority of attribute requests
+/// that don't mention it. Scoped `profile_picture` keys deliberately don't
+/// count: they resolve to "not available for this issuer" without ever
+/// consulting the stored picture.
+pub fn requests_profile_picture(specs: &[ValidatedAttributeSpec]) -> bool {
+    specs.iter().any(|spec| {
+        spec.key.attribute_name == AttributeName::ProfilePicture && spec.key.scope.is_none()
+    })
+}
+
+/// Whether a `list_available_attributes` filter would surface the
+/// `profile_picture` row. `None` is the unfiltered listing, which surfaces
+/// everything. Companion to [`requests_profile_picture`].
+pub fn lists_profile_picture(requested: Option<&[AttributeKey]>) -> bool {
+    match requested {
+        None => true,
+        Some(keys) => keys
+            .iter()
+            .any(|key| key.attribute_name == AttributeName::ProfilePicture && key.scope.is_none()),
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, CandidType, Serialize, Deserialize)]
 pub struct PrepareIcrc3AttributeResponse {
     pub message: Vec<u8>,
@@ -1167,6 +1192,54 @@ mod tests {
                     name
                 );
             }
+        }
+
+        /// The picture is loaded from stable memory only when a request
+        /// actually names it, so these predicates decide whether a 100 KiB
+        /// read happens. A false negative would silently break sharing.
+        #[test]
+        fn profile_picture_is_requested_only_by_an_unscoped_key() {
+            let spec = |key: &str, omit_scope: bool| ValidatedAttributeSpec {
+                key: AttributeKey::try_from(key.to_string()).expect("test key must parse"),
+                value: None,
+                omit_scope,
+            };
+
+            assert!(requests_profile_picture(&[spec("profile_picture", true)]));
+            // Present alongside others still counts.
+            assert!(requests_profile_picture(&[
+                spec("name", false),
+                spec("profile_picture", true),
+            ]));
+
+            assert!(!requests_profile_picture(&[]));
+            assert!(!requests_profile_picture(&[spec("email", true)]));
+            // A scoped key resolves to "not available for this issuer"
+            // without consulting the stored picture, so it must not trigger
+            // the read.
+            assert!(!requests_profile_picture(&[spec(
+                "openid:https://accounts.google.com:profile_picture",
+                false
+            )]));
+        }
+
+        #[test]
+        fn profile_picture_is_listed_when_unfiltered_or_named() {
+            let key = |k: &str| AttributeKey::try_from(k.to_string()).expect("must parse");
+
+            // The unfiltered listing surfaces everything.
+            assert!(lists_profile_picture(None));
+            assert!(lists_profile_picture(Some(&[key("profile_picture")])));
+            assert!(lists_profile_picture(Some(&[
+                key("email"),
+                key("profile_picture")
+            ])));
+
+            assert!(!lists_profile_picture(Some(&[])));
+            assert!(!lists_profile_picture(Some(&[key("email")])));
+            assert!(!lists_profile_picture(Some(&[key(
+                "openid:https://accounts.google.com:profile_picture"
+            )])));
         }
 
         /// The per-name bound is what `Attribute::try_from` enforces — a

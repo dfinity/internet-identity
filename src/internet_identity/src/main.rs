@@ -18,13 +18,13 @@ use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
-    CertifiedAttributes, GetAttributesError, GetAttributesRequest, GetIcrc3AttributeError,
-    GetIcrc3AttributeRequest, GetIcrc3AttributeResponse, ListAvailableAttributesError,
-    ListAvailableAttributesRequest, PrepareAttributeError, PrepareAttributeRequest,
-    PrepareAttributeResponse, PrepareIcrc3AttributeError, PrepareIcrc3AttributeRequest,
-    PrepareIcrc3AttributeResponse, ValidatedGetIcrc3AttributeRequest,
-    ValidatedListAvailableAttributesRequest, ValidatedPrepareAttributeRequest,
-    ValidatedPrepareIcrc3AttributeRequest,
+    lists_profile_picture, requests_profile_picture, CertifiedAttributes, GetAttributesError,
+    GetAttributesRequest, GetIcrc3AttributeError, GetIcrc3AttributeRequest,
+    GetIcrc3AttributeResponse, ListAvailableAttributesError, ListAvailableAttributesRequest,
+    PrepareAttributeError, PrepareAttributeRequest, PrepareAttributeResponse,
+    PrepareIcrc3AttributeError, PrepareIcrc3AttributeRequest, PrepareIcrc3AttributeResponse,
+    ValidatedGetIcrc3AttributeRequest, ValidatedListAvailableAttributesRequest,
+    ValidatedPrepareAttributeRequest, ValidatedPrepareIcrc3AttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
@@ -2335,9 +2335,15 @@ mod attribute_sharing {
         state::ensure_salt_set().await;
 
         let issued_at_timestamp_ns = ic_cdk::api::time();
+        // Only load the picture when a spec actually names it: it is up to
+        // 100 KiB read out of stable memory and cloned, and the overwhelming
+        // majority of attribute requests never mention it.
+        let profile_picture = requests_profile_picture(&attributes)
+            .then(|| crate::profile_picture::get(identity_number))
+            .flatten();
         let message = anchor.prepare_icrc3_attributes(
             attributes,
-            crate::profile_picture::get(identity_number),
+            profile_picture,
             nonce,
             origin,
             unmapped_origin,
@@ -2391,11 +2397,13 @@ mod attribute_sharing {
                 ListAvailableAttributesError::AuthorizationError(principal)
             })?;
 
-        Ok(anchor.list_available_attributes(
-            attributes,
-            sso_session_domain,
-            crate::profile_picture::get(identity_number),
-        ))
+        // As in `prepare_icrc3_attributes`: skip the 100 KiB read unless the
+        // listing would actually surface the picture.
+        let profile_picture = lists_profile_picture(attributes.as_deref())
+            .then(|| crate::profile_picture::get(identity_number))
+            .flatten();
+
+        Ok(anchor.list_available_attributes(attributes, sso_session_domain, profile_picture))
     }
 }
 

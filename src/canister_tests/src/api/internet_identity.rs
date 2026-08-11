@@ -943,6 +943,69 @@ pub fn verified_email_remove(
     .map(|(x,)| x)
 }
 
+pub fn profile_picture_get(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+) -> Result<
+    Result<
+        Option<types::profile_picture::ProfilePicture>,
+        types::profile_picture::ProfilePictureError,
+    >,
+    RejectResponse,
+> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "profile_picture_get",
+        (identity_number,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn profile_picture_set(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    bytes: Vec<u8>,
+) -> Result<Result<(), types::profile_picture::ProfilePictureError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "profile_picture_set",
+        (
+            identity_number,
+            types::profile_picture::ProfilePictureSetArg {
+                bytes: serde_bytes::ByteBuf::from(bytes),
+            },
+        ),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn profile_picture_remove(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+) -> Result<Result<(), types::profile_picture::ProfilePictureError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "profile_picture_remove",
+        (identity_number,),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn smtp_request(
     env: &PocketIc,
     canister_id: CanisterId,

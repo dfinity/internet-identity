@@ -17,6 +17,7 @@ mod email_recovery;
 mod http;
 mod mcp;
 mod openid;
+mod profile_pictures;
 mod rollback;
 mod session_delegation;
 mod stable_memory;
