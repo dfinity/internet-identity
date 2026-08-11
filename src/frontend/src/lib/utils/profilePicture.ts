@@ -13,6 +13,8 @@
  * meet, not to enforce it.
  */
 
+import type { ProfilePictureMediaType } from "$lib/generated/internet_identity_types";
+
 /** Mirrors `PROFILE_PICTURE_MAX_BYTES` on the canister. Keep in sync with
  *  `internet_identity_interface::internet_identity::types::profile_picture`. */
 export const PROFILE_PICTURE_MAX_BYTES = 100 * 1024;
@@ -193,19 +195,37 @@ const toPrepared = async (
   return { bytes, dataUrl: await readAsDataUrl(blob), mediaType };
 };
 
+/** The IANA media type for a candid `ProfilePictureMediaType`.
+ *
+ *  Every variant is matched explicitly and the fall-through is a compile
+ *  error, not a guess: if the canister gains a format and the generated
+ *  bindings are regenerated without updating this function, `variant` is no
+ *  longer `never` and `npm run check` fails. Were this a chain ending in a
+ *  default, a new format would instead be silently mislabelled — and the
+ *  label is what a relying party's `<img>` tag trusts.
+ *
+ *  The throw is the runtime half of the same guard, for a value that reached
+ *  us without passing through the type system. Callers render the picture
+ *  inside an `{#await}`, so it surfaces as the placeholder rather than as an
+ *  image with the wrong MIME type. */
+const ianaMediaType = (variant: ProfilePictureMediaType): string => {
+  if ("Png" in variant) return "image/png";
+  if ("Jpeg" in variant) return "image/jpeg";
+  if ("Webp" in variant) return "image/webp";
+  const unhandled: never = variant;
+  throw new Error(
+    `Unknown profile picture media type: ${JSON.stringify(unhandled)}`,
+  );
+};
+
 /** The `data:` URL for a picture fetched from the canister, so it can be
  *  rendered without another round trip. Mirrors `ProfilePicture::to_data_url`
  *  on the canister side. */
 export const profilePictureDataUrl = (picture: {
-  media_type: { Png: null } | { Jpeg: null } | { Webp: null };
+  media_type: ProfilePictureMediaType;
   bytes: Uint8Array | number[];
 }): string => {
-  const mediaType =
-    "Png" in picture.media_type
-      ? "image/png"
-      : "Jpeg" in picture.media_type
-        ? "image/jpeg"
-        : "image/webp";
+  const mediaType = ianaMediaType(picture.media_type);
   const bytes =
     picture.bytes instanceof Uint8Array
       ? picture.bytes

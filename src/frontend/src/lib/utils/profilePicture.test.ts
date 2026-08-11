@@ -31,6 +31,24 @@ describe("profilePictureDataUrl", () => {
     ).toBe("data:image/png;base64,iVBORw==");
   });
 
+  // The compile-time half of this guard is an exhaustiveness check that makes
+  // a newly added candid variant a `npm run check` failure (verified by
+  // temporarily adding one). This is the runtime half, for a value that
+  // reached us without passing through the type system — it must fail loudly
+  // rather than mislabel the bytes, because the MIME type in the URL is what a
+  // consumer's `<img>` tag trusts.
+  it("throws on an unknown media type instead of guessing one", () => {
+    const unknown = { Avif: null } as unknown as Parameters<
+      typeof profilePictureDataUrl
+    >[0]["media_type"];
+    expect(() =>
+      profilePictureDataUrl({
+        media_type: unknown,
+        bytes: new Uint8Array([1, 2, 3]),
+      }),
+    ).toThrow(/Unknown profile picture media type/);
+  });
+
   it("accepts `number[]` bytes (the Candid wire shape)", () => {
     expect(
       profilePictureDataUrl({
