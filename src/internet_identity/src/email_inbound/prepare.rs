@@ -326,7 +326,7 @@ mod tests {
     fn normalize_rejects_second_at() {
         for input in [
             "alice@example.org@example.com",
-            "\"alice@example.org\"@example.com",
+            "\"a@b\"@example.com",
             "alice@example.com@example.org",
         ] {
             assert_eq!(normalize_address(input), None, "accepted {input:?}");
