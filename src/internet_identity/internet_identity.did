@@ -1583,7 +1583,7 @@ type NotificationRejection = variant {
 type NotificationSendResult = record {
     accepted : nat32;                // queued, not delivered
     rejected : vec record { id : blob; reason : NotificationRejection };
-    retry_after_ms : opt nat32;      // at capacity, wait this long before the next chunk
+    retry_after_ms : opt nat32;      // at capacity, wait this long before sending more
 };
 
 service : (opt InternetIdentityInit) -> {
@@ -2033,7 +2033,6 @@ service : (opt InternetIdentityInit) -> {
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
 
     notification_send : (
-        chunk_id : blob,             // batch idempotency. a network retry is O(1) to reject
         notifications : vec Notification,
     ) -> (NotificationSendResult);
 
