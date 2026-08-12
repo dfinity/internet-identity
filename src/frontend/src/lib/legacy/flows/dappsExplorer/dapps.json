@@ -772,5 +772,12 @@
       "https://hcv4s-uaaaa-aaabq-qaaba-cai.icp.net"
     ],
     "logo": "multidex_logo.svg"
+  },
+  {
+    "name": "Mingle Berry Partners",
+    "oneLiner": "Partner program and academy for freelancers and agencies who bring businesses to the Internet Computer",
+    "website": "https://partner.mingleberrymedia.com",
+    "authOrigins": ["https://partner.mingleberrymedia.com"],
+    "logo": "mingle-berry-partners_logo.webp"
   }
 ]
