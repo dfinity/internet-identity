@@ -1162,9 +1162,12 @@ mod tests {
         use serde_bytes::ByteBuf;
 
         // A DKIM-Signature covering From:To (order matters for the hash
-        // input). Tag values other than `h=` are irrelevant to
-        // build_header_hash_input, which only canonicalises the listed
-        // headers plus the signature header with `b=` blanked.
+        // input). Its other tag values (d=, s=, bh=, ...) are arbitrary
+        // only because the *same* DKIM-Signature value is reused for both
+        // the honest and forged messages: build_header_hash_input
+        // canonicalises the signature header itself (with `b=` blanked)
+        // into the signed bytes, so those tags do contribute — identically
+        // on both sides.
         let dkim_value = "v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; \
                           s=sel; h=From:To; bh=MTIzNDU2; b=YWJj";
         let sig = crate::dkim::parse_dkim_signature(dkim_value).expect("parse DKIM-Signature");
