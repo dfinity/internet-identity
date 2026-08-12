@@ -772,5 +772,15 @@
       "https://hcv4s-uaaaa-aaabq-qaaba-cai.icp.net"
     ],
     "logo": "multidex_logo.svg"
+  },
+  {
+    "name": "Blitz Grid",
+    "oneLiner": "Mobile fantasy football \u2014 snake draft, weekly lineups and league chat, running fully on-chain",
+    "website": "https://blitzgrid.xyz",
+    "authOrigins": [
+      "https://blitzgrid.xyz",
+      "https://tudjq-3yaaa-aaaas-qgxxq-cai.icp0.io"
+    ],
+    "logo": "blitz-grid_logo.webp"
   }
 ]
