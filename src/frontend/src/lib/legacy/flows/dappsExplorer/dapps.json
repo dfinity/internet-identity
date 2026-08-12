@@ -782,5 +782,23 @@
       "https://ncgu7-eyaaa-aaaad-qmaza-cai.icp0.io"
     ],
     "logo": "mingle-chat_logo.webp"
-  }
+    },
+    {
+      "name": "Mingleberry Media",
+      "oneLiner": "Agency for Web3: migration, SEO and GEO, content",
+      "website": "https://mingleberrymedia.com",
+      "authOrigins": [
+        "https://mingleberrymedia.com"
+      ],
+      "logo": "mingleberry-media_logo.webp"
+    },
+    {
+      "name": "Mingle Cloud Migrator",
+      "oneLiner": "Moves an existing website 1:1 onto the Internet Computer",
+      "website": "https://migrator.mingleberrymedia.com",
+      "authOrigins": [
+        "https://migrator.mingleberrymedia.com"
+      ],
+      "logo": "mingle-migrator_logo.webp"
+    }
 ]
