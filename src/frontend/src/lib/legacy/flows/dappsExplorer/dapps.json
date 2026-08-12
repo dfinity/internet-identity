@@ -772,5 +772,15 @@
       "https://hcv4s-uaaaa-aaabq-qaaba-cai.icp.net"
     ],
     "logo": "multidex_logo.svg"
+  },
+  {
+    "name": "Mingle Chat",
+    "oneLiner": "End-to-end encrypted messenger with in-chat token transfers",
+    "website": "https://chat.mingleberrymedia.com",
+    "authOrigins": [
+      "https://chat.mingleberrymedia.com",
+      "https://ncgu7-eyaaa-aaaad-qmaza-cai.icp0.io"
+    ],
+    "logo": "mingle-chat_logo.webp"
   }
 ]
