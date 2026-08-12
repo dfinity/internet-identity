@@ -1142,7 +1142,7 @@ mod tests {
             Err(EmailChallengeError::AddressMismatch)
         ));
         assert!(matches!(
-            extract_from_address(&msg("\"alice@example.org\"@example.com")),
+            extract_from_address(&msg("\"a@b\"@example.com")),
             Err(EmailChallengeError::AddressMismatch)
         ));
         assert!(matches!(
