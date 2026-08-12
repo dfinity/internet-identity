@@ -1121,6 +1121,36 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn extract_from_rejects_second_at() {
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpHeader, SmtpMessage,
+        };
+        use serde_bytes::ByteBuf;
+        let msg = |value: &str| SmtpMessage {
+            headers: vec![SmtpHeader {
+                name: "From".into(),
+                value: value.into(),
+            }],
+            body: ByteBuf::new(),
+        };
+        // `prepare` splits from the right to name the domain, this
+        // extractor splits from the left. One `@` per address keeps
+        // the two from ever disagreeing.
+        assert!(matches!(
+            extract_from_address(&msg("alice@example.org@example.com")),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+        assert!(matches!(
+            extract_from_address(&msg("\"alice@example.org\"@example.com")),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+        assert!(matches!(
+            extract_from_address(&msg("Alice <alice@example.org@example.com>")),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+    }
+
     fn smtp_envelope(user: &str, domain: &str) -> SmtpRequest {
         smtp_envelope_with_recipients(&[(user, domain)])
     }

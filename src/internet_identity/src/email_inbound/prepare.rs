@@ -254,8 +254,8 @@ fn verify_dnssec_skeleton(
 
 /// Normalise an email address to the canonical `lowercase(local) +
 /// "@" + lowercase(domain)` form. Returns `None` if the address is
-/// obviously malformed (no `@`, empty local-part, empty domain,
-/// embedded whitespace).
+/// obviously malformed (no `@`, more than one `@`, empty local-part,
+/// empty domain, embedded whitespace).
 ///
 /// Stricter normalisation (IDN, RFC 5322 quoted local-parts) is the
 /// mail-auth verifier's job — here we just want to reject the
@@ -278,6 +278,12 @@ fn normalize_address(input: &str) -> Option<String> {
     if local.is_empty() || domain.is_empty() {
         return None;
     }
+    // `registered_domain_of` splits from the right and the verifier
+    // splits from the left, so a second `@` would leave them naming
+    // different domains for one address. Require one answer.
+    if domain.contains('@') {
+        return None;
+    }
     if local.len() > super::MAX_LOCAL_PART || domain.len() > super::MAX_DOMAIN {
         return None;
     }
@@ -295,4 +301,47 @@ fn normalize_address(input: &str) -> Option<String> {
 /// value, which is what the operator configures.
 fn registered_domain_of(address: &str) -> Option<String> {
     address.rsplit_once('@').map(|(_, d)| d.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_lowercases_both_parts() {
+        assert_eq!(
+            normalize_address(" Alice@GMAIL.com ").as_deref(),
+            Some("alice@gmail.com")
+        );
+    }
+
+    #[test]
+    fn normalize_rejects_malformed() {
+        for input in ["", "alice", "@gmail.com", "alice@", "ali ce@gmail.com"] {
+            assert_eq!(normalize_address(input), None, "accepted {input:?}");
+        }
+    }
+
+    #[test]
+    fn normalize_rejects_second_at() {
+        for input in [
+            "alice@example.org@example.com",
+            "\"alice@example.org\"@example.com",
+            "alice@example.com@example.org",
+        ] {
+            assert_eq!(normalize_address(input), None, "accepted {input:?}");
+        }
+    }
+
+    #[test]
+    fn accepted_addresses_agree_on_their_domain() {
+        // The invariant the `@` cap buys: for anything
+        // `normalize_address` accepts, a left split and a right split
+        // name the same domain.
+        let address = normalize_address("alice@example.com").unwrap();
+        assert_eq!(
+            registered_domain_of(&address).as_deref(),
+            address.split_once('@').map(|(_, d)| d)
+        );
+    }
 }
