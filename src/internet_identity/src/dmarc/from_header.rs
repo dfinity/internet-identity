@@ -21,8 +21,9 @@ const FROM_HEADER: &str = "From";
 ///
 /// Returns `Err` with a human-readable reason on:
 /// - zero or more than one `From:` header,
-/// - a header value that's empty / has no `@` / has trailing list
-///   syntax / uses RFC 5322 group syntax (`name:addrs;`),
+/// - a header value that's empty / has no `@` / has more than one `@`
+///   / has trailing list syntax / uses RFC 5322 group syntax
+///   (`name:addrs;`),
 /// - a domain that's empty after `@`.
 pub fn extract_from_domain(message: &SmtpMessage) -> Result<String, String> {
     let mut iter = message
@@ -59,12 +60,12 @@ fn parse_single_mailbox_domain(value: &str) -> Result<String, String> {
 ///
 /// This is the shared front half of [`parse_single_mailbox_domain`]:
 /// it locates the address-spec and enforces the "exactly one mailbox"
-/// rule (rejecting address-lists, group syntax, and whitespace inside
-/// a bare addr-spec), but returns the whole `local@domain` slice
-/// instead of only the domain. Callers that need the full mailbox —
-/// the email-recovery inbound path, which matches the verified sender
-/// against the anchor's registered address — reuse this rather than
-/// re-implementing the mailbox scan.
+/// rule (rejecting address-lists, group syntax, whitespace inside a
+/// bare addr-spec, and a second `@`), but returns the whole
+/// `local@domain` slice instead of only the domain. Callers that need
+/// the full mailbox — the email-recovery inbound path, which matches
+/// the verified sender against the anchor's registered address —
+/// reuse this rather than re-implementing the mailbox scan.
 ///
 /// The returned slice borrows from `value` (trimmed); it still
 /// contains the `@`, and the caller is responsible for any further
@@ -91,6 +92,15 @@ pub(crate) fn parse_single_mailbox_addr_spec(value: &str) -> Result<&str, String
     // would otherwise slip through with domain == example.com.
     if !in_angle_brackets && address_part.chars().any(char::is_whitespace) {
         return Err("From: addr-spec contains whitespace".to_string());
+    }
+
+    // Exactly one `@`, so "the domain" is the same slice no matter
+    // which side a caller splits from. RFC 5322 does permit a quoted
+    // local-part to carry an `@` (`"a@b"@example.com`), but accepting
+    // one means a first-`@` split and a last-`@` split disagree about
+    // the domain — and this parser feeds both.
+    if address_part.matches('@').count() != 1 {
+        return Err("From: addr-spec must contain exactly one '@'".to_string());
     }
 
     Ok(address_part)
@@ -336,6 +346,29 @@ mod tests {
         let m = message_with(&["alice @example.com"]);
         let err = extract_from_domain(&m).unwrap_err();
         assert!(err.contains("whitespace"));
+    }
+
+    #[test]
+    fn rejects_second_at_in_bare_addr_spec() {
+        let m = message_with(&["alice@example.com@example.org"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("exactly one '@'"));
+    }
+
+    #[test]
+    fn rejects_second_at_in_quoted_local_part() {
+        // Legal RFC 5322, deliberately refused: a left split and a right
+        // split disagree about the domain, and both happen downstream.
+        let m = message_with(&["\"alice@example.com\"@example.org"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("exactly one '@'"));
+    }
+
+    #[test]
+    fn rejects_second_at_inside_angle_brackets() {
+        let m = message_with(&["Alice <alice@example.com@example.org>"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("exactly one '@'"));
     }
 
     #[test]

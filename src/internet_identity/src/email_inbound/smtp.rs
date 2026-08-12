@@ -1125,10 +1125,9 @@ mod tests {
     fn extract_from_rejects_crlf_spliced_header() {
         // A `From:` value carrying a second mailbox smuggled behind an
         // embedded CRLF must not resolve to that second mailbox — it is
-        // not a single mailbox, so
-        // extraction fails closed. Before the single-mailbox parser
-        // this returned the *last* angle-bracket pair, i.e. the
-        // attacker-chosen `victim@`.
+        // not a single mailbox, so extraction fails closed. Before the
+        // single-mailbox parser this returned the *last* angle-bracket
+        // pair, i.e. the attacker-chosen `victim@`.
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpHeader, SmtpMessage,
         };
@@ -1219,6 +1218,36 @@ mod tests {
         );
         assert!(matches!(
             extract_from_address(&with_body(forged)),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+    }
+
+    #[test]
+    fn extract_from_rejects_second_at() {
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpHeader, SmtpMessage,
+        };
+        use serde_bytes::ByteBuf;
+        let msg = |value: &str| SmtpMessage {
+            headers: vec![SmtpHeader {
+                name: "From".into(),
+                value: value.into(),
+            }],
+            body: ByteBuf::new(),
+        };
+        // `prepare` splits from the right to name the domain, this
+        // extractor splits from the left. One `@` per address keeps
+        // the two from ever disagreeing.
+        assert!(matches!(
+            extract_from_address(&msg("alice@example.org@example.com")),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+        assert!(matches!(
+            extract_from_address(&msg("\"a@b\"@example.com")),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+        assert!(matches!(
+            extract_from_address(&msg("Alice <alice@example.org@example.com>")),
             Err(EmailChallengeError::AddressMismatch)
         ));
     }
