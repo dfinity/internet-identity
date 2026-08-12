@@ -772,5 +772,12 @@
       "https://hcv4s-uaaaa-aaabq-qaaba-cai.icp.net"
     ],
     "logo": "multidex_logo.svg"
+  },
+  {
+    "name": "Mingle Cloud Migrator",
+    "oneLiner": "Rebuilds an existing Web2 codebase as Motoko canisters on the Internet Computer",
+    "website": "https://migrator.mingleberrymedia.com",
+    "authOrigins": ["https://migrator.mingleberrymedia.com"],
+    "logo": "mingle-cloud-migrator_logo.webp"
   }
 ]
