@@ -16,17 +16,16 @@
   interface Props {
     upgrade: (name: string) => Promise<void | "cancelled">;
     identityNumber: bigint;
-    initialName?: string;
   }
 
-  const { upgrade, identityNumber, initialName }: Props = $props();
+  const { upgrade, identityNumber }: Props = $props();
 
   onMount(() => {
     upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.CreatePasskeyScreen);
   });
 
   let inputRef = $state<HTMLInputElement>();
-  let name = $state(initialName ?? "");
+  let name = $state("");
   let isUpgrading = $state(false);
   let isCancelled = $state(false);
 

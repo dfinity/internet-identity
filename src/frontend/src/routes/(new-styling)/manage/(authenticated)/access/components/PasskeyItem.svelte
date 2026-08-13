@@ -24,8 +24,7 @@
     onRename?: () => void;
     onRemove?: () => void;
     onSwitch?: () => void;
-    onUpgrade: () => void;
-    hasCurrentPasskey: boolean;
+    recoveryHref: string;
     isCurrentAccessMethod?: boolean;
     isLastAccessMethod?: boolean;
     isSignedInWithRecovery?: boolean;
@@ -37,8 +36,7 @@
     onRename,
     onRemove,
     onSwitch,
-    onUpgrade,
-    hasCurrentPasskey,
+    recoveryHref,
     isCurrentAccessMethod = false,
     isLastAccessMethod = false,
     isSignedInWithRecovery = false,
@@ -69,7 +67,6 @@
       : undefined,
   );
   const isLegacy = $derived(isLegacyPasskey(passkey));
-  const showUpgradeAction = $derived(!hasCurrentPasskey);
 
   const options = $derived([
     ...(onRename !== undefined
@@ -225,19 +222,16 @@
   </div>
   <div class="text-text-primary text-xs">
     {#if isLegacy}
-      {#if showUpgradeAction}
-        <Trans>
-          Created on the old Internet Identity site. You may still use it to
-          <button
-            type="button"
-            onclick={onUpgrade}
-            class="text-text-primary font-semibold outline-0 hover:underline focus-visible:underline"
-            >recover</button
-          >.
-        </Trans>
-      {:else}
-        {$t`Created on the old Internet Identity site. You no longer need it.`}
-      {/if}
+      <Trans>
+        Created on the old Internet Identity site. Can only be used to
+        <a
+          href={recoveryHref}
+          target="_blank"
+          rel="noopener"
+          class="text-text-primary font-semibold outline-0 hover:underline focus-visible:underline"
+          >recover</a
+        >, when upgrading from an identity number.
+      </Trans>
     {:else if provider?.type === "cloud"}
       {provider.platform === undefined
         ? $t`Stored in your ${provider.account} account and synced across your devices.`

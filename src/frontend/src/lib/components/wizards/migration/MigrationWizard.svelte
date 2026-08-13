@@ -17,11 +17,9 @@
     onSuccess: (identityNumber: bigint) => void;
     onError: (error: unknown) => void;
     initialIdentityNumber?: bigint;
-    initialName?: string;
   }
 
-  const { onSuccess, onError, initialIdentityNumber, initialName }: Props =
-    $props();
+  const { onSuccess, onError, initialIdentityNumber }: Props = $props();
 
   onMount(() => {
     upgradeIdentityFunnel.init();
@@ -78,6 +76,5 @@
   <UpgradePasskey
     upgrade={handleUpgrade}
     identityNumber={migrationFlow.identityNumber}
-    {initialName}
   />
 {/if}

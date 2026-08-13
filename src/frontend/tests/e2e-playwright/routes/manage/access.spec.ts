@@ -351,27 +351,27 @@ test.describe("Access methods", () => {
         .assertRemoveDisabled();
     });
 
-    test("says the legacy passkey is not needed", async ({
+    test("links a legacy passkey to recovery", async ({
       manageAccessPage,
+      identities,
     }) => {
-      const passkeyItem = manageAccessPage.findPasskey(LEGACY_PASSKEY_NAME);
-      await expect(
-        passkeyItem.locator.getByText("You no longer need it."),
-      ).toBeVisible();
-      await expect(
-        passkeyItem.locator.getByRole("button", { name: "recover" }),
-      ).toBeHidden();
+      const link = manageAccessPage
+        .findPasskey(LEGACY_PASSKEY_NAME)
+        .locator.getByRole("link", { name: "recover" });
+      await expect(link).toHaveAttribute(
+        "href",
+        `/recovery?identity=${identities[0].identityNumber}`,
+      );
+      await expect(link).toHaveAttribute("target", "_blank");
     });
   });
 
-  test("offers recovery while no passkey exists on the current site", async ({
+  test("opens recovery with the identity number already filled in", async ({
     page,
+    context,
     manageAccessPage,
     identities,
   }) => {
-    // Restamping only the origin metadata leaves the credential bound to the
-    // current site, so it still signs in while the identity reads as
-    // un-upgraded.
     const actor = await createActorForCredential(
       identities[0].host,
       identities[0].canisterId,
@@ -387,16 +387,15 @@ test.describe("Access methods", () => {
     );
     await page.reload();
 
-    const passkeyItem = manageAccessPage.findPasskey(DEFAULT_PASSKEY_NAME);
-    await expect(
-      passkeyItem.locator.getByText("You may still use it to"),
-    ).toBeVisible();
+    const tab = context.waitForEvent("page");
+    await manageAccessPage
+      .findPasskey(DEFAULT_PASSKEY_NAME)
+      .locator.getByRole("link", { name: "recover" })
+      .click();
+    const recoveryTab = await tab;
 
-    await passkeyItem.locator.getByRole("button", { name: "recover" }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
     await expect(
-      dialog.getByPlaceholder("Internet Identity number"),
+      recoveryTab.getByPlaceholder("Internet Identity number"),
     ).toHaveValue(identities[0].identityNumber.toString());
   });
 
