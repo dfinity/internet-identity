@@ -183,6 +183,30 @@ enum PubKeyCoseAlgo {
   RSA_WITH_SHA256 = -257,
 }
 
+// How long the browser may keep a ceremony pending before giving up. Without a
+// timeout the platform default applies, which is several minutes: long enough
+// for an abandoned ceremony to keep blocking the ones after it.
+const CREATION_TIMEOUT_MS = 120_000;
+const REQUEST_TIMEOUT_MS = 60_000;
+
+// A ceremony that is started but never settled keeps occupying the browser's
+// slot for pending credential requests, and Chrome rejects every later ceremony
+// in the same tab with `OperationError: A request is already pending.` II is a
+// single page app, so no navigation comes along to clear that state — hold on
+// to the controller instead, and abort the ceremony still in flight before
+// starting the next one.
+let ceremonyController: AbortController | undefined;
+
+// A fresh signal per ceremony: an identity can be signed with more than once,
+// and an already aborted signal would reject the next ceremony immediately.
+const newCeremonySignal = (): AbortSignal => {
+  ceremonyController?.abort(
+    new DOMException("Cancelling existing WebAuthn ceremony", "AbortError"),
+  );
+  ceremonyController = new AbortController();
+  return ceremonyController.signal;
+};
+
 export class DiscoverablePasskeyIdentity extends SignIdentity {
   #credentialCreationOptions?: CredentialCreationOptionsWithoutChallenge;
   #credentialRequestOptions?: CredentialRequestOptionsWithoutChallenge;
@@ -261,9 +285,11 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
   }
 
   async sign(blob: Uint8Array): Promise<Signature> {
+    const signal = newCeremonySignal();
     const credential = await (this.#credentialCreationOptions !== undefined
       ? navigator.credentials.create({
           ...this.#credentialCreationOptions,
+          signal,
           publicKey: {
             ...this.#credentialCreationOptions.publicKey,
             challenge: new Uint8Array(blob),
@@ -272,6 +298,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
       : this.#credentialRequestOptions !== undefined
         ? navigator.credentials.get({
             ...this.#credentialRequestOptions,
+            signal,
             publicKey: {
               ...this.#credentialRequestOptions.publicKey,
               challenge: new Uint8Array(blob),
@@ -331,6 +358,7 @@ export const creationOptions = (
   rpId?: string,
 ): CredentialCreationOptionsWithoutChallenge => ({
   publicKey: {
+    timeout: CREATION_TIMEOUT_MS,
     // Identify the AAGUID of the passkey provider
     attestation: "direct",
     authenticatorSelection: {
@@ -373,6 +401,7 @@ export const requestOptions = (
 ): CredentialRequestOptionsWithoutChallenge => ({
   publicKey: {
     rpId,
+    timeout: REQUEST_TIMEOUT_MS,
     // Either use the specified credential ids or let the user pick a passkey
     allowCredentials:
       credentialIds !== undefined && credentialIds.length > 0
