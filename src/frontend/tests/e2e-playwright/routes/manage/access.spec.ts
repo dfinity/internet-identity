@@ -1,6 +1,10 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { createActorForCredential, II_URL } from "../../utils";
+import {
+  createActorForCredential,
+  CredentialIdentity,
+  II_URL,
+} from "../../utils";
 import { DEFAULT_PASSKEY_NAME } from "../../fixtures/manageAccessPage";
 import { SSO_DISCOVERY_DOMAIN, SSO_OPENID_PORT } from "../../fixtures/sso";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
@@ -346,6 +350,54 @@ test.describe("Access methods", () => {
         .findPasskey(LEGACY_PASSKEY_NAME)
         .assertRemoveDisabled();
     });
+
+    test("says the legacy passkey is not needed", async ({
+      manageAccessPage,
+    }) => {
+      const passkeyItem = manageAccessPage.findPasskey(LEGACY_PASSKEY_NAME);
+      await expect(
+        passkeyItem.locator.getByText("You no longer need it."),
+      ).toBeVisible();
+      await expect(
+        passkeyItem.locator.getByRole("button", { name: "recover" }),
+      ).toBeHidden();
+    });
+  });
+
+  test("offers recovery while no passkey exists on the current site", async ({
+    page,
+    manageAccessPage,
+    identities,
+  }) => {
+    // Restamping only the origin metadata leaves the credential bound to the
+    // current site, so it still signs in while the identity reads as
+    // un-upgraded.
+    const actor = await createActorForCredential(
+      identities[0].host,
+      identities[0].canisterId,
+      identities[0].credentials[0],
+    );
+    const identity = await CredentialIdentity.fromCredential(
+      identities[0].credentials[0],
+    );
+    await actor.authn_method_metadata_replace(
+      identities[0].identityNumber,
+      new Uint8Array(identity.getPublicKey().toDer()),
+      [["origin", { String: LEGACY_II_URL }]],
+    );
+    await page.reload();
+
+    const passkeyItem = manageAccessPage.findPasskey(DEFAULT_PASSKEY_NAME);
+    await expect(
+      passkeyItem.locator.getByText("You may still use it to"),
+    ).toBeVisible();
+
+    await passkeyItem.locator.getByRole("button", { name: "recover" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByPlaceholder("Internet Identity number"),
+    ).toHaveValue(identities[0].identityNumber.toString());
   });
 
   test.describe("with an SSO method", () => {
