@@ -2009,18 +2009,24 @@ fn recovery_succeeds_for_honest_single_mailbox_from() {
     };
     assert!(!user_key.is_empty());
 
-    // The delegation is actually retrievable for the session key we bound.
-    api::email_recovery_get_delegation(
+    // The delegation is retrievable, cryptographically valid against the
+    // IC root key, and bound to exactly the session key and expiration we
+    // requested — not just an `Ok` from the lookup.
+    let signed_delegation = api::email_recovery_get_delegation(
         &env,
         canister_id,
         internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryGetDelegationArgs {
             nonce: challenge.nonce,
-            session_key,
+            session_key: session_key.clone(),
             expiration,
         },
     )
     .expect("get_delegation call failed")
     .expect("delegation should be retrievable for honest recovery");
+
+    verify_delegation(&env, user_key, &signed_delegation, &env.root_key().unwrap());
+    assert_eq!(signed_delegation.delegation.pubkey, session_key);
+    assert_eq!(signed_delegation.delegation.expiration, expiration);
 }
 
 // ===================================================================
