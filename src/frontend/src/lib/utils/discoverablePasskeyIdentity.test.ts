@@ -1,3 +1,4 @@
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 
 describe("DiscoverablePasskeyIdentity", () => {
@@ -27,6 +28,7 @@ describe("DiscoverablePasskeyIdentity", () => {
       expect(signals).toHaveLength(2);
       expect(signals[0]?.aborted).toBe(true);
       expect(signals[1]?.aborted).toBe(false);
+      expect(signals[1]).not.toBe(signals[0]);
     });
   });
 });
