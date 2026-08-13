@@ -49,6 +49,7 @@
     toAccessMethods,
     toKey,
     isCurrentAccessMethod,
+    isLegacyPasskey,
   } from "./utils";
   import { sessionStore } from "$lib/stores/session.store";
   import { page } from "$app/state";
@@ -88,6 +89,12 @@
   );
   const openIdCredentials = $derived(
     accessMethods.filter((m) => "openid" in m).map(({ openid }) => openid),
+  );
+  const hasCurrentPasskey = $derived(
+    accessMethods.some(
+      (accessMethod) =>
+        "passkey" in accessMethod && !isLegacyPasskey(accessMethod.passkey),
+    ),
   );
   let recoveryPhraseStatus: "missing" | "unverified" | "verified" = $derived.by(
     () => {
@@ -461,6 +468,7 @@
               onRemove={() => (removingAccessMethodKey = toKey(accessMethod))}
               onSwitch={() => (switchingAccessMethodKey = toKey(accessMethod))}
               onUpgrade={() => (isUpgradingPasskey = true)}
+              {hasCurrentPasskey}
               isCurrentAccessMethod={isCurrentAccessMethod(
                 $authenticatedStore,
                 accessMethod,

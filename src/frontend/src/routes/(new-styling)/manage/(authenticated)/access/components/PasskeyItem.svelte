@@ -14,10 +14,9 @@
   import { aaguidToString, getAuthnMethodAlias } from "$lib/utils/webAuthn";
   import { onMount } from "svelte";
   import type { Provider } from "$lib/assets/aaguid";
-  import { getMetadataString } from "$lib/utils/openID";
-  import { getPrimaryOrigin } from "$lib/globals";
   import Badge from "$lib/components/ui/Badge.svelte";
   import { Trans } from "$lib/components/locale";
+  import { isLegacyPasskey } from "../utils";
 
   interface Props {
     passkey: AuthnMethodData;
@@ -26,6 +25,7 @@
     onRemove?: () => void;
     onSwitch?: () => void;
     onUpgrade: () => void;
+    hasCurrentPasskey: boolean;
     isCurrentAccessMethod?: boolean;
     isLastAccessMethod?: boolean;
     isSignedInWithRecovery?: boolean;
@@ -38,6 +38,7 @@
     onRemove,
     onSwitch,
     onUpgrade,
+    hasCurrentPasskey,
     isCurrentAccessMethod = false,
     isLastAccessMethod = false,
     isSignedInWithRecovery = false,
@@ -68,19 +69,17 @@
       : undefined,
   );
   // TEMPORARY STAGING PREVIEW — DO NOT MERGE.
-  // Forces every passkey to render the legacy branch so the copy and the
-  // "Use recovery" action can be reviewed without a legacy identity.
+  // Forces every passkey to render the legacy branch so the copy can be
+  // reviewed without a legacy identity. Set the second const to false to
+  // preview the already-upgraded wording instead of the upgrade action.
   // Revert this commit before marking the PR ready.
   const FORCE_LEGACY_PREVIEW = true;
+  const FORCE_UPGRADE_ACTION_PREVIEW: boolean | undefined = true;
 
-  const isLegacy = $derived.by(() => {
-    const primaryOrigin = getPrimaryOrigin();
-    const origin = getMetadataString(passkey.metadata, "origin");
-    return (
-      FORCE_LEGACY_PREVIEW ||
-      (primaryOrigin !== undefined && origin !== primaryOrigin)
-    );
-  });
+  const isLegacy = $derived(FORCE_LEGACY_PREVIEW || isLegacyPasskey(passkey));
+  const showUpgradeAction = $derived(
+    FORCE_UPGRADE_ACTION_PREVIEW ?? !hasCurrentPasskey,
+  );
 
   const options = $derived([
     ...(onRename !== undefined
@@ -236,14 +235,18 @@
   </div>
   <div class="text-text-primary text-xs">
     {#if isLegacy}
-      <Trans>
-        Created on the old Internet Identity site.
-        <button
-          onclick={onUpgrade}
-          class="text-text-primary font-semibold outline-0 hover:underline focus-visible:underline"
-          >Use recovery</button
-        > to keep using it.
-      </Trans>
+      {#if showUpgradeAction}
+        <Trans>
+          Created on the old Internet Identity site. You may still use it to
+          <button
+            onclick={onUpgrade}
+            class="text-text-primary font-semibold outline-0 hover:underline focus-visible:underline"
+            >recover</button
+          >.
+        </Trans>
+      {:else}
+        {$t`Created on the old Internet Identity site. You no longer need it.`}
+      {/if}
     {:else if provider?.type === "cloud"}
       {provider.platform === undefined
         ? $t`Stored in your ${provider.account} account and synced across your devices.`
