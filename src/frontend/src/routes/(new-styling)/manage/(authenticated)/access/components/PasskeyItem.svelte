@@ -67,10 +67,19 @@
       ? knownProviders[aaguid]
       : undefined,
   );
+  // TEMPORARY STAGING PREVIEW — DO NOT MERGE.
+  // Forces every passkey to render the legacy branch so the copy and the
+  // "Use recovery" action can be reviewed without a legacy identity.
+  // Revert this commit before marking the PR ready.
+  const FORCE_LEGACY_PREVIEW = true;
+
   const isLegacy = $derived.by(() => {
     const primaryOrigin = getPrimaryOrigin();
     const origin = getMetadataString(passkey.metadata, "origin");
-    return primaryOrigin !== undefined && origin !== primaryOrigin;
+    return (
+      FORCE_LEGACY_PREVIEW ||
+      (primaryOrigin !== undefined && origin !== primaryOrigin)
+    );
   });
 
   const options = $derived([
