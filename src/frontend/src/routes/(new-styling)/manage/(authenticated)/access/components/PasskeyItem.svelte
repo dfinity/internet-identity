@@ -68,18 +68,8 @@
       ? knownProviders[aaguid]
       : undefined,
   );
-  // TEMPORARY STAGING PREVIEW — DO NOT MERGE.
-  // Forces every passkey to render the legacy branch so the copy can be
-  // reviewed without a legacy identity. Set the second const to false to
-  // preview the already-upgraded wording instead of the upgrade action.
-  // Revert this commit before marking the PR ready.
-  const FORCE_LEGACY_PREVIEW = true;
-  const FORCE_UPGRADE_ACTION_PREVIEW: boolean | undefined = true;
-
-  const isLegacy = $derived(FORCE_LEGACY_PREVIEW || isLegacyPasskey(passkey));
-  const showUpgradeAction = $derived(
-    FORCE_UPGRADE_ACTION_PREVIEW ?? !hasCurrentPasskey,
-  );
+  const isLegacy = $derived(isLegacyPasskey(passkey));
+  const showUpgradeAction = $derived(!hasCurrentPasskey);
 
   const options = $derived([
     ...(onRename !== undefined
