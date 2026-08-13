@@ -66,12 +66,7 @@
       ? knownProviders[aaguid]
       : undefined,
   );
-  // TEMPORARY PREVIEW — DO NOT MERGE.
-  // Renders the legacy wording and recovery link on every passkey so the
-  // change can be reviewed without a legacy identity. Revert before ready.
-  const FORCE_LEGACY_PREVIEW = true;
-
-  const isLegacy = $derived(FORCE_LEGACY_PREVIEW || isLegacyPasskey(passkey));
+  const isLegacy = $derived(isLegacyPasskey(passkey));
 
   const options = $derived([
     ...(onRename !== undefined
