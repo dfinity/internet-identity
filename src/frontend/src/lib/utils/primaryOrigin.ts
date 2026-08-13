@@ -52,6 +52,6 @@ export const redirectToPrimaryOrigin = (): boolean => {
   target.search = search;
   target.hash = hash;
   redirecting = true;
-  window.location.replace(target);
+  window.location.replace(target.href);
   return true;
 };
