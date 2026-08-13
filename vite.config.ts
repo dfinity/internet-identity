@@ -80,7 +80,6 @@ export default defineConfig(({ command, mode }): UserConfig => {
                   {
                     hosts: [
                       "id.ai",
-                      "cli.id.ai",
                       "identity.ic0.app",
                       "identity.internetcomputer.org",
                     ],

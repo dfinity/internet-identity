@@ -7,16 +7,6 @@ import { addVirtualAuthenticator, authorize, II_URL } from "../utils";
 const hexToBytes = (hex: string): Uint8Array =>
   Uint8Array.from(hex.match(/.{1,2}/g) ?? [], (byte) => parseInt(byte, 16));
 
-const cliFragment = (params: {
-  publicKey: string;
-  callbackUrl: string;
-}): string => {
-  const fragment = new URLSearchParams();
-  fragment.set("public_key", params.publicKey);
-  fragment.set("callback", params.callbackUrl);
-  return fragment.toString();
-};
-
 const signUp = async (page: Page): Promise<void> => {
   const continueWithPasskey = page.getByRole("button", {
     name: "Continue with passkey",
@@ -87,19 +77,6 @@ const enableCliAccessInSettings = async (
     page.getByText("Enabled on this device", { exact: true }),
   ).toBeVisible();
 };
-
-test("cli.id.ai redirects to id.ai/cli, preserving the fragment", async ({
-  page,
-  cli,
-}) => {
-  const fragment = cliFragment({
-    publicKey: cli.publicKey,
-    callbackUrl: cli.callbackUrl,
-  });
-  await page.goto(`https://cli.id.ai/#${fragment}`);
-  await page.waitForURL(`${II_URL}/cli**`);
-  expect(page.url()).toBe(`${II_URL}/cli#${fragment}`);
-});
 
 test("Invalid params show the error screen", async ({ page }) => {
   await page.goto(II_URL + "/cli");
