@@ -1122,6 +1122,107 @@ mod tests {
     }
 
     #[test]
+    fn extract_from_rejects_crlf_spliced_header() {
+        // A `From:` value carrying a second mailbox smuggled behind an
+        // embedded CRLF must not resolve to that second mailbox — it is
+        // not a single mailbox, so extraction fails closed. Before the
+        // single-mailbox parser this returned the *last* angle-bracket
+        // pair, i.e. the attacker-chosen `victim@`.
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpHeader, SmtpMessage,
+        };
+        use serde_bytes::ByteBuf;
+        let msg = SmtpMessage {
+            headers: vec![SmtpHeader {
+                name: "From".into(),
+                value: "Attacker <attacker@example.com>\r\nto:Victim <victim@example.com>".into(),
+            }],
+            body: ByteBuf::new(),
+        };
+        assert!(matches!(
+            extract_from_address(&msg),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+    }
+
+    #[test]
+    fn crlf_splice_preserves_dkim_signed_bytes() {
+        // Documents *why* the forgery kept a valid signature: relocating
+        // the `To:` header's canonical bytes into the `From:` value (via
+        // an embedded CRLF) and dropping the `To:` header leaves the DKIM
+        // signed-header input byte-for-byte identical. So a genuine
+        // signature over the honest message also verifies over the forged
+        // one — the only thing that changes is which mailbox the sender
+        // resolves to. The fix is therefore in `extract_from_address`
+        // (asserted above), not in the signature check.
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpHeader, SmtpMessage,
+        };
+        use serde_bytes::ByteBuf;
+
+        // A DKIM-Signature covering From:To (order matters for the hash
+        // input). Its other tag values (d=, s=, bh=, ...) are arbitrary
+        // only because the *same* DKIM-Signature value is reused for both
+        // the honest and forged messages: build_header_hash_input
+        // canonicalises the signature header itself (with `b=` blanked)
+        // into the signed bytes, so those tags do contribute — identically
+        // on both sides.
+        let dkim_value = "v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; \
+                          s=sel; h=From:To; bh=MTIzNDU2; b=YWJj";
+        let sig = crate::dkim::parse_dkim_signature(dkim_value).expect("parse DKIM-Signature");
+
+        let honest = vec![
+            SmtpHeader {
+                name: "From".into(),
+                value: "Attacker <attacker@example.com>".into(),
+            },
+            SmtpHeader {
+                name: "To".into(),
+                value: "Victim <victim@example.com>".into(),
+            },
+            SmtpHeader {
+                name: "DKIM-Signature".into(),
+                value: dkim_value.into(),
+            },
+        ];
+        // The forged message: the `To:` canonical line is smuggled into
+        // the `From:` value behind a CRLF, and the real `To:` header is
+        // dropped.
+        let forged = vec![
+            SmtpHeader {
+                name: "From".into(),
+                value: "Attacker <attacker@example.com>\r\nto:Victim <victim@example.com>".into(),
+            },
+            SmtpHeader {
+                name: "DKIM-Signature".into(),
+                value: dkim_value.into(),
+            },
+        ];
+
+        let honest_signed = crate::dkim::build_header_hash_input(&honest, &sig, dkim_value);
+        let forged_signed = crate::dkim::build_header_hash_input(&forged, &sig, dkim_value);
+        assert_eq!(
+            honest_signed, forged_signed,
+            "CRLF splice must reproduce the honest signed-header bytes exactly"
+        );
+
+        // ...yet the two resolve to different senders: the honest message
+        // to the real sender, the forged one to nothing (rejected).
+        let with_body = |headers: Vec<SmtpHeader>| SmtpMessage {
+            headers,
+            body: ByteBuf::new(),
+        };
+        assert_eq!(
+            extract_from_address(&with_body(honest)).unwrap(),
+            "attacker@example.com"
+        );
+        assert!(matches!(
+            extract_from_address(&with_body(forged)),
+            Err(EmailChallengeError::AddressMismatch)
+        ));
+    }
+
+    #[test]
     fn extract_from_rejects_second_at() {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpHeader, SmtpMessage,

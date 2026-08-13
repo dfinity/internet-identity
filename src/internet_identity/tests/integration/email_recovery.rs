@@ -1785,6 +1785,251 @@ fn fake_dkim_dns_response(txt: &[u8]) -> Vec<u8> {
 }
 
 // ===================================================================
+// Regression: DKIM From-header forgery via CRLF header smuggling
+// ===================================================================
+//
+// Reproduces the header-forgery attack end-to-end against a real
+// canister: an unauthenticated caller drives the recovery flow claiming a
+// victim's address, and delivers an email that is *genuinely* signed
+// by the victim's domain but whose signed `From:` is `attacker@domain`
+// — with the victim's mailbox smuggled into the delivered `From:`
+// header behind an embedded CRLF (and the `To:` header dropped), so
+// the DKIM signed-header bytes are byte-identical to an honest message
+// and the signature still verifies.
+//
+// The exploit only works if the canister resolves the *smuggled*
+// mailbox as the sender. The strict single-mailbox `From:` parser
+// rejects the multi-line value, so recovery fails closed with
+// `AddressMismatch` and mints no delegation. The negative control
+// confirms honest single-mailbox recovery still completes.
+
+const VICTIM_ADDRESS: &str = TEST_ADDRESS; // alice@test.example.com
+const ATTACKER_ADDRESS: &str = "mallory@test.example.com"; // same signing domain
+const RECOVERY_DATE: &str = "Mon, 5 May 2026 12:00:00 +0000";
+
+/// Bind `VICTIM_ADDRESS` as a recovery credential on a fresh anchor via
+/// the DoH setup flow, so the recovery flow has an anchor to resolve.
+fn bind_victim_recovery_credential(
+    env: &PocketIc,
+    canister_id: candid::Principal,
+    signer: &dkim_signer::TestSigner,
+) {
+    let (id, p) = fresh_identity(env, canister_id);
+    let challenge = api::email_recovery_credential_prepare_add(
+        env,
+        canister_id,
+        p,
+        id,
+        EmailChallengeDnsInput {
+            address: VICTIM_ADDRESS.into(),
+            dns_proof: None,
+        },
+    )
+    .expect("prepare_add call failed")
+    .expect("prepare_add should succeed");
+    let signed = signer.sign_email(SignedEmailParams {
+        from: VICTIM_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: time(env) / 1_000_000_000,
+    });
+    let resp = api::smtp_request(env, canister_id, &signed.request).expect("smtp_request call");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+    let status = drive_doh_resolution(
+        env,
+        canister_id,
+        &challenge.nonce,
+        &signer.public_txt_record(),
+    );
+    assert!(
+        matches!(status, EmailChallengeStatus::RegistrationSucceeded),
+        "victim credential bind should succeed, got {status:?}"
+    );
+}
+
+#[test]
+fn recovery_rejects_crlf_spliced_from_header() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    // One signer = the shared-domain provider's DKIM key. The attacker
+    // holds an ordinary signed message from their *own* account at that
+    // domain; they never possess the victim's mailbox.
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    bind_victim_recovery_credential(&env, canister_id, &signer);
+
+    // Attacker, unauthenticated, opens a recovery challenge claiming the
+    // victim's address, bound to a session key the attacker controls.
+    let attacker_session_key = ByteBuf::from(vec![7u8; 32]);
+    let challenge = api::email_recovery_prepare_delegation(
+        &env,
+        canister_id,
+        EmailChallengeDnsInput {
+            address: VICTIM_ADDRESS.into(),
+            dns_proof: None,
+        },
+        attacker_session_key.clone(),
+    )
+    .expect("prepare_delegation call failed")
+    .expect("prepare_delegation should issue a challenge");
+
+    // Genuinely sign a message from the attacker's own mailbox, covering
+    // From:To:Subject:Date:Message-ID (name-addr form).
+    let attacker_name_addr = format!("Mallory <{ATTACKER_ADDRESS}>");
+    let victim_name_addr = format!("Victim <{VICTIM_ADDRESS}>");
+    let msg_id = format!("<forge@{TEST_DOMAIN}>");
+    let dkim_value = signer.sign_headers(
+        &[
+            ("From", &attacker_name_addr),
+            ("To", &victim_name_addr),
+            ("Subject", &challenge.nonce),
+            ("Date", RECOVERY_DATE),
+            ("Message-ID", &msg_id),
+        ],
+        TEST_BODY,
+        time(&env) / 1_000_000_000,
+    );
+
+    // Deliver the forgery: the `To:` canonical line is smuggled into the
+    // `From:` value behind a CRLF and the real `To:` header is dropped —
+    // the signed bytes are unchanged, so the signature still verifies,
+    // but a lenient parser would read the sender as the victim.
+    let spliced_from = format!("{attacker_name_addr}\r\nto:{victim_name_addr}");
+    let forged = SmtpRequest {
+        envelope: Some(SmtpEnvelope {
+            from: SmtpAddress {
+                user: "mallory".into(),
+                domain: TEST_DOMAIN.into(),
+            },
+            to: vec![SmtpAddress {
+                user: "recover".into(),
+                domain: "id.ai".into(),
+            }],
+        }),
+        message: Some(SmtpMessage {
+            headers: vec![
+                SmtpHeader {
+                    name: "DKIM-Signature".into(),
+                    value: dkim_value,
+                },
+                SmtpHeader {
+                    name: "From".into(),
+                    value: spliced_from,
+                },
+                SmtpHeader {
+                    name: "Subject".into(),
+                    value: challenge.nonce.clone(),
+                },
+                SmtpHeader {
+                    name: "Date".into(),
+                    value: RECOVERY_DATE.into(),
+                },
+                SmtpHeader {
+                    name: "Message-ID".into(),
+                    value: msg_id,
+                },
+            ],
+            body: ByteBuf::from(TEST_BODY.to_vec()),
+        }),
+        gateway_flags: None,
+        message_id: None,
+    };
+    let resp = api::smtp_request(&env, canister_id, &forged).expect("smtp_request call");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+
+    // The attack must fail closed: the forged sender doesn't resolve to a
+    // single mailbox, so verification ends in AddressMismatch and never
+    // reaches RecoveryReady. (Pre-fix, the lenient parser resolved the
+    // smuggled `victim@` and this reached RecoveryReady — a takeover.)
+    let status = drive_doh_resolution(
+        &env,
+        canister_id,
+        &challenge.nonce,
+        &signer.public_txt_record(),
+    );
+    assert!(
+        matches!(
+            status,
+            EmailChallengeStatus::Failed(EmailChallengeError::AddressMismatch)
+        ),
+        "CRLF-spliced From must be rejected with AddressMismatch, got {status:?}"
+    );
+    assert!(
+        !matches!(status, EmailChallengeStatus::RecoveryReady { .. }),
+        "recovery must not complete for a forged sender"
+    );
+}
+
+#[test]
+fn recovery_succeeds_for_honest_single_mailbox_from() {
+    // Negative control: the same flow with an honest, single-mailbox
+    // `From:` completes and mints a delegation — proving the strict
+    // parser doesn't break legitimate recovery.
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    bind_victim_recovery_credential(&env, canister_id, &signer);
+
+    let session_key = ByteBuf::from(vec![9u8; 32]);
+    let challenge = api::email_recovery_prepare_delegation(
+        &env,
+        canister_id,
+        EmailChallengeDnsInput {
+            address: VICTIM_ADDRESS.into(),
+            dns_proof: None,
+        },
+        session_key.clone(),
+    )
+    .expect("prepare_delegation call failed")
+    .expect("prepare_delegation should issue a challenge");
+
+    let signed = signer.sign_email(SignedEmailParams {
+        from: VICTIM_ADDRESS,
+        to: "recover@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: time(&env) / 1_000_000_000,
+    });
+    let resp = api::smtp_request(&env, canister_id, &signed.request).expect("smtp_request call");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+
+    let status = drive_doh_resolution(
+        &env,
+        canister_id,
+        &challenge.nonce,
+        &signer.public_txt_record(),
+    );
+    let (user_key, expiration) = match status {
+        EmailChallengeStatus::RecoveryReady {
+            user_key,
+            expiration,
+            ..
+        } => (user_key, expiration),
+        other => panic!("honest recovery should reach RecoveryReady, got {other:?}"),
+    };
+    assert!(!user_key.is_empty());
+
+    // The delegation is retrievable, cryptographically valid against the
+    // IC root key, and bound to exactly the session key and expiration we
+    // requested — not just an `Ok` from the lookup.
+    let signed_delegation = api::email_recovery_get_delegation(
+        &env,
+        canister_id,
+        internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryGetDelegationArgs {
+            nonce: challenge.nonce,
+            session_key: session_key.clone(),
+            expiration,
+        },
+    )
+    .expect("get_delegation call failed")
+    .expect("delegation should be retrievable for honest recovery");
+
+    verify_delegation(&env, user_key, &signed_delegation, &env.root_key().unwrap());
+    assert_eq!(signed_delegation.delegation.pubkey, session_key);
+    assert_eq!(signed_delegation.delegation.expiration, expiration);
+}
+
+// ===================================================================
 // Args structs
 // ===================================================================
 
@@ -1956,6 +2201,53 @@ pub(crate) mod dkim_signer {
             };
 
             super::SignedEmail { request }
+        }
+
+        /// Sign an explicit, ordered set of headers — `h=` is exactly
+        /// those names, in order — over `body`, and return the final
+        /// `DKIM-Signature` header value (with `b=` filled).
+        ///
+        /// Unlike [`Self::sign_email`], which couples the signed headers
+        /// to the delivered message, this lets a test deliver a message
+        /// whose headers differ from the signed set as long as they
+        /// canonicalise to the same bytes — e.g. a forged `From:` that
+        /// absorbs a `To:` line behind an embedded CRLF.
+        pub fn sign_headers(
+            &self,
+            signed_headers: &[(&str, &str)],
+            body: &[u8],
+            timestamp: u64,
+        ) -> String {
+            let canon_body = relaxed_body(body);
+            let bh_b64 = base64_encode(&Sha256::digest(&canon_body));
+            let h = signed_headers
+                .iter()
+                .map(|(name, _)| *name)
+                .collect::<Vec<_>>()
+                .join(":");
+            let sig_value_no_b = format!(
+                "v=1; a=rsa-sha256; c=relaxed/relaxed; d={d}; s={s}; \
+                 t={t}; h={h}; bh={bh}; b=",
+                d = self.domain,
+                s = self.selector,
+                t = timestamp,
+                bh = bh_b64,
+            );
+            let mut hash_input = Vec::new();
+            for (name, value) in signed_headers {
+                hash_input.extend(relaxed_header(name, value));
+            }
+            let mut canon_dkim = relaxed_header("DKIM-Signature", &sig_value_no_b);
+            if canon_dkim.ends_with(b"\r\n") {
+                canon_dkim.truncate(canon_dkim.len() - 2);
+            }
+            hash_input.extend(canon_dkim);
+            let digest: [u8; 32] = Sha256::digest(&hash_input).into();
+            let sig = self
+                .private_key
+                .sign(Pkcs1v15Sign::new::<Sha256>(), &digest)
+                .expect("RSA sign");
+            format!("{sig_value_no_b}{}", base64_encode(&sig))
         }
     }
 
