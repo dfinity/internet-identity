@@ -115,8 +115,7 @@ import { DEFAULT_HOST } from "../../fixtures/identity";
         (device) => device.credential_id.length > 0,
       );
       expect(passkeys.length).toBeGreaterThan(0);
-      // The passkey is scoped to the primary origin, a passkey stamped with
-      // the legacy origin is reported as unusable in /manage/access.
+      // Assert all passkeys are created for the primary origin
       for (const passkey of passkeys) {
         expect(passkey.origin).toEqual([II_URL]);
       }
