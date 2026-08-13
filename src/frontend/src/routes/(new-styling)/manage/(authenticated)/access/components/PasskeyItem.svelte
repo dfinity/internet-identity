@@ -17,6 +17,7 @@
   import { getMetadataString } from "$lib/utils/openID";
   import { getPrimaryOrigin } from "$lib/globals";
   import Badge from "$lib/components/ui/Badge.svelte";
+  import { Trans } from "$lib/components/locale";
 
   interface Props {
     passkey: AuthnMethodData;
@@ -24,6 +25,7 @@
     onRename?: () => void;
     onRemove?: () => void;
     onSwitch?: () => void;
+    onUpgrade: () => void;
     isCurrentAccessMethod?: boolean;
     isLastAccessMethod?: boolean;
     isSignedInWithRecovery?: boolean;
@@ -35,6 +37,7 @@
     onRename,
     onRemove,
     onSwitch,
+    onUpgrade,
     isCurrentAccessMethod = false,
     isLastAccessMethod = false,
     isSignedInWithRecovery = false,
@@ -224,7 +227,14 @@
   </div>
   <div class="text-text-primary text-xs">
     {#if isLegacy}
-      {$t`This legacy passkey is no longer usable and should be removed.`}
+      <Trans>
+        Created on the old Internet Identity site.
+        <button
+          onclick={onUpgrade}
+          class="text-text-primary font-semibold outline-0 hover:underline focus-visible:underline"
+          >Use recovery</button
+        > to keep using it.
+      </Trans>
     {:else if provider?.type === "cloud"}
       {provider.platform === undefined
         ? $t`Stored in your ${provider.account} account and synced across your devices.`

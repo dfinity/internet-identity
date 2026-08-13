@@ -36,6 +36,7 @@
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
   import { get } from "svelte/store";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
+  import { MigrationWizard } from "$lib/components/wizards/migration";
   import { flip } from "svelte/animate";
   import { scale } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
@@ -64,6 +65,7 @@
   let removingAccessMethodKey = $state<string>();
   let switchingAccessMethodKey = $state<string>();
   let accessMethods = $derived(toAccessMethods(data.identityInfo));
+  let isUpgradingPasskey = $state(false);
   let pendingRegistrationId = $state(data.pendingRegistrationId);
   let showRegistrationDialog = $state(data.pendingRegistrationId !== null);
 
@@ -458,6 +460,7 @@
               onRename={() => (renamingAccessMethodKey = toKey(accessMethod))}
               onRemove={() => (removingAccessMethodKey = toKey(accessMethod))}
               onSwitch={() => (switchingAccessMethodKey = toKey(accessMethod))}
+              onUpgrade={() => (isUpgradingPasskey = true)}
               isCurrentAccessMethod={isCurrentAccessMethod(
                 $authenticatedStore,
                 accessMethod,
@@ -484,6 +487,23 @@
     {/key}
   </ul>
 </div>
+
+{#if isUpgradingPasskey}
+  <Dialog onClose={() => (isUpgradingPasskey = false)}>
+    <MigrationWizard
+      initialIdentityNumber={data.identityNumber}
+      initialName={data.identityInfo.name[0]}
+      onSuccess={() => {
+        isUpgradingPasskey = false;
+        void invalidateAll();
+      }}
+      onError={(error) => {
+        isUpgradingPasskey = false;
+        handleError(error);
+      }}
+    />
+  </Dialog>
+{/if}
 
 {#if isAddingAccessMethod}
   <Dialog onClose={() => (isAddingAccessMethod = false)}>
