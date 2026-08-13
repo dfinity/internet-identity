@@ -36,7 +36,7 @@ export const redirectToPrimaryOrigin = (): boolean => {
   if (primaryOrigin === undefined || window.location.origin === primaryOrigin) {
     return false;
   }
-  const { pathname, search, hash, host } = window.location;
+  const { pathname, search, hash } = window.location;
   // Legacy AuthClient, the legacy transport carries the request across the
   // redirect itself and bounces the response back to this origin.
   if (pathname === "/" && hash === "#authorize") {
@@ -46,9 +46,7 @@ export const redirectToPrimaryOrigin = (): boolean => {
     return false;
   }
   const target = new URL(primaryOrigin);
-  // cli.id.ai serves only the CLI authorize entry point, every hit there
-  // lands on /cli on the primary origin, regardless of path.
-  target.pathname = host === "cli.id.ai" ? "/cli" : pathname;
+  target.pathname = pathname;
   target.search = search;
   target.hash = hash;
   redirecting = true;
