@@ -232,6 +232,7 @@
             type="button"
             onclick={onUpgrade}
             class="text-text-primary font-semibold outline-0 hover:underline focus-visible:underline"
+            >recover</button
           >.
         </Trans>
       {:else}
