@@ -87,6 +87,9 @@
   const openIdCredentials = $derived(
     accessMethods.filter((m) => "openid" in m).map(({ openid }) => openid),
   );
+  const recoveryHref = $derived(
+    `/recovery?${new URLSearchParams({ identity: data.identityNumber.toString() })}`,
+  );
   let recoveryPhraseStatus: "missing" | "unverified" | "verified" = $derived.by(
     () => {
       const value = data.identityInfo.authn_methods.find(
@@ -272,8 +275,7 @@
               : undefined;
         let jwt: string;
         let ssoDiscoveryPromise:
-          | ReturnType<typeof discoverSsoConfig>
-          | undefined;
+          ReturnType<typeof discoverSsoConfig> | undefined;
         if (ssoDomain !== undefined) {
           ssoDiscoveryPromise = discoverSsoConfig(ssoDomain);
           jwt = await requestWithPopup(
@@ -459,6 +461,7 @@
               onRename={() => (renamingAccessMethodKey = toKey(accessMethod))}
               onRemove={() => (removingAccessMethodKey = toKey(accessMethod))}
               onSwitch={() => (switchingAccessMethodKey = toKey(accessMethod))}
+              {recoveryHref}
               isCurrentAccessMethod={isCurrentAccessMethod(
                 $authenticatedStore,
                 accessMethod,

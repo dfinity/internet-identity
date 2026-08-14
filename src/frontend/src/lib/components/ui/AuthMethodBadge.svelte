@@ -3,9 +3,7 @@
   import SsoIcon from "../icons/SsoIcon.svelte";
 
   export type AuthMethodBadgeVariant =
-    | { type: "passkey" }
-    | { type: "openid"; logo?: string }
-    | { type: "sso" };
+    { type: "passkey" } | { type: "openid"; logo?: string } | { type: "sso" };
 
   type Props = {
     variant: AuthMethodBadgeVariant;

@@ -100,8 +100,7 @@ export type LoginSuccess = {
 };
 
 export type RegFlowNextStep =
-  | { step: "checkCaptcha"; captcha_png_base64: string }
-  | { step: "finish" };
+  { step: "checkCaptcha"; captcha_png_base64: string } | { step: "finish" };
 export type RegistrationFlowStepSuccess = {
   kind: "registrationFlowStepSuccess";
   nextStep: RegFlowNextStep;
@@ -150,8 +149,7 @@ export interface IIWebAuthnIdentity extends SignIdentity {
 
 export class Connection {
   private webAuthFlows:
-    | { flows: WebAuthnFlow[]; currentIndex: number }
-    | undefined;
+    { flows: WebAuthnFlow[]; currentIndex: number } | undefined;
 
   public constructor(
     readonly canisterId: string,

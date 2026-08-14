@@ -5,10 +5,17 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { Authenticated } from "$lib/stores/authentication.store";
 import { toHex } from "$lib/utils/utils";
+import { getPrimaryOrigin } from "$lib/globals";
+import { getMetadataString } from "$lib/utils/openID";
 
 export type AccessMethod =
-  | { passkey: AuthnMethodData }
-  | { openid: OpenIdCredential };
+  { passkey: AuthnMethodData } | { openid: OpenIdCredential };
+
+export const isLegacyPasskey = (passkey: AuthnMethodData): boolean => {
+  const primaryOrigin = getPrimaryOrigin();
+  const origin = getMetadataString(passkey.metadata, "origin");
+  return primaryOrigin !== undefined && origin !== primaryOrigin;
+};
 
 /**
  * Compares two access methods for sorting.

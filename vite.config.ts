@@ -80,7 +80,6 @@ export default defineConfig(({ command, mode }): UserConfig => {
                   {
                     hosts: [
                       "id.ai",
-                      "cli.id.ai",
                       "identity.ic0.app",
                       "identity.internetcomputer.org",
                     ],
@@ -117,7 +116,17 @@ export default defineConfig(({ command, mode }): UserConfig => {
         : {
             https: process.env.TLS_DEV_SERVER === "1" ? {} : undefined,
             proxy: {
-              "/api": `http://127.0.0.1:${readReplicaPort()}`,
+              "/api": {
+                // `readReplicaPort` shells out to `icp`, so it must not run while
+                // the config is merely being resolved — svelte-check resolves it
+                // in serve mode to preprocess `<style>` blocks, where no replica
+                // is running. Vite reads `target` when it creates the proxy at
+                // dev-server start, by which point the replica is up.
+                get target() {
+                  return `http://127.0.0.1:${readReplicaPort()}`;
+                },
+                changeOrigin: true,
+              },
             },
             allowedHosts: ["icp-api.io"],
             cors: {

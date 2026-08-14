@@ -1,7 +1,6 @@
 import { CDPSession, expect, Page } from "@playwright/test";
 import { Principal } from "@icp-sdk/core/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
-import Protocol from "devtools-protocol";
 import { DER_COSE_OID, wrapDER } from "@icp-sdk/core/identity";
 import {
   Actor,
@@ -383,13 +382,24 @@ export const removeVirtualAuthenticator = async (
 export const getCredentialsFromVirtualAuthenticator = async (
   page: Page,
   authenticatorId: string,
-): Promise<Protocol.WebAuthn.Credential[]> => {
+) => {
   const client = await getWebAuthnClient(page);
   const { credentials } = await client.send("WebAuthn.getCredentials", {
     authenticatorId,
   });
   return credentials;
 };
+
+/**
+ * A CDP WebAuthn credential, derived from the CDP protocol types Playwright
+ * bundles rather than from a separate `devtools-protocol` dependency. Playwright
+ * type-checks `CDPSession.send` against its own bundled copy, so deriving the
+ * type from a session call is what keeps it assignable in both directions —
+ * an independently versioned copy drifts as Chrome changes the protocol.
+ */
+export type WebAuthnCredential = Awaited<
+  ReturnType<typeof getCredentialsFromVirtualAuthenticator>
+>[number];
 
 /**
  * Adds a credential to a virtual authenticator
@@ -400,7 +410,7 @@ export const getCredentialsFromVirtualAuthenticator = async (
 export const addCredentialToVirtualAuthenticator = async (
   page: Page,
   authenticatorId: string,
-  credential: Protocol.WebAuthn.Credential,
+  credential: WebAuthnCredential,
 ): Promise<void> => {
   const client = await getWebAuthnClient(page);
   await client.send("WebAuthn.addCredential", {
@@ -458,13 +468,13 @@ export const toBase64URL = (bytes: Uint8Array): string =>
 export class CredentialIdentity extends SignIdentity {
   #privateKey: CryptoKey;
   #derPublicKey: DerEncodedPublicKey;
-  #credential: Protocol.WebAuthn.Credential;
+  #credential: WebAuthnCredential;
   #originHost: string;
 
   private constructor(
     privateKey: CryptoKey,
     derPublicKey: Uint8Array,
-    credential: Protocol.WebAuthn.Credential,
+    credential: WebAuthnCredential,
     originHost: string,
   ) {
     super();
@@ -475,7 +485,7 @@ export class CredentialIdentity extends SignIdentity {
   }
 
   static async fromCredential(
-    credential: Protocol.WebAuthn.Credential,
+    credential: WebAuthnCredential,
   ): Promise<CredentialIdentity> {
     if (credential.rpId === undefined) {
       throw new Error("Credential rpId is required");
@@ -656,7 +666,7 @@ const insecureFetch: typeof fetch = (url, options = {}) =>
 export const createActorForCredential = async (
   host: string,
   canisterId: Principal,
-  credential: Protocol.WebAuthn.Credential,
+  credential: WebAuthnCredential,
 ): Promise<ActorSubclass<_SERVICE>> => {
   const identity = await CredentialIdentity.fromCredential(credential);
   const agent = await HttpAgent.create({
@@ -682,7 +692,7 @@ export const LEGACY_PASSKEY_ALIAS = "pre-upgrade-passkey";
  */
 export const createLegacyCredential = async (
   page: Page,
-): Promise<Protocol.WebAuthn.Credential> => {
+): Promise<WebAuthnCredential> => {
   await page.goto(LEGACY_II_URL + "/self-service");
   const legacyAuthenticatorId = await addVirtualAuthenticator(page);
   await page.evaluate(
@@ -725,9 +735,9 @@ export const swapToLegacyOnlyIdentity = async (
   actor: ActorSubclass<_SERVICE>,
   identity: {
     identityNumber: bigint;
-    credentials: Protocol.WebAuthn.Credential[];
+    credentials: WebAuthnCredential[];
   },
-  legacyCredential: Protocol.WebAuthn.Credential,
+  legacyCredential: WebAuthnCredential,
   alias: string = LEGACY_PASSKEY_ALIAS,
 ): Promise<void> => {
   const legacyIdentity =

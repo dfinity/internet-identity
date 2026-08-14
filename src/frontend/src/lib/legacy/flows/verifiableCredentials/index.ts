@@ -310,8 +310,7 @@ const getValidatedIssuerDerivationOrigin = async ({
   | {
       kind: "error";
       err:
-        | "derivation_origin_issuer_error"
-        | "invalid_derivation_origin_issuer";
+        "derivation_origin_issuer_error" | "invalid_derivation_origin_issuer";
     }
   | { kind: "ok"; origin: string }
 > => {
