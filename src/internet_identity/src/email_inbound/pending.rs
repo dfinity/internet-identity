@@ -15,7 +15,9 @@ use internet_identity_interface::internet_identity::types::email_challenge::{
     error_code_name, EmailChallengeDiagnostics, EmailChallengeError, EmailChallengeStatus,
     VerificationPath,
 };
-use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey, Timestamp};
+use internet_identity_interface::internet_identity::types::{
+    AnchorNumber, AuthorizationKey, SessionKey, Timestamp,
+};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -173,7 +175,18 @@ pub struct PartialVerification {
 pub enum PendingKind {
     /// Setup flow — caller is authenticated; the email-recovery
     /// credential will be written to this anchor on success.
-    Register { anchor: AnchorNumber },
+    ///
+    /// `authorization_key` is the authn method that passed
+    /// `check_authorization` at prepare (device pubkey / OpenID key /
+    /// recovery address) — **not** the live caller principal. Finalize
+    /// re-checks that this method is still on the anchor. Pinning the
+    /// key (rather than `caller()`) matters for temp-key registration:
+    /// temp keys expire in 10 minutes while the challenge TTL is 30,
+    /// and the underlying device must remain valid for the full TTL.
+    Register {
+        anchor: AnchorNumber,
+        authorization_key: AuthorizationKey,
+    },
     /// Recovery flow — caller is anonymous. The anchor is resolved
     /// at submit-leaf time from the verified `From:` of the inbound
     /// email (via the `address → AnchorNumber` reverse index). The
@@ -185,8 +198,12 @@ pub enum PendingKind {
     /// success. Parallel to `Register`, but lives in its own anchor
     /// field and uses the `II-Verify-` Subject prefix so an inbound
     /// challenge email can never be cross-applied between the two
-    /// flows.
-    VerifyEmail { anchor: AnchorNumber },
+    /// flows. See [`PendingKind::Register`] for why `authorization_key`
+    /// is pinned.
+    VerifyEmail {
+        anchor: AnchorNumber,
+        authorization_key: AuthorizationKey,
+    },
 }
 
 /// Status the FE polls. The terminal variants (`Succeeded`,
@@ -392,6 +409,41 @@ fn is_expired_at(c: &PendingChallenge, now_secs: u64) -> bool {
     now_secs.saturating_sub(c.created_at_secs) >= super::CHALLENGE_TTL_SECS
 }
 
+/// Drop every in-flight email challenge (recovery setup *and*
+/// verified-email) that targets `anchor`.
+///
+/// Called at the start of security-relevant *shrinks* of the anchor's
+/// control set (authn-method remove/replace, OpenID remove,
+/// email-recovery / verified-email remove) so a prepare started under a
+/// now-revoked method can't complete, and so the pending map doesn't keep
+/// "zombie" entries that only the finalize-time re-auth would reject.
+/// Method *additions* (including registration-mode confirm) do not drop:
+/// they leave the pinned AuthorizationKey valid.
+///
+/// Recovery-flow entries (`PendingKind::Recover`) are *not* keyed by
+/// anchor (the anchor is resolved from the verified `From:` later)
+/// and are left alone.
+///
+/// Order contract with callers: invoke this **before** mutating the
+/// auth set, in the same update message, so there is no window where
+/// a concurrent finalize can race past a half-applied revoke.
+pub fn drop_challenges_for_anchor(anchor: AnchorNumber) {
+    PENDING.with(|cell| {
+        let mut map = cell.borrow_mut();
+        map.retain(|_, c| match &c.kind {
+            PendingKind::Register {
+                anchor: a,
+                authorization_key: _,
+            }
+            | PendingKind::VerifyEmail {
+                anchor: a,
+                authorization_key: _,
+            } => *a != anchor,
+            PendingKind::Recover { .. } => true,
+        });
+    });
+}
+
 /// Drop the entry with the smallest `created_at_secs`. Called only
 /// when the map is at capacity *after* the TTL sweep — i.e. the
 /// attacker is filling faster than entries naturally expire.
@@ -424,13 +476,20 @@ pub(crate) fn len_for_tests() -> usize {
 mod tests {
     use super::*;
 
+    fn test_auth_key() -> AuthorizationKey {
+        AuthorizationKey::DeviceKey(serde_bytes::ByteBuf::from(vec![1, 2, 3]))
+    }
+
     fn challenge(addr: &str, now: u64) -> PendingChallenge {
         let registered_domain = addr
             .rsplit_once('@')
             .map(|(_, d)| d.to_string())
             .unwrap_or_default();
         PendingChallenge {
-            kind: PendingKind::Register { anchor: 1 },
+            kind: PendingKind::Register {
+                anchor: 1,
+                authorization_key: test_auth_key(),
+            },
             claimed_address: addr.into(),
             registered_domain,
             created_at_secs: now,
@@ -620,5 +679,91 @@ mod tests {
         // Right at the TTL → None, and the entry is evicted on read.
         assert!(diagnostics_of("n1", created_at + super::super::CHALLENGE_TTL_SECS).is_none());
         assert_eq!(len_for_tests(), 0);
+    }
+
+    #[test]
+    fn drop_challenges_for_anchor_removes_setup_and_verify_only() {
+        reset_for_tests();
+        let authorization_key = test_auth_key();
+        insert_with_eviction("reg".into(), challenge("a@x.com", 100), 100);
+        insert_with_eviction(
+            "verify".into(),
+            PendingChallenge {
+                kind: PendingKind::VerifyEmail {
+                    anchor: 1,
+                    authorization_key: authorization_key.clone(),
+                },
+                claimed_address: "b@x.com".into(),
+                registered_domain: "x.com".into(),
+                created_at_secs: 100,
+                cached_root_dnskey: None,
+                cached_zones: crate::dnssec::ZoneKeysMap::new(),
+                cached_dmarc_txt: None,
+                partial_verification: None,
+                status: PendingStatus::Pending,
+                recovery_outcome: None,
+                message_id: None,
+            },
+            100,
+        );
+        insert_with_eviction(
+            "other-anchor".into(),
+            PendingChallenge {
+                kind: PendingKind::Register {
+                    anchor: 2,
+                    authorization_key,
+                },
+                claimed_address: "c@x.com".into(),
+                registered_domain: "x.com".into(),
+                created_at_secs: 100,
+                cached_root_dnskey: None,
+                cached_zones: crate::dnssec::ZoneKeysMap::new(),
+                cached_dmarc_txt: None,
+                partial_verification: None,
+                status: PendingStatus::Pending,
+                recovery_outcome: None,
+                message_id: None,
+            },
+            100,
+        );
+        insert_with_eviction(
+            "recover".into(),
+            PendingChallenge {
+                kind: PendingKind::Recover {
+                    session_pk: serde_bytes::ByteBuf::from(vec![1, 2, 3]),
+                },
+                claimed_address: "d@x.com".into(),
+                registered_domain: "x.com".into(),
+                created_at_secs: 100,
+                cached_root_dnskey: None,
+                cached_zones: crate::dnssec::ZoneKeysMap::new(),
+                cached_dmarc_txt: None,
+                partial_verification: None,
+                status: PendingStatus::Pending,
+                recovery_outcome: None,
+                message_id: None,
+            },
+            100,
+        );
+
+        drop_challenges_for_anchor(1);
+
+        assert!(matches!(
+            status_of("reg", 200),
+            EmailChallengeStatus::Expired
+        ));
+        assert!(matches!(
+            status_of("verify", 200),
+            EmailChallengeStatus::Expired
+        ));
+        assert!(matches!(
+            status_of("other-anchor", 200),
+            EmailChallengeStatus::Pending
+        ));
+        assert!(matches!(
+            status_of("recover", 200),
+            EmailChallengeStatus::Pending
+        ));
+        assert_eq!(len_for_tests(), 2);
     }
 }

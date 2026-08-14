@@ -49,13 +49,14 @@
 //! See design doc §8.4 / §8.5.
 
 use super::pending::{self, PendingKind, PendingStatus};
+use crate::authz_utils::{authorization_key_is_valid, unauthorized_principal_for_key};
 use crate::doh::{DohError, DohRecord};
 use crate::single_flight_cache::Cached;
 use internet_identity_interface::internet_identity::types::email_challenge::{
     EmailChallengeError, EmailChallengeSubmitDkimLeafArg,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, DelegationChain, SessionKey, SignedRRset,
+    AnchorNumber, AuthorizationKey, DelegationChain, SessionKey, SignedRRset,
 };
 
 /// A resolved DKIM TXT (required) plus DMARC TXT (optional — `None` is the
@@ -216,8 +217,13 @@ async fn finalize(
     }
 
     match &mat.kind {
-        SnapshotKind::Register { anchor } => {
-            let result = super::smtp::bind_credential(*anchor, &mat.claimed_address, now_secs);
+        SnapshotKind::Register {
+            anchor,
+            authorization_key,
+        } => {
+            let result = finalize_authenticated_bind(anchor, authorization_key, || {
+                super::smtp::bind_credential(*anchor, &mat.claimed_address, now_secs)
+            });
             pending::with_mut(nonce, now_secs, |c| {
                 c.partial_verification = None;
                 c.status = match result {
@@ -226,12 +232,17 @@ async fn finalize(
                 };
             });
         }
-        SnapshotKind::VerifyEmail { anchor } => {
-            let result = super::smtp::append_or_refresh_verified_email(
-                *anchor,
-                &mat.claimed_address,
-                now_secs,
-            );
+        SnapshotKind::VerifyEmail {
+            anchor,
+            authorization_key,
+        } => {
+            let result = finalize_authenticated_bind(anchor, authorization_key, || {
+                super::smtp::append_or_refresh_verified_email(
+                    *anchor,
+                    &mat.claimed_address,
+                    now_secs,
+                )
+            });
             pending::with_mut(nonce, now_secs, |c| {
                 c.partial_verification = None;
                 c.status = match result {
@@ -264,6 +275,23 @@ async fn finalize(
             };
         }
     }
+}
+
+/// Re-auth the prepare-time authorization method against `anchor`, then
+/// run the bind/append. If that device/OpenID/recovery credential was
+/// removed mid-flow, the challenge is stale (`Unauthorized`) and the
+/// anchor is left untouched. Does **not** depend on temp-key TTL.
+fn finalize_authenticated_bind(
+    anchor: &AnchorNumber,
+    authorization_key: &AuthorizationKey,
+    bind: impl FnOnce() -> Result<(), EmailChallengeError>,
+) -> Result<(), EmailChallengeError> {
+    if !authorization_key_is_valid(*anchor, authorization_key) {
+        return Err(EmailChallengeError::Unauthorized(
+            unauthorized_principal_for_key(authorization_key),
+        ));
+    }
+    bind()
 }
 
 /// Everything the signature verification + finalize need, derived from the
@@ -304,6 +332,9 @@ struct Snapshot {
 enum SnapshotKind {
     Register {
         anchor: AnchorNumber,
+        /// Authn method from prepare; re-authed at finalize (device still
+        /// on anchor, etc.) — not the live caller / temp-key principal.
+        authorization_key: AuthorizationKey,
     },
     Recovery {
         session_pk: SessionKey,
@@ -313,17 +344,31 @@ enum SnapshotKind {
     /// as a recovery credential.
     VerifyEmail {
         anchor: AnchorNumber,
+        /// Authn method from prepare; re-authed at finalize.
+        authorization_key: AuthorizationKey,
     },
 }
 
 impl VerifyMaterial {
     fn kind_from(c: &super::pending::PendingChallenge) -> SnapshotKind {
         match &c.kind {
-            PendingKind::Register { anchor } => SnapshotKind::Register { anchor: *anchor },
+            PendingKind::Register {
+                anchor,
+                authorization_key,
+            } => SnapshotKind::Register {
+                anchor: *anchor,
+                authorization_key: authorization_key.clone(),
+            },
             PendingKind::Recover { session_pk } => SnapshotKind::Recovery {
                 session_pk: session_pk.clone(),
             },
-            PendingKind::VerifyEmail { anchor } => SnapshotKind::VerifyEmail { anchor: *anchor },
+            PendingKind::VerifyEmail {
+                anchor,
+                authorization_key,
+            } => SnapshotKind::VerifyEmail {
+                anchor: *anchor,
+                authorization_key: authorization_key.clone(),
+            },
         }
     }
 
@@ -518,8 +563,13 @@ fn finalize_via_doh(
             });
         }
         Ok(()) => match &mat.kind {
-            SnapshotKind::Register { anchor } => {
-                let result = super::smtp::bind_credential(*anchor, &mat.claimed_address, now_secs);
+            SnapshotKind::Register {
+                anchor,
+                authorization_key,
+            } => {
+                let result = finalize_authenticated_bind(anchor, authorization_key, || {
+                    super::smtp::bind_credential(*anchor, &mat.claimed_address, now_secs)
+                });
                 pending::with_mut(&nonce, now_secs, |c| {
                     c.partial_verification = None;
                     c.status = match result {
@@ -528,12 +578,17 @@ fn finalize_via_doh(
                     };
                 });
             }
-            SnapshotKind::VerifyEmail { anchor } => {
-                let result = super::smtp::append_or_refresh_verified_email(
-                    *anchor,
-                    &mat.claimed_address,
-                    now_secs,
-                );
+            SnapshotKind::VerifyEmail {
+                anchor,
+                authorization_key,
+            } => {
+                let result = finalize_authenticated_bind(anchor, authorization_key, || {
+                    super::smtp::append_or_refresh_verified_email(
+                        *anchor,
+                        &mat.claimed_address,
+                        now_secs,
+                    )
+                });
                 pending::with_mut(&nonce, now_secs, |c| {
                     c.partial_verification = None;
                     c.status = match result {

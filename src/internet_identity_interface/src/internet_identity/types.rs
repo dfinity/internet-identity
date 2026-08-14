@@ -518,6 +518,7 @@ pub struct GetSsoDiscoveryStatusRequest {
     pub target_app_origin: Option<FrontendHostname>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AuthorizationKey {
     DeviceKey(DeviceKey),
     OpenIdCredentialKey((OpenIdCredentialKey, Option<ConfigIss>)),
