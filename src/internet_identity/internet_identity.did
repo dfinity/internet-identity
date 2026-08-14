@@ -1026,6 +1026,13 @@ type IdentityInfo = record {
     // shows a "limit reached" notice in the wizard when adding
     // beyond the cap.
     verified_emails : opt vec VerifiedEmail;
+    // The anchor's synced trusted-MCP-server config (absent when the
+    // anchor never wrote one). Carried here rather than read from the
+    // mcp_get_config query so the Settings UI has a certified value to
+    // render and to base its writes on: identity_info is an update
+    // call, so its response is certified through consensus, whereas a
+    // query reply a single malicious node could forge is not.
+    mcp_config : opt McpConfig;
 };
 
 type IdentityInfoError = variant {
@@ -1876,9 +1883,13 @@ service : (opt InternetIdentityInit) -> {
 
     // Read the identity's synced trusted-MCP-server config (master toggle + the
     // trusted server URL). Persisted on-chain, so it follows the identity across
-    // devices. Read by the Settings UI and the /mcp connect flow (which verifies
-    // the connecting origin against it). Returns the disabled, no-server default
-    // for an unauthorized caller or an anchor that never wrote a config.
+    // devices. Being a query, the reply is signed by a single node: the /mcp
+    // connect flow uses it only to pick which screen to show, and gates delivery
+    // on the certified trusted_url from prepare_mcp_registration_delegation.
+    // Callers that render trust, or write the config back, take it from
+    // IdentityInfo.mcp_config on the identity_info update call instead. Returns
+    // the disabled, no-server default for an unauthorized caller or an anchor
+    // that never wrote a config.
     // `null` means the identity has never written a config — distinct from a
     // stored one that is switched off. The two behave differently at /mcp: the
     // first may connect the deployment's official connector (completing the

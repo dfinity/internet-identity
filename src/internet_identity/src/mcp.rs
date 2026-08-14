@@ -243,8 +243,9 @@ pub fn register(
 
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
 /// trusted server URL), or `None` when the anchor has never written one, which
-/// Settings renders the same as switched off. The caller must already be
-/// authorized for `anchor_number` (checked by the canister method). The stored
+/// Settings renders the same as switched off. Serves both the `mcp_get_config`
+/// query and `IdentityInfo::mcp_config`. The caller must already be authorized
+/// for `anchor_number` (checked by the canister method). The stored
 /// `session_principal` pointer is internal bookkeeping and not exposed.
 pub fn get_mcp_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
     storage_borrow(|storage| storage.lookup_mcp_config(anchor_number)).map(|config| McpConfig {
