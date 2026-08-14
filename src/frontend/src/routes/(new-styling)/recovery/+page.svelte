@@ -41,13 +41,20 @@
   import { purgeSession } from "$lib/stores/session-delegation.store";
   import { authenticateWithSession } from "$lib/utils/authentication";
   import { goto, preloadData } from "$app/navigation";
+  import { page } from "$app/state";
   import { toaster } from "$lib/components/utils/toaster";
   import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
   import { transformSignedDelegation } from "$lib/utils/utils";
 
+  const identityParam = page.url.searchParams.get("identity");
+  const linkedIdentityNumber =
+    identityParam !== null && /^\d+$/.test(identityParam)
+      ? BigInt(identityParam)
+      : undefined;
+
   let showRecoveryDialog = $state(false);
   let showEmailRecoveryDialog = $state(false);
-  let showIdentityNumberDialog = $state(false);
+  let showIdentityNumberDialog = $state(linkedIdentityNumber !== undefined);
 
   const handleSubmit = async (
     recoveryPhrase: string[],
@@ -345,6 +352,7 @@
 {#if showIdentityNumberDialog}
   <Dialog onClose={() => (showIdentityNumberDialog = false)}>
     <MigrationWizard
+      initialIdentityNumber={linkedIdentityNumber}
       onSuccess={handleIdentityNumberSuccess}
       onError={(error) => {
         showIdentityNumberDialog = false;

@@ -1,43 +1,14 @@
 <script lang="ts">
-  import { getPrimaryOrigin } from "$lib/globals";
+  import { isRedirectingToPrimaryOrigin } from "$lib/utils/primaryOrigin";
   import { onMount } from "svelte";
   import { page } from "$app/state";
 
   const { children } = $props();
 
   onMount(() => {
-    // Always redirect to primary origin
-    const primaryOrigin = getPrimaryOrigin();
-    if (
-      primaryOrigin !== undefined &&
-      window.location.origin !== primaryOrigin &&
-      // Don't redirect if we're coming from legacy AuthClient
-      !(
-        window.location.pathname === "/" &&
-        window.location.hash === "#authorize"
-      ) &&
-      // Don't redirect if we're visiting legacy verifiable credentials
-      window.location.pathname !== "/vc-flow" &&
-      // Don't redirect if we're visiting self-service
-      window.location.pathname !== "/self-service" &&
-      // Don't redirect if we're visiting webauthn iframe used for migration
-      window.location.pathname !== "/iframe/webauthn" &&
-      // Don't redirect if we're visiting new authorize flow
-      // TODO: Implement redirect with pending ICRC-29 state
-      window.location.pathname !== "/authorize"
-    ) {
-      // cli.id.ai serves only the CLI authorize entry point — every hit
-      // there lands on /cli on the primary origin, regardless of path.
-      const pathname =
-        window.location.host === "cli.id.ai"
-          ? "/cli"
-          : window.location.pathname;
-      window.location.replace(
-        primaryOrigin +
-          pathname +
-          window.location.search +
-          window.location.hash,
-      );
+    // A redirect to the primary origin is in flight, keep the page hidden
+    // rather than flashing this origin's render before it commits.
+    if (isRedirectingToPrimaryOrigin()) {
       return;
     }
 

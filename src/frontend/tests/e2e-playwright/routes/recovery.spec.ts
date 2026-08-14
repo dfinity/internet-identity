@@ -268,4 +268,23 @@ test.describe("Identity number recovery (MigrationWizard)", () => {
 
     await removeVirtualAuthenticator(page, authenticatorId);
   });
+
+  test("opens the wizard with the identity number from the query", async ({
+    page,
+  }) => {
+    await page.goto(II_URL + "/recovery?identity=12345");
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByPlaceholder("Internet Identity number"),
+    ).toHaveValue("12345");
+  });
+
+  test("ignores a non-numeric identity query", async ({ page }) => {
+    await page.goto(II_URL + "/recovery?identity=not-a-number");
+    await expect(
+      page.getByRole("heading", { name: "Recover your identity" }),
+    ).toBeVisible();
+    await expect(page.getByRole("dialog")).toBeHidden();
+  });
 });

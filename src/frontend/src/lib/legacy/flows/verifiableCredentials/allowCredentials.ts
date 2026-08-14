@@ -1,16 +1,10 @@
 import { mkAnchorInput } from "$lib/templates/anchorInput";
 import { mainWindow } from "$lib/templates/mainWindow";
 import { I18n } from "$lib/legacy/i18n";
-import { markdownToHTML } from "$lib/utils/html";
-import { mount, renderPage, TemplateElement } from "$lib/utils/lit-html";
-import { Chan } from "$lib/utils/utils";
+import { mount, renderPage } from "$lib/utils/lit-html";
 import { html, TemplateResult } from "lit-html";
-import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 
 import { getDapps, KnownDapp } from "../dappsExplorer/dapps";
-
-import DOMPurify from "dompurify";
 
 import copyJson from "./allowCredentials.json";
 
@@ -72,14 +66,6 @@ const allowCredentialsTemplate = ({
   };
 
   const knownDapps = getDapps();
-  const consentMessage = new Chan<TemplateElement>(html`${consentMessage_}`);
-
-  // Kickstart markdown parsing & sanitizing; once done, replace the consent message
-  void (async () => {
-    const parsed = await markdownToHTML(consentMessage_);
-    const sanitized = await DOMPurify.sanitize(parsed);
-    consentMessage.send(unsafeHTML(sanitized));
-  })();
 
   const originDapp = getOrigin(providerOrigin, knownDapps);
   const relyingDapp = getOrigin(relyingOrigin, knownDapps);
@@ -95,8 +81,11 @@ const allowCredentialsTemplate = ({
 
     <div class="c-card c-card--narrow c-card--warning l-stack">
       <article class="c-card--consent">
-        <div class="t-formatted t-formatted--monospace">
-          ${asyncReplace(consentMessage)}
+        <!-- The consent message is issuer-supplied and bound as text, so lit
+             escapes it and any markup the issuer included is shown as written
+             rather than interpreted. -->
+        <div class="t-formatted t-formatted--monospace t-formatted--verbatim">
+          ${consentMessage_}
         </div>
       </article>
       <div class="l-horizontal l-stack--small">
