@@ -451,6 +451,9 @@ msgstr "Скопіювати тему"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Не вдалося завантажити налаштування SSO з {domainInput}. Попросіть адміністратора SSO перевірити, що /.well-known/ii-openid-configuration доступний."
 
+msgid "Couldn't load your AI access settings."
+msgstr "Не вдалося завантажити налаштування доступу AI."
+
 msgid "Couldn't remove the connector. Please try again."
 msgstr "Не вдалося видалити конектор. Будь ласка, спробуйте ще раз."
 
@@ -1646,6 +1649,9 @@ msgstr "Це метод доступу, за допомогою якого ви 
 
 msgid "This is the recovery method you're currently signed in with."
 msgstr "Це метод відновлення, за допомогою якого ви наразі увійшли."
+
+msgid "This legacy passkey is no longer usable and should be removed."
+msgstr "Цей застарілий ключ доступу більше не може використовуватися і має бути видалений."
 
 msgid "This may take a few seconds"
 msgstr "Це може зайняти кілька секунд"

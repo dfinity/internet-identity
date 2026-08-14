@@ -451,6 +451,9 @@ msgstr "موضوع کاپی کریں"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "{domainInput} سے SSO سیٹنگز لوڈ نہیں ہو سکیں۔ اپنے SSO ایڈمن سے کہیں کہ وہ یہ یقینی بنائے کہ /.well-known/ii-openid-configuration قابلِ رسائی ہے۔"
 
+msgid "Couldn't load your AI access settings."
+msgstr "آپ کی AI رسائی کی ترتیبات لوڈ نہیں ہو سکیں۔"
+
 msgid "Couldn't remove the connector. Please try again."
 msgstr "کنیکٹر نہیں ہٹایا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔"
 
@@ -1646,6 +1649,9 @@ msgstr "یہ وہ رسائی کا طریقہ ہے جس سے آپ فی الحال
 
 msgid "This is the recovery method you're currently signed in with."
 msgstr "یہ وہ ریکوری طریقہ ہے جس سے آپ فی الحال سائن اِن ہیں۔"
+
+msgid "This legacy passkey is no longer usable and should be removed."
+msgstr "یہ پرانی پاس کی اب قابل استعمال نہیں ہے اور اسے ہٹا دینا چاہیے"
 
 msgid "This may take a few seconds"
 msgstr "اس میں کچھ سیکنڈ لگ سکتے ہیں"

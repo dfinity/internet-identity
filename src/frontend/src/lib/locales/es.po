@@ -1647,6 +1647,9 @@ msgstr "Este es el método de acceso con el que tienes sesión iniciada actualme
 msgid "This is the recovery method you're currently signed in with."
 msgstr "Este es el método de recuperación con el que tienes sesión iniciada actualmente."
 
+msgid "This legacy passkey is no longer usable and should be removed."
+msgstr "Esta passkey de legado ya no es utilizable y debería eliminarse."
+
 msgid "This may take a few seconds"
 msgstr "Esto puede tardar unos segundos"
 
