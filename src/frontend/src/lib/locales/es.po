@@ -936,7 +936,7 @@ msgid "Loading permissions"
 msgstr "Cargando permisos"
 
 msgid "Long-press the link that opened this page."
-msgstr "Mantén presionada la tecla de la página que abrió esta página."
+msgstr "Mantén presionado el enlace que abrió esta página."
 
 msgid "Looks things up, changing nothing."
 msgstr "Busca información sin cambiar nada."

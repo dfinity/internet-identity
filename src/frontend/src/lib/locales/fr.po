@@ -1960,7 +1960,7 @@ msgid "You can manage your access methods on this page."
 msgstr "Vous pouvez gérer vos méthodes d'accès sur cette page."
 
 msgid "You can reset your recovery phrase at any time. This keeps your identity secure if it is ever exposed."
-msgstr "Vous pouvez réinitialiser votre phrase de récupération à tout moment. Cela permet de protèger votre identité si elle venait à être divulguée."
+msgstr "Vous pouvez réinitialiser votre phrase de récupération à tout moment. Cela permet de protéger votre identité si elle venait à être divulguée."
 
 msgid "You can return to your agent."
 msgstr "Vous pouvez retourner à votre agent."
