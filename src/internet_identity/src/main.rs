@@ -538,9 +538,14 @@ fn get_account_delegation(
 
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
 /// trusted server URL). Persisted on-chain, so it follows the identity across
-/// devices. Read by the Settings UI and by the `/mcp` connect flow, which
-/// verifies the connecting origin against it at connect time. `null` means the
-/// anchor has never written a config.
+/// devices. `null` means the anchor has never written a config.
+///
+/// A query, so the reply is signed by one node rather than by consensus: the
+/// `/mcp` connect flow uses it only to pick which screen to show, and gates
+/// delivery on the certified `trusted_url` from
+/// `prepare_mcp_registration_delegation`. Anything that renders trust or feeds
+/// a write reads the config from `IdentityInfo::mcp_config` instead, certified
+/// by the `identity_info` update call.
 #[query]
 fn mcp_get_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
     if check_session_authorization(anchor_number).is_err() {
@@ -1089,6 +1094,11 @@ mod v2_api {
             created_at: anchor_info.created_at,
             email_recovery,
             verified_emails,
+            // The same config `mcp_get_config` serves, but certified: this is
+            // an update call, so the Settings UI can render the trusted server
+            // — and base the config it writes back — on a value no single node
+            // can forge.
+            mcp_config: mcp::get_mcp_config(identity_number),
         };
         Ok(identity_info)
     }

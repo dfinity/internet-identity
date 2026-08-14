@@ -559,6 +559,10 @@ export const idlFactory = ({ IDL }) => {
     'address' : IDL.Text,
     'last_used' : IDL.Opt(Timestamp),
   });
+  const McpConfig = IDL.Record({
+    'url' : IDL.Opt(IDL.Text),
+    'enabled' : IDL.Bool,
+  });
   const AuthnMethodRegistrationInfo = IDL.Record({
     'expiration' : Timestamp,
     'session' : IDL.Opt(IDL.Principal),
@@ -571,6 +575,7 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Opt(IDL.Text),
     'email_recovery' : IDL.Opt(IDL.Vec(EmailRecoveryCredential)),
     'created_at' : IDL.Opt(Timestamp),
+    'mcp_config' : IDL.Opt(McpConfig),
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
   });
@@ -627,10 +632,6 @@ export const idlFactory = ({ IDL }) => {
   const DeviceKeyWithAnchor = IDL.Record({
     'pubkey' : DeviceKey,
     'anchor_number' : UserNumber,
-  });
-  const McpConfig = IDL.Record({
-    'url' : IDL.Opt(IDL.Text),
-    'enabled' : IDL.Bool,
   });
   const McpPrepareDelegation = IDL.Record({
     'user_key' : UserKey,
