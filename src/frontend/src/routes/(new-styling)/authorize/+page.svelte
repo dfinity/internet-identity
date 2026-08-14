@@ -70,7 +70,15 @@
 
   // --- Local state ---
   let upgradeSuccess = $state(false);
-  let openIdResumeProcessing = $state(false);
+  // The 1-click OpenID resume load shows the redirect animation from its very
+  // first frame. `resumeOpenId` runs in `onMount`, i.e. *after* that first
+  // render, so starting at `false` renders the returning-user account picker
+  // for one frame — and that picker immediately starts origin-bound canister
+  // work, which throws "Authorization context is not available yet": the
+  // dapp's authorize request cannot have arrived yet on a freshly resumed
+  // channel. The early exits below (and a failure in `resumeOpenId`) set this
+  // back to `false`, which is what surfaces the regular fall-back UI.
+  let openIdResumeProcessing = $state(data.flow === "openid-resume");
   // Set when a 1-click SSO redemption hits the normal-login-required fail-safe.
   // Holds everything the dialog needs to run one normal (primary-client)
   // sign-in, then replay the stashed gated JWT and authorize.
@@ -314,6 +322,7 @@
     // popup sign-in from this tab.
     sessionStorage.removeItem("ii-openid-authorize-state");
     if (storedPayload === null || openIdAuthorizeState === null) {
+      openIdResumeProcessing = false;
       return;
     }
     let jwt: string;
@@ -326,6 +335,7 @@
       // A state mismatch, an IdP error report or a missing token is not
       // recoverable here; fall back to the regular flow so the user can
       // start sign-in again.
+      openIdResumeProcessing = false;
       return;
     }
     const { iss, aud, ...metadata } = decodeJWT(jwt);
@@ -338,8 +348,6 @@
     sessionStorage.removeItem("ii-sso-1-click-domain");
     // SSO is never tracked as a last-used identity.
     const authFlow = new AuthFlow({ trackLastUsed: ssoDomain === null });
-    // Show the redirect animation now so the wait below doesn't flash the wizard.
-    openIdResumeProcessing = true;
     // Redeem through the origin-bound gate path so the session certifies
     // `sso:<domain>` attributes.
     let sso: { origin: string } | undefined;
@@ -379,6 +387,7 @@
         ]),
       );
       if (config === undefined) {
+        openIdResumeProcessing = false;
         return;
       }
       authorizationStore.setFlow({
@@ -459,7 +468,12 @@
     } else if (data.flow === "openid-resume") {
       // resumeOpenId sets the flow once the JWT (and thus the issuer)
       // has been decoded.
-      resumeOpenId().catch(handleError);
+      resumeOpenId().catch((error) => {
+        // Bring the regular UI back rather than leaving the redirect animation
+        // up for a resume that has already failed.
+        openIdResumeProcessing = false;
+        handleError(error);
+      });
     } else {
       authorizationStore.setFlow({ type: "regular" });
     }

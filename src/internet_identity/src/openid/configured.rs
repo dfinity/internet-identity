@@ -262,8 +262,21 @@ fn schedule_fetch_certs(issuer: String, jwks_uri: String, delay: Option<u64>) {
             spawn(async move {
                 let result = super::jwks::fetch_jwks(jwks_uri.clone()).await;
                 let next_delay = compute_next_certs_fetch_delay(&result, delay);
-                if let Ok(certs) = result {
-                    state::storage_borrow_mut(|s| s.write_openid_jwks(&issuer, certs));
+                match result {
+                    Ok(certs) => {
+                        state::storage_borrow_mut(|s| s.write_openid_jwks(&issuer, certs));
+                    }
+                    Err(err) => {
+                        // Until the next fetch succeeds, verification keeps using
+                        // the keys already in stable storage. Without this line, a
+                        // provider rotating its signing key while these fetches are
+                        // failing shows up only as "Certificate not found for
+                        // {kid}" on every sign-in, with no hint of the cause.
+                        ic_cdk::println!(
+                            "Failed to fetch JWKs for {issuer}: {err} (retrying in {}s)",
+                            next_delay.unwrap_or(FETCH_CERTS_INTERVAL_SECONDS)
+                        );
+                    }
                 }
                 schedule_fetch_certs(issuer, jwks_uri, next_delay);
             });
