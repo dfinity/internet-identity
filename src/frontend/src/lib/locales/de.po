@@ -451,9 +451,6 @@ msgstr "Betreff kopieren"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Die SSO-Einstellungen von {domainInput} konnten nicht geladen werden. Bitten Sie Ihren SSO-Administrator zu prüfen, ob /.well-known/ii-openid-configuration erreichbar ist."
 
-msgid "Couldn't load your AI access settings."
-msgstr "Ihre KI-Zugriffseinstellungen konnten nicht geladen werden."
-
 msgid "Couldn't remove the connector. Please try again."
 msgstr "Der Connector konnte nicht entfernt werden. Bitte versuchen Sie es erneut."
 
@@ -504,6 +501,9 @@ msgstr "{0} erstellt"
 
 msgid "Created {date}"
 msgstr "Am {date} erstellt"
+
+msgid "Created on the old Internet Identity site. Can only be used to <0>recover</0>, when upgrading from an identity number."
+msgstr "Auf der alten Internet Identity-Website erstellt. Kann nur zum <0>Wiederherstellen</0> verwendet werden, wenn von einer Identitätsnummer gewechselt wird."
 
 msgid "Creating account..."
 msgstr "Konto wird erstellt..."
@@ -1646,9 +1646,6 @@ msgstr "Dies ist die Zugriffsmethode, mit der Sie derzeit angemeldet sind."
 
 msgid "This is the recovery method you're currently signed in with."
 msgstr "Dies ist die Wiederherstellungsmethode, mit der Sie derzeit angemeldet sind."
-
-msgid "This legacy passkey is no longer usable and should be removed."
-msgstr "Dieser Legacy-Passkey ist nicht mehr verwendbar und sollte entfernt werden."
 
 msgid "This may take a few seconds"
 msgstr "Dies kann einige Sekunden dauern"

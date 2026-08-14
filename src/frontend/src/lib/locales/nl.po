@@ -451,9 +451,6 @@ msgstr "Onderwerp kopiëren"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "SSO-instellingen van {domainInput} konden niet worden geladen. Vraag uw SSO-beheerder om te controleren of /.well-known/ii-openid-configuration bereikbaar is."
 
-msgid "Couldn't load your AI access settings."
-msgstr "Uw AI-toegangsinstellingen konden niet worden geladen."
-
 msgid "Couldn't remove the connector. Please try again."
 msgstr "De connector kon niet worden verwijderd. Probeer het opnieuw."
 
@@ -504,6 +501,9 @@ msgstr "Gemaakt {0}"
 
 msgid "Created {date}"
 msgstr "Gemaakt {date}"
+
+msgid "Created on the old Internet Identity site. Can only be used to <0>recover</0>, when upgrading from an identity number."
+msgstr "Aangemaakt op de oude Internet Identity-site. Kan alleen worden gebruikt om <0>te herstellen</0>, bij het upgraden van een identiteitsnummer."
 
 msgid "Creating account..."
 msgstr "Account aanmaken..."
@@ -1646,9 +1646,6 @@ msgstr "Dit is de toegangsmethode waarmee u momenteel bent ingelogd."
 
 msgid "This is the recovery method you're currently signed in with."
 msgstr "Dit is de herstelmethode waarmee u momenteel bent ingelogd."
-
-msgid "This legacy passkey is no longer usable and should be removed."
-msgstr "Deze verouderde passkey is niet meer bruikbaar en moet worden verwijderd."
 
 msgid "This may take a few seconds"
 msgstr "Dit kan enkele seconden duren"

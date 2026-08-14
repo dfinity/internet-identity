@@ -451,9 +451,6 @@ msgstr "Скопировать тему"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Не удалось загрузить настройки SSO с {domainInput}. Попросите вашего администратора SSO убедиться, что /.well-known/ii-openid-configuration доступен."
 
-msgid "Couldn't load your AI access settings."
-msgstr "Не удалось загрузить настройки доступа AI."
-
 msgid "Couldn't remove the connector. Please try again."
 msgstr "Не удалось удалить коннектор. Пожалуйста, попробуйте снова."
 
@@ -504,6 +501,9 @@ msgstr "Создано {0}"
 
 msgid "Created {date}"
 msgstr "Создано {date}"
+
+msgid "Created on the old Internet Identity site. Can only be used to <0>recover</0>, when upgrading from an identity number."
+msgstr "Создан на старом сайте Internet Identity. Может использоваться только для <0>восстановления</0>, при переходе с номера учётной записи."
 
 msgid "Creating account..."
 msgstr "Создание аккаунта..."
@@ -1646,9 +1646,6 @@ msgstr "Это метод доступа, с помощью которого в�
 
 msgid "This is the recovery method you're currently signed in with."
 msgstr "Это метод восстановления, с помощью которого вы в данный момент вошли."
-
-msgid "This legacy passkey is no longer usable and should be removed."
-msgstr "Этот устаревший ключ доступа больше не может быть использован и должен быть удален."
 
 msgid "This may take a few seconds"
 msgstr "Это может занять несколько секунд."
