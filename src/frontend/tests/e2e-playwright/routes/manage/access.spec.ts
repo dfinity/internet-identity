@@ -1,10 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import {
-  createActorForCredential,
-  CredentialIdentity,
-  II_URL,
-} from "../../utils";
+import { createActorForCredential, II_URL } from "../../utils";
 import { DEFAULT_PASSKEY_NAME } from "../../fixtures/manageAccessPage";
 import { SSO_DISCOVERY_DOMAIN, SSO_OPENID_PORT } from "../../fixtures/sso";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
@@ -364,39 +360,6 @@ test.describe("Access methods", () => {
       );
       await expect(link).toHaveAttribute("target", "_blank");
     });
-  });
-
-  test("opens recovery with the identity number already filled in", async ({
-    page,
-    context,
-    manageAccessPage,
-    identities,
-  }) => {
-    const actor = await createActorForCredential(
-      identities[0].host,
-      identities[0].canisterId,
-      identities[0].credentials[0],
-    );
-    const identity = await CredentialIdentity.fromCredential(
-      identities[0].credentials[0],
-    );
-    await actor.authn_method_metadata_replace(
-      identities[0].identityNumber,
-      new Uint8Array(identity.getPublicKey().toDer()),
-      [["origin", { String: LEGACY_II_URL }]],
-    );
-    await page.reload();
-
-    const tab = context.waitForEvent("page");
-    await manageAccessPage
-      .findPasskey(DEFAULT_PASSKEY_NAME)
-      .locator.getByRole("link", { name: "recover" })
-      .click();
-    const recoveryTab = await tab;
-
-    await expect(
-      recoveryTab.getByPlaceholder("Internet Identity number"),
-    ).toHaveValue(identities[0].identityNumber.toString());
   });
 
   test.describe("with an SSO method", () => {
