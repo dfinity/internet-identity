@@ -99,6 +99,16 @@ pub struct IdentityInfo {
     /// `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
     pub verified_emails:
         Option<Vec<crate::internet_identity::types::verified_email::VerifiedEmail>>,
+    /// The anchor's synced trusted-MCP-server config (master toggle +
+    /// trusted server URL). `None` for an anchor that never wrote one.
+    ///
+    /// Carried here — rather than read from the `mcp_get_config` query —
+    /// so the Settings UI has a *certified* value: `identity_info` is an
+    /// update call, so its response goes through consensus, while a single
+    /// malicious node can forge a query reply. Settings both renders the
+    /// trusted server from this value and uses it as the basis of the
+    /// config it writes back with `mcp_set_config`.
+    pub mcp_config: Option<crate::internet_identity::types::McpConfig>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

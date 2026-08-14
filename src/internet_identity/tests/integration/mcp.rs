@@ -14,10 +14,10 @@ use crate::v2_api::authn_method_test_helpers::{
 use candid::Principal;
 use canister_tests::{
     api::internet_identity::api_v2::{
-        create_account, get_mcp_registration_delegation, mcp_get_accounts, mcp_get_config,
-        mcp_get_delegation, mcp_prepare_delegation, mcp_register_v2, mcp_set_config,
-        prepare_account_delegation, prepare_mcp_registration_delegation, set_default_account,
-        AccountDelegationParams,
+        create_account, get_mcp_registration_delegation, identity_info, mcp_get_accounts,
+        mcp_get_config, mcp_get_delegation, mcp_prepare_delegation, mcp_register_v2,
+        mcp_set_config, prepare_account_delegation, prepare_mcp_registration_delegation,
+        set_default_account, AccountDelegationParams,
     },
     flows,
     framework::{
@@ -1100,6 +1100,52 @@ fn mcp_config_round_trips_and_persists_across_upgrade() -> Result<(), RejectResp
     assert_eq!(
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
         Some(config.clone())
+    );
+
+    Ok(())
+}
+
+/// `identity_info` carries the same config `mcp_get_config` serves. That is
+/// what lets Settings render the trusted server — and base the config it
+/// writes back — on a certified value: `identity_info` is an update call,
+/// whereas a query reply is signed by a single node and can be forged.
+#[test]
+fn identity_info_carries_the_mcp_config() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let authn_method = test_authn_method();
+    let anchor = create_identity_with_authn_method(&env, canister_id, &authn_method);
+
+    // This deployment ships no official connector, so registration wrote no
+    // config and the identity starts out with nothing stored.
+    assert_eq!(
+        identity_info(&env, canister_id, authn_method.principal(), anchor)
+            .unwrap()
+            .unwrap()
+            .mcp_config,
+        None
+    );
+
+    let config = McpConfig {
+        enabled: true,
+        url: Some(format!("{MCP_ORIGIN}/mcp")),
+    };
+    mcp_set_config(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        anchor,
+        config.clone(),
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(
+        identity_info(&env, canister_id, authn_method.principal(), anchor)
+            .unwrap()
+            .unwrap()
+            .mcp_config,
+        Some(config)
     );
 
     Ok(())
