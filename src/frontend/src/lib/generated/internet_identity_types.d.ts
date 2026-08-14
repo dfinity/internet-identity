@@ -660,6 +660,14 @@ export interface EmailChallengeSubmitDkimLeafArg {
   'hops' : Array<SignedRRset>,
   'nonce' : string,
 }
+/**
+ * Email-recovery types
+ * ====================
+ * See `docs/ongoing/email-recovery.md` for the full design. Covers
+ * both halves of the flow: setup (binding a recovery email to an
+ * anchor) and recovery (proving control of a previously-bound
+ * address to obtain a signed delegation).
+ */
 export interface EmailRecoveryCredential {
   'created_at' : Timestamp,
   'address' : string,
@@ -802,6 +810,10 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
+/**
+ * ICRC-3 attribute sharing types
+ * ==============================
+ */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -930,6 +942,15 @@ export interface IdentityInfo {
    * The timestamp at which the anchor was created
    */
   'created_at' : [] | [Timestamp],
+  /**
+   * The anchor's synced trusted-MCP-server config (absent when the
+   * anchor never wrote one). Carried here rather than read from the
+   * mcp_get_config query so the Settings UI has a certified value to
+   * render and to base its writes on: identity_info is an update
+   * call, so its response is certified through consensus, whereas a
+   * query reply a single malicious node could forge is not.
+   */
+  'mcp_config' : [] | [McpConfig],
   'authn_method_registration' : [] | [AuthnMethodRegistrationInfo],
   'openid_credentials' : [] | [Array<OpenIdCredential>],
 }
@@ -2172,9 +2193,13 @@ export interface _SERVICE {
   /**
    * Read the identity's synced trusted-MCP-server config (master toggle + the
    * trusted server URL). Persisted on-chain, so it follows the identity across
-   * devices. Read by the Settings UI and the /mcp connect flow (which verifies
-   * the connecting origin against it). Returns the disabled, no-server default
-   * for an unauthorized caller or an anchor that never wrote a config.
+   * devices. Being a query, the reply is signed by a single node: the /mcp
+   * connect flow uses it only to pick which screen to show, and gates delivery
+   * on the certified trusted_url from prepare_mcp_registration_delegation.
+   * Callers that render trust, or write the config back, take it from
+   * IdentityInfo.mcp_config on the identity_info update call instead. Returns
+   * the disabled, no-server default for an unauthorized caller or an anchor
+   * that never wrote a config.
    * `null` means the identity has never written a config — distinct from a
    * stored one that is switched off. The two behave differently at /mcp: the
    * first may connect the deployment's official connector (completing the

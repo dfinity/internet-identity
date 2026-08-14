@@ -35,6 +35,14 @@ use std::collections::HashMap;
 // we are using 10 minutes to account for potential clock offsets as well as users.
 const MAX_VALIDITY_WINDOW_SECONDS: u64 = 10 * 60; // Same as ingress expiry
 
+// Tolerance for the identity provider's clock running ahead of the subnet's.
+// Without any leeway, a provider a second or two fast makes a JWT that was just
+// issued fail as "not valid yet" until the subnet catches up, which the user
+// only sees as a sign-in that failed for no reason. This widens the *lower*
+// bound only: `exp` and the `iat + MAX_VALIDITY_WINDOW_SECONDS` check above
+// still bound how long a token stays usable.
+const CLOCK_SKEW_LEEWAY_SECONDS: u64 = 30;
+
 // Maximum length of the email claim in the JWT, in practice we expect the identity provider to
 // already validate it on their end for a sane maximum length. This is an additional sanity check.
 const MAX_EMAIL_LENGTH: usize = 256;
@@ -361,7 +369,9 @@ fn verify_claims(
     if now_secs > max_valid_until_secs {
         return Err(OpenIDJWTVerificationError::JWTExpired);
     }
-    if now_secs < claims.iat {
+    // `saturating_add` keeps this panic-free for the same reason as the
+    // `checked_add` above: the leeway is applied to the clock, not the claim.
+    if now_secs.saturating_add(CLOCK_SKEW_LEEWAY_SECONDS) < claims.iat {
         return Err(OpenIDJWTVerificationError::GenericError(
             "JWT is not valid yet".into(),
         ));
@@ -638,13 +648,27 @@ mod tests {
     #[test]
     fn should_reject_jwt_issued_in_the_future() {
         reset_test_env();
-        // One second before the token's `iat`.
-        TEST_TIME.set(secs_to_nanos(TEST_IAT_SECONDS - 1));
+        // One second before the leeway's reach: a provider clock this far ahead
+        // is a real mismatch, not the second or two of skew we tolerate.
+        TEST_TIME.set(secs_to_nanos(
+            TEST_IAT_SECONDS - CLOCK_SKEW_LEEWAY_SECONDS - 1,
+        ));
         let err =
             verify_and_build(VALID_JWT, &descriptor(), &test_certs(), &test_salt()).unwrap_err();
         assert!(
             matches!(err, OpenIDJWTVerificationError::GenericError(msg) if msg.contains("not valid yet"))
         );
+    }
+
+    #[test]
+    fn should_accept_jwt_issued_within_clock_skew_leeway() {
+        reset_test_env();
+        // The subnet clock trails the provider's, so the JWT looks issued in the
+        // future — by less than the leeway, which is what a provider running a
+        // little fast looks like. It must verify instead of failing the sign-in.
+        TEST_TIME.set(secs_to_nanos(TEST_IAT_SECONDS - CLOCK_SKEW_LEEWAY_SECONDS));
+        verify_and_build(VALID_JWT, &descriptor(), &test_certs(), &test_salt())
+            .expect("expected verification to succeed within the clock-skew leeway");
     }
 
     #[test]
