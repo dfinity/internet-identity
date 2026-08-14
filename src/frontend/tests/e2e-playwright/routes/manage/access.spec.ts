@@ -346,6 +346,20 @@ test.describe("Access methods", () => {
         .findPasskey(LEGACY_PASSKEY_NAME)
         .assertRemoveDisabled();
     });
+
+    test("links a legacy passkey to recovery", async ({
+      manageAccessPage,
+      identities,
+    }) => {
+      const link = manageAccessPage
+        .findPasskey(LEGACY_PASSKEY_NAME)
+        .locator.getByRole("link", { name: "recover" });
+      await expect(link).toHaveAttribute(
+        "href",
+        `/recovery?identity=${identities[0].identityNumber}`,
+      );
+      await expect(link).toHaveAttribute("target", "_blank");
+    });
   });
 
   test.describe("with an SSO method", () => {
