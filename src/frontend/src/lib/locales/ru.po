@@ -451,6 +451,9 @@ msgstr "Скопировать тему"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Не удалось загрузить настройки SSO с {domainInput}. Попросите вашего администратора SSO убедиться, что /.well-known/ii-openid-configuration доступен."
 
+msgid "Couldn't load your AI access settings."
+msgstr "Не удалось загрузить настройки доступа AI."
+
 msgid "Couldn't remove the connector. Please try again."
 msgstr "Не удалось удалить коннектор. Пожалуйста, попробуйте снова."
 

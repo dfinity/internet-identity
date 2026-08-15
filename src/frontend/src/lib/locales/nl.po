@@ -451,6 +451,9 @@ msgstr "Onderwerp kopiëren"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "SSO-instellingen van {domainInput} konden niet worden geladen. Vraag uw SSO-beheerder om te controleren of /.well-known/ii-openid-configuration bereikbaar is."
 
+msgid "Couldn't load your AI access settings."
+msgstr "Uw AI-toegangsinstellingen konden niet worden geladen."
+
 msgid "Couldn't remove the connector. Please try again."
 msgstr "De connector kon niet worden verwijderd. Probeer het opnieuw."
 

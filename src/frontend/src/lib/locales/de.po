@@ -451,6 +451,9 @@ msgstr "Betreff kopieren"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Die SSO-Einstellungen von {domainInput} konnten nicht geladen werden. Bitten Sie Ihren SSO-Administrator zu prüfen, ob /.well-known/ii-openid-configuration erreichbar ist."
 
+msgid "Couldn't load your AI access settings."
+msgstr "Ihre KI-Zugriffseinstellungen konnten nicht geladen werden."
+
 msgid "Couldn't remove the connector. Please try again."
 msgstr "Der Connector konnte nicht entfernt werden. Bitte versuchen Sie es erneut."
 
