@@ -62,6 +62,7 @@ mod ii_domain;
 mod mcp;
 mod mcp_registration;
 
+mod notifications;
 mod openid;
 mod session_delegation;
 mod single_flight_cache;
@@ -315,6 +316,87 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
 fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
     let caller = caller();
     anchor_management::lookup_caller_identity_by_recovery_phrase(caller)
+}
+
+// ---- Notifications: called by II's frontend / service worker ----
+
+#[update]
+#[allow(clippy::too_many_arguments)]
+fn webpush_subscribe_device(
+    anchor_number: AnchorNumber,
+    endpoint: String,
+    p256dh: ByteBuf,
+    auth: ByteBuf,
+    vapid_public_key: ByteBuf,
+    jwt_signatures: Vec<ByteBuf>,
+    jwt_issued_at_ns: Timestamp,
+) -> Result<(), String> {
+    notifications::push::subscription::subscribe_device(
+        anchor_number,
+        endpoint,
+        p256dh.into_vec(),
+        auth.into_vec(),
+        vapid_public_key.into_vec(),
+        jwt_signatures.into_iter().map(ByteBuf::into_vec).collect(),
+        jwt_issued_at_ns,
+    )
+}
+
+#[update]
+fn webpush_refresh_jwts(
+    anchor_number: AnchorNumber,
+    endpoint: String,
+    jwt_signatures: Vec<ByteBuf>,
+    jwt_issued_at_ns: Timestamp,
+) -> Result<(), String> {
+    notifications::push::jwt_pool::refresh_jwts(
+        anchor_number,
+        endpoint,
+        jwt_signatures.into_iter().map(ByteBuf::into_vec).collect(),
+        jwt_issued_at_ns,
+    )
+}
+
+#[query]
+fn webpush_jwt_pool_status(
+    anchor_number: AnchorNumber,
+    endpoint: String,
+) -> Option<notifications::push::jwt_pool::JwtPoolStatus> {
+    notifications::push::jwt_pool::jwt_pool_state(anchor_number, endpoint)
+}
+
+#[update]
+fn webpush_unsubscribe_device(anchor_number: AnchorNumber, endpoint: String) -> Result<(), String> {
+    notifications::push::subscription::unsubscribe_device(anchor_number, endpoint)
+}
+
+#[update]
+fn notification_grant_consent(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+) -> Result<(), String> {
+    notifications::consent::grant_consent(anchor_number, origin)
+}
+
+#[update]
+fn notification_revoke_consent(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+) -> Result<(), String> {
+    notifications::consent::revoke_consent(anchor_number, origin)
+}
+
+#[query]
+fn notification_consent_status(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+) -> notifications::consent::NotificationConsentStatus {
+    notifications::consent::consent_status(anchor_number, origin)
+}
+
+#[query]
+fn notification_consented_origins(anchor_number: AnchorNumber) -> Vec<FrontendHostname> {
+    notifications::consent::consented_origins(anchor_number)
 }
 
 #[query]
