@@ -1584,6 +1584,7 @@ type NotificationSendResult = record {
     accepted : nat32;                // queued, not delivered
     rejected : vec record { id : blob; reason : NotificationRejection };
     retry_after_ms : opt nat32;      // at capacity, wait this long before sending more
+    drain_epoch : nat64;             // bumped when II drops the buffer (e.g. upgrade); resend unacked if it changed
 };
 
 service : (opt InternetIdentityInit) -> {
@@ -2036,10 +2037,11 @@ service : (opt InternetIdentityInit) -> {
         notifications : vec Notification,
     ) -> (NotificationSendResult);
 
-    notification_consent_status : (sender : principal) -> (bool) query;
+    notification_consent_status : (origin : text) -> (bool) query;
 
-    notification_register_sender : (origin : text, sender : opt principal) -> (variant { Ok; Err : text });
-    notification_registered_sender : (origin : text) -> (opt principal) query;
+    notification_register_sender : (origin : text, sender : principal) -> (variant { Ok; Err : text });       // add to the origin's set
+    notification_unregister_sender : (origin : text, sender : principal) -> (variant { Ok; Err : text });     // remove from the set
+    notification_registered_senders : (origin : text) -> (vec principal) query;
 
     notification_grant_consent : (origin : text) -> (variant { Ok; Err : text });
     notification_revoke_consent : (origin : text) -> (variant { Ok; Err : text });

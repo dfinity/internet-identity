@@ -13,10 +13,6 @@ service : {
     // Called by II's service worker as the user. Must be a query.
     ii_pending_notifications : () -> (vec Notification) query;
 
-    // Called after display, so the dApp can stop serving them.
-    ii_notifications_delivered : (ids : vec text) -> ();
-
-    // Only needed for channels that cannot fetch for themselves. II-only caller.
-    ii_pending_notifications_batch : (users : vec principal)
-        -> (vec record { user : principal; notifications : vec Notification }) query;
+    // Called after display, so the dApp can stop serving them. ids match Notification.id.
+    ii_notifications_delivered : (ids : vec blob) -> ();
 };
