@@ -40,6 +40,7 @@ const baseIdentityInfo: IdentityInfo = {
   created_at: [],
   authn_method_registration: [],
   openid_credentials: [],
+  mcp_config: [],
 };
 
 const withVerifiedRecoveryPhrase = (info: IdentityInfo): IdentityInfo => ({

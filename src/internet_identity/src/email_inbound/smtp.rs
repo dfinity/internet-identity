@@ -276,16 +276,28 @@ pub fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
             c.message_id = request.message_id.clone();
         }
         let kind = match (&c.kind, recipient_flow) {
-            (PendingKind::Register { anchor }, RecipientFlow::Setup) => {
-                SnapshotKind::Setup { anchor: *anchor }
-            }
+            // `authorization_key` is not needed on the SMTP snapshot —
+            // re-auth runs at finalize (submit_leaf / resolve_via_doh)
+            // where the bind actually happens. SMTP only stashes the
+            // partial and flips status to NeedDkimLeaf / ResolvingDoh.
+            (
+                PendingKind::Register {
+                    anchor,
+                    authorization_key: _,
+                },
+                RecipientFlow::Setup,
+            ) => SnapshotKind::Setup { anchor: *anchor },
             // VerifyEmail rides the Setup recipient: the magic email
             // is addressed to `register@id.ai` (same as Register).
             // The Subject prefix (`II-Verify-…`) and the `PendingKind`
             // are what disambiguate the two flows from here on.
-            (PendingKind::VerifyEmail { anchor }, RecipientFlow::Setup) => {
-                SnapshotKind::VerifyEmail { anchor: *anchor }
-            }
+            (
+                PendingKind::VerifyEmail {
+                    anchor,
+                    authorization_key: _,
+                },
+                RecipientFlow::Setup,
+            ) => SnapshotKind::VerifyEmail { anchor: *anchor },
             (PendingKind::Recover { session_pk }, RecipientFlow::Recovery) => {
                 SnapshotKind::Recovery {
                     session_pk: session_pk.clone(),

@@ -162,7 +162,11 @@ fn verify_tentative_device(
     ) {
         Ok(maybe_confirmed_device) => {
             if let Some(confirmed_device) = maybe_confirmed_device {
-                // Add device to anchor with bookkeeping if it has been confirmed
+                // Add device to anchor with bookkeeping if it has been confirmed.
+                // Adding a method does not invalidate a pinned prepare-time
+                // AuthorizationKey; finalize re-auth remains the gate. (Eager
+                // drop is reserved for remove/replace paths — same as
+                // authn_method_add / OpenID add.)
                 anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
                 let operation = anchor_management::add_device(&mut anchor, confirmed_device);
                 if let Err(err) = state::storage_borrow_mut(|storage| storage.write(anchor)) {
@@ -538,9 +542,14 @@ fn get_account_delegation(
 
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
 /// trusted server URL). Persisted on-chain, so it follows the identity across
-/// devices. Read by the Settings UI and by the `/mcp` connect flow, which
-/// verifies the connecting origin against it at connect time. `null` means the
-/// anchor has never written a config.
+/// devices. `null` means the anchor has never written a config.
+///
+/// A query, so the reply is signed by one node rather than by consensus: the
+/// `/mcp` connect flow uses it only to pick which screen to show, and gates
+/// delivery on the certified `trusted_url` from
+/// `prepare_mcp_registration_delegation`. Anything that renders trust or feeds
+/// a write reads the config from `IdentityInfo::mcp_config` instead, certified
+/// by the `identity_info` update call.
 #[query]
 fn mcp_get_config(anchor_number: AnchorNumber) -> Option<McpConfig> {
     if check_session_authorization(anchor_number).is_err() {
@@ -1089,6 +1098,11 @@ mod v2_api {
             created_at: anchor_info.created_at,
             email_recovery,
             verified_emails,
+            // The same config `mcp_get_config` serves, but certified: this is
+            // an update call, so the Settings UI can render the trusted server
+            // — and base the config it writes back — on a value no single node
+            // can forge.
+            mcp_config: mcp::get_mcp_config(identity_number),
         };
         Ok(identity_info)
     }
@@ -1331,7 +1345,9 @@ mod v2_api {
             )?;
 
         if let Some(confirmed_device) = maybe_confirmed_device {
-            // Add device to anchor with bookkeeping if it has been confirmed
+            // Adding a method does not invalidate a pinned prepare-time
+            // AuthorizationKey (see verify_tentative_device). No pending
+            // email-challenge drop here — match authn_method_add / OpenID add.
             anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
             let operation = anchor_management::add_device(&mut anchor, confirmed_device);
             state::storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| {
@@ -2002,11 +2018,24 @@ mod email_recovery_api {
         identity_number: IdentityNumber,
         dns_input: EmailChallengeDnsInput,
     ) -> Result<EmailChallenge, EmailChallengeError> {
-        check_authorization(identity_number)
+        // Seed the email-challenge PRNG *before* pinning AuthorizationKey.
+        // `prepare_common` also calls `ensure_seeded`; if we snapshot authz
+        // first, the first prepare after install/upgrade yields on
+        // `raw_rand` and a concurrent remove/replace can finish while no
+        // pending entry exists for `drop_challenges_for_anchor` — then this
+        // call resumes and inserts a stale challenge. Seeding first makes
+        // that await a no-op, so authz → insert runs without yielding
+        // (IC only interleaves at await points).
+        crate::email_inbound::rng::ensure_seeded().await;
+
+        // Pin the authorization *method* (device pubkey / OpenID key /
+        // recovery address), not `caller()`: a temp-key principal expires
+        // in 10 minutes while the challenge lives 30.
+        let (_anchor, authorization_key) = check_authorization(identity_number)
             .map_err(|err| EmailChallengeError::Unauthorized(err.principal))?;
 
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        email_recovery::prepare_add(identity_number, dns_input, now_secs).await
+        email_recovery::prepare_add(identity_number, dns_input, now_secs, authorization_key).await
     }
 
     /// Anonymous. The FE-side counterpart of `prepare_add` for the
@@ -2119,12 +2148,24 @@ mod verified_email_api {
         identity_number: IdentityNumber,
         dns_input: EmailChallengeDnsInput,
     ) -> Result<EmailChallenge, EmailChallengeError> {
-        check_authorization(identity_number)
+        // Same linearization as `email_recovery_credential_prepare_add`:
+        // seed before authz snapshot so prepare does not await between
+        // pinning AuthorizationKey and inserting the pending challenge.
+        crate::email_inbound::rng::ensure_seeded().await;
+
+        // Pin the authorization *method*, not `caller()` — see
+        // `email_recovery_credential_prepare_add`.
+        let (_anchor, authorization_key) = check_authorization(identity_number)
             .map_err(|err| EmailChallengeError::Unauthorized(err.principal))?;
 
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        crate::verified_emails::prepare_add_verified_email(identity_number, dns_input, now_secs)
-            .await
+        crate::verified_emails::prepare_add_verified_email(
+            identity_number,
+            dns_input,
+            now_secs,
+            authorization_key,
+        )
+        .await
     }
 
     #[update]

@@ -16,6 +16,18 @@ use internet_identity_interface::internet_identity::types::email_challenge::{
 /// render the user-facing label, and the canister accepts mail at
 /// any of the configured `related_origins` aliases (see
 /// [`super::mailbox_domains`]).
+///
+/// # Await / authz linearization
+///
+/// This function's **only** await is [`ensure_seeded`] (after input
+/// validation, only on the first call after install/upgrade).
+/// Authenticated callers that pin an [`AuthorizationKey`] in `kind`
+/// **must** call `ensure_seeded().await` *before* taking that snapshot
+/// (see `email_recovery_credential_prepare_add` /
+/// `verified_email_prepare_add`). Then this await is a no-op and the
+/// path from authz → insert does not yield, so a concurrent
+/// remove/replace cannot race while the pending map is still empty
+/// (`drop_challenges_for_anchor` would have had nothing to drop).
 pub(crate) async fn prepare_common(
     dns_input: EmailChallengeDnsInput,
     now_secs: u64,
@@ -74,8 +86,9 @@ pub(crate) async fn prepare_common(
         }
     };
 
-    // Now we can mutate state. The async raw_rand fetch happens at
-    // most once per canister lifetime (see `rng::ensure_seeded`).
+    // Only await in this function. Authenticated entry points pre-seed so
+    // this is a no-op and the remainder of the function (nonce + insert)
+    // cannot interleave with remove/replace. See module docs above.
     ensure_seeded().await;
 
     // Loop guards against the (vanishingly improbable) event of a

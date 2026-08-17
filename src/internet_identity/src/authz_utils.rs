@@ -168,6 +168,50 @@ pub fn check_authorization(
     Err(AuthorizationError::from(caller))
 }
 
+/// Whether the prepare-time [`AuthorizationKey`] is still a valid
+/// control method on `anchor_number`.
+///
+/// Used at email-challenge finalize to re-auth the method that started
+/// the wizard. Intentionally checks **membership of the authn method
+/// on the anchor**, not the live caller principal and **not** temp-key
+/// validity: temp keys expire in 10 minutes while challenges live 30,
+/// and a prepare done via temp key must still finalize as long as the
+/// underlying device (or OpenID / recovery credential) remains.
+pub fn authorization_key_is_valid(
+    anchor_number: AnchorNumber,
+    authorization_key: &AuthorizationKey,
+) -> bool {
+    let anchor = state::anchor(anchor_number);
+    match authorization_key {
+        AuthorizationKey::DeviceKey(device_key) => anchor.device(device_key).is_some(),
+        AuthorizationKey::OpenIdCredentialKey(((iss, sub, aud), _)) => anchor
+            .openid_credentials()
+            .iter()
+            // Compare fields in place — avoid `credential.key()` which clones
+            // the three strings on every iteration.
+            .any(|credential| {
+                &credential.iss == iss && &credential.sub == sub && &credential.aud == aud
+            }),
+        AuthorizationKey::EmailRecoveryAddress(address) => anchor
+            .email_recovery
+            .iter()
+            .any(|credential| credential.address.eq_ignore_ascii_case(address)),
+    }
+}
+
+/// Principal to surface in `EmailChallengeError::Unauthorized` when a
+/// pinned authorization key is no longer valid. Best-effort: device
+/// keys map to their self-authenticating principal; other variants
+/// have no stable principal without more context, so anonymous is used.
+pub fn unauthorized_principal_for_key(authorization_key: &AuthorizationKey) -> Principal {
+    match authorization_key {
+        AuthorizationKey::DeviceKey(device_key) => Principal::self_authenticating(device_key),
+        AuthorizationKey::OpenIdCredentialKey(_) | AuthorizationKey::EmailRecoveryAddress(_) => {
+            Principal::anonymous()
+        }
+    }
+}
+
 /// Checks that the caller is authorized to operate on the given anchor_number and updates the authorization method used to
 /// reflect the current activity.
 /// Also updates the aggregated stats on daily and monthly active users.
