@@ -18,6 +18,7 @@ pub mod mcp_config;
 pub mod mcp_grant;
 pub mod mcp_registration;
 pub mod metadata_v2;
+pub mod notifications;
 pub mod openid_credential;
 pub mod openid_credential_key;
 pub mod openid_jwks;
