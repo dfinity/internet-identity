@@ -9,7 +9,7 @@
     AuthenticationV2Events,
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
+  import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { plural, t } from "$lib/stores/locale.store";
   import Toggle from "$lib/components/ui/Toggle.svelte";
@@ -186,10 +186,8 @@
   const isAccountLimitReached = $derived(
     accounts !== undefined && accounts.length >= 5,
   );
-  const dapps = getDapps();
-  const application = $derived(
-    dapps.find((dapp) => dapp.hasOrigin(displayOrigin))?.name,
-  );
+  const metadataStore = $derived(getAppMetadataStore(displayOrigin));
+  const application = $derived($metadataStore.name);
   const dappName = $derived(application ?? new URL(displayOrigin).hostname);
   const primaryAccountName = $derived(
     application !== undefined ? $t`My ${application} account` : $t`My account`,

@@ -335,6 +335,64 @@ To prevent misuse of this feature, the number of alternative origins _must not_ 
 In order to allow Internet Identity to read the path `/.well-known/ii-alternative-origins`, the CORS response header [`Access-Control-Allow-Origin`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin) must be set and allow the Internet Identity origin being used, for example `https://id.ai`, `https://identity.internetcomputer.org`, or `https://identity.ic0.app`.
 :::
 
+## App metadata
+
+Internet Identity displays the name and logo of the client application on its authorization screens (e.g. "Continue to _App_"). Any application can provide this metadata itself — permissionlessly, without being included in any curated list — by serving a JSON document on the URL `/.well-known/ii-app-metadata` of its origin:
+
+```json
+{
+  "name": "Example App",
+  "description": "A short tagline shown on the sign-in screen",
+  "logo": "/logo.png"
+}
+```
+
+Internet Identity fetches this document from the origin of the client application (the origin shown to the user, i.e. `event.origin` of the authorization request, not the `derivationOrigin`) when the authorization flow starts. When the document is missing or invalid, Internet Identity falls back to displaying the origin's hostname.
+
+Since the file is under the sole control of the application origin, the metadata is exactly as trustworthy as that origin itself: it does not certify or verify the application's identity in any way. Internet Identity therefore always displays the application's origin alongside this metadata, as the value users can actually verify.
+
+Requirements:
+
+- All fields are optional, and unknown fields are ignored. Fields that fail validation are ignored individually; a document without any valid field is ignored entirely.
+- `name` must not exceed 40 characters and `description` must not exceed 120 characters (after whitespace normalization). Control characters and bidirectional-override characters are stripped.
+- `logo` must be a URL (relative URLs are resolved against the application origin) pointing to an image _on the same origin_. Internet Identity downloads the logo (it is never hotlinked), so both the metadata document and the logo asset must be readable cross-origin (see the CORS note below). The logo must be served with one of the content types `image/png`, `image/jpeg`, `image/webp`, `image/gif`, `image/avif` or `image/svg+xml`, and must not exceed 256 KiB.
+- The metadata document must not exceed 8 KiB, must be answered with a `200` HTTP status code and must not redirect (Internet Identity _will not_ follow redirects for either the document or the logo).
+
+### JSON Schema {#app-metadata-schema}
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "II App Metadata",
+  "description": "Display metadata (name, description, logo) shown by Internet Identity on authorization screens for the origin serving this document.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "Display name of the application",
+      "type": "string",
+      "maxLength": 40
+    },
+    "description": {
+      "description": "Short description or tagline of the application",
+      "type": "string",
+      "maxLength": 120
+    },
+    "logo": {
+      "description": "URL of the application logo, on the same origin as this document",
+      "type": "string"
+    }
+  }
+}
+```
+
+:::note
+In order to allow Internet Identity to read the path `/.well-known/ii-app-metadata` as well as the logo asset it references, the CORS response header [`Access-Control-Allow-Origin`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin) must be set on both responses and allow the Internet Identity origin being used, for example `https://id.ai`, `https://identity.internetcomputer.org`, or `https://identity.ic0.app`.
+:::
+
+:::note
+Unlike `/.well-known/ii-alternative-origins`, this document has no security semantics for principal derivation, so it may be served by any web server — the application does not need to be hosted on ICP. For applications hosted in an ICP asset canister, the file is served like any other asset (and must be certified when served via a non-raw domain).
+:::
+
 ## The Internet Identity Service Backend interface
 
 This section describes the interface that the backend canister provides.

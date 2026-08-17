@@ -2,7 +2,7 @@
   import { establishedChannelStore } from "$lib/stores/channelStore";
   import { authorizationStore } from "$lib/stores/authorization.store";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
+  import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { t } from "$lib/stores/locale.store";
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
@@ -21,12 +21,11 @@
     mode = $bindable("both"),
   }: Props = $props();
 
-  const dapps = getDapps();
-  const dapp = $derived(
-    dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin)),
+  const metadataStore = $derived(
+    getAppMetadataStore($establishedChannelStore.origin),
   );
   const dappName = $derived(
-    dapp?.name ?? new URL($establishedChannelStore.origin).hostname,
+    $metadataStore.name ?? new URL($establishedChannelStore.origin).hostname,
   );
 </script>
 

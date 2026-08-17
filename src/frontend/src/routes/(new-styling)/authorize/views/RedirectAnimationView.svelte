@@ -1,6 +1,6 @@
 <script lang="ts">
   import { establishedChannelStore } from "$lib/stores/channelStore";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
+  import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
   import { t } from "$lib/stores/locale.store";
   import { draw, fade, scale } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
@@ -11,10 +11,11 @@
   import { waitFor } from "$lib/utils/utils";
   import BreatheSparkleCanvas from "$lib/components/backgrounds/BreatheSparkleCanvas.svelte";
 
-  const dapps = getDapps();
-  const dapp = $derived(
-    dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin)),
+  const metadataStore = $derived(
+    getAppMetadataStore($establishedChannelStore.origin),
   );
+  const dapp = $derived($metadataStore);
+  const hostname = $derived(new URL($establishedChannelStore.origin).hostname);
 </script>
 
 <div class="flex min-h-[100dvh] flex-col items-center justify-center px-8">
@@ -22,7 +23,7 @@
     in:scale={{ duration: 500, easing: cubicOut, start: 0.9 }}
     class="flex flex-col items-center justify-center"
   >
-    {#if dapp?.logoSrc !== undefined}
+    {#if dapp.logo !== undefined}
       <div class="relative">
         <svg viewBox="0 0 92 92" width="92" height="92" class="mb-4">
           <path
@@ -49,8 +50,8 @@
           </g>
         </svg>
         <img
-          src={dapp.logoSrc}
-          alt={$t`${dapp.name} logo`}
+          src={dapp.logo}
+          alt={$t`${dapp.name ?? hostname} logo`}
           class="absolute inset-1 size-[84px] rounded-[18px] object-cover"
         />
       </div>

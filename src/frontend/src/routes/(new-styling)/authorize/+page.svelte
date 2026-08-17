@@ -9,7 +9,7 @@
     channelStore,
     establishedChannelStore,
   } from "$lib/stores/channelStore";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
+  import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { t } from "$lib/stores/locale.store";
@@ -107,10 +107,10 @@
     );
   });
 
-  const dapps = getDapps();
-  const dapp = $derived(
-    dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin)),
+  const metadataStore = $derived(
+    getAppMetadataStore($establishedChannelStore.origin),
   );
+  const dapp = $derived($metadataStore);
 
   // --- View selection ---
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
@@ -509,7 +509,7 @@
       <h2
         class="mx-6 mb-3 text-center text-lg font-medium text-balance text-black dark:text-white"
       >
-        {#if dapp?.name !== undefined}
+        {#if dapp.name !== undefined}
           {@const application = dapp.name}
           {$t`${application} has moved to the new Internet Identity`}
         {:else}

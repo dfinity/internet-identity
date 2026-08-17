@@ -2,7 +2,11 @@
   import { ArrowRightIcon, GlobeIcon, TerminalIcon } from "@lucide/svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
+  import { readable } from "svelte/store";
+  import {
+    getAppMetadataStore,
+    type AppMetadata,
+  } from "$lib/stores/app-metadata.store";
 
   interface Props {
     /** Hostname of the app the CLI is being authorized for, or undefined for
@@ -12,12 +16,13 @@
 
   const { appOrigin }: Props = $props();
 
-  const apps = getDapps();
-  const app = $derived(
+  const emptyMetadataStore = readable<AppMetadata>({});
+  const metadataStore = $derived(
     appOrigin !== undefined
-      ? apps.find((a) => a.hasOrigin(appOrigin))
-      : undefined,
+      ? getAppMetadataStore(appOrigin)
+      : emptyMetadataStore,
   );
+  const app = $derived($metadataStore);
   const hostname = $derived(
     appOrigin !== undefined ? new URL(appOrigin).hostname : undefined,
   );
@@ -29,14 +34,14 @@
       <div
         class={[
           "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
-          app?.logoSrc === undefined &&
+          app.logo === undefined &&
             "border-border-tertiary text-fg-primary bg-bg-primary border",
         ]}
       >
-        {#if app?.logoSrc !== undefined}
+        {#if app.logo !== undefined}
           <img
-            src={app.logoSrc}
-            alt={`${app.name} logo`}
+            src={app.logo}
+            alt={`${app.name ?? hostname} logo`}
             class="h-20 max-w-50 object-contain"
           />
         {:else}

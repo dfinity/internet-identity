@@ -1,7 +1,7 @@
 <script lang="ts">
   import Badge from "$lib/components/ui/Badge.svelte";
   import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps.js";
+  import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
   import type { HTMLAttributes } from "svelte/elements";
   import { GlobeIcon } from "@lucide/svelte";
 
@@ -12,8 +12,10 @@
   const { class: className, origin, ...props }: Props = $props();
 
   const hostname = $derived(new URL(origin).hostname);
-  const dapps = getDapps();
-  const dapp = $derived(dapps.find((dapp) => dapp.hasOrigin(origin)));
+  // App-provided (permissionless) display metadata; the hostname badge below
+  // stays visible regardless, as the trust anchor the user can verify.
+  const metadataStore = $derived(getAppMetadataStore(origin));
+  const metadata = $derived($metadataStore);
 </script>
 
 <div
@@ -26,14 +28,14 @@
   <div
     class={[
       "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
-      dapp?.logoSrc === undefined &&
+      metadata.logo === undefined &&
         "border-border-tertiary text-fg-primary bg-bg-primary border",
     ]}
   >
-    {#if dapp?.logoSrc !== undefined}
+    {#if metadata.logo !== undefined}
       <img
-        src={dapp.logoSrc}
-        alt={`${dapp.name} logo`}
+        src={metadata.logo}
+        alt={`${metadata.name ?? hostname} logo`}
         class={["h-20 max-w-50 object-contain"]}
       />
     {:else}
@@ -42,7 +44,16 @@
       </div>
     {/if}
   </div>
-  <Badge size="sm" class="max-w-[75%]">
-    <Ellipsis text={hostname} position="middle" />
-  </Badge>
+  <div class="flex max-w-full flex-col items-center gap-2">
+    <Badge size="sm" class="max-w-[75%]">
+      <Ellipsis text={hostname} position="middle" />
+    </Badge>
+    {#if metadata.description !== undefined}
+      <p
+        class="text-text-tertiary line-clamp-2 max-w-[85%] text-center text-sm text-balance"
+      >
+        {metadata.description}
+      </p>
+    {/if}
+  </div>
 </div>
