@@ -186,13 +186,13 @@ fn should_write_and_update_openid_credential_lookup() {
     assert_eq!(storage.read(anchor.anchor_number()).unwrap(), anchor);
     assert_eq!(
         storage
-            .lookup_anchor_with_openid_credential(&openid_credential_0.key())
+            .lookup_anchor_with_openid_credential(&openid_credential_0.key(), None)
             .unwrap(),
         anchor.anchor_number()
     );
     assert_eq!(
         storage
-            .lookup_anchor_with_openid_credential(&openid_credential_1.key())
+            .lookup_anchor_with_openid_credential(&openid_credential_1.key(), None)
             .unwrap(),
         anchor.anchor_number()
     );
@@ -203,12 +203,12 @@ fn should_write_and_update_openid_credential_lookup() {
         .unwrap();
     storage.write(anchor.clone()).unwrap();
     assert_eq!(
-        storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()),
+        storage.lookup_anchor_with_openid_credential(&openid_credential_0.key(), None),
         None
     );
     assert_eq!(
         storage
-            .lookup_anchor_with_openid_credential(&openid_credential_1.key())
+            .lookup_anchor_with_openid_credential(&openid_credential_1.key(), None)
             .unwrap(),
         anchor.anchor_number()
     );
@@ -219,18 +219,18 @@ fn should_write_and_update_openid_credential_lookup() {
         .unwrap();
     storage.write(anchor.clone()).unwrap();
     assert_eq!(
-        storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()),
+        storage.lookup_anchor_with_openid_credential(&openid_credential_0.key(), None),
         None
     );
     assert_eq!(
         storage
-            .lookup_anchor_with_openid_credential(&openid_credential_1.key())
+            .lookup_anchor_with_openid_credential(&openid_credential_1.key(), None)
             .unwrap(),
         anchor.anchor_number()
     );
     assert_eq!(
         storage
-            .lookup_anchor_with_openid_credential(&openid_credential_2.key())
+            .lookup_anchor_with_openid_credential(&openid_credential_2.key(), None)
             .unwrap(),
         anchor.anchor_number()
     );
