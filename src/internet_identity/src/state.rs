@@ -152,6 +152,8 @@ pub struct PersistentState {
     /// `docs/ongoing/email-recovery.md` §7.6.
     pub doh_config: Option<DohConfig>,
     pub mcp_official_url: Option<String>,
+    /// Deploy flag for the notifications feature. `None`/`Some(false)` => disabled; `Some(true)` => enabled.
+    pub notifications_enabled: Option<bool>,
 }
 
 impl Default for PersistentState {
@@ -180,6 +182,7 @@ impl Default for PersistentState {
             dnssec_config: None,
             doh_config: None,
             mcp_official_url: None,
+            notifications_enabled: None,
         }
     }
 }
