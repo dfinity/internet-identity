@@ -349,7 +349,7 @@ Internet Identity displays the name and logo of the client application on its au
 
 Internet Identity fetches this document when the authorization flow starts, always from the same origin it displays to the user alongside the metadata — for the authorization screens this is the origin of the client application (`event.origin` of the authorization request); screens that display a validated `derivationOrigin` instead fetch the document from that displayed origin. When the document is missing or invalid, Internet Identity falls back to the curated metadata it ships for a small list of known applications (a transitional mechanism that this document supersedes), and otherwise to displaying the origin's hostname only.
 
-Since the file is under the sole control of the application origin, the metadata is exactly as trustworthy as that origin itself: it does not certify or verify the application's identity in any way. Internet Identity therefore always displays the application's origin alongside this metadata, as the value users can actually verify.
+Since the file is under the sole control of the application origin, the metadata is exactly as trustworthy as that origin itself: it does not certify or verify the application's identity in any way. Internet Identity therefore always displays the application's origin (as its hostname) alongside this metadata, as the value users can actually verify.
 
 Requirements:
 

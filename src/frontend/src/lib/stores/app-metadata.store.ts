@@ -34,8 +34,11 @@ const knownDappMetadata = (origin: string): AppMetadata => {
  * `/.well-known/ii-app-metadata` file has been fetched and validated. The
  * fetch runs once per origin per page load; all subscribers share the result.
  *
- * @param origin Origin as shown to the user (e.g. the postMessage channel
- *   origin), not the derivation origin (which may be remapped).
+ * @param origin The origin the calling screen displays to the user (its
+ *   hostname badge) — usually the postMessage channel origin, or the
+ *   validated derivation origin on screens that display that instead. The
+ *   displayed origin and the metadata source must always be the same, so the
+ *   hostname the user can verify vouches for the presentation next to it.
  */
 export const getAppMetadataStore = (origin: string): Readable<AppMetadata> => {
   const existing = storeByOrigin.get(origin);

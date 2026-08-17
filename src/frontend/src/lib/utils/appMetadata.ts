@@ -150,10 +150,13 @@ const fetchCapped = async (
       signal: controller.signal,
     });
     if (response.status !== 200) {
+      // Cancel the stream so the download stops now, not at GC time.
+      await response.body?.cancel().catch(() => undefined);
       return undefined;
     }
     const declaredLength = response.headers.get("content-length");
     if (declaredLength !== null && Number(declaredLength) > maxBytes) {
+      await response.body?.cancel().catch(() => undefined);
       return undefined;
     }
     const body = await readBodyCapped(response, maxBytes);
