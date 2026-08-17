@@ -1575,16 +1575,22 @@ type Notification = record {
 };
 
 type NotificationRejection = variant {
-    no_consent;
-    not_subscribed;
+    no_consent;                      // unknown identity OR not consented, merged so existence can't be probed
+    not_subscribed;                  // consented, but no active device
     invalid;
 };
 
-type NotificationSendResult = record {
-    accepted : nat32;                // queued, not delivered
-    rejected : vec record { id : blob; reason : NotificationRejection };
+// App-facing request/response use records with all-opt fields (the conventional
+// signature) so the surface can grow without a breaking candid change.
+type NotificationSendRequest = record {
+    notifications : opt vec Notification;
+};
+
+type NotificationSendResponse = record {
+    accepted : opt nat32;            // queued, not delivered
+    rejected : opt vec record { id : blob; reason : NotificationRejection };
     retry_after_ms : opt nat32;      // at capacity, wait this long before sending more
-    drain_epoch : nat64;             // bumped when II drops the buffer (e.g. upgrade); resend unacked if it changed
+    drain_epoch : opt nat64;         // bumped when II drops the buffer (e.g. upgrade); resend unacked if it changed
 };
 
 service : (opt InternetIdentityInit) -> {
@@ -2033,21 +2039,22 @@ service : (opt InternetIdentityInit) -> {
     // Looks up identity number when called with a recovery phrase
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
 
-    notification_send : (
-        notifications : vec Notification,
-    ) -> (NotificationSendResult);
+    // ===== Push notifications: called by a sending dApp =====
+    //
+    // A dApp authorizes its sender canisters by serving, at its origin,
+    //   /.well-known/ii-notification-senders  ->  { "senders" : [ "<canister-id>", ... ] }
+    // II fetches and caches that list, so the origin a send targets is derived
+    // from caller() against it and is never passed in. There is deliberately no
+    // register endpoint: serving the file is what proves origin ownership.
+    notification_send : (NotificationSendRequest) -> (NotificationSendResponse);
 
-    notification_consent_status : (origin : text) -> (bool) query;
+    // ===== Push notifications: called by II's own frontend / service worker =====
+    notification_grant_consent : (anchor_number : UserNumber, origin : text) -> (variant { Ok; Err : text });
+    notification_revoke_consent : (anchor_number : UserNumber, origin : text) -> (variant { Ok; Err : text });
+    notification_consent_status : (anchor_number : UserNumber, origin : text) -> (bool) query;
+    notification_consented_origins : (anchor_number : UserNumber) -> (vec text) query;
 
-    notification_register_sender : (origin : text, sender : principal) -> (variant { Ok; Err : text });       // add to the origin's set
-    notification_unregister_sender : (origin : text, sender : principal) -> (variant { Ok; Err : text });     // remove from the set
-    notification_registered_senders : (origin : text) -> (vec principal) query;
-
-    notification_grant_consent : (origin : text) -> (variant { Ok; Err : text });
-    notification_revoke_consent : (origin : text) -> (variant { Ok; Err : text });
-    notification_consented_origins : () -> (vec text) query;
-
-    webpush_subscribe_device : (endpoint : text, p256dh : blob, auth : blob) -> (variant { Ok; Err : text });
-    webpush_unsubscribe_device : (endpoint : text) -> (variant { Ok; Err : text });
+    webpush_subscribe_device : (anchor_number : UserNumber, endpoint : text, p256dh : blob, auth : blob) -> (variant { Ok; Err : text });
+    webpush_unsubscribe_device : (anchor_number : UserNumber, endpoint : text) -> (variant { Ok; Err : text });
     webpush_vapid_public_key : () -> (blob) query;
 };
