@@ -217,7 +217,7 @@ test("should drop text fields exceeding their length limits", async () => {
 test("should strip control and bidi characters and normalize whitespace", async () => {
   setupFetchMock(
     Response.json({
-      name: "  Example \u0000\u202e \n\t App\u200f ",
+      name: "  Example \u0000\u202e \n\t App\u200f\u061c ",
       description: "Multi\r\nline\u2066   description\u0007 ",
     }),
   );

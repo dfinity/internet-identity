@@ -187,7 +187,7 @@ const cleanTextField = (
     // regular spaces (stripping them instead would join adjacent words).
     .replace(
       // eslint-disable-next-line no-control-regex
-      /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g,
+      /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u061c\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g,
       "",
     )
     .replace(/\s+/g, " ")
