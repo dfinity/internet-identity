@@ -121,6 +121,9 @@ use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
+use crate::storage::storable::notifications::consent::StorableNotificationConsent;
+use crate::storage::storable::notifications::webpush::endpoint_hash::StorableEndpointSha256;
+use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::session_handle::StorableSessionHandle;
@@ -215,6 +218,10 @@ const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
 const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
 const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
+// Notification indexes, appended after the current max (36)
+const WEBPUSH_SUBSCRIPTIONS_MEMORY_INDEX: u8 = 37u8;
+const NOTIFICATIONS_CONSENT_MEMORY_INDEX: u8 = 38u8;
+const NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_INDEX: u8 = 39u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -306,6 +313,17 @@ const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
 /// Monotonic [`SessionId`] allocator. A revoked session's id is retired, never reissued,
 /// which is what makes the revocation final: the id is an input to the session seed.
 const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY_INDEX);
+
+/// Device subscriptions, keyed `(anchor, sha256(endpoint))`. One row per
+/// browser; re-subscribe overwrites. Capped at 20/anchor, evict-oldest.
+const WEBPUSH_SUBSCRIPTIONS_MEMORY_ID: MemoryId = MemoryId::new(WEBPUSH_SUBSCRIPTIONS_MEMORY_INDEX);
+/// Per-`(anchor, origin)` consent grants; presence means granted.
+const NOTIFICATIONS_CONSENT_MEMORY_ID: MemoryId = MemoryId::new(NOTIFICATIONS_CONSENT_MEMORY_INDEX);
+/// `recipient_principal -> anchor` reverse index for the send path, where
+/// `recipient = delegation::get_principal(anchor, origin)`. Recomputing it from
+/// the sender's origin at send time also checks the sender isn't lying.
+const NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_ID: MemoryId =
+    MemoryId::new(NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -514,6 +532,25 @@ pub struct Storage<M: Memory> {
     /// [`SSO_STABLE_ID_INDEX_MEMORY_ID`].
     sso_stable_id_index_memory:
         StableBTreeMap<StorableSsoStableIdKey, StorableAnchorNumberList, ManagedMemory<M>>,
+
+    // ---- Notifications ------------------------------------------
+    webpush_subscriptions_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    pub(crate) webpush_subscriptions_memory: StableBTreeMap<
+        (StorableAnchorNumber, StorableEndpointSha256),
+        StorableWebPushSubscription,
+        ManagedMemory<M>,
+    >,
+
+    notifications_consent_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    pub(crate) notifications_consent_memory: StableBTreeMap<
+        (StorableAnchorNumber, StorableOriginSha256),
+        StorableNotificationConsent,
+        ManagedMemory<M>,
+    >,
+
+    notifications_recipient_index_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    pub(crate) notifications_recipient_index_memory:
+        StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -608,6 +645,10 @@ impl<M: Memory + Clone> Storage<M> {
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
         let sso_stable_id_index_memory = memory_manager.get(SSO_STABLE_ID_INDEX_MEMORY_ID);
+        let webpush_subscriptions_memory = memory_manager.get(WEBPUSH_SUBSCRIPTIONS_MEMORY_ID);
+        let notifications_consent_memory = memory_manager.get(NOTIFICATIONS_CONSENT_MEMORY_ID);
+        let notifications_recipient_index_memory =
+            memory_manager.get(NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -741,6 +782,21 @@ impl<M: Memory + Clone> Storage<M> {
                 sso_stable_id_index_memory.clone(),
             ),
             sso_stable_id_index_memory: StableBTreeMap::init(sso_stable_id_index_memory),
+
+            webpush_subscriptions_memory_wrapper: MemoryWrapper::new(
+                webpush_subscriptions_memory.clone(),
+            ),
+            webpush_subscriptions_memory: StableBTreeMap::init(webpush_subscriptions_memory),
+            notifications_consent_memory_wrapper: MemoryWrapper::new(
+                notifications_consent_memory.clone(),
+            ),
+            notifications_consent_memory: StableBTreeMap::init(notifications_consent_memory),
+            notifications_recipient_index_memory_wrapper: MemoryWrapper::new(
+                notifications_recipient_index_memory.clone(),
+            ),
+            notifications_recipient_index_memory: StableBTreeMap::init(
+                notifications_recipient_index_memory,
+            ),
         }
     }
 
@@ -1579,6 +1635,19 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Option<ApplicationNumber> {
         self.lookup_application_with_origin_memory
             .get(&StorableOriginSha256::from_origin(origin))
+    }
+
+    /// Every origin `anchor_number` has consented to notifications from.
+    pub fn notifications_consented_origins(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> Vec<FrontendHostname> {
+        let start = (anchor_number, StorableOriginSha256::MIN);
+        let end = (anchor_number, StorableOriginSha256::MAX);
+        self.notifications_consent_memory
+            .range(start..=end)
+            .map(|(_, consent)| consent.origin)
+            .collect()
     }
 
     /// Only used in tests.
@@ -4044,6 +4113,18 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "sso_stable_id_index_memory".to_string(),
                 self.sso_stable_id_index_memory_wrapper.size(),
+            ),
+            (
+                "webpush_subscriptions_memory".to_string(),
+                self.webpush_subscriptions_memory_wrapper.size(),
+            ),
+            (
+                "notifications_consent_memory".to_string(),
+                self.notifications_consent_memory_wrapper.size(),
+            ),
+            (
+                "notifications_recipient_index_memory".to_string(),
+                self.notifications_recipient_index_memory_wrapper.size(),
             ),
         ])
     }

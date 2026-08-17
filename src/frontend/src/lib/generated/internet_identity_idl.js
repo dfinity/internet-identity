@@ -717,6 +717,11 @@ export const idlFactory = ({ IDL }) => {
     'permissions' : Permissions,
     'expiration' : Timestamp,
   });
+  const NotificationChannel = IDL.Variant({ 'push' : IDL.Null });
+  const NotificationConsentStatus = IDL.Record({
+    'deliverable_channels' : IDL.Opt(IDL.Vec(NotificationChannel)),
+    'consented' : IDL.Opt(IDL.Bool),
+  });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
@@ -1357,6 +1362,26 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
+    'notification_consent_status' : IDL.Func(
+        [UserNumber, IDL.Text],
+        [NotificationConsentStatus],
+        ['query'],
+      ),
+    'notification_consented_origins' : IDL.Func(
+        [UserNumber],
+        [IDL.Vec(IDL.Text)],
+        ['query'],
+      ),
+    'notification_grant_consent' : IDL.Func(
+        [UserNumber, IDL.Text],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'notification_revoke_consent' : IDL.Func(
+        [UserNumber, IDL.Text],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
     'openid_credential_add' : IDL.Func(
         [IdentityNumber, JWT, Salt, IDL.Opt(IDL.Text)],
         [
@@ -1548,6 +1573,38 @@ export const idlFactory = ({ IDL }) => {
     'verify_tentative_device' : IDL.Func(
         [UserNumber, IDL.Text],
         [VerifyTentativeDeviceResponse],
+        [],
+      ),
+    'webpush_jwt_pool_status' : IDL.Func(
+        [UserNumber, IDL.Text],
+        [
+          IDL.Opt(
+            IDL.Record({ 'issued_at_ns' : IDL.Nat64, 'remaining' : IDL.Nat32 })
+          ),
+        ],
+        ['query'],
+      ),
+    'webpush_refresh_jwts' : IDL.Func(
+        [UserNumber, IDL.Text, IDL.Vec(IDL.Vec(IDL.Nat8)), IDL.Nat64],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'webpush_subscribe_device' : IDL.Func(
+        [
+          UserNumber,
+          IDL.Text,
+          IDL.Vec(IDL.Nat8),
+          IDL.Vec(IDL.Nat8),
+          IDL.Vec(IDL.Nat8),
+          IDL.Vec(IDL.Vec(IDL.Nat8)),
+          IDL.Nat64,
+        ],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'webpush_unsubscribe_device' : IDL.Func(
+        [UserNumber, IDL.Text],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
     'whoami' : IDL.Func([], [IDL.Principal], ['query']),
