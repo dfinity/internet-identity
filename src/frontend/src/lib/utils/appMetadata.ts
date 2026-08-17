@@ -21,7 +21,11 @@
  *
  * Hardening, since the file is attacker-controlled by construction:
  * - The file is fetched without credentials and redirects are rejected,
- *   mirroring the `/.well-known/ii-alternative-origins` fetch.
+ *   mirroring the `/.well-known/ii-alternative-origins` fetch, with a
+ *   timeout spanning both the connection and the body read.
+ * - Bodies are read with hard byte caps, enforced up front via
+ *   `Content-Length` and chunk-by-chunk while streaming, so an origin can't
+ *   make the authorization page buffer an arbitrarily large response.
  * - Text fields are stripped of control and bidi-override characters and
  *   dropped when they exceed conservative length limits.
  * - The logo must live on the app's own origin. It is downloaded via `fetch`
@@ -46,13 +50,15 @@ export interface AppMetadata {
 /** Well-known path (relative to the app's origin) the metadata is served on. */
 export const APP_METADATA_PATH = "/.well-known/ii-app-metadata";
 
-/** Maximum size of the metadata file (in UTF-16 code units of the body). */
+/** Maximum size of the metadata file in bytes (8 KiB). */
 export const MAX_APP_METADATA_SIZE = 8_192;
 
-/** Maximum length of the app name, after whitespace normalization. */
+/** Maximum length of the app name in Unicode code points, after whitespace
+ *  normalization. */
 export const MAX_APP_NAME_LENGTH = 40;
 
-/** Maximum length of the app description, after whitespace normalization. */
+/** Maximum length of the app description in Unicode code points, after
+ *  whitespace normalization. */
 export const MAX_APP_DESCRIPTION_LENGTH = 120;
 
 /** Maximum size of the logo asset in bytes (256 KiB). */
@@ -68,31 +74,102 @@ export const APP_LOGO_CONTENT_TYPES = [
   "image/svg+xml",
 ];
 
-/** Time budget for each fetch; the UI renders a fallback in the meantime, so
- *  a slow origin only delays its own polish, never the sign-in flow. */
+/** Time budget per resource, spanning the connection and the body read; the
+ *  UI renders a fallback in the meantime, so a slow origin only delays its
+ *  own polish, never the sign-in flow. */
 const FETCH_TIMEOUT_MILLIS = 10_000;
 
-const fetchOptions = (accept: string): RequestInit => ({
-  // fail on redirects
-  redirect: "error",
-  headers: {
-    Accept: accept,
-  },
-  // do not send cookies or other credentials
-  credentials: "omit",
-  signal:
-    typeof AbortSignal.timeout === "function"
-      ? AbortSignal.timeout(FETCH_TIMEOUT_MILLIS)
-      : undefined,
-});
+/**
+ * Read the body with a hard byte cap, cancelling the stream as soon as the
+ * cap is crossed rather than buffering an arbitrarily large body first and
+ * measuring it afterwards (mirrors the capped reader in `authCallbacks.ts`).
+ * Returns `undefined` when the cap is exceeded.
+ */
+const readBodyCapped = async (
+  response: Response,
+  maxBytes: number,
+): Promise<Uint8Array | undefined> => {
+  if (response.body === null) {
+    // No streamable body (older environments): read, then enforce the cap.
+    const buffer = new Uint8Array(await response.arrayBuffer());
+    return buffer.byteLength > maxBytes ? undefined : buffer;
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    received += value.byteLength;
+    if (received > maxBytes) {
+      // Stop pulling from the network instead of buffering the rest.
+      await reader.cancel().catch(() => undefined);
+      return undefined;
+    }
+    chunks.push(value);
+  }
+  const body = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+};
+
+/**
+ * Fetch `url` with the hardened options shared by both resources and read the
+ * body under `maxBytes` (rejected up front when `Content-Length` declares an
+ * oversize response, enforced while streaming otherwise). Returns `undefined`
+ * on a non-200 status or when the cap is exceeded; network errors propagate
+ * to the caller.
+ */
+const fetchCapped = async (
+  url: URL,
+  accept: string,
+  maxBytes: number,
+): Promise<{ response: Response; body: Uint8Array } | undefined> => {
+  // AbortController + setTimeout matches the rest of the FE (e.g.
+  // `lib/utils/dnssec/doh.ts`, `lib/utils/ssoDiscovery.ts`); we avoid
+  // `AbortSignal.timeout` because the project still supports browsers
+  // without it. The timer stays armed until the body has been read, so a
+  // slow origin can't keep the request pending indefinitely.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MILLIS);
+  try {
+    const response = await fetch(url.href, {
+      // fail on redirects
+      redirect: "error",
+      headers: {
+        Accept: accept,
+      },
+      // do not send cookies or other credentials
+      credentials: "omit",
+      signal: controller.signal,
+    });
+    if (response.status !== 200) {
+      return undefined;
+    }
+    const declaredLength = response.headers.get("content-length");
+    if (declaredLength !== null && Number(declaredLength) > maxBytes) {
+      return undefined;
+    }
+    const body = await readBodyCapped(response, maxBytes);
+    return body === undefined ? undefined : { response, body };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
 
 /**
  * Clean up an app-provided text field: normalize whitespace and strip
  * control characters as well as bidi-override/invisible formatting
  * characters, which could otherwise be used to visually spoof the sign-in
  * screen. Returns `undefined` when the value is not a string, is empty after
- * cleanup, or exceeds `maxLength` (no silent truncation: apps should notice
- * and fix their metadata instead of shipping a clipped name).
+ * cleanup, or exceeds `maxLength` code points (no silent truncation: apps
+ * should notice and fix their metadata instead of shipping a clipped name).
  */
 const cleanTextField = (
   value: unknown,
@@ -112,7 +189,9 @@ const cleanTextField = (
     )
     .replace(/\s+/g, " ")
     .trim();
-  if (cleaned.length === 0 || cleaned.length > maxLength) {
+  // Count code points, not UTF-16 units, matching the documented limits
+  // (JSON Schema `maxLength` semantics) — e.g. an emoji counts as one.
+  if (cleaned.length === 0 || [...cleaned].length > maxLength) {
     return undefined;
   }
   return cleaned;
@@ -136,8 +215,7 @@ const resolveLogoUrl = (value: unknown, origin: string): URL | undefined => {
   }
 };
 
-const toBase64 = (buffer: ArrayBuffer): string => {
-  const bytes = new Uint8Array(buffer);
+const toBase64 = (bytes: Uint8Array): string => {
   // Convert in chunks: spreading the whole buffer into one
   // `String.fromCharCode` call can overflow the argument limit.
   const chunkSize = 0x8000;
@@ -154,22 +232,21 @@ const toBase64 = (buffer: ArrayBuffer): string => {
  * https origins) and so the size and content type can be enforced up front.
  */
 const fetchLogoAsDataUrl = async (url: URL): Promise<string | undefined> => {
-  const response = await fetch(url.href, fetchOptions("image/*"));
-  if (response.status !== 200) {
+  const result = await fetchCapped(url, "image/*", MAX_APP_LOGO_SIZE);
+  if (result === undefined) {
     return undefined;
   }
-  const contentType = (response.headers.get("content-type") ?? "")
+  const contentType = (result.response.headers.get("content-type") ?? "")
     .split(";")[0]
     .trim()
     .toLowerCase();
   if (!APP_LOGO_CONTENT_TYPES.includes(contentType)) {
     return undefined;
   }
-  const buffer = await response.arrayBuffer();
-  if (buffer.byteLength === 0 || buffer.byteLength > MAX_APP_LOGO_SIZE) {
+  if (result.body.byteLength === 0) {
     return undefined;
   }
-  return `data:${contentType};base64,${toBase64(buffer)}`;
+  return `data:${contentType};base64,${toBase64(result.body)}`;
 };
 
 /**
@@ -181,30 +258,24 @@ const fetchLogoAsDataUrl = async (url: URL): Promise<string | undefined> => {
  * headers), is malformed, or contains no usable field — callers should then
  * fall back to other sources (e.g. the hostname).
  *
- * @param origin Origin of the app requesting authorization, i.e. the origin
- *   shown to the user (not the derivation origin, which may be remapped).
+ * @param origin Origin of the app as displayed to the user alongside the
+ *   metadata (the two must always come from the same origin, so the
+ *   hostname the user can verify vouches for the presentation next to it).
  */
 export const fetchAppMetadata = async (
   origin: string,
 ): Promise<AppMetadata | undefined> => {
   try {
     const url = new URL(APP_METADATA_PATH, origin);
-    const response = await fetch(url.href, fetchOptions("application/json"));
-    if (response.status !== 200) {
+    const result = await fetchCapped(
+      url,
+      "application/json",
+      MAX_APP_METADATA_SIZE,
+    );
+    if (result === undefined) {
       return undefined;
     }
-    const contentLength = response.headers.get("content-length");
-    if (
-      contentLength !== null &&
-      Number(contentLength) > MAX_APP_METADATA_SIZE
-    ) {
-      return undefined;
-    }
-    const body = await response.text();
-    if (body.length > MAX_APP_METADATA_SIZE) {
-      return undefined;
-    }
-    const parsed: unknown = JSON.parse(body);
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(result.body));
     if (
       parsed === null ||
       typeof parsed !== "object" ||

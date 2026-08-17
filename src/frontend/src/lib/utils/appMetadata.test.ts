@@ -220,6 +220,17 @@ test("should strip control and bidi characters and normalize whitespace", async 
   });
 });
 
+test("should count text limits in code points, not UTF-16 units", async () => {
+  // Each emoji is one code point but two UTF-16 units: a name of exactly
+  // MAX_APP_NAME_LENGTH emoji is within the documented limit.
+  const emojiName = "🌍".repeat(MAX_APP_NAME_LENGTH);
+  setupFetchMock(Response.json({ name: emojiName }));
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({ name: emojiName });
+
+  setupFetchMock(Response.json({ name: "🌍".repeat(MAX_APP_NAME_LENGTH + 1) }));
+  expect(await fetchAppMetadata(ORIGIN)).toBeUndefined();
+});
+
 test("should drop logos that are not same-origin", async () => {
   for (const logo of [
     "https://evil.com/logo.png",

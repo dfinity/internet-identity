@@ -347,14 +347,14 @@ Internet Identity displays the name and logo of the client application on its au
 }
 ```
 
-Internet Identity fetches this document from the origin of the client application (the origin shown to the user, i.e. `event.origin` of the authorization request, not the `derivationOrigin`) when the authorization flow starts. When the document is missing or invalid, Internet Identity falls back to displaying the origin's hostname.
+Internet Identity fetches this document when the authorization flow starts, always from the same origin it displays to the user alongside the metadata — for the authorization screens this is the origin of the client application (`event.origin` of the authorization request); screens that display a validated `derivationOrigin` instead fetch the document from that displayed origin. When the document is missing or invalid, Internet Identity falls back to the curated metadata it ships for a small list of known applications (a transitional mechanism that this document supersedes), and otherwise to displaying the origin's hostname only.
 
 Since the file is under the sole control of the application origin, the metadata is exactly as trustworthy as that origin itself: it does not certify or verify the application's identity in any way. Internet Identity therefore always displays the application's origin alongside this metadata, as the value users can actually verify.
 
 Requirements:
 
-- All fields are optional, and unknown fields are ignored. Fields that fail validation are ignored individually; a document without any valid field is ignored entirely.
-- `name` must not exceed 40 characters and `description` must not exceed 120 characters (after whitespace normalization). Control characters and bidirectional-override characters are stripped.
+- All fields are optional, and unknown fields are ignored. Fields that fail validation are ignored individually; a document without any valid field is ignored entirely (and a valid document replaces any curated fallback entry wholesale).
+- `name` must not exceed 40 characters and `description` must not exceed 120 characters (counted in Unicode code points, after whitespace normalization). Control characters and bidirectional-override characters are stripped.
 - `logo` must be a URL (relative URLs are resolved against the application origin) pointing to an image _on the same origin_. Internet Identity downloads the logo (it is never hotlinked), so both the metadata document and the logo asset must be readable cross-origin (see the CORS note below). The logo must be served with one of the content types `image/png`, `image/jpeg`, `image/webp`, `image/gif`, `image/avif` or `image/svg+xml`, and must not exceed 256 KiB.
 - The metadata document must not exceed 8 KiB, must be answered with a `200` HTTP status code and must not redirect (Internet Identity _will not_ follow redirects for either the document or the logo).
 

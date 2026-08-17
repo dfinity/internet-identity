@@ -5,6 +5,8 @@
   import { draw, fade, scale } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import Logo from "$lib/components/ui/Logo.svelte";
+  import Badge from "$lib/components/ui/Badge.svelte";
+  import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
@@ -86,6 +88,12 @@
         </g>
       </svg>
     {/if}
+    <!-- The logo above is app-provided (permissionless) metadata, so the
+         app's origin stays visible next to it as the trust anchor the user
+         can verify — same pairing as on the authorize screens. -->
+    <Badge size="sm" class="mb-4 max-w-75">
+      <Ellipsis text={hostname} position="middle" />
+    </Badge>
     <p class="text-text-primary mb-2 text-2xl font-medium">
       {$t`Signing in securely`}
     </p>
