@@ -210,10 +210,7 @@ pub fn check_openid_credential_is_unique<M: Memory + Clone>(
     storage: &Storage<M>,
     openid_credential_key: &OpenIdCredentialKey,
 ) -> Result<(), AnchorError> {
-    if storage
-        .lookup_anchor_with_openid_credential(openid_credential_key)
-        .is_some()
-    {
+    if storage.is_openid_credential_registered(openid_credential_key) {
         return Err(AnchorError::OpenIdCredentialAlreadyRegistered);
     }
 

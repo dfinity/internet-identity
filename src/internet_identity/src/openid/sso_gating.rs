@@ -215,13 +215,10 @@ fn ii_client_sub_on_anchor(
     })
 }
 
-/// The `sub`-org domain check: is there an anchor with an II-client credential
-/// `(iss, sub, ii_client_id)` established through this exact `sso_domain`? For a
-/// `sub` org the per-app token's `sub` already equals the II-client `sub` (one
-/// `sub` across clients, e.g. Google), so the `sso_domain` match is what stops a
-/// login through a foreign domain from resolving onto an identity established
-/// elsewhere. Another domain — or a non-SSO credential (`sso_domain == None`) —
-/// doesn't match.
+/// The `sub`-org lookup: is there an anchor with an II-client credential
+/// `(iss, sub, ii_client_id)` established through this `sso_domain`? For a `sub`
+/// org the per-app token's `sub` already equals the II-client `sub` (one `sub`
+/// across clients, e.g. Google), so the token carries everything the lookup needs.
 fn anchor_established_through_domain(
     sso_domain: &str,
     iss: &str,
@@ -230,18 +227,9 @@ fn anchor_established_through_domain(
 ) -> bool {
     let key = (iss.to_string(), sub.to_string(), ii_client_id.to_string());
     state::storage_borrow(|storage| {
-        let Some(anchor_number) = storage.lookup_anchor_with_openid_credential(&key) else {
-            return false;
-        };
-        let Ok(anchor) = storage.read(anchor_number) else {
-            return false;
-        };
-        anchor.openid_credentials().iter().any(|c| {
-            c.iss == iss
-                && c.sub == sub
-                && c.aud == ii_client_id
-                && c.sso_domain.as_deref() == Some(sso_domain)
-        })
+        storage
+            .lookup_anchor_with_openid_credential(&key, Some(sso_domain))
+            .is_some()
     })
 }
 
