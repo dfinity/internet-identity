@@ -278,7 +278,11 @@ export const fetchAppMetadata = async (
     if (result === undefined) {
       return undefined;
     }
-    const parsed: unknown = JSON.parse(new TextDecoder().decode(result.body));
+    // Fatal decoding: malformed UTF-8 rejects the file (via the catch below)
+    // instead of silently turning into U+FFFD on the sign-in screen.
+    const parsed: unknown = JSON.parse(
+      new TextDecoder("utf-8", { fatal: true }).decode(result.body),
+    );
     if (
       parsed === null ||
       typeof parsed !== "object" ||

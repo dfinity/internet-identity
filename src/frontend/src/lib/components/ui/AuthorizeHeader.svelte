@@ -16,6 +16,12 @@
   // stays visible regardless, as the trust anchor the user can verify.
   const metadataStore = $derived(getAppMetadataStore(origin));
   const metadata = $derived($metadataStore);
+  // A logo that fails to decode falls back to the default icon instead of a
+  // broken image; keyed by value so a later (valid) logo still renders.
+  let failedLogo = $state<string>();
+  const logo = $derived(
+    metadata.logo !== failedLogo ? metadata.logo : undefined,
+  );
 </script>
 
 <div
@@ -28,15 +34,16 @@
   <div
     class={[
       "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
-      metadata.logo === undefined &&
+      logo === undefined &&
         "border-border-tertiary text-fg-primary bg-bg-primary border",
     ]}
   >
-    {#if metadata.logo !== undefined}
+    {#if logo !== undefined}
       <img
-        src={metadata.logo}
+        src={logo}
         alt={`${metadata.name ?? hostname} logo`}
         class={["h-20 max-w-50 object-contain"]}
+        onerror={() => (failedLogo = metadata.logo)}
       />
     {:else}
       <div class="flex size-20 items-center justify-center" aria-hidden="true">

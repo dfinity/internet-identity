@@ -151,6 +151,16 @@ test("should return undefined for malformed bodies", async () => {
   }
 });
 
+test("should return undefined for malformed UTF-8", async () => {
+  // 0xff is never valid in UTF-8; fatal decoding must reject the file
+  // rather than smuggling U+FFFD replacement characters into the metadata.
+  setupFetchMock(
+    new Response(new Uint8Array([0x7b, 0xff, 0x7d]), { status: 200 }),
+  );
+
+  expect(await fetchAppMetadata(ORIGIN)).toBeUndefined();
+});
+
 test("should return undefined when no usable field is present", async () => {
   for (const body of [
     {},

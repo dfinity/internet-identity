@@ -17,6 +17,10 @@
     getAppMetadataStore($establishedChannelStore.origin),
   );
   const dapp = $derived($metadataStore);
+  // A logo that fails to decode falls back to the default animation instead
+  // of a broken image; keyed by value so a later (valid) logo still renders.
+  let failedLogo = $state<string>();
+  const logo = $derived(dapp.logo !== failedLogo ? dapp.logo : undefined);
   const hostname = $derived(new URL($establishedChannelStore.origin).hostname);
 </script>
 
@@ -25,7 +29,7 @@
     in:scale={{ duration: 500, easing: cubicOut, start: 0.9 }}
     class="flex flex-col items-center justify-center"
   >
-    {#if dapp.logo !== undefined}
+    {#if logo !== undefined}
       <div class="relative">
         <svg viewBox="0 0 92 92" width="92" height="92" class="mb-4">
           <path
@@ -52,9 +56,10 @@
           </g>
         </svg>
         <img
-          src={dapp.logo}
+          src={logo}
           alt={$t`${dapp.name ?? hostname} logo`}
           class="absolute inset-1 size-[84px] rounded-[18px] object-cover"
+          onerror={() => (failedLogo = dapp.logo)}
         />
       </div>
     {:else}

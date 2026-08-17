@@ -23,6 +23,10 @@
       : emptyMetadataStore,
   );
   const app = $derived($metadataStore);
+  // A logo that fails to decode falls back to the default icon instead of a
+  // broken image; keyed by value so a later (valid) logo still renders.
+  let failedLogo = $state<string>();
+  const logo = $derived(app.logo !== failedLogo ? app.logo : undefined);
   const hostname = $derived(
     appOrigin !== undefined ? new URL(appOrigin).hostname : undefined,
   );
@@ -34,15 +38,16 @@
       <div
         class={[
           "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
-          app.logo === undefined &&
+          logo === undefined &&
             "border-border-tertiary text-fg-primary bg-bg-primary border",
         ]}
       >
-        {#if app.logo !== undefined}
+        {#if logo !== undefined}
           <img
-            src={app.logo}
+            src={logo}
             alt={`${app.name ?? hostname} logo`}
             class="h-20 max-w-50 object-contain"
+            onerror={() => (failedLogo = app.logo)}
           />
         {:else}
           <div
