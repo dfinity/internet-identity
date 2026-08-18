@@ -17,7 +17,7 @@ From the client doc, the three pieces it puts in place:
 | ----- | ------ |
 | A shared `derivationOrigin`, authorized by `ii-alternative-origins` on that origin | Every sibling resolves to the same principal |
 | A `CookieDelegationStorage` scoped to the parent domain | Siblings can see *that* a session exists. The cookie holds only the principal and the expiry, never key material |
-| A `/reauth` page running `transport: 'redirect'`, `prompt: 'none'`, `hint: <principal from the cookie>` | Re-issues this app's own delegation and returns to `?next=` |
+| A `/reauth` page running `transport: 'redirect'`, `prompt: 'none'`, `hint: <principal from the cookie>` | Re-issues this app's own delegation, then returns the user to its own `?next=` (§3.1) |
 
 So II is handed a redirect authorize request naming an origin, a derivation origin, a `prompt` and a `hint`, and is expected either to answer without rendering anything or to fail in a way the client can tell apart from a real error.
 
@@ -30,7 +30,7 @@ Note the cookie is not II's mechanism and II never sees it. It is how the *sibli
 | Item | Change |
 | ---- | ------ |
 | `prompt` authorize-URL parameter | New. `none` answers from a held session or fails; `login` and absent behave as today |
-| `hint` authorize-URL parameter | New. A principal, selecting which of the origin's sessions to re-issue from |
+| `hint` authorize-URL parameter | New. A principal in text form, selecting which of the origin's sessions to re-issue from |
 | A no-UI path through the authorize flow | New. Resolves the session, extends its chain, delivers the redirect response, renders nothing |
 | `interaction_required` outcome | New. Distinguishable from every other failure, so the client can fall back to a ceremony |
 
@@ -49,8 +49,8 @@ sequenceDiagram
     participant IIF as II frontend
     participant IIC as II canister
     App->>App: no local session, cookie has a hint
-    App->>IIF: redirect to /authorize?prompt=none&hint=P&next=/page
-    Note over IIF: validate the callback and derivation origin,<br/>as the redirect transport already does
+    App->>IIF: redirect to /authorize?prompt=none&hint=<principal><br/>plus the URL transport's own callbackUrl
+    Note over IIF: validate callbackUrl against ii-auth-callbacks<br/>and the derivation origin, as today
     Note over IIF: resolve P to a locator via the principal index,<br/>require it to be this origin's (§4)
     alt a live session is held for it
         Note over IIF: extend the stored session chain to the app's key
@@ -64,6 +64,20 @@ sequenceDiagram
 ```
 
 The II frontend does not mint the app delegation here. It hands back the session chain and the app mints its own, exactly as on a first sign-in, so there is one path for that and not two.
+
+### 3.1 What actually reaches II, and what does not
+
+Worth being exact, because two of these look like II parameters and are not.
+
+| Value | Where it lives | Does II see it |
+| ----- | -------------- | -------------- |
+| `prompt=none` | Query param on the authorize URL, set by the client as an II extension | Yes. This doc's §4 |
+| `hint=<principal text>` | Query param on the authorize URL, likewise | Yes. This doc's §5 |
+| `callbackUrl` | The ICRC-167 URL transport's own return address: a full, query-less URL of the form `https://chat.example.com/reauth` | Yes, and it is validated against that origin's `ii-auth-callbacks`. Unchanged by this design |
+| `next=/some/path` | A query param the app puts on **its own** `/reauth` URL | No. Never sent to II |
+| `returnTo` | An `AuthClient` option, which `/reauth` sets from `next` | No. The client journals it so it survives the round trip, then does `location.replace(returnTo)` once the flow has completed |
+
+So the return address II is given is a whole URL and an allow-listed one, not a path. Where the user lands *within* the app afterwards is the app's business, handled entirely on its side, and II has no part in it. That separation is what keeps the callback allow-list meaningful: it enumerates a small fixed set of pages, and it would be worthless if II accepted an arbitrary path or URL alongside it.
 
 ---
 
@@ -133,6 +147,7 @@ One outcome for every session-related case, so a client's fallback is a single b
 | # | Decision | § |
 | - | -------- | - |
 | R1 | `prompt` and `hint` travel as authorize-URL parameters, not in the ICRC request, matching how the client already sends them | 2 |
+| R1a | They are the only new values II receives. `next` and `returnTo` are app-side and never reach it, and the return address stays the URL transport's allow-listed `callbackUrl` | 3.1 |
 | R2 | `prompt=none` renders nothing and returns either a session chain or `interaction_required` | 4 |
 | R3 | `prompt=none` never creates a session, since it has no access method to authorize one | 4 |
 | R4 | `hint` selects among the requesting origin's sessions and can never name another origin's | 4 |
