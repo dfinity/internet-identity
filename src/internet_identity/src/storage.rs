@@ -2002,14 +2002,34 @@ impl<M: Memory + Clone> Storage<M> {
             application.stored_accounts,
             application.stored_account_references,
         );
-        self.stable_application_memory.insert(
-            application_number,
-            StorableApplication {
-                origin: application.origin,
-                stored_accounts,
-                stored_account_references,
-            },
-        );
+        if stored_account_references == 0 {
+            self.reap_application(application_number, &application.origin);
+        } else {
+            self.stable_application_memory.insert(
+                application_number,
+                StorableApplication {
+                    origin: application.origin,
+                    stored_accounts,
+                    stored_account_references,
+                },
+            );
+        }
+    }
+
+    /// Retires an application no anchor references any more.
+    ///
+    /// Nothing else is keyed by `ApplicationNumber` at this point: reference-list rows
+    /// are gone by definition at zero references, and config rows cannot outlive them.
+    /// The number itself is retired rather than reissued, so a later sign-in at the
+    /// same origin allocates a fresh one.
+    fn reap_application(&mut self, application_number: ApplicationNumber, origin: &str) {
+        self.stable_application_memory.remove(&application_number);
+
+        let origin_key = StorableOriginSha256::from_origin(&origin.to_string());
+        if self.lookup_application_with_origin_memory.get(&origin_key) == Some(application_number) {
+            self.lookup_application_with_origin_memory
+                .remove(&origin_key);
+        }
     }
 
     /// This is for testing purposes only, DO NOT use anywhere else!

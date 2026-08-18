@@ -1606,3 +1606,70 @@ fn should_track_a_chosen_default_account_without_marking_it_used() -> Result<(),
 
     Ok(())
 }
+
+/// Verifies that an anchor signing in at more origins than the per-anchor cap allows
+/// keeps signing in successfully, and that the applications it stops referencing are
+/// reclaimed rather than accumulating for the lifetime of the canister.
+#[test]
+fn should_reap_applications_an_anchor_stops_referencing() -> Result<(), RejectResponse> {
+    const EVICTABLE_DEFAULT_ACCOUNTS_CAP: u64 = 500;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+
+    let evicted_origin = "https://dapp-0.com".to_string();
+    let mut user_key_before_eviction = None;
+    for index in 0..EVICTABLE_DEFAULT_ACCOUNTS_CAP {
+        let params = AccountDelegationParams::new(
+            &env,
+            canister_id,
+            principal_1(),
+            identity_number,
+            format!("https://dapp-{index}.com"),
+            None,
+            ByteBuf::from(vec![1; 32]),
+        );
+        let prepared = prepare_account_delegation(&params, None)?
+            .expect("signing in must never fail on the per-anchor cap");
+        if index == 0 {
+            user_key_before_eviction = Some(prepared.user_key);
+        }
+    }
+
+    let (application_count, _) = parse_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_total_application_count",
+    );
+    assert!(
+        application_count < EVICTABLE_DEFAULT_ACCOUNTS_CAP as f64,
+        "expected reaping to reclaim applications, got {application_count}"
+    );
+
+    // Eviction drops a timestamp, not an account: the origin is usable again and
+    // derives the same principal it did before.
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        evicted_origin.clone(),
+        None,
+        ByteBuf::from(vec![1; 32]),
+    );
+    let prepared = prepare_account_delegation(&params, None)?.unwrap();
+    assert_eq!(Some(prepared.user_key), user_key_before_eviction);
+
+    let accounts = get_accounts(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        evicted_origin,
+    )?
+    .unwrap();
+    assert_eq!(accounts.len(), 1);
+    assert!(accounts[0].last_used.is_some());
+
+    Ok(())
+}

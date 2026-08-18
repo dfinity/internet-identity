@@ -2673,11 +2673,8 @@ mod tracked_default_eviction_tests {
         );
 
         for index in 0..evicted {
-            let application_number = storage
-                .lookup_application_number_with_origin(&origin_of(index))
-                .unwrap();
             assert!(storage
-                .lookup_account_references(anchor_number, application_number)
+                .lookup_application_number_with_origin(&origin_of(index))
                 .is_none());
         }
         for index in evicted..MAX_EVICTABLE_DEFAULT_ACCOUNTS {
@@ -2858,14 +2855,10 @@ mod tracked_default_eviction_tests {
                 .stored_account_references,
             0
         );
-        assert_eq!(
-            storage
-                .stable_application_memory
-                .get(&application_number)
-                .unwrap()
-                .stored_account_references,
-            0
-        );
+        assert!(storage
+            .stable_application_memory
+            .get(&application_number)
+            .is_none());
         assert_eq!(
             storage
                 .get_total_accounts_counter()
@@ -3017,5 +3010,247 @@ mod tracked_default_eviction_tests {
             .unwrap();
 
         assert_eq!(storage.evictable_default_rows(anchor_number).len(), 0);
+    }
+}
+
+mod application_reaping_tests {
+    use crate::storage::account::{AccountReference, CreateAccountParams};
+    use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
+    use crate::storage::storable::application::StorableOriginSha256;
+    use crate::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    fn storage_with_anchors() -> (Storage<VectorMemory>, AnchorNumber, AnchorNumber) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let first = storage.allocate_anchor(0).unwrap();
+        let first_number = first.anchor_number();
+        storage.write(first).unwrap();
+        let second = storage.allocate_anchor(0).unwrap();
+        let second_number = second.anchor_number();
+        storage.write(second).unwrap();
+        (storage, first_number, second_number)
+    }
+
+    #[test]
+    fn the_last_reference_leaving_reaps_the_application() {
+        let (mut storage, anchor_number, _) = storage_with_anchors();
+        let origin = "https://example.com".to_string();
+        storage
+            .set_account_last_used(anchor_number, origin.clone(), None, 1_000)
+            .unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+
+        storage
+            .remove_reference_list(anchor_number, application_number)
+            .unwrap();
+
+        assert!(storage
+            .lookup_application_number_with_origin(&origin)
+            .is_none());
+        assert!(storage
+            .stable_application_memory
+            .get(&application_number)
+            .is_none());
+        assert_eq!(storage.get_total_application_count(), 0);
+    }
+
+    #[test]
+    fn an_application_another_anchor_still_references_is_kept() {
+        let (mut storage, anchor_number, other_anchor_number) = storage_with_anchors();
+        let origin = "https://example.com".to_string();
+        storage
+            .set_account_last_used(anchor_number, origin.clone(), None, 1_000)
+            .unwrap();
+        storage
+            .set_account_last_used(other_anchor_number, origin.clone(), None, 2_000)
+            .unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+
+        storage
+            .remove_reference_list(anchor_number, application_number)
+            .unwrap();
+
+        assert_eq!(
+            storage.lookup_application_number_with_origin(&origin),
+            Some(application_number)
+        );
+        assert_eq!(
+            storage
+                .stable_application_memory
+                .get(&application_number)
+                .unwrap()
+                .stored_account_references,
+            1
+        );
+    }
+
+    #[test]
+    fn a_reaped_number_is_never_reissued() {
+        let (mut storage, anchor_number, _) = storage_with_anchors();
+        let reaped_origin = "https://reaped.com".to_string();
+        let kept_origin = "https://kept.com".to_string();
+        storage
+            .set_account_last_used(anchor_number, reaped_origin.clone(), None, 1_000)
+            .unwrap();
+        storage
+            .set_account_last_used(anchor_number, kept_origin.clone(), None, 2_000)
+            .unwrap();
+        let reaped_number = storage
+            .lookup_application_number_with_origin(&reaped_origin)
+            .unwrap();
+        let kept_number = storage
+            .lookup_application_number_with_origin(&kept_origin)
+            .unwrap();
+
+        storage
+            .remove_reference_list(anchor_number, reaped_number)
+            .unwrap();
+        storage
+            .set_account_last_used(anchor_number, "https://fresh.com".to_string(), None, 3_000)
+            .unwrap();
+
+        let fresh_number = storage
+            .lookup_application_number_with_origin(&"https://fresh.com".to_string())
+            .unwrap();
+        assert_ne!(fresh_number, reaped_number);
+        assert_ne!(fresh_number, kept_number);
+        assert_eq!(
+            storage.lookup_application_number_with_origin(&kept_origin),
+            Some(kept_number)
+        );
+    }
+
+    #[test]
+    fn a_reaped_origin_signed_into_again_gets_a_fresh_application() {
+        let (mut storage, anchor_number, _) = storage_with_anchors();
+        let origin = "https://example.com".to_string();
+        storage
+            .set_account_last_used(anchor_number, origin.clone(), None, 1_000)
+            .unwrap();
+        let first_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        storage
+            .remove_reference_list(anchor_number, first_number)
+            .unwrap();
+
+        storage
+            .set_account_last_used(anchor_number, origin.clone(), None, 2_000)
+            .unwrap();
+
+        let second_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        assert_ne!(second_number, first_number);
+        assert!(storage
+            .lookup_account_references(anchor_number, second_number)
+            .is_some());
+    }
+
+    #[test]
+    fn an_application_holding_a_named_account_is_not_reaped_by_a_default_leaving() {
+        let (mut storage, anchor_number, other_anchor_number) = storage_with_anchors();
+        let origin = "https://example.com".to_string();
+        storage
+            .create_additional_account(CreateAccountParams {
+                anchor_number,
+                name: "named".to_string(),
+                origin: origin.clone(),
+            })
+            .unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        storage
+            .write_reference_list(
+                other_anchor_number,
+                application_number,
+                vec![AccountReference {
+                    account_number: None,
+                    last_used: Some(1_000),
+                }],
+            )
+            .unwrap();
+
+        storage
+            .remove_reference_list(other_anchor_number, application_number)
+            .unwrap();
+
+        assert_eq!(
+            storage.lookup_application_number_with_origin(&origin),
+            Some(application_number)
+        );
+    }
+
+    #[test]
+    fn reaping_leaves_no_config_row_behind() {
+        let (mut storage, anchor_number, _) = storage_with_anchors();
+        let origin = "https://example.com".to_string();
+        let named = storage
+            .create_additional_account(CreateAccountParams {
+                anchor_number,
+                name: "named".to_string(),
+                origin: origin.clone(),
+            })
+            .unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        storage.set_anchor_application_config(
+            anchor_number,
+            application_number,
+            AnchorApplicationConfig {
+                default_account_number: named.account_number,
+            },
+        );
+        assert!(storage
+            .stable_anchor_application_config_memory
+            .get(&(anchor_number, application_number))
+            .is_some());
+
+        storage
+            .remove_reference_list(anchor_number, application_number)
+            .unwrap();
+
+        assert!(storage
+            .stable_anchor_application_config_memory
+            .get(&(anchor_number, application_number))
+            .is_none());
+        assert!(storage
+            .lookup_application_number_with_origin(&origin)
+            .is_none());
+    }
+
+    /// The origin index is keyed by origin, not by application number, so a reap must
+    /// not remove an entry that already points somewhere else.
+    #[test]
+    fn reaping_leaves_an_origin_that_was_reallocated_alone() {
+        let (mut storage, anchor_number, _) = storage_with_anchors();
+        let origin = "https://example.com".to_string();
+        storage
+            .set_account_last_used(anchor_number, origin.clone(), None, 1_000)
+            .unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        let reallocated = application_number + 7;
+        storage
+            .lookup_application_with_origin_memory
+            .insert(StorableOriginSha256::from_origin(&origin), reallocated);
+
+        storage
+            .remove_reference_list(anchor_number, application_number)
+            .unwrap();
+
+        assert_eq!(
+            storage.lookup_application_number_with_origin(&origin),
+            Some(reallocated)
+        );
     }
 }
