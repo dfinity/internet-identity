@@ -492,7 +492,7 @@ Revocation latency, app-delegation TTL and refresh rate are one number. Refresh 
 | 100k | 333 update calls/s | 55/s |
 | 1M | 3,333/s | 555/s |
 
-Each is a replicated update that inserts a signature and updates the root hash, against a single canister on one subnet. Worth measuring the current `prepare_delegation` rate before fixing T.
+Each is a replicated update that inserts a signature and updates the root hash, against a single canister on one subnet.
 
 Note the stable write from §6.4 does **not** scale with `1/T`, because the stamp is coalesced to a fixed interval. Lowering `T` multiplies the calls, not the writes.
 
@@ -502,7 +502,7 @@ Note the stable write from §6.4 does **not** scale with `1/T`, because the stam
 
 Signing several delegations ahead in one update looks like an escape and is not: revocation latency equals the maximum lifetime of any already-issued delegation, so pre-signing is the same thing as a longer TTL. Without the relying party checking with II per call, T is the only dial.
 
-**T is the open number in this design.** 5 minutes matches what MCP already mints.
+**T is 5 minutes**, matching what MCP already mints (`MCP_MAX_EXPIRATION_PERIOD_NS`). Measuring the current `prepare_delegation` rate is a validation step before rollout, not a precondition for the design: the ceiling above is the worst case, and if it ever binds, T is a constant to raise rather than a shape to change.
 
 ---
 
@@ -555,6 +555,7 @@ Also out of scope: whether to fold MCP's grant into this mechanism. The value sh
 | S15a | Session errors are distinguishable, not collapsed: there is no oracle to hide from | 6.1, 10 |
 | S16 | Anchor-authenticated methods name sessions by locator, so the principal index is on the refresh path only | 7.2 |
 | S17 | Revocation latency is exactly the app-delegation TTL, by construction | 7.3 |
+| S17a | The app-delegation TTL is 5 minutes, matching MCP | 9 |
 | S18 | Device registry is `StorableAnchor` field 7, capped at 20, read through `identity_info` | 8.1 |
 | S19 | The canister allocates device ids from a monotonic per-anchor `next_id`; the frontend only caches and echoes them | 8.2 |
 | S20 | Device revocation is an eager atomic sweep, so refresh never reads the anchor | 8.3 |
