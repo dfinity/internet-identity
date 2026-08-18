@@ -72,7 +72,7 @@ flowchart LR
     DC["dapp canister"]
 
     App -->|"ii_session_delegation (session only)"| IIF
-    IIF -->|"prepare/get_account_session<br/>revoke_session / revoke_session_device"| IIC
+    IIF -->|"prepare/get_account_session<br/>revoke_account_session / revoke_device_sessions"| IIC
     App -->|"app_prepare_delegation / app_get_delegation<br/>app_revoke_session"| IIC
     App -->|"app delegation"| DC
 ```
@@ -87,7 +87,7 @@ Three things deliberately never happen: the dapp canister never talks to II, the
 | `app_prepare_delegation` / `app_get_delegation` | app frontend | its session chain | 7.1 |
 | `app_revoke_session` | app frontend | its session chain | 8.1 |
 | `prepare_account_session` / `get_account_session` | II frontend | an anchor access method | 6.3 |
-| `revoke_session`, `revoke_session_device` | II frontend | an anchor access method | 8.2 |
+| `revoke_account_session`, `revoke_device_sessions` | II frontend | an anchor access method | 8.2 |
 
 **No method serves both frontends.** Each is authenticated exactly one way, so its authorization is unconditional and auditable rather than a branch. Where both frontends need the same outcome, as with revocation, they get separate methods. The audience is in the name: `app_` marks the app frontend, following the `mcp_` precedent, and unprefixed methods are the II frontend's.
 
@@ -119,8 +119,8 @@ Three methods, and none of them names an anchor.
 | `prepare_account_session` | new update | Create or reuse a session and sign it to the frontend's key (§6.3) |
 | `get_account_session` | new query | Fetch the session delegation and witness the bundle signature (§6.3) |
 | `IdentityInfo` | `session_devices` field | Devices live on the anchor, so they ride here (§9.1) |
-| `revoke_session` | new update | Revoke one session (§8.2) |
-| `revoke_session_device` | new update | Revoke a browser and sweep (§8.2, §9.3) |
+| `revoke_account_session` | new update | Revoke one session at one account (§8.2) |
+| `revoke_device_sessions` | new update | Sign a browser out by sweeping its sessions (§8.2, §9.3) |
 | `PrepareAccountSession*`, `GetAccountSession*`, `AccountSessionError` | new types | (§6.3) |
 
 **JSON-RPC**, app frontend to II frontend.
@@ -468,14 +468,14 @@ The app deliberately cannot revoke anything else. "Sign out everywhere" is the I
 ### 8.2 The anchor-authenticated methods
 
 ```candid
-revoke_session : (record {
+revoke_account_session : (record {
     identity_number : IdentityNumber;
     origin : text;
     account_number : opt AccountNumber;
     created_at : Timestamp;
 }) -> (variant { Ok; Err : SessionRevokeError });
 
-revoke_session_device : (record {
+revoke_device_sessions : (record {
     identity_number : IdentityNumber;
     device_id : nat32;
 }) -> (variant { Ok; Err : SessionRevokeError });
@@ -489,7 +489,7 @@ What that leaves usable today:
 
 | Operation | Drivable now? |
 | --------- | ------------- |
-| Revoke a whole browser | Yes. `identity_info` already carries `session_devices` with their names (§9.1), so the UI can offer them |
+| Sign a whole browser out | Yes. `identity_info` already carries `session_devices` with their names (§9.1), so the UI can offer them |
 | Revoke one session | The method exists, but nothing enumerates sessions yet, so its UI arrives with the listing work |
 
 ```mermaid
@@ -502,8 +502,8 @@ sequenceDiagram
     IIF->>IIC: identity_info(identity_number)
     IIC-->>IIF: session_devices with names
     User->>IIF: sign out "Chrome on MacBook"
-    IIF->>IIC: revoke_session_device { identity_number, device_id }
-    Note over IIC: delete the device and sweep the anchor's<br/>references in one message (§9.3)
+    IIF->>IIC: revoke_device_sessions { identity_number, device_id }
+    Note over IIC: sweep the anchor's references for that device<br/>in one message, and the device record stays (§9.3)
     IIC-->>IIF: Ok
 ```
 
@@ -550,11 +550,15 @@ There is no registration method. `prepare_account_session` carries `device_name`
 
 The frontend caches the returned id per anchor and passes it back on every later auth flow, for every app. It does not choose the id, derive it, or influence it.
 
-The id comes from an explicit per-anchor `next_id`, monotonic and never reused. Computing `max(ids) + 1` instead would technically be safe given the eager sweep in §9.3, since no session survives referencing a deleted device, but it silently couples id safety to sweep completeness: a later move to lazy revocation would reintroduce misattribution with nothing visibly changing. Four bytes decouples it, and it matches the monotonic-and-never-reissued rule already established for account and application numbers.
+The id comes from an explicit per-anchor `next_id`, monotonic and never reused. Since §9.3 does not delete device records, an id cannot come up for reuse in the first place, so this is belt and braces rather than load-bearing today. It stays explicit because it will matter the moment records can be deleted, and it matches the monotonic-and-never-reissued rule already established for account and application numbers.
 
-### 9.3 Device revocation is an eager sweep
+### 9.3 Signing a browser out is an eager sweep
 
-`revoke_session_device` removes the device from the anchor and sweeps that anchor's references in the same message: the anchor-major range scan the eviction path already performs, bounded at 1000 rows by `tracked-default-accounts.md` §7.3, writing only rows that actually hold that device's sessions. Atomic, with no partially-revoked state.
+`revoke_device_sessions` does what its name says and no more: it removes every session carrying that `device_id`, and **leaves the device record in place.** The rename is not cosmetic. A browser that has been signed out is still a browser the user recognises, so the settings UI can show "Chrome on MacBook, no active sessions", and signing back in from it reuses the same id rather than adding a second entry for the same machine.
+
+Deleting a device record is therefore a separate operation from signing one out, and it is not specified here. §9.6 is where it is wanted, to clear the duplicate a storage wipe leaves behind, and it belongs with the listing work.
+
+The sweep runs over that anchor's references in one message: the anchor-major range scan the eviction path already performs, bounded at 1000 rows by `tracked-default-accounts.md` §7.3, writing only rows that actually hold that device's sessions. Atomic, with no partially-revoked state.
 
 Doing it eagerly is what keeps refresh cheap. The alternative, marking a device revoked and checking it during refresh, makes revocation O(1) but adds an anchor read to a call that otherwise never touches the anchor, since refresh authenticates by session chain and never runs `check_authorization`. Refresh happens every few minutes per active session; revocation is rare.
 
@@ -655,7 +659,7 @@ Also out of scope: whether to fold MCP's grant into this mechanism. The value sh
 | S17a | The app-delegation TTL is 5 minutes, matching MCP, and is not requestable by the app | 10, 7.1 |
 | S18 | Device registry is `StorableAnchor` field 7, capped at 20, read through `identity_info` | 9.1 |
 | S19 | Device registration is not a method. `device_name` and `device_id` on `prepare_account_session` resolve or register, and the id comes back in the response; the canister allocates from a monotonic per-anchor `next_id` | 9.2 |
-| S20 | Device revocation is an eager atomic sweep, so refresh never reads the anchor | 9.3 |
+| S20 | Signing a browser out is an eager atomic sweep of its sessions, so refresh never reads the anchor. The device record survives, so ids stay stable and deleting a record is a separate, deferred operation | 9.3 |
 | S21 | Only `prepare_account_session` accepts a device id, so no dapp-reachable surface takes one | 9.4 |
 | S22 | The device id is per anchor, never browser-global | 9.5 |
 | S23 | Nothing changes for apps on `icrc34_delegation`; opting in means upgrading the client | 11 |
