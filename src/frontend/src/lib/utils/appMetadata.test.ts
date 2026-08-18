@@ -120,7 +120,7 @@ test("should fetch a same-origin logo and render it from a blob url", async () =
     Response.json({ name: "Example App", logo: "/assets/logo.png" }),
     imageResponse(),
   );
-  const { createObjectURL, toBlob } = setupImageMock();
+  const { createImageBitmap, createObjectURL, toBlob } = setupImageMock();
 
   const result = await fetchAppMetadata(ORIGIN);
 
@@ -128,6 +128,8 @@ test("should fetch a same-origin logo and render it from a blob url", async () =
     name: "Example App",
     logo: LOGO_OBJECT_URL,
   });
+  // The downloaded bytes reach the decoder as a blob, never as a JS buffer.
+  expect(createImageBitmap).toHaveBeenCalledWith(expect.any(Blob));
   // The rendered bytes are II's own re-encoding, held in the browser's blob
   // store: no attacker-controlled payload reaches the DOM or the JS heap, as a
   // `data:` URL would.

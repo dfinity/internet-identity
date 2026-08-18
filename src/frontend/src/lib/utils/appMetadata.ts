@@ -137,8 +137,12 @@ const readBodyCapped = async (
     }),
   );
   try {
-    // The headers come along so the blob keeps the response's content type.
-    return await new Response(capped, { headers: response.headers }).blob();
+    // Only the content type is carried over, so the blob keeps it; copying the
+    // rest would attach a `Content-Length` and `Content-Encoding` that no
+    // longer describe this stream.
+    return await new Response(capped, {
+      headers: { "content-type": response.headers.get("content-type") ?? "" },
+    }).blob();
   } catch {
     return undefined;
   }
