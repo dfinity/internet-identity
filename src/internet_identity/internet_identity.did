@@ -1586,6 +1586,21 @@ type NotificationSendRequest = record {
     notifications : opt vec Notification;
 };
 
+// Delivery channels a notification can travel over. Web Push is the only one
+// today; a second channel (email, SMS) is a variant addition here rather than a
+// new endpoint, because consent is per app and not per channel.
+type NotificationChannel = variant {
+    push;
+};
+
+// Whether an app may notify this identity, and whether anything can actually
+// reach them. Kept as a record so channels can be reported without changing the
+// method signature.
+type NotificationConsentStatus = record {
+    consented : opt bool;                            // the user allowed this app; channel-agnostic
+    deliverable_channels : opt vec NotificationChannel;  // channels set up right now; empty means consented but unreachable
+};
+
 type NotificationSendResponse = record {
     accepted : opt nat32;            // queued, not delivered
     rejected : opt vec record { id : blob; reason : NotificationRejection };
@@ -2051,10 +2066,17 @@ service : (opt InternetIdentityInit) -> {
     // ===== Push notifications: called by II's own frontend / service worker =====
     notification_grant_consent : (anchor_number : UserNumber, origin : text) -> (variant { Ok; Err : text });
     notification_revoke_consent : (anchor_number : UserNumber, origin : text) -> (variant { Ok; Err : text });
-    notification_consent_status : (anchor_number : UserNumber, origin : text) -> (bool) query;
+    notification_consent_status : (anchor_number : UserNumber, origin : text) -> (NotificationConsentStatus) query;
     notification_consented_origins : (anchor_number : UserNumber) -> (vec text) query;
 
-    webpush_subscribe_device : (anchor_number : UserNumber, endpoint : text, p256dh : blob, auth : blob) -> (variant { Ok; Err : text });
+    // Web Push specifics. VAPID (RFC 8292) needs an ES256 signature per relay
+    // POST and the IC has no P-256 signing primitive, so rather than hold an
+    // unrotatable key in canister state II holds none: the device generates its
+    // own VAPID keypair, uses the public half as its applicationServerKey, and
+    // uploads signatures covering successive validity windows. II spends the
+    // window covering the moment it sends and reassembles the JWT by templating.
+    webpush_subscribe_device : (anchor_number : UserNumber, endpoint : text, p256dh : blob, auth : blob, vapid_public_key : blob, jwt_signatures : vec blob, jwt_issued_at_ns : nat64) -> (variant { Ok; Err : text });
     webpush_unsubscribe_device : (anchor_number : UserNumber, endpoint : text) -> (variant { Ok; Err : text });
-    webpush_vapid_public_key : () -> (blob) query;
+    webpush_refresh_jwts : (anchor_number : UserNumber, endpoint : text, jwt_signatures : vec blob, jwt_issued_at_ns : nat64) -> (variant { Ok; Err : text });
+    webpush_jwt_pool_status : (anchor_number : UserNumber, endpoint : text) -> (opt record { remaining : nat32; issued_at_ns : nat64 }) query;
 };
