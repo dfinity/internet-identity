@@ -26,8 +26,10 @@
  * - Bodies are read with hard byte caps, enforced up front via
  *   `Content-Length` and chunk-by-chunk while streaming, so an origin can't
  *   make the authorization page buffer an arbitrarily large response.
- * - Text fields are stripped of control and bidi-override characters and
- *   dropped when they exceed conservative length limits.
+ * - A document is applied only if every field it carries meets the
+ *   requirements: one bad field rejects the whole document, with a console
+ *   warning naming it, so the app's developers can see and fix the mistake
+ *   instead of shipping a half-applied file that looks subtly wrong.
  * - The logo must live on the app's own origin. It is downloaded via `fetch`
  *   (II's CSP `connect-src` allows any https origin, unlike `img-src`),
  *   checked against an image content-type allowlist and a size cap, and only
@@ -169,60 +171,98 @@ const fetchCapped = async (
   }
 };
 
+/** Marker for a field that is present but violates the requirements. It
+ *  rejects the whole document rather than just itself — see
+ *  {@link fetchAppMetadata}. */
+const INVALID = Symbol("invalid");
+
+/** A validated field: the value to use, `undefined` when the field is absent,
+ *  or {@link INVALID} when it is present and unusable. */
+type Validated<T> = T | undefined | typeof INVALID;
+
 /**
- * Clean up an app-provided text field: normalize whitespace and strip
- * control characters as well as bidi-override/invisible formatting
- * characters, which could otherwise be used to visually spoof the sign-in
- * screen. Returns `undefined` when the value is not a string, is empty after
- * cleanup, or exceeds `maxLength` code points (no silent truncation: apps
- * should notice and fix their metadata instead of shipping a clipped name).
+ * Reject the document, logging which field is at fault and why. Without this,
+ * a mistake in the file would be invisible to the app's developers: II simply
+ * falls back to the previous presentation, on a screen they don't control.
  */
-const cleanTextField = (
+const reject = (field: string, problem: string): typeof INVALID => {
+  console.warn(`Ignoring ${APP_METADATA_PATH}: \`${field}\` ${problem}.`);
+  return INVALID;
+};
+
+/** Characters an app-provided text field must not contain: control characters
+ *  (except the ASCII whitespace ones \t \n \v \f \r, which are normalized to
+ *  spaces below) together with zero-width and bidi formatting characters,
+ *  which could otherwise be used to visually spoof the sign-in screen.
+ *
+ *  The zero-width joiners U+200C/U+200D are deliberately allowed: ZWNJ drives
+ *  correct shaping in scripts such as Persian and ZWJ holds emoji sequences
+ *  together (dropping it decays one joined emoji into two), and neither is a
+ *  control or bidi character. */
+const FORBIDDEN_CHARACTERS =
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u061c\u200b\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/;
+
+/**
+ * Validate an app-provided text field, returning the value to display (with
+ * whitespace collapsed and trimmed), `undefined` when the field is absent, or
+ * {@link INVALID} when it is present but does not meet the requirements.
+ *
+ * The length limit is applied to the value as served, counted in Unicode code
+ * points, so it is exactly what the published JSON Schema expresses — a
+ * document that validates against the schema is one II accepts. Whitespace
+ * normalization is presentation only and never rescues an over-long value.
+ */
+const validateTextField = (
   value: unknown,
+  field: string,
   maxLength: number,
-): string | undefined => {
+): Validated<string> => {
+  if (value === undefined) {
+    return undefined;
+  }
   if (typeof value !== "string") {
-    return undefined;
+    return reject(field, "must be a string");
   }
-  const cleaned = value
-    // Strip control and invisible formatting characters, except the ASCII
-    // whitespace ones (\t \n \v \f \r), which the next step collapses into
-    // regular spaces (stripping them instead would join adjacent words).
-    // The zero-width joiners U+200C/U+200D are also kept: ZWNJ drives correct
-    // shaping in scripts such as Persian and ZWJ holds emoji sequences
-    // together (stripping it decays one joined emoji into two), and neither
-    // is a control or bidi character.
-    .replace(
-      // eslint-disable-next-line no-control-regex
-      /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u061c\u200b\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g,
-      "",
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-  // Count code points, not UTF-16 units, matching the documented limits
-  // (JSON Schema `maxLength` semantics) — e.g. an emoji counts as one.
-  if (cleaned.length === 0 || [...cleaned].length > maxLength) {
-    return undefined;
+  if ([...value].length > maxLength) {
+    return reject(field, `must not exceed ${maxLength} characters`);
   }
-  return cleaned;
+  if (FORBIDDEN_CHARACTERS.test(value)) {
+    return reject(
+      field,
+      "must not contain control or bidirectional formatting characters",
+    );
+  }
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length === 0) {
+    return reject(field, "must not be blank");
+  }
+  return normalized;
 };
 
 /**
- * Resolve the `logo` field against the app origin and require the result to
- * live on that same origin. Same-origin keeps the sign-in private (no third
+ * Validate the `logo` field: it must resolve (relative to the app origin) to a
+ * URL on that same origin. Same-origin keeps the sign-in private (no third
  * party learns about it through an image load) and rules out `data:`,
  * `javascript:` and other non-http(s) schemes, whose origin never matches.
  */
-const resolveLogoUrl = (value: unknown, origin: string): URL | undefined => {
+const validateLogoUrl = (value: unknown, origin: string): Validated<URL> => {
+  if (value === undefined) {
+    return undefined;
+  }
   if (typeof value !== "string" || value.length === 0) {
-    return undefined;
+    return reject("logo", "must be a non-empty string");
   }
+  let url: URL;
   try {
-    const url = new URL(value, origin);
-    return url.origin === new URL(origin).origin ? url : undefined;
+    url = new URL(value, origin);
   } catch {
-    return undefined;
+    return reject("logo", "must be a valid URL");
   }
+  if (url.origin !== new URL(origin).origin) {
+    return reject("logo", "must be on the same origin as the document");
+  }
+  return url;
 };
 
 const toBase64 = (bytes: Uint8Array): string => {
@@ -263,14 +303,19 @@ const fetchLogoAsDataUrl = async (url: URL): Promise<string | undefined> => {
  * Fetch and validate the app metadata served by `origin` on
  * {@link APP_METADATA_PATH}.
  *
- * Individual fields that fail validation are dropped; the result is
- * `undefined` when the file is absent, cannot be fetched (e.g. missing CORS
- * headers), is malformed, or contains no usable field — callers should then
- * fall back to other sources (e.g. the hostname).
+ * Validation is all-or-nothing: a field that does not meet the requirements
+ * rejects the whole document, so an app never ends up displayed with half of
+ * its metadata applied and nothing to indicate why. The result is `undefined`
+ * when the file is absent, cannot be fetched (e.g. missing CORS headers), is
+ * malformed, fails validation, or carries no usable field — callers should
+ * then fall back to other sources (e.g. the hostname).
  *
- * @param origin Origin of the app as displayed to the user alongside the
- *   metadata (the two must always come from the same origin, so the
- *   hostname the user can verify vouches for the presentation next to it).
+ * @param origin Origin the app's identity is derived for: the validated
+ *   derivation origin when the authorization request carries one, and the
+ *   requesting origin otherwise. That origin is the single source of truth for
+ *   an app's presentation, so sibling origins sharing it (its alternative
+ *   origins, which it has certified as its own) present identically without
+ *   having to duplicate the document.
  */
 export const fetchAppMetadata = async (
   origin: string,
@@ -298,15 +343,37 @@ export const fetchAppMetadata = async (
       return undefined;
     }
     const { name, description, logo } = parsed as Record<string, unknown>;
+    // Validate every field before bailing out, so a document with more than
+    // one problem reports all of them in one go.
+    const validName = validateTextField(name, "name", MAX_APP_NAME_LENGTH);
+    const validDescription = validateTextField(
+      description,
+      "description",
+      MAX_APP_DESCRIPTION_LENGTH,
+    );
+    const logoUrl = validateLogoUrl(logo, origin);
+    if (
+      validName === INVALID ||
+      validDescription === INVALID ||
+      logoUrl === INVALID
+    ) {
+      return undefined;
+    }
     const metadata: AppMetadata = {
-      name: cleanTextField(name, MAX_APP_NAME_LENGTH),
-      description: cleanTextField(description, MAX_APP_DESCRIPTION_LENGTH),
+      name: validName,
+      description: validDescription,
     };
-    const logoUrl = resolveLogoUrl(logo, origin);
     if (logoUrl !== undefined) {
-      // A broken logo (e.g. missing CORS headers on the asset) only loses the
-      // logo, not the name and description.
+      // The asset is a second network resource, so unlike the fields of the
+      // document its failures aren't necessarily authoring mistakes (a 500 or
+      // a dropped connection is transient). Losing just the logo is the better
+      // outcome here: the name and description still render.
       metadata.logo = await fetchLogoAsDataUrl(logoUrl).catch(() => undefined);
+      if (metadata.logo === undefined) {
+        console.warn(
+          `Ignoring the \`logo\` in ${APP_METADATA_PATH}: it could not be loaded as an image of an allowed type within ${MAX_APP_LOGO_SIZE} bytes.`,
+        );
+      }
     }
     if (
       metadata.name === undefined &&

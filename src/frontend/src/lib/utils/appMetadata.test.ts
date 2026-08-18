@@ -7,7 +7,14 @@ import {
   MAX_APP_NAME_LENGTH,
   fetchAppMetadata,
 } from "$lib/utils/appMetadata";
-import { expect, test, vi } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
+
+beforeEach(() => {
+  // A rejected document logs a warning naming the offending field, which is
+  // how an app's developers find out. Silence it by default; the test below
+  // asserts on it explicitly.
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+});
 
 const ORIGIN = "https://app.example.com";
 const METADATA_URL = `${ORIGIN}${APP_METADATA_PATH}`;
@@ -210,12 +217,7 @@ test("should return undefined for malformed UTF-8", async () => {
 });
 
 test("should return undefined when no usable field is present", async () => {
-  for (const body of [
-    {},
-    { unrelated: "field" },
-    { name: 42, description: true, logo: [] },
-    { name: "", description: "   " },
-  ]) {
+  for (const body of [{}, { unrelated: "field" }]) {
     setupFetchMock(Response.json(body));
     expect(
       await fetchAppMetadata(ORIGIN),
@@ -247,7 +249,10 @@ test("should return undefined when content-length exceeds the size limit", async
   expect(await fetchAppMetadata(ORIGIN)).toBeUndefined();
 });
 
-test("should drop text fields exceeding their length limits", async () => {
+test("should reject the whole document when a text field exceeds its limit", async () => {
+  // Not just the offending field: an app that ships a too-long name sees its
+  // metadata not applied at all, which is noticeable and points at the fix,
+  // rather than silently losing one field on a screen it doesn't control.
   setupFetchMock(
     Response.json({
       name: "a".repeat(MAX_APP_NAME_LENGTH + 1),
@@ -255,18 +260,61 @@ test("should drop text fields exceeding their length limits", async () => {
     }),
   );
 
-  const result = await fetchAppMetadata(ORIGIN);
-
-  expect(result).toEqual({
-    description: "b".repeat(MAX_APP_DESCRIPTION_LENGTH),
-  });
+  expect(await fetchAppMetadata(ORIGIN)).toBeUndefined();
 });
 
-test("should strip control and bidi characters and normalize whitespace", async () => {
+test("should reject the whole document when a field has the wrong type", async () => {
+  for (const body of [
+    { name: 42, description: "An example app" },
+    { name: "Example App", description: true },
+    { name: "Example App", description: null },
+    { name: "Example App", logo: [] },
+    { name: "Example App", logo: "" },
+  ]) {
+    setupFetchMock(Response.json(body));
+
+    expect(
+      await fetchAppMetadata(ORIGIN),
+      JSON.stringify(body),
+    ).toBeUndefined();
+  }
+});
+
+test("should reject the whole document when a text field is blank", async () => {
+  for (const body of [
+    { name: "", description: "An example app" },
+    { name: "   ", description: "An example app" },
+    { name: "Example App", description: "\t\n" },
+  ]) {
+    setupFetchMock(Response.json(body));
+
+    expect(
+      await fetchAppMetadata(ORIGIN),
+      JSON.stringify(body),
+    ).toBeUndefined();
+  }
+});
+
+test("should name the offending field when rejecting a document", async () => {
+  // The console warning is the only signal an app's developers get, so it has
+  // to say which field is at fault.
+  setupFetchMock(Response.json({ name: "a".repeat(MAX_APP_NAME_LENGTH + 1) }));
+
+  expect(await fetchAppMetadata(ORIGIN)).toBeUndefined();
+  expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("`name`"));
+  expect(console.warn).toHaveBeenCalledWith(
+    expect.stringContaining(APP_METADATA_PATH),
+  );
+});
+
+test("should normalize whitespace in text fields", async () => {
+  // Whitespace is legitimate in a JSON document but would render as gaps, so
+  // runs of it collapse to single spaces and the value is trimmed. This is
+  // presentation only: it never rescues a value that breaks a requirement.
   setupFetchMock(
     Response.json({
-      name: "  Example \u0000\u202e \n\t App\u200f\u061c ",
-      description: "Multi\r\nline\u2066   description\u0007 ",
+      name: "  Example \t App\n",
+      description: "Multi\r\nline   description ",
     }),
   );
 
@@ -276,6 +324,32 @@ test("should strip control and bidi characters and normalize whitespace", async 
     name: "Example App",
     description: "Multi line description",
   });
+});
+
+test("should reject documents whose text fields carry control or bidi characters", async () => {
+  // These can visually reorder or hide parts of a name on the sign-in screen.
+  // Rejecting is both safer than stripping and visible to the app: a name that
+  // renders as something else than it reads is a bug in the file.
+  for (const char of [
+    "\u0000", // NUL
+    "\u0007", // BEL
+    "\u001b", // ESC
+    "\u061c", // arabic letter mark
+    "\u200b", // zero-width space
+    "\u200f", // right-to-left mark
+    "\u202e", // right-to-left override
+    "\u2066", // left-to-right isolate
+    "\ufeff", // zero-width no-break space
+  ]) {
+    setupFetchMock(
+      Response.json({ name: `Example${char}App`, description: "An example" }),
+    );
+
+    expect(
+      await fetchAppMetadata(ORIGIN),
+      char.codePointAt(0)?.toString(16),
+    ).toBeUndefined();
+  }
 });
 
 test("should preserve the zero-width joiners scripts and emoji need", async () => {
@@ -301,7 +375,7 @@ test("should count text limits in code points, not UTF-16 units", async () => {
   expect(await fetchAppMetadata(ORIGIN)).toBeUndefined();
 });
 
-test("should drop logos that are not same-origin", async () => {
+test("should reject the whole document when the logo is not same-origin", async () => {
   for (const logo of [
     "https://evil.com/logo.png",
     "//evil.com/logo.png",
@@ -315,14 +389,19 @@ test("should drop logos that are not same-origin", async () => {
       Response.json({ name: "Example App", logo }),
     );
 
-    const result = await fetchAppMetadata(ORIGIN);
-
-    expect(result, logo).toEqual({ name: "Example App" });
+    // A logo pointing somewhere else is an authoring mistake in the document
+    // (and a privacy leak if honored), so it invalidates the document rather
+    // than quietly dropping just the logo.
+    expect(await fetchAppMetadata(ORIGIN), logo).toBeUndefined();
     // The logo must not even be fetched.
     expect(fetchMock, logo).toHaveBeenCalledTimes(1);
   }
 });
 
+// Failures of the logo *asset* stay non-fatal, unlike invalid fields in the
+// document above: fetching a second resource can fail transiently (a 500, a
+// dropped connection), and losing the name and description over that would be
+// worse than rendering the app without its logo.
 test("should drop logos served with a non-image content type", async () => {
   setupFetchMock(
     Response.json({ name: "Example App", logo: "/logo.png" }),

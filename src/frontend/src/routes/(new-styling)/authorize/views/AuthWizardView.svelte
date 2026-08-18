@@ -21,8 +21,14 @@
     mode = $bindable("both"),
   }: Props = $props();
 
+  // Metadata comes from the origin the identity is derived for (the app's
+  // derivation origin when it uses one); the badge in the header keeps showing
+  // the origin the user is signing in from.
+  const metadataOrigin = $derived(
+    $authorizationStore?.effectiveOrigin ?? $establishedChannelStore.origin,
+  );
   const metadataStore = $derived(
-    getAppMetadataStore($establishedChannelStore.origin),
+    getAppMetadataStore(metadataOrigin, $establishedChannelStore.origin),
   );
   const dappName = $derived(
     $metadataStore.name ?? new URL($establishedChannelStore.origin).hostname,
@@ -36,7 +42,7 @@
   bind:mode
   ssoOrigin={$authorizationStore?.effectiveOrigin}
 >
-  <AuthorizeHeader origin={$establishedChannelStore.origin} />
+  <AuthorizeHeader origin={$establishedChannelStore.origin} {metadataOrigin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
     {mode === "signup"
       ? $t`Create an Identity`

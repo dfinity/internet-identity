@@ -337,7 +337,7 @@ In order to allow Internet Identity to read the path `/.well-known/ii-alternativ
 
 ## App metadata
 
-Internet Identity displays the name and logo of the client application on its authorization screens (e.g. "Continue to _App_"). Any application can provide this metadata itself — permissionlessly, without being included in any curated list — by serving a JSON document on the URL `/.well-known/ii-app-metadata` of its origin:
+Internet Identity displays the name and logo of the client application on its authorization screens (e.g. "Continue to _App_"). Any application can provide this metadata itself — permissionlessly, without being included in any curated list — by serving a JSON document at the path `/.well-known/ii-app-metadata` (on the origin identified below):
 
 ```json
 {
@@ -347,20 +347,24 @@ Internet Identity displays the name and logo of the client application on its au
 }
 ```
 
-Internet Identity fetches this document when the authorization flow starts, always from the same origin it displays to the user alongside the metadata — for the authorization screens this is the origin of the client application (`event.origin` of the authorization request); screens that display a validated `derivationOrigin` instead fetch the document from that displayed origin. When the document is missing or invalid, Internet Identity falls back to the curated metadata it ships for a small list of known applications (a transitional mechanism that this document supersedes), and otherwise to displaying the origin's hostname only.
+Internet Identity fetches this document when the authorization flow starts, from the origin the application's identity is derived for: the `derivationOrigin` of the authorization request once it has been validated (see [Alternative frontend origins](#alternative-frontend-origins)), and the origin the request came from otherwise. An application therefore publishes the document once, on the origin its principals and its Internet Identity accounts are bound to, and all of its alternative frontend origins — which that origin has certified as its own — present the same name, description and logo, with nothing to keep in sync between them. When the document is missing or invalid, Internet Identity falls back to the curated metadata it ships for a small list of known applications (a transitional mechanism that this document supersedes), and otherwise to displaying the origin only.
 
-Since the file is under the sole control of the application origin, the metadata is exactly as trustworthy as that origin itself: it does not certify or verify the application's identity in any way. Internet Identity therefore always displays the application's origin alongside this metadata, as the value users can actually verify. Ordinary `https` origins on the default port are shown as their hostname (`https://example.com` as `example.com`); an origin whose scheme or port would otherwise be hidden is shown in full (for example `https://example.com:8443`), since those components distinguish origins that derive different principals.
+Since the file is under the sole control of the origin serving it, the metadata is exactly as trustworthy as that origin itself: it does not certify or verify the application's identity in any way. Internet Identity therefore always displays the origin the user is signing in from alongside this metadata, as the value users can actually verify. Ordinary `https` origins on the default port are shown as their hostname (`https://example.com` as `example.com`); an origin whose scheme or port would otherwise be hidden is shown in full (for example `https://example.com:8443`), since those components distinguish origins that derive different principals.
+
+When the document comes from a `derivationOrigin`, the displayed origin is one that origin has itself listed as an alternative frontend origin, in a certified document, and it is that origin's principals the user receives — so the presentation still comes from the origin the sign-in is bound to, and no origin can present itself using metadata of an origin that has not vouched for it.
 
 Requirements:
 
-- All fields are optional, and unknown fields are ignored. Fields that fail validation are ignored individually; a document without any valid field is ignored entirely (and a valid document replaces any curated fallback entry wholesale).
-- `name` and `description` are normalized before they are checked: control characters and bidirectional-override characters are stripped (the zero-width joiners U+200C and U+200D are preserved, since they are needed for correct shaping in scripts such as Persian and for emoji sequences), runs of whitespace are collapsed to single spaces, and the result is trimmed. A field that is empty after normalization is dropped. The normalized `name` must not exceed 40 characters and the normalized `description` must not exceed 120 characters, counted in Unicode code points; a field that exceeds its limit is dropped rather than truncated.
-- `logo` must be a URL (relative URLs are resolved against the application origin) pointing to an image _on the same origin_. Internet Identity downloads the logo (it is never hotlinked), so both the metadata document and the logo asset must be readable cross-origin (see the CORS note below). The logo must be served with one of the content types `image/png`, `image/jpeg`, `image/webp`, `image/gif`, `image/avif` or `image/svg+xml`, and must not exceed 256 KiB.
+- All fields are optional, and unknown fields are ignored, so that fields added in the future do not invalidate documents for older versions of Internet Identity. A document that carries no field Internet Identity knows is ignored; a valid document replaces any curated fallback entry wholesale.
+- A field that is present but does not meet the requirements below invalidates **the whole document**, which is then ignored — the offending field is not simply dropped. An application whose file is wrong therefore sees none of its metadata applied, instead of shipping a file that is silently half-applied on a screen it does not control; Internet Identity also logs which field is at fault to the browser console.
+- `name` must not exceed 40 characters and `description` must not exceed 120 characters, counted in Unicode code points on the value as served. Neither may be blank, and neither may contain control characters (other than the ASCII whitespace characters `\t`, `\n`, `\v`, `\f` and `\r`) or zero-width and bidirectional formatting characters, which could otherwise make the rendered text read differently from what it contains. The zero-width joiners U+200C and U+200D are allowed, since they are needed for correct shaping in scripts such as Persian and for emoji sequences.
+- Before being displayed, `name` and `description` have runs of whitespace collapsed to single spaces and are trimmed. This is presentation only, applied after the requirements above are checked: it never rescues a value that violates them.
+- `logo` must be a URL (relative URLs are resolved against the document's origin) pointing to an image _on that same origin_. Internet Identity downloads the logo (it is never hotlinked), so both the metadata document and the logo asset must be readable cross-origin (see the CORS note below). The logo must be served with one of the content types `image/png`, `image/jpeg`, `image/webp`, `image/gif`, `image/avif` or `image/svg+xml`, and must not exceed 256 KiB. Unlike the fields of the document, a logo that cannot be fetched or does not meet these asset requirements costs the application only its logo: fetching a second resource can fail transiently, and the name and description are still used.
 - The metadata document must not exceed 8 KiB, must be answered with a `200` HTTP status code and must not redirect (Internet Identity _will not_ follow redirects for either the document or the logo).
 
 ### JSON Schema {#app-metadata-schema}
 
-The schema below is a convenience for authoring and validating the document; the requirements above are normative. It is deliberately stricter than Internet Identity on length, because it can only see the raw value: the lengths it constrains are checked by Internet Identity _after_ the normalization described above, so a value that the schema rejects for length may still be accepted (for instance a `name` padded with whitespace that collapses to under 40 characters).
+The schema below expresses the requirements above, so a document that validates against it is one Internet Identity accepts (whitespace normalization happens after validation and is not part of it). Validating in CI is the easiest way to catch a mistake before it costs the application its metadata.
 
 ```json
 {
@@ -373,13 +377,17 @@ The schema below is a convenience for authoring and validating the document; the
       "description": "Display name of the application",
       "type": "string",
       "minLength": 1,
-      "maxLength": 40
+      "maxLength": 40,
+      "pattern": "\\S",
+      "not": { "pattern": "[\\u0000-\\u0008\\u000e-\\u001f\\u007f-\\u009f\\u061c\\u200b\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069\\ufeff]" }
     },
     "description": {
       "description": "Short description or tagline of the application",
       "type": "string",
       "minLength": 1,
-      "maxLength": 120
+      "maxLength": 120,
+      "pattern": "\\S",
+      "not": { "pattern": "[\\u0000-\\u0008\\u000e-\\u001f\\u007f-\\u009f\\u061c\\u200b\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069\\ufeff]" }
     },
     "logo": {
       "description": "URL of the application logo, on the same origin as this document",

@@ -17,6 +17,9 @@
 
   const { appOrigin }: Props = $props();
 
+  // The CLI flow has no separate derivation origin: `--app <domain>` is both
+  // the origin shown here and the one the linked principal is derived for, so
+  // this origin is where the app's metadata is published.
   const emptyMetadataStore = readable<AppMetadata>({});
   const metadataStore = $derived(
     appOrigin !== undefined

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { establishedChannelStore } from "$lib/stores/channelStore";
+  import { authorizationStore } from "$lib/stores/authorization.store";
   import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
   import { originLabel } from "$lib/utils/urlUtils";
   import { t } from "$lib/stores/locale.store";
@@ -14,8 +15,13 @@
   import { waitFor } from "$lib/utils/utils";
   import BreatheSparkleCanvas from "$lib/components/backgrounds/BreatheSparkleCanvas.svelte";
 
+  // Metadata from the origin the identity is derived for; the badge below
+  // keeps showing the origin the user signed in from.
   const metadataStore = $derived(
-    getAppMetadataStore($establishedChannelStore.origin),
+    getAppMetadataStore(
+      $authorizationStore?.effectiveOrigin ?? $establishedChannelStore.origin,
+      $establishedChannelStore.origin,
+    ),
   );
   const dapp = $derived($metadataStore);
   // A logo that fails to decode falls back to the default animation instead

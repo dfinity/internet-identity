@@ -191,7 +191,13 @@
   const isAccountLimitReached = $derived(
     accounts !== undefined && accounts.length >= 5,
   );
-  const metadataStore = $derived(getAppMetadataStore(displayOrigin));
+  // The app's metadata is published on the origin its identity is derived for
+  // (`effectiveOrigin`), which is also where its accounts live — so the account
+  // labels below stay stable no matter which of its origins the user signs in
+  // from. `displayOrigin` remains what the header shows.
+  const metadataStore = $derived(
+    getAppMetadataStore(effectiveOrigin, displayOrigin),
+  );
   const application = $derived($metadataStore.name);
   const dappName = $derived(application ?? new URL(displayOrigin).hostname);
   // Account names are capped at 32 characters in `EditAccount`; a longer
@@ -638,7 +644,7 @@
   {#if header}
     {@render header()}
   {:else}
-    <AuthorizeHeader origin={displayOrigin} />
+    <AuthorizeHeader origin={displayOrigin} metadataOrigin={effectiveOrigin} />
     <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
       {$t`Continue to ${dappName}`}
     </h1>

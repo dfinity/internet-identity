@@ -107,8 +107,15 @@
     );
   });
 
+  // The app's display metadata is published on the origin its identity is
+  // derived for; screens fall back to the channel origin until the
+  // authorization context is established (and for apps without a derivation
+  // origin the two are the same origin anyway).
   const metadataStore = $derived(
-    getAppMetadataStore($establishedChannelStore.origin),
+    getAppMetadataStore(
+      $authorizationStore?.effectiveOrigin ?? $establishedChannelStore.origin,
+      $establishedChannelStore.origin,
+    ),
   );
   const dapp = $derived($metadataStore);
 

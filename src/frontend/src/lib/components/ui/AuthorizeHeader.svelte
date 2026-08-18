@@ -7,17 +7,32 @@
   import { GlobeIcon } from "@lucide/svelte";
 
   type Props = HTMLAttributes<HTMLDivElement> & {
+    /** Origin displayed to the user: the app they are signing in from. */
     origin: string;
+    /** Origin the app's display metadata is published on — the origin its
+     *  identity is derived for, i.e. its validated derivation origin when the
+     *  request carries one. Defaults to `origin`, which is the same origin
+     *  whenever the app doesn't use a derivation origin. */
+    metadataOrigin?: string;
   };
 
-  const { class: className, origin, ...props }: Props = $props();
+  const {
+    class: className,
+    origin,
+    metadataOrigin,
+    ...props
+  }: Props = $props();
 
   // Shown as the trust anchor for the app-provided metadata below, so it
   // keeps any scheme/port that distinguishes this origin from another.
   const hostname = $derived(originLabel(origin));
-  // App-provided (permissionless) display metadata; the hostname badge below
-  // stays visible regardless, as the trust anchor the user can verify.
-  const metadataStore = $derived(getAppMetadataStore(origin));
+  // App-provided (permissionless) display metadata; the origin badge below
+  // stays visible regardless, as the value the user can verify. A derivation
+  // origin publishes on behalf of its alternative origins, which it has
+  // certified as its own via `/.well-known/ii-alternative-origins`.
+  const metadataStore = $derived(
+    getAppMetadataStore(metadataOrigin ?? origin, origin),
+  );
   const metadata = $derived($metadataStore);
   // A logo that fails to decode falls back to the default icon instead of a
   // broken image; keyed by value so a later (valid) logo still renders.

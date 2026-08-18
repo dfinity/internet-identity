@@ -44,6 +44,39 @@ test("should fall back to the curated dapps list while fetching", () => {
   });
 });
 
+test("should fetch from the derivation origin, not the displayed one", () => {
+  fetchAppMetadataMock.mockReturnValue(pending());
+
+  getAppMetadataStore(
+    "https://derivation.example.com",
+    "https://displayed.example.com",
+  );
+
+  // The app publishes once, on the origin its identity is derived for; its
+  // alternative origins are presented from that same document.
+  expect(fetchAppMetadataMock).toHaveBeenCalledExactlyOnceWith(
+    "https://derivation.example.com",
+  );
+});
+
+test("should match the curated fallback on the displayed origin too", () => {
+  // A curated entry lists the origins an app signs in from, which needn't
+  // include the origin it derives from -- so while apps migrate to the
+  // well-known file, the displayed origin still resolves the entry.
+  fetchAppMetadataMock.mockReturnValue(pending());
+
+  const store = getAppMetadataStore(
+    "https://derivation.example.com",
+    "https://known.example.com",
+  );
+
+  expect(get(store)).toEqual({
+    name: "Known App",
+    description: "A curated app",
+    logo: "/known-logo.png",
+  });
+});
+
 test("should fall back to empty metadata for unknown origins", () => {
   fetchAppMetadataMock.mockReturnValue(pending());
 
