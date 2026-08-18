@@ -122,6 +122,7 @@ use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::notifications::consent::StorableNotificationConsent;
 use crate::storage::storable::notifications::webpush::endpoint_hash::StorableEndpointSha256;
+use crate::storage::storable::notifications::webpush::seal::StorableWebPushSeal;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
@@ -217,6 +218,7 @@ const WEBPUSH_SUBSCRIPTIONS_MEMORY_INDEX: u8 = 33u8;
 // 34 retired: the JWT pool now rides on the subscription row (index 33).
 const NOTIFICATIONS_CONSENT_MEMORY_INDEX: u8 = 35u8;
 const NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_INDEX: u8 = 36u8;
+const WEBPUSH_SEAL_MEMORY_INDEX: u8 = 37u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -306,6 +308,10 @@ const NOTIFICATIONS_CONSENT_MEMORY_ID: MemoryId = MemoryId::new(NOTIFICATIONS_CO
 /// the sender's origin at send time also checks the sender isn't lying.
 const NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_ID: MemoryId =
     MemoryId::new(NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_INDEX);
+/// `(anchor, endpoint_sha256, origin_sha256) -> StorableWebPushSeal`. RFC 8291
+/// sealed payloads, computed at consent and reused per send. Keyed device-first
+/// so a device's seals are a contiguous range for re-subscribe/unsubscribe.
+const WEBPUSH_SEAL_MEMORY_ID: MemoryId = MemoryId::new(WEBPUSH_SEAL_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -468,6 +474,18 @@ pub struct Storage<M: Memory> {
         ManagedMemory<M>,
     >,
 
+    webpush_seal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// See [`WEBPUSH_SEAL_MEMORY_ID`].
+    pub(crate) webpush_seal_memory: StableBTreeMap<
+        (
+            StorableAnchorNumber,
+            StorableEndpointSha256,
+            StorableOriginSha256,
+        ),
+        StorableWebPushSeal,
+        ManagedMemory<M>,
+    >,
+
     notifications_consent_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     pub(crate) notifications_consent_memory: StableBTreeMap<
         (StorableAnchorNumber, StorableOriginSha256),
@@ -569,6 +587,7 @@ impl<M: Memory + Clone> Storage<M> {
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
         let sso_stable_id_index_memory = memory_manager.get(SSO_STABLE_ID_INDEX_MEMORY_ID);
         let webpush_subscriptions_memory = memory_manager.get(WEBPUSH_SUBSCRIPTIONS_MEMORY_ID);
+        let webpush_seal_memory = memory_manager.get(WEBPUSH_SEAL_MEMORY_ID);
         let notifications_consent_memory = memory_manager.get(NOTIFICATIONS_CONSENT_MEMORY_ID);
         let notifications_recipient_index_memory =
             memory_manager.get(NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_ID);
@@ -695,6 +714,8 @@ impl<M: Memory + Clone> Storage<M> {
                 webpush_subscriptions_memory.clone(),
             ),
             webpush_subscriptions_memory: StableBTreeMap::init(webpush_subscriptions_memory),
+            webpush_seal_memory_wrapper: MemoryWrapper::new(webpush_seal_memory.clone()),
+            webpush_seal_memory: StableBTreeMap::init(webpush_seal_memory),
             notifications_consent_memory_wrapper: MemoryWrapper::new(
                 notifications_consent_memory.clone(),
             ),
@@ -1597,6 +1618,97 @@ impl<M: Memory + Clone> Storage<M> {
             .range(start..=end)
             .map(|(_, consent)| consent)
             .collect()
+    }
+
+    /// The push keys of every device subscribed under `anchor_number`, as
+    /// `(endpoint_sha256, p256dh, auth)`.
+    pub fn webpush_subscribed_devices(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> Vec<(StorableEndpointSha256, Vec<u8>, Vec<u8>)> {
+        let start = (anchor_number, StorableEndpointSha256::MIN);
+        let end = (anchor_number, StorableEndpointSha256::MAX);
+        self.webpush_subscriptions_memory
+            .range(start..=end)
+            .map(|((_, endpoint_hash), subscription)| {
+                (endpoint_hash, subscription.p256dh, subscription.auth)
+            })
+            .collect()
+    }
+
+    /// Stores one device's sealed payload for one origin, keyed
+    /// `(anchor, endpoint_sha256, origin_sha256)`. Overwrites in place on reseal.
+    pub fn add_webpush_seal(
+        &mut self,
+        key: (AnchorNumber, StorableEndpointSha256, StorableOriginSha256),
+        seal: StorableWebPushSeal,
+    ) {
+        self.webpush_seal_memory.insert(key, seal);
+    }
+
+    /// Drops every seal of one device. A device's seals are a contiguous range,
+    /// since the endpoint precedes the origin in the key.
+    pub fn remove_webpush_seals_for_device(
+        &mut self,
+        anchor_number: AnchorNumber,
+        endpoint_hash: &StorableEndpointSha256,
+    ) {
+        let start = (
+            anchor_number,
+            endpoint_hash.clone(),
+            StorableOriginSha256::MIN,
+        );
+        let end = (
+            anchor_number,
+            endpoint_hash.clone(),
+            StorableOriginSha256::MAX,
+        );
+        let keys = self
+            .webpush_seal_memory
+            .range(start..=end)
+            .map(|(key, _)| key);
+        self.remove_webpush_seals(keys.collect());
+    }
+
+    /// Drops every device's seal for one origin. The origin is the last key
+    /// component, so this scans the anchor's seals and filters.
+    pub fn remove_webpush_seals_for_origin(
+        &mut self,
+        anchor_number: AnchorNumber,
+        origin_hash: &StorableOriginSha256,
+    ) {
+        let start = (
+            anchor_number,
+            StorableEndpointSha256::MIN,
+            StorableOriginSha256::MIN,
+        );
+        let end = (
+            anchor_number,
+            StorableEndpointSha256::MAX,
+            StorableOriginSha256::MAX,
+        );
+        let keys = self
+            .webpush_seal_memory
+            .range(start..=end)
+            .map(|(key, _)| key)
+            .filter(|(_, _, origin)| origin == origin_hash);
+        self.remove_webpush_seals(keys.collect());
+    }
+
+    /// The keys must come from a scan of `webpush_seal_memory`, so a missing row
+    /// means the map was mutated underneath the caller.
+    fn remove_webpush_seals(
+        &mut self,
+        keys: Vec<(
+            StorableAnchorNumber,
+            StorableEndpointSha256,
+            StorableOriginSha256,
+        )>,
+    ) {
+        for key in keys {
+            let removed = self.webpush_seal_memory.remove(&key);
+            debug_assert!(removed.is_some(), "removed a seal that was not present");
+        }
     }
 
     /// Only used in tests.
@@ -2559,6 +2671,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "webpush_subscriptions_memory".to_string(),
                 self.webpush_subscriptions_memory_wrapper.size(),
+            ),
+            (
+                "webpush_seal_memory".to_string(),
+                self.webpush_seal_memory_wrapper.size(),
             ),
             (
                 "notifications_consent_memory".to_string(),
