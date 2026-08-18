@@ -1515,11 +1515,13 @@ mod openid_api {
             Err(err) => return OpenIdResult::Err(err.into()),
         };
         // The verified credential already carries the SSO stable identifier, so
-        // the anchor write below reconciles the stable-id index — an existing
-        // anchor self-heals on a normal sign-in.
+        // the anchor write below reconciles the stable-id index.
         let prepared: Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> = async {
             let anchor_number = state::storage_borrow(|storage| {
-                storage.lookup_anchor_with_openid_credential(&openid_credential.key())
+                storage.lookup_anchor_with_openid_credential(
+                    &openid_credential.key(),
+                    discovery_domain.as_deref(),
+                )
             })
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
@@ -1537,7 +1539,10 @@ mod openid_api {
 
             // Checking again because the association could've changed during the .await
             let still_anchor_number = state::storage_borrow(|storage| {
-                storage.lookup_anchor_with_openid_credential(&openid_credential.key())
+                storage.lookup_anchor_with_openid_credential(
+                    &openid_credential.key(),
+                    discovery_domain.as_deref(),
+                )
             })
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
@@ -1579,7 +1584,10 @@ mod openid_api {
         };
 
         let delegation = match state::storage_borrow(|storage| {
-            storage.lookup_anchor_with_openid_credential(&openid_credential.key())
+            storage.lookup_anchor_with_openid_credential(
+                &openid_credential.key(),
+                discovery_domain.as_deref(),
+            )
         }) {
             Some(anchor_number) => {
                 openid_credential.get_jwt_delegation(session_key, expiration, anchor_number)
@@ -1646,9 +1654,10 @@ mod openid_api {
 
         let prepared: Result<SsoPrepareDelegationResponse, OpenIdDelegationError> = async {
             let key = identity.credential.key();
-            let anchor_number =
-                state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
-                    .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            let anchor_number = state::storage_borrow(|storage| {
+                storage.lookup_anchor_with_openid_credential(&key, Some(&discovery_domain))
+            })
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
             // Refresh the II-client credential's metadata from the token; never adds a per-app credential.
             let mut anchor = state::anchor(anchor_number);
@@ -1679,9 +1688,10 @@ mod openid_api {
             );
 
             // The association could change during the `.await`.
-            let still_anchor_number =
-                state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
-                    .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            let still_anchor_number = state::storage_borrow(|storage| {
+                storage.lookup_anchor_with_openid_credential(&key, Some(&discovery_domain))
+            })
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
             if anchor_number != still_anchor_number {
                 // The credential re-associated to a different anchor during the
                 // `.await` (a concurrent account change). Deliberately reported
@@ -1729,9 +1739,9 @@ mod openid_api {
             Err(err) => return OpenIdResult::Err(err),
         };
         let key = identity.credential.key();
-        let Some(anchor_number) =
-            state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
-        else {
+        let Some(anchor_number) = state::storage_borrow(|storage| {
+            storage.lookup_anchor_with_openid_credential(&key, Some(&discovery_domain))
+        }) else {
             return OpenIdResult::Err(OpenIdDelegationError::NoSuchAnchor);
         };
         let signed_delegation =
