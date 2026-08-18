@@ -354,11 +354,13 @@ Since the file is under the sole control of the application origin, the metadata
 Requirements:
 
 - All fields are optional, and unknown fields are ignored. Fields that fail validation are ignored individually; a document without any valid field is ignored entirely (and a valid document replaces any curated fallback entry wholesale).
-- `name` must not exceed 40 characters and `description` must not exceed 120 characters (counted in Unicode code points, after whitespace normalization). Control characters and bidirectional-override characters are stripped.
+- `name` and `description` are normalized before they are checked: control characters and bidirectional-override characters are stripped (the zero-width joiners U+200C and U+200D are preserved, since they are needed for correct shaping in scripts such as Persian and for emoji sequences), runs of whitespace are collapsed to single spaces, and the result is trimmed. A field that is empty after normalization is dropped. The normalized `name` must not exceed 40 characters and the normalized `description` must not exceed 120 characters, counted in Unicode code points; a field that exceeds its limit is dropped rather than truncated.
 - `logo` must be a URL (relative URLs are resolved against the application origin) pointing to an image _on the same origin_. Internet Identity downloads the logo (it is never hotlinked), so both the metadata document and the logo asset must be readable cross-origin (see the CORS note below). The logo must be served with one of the content types `image/png`, `image/jpeg`, `image/webp`, `image/gif`, `image/avif` or `image/svg+xml`, and must not exceed 256 KiB.
 - The metadata document must not exceed 8 KiB, must be answered with a `200` HTTP status code and must not redirect (Internet Identity _will not_ follow redirects for either the document or the logo).
 
 ### JSON Schema {#app-metadata-schema}
+
+The schema below is a convenience for authoring and validating the document; the requirements above are normative. It is deliberately stricter than Internet Identity on length, because it can only see the raw value: the lengths it constrains are checked by Internet Identity _after_ the normalization described above, so a value that the schema rejects for length may still be accepted (for instance a `name` padded with whitespace that collapses to under 40 characters).
 
 ```json
 {
@@ -370,16 +372,19 @@ Requirements:
     "name": {
       "description": "Display name of the application",
       "type": "string",
+      "minLength": 1,
       "maxLength": 40
     },
     "description": {
       "description": "Short description or tagline of the application",
       "type": "string",
+      "minLength": 1,
       "maxLength": 120
     },
     "logo": {
       "description": "URL of the application logo, on the same origin as this document",
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     }
   }
 }
