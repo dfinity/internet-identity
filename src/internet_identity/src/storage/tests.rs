@@ -2352,3 +2352,136 @@ mod reference_list_write_path_tests {
         assert_eq!(written.stored_accounts, 6);
     }
 }
+
+mod application_number_allocator_tests {
+    use crate::storage::storable::application::StorableApplication;
+    use crate::Storage;
+    use ic_stable_structures::VectorMemory;
+    use pretty_assertions::assert_eq;
+
+    fn application(origin: &str) -> StorableApplication {
+        StorableApplication {
+            origin: origin.to_string(),
+            stored_accounts: 0,
+            stored_account_references: 0,
+        }
+    }
+
+    #[test]
+    fn allocates_dense_numbers_from_zero() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+
+        let first =
+            storage.lookup_or_insert_application_number_with_origin(&"https://a.com".into());
+        let second =
+            storage.lookup_or_insert_application_number_with_origin(&"https://b.com".into());
+        let third =
+            storage.lookup_or_insert_application_number_with_origin(&"https://c.com".into());
+
+        assert_eq!((first, second, third), (0, 1, 2));
+    }
+
+    #[test]
+    fn returns_the_existing_number_for_a_known_origin() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let origin = "https://a.com".to_string();
+
+        let first = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let again = storage.lookup_or_insert_application_number_with_origin(&origin);
+
+        assert_eq!(first, again);
+        assert_eq!(storage.get_total_application_count(), 1);
+    }
+
+    #[test]
+    fn seeds_past_applications_written_before_the_allocator_existed() {
+        let memory = VectorMemory::default();
+        let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+        for (number, origin) in [
+            (0, "https://a.com"),
+            (1, "https://b.com"),
+            (2, "https://c.com"),
+        ] {
+            storage
+                .stable_application_memory
+                .insert(number, application(origin));
+        }
+        storage.next_application_number_memory.set(0).unwrap();
+        storage.flush();
+
+        let mut storage = Storage::from_memory(memory);
+        let next = storage.lookup_or_insert_application_number_with_origin(&"https://d.com".into());
+
+        assert_eq!(next, 3);
+    }
+
+    #[test]
+    fn never_reissues_the_number_of_a_removed_application() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        for origin in ["https://a.com", "https://b.com", "https://c.com"] {
+            storage.lookup_or_insert_application_number_with_origin(&origin.into());
+        }
+
+        storage.stable_application_memory.remove(&1);
+
+        let next = storage.lookup_or_insert_application_number_with_origin(&"https://d.com".into());
+
+        assert_eq!(next, 3);
+        assert!(storage.stable_application_memory.get(&2).is_some());
+    }
+
+    #[test]
+    fn reseeding_after_a_reap_does_not_lower_the_allocator() {
+        let memory = VectorMemory::default();
+        let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+        for origin in [
+            "https://a.com",
+            "https://b.com",
+            "https://c.com",
+            "https://d.com",
+        ] {
+            storage.lookup_or_insert_application_number_with_origin(&origin.into());
+        }
+        storage.flush();
+        storage.stable_application_memory.remove(&1);
+        storage.stable_application_memory.remove(&2);
+        assert_eq!(storage.stable_application_memory.len(), 2);
+
+        let mut storage = Storage::from_memory(memory.clone());
+        let next = storage.lookup_or_insert_application_number_with_origin(&"https://e.com".into());
+
+        assert_eq!(next, 4);
+        assert_eq!(
+            storage.stable_application_memory.get(&3).unwrap().origin,
+            "https://d.com"
+        );
+
+        let mut storage = Storage::from_memory(memory);
+        assert_eq!(
+            storage.lookup_or_insert_application_number_with_origin(&"https://f.com".into()),
+            5
+        );
+    }
+
+    #[test]
+    fn a_removal_before_the_first_allocation_does_not_collide_with_a_live_number() {
+        let memory = VectorMemory::default();
+        let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+        for origin in ["https://a.com", "https://b.com", "https://c.com"] {
+            storage.lookup_or_insert_application_number_with_origin(&origin.into());
+        }
+        storage.next_application_number_memory.set(0).unwrap();
+        storage.flush();
+
+        let mut storage = Storage::from_memory(memory);
+        storage.stable_application_memory.remove(&0);
+
+        let next = storage.lookup_or_insert_application_number_with_origin(&"https://d.com".into());
+
+        assert_eq!(next, 3);
+        assert_eq!(
+            storage.stable_application_memory.get(&2).unwrap().origin,
+            "https://c.com"
+        );
+    }
+}
