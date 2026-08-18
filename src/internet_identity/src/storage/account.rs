@@ -164,19 +164,27 @@ impl Account {
     ///
     /// * `account` is the `Account` we're using for this delegation
     pub fn calculate_seed(&self) -> Hash {
+        self.calculate_seed_with_salt(&crate::state::salt())
+    }
+
+    pub fn calculate_seed_with_salt(&self, salt: &[u8; 32]) -> Hash {
         // If this is a non-stored default account, we derive from frontend and anchor
         if self.account_number.is_none() {
-            return delegation::calculate_anchor_seed(self.anchor_number, &self.origin);
+            return delegation::calculate_anchor_seed_with_salt(
+                salt,
+                self.anchor_number,
+                &self.origin,
+            );
         }
 
         match (self.get_seed_anchor(), self.account_number) {
             (Some(seed_from_anchor), _) => {
                 // If this is a stored default account, we derive from frontend and anchor
-                delegation::calculate_anchor_seed(seed_from_anchor, &self.origin)
+                delegation::calculate_anchor_seed_with_salt(salt, seed_from_anchor, &self.origin)
             }
             (None, Some(account_number)) => {
                 // If this is an added account, we derive from the account number and origin.
-                delegation::calculate_account_seed(account_number, &self.origin)
+                delegation::calculate_account_seed_with_salt(salt, account_number, &self.origin)
             }
             (None, None) => trap("Attempted to calculate an account seed from an account without seed anchor or anchor number - this should never happen!")
         }
