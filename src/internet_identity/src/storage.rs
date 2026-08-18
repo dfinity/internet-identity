@@ -209,6 +209,7 @@ const MCP_GRANT_MEMORY_INDEX: u8 = 29u8;
 // const DEPRECATED_MCP_REGISTRATION_URL_MEMORY_INDEX: u8 = 30u8;
 const MCP_REGISTRATION_MEMORY_INDEX: u8 = 31u8;
 const SSO_STABLE_ID_INDEX_MEMORY_INDEX: u8 = 32u8;
+const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -287,6 +288,11 @@ const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
 /// SSO stable-id bridge:
 /// `SHA-256(sso_domain, iss, ii_client_id, stable_id) -> AnchorNumber`.
 const SSO_STABLE_ID_INDEX_MEMORY_ID: MemoryId = MemoryId::new(SSO_STABLE_ID_INDEX_MEMORY_INDEX);
+
+/// Monotonic `ApplicationNumber` allocator. Reaped numbers are retired rather than
+/// reissued, so the number cannot be derived from how many applications exist.
+const NEXT_APPLICATION_NUMBER_MEMORY_ID: MemoryId =
+    MemoryId::new(NEXT_APPLICATION_NUMBER_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -376,6 +382,7 @@ pub struct Storage<M: Memory> {
         ManagedMemory<M>,
     >,
     stable_account_counter_memory: StableCell<StorableAccountsCounter, ManagedMemory<M>>,
+    next_application_number_memory: StableCell<StorableApplicationNumber, ManagedMemory<M>>,
     /// Counter that counts how often there was a discrepancy between the anchor accounts counter and the actual number of accounts
     stable_account_counter_discrepancy_counter_memory:
         StableCell<StorableDiscrepancyCounter, ManagedMemory<M>>,
@@ -511,6 +518,7 @@ impl<M: Memory + Clone> Storage<M> {
         let stable_default_account_reference_memory =
             memory_manager.get(STABLE_DEFAULT_ACCOUNT_REFERENCE_MEMORY_ID);
         let stable_account_counter_memory = memory_manager.get(STABLE_ACCOUNT_COUNTER_MEMORY_ID);
+        let next_application_number_memory = memory_manager.get(NEXT_APPLICATION_NUMBER_MEMORY_ID);
         let stable_account_counter_discrepancy_counter_memory =
             memory_manager.get(STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_ID);
         let lookup_anchor_with_openid_credential_memory =
@@ -537,7 +545,7 @@ impl<M: Memory + Clone> Storage<M> {
             MinHeap::init(registration_current_rate_memory.clone())
                 .expect("failed to initialize registration current rate min heap"),
         );
-        Self {
+        let mut storage = Self {
             header,
             header_memory,
             anchor_memory,
@@ -593,6 +601,8 @@ impl<M: Memory + Clone> Storage<M> {
                 StorableAccountsCounter::default(),
             )
             .expect("stable_account_counter_memory"),
+            next_application_number_memory: StableCell::init(next_application_number_memory, 0)
+                .expect("next_application_number_memory"),
             stable_account_counter_discrepancy_counter_memory: StableCell::init(
                 stable_account_counter_discrepancy_counter_memory,
                 StorableDiscrepancyCounter::default(),
@@ -648,7 +658,25 @@ impl<M: Memory + Clone> Storage<M> {
                 sso_stable_id_index_memory.clone(),
             ),
             sso_stable_id_index_memory: StableBTreeMap::init(sso_stable_id_index_memory),
-        }
+        };
+        storage.seed_application_number_allocator();
+        storage
+    }
+
+    /// Existing application numbers are dense from zero, so the number of application
+    /// rows is the first free number.
+    ///
+    /// Seeding here rather than at the first allocation is what keeps that true:
+    /// reaping shrinks the row count, so a reap that lands before the first allocation
+    /// would otherwise seed the allocator onto a live number.
+    fn seed_application_number_allocator(&mut self) {
+        let seeded = ApplicationNumber::max(
+            *self.next_application_number_memory.get(),
+            self.stable_application_memory.len(),
+        );
+        self.next_application_number_memory
+            .set(seeded)
+            .expect("failed to seed the application number allocator");
     }
 
     pub fn salt(&self) -> Option<&Salt> {
@@ -1490,7 +1518,7 @@ impl<M: Memory + Clone> Storage<M> {
         {
             existing_number
         } else {
-            let new_number: ApplicationNumber = self.lookup_application_with_origin_memory.len();
+            let new_number = self.allocate_application_number();
 
             // Update the source of truth.
             self.lookup_application_with_origin_memory
@@ -1506,6 +1534,14 @@ impl<M: Memory + Clone> Storage<M> {
                 .insert(new_number, new_application);
             new_number
         }
+    }
+
+    fn allocate_application_number(&mut self) -> ApplicationNumber {
+        let new_number = *self.next_application_number_memory.get();
+        self.next_application_number_memory
+            .set(new_number + 1)
+            .expect("failed to advance the application number allocator");
+        new_number
     }
 
     pub fn lookup_application_number_with_origin(
