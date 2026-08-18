@@ -17,6 +17,7 @@ An app delegation is unrevocable for as long as it is valid, which is up to 30 d
 | **Refresh** | The app calling the II canister with its session chain to mint a new app delegation. No browser involvement. |
 | **Silent re-auth** | The app asking II for a delegation again, answered from II's stored session with no ceremony. |
 | **Session device** | A per-anchor label for one browser, so a browser's sessions can be listed and revoked together. |
+| **Locator** | The `(anchor, application, account)` triple that identifies one account. What a derived principal resolves to through the principal index of `tracked-default-accounts.md` §9. |
 
 ---
 
@@ -92,7 +93,7 @@ Three things deliberately never happen: the dapp canister never talks to II, the
 
 That is not tidiness. Three things follow from it:
 
-- **The two audiences cannot share an argument list.** `prepare_account_delegation` names the anchor with `identity_number`, which an app cannot supply and must never learn, so the app-facing calls take `app_principal` and let II resolve the rest. Producing the same artifact does not make them the same operation.
+- **The two audiences cannot share an argument list.** `prepare_account_delegation` names the anchor with `identity_number`, which an app cannot supply and must never learn, so the app-facing calls name nothing and echo back an opaque bundle instead. Producing the same artifact does not make them the same operation.
 - **The `app_` set is public API.** Every dapp and every client library depends on it, so it has to stay small and stable, and any change to it is a compatibility event.
 - **The unprefixed set is internal.** Only the II frontend calls it, and the frontend ships with the canister, so it can be changed freely and in the same release. That is where complexity belongs when there is a choice about where to put it.
 
@@ -115,7 +116,7 @@ Three methods, and none of them names an anchor.
 
 | Item | Change | Detail |
 | ---- | ------ | ------ |
-| `prepare_account_delegation` | `session : opt SessionRequest` argument, `session_id : opt nat32` in the response | Mints a session instead of an app delegation when present (§6.3) |
+| `prepare_account_delegation` | `session : opt SessionRequest` argument; `session_id : opt nat32` and `session_attr_bundle : opt blob` in the response | Mints a session instead of an app delegation when present (§6.3) |
 | `get_account_delegation` | `session : opt bool` argument | Fetches the session delegation when true (§6.3) |
 | `IdentityInfo` | `session_devices` field | Devices live on the anchor, so they ride here (§9.1) |
 | `revoke_session` | new update | Revoke one session (§8.2) |
@@ -169,7 +170,7 @@ Blocking would be the wrong failure: the user is trying to sign in on a new brow
 
 Evicting on `last_refreshed` rather than `created_at` is what `last_refreshed` buys here beyond the UI. Ordering by creation would drop a months-old session still in daily use in favour of one created an hour ago and never touched again, which is exactly backwards.
 
-The cap is now purely about the size of the row and the length of the list a user has to reason about. An earlier draft leaned on it to bound a per-refresh loop over the session records, but §7.2 replaced that loop with a single index lookup, so nothing on the hot path depends on the number any more.
+The cap also bounds the per-refresh match in §7.2, which walks the row's records recomputing seeds, so it wants enforcing at creation rather than being treated as advisory.
 
 ### 4.2 Two further rules
 
@@ -227,7 +228,7 @@ The app talks to the II frontend over the existing authorize transport. One new 
 
 ```
 params:  { sessionPublicKey }
-result:  { sessionDelegation, appPrincipal }
+result:  { sessionDelegation, sessionAttrBundle }
 ```
 
 It is namespaced `ii_` rather than extending `icrc34_delegation`, for the same reason `prompt` and `hint` ride on the authorize URL instead of the ICRC request: it is not part of the standard, its response carries an artifact the standard has no field for, and apps that do not want a session should not be handed one.
@@ -242,7 +243,9 @@ The cost is one canister round trip before the app's first call, once per sign-i
 
 **One keypair, two chains.** The app delegation targets the same `sessionPublicKey` the session chain terminates at, so the app holds one key with two chains over it: the session chain, which `targets` restricts to the II canister, and the app delegation, which works against dapp canisters. A second keypair would protect nothing, since anything that reaches one reaches the other, and the guardrail against confusing the two is `targets`, not key separation.
 
-`appPrincipal` is load-bearing rather than a convenience here: it is the argument every refresh takes, and the app cannot derive it from the session chain, whose root is a different seed. It is `self_authenticating` of the *app delegation's* user key, which the app does not have yet at this point.
+`sessionAttrBundle` is the blob every app-facing call echoes back (§7.1). The app stores it beside the session keypair and never parses it. It has to come from here rather than being derived, because it is II's own state and the app has nothing yet to derive anything from.
+
+The app's own principal is not returned, and is not needed: once it has minted an app delegation it reads its principal off that chain, which is what `DelegationIdentity.getPrincipal()` already does.
 
 The session's expiry needs no field. It is the `expiration` on the session chain's own hops (§6.1), so the app already has it.
 
@@ -260,7 +263,8 @@ type SessionRequest = record {
 };
 
 // Added to its response.
-session_id : opt nat32;   // present when `session` was
+session_id : opt nat32;            // present when `session` was
+session_attr_bundle : opt blob;    // the blob the app echoes back (§7.1)
 
 // Added to get_account_delegation.
 session : opt bool;       // true fetches the session delegation
@@ -280,14 +284,14 @@ sequenceDiagram
     Note over IIF: ceremony (passkey or OpenID)
     IIF->>IIC: prepare_account_delegation { .., session_key = II key,<br/>session: { name, id: cached or absent } }
     Note over IIC: resolve or register the device from (id, name)<br/>reuse an unexpired session for this locator+device,<br/>else prune, evict LRU at cap, create (§4.1)
-    IIC-->>IIF: { user_key = session identity, expiration = valid_till, session_id }
+    IIC-->>IIF: { user_key = session identity, expiration = valid_till,<br/>session_id, session_attr_bundle }
     IIF->>IIC: get_account_delegation { .., session = true }
     IIC-->>IIF: session delegation
     Note over IIF: cache session_id for this anchor<br/>store (keypair, chain) by (anchor, account, origin)<br/>extend the chain to sessionPublicKey
-    IIF-->>App: { sessionDelegation, appPrincipal }
-    App->>IIC: app_prepare_delegation { sessionPublicKey }<br/>signed with the session chain
+    IIF-->>App: { sessionDelegation, sessionAttrBundle }
+    App->>IIC: app_prepare_delegation { session_attr_bundle, sessionPublicKey }<br/>signed with the session chain
     IIC-->>App: expiration
-    App->>IIC: app_get_delegation { sessionPublicKey, expiration }
+    App->>IIC: app_get_delegation { .., expiration }
     IIC-->>App: app delegation
 ```
 
@@ -305,7 +309,7 @@ sequenceDiagram
     else revoked, expired, or nothing stored
         Note over IIF: ceremony, then §6.3
     end
-    IIF-->>App: { sessionDelegation, appPrincipal }
+    IIF-->>App: { sessionDelegation, sessionAttrBundle }
     Note over App: mints its own app delegation as in §6.3
 ```
 
@@ -322,10 +326,10 @@ sequenceDiagram
     autonumber
     participant App as app frontend
     participant IIC as II canister
-    App->>IIC: app_prepare_delegation { session_key }<br/>signed with the session chain
-    Note over IIC: caller() -> principal index -> locator + created_at (§7.2)<br/>recompute the seed, verify, check valid_till<br/>cap the TTL to valid_till
+    App->>IIC: app_prepare_delegation { session_attr_bundle, session_key }<br/>signed with the session chain
+    Note over IIC: authenticate the bundle, read the locator<br/>match caller() over the records, check valid_till (§7.2)<br/>cap the TTL to valid_till
     IIC-->>App: expiration
-    App->>IIC: app_get_delegation { session_key, expiration }
+    App->>IIC: app_get_delegation { session_attr_bundle, session_key, expiration }
     IIC-->>App: app delegation
 ```
 
@@ -333,31 +337,29 @@ sequenceDiagram
 
 ```candid
 app_prepare_delegation : (record {
+    session_attr_bundle : blob;      // issued with the session, echoed back
     session_key : SessionKey;        // the key the app delegation targets
     max_ttl : opt nat64;             // clamped to the app-delegation TTL
     permissions : opt Permissions;
 }) -> (variant { Ok : record { user_key : PublicKey; expiration : Timestamp }; Err : AppSessionError });
 
 app_get_delegation : (record {
+    session_attr_bundle : blob;
     session_key : SessionKey;
     expiration : Timestamp;          // must match the prepared value
 }) -> (variant { Ok : SignedDelegation; Err : AppSessionError }) query;
 ```
 
-**No principal argument, and no locator.** `caller()` is the session principal, and the session determines which `(anchor, application, account)` it may mint for, so there is nothing left for the app to name. The app does hold its app principal, from the sign-in response, but only so it knows who it is; it never sends it back.
+**The app names nothing.** It echoes back the bundle it was issued with the session, and II reads the locator out of its own blob. This is the pattern II already uses to carry state to a caller and back: `sso_prepare_delegation` returns an `sso_attr_bundle : blob` that `sso_get_delegation` takes as an argument, and `prepare_attributes` returns `attributes` that `get_attributes` echoes back as a subset.
 
-Getting from `caller()` to the session needs a reverse lookup, since the seed is a hash. **No new map is needed for it.** `tracked-default-accounts.md` §9 already specifies a principal index at memory index 34, mapping a derived principal to its locator and maintained by the write path in its §4. A session principal is just another derived principal, so it goes there, with one additive field distinguishing the two key families:
+Two things follow from it being II's own artifact rather than a value the app assembles:
 
-```rust
-StorableAccountLocator {
-    anchor_number, application_number, account_number,
-    session_created_at: Option<Timestamp>,   // NEW. Some = this principal is a session
-}
-```
+- **It is tamper-evident.** II authenticates the blob it issued, so a substituted or hand-built bundle is rejected before anything is resolved, instead of merely failing to match later.
+- **It is not public API in substance.** The contents and encoding stay II's to change, since no caller parses it. Only the field is public.
 
-Absent means the principal *is* the account. Present means it is a session for that account, and the value doubles as the record's key within the reference row. The tag is what stops a session principal from ever being resolved as an account identity, and the two families cannot collide in the first place because the session seed is domain-separated by its `"session"` tag.
+Reading it needs **no new storage.** `tracked-default-accounts.md` §9 already indexes app principals to their locator, and resolving one is exactly what that index is for. Nothing about sessions goes into it: session principals are not indexed, not stored as keys anywhere, and never looked up.
 
-This is a separate pair from `prepare_account_delegation`, not an option on it. Both mint an app delegation, but they are different operations: this one proves a live session and names nothing, that one proves an access method and names the anchor outright. Merging them would mean one method with two authorizers and two argument shapes, and would drag the II frontend's internal surface into public API (§3.2).
+This is a separate pair from `prepare_account_delegation`, not an option on it. Both mint an app delegation, but they are different operations: this one proves a live session and identifies the account by its principal, that one proves an access method and names the anchor outright. Merging them would mean one method with two authorizers and two argument shapes, and would drag the II frontend's internal surface into public API (§3.2).
 
 Nothing here creates a session. A session comes only from `prepare_account_delegation` with a `SessionRequest`, which requires an access method (§6.3), so a stolen chain cannot extend its own lifetime or spawn siblings. The internal `max_expiration` parameter that `main.rs` currently passes `None` is what carries `valid_till` into the signature, so a minted delegation cannot outlive its session.
 
@@ -367,16 +369,17 @@ One asymmetry with MCP: its `read_only` is a property of the grant, applied to e
 
 ### 7.2 Matching
 
-One lookup, then one verification:
+1. Authenticate `session_attr_bundle` and read the locator out of it. A bundle II did not issue is rejected here.
+2. Read that reference row and recompute `session_seed` for each of its at most ten session records, until one derives to `caller()`.
+3. Check the matched record's `valid_till`.
 
-1. The principal index gives `caller()`'s locator plus `session_created_at`. Nothing there, or a `None` tag, is the whole of authorization failing.
-2. Read that reference row and find the record with that `created_at`, which supplies `device_id`.
-3. Recompute `session_seed` and confirm it derives to `caller()`. The seed is a function of the record's immutable fields, so this catches a corrupted or stale index rather than trusting it.
-4. Check `valid_till`.
+At ten records that is roughly twenty hashes, negligible beside the signature insert and root-hash update the call already performs.
+
+Neither input needs to be trusted. The bundle is authenticated, and even were it not, a substituted one would resolve to a locator whose records cannot match `caller()`.
+
+**Requiring the match is what stops an app delegation renewing itself.** `caller()` on this path could in principle be the account's own principal rather than a session's, since a holder of an app delegation can sign as it. That caller resolves to a locator perfectly well, but no session record's seed will ever equal it, because the two seed families are domain-separated by the `"session"` tag. Without that rejection an app delegation could mint its own replacement forever and revocation would mean nothing.
 
 An expired record and a revoked one are the same outcome, since a revoked one is simply absent.
-
-Earlier drafts had the app pass its principal and had the canister iterate the session list recomputing seeds until one matched. The index replaces both: the public surface loses an argument, and the hot path loses the loop.
 
 ### 7.3 What refresh writes
 
@@ -401,7 +404,7 @@ The two timestamps are different fields for different jobs and both are needed:
 
 | Caller | Authenticated as | May revoke | Names a session by |
 | ------ | ---------------- | ---------- | ------------------ |
-| The app | its own session chain, so `caller()` is the session principal | only its own session | nothing, `caller()` is enough (§7.2) |
+| The app | its own session chain, so `caller()` is the session principal | only its own session | the bundle it was issued, as in §7.2 |
 | The II frontend | an anchor access method, via `check_authorization` | any session of that anchor | `(origin, account, created_at)`, or a whole `device_id` |
 
 Two sets of methods, and the split falls out of what each caller can prove and what each one knows.
@@ -409,7 +412,7 @@ Two sets of methods, and the split falls out of what each caller can prove and w
 **The app's method is sign-out**, and it is what a user pressing "log out" triggers:
 
 ```candid
-app_revoke_session : () -> ();
+app_revoke_session : (record { session_attr_bundle : blob }) -> ();
 ```
 
 ```mermaid
@@ -419,8 +422,8 @@ sequenceDiagram
     participant App as app frontend
     participant IIC as II canister
     User->>App: log out
-    App->>IIC: app_revoke_session()<br/>signed with the session chain
-    Note over IIC: caller() -> principal index -> the record,<br/>remove it
+    App->>IIC: app_revoke_session { session_attr_bundle }<br/>signed with the session chain
+    Note over IIC: match as in §7.2, remove that record
     IIC-->>App: ()
     Note over App: discard the session chain and<br/>the app delegation locally
 ```
@@ -575,13 +578,13 @@ There is no flag day and no ecosystem coordination, because nothing existing cha
 Two amendments to `tracked-default-accounts.md`:
 
 - **§7.1's eviction predicate** gains "and holds no unexpired session" (§4.2).
-- **D24** says resolution "never accepts a principal argument", and nothing here does: the app-facing methods take no principal and no locator, resolving `caller()` through the index instead (§7.1). So the decision holds as written, and the invariant behind it is worth stating positively:
+- **D24** says resolution "never accepts a principal argument", and `app_prepare_delegation` does. The invariant that actually matters is narrower:
 
   > No method returns a locator, an anchor, or anything derived from one unless `caller()` proves possession of a session for it.
 
-  Its extension to session principals is the `session_created_at` tag: a session entry in the index resolves only to a mint, never to an account identity.
+  Echoing back a bundle is fine under that. On success the caller gets only a delegation it could already obtain, and the bundle is II's own authenticated artifact rather than a principal the app names (§7.1). What stays banned is a lookup that takes a principal and answers with its locator.
 
-  An earlier draft of this design also required unknown-principal and no-session-for-this-caller to be one indistinguishable failure, back when a principal was an argument. With no such argument the question is moot, and it was not needed anyway: a canister-signature principal's public key encodes the issuing canister, so anyone holding a delegation chain already knows a principal is II-derived, and the failure modes reveal nothing further. Distinguishable errors are the better trade, since they are what makes a client's own failures diagnosable.
+  There is no oracle to hide from either, so the failure cases stay distinguishable rather than collapsed. A canister-signature principal's public key encodes the issuing canister, so anyone holding a delegation chain already knows a principal is II-derived, and the failure modes reveal nothing further: not the anchor, not the origin, not the account. Distinguishable errors are the better trade, since they are what makes a client's own failures diagnosable.
 
 Also out of scope: whether to fold MCP's grant into this mechanism. The value shapes are close, but MCP's grant is a principal-keyed row precisely because it has no account reference to hang off, and its one-session-per-anchor rule would become a special case of §4.1's cap. Unifying is cleaner and touches shipped behaviour.
 
@@ -600,14 +603,14 @@ Also out of scope: whether to fold MCP's grant into this mechanism. The value sh
 | S6a | Only immutable record fields feed the seed, so `last_refreshed` is excluded | 5 |
 | S7 | The canister signs the session to a non-extractable II key; II extends the chain to the app's key, sharing no private key | 6.1 |
 | S7a | No method serves both frontends. Audience is in the name (`app_` for app frontends, unprefixed for II's), so the `app_` set is public API and the rest is internal | API changes |
-| S7b | Refresh is its own pair, `app_prepare_delegation` / `app_get_delegation`, naming nothing at all | 7.1 |
+| S7b | Refresh is its own pair, `app_prepare_delegation` / `app_get_delegation`, identifying the account by principal and never by `identity_number` | 7.1 |
 | S7c | Session creation rides on the II frontend's existing pair as two optional fields, rather than a parallel pair. Minting a session requires an access method, so a session cannot spawn or extend itself | 6.3 |
 | S8 | The app's hop carries `targets: [ii_canister_id]` as a developer guardrail, and expires with the session rather than sooner | 6.1, 8.4 |
-| S9 | `ii_session_delegation` returns the session chain and the app principal only. The app mints its own app delegations, so `icrc34_delegation` is untouched and unconditional | 6.2 |
+| S9 | `ii_session_delegation` returns the session chain and its attr bundle only. The app mints its own app delegations, so `icrc34_delegation` is untouched and unconditional | 6.2 |
 | S10 | No account number in the request: the user picks the account in II's UI | 6.2 |
 | S10a | One app keypair, carrying both the session chain and the app delegation | 6.2 |
-| S11 | App-facing methods take no principal and no locator. `caller()` resolves through the existing principal index, extended with a `session_created_at` tag rather than a second map | 7.1, 7.2 |
-| S12 | Matching is one index lookup plus a seed recomputation that verifies it, not a loop over the session list | 7.2 |
+| S11 | App-facing methods echo back an opaque `session_attr_bundle`, following `sso_prepare_delegation` / `sso_get_delegation`. The app names nothing, and session principals are never indexed | 7.1 |
+| S12 | Resolve the principal through the existing index, then match `caller()` by seed over the at-most-ten records. The match is what stops an app delegation renewing itself | 7.2 |
 | S13 | Refresh stamps `last_refreshed` and `last_used`, coalesced to at most one write per hour per session | 7.4 |
 | S14 | Two revocation surfaces: the app revokes only its own session via its session chain, the II frontend revokes any via an access method | 8.1 |
 | S15 | App-side sign-out returns nothing and always succeeds, so it is idempotent | 8.1 |
