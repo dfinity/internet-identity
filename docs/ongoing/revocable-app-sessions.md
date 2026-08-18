@@ -3,78 +3,9 @@
 **Status:** Draft, RFC for review. No code yet.
 **Depends on:** `tracked-default-accounts.md`, whose account reference stores a session and whose principal index is on the refresh path.
 **Last updated:** 2026-08-18
-**Scope:** Canister storage and API, plus the II frontend and its RPC surface. Breaks no existing app: the current RPC methods keep behaving exactly as they do (§10).
+**Scope:** Canister storage and API, plus the II frontend and its RPC surface. Breaks no existing app: the current RPC methods keep behaving exactly as they do (§11).
 
 An app delegation is unrevocable for as long as it is valid, which is up to 30 days. This makes app delegations short-lived and revocable: II stores a long-lived **session** on the account reference, hands the app a chain rooted at that session, and mints a fresh short-lived app delegation whenever the app asks. Removing the session ends the app's access within one delegation lifetime.
-
-```mermaid
-flowchart LR
-    App["app frontend<br/>(@icp-sdk/auth)"]
-    IIF["II frontend<br/>id.ai"]
-    IIC["II canister"]
-    DC["dapp canister"]
-
-    App -->|"ii_session_delegation (session only)"| IIF
-    IIF -->|"prepare/get_account_delegation<br/>list_sessions / revoke_session / revoke_session_device"| IIC
-    App -->|"app_prepare_delegation / app_get_delegation<br/>app_revoke_session"| IIC
-    App -->|"app delegation"| DC
-```
-
-Three things deliberately never happen: the dapp canister never talks to II, the app never goes through the II frontend to refresh, and the II frontend never holds or uses the app's key.
-
-| Method | Audience | Authenticated as | § |
-| ------ | -------- | ---------------- | - |
-| `ii_session_delegation` (JSON-RPC) | app frontend | the authorize transport | 5.2 |
-| `app_prepare_delegation` / `app_get_delegation` | app frontend | its session chain | 6.1 |
-| `app_revoke_session` | app frontend | its session chain | 7.1 |
-| `prepare_account_delegation` / `get_account_delegation` | II frontend | an anchor access method | 5.3 |
-| `list_sessions`, `revoke_session`, `revoke_session_device` | II frontend | an anchor access method | 7.2 |
-
-**No method serves both frontends.** Each is authenticated exactly one way, so its authorization is unconditional and auditable rather than a branch. Where both frontends need the same outcome, as with revocation, they get separate methods. The audience is in the name: `app_` marks the app frontend, following the `mcp_` precedent, and unprefixed methods are the II frontend's.
-
-That is not tidiness. Three things follow from it:
-
-- **The two audiences cannot share an argument list.** `prepare_account_delegation` names the anchor with `identity_number`, which an app cannot supply and must never learn, so the app-facing calls take `app_principal` and let II resolve the rest. Producing the same artifact does not make them the same operation.
-- **The `app_` set is public API.** Every dapp and every client library depends on it, so it has to stay small and stable, and any change to it is a compatibility event.
-- **The unprefixed set is internal.** Only the II frontend calls it, and the frontend ships with the canister, so it can be changed freely and in the same release. That is where complexity belongs when there is a choice about where to put it.
-
-What *is* shared is the II frontend's own flow. Minting a session rides on `prepare_account_delegation` rather than getting a parallel pair of its own (§6.1).
-
-### API changes
-
-**External candid**, called by app frontends. Public API, so it stays small and every change to it is a compatibility event.
-
-| Item | Change | Detail |
-| ---- | ------ | ------ |
-| `app_prepare_delegation` | new update | Mint an app delegation from a session (§6.1) |
-| `app_get_delegation` | new query | Fetch it (§6.1) |
-| `app_revoke_session` | new update | Sign out (§7.1) |
-| `AppSessionError` | new type | Distinguishes no-such-session, expired, no-match (§6.1) |
-
-Three methods, and none of them names an anchor.
-
-**Internal candid**, called only by the II frontend, which ships with the canister. Changeable in the same release, so this is where complexity belongs.
-
-| Item | Change | Detail |
-| ---- | ------ | ------ |
-| `prepare_account_delegation` | `session : opt SessionRequest` argument, `session_id : opt nat32` in the response | Mints a session instead of an app delegation when present (§5.3) |
-| `get_account_delegation` | `session : opt bool` argument | Fetches the session delegation when true (§5.3) |
-| `IdentityInfo` | `session_devices` field | Devices live on the anchor, so they ride here (§8.1) |
-| `list_sessions` | new update | Sessions with their locators, for the settings UI (§7.2) |
-| `revoke_session` | new update | Revoke one session (§7.2) |
-| `revoke_session_device` | new update | Revoke a browser and sweep (§7.2, §8.3) |
-| `SessionRequest`, `SessionInfo` | new types | (§5.3, §7.2) |
-
-**JSON-RPC**, app frontend to II frontend.
-
-| Item | Change | Detail |
-| ---- | ------ | ------ |
-| `ii_session_delegation` | new | Obtain a session (§5.2) |
-| `icrc34_delegation` | unchanged | Legacy apps, and unconditional: its behaviour does not depend on anything else the app called |
-
-Nothing existing is removed, and nothing existing changes behaviour, so no app has to do anything until it opts in (§10).
-
----
 
 ## Glossary
 
@@ -113,7 +44,7 @@ So the minting half is already built and shipping. What MCP does not need, and a
 
 ### 1.3 The signature map is not the constraint
 
-`SIGNATURE_EXPIRATION_PERIOD_NS` in `ic-canister-sig-creation` is one minute, and `add_signature` prunes up to 50 expired entries per call. A signature is fetchable for a minute after `prepare`; the delegation the client keeps is the durable artifact. Shortening delegations therefore does not grow the signature map. The cost is call volume (§9).
+`SIGNATURE_EXPIRATION_PERIOD_NS` in `ic-canister-sig-creation` is one minute, and `add_signature` prunes up to 50 expired entries per call. A signature is fetchable for a minute after `prepare`; the delegation the client keeps is the durable artifact. Shortening delegations therefore does not grow the signature map. The cost is call volume (§10).
 
 ---
 
@@ -124,11 +55,85 @@ So the minting half is already built and shipping. What MCP does not need, and a
 3. Sessions visible and revocable per browser, not only per app.
 4. No new browser plumbing on the refresh path: no navigation, no popup, no iframe.
 
-Non-goals: changing the initial ceremony, and changing anything for apps that have not upgraded their client (§10).
+Non-goals: changing the initial ceremony, and changing anything for apps that have not upgraded their client (§11).
 
 ---
 
-## 3. The session record
+## 3. Interfaces
+
+### 3.1 Actors
+
+```mermaid
+flowchart LR
+    App["app frontend<br/>(@icp-sdk/auth)"]
+    IIF["II frontend<br/>id.ai"]
+    IIC["II canister"]
+    DC["dapp canister"]
+
+    App -->|"ii_session_delegation (session only)"| IIF
+    IIF -->|"prepare/get_account_delegation<br/>revoke_session / revoke_session_device"| IIC
+    App -->|"app_prepare_delegation / app_get_delegation<br/>app_revoke_session"| IIC
+    App -->|"app delegation"| DC
+```
+
+Three things deliberately never happen: the dapp canister never talks to II, the app never goes through the II frontend to refresh, and the II frontend never holds or uses the app's key.
+
+### 3.2 One audience per method
+
+| Method | Audience | Authenticated as | § |
+| ------ | -------- | ---------------- | - |
+| `ii_session_delegation` (JSON-RPC) | app frontend | the authorize transport | 5.2 |
+| `app_prepare_delegation` / `app_get_delegation` | app frontend | its session chain | 6.1 |
+| `app_revoke_session` | app frontend | its session chain | 7.1 |
+| `prepare_account_delegation` / `get_account_delegation` | II frontend | an anchor access method | 5.3 |
+| `revoke_session`, `revoke_session_device` | II frontend | an anchor access method | 8.2 |
+
+**No method serves both frontends.** Each is authenticated exactly one way, so its authorization is unconditional and auditable rather than a branch. Where both frontends need the same outcome, as with revocation, they get separate methods. The audience is in the name: `app_` marks the app frontend, following the `mcp_` precedent, and unprefixed methods are the II frontend's.
+
+That is not tidiness. Three things follow from it:
+
+- **The two audiences cannot share an argument list.** `prepare_account_delegation` names the anchor with `identity_number`, which an app cannot supply and must never learn, so the app-facing calls take `app_principal` and let II resolve the rest. Producing the same artifact does not make them the same operation.
+- **The `app_` set is public API.** Every dapp and every client library depends on it, so it has to stay small and stable, and any change to it is a compatibility event.
+- **The unprefixed set is internal.** Only the II frontend calls it, and the frontend ships with the canister, so it can be changed freely and in the same release. That is where complexity belongs when there is a choice about where to put it.
+
+What *is* shared is the II frontend's own flow. Minting a session rides on `prepare_account_delegation` rather than getting a parallel pair of its own (§7.1).
+
+### 3.3 API changes
+
+**External candid**, called by app frontends. Public API, so it stays small and every change to it is a compatibility event.
+
+| Item | Change | Detail |
+| ---- | ------ | ------ |
+| `app_prepare_delegation` | new update | Mint an app delegation from a session (§7.1) |
+| `app_get_delegation` | new query | Fetch it (§7.1) |
+| `app_revoke_session` | new update | Sign out (§8.1) |
+| `AppSessionError` | new type | Distinguishes no-such-session, expired, no-match (§7.1) |
+
+Three methods, and none of them names an anchor.
+
+**Internal candid**, called only by the II frontend, which ships with the canister. Changeable in the same release, so this is where complexity belongs.
+
+| Item | Change | Detail |
+| ---- | ------ | ------ |
+| `prepare_account_delegation` | `session : opt SessionRequest` argument, `session_id : opt nat32` in the response | Mints a session instead of an app delegation when present (§6.3) |
+| `get_account_delegation` | `session : opt bool` argument | Fetches the session delegation when true (§6.3) |
+| `IdentityInfo` | `session_devices` field | Devices live on the anchor, so they ride here (§9.1) |
+| `revoke_session` | new update | Revoke one session (§8.2) |
+| `revoke_session_device` | new update | Revoke a browser and sweep (§8.2, §9.3) |
+| `SessionRequest` | new type | (§6.3) |
+
+**JSON-RPC**, app frontend to II frontend.
+
+| Item | Change | Detail |
+| ---- | ------ | ------ |
+| `ii_session_delegation` | new | Obtain a session (§6.2) |
+| `icrc34_delegation` | unchanged | Legacy apps, and unconditional: its behaviour does not depend on anything else the app called |
+
+Nothing existing is removed, and nothing existing changes behaviour, so no app has to do anything until it opts in (§11).
+
+---
+
+## 4. The session record
 
 A session is an entry in a list on the account reference introduced by `tracked-default-accounts.md`:
 
@@ -143,15 +148,15 @@ SessionRecord {
 
 Nothing else. `created_at`, `valid_till` and `device_id` are fixed for the session's life; `last_refreshed` is the only mutable field.
 
-`last_refreshed` exists for the user rather than for the canister. "This browser used this app 3 minutes ago" against "5 weeks ago" is what makes a session list worth reading, and it is the signal that lets someone spot a session they do not recognise *still being used* rather than merely still existing. §6.4 covers what it costs.
+`last_refreshed` exists for the user rather than for the canister. "This browser used this app 3 minutes ago" against "5 weeks ago" is what makes a session list worth reading, and it is the signal that lets someone spot a session they do not recognise *still being used* rather than merely still existing. §7.3 covers what it costs.
 
 Consequences of putting sessions on the reference rather than in their own map:
 
 - Sessions inherit the per-anchor caps of `tracked-default-accounts.md` §7.3, so they are bounded without new accounting.
 - Revoking, expiring and evicting all reuse machinery that already exists.
-- The row is written on create, on remove, and on a coarsened refresh stamp (§6.4), and at no other time.
+- The row is written on create, on remove, and on a coarsened refresh stamp (§7.3), and at no other time.
 
-### 3.1 The cap evicts, it never blocks
+### 4.1 The cap evicts, it never blocks
 
 Ten sessions per account reference. Creating an eleventh does not fail; it drops the oldest. On create:
 
@@ -164,16 +169,16 @@ Blocking would be the wrong failure: the user is trying to sign in on a new brow
 
 Evicting on `last_refreshed` rather than `created_at` is what `last_refreshed` buys here beyond the UI. Ordering by creation would drop a months-old session still in daily use in favour of one created an hour ago and never touched again, which is exactly backwards.
 
-The cap still bounds the refresh loop (§6.3), since the list is never longer than ten either way.
+The cap is now purely about the size of the row and the length of the list a user has to reason about. An earlier draft leaned on it to bound a per-refresh loop over the session records, but §7.2 replaced that loop with a single index lookup, so nothing on the hot path depends on the number any more.
 
-### 3.2 Two further rules
+### 4.2 Two further rules
 
 - **A row holding an unexpired session is not evictable.** This extends the eviction predicate in `tracked-default-accounts.md` §6.1. Without it, evicting an account reference would silently destroy a working session.
 - **Expired entries are pruned only when the list is written for another reason**, such as creating a session. Pruning on refresh would reintroduce a write on the hot path.
 
 ---
 
-## 4. Session identity
+## 5. Session identity
 
 ```
 session_seed = H(salt, "session", anchor, application, account, created_at, device_id)
@@ -187,7 +192,7 @@ The `device_id` is an input so a session's device attribution cannot be rewritte
 
 Only the record's **immutable** fields feed the seed, which is why `last_refreshed` is not one. A mutable input would change the session's principal every time it was stamped.
 
-### 4.1 A same-timestamp collision is an error
+### 5.1 A same-timestamp collision is an error
 
 `time()` is the round time, so every message in one round sees the same value. Two sessions created for the same `(anchor, application, account)` in the same round would derive the same seed. That is reachable, not theoretical: two tabs, two devices, or a deliberately raced pair of authorize calls.
 
@@ -195,13 +200,13 @@ Only the record's **immutable** fields feed the seed, which is why `last_refresh
 
 `EventKey` solves the same problem the other way, pairing a timestamp with a `u16` counter. That is the fallback if the error ever proves noisy in practice.
 
-In practice it should be unreachable. Two records can only collide if they share a locator, a `device_id` and a round, and step 0 of §3.1 reuses rather than creates when all three match. It stays as a guard rather than an expected path.
+In practice it should be unreachable. Two records can only collide if they share a locator, a `device_id` and a round, and step 0 of §4.1 reuses rather than creates when all three match. It stays as a guard rather than an expected path.
 
 ---
 
-## 5. Creating a session
+## 6. Creating a session
 
-### 5.1 Chain shape
+### 6.1 Chain shape
 
 ```mermaid
 flowchart LR
@@ -213,10 +218,10 @@ flowchart LR
 - The canister signs the session identity to a **non-extractable** key the II frontend generates, and the frontend stores the pair keyed by `(anchor, account, origin)`.
 - To give the app access, the frontend **extends the chain** to a public key the app supplies. No private key is shared and neither side loses non-extractability.
 - `caller()` derives from the chain's root, the canister-signature key over `session_seed`, so it is the session principal at any chain depth. The canister-side lookup is depth-agnostic.
-- The app's hop carries `targets: [ii_canister_id]`. II has never set `targets`, though `delegation_signature_msg_with_permissions` already accepts them. This is a guardrail rather than a defence: see §7.4.
-- **Both hops expire with the session**, at `valid_till`. Giving the app's hop a shorter expiry was an earlier idea and it is a bad one: the app would have to return to the II frontend, and therefore navigate, every time its hop lapsed, which is the cadence this design exists to remove. It would also buy nothing, since a thief holding the hop can refresh for as long as it lasts either way, and revocation is the actual control (§7.4).
+- The app's hop carries `targets: [ii_canister_id]`. II has never set `targets`, though `delegation_signature_msg_with_permissions` already accepts them. This is a guardrail rather than a defence: see §8.4.
+- **Both hops expire with the session**, at `valid_till`. Giving the app's hop a shorter expiry was an earlier idea and it is a bad one: the app would have to return to the II frontend, and therefore navigate, every time its hop lapsed, which is the cadence this design exists to remove. It would also buy nothing, since a thief holding the hop can refresh for as long as it lasts either way, and revocation is the actual control (§8.4).
 
-### 5.2 The JSON-RPC method
+### 6.2 The JSON-RPC method
 
 The app talks to the II frontend over the existing authorize transport. One new II-specific method, `ii_session_delegation`:
 
@@ -229,7 +234,7 @@ It is namespaced `ii_` rather than extending `icrc34_delegation`, for the same r
 
 **No account number.** Which account a session is for is decided during the ceremony, by the user, in II's own UI. The app has no way to enumerate an anchor's accounts and no business naming one, exactly as it cannot today with `icrc34_delegation`.
 
-**It returns the session and nothing else.** `sessionDelegation` is the session chain extended to `sessionPublicKey`. The app then mints its own first app delegation through `app_prepare_delegation` (§6.1), the same call it will use for every subsequent one. So the new flow does not involve `icrc34_delegation` at all, and that method keeps behaving for legacy apps exactly as it does today (§10).
+**It returns the session and nothing else.** `sessionDelegation` is the session chain extended to `sessionPublicKey`. The app then mints its own first app delegation through `app_prepare_delegation` (§7.1), the same call it will use for every subsequent one. So the new flow does not involve `icrc34_delegation` at all, and that method keeps behaving for legacy apps exactly as it does today (§11).
 
 That is deliberately not the same as having `icrc34_delegation` return a shorter delegation when a session was requested. Making its TTL depend on whether some other method was called earlier is hidden coupling, and it fails in the worst direction: an app that asks for a session but has not implemented refresh would silently start receiving 5-minute delegations. With a session-only response, an app that cannot refresh simply never calls the method.
 
@@ -239,9 +244,9 @@ The cost is one canister round trip before the app's first call, once per sign-i
 
 `appPrincipal` is load-bearing rather than a convenience here: it is the argument every refresh takes, and the app cannot derive it from the session chain, whose root is a different seed. It is `self_authenticating` of the *app delegation's* user key, which the app does not have yet at this point.
 
-The session's expiry needs no field. It is the `expiration` on the session chain's own hops (§5.1), so the app already has it.
+The session's expiry needs no field. It is the `expiration` on the session chain's own hops (§6.1), so the app already has it.
 
-### 5.3 First sign-in
+### 6.3 First sign-in
 
 Session creation rides on the II frontend's existing pair rather than getting one of its own. `prepare_account_delegation` and `get_account_delegation` each gain one optional field:
 
@@ -261,7 +266,7 @@ session_id : opt nat32;   // present when `session` was
 session : opt bool;       // true fetches the session delegation
 ```
 
-With `session` present the call signs the *session* identity for that locator instead of the account identity, creating or reusing the record. Registering a device is therefore not a call of its own either: the frontend passes the name it would have registered with plus whatever id it has cached, and the canister resolves the rest (§8.2).
+With `session` present the call signs the *session* identity for that locator instead of the account identity, creating or reusing the record. Registering a device is therefore not a call of its own either: the frontend passes the name it would have registered with plus whatever id it has cached, and the canister resolves the rest (§9.2).
 
 Both fields are additive and optional, so today's callers are unaffected. And because this pair is internal (see the method index), extending it costs nothing in compatibility.
 
@@ -274,19 +279,19 @@ sequenceDiagram
     App->>IIF: ii_session_delegation { sessionPublicKey }
     Note over IIF: ceremony (passkey or OpenID)
     IIF->>IIC: prepare_account_delegation { .., session_key = II key,<br/>session: { name, id: cached or absent } }
-    Note over IIC: resolve or register the device from (id, name)<br/>reuse an unexpired session for this locator+device,<br/>else prune, evict LRU at cap, create (§3.1)
+    Note over IIC: resolve or register the device from (id, name)<br/>reuse an unexpired session for this locator+device,<br/>else prune, evict LRU at cap, create (§4.1)
     IIC-->>IIF: { user_key = session identity, expiration = valid_till, session_id }
     IIF->>IIC: get_account_delegation { .., session = true }
     IIC-->>IIF: session delegation
     Note over IIF: cache session_id for this anchor<br/>store (keypair, chain) by (anchor, account, origin)<br/>extend the chain to sessionPublicKey
     IIF-->>App: { sessionDelegation, appPrincipal }
-    App->>IIC: app_prepare_delegation { app_principal, sessionPublicKey }<br/>signed with the session chain
+    App->>IIC: app_prepare_delegation { sessionPublicKey }<br/>signed with the session chain
     IIC-->>App: expiration
-    App->>IIC: app_get_delegation { .., expiration }
+    App->>IIC: app_get_delegation { sessionPublicKey, expiration }
     IIC-->>App: app delegation
 ```
 
-### 5.4 Silent re-auth, when the session is still live
+### 6.4 Silent re-auth, when the session is still live
 
 ```mermaid
 sequenceDiagram
@@ -298,68 +303,82 @@ sequenceDiagram
     alt stored session still valid
         Note over IIF: no ceremony, extend the stored chain
     else revoked, expired, or nothing stored
-        Note over IIF: ceremony, then §5.3
+        Note over IIF: ceremony, then §6.3
     end
     IIF-->>App: { sessionDelegation, appPrincipal }
-    Note over App: mints its own app delegation as in §5.3
+    Note over App: mints its own app delegation as in §6.3
 ```
 
 Extending the chain is an offline operation, so it is not what makes anything revocable. What does is that the app delegation itself can only come from the canister, which checks the session record on every mint.
 
-**When this actually avoids a ceremony is narrower than it looks.** Signing out of an app revokes its session (§7.1), so returning to that app afterwards is a ceremony, correctly. The stored session helps when the user did not sign out: a closed tab, an expired app delegation, or a *sibling subdomain* asking for the first time. That last case is the main one, and it is why the frontend keeps the session at all.
+**When this actually avoids a ceremony is narrower than it looks.** Signing out of an app revokes its session (§8.1), so returning to that app afterwards is a ceremony, correctly. The stored session helps when the user did not sign out: a closed tab, an expired app delegation, or a *sibling subdomain* asking for the first time. That last case is the main one, and it is why the frontend keeps the session at all.
 
 The frontend cannot know that an app revoked a session behind its back, so it treats a failed mint as "no session" and falls through to the ceremony rather than surfacing an error.
 
-## 6. Refresh
+## 7. Refresh
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant App as app frontend
     participant IIC as II canister
-    App->>IIC: app_prepare_delegation { app_principal, session_key }<br/>signed with the session chain
-    Note over IIC: match caller() against the session list (§6.3)<br/>resolve app_principal to a locator via the index<br/>check valid_till, cap the TTL to it
+    App->>IIC: app_prepare_delegation { session_key }<br/>signed with the session chain
+    Note over IIC: caller() -> principal index -> locator + created_at (§7.2)<br/>recompute the seed, verify, check valid_till<br/>cap the TTL to valid_till
     IIC-->>App: expiration
-    App->>IIC: app_get_delegation { app_principal, session_key, expiration }
+    App->>IIC: app_get_delegation { session_key, expiration }
     IIC-->>App: app delegation
 ```
 
-### 6.1 The app-facing pair
+### 7.1 The app-facing pair
 
 ```candid
 app_prepare_delegation : (record {
-    app_principal : principal;      // the account's principal at this origin
-    session_key : SessionKey;       // the key the app delegation targets
-    max_ttl : opt nat64;            // clamped to the app-delegation TTL
+    session_key : SessionKey;        // the key the app delegation targets
+    max_ttl : opt nat64;             // clamped to the app-delegation TTL
     permissions : opt Permissions;
 }) -> (variant { Ok : record { user_key : PublicKey; expiration : Timestamp }; Err : AppSessionError });
 
 app_get_delegation : (record {
-    app_principal : principal;
     session_key : SessionKey;
-    expiration : Timestamp;         // must match the prepared value
+    expiration : Timestamp;          // must match the prepared value
 }) -> (variant { Ok : SignedDelegation; Err : AppSessionError }) query;
 ```
 
-This is a separate pair from `prepare_account_delegation`, not an option on it. Both mint an app delegation, but they are different operations: this one proves a live session and takes no `identity_number`, that one proves an access method and names the anchor outright. Merging them would mean one method with two authorizers and two argument shapes, and would drag the II frontend's internal surface into public API (see the method index above).
+**No principal argument, and no locator.** `caller()` is the session principal, and the session determines which `(anchor, application, account)` it may mint for, so there is nothing left for the app to name. The app does hold its app principal, from the sign-in response, but only so it knows who it is; it never sends it back.
 
-Nothing here creates a session. A session comes only from `prepare_account_delegation` with a `SessionRequest`, which requires an access method (§5.3), so a stolen chain cannot extend its own lifetime or spawn siblings. The internal `max_expiration` parameter that `main.rs` currently passes `None` is what carries `valid_till` into the signature, so a minted delegation cannot outlive its session.
+Getting from `caller()` to the session needs a reverse lookup, since the seed is a hash. **No new map is needed for it.** `tracked-default-accounts.md` §9 already specifies a principal index at memory index 34, mapping a derived principal to its locator and maintained by the write path in its §4. A session principal is just another derived principal, so it goes there, with one additive field distinguishing the two key families:
 
-`AppSessionError` distinguishes its cases (no such session, expired, no match) rather than collapsing them. See §10 for why there is no oracle to hide from.
+```rust
+StorableAccountLocator {
+    anchor_number, application_number, account_number,
+    session_created_at: Option<Timestamp>,   // NEW. Some = this principal is a session
+}
+```
+
+Absent means the principal *is* the account. Present means it is a session for that account, and the value doubles as the record's key within the reference row. The tag is what stops a session principal from ever being resolved as an account identity, and the two families cannot collide in the first place because the session seed is domain-separated by its `"session"` tag.
+
+This is a separate pair from `prepare_account_delegation`, not an option on it. Both mint an app delegation, but they are different operations: this one proves a live session and names nothing, that one proves an access method and names the anchor outright. Merging them would mean one method with two authorizers and two argument shapes, and would drag the II frontend's internal surface into public API (§3.2).
+
+Nothing here creates a session. A session comes only from `prepare_account_delegation` with a `SessionRequest`, which requires an access method (§6.3), so a stolen chain cannot extend its own lifetime or spawn siblings. The internal `max_expiration` parameter that `main.rs` currently passes `None` is what carries `valid_till` into the signature, so a minted delegation cannot outlive its session.
+
+`AppSessionError` distinguishes its cases (no such session, expired, no match) rather than collapsing them. See §11 for why there is no oracle to hide from.
 
 One asymmetry with MCP: its `read_only` is a property of the grant, applied to everything the session mints. A session record here has no access field, so `permissions` stays a per-request argument.
 
-### 6.2 Why `app_principal` and nothing else
+### 7.2 Matching
 
-The app principal is what the app already knows itself as, and is also `self_authenticating(user_key)` from the original response. `created_at` is deliberately not an argument: the session keypair alone is then sufficient to refresh, so a client holding a usable key can never be blocked because some companion value went missing.
+One lookup, then one verification:
 
-### 6.3 Matching
+1. The principal index gives `caller()`'s locator plus `session_created_at`. Nothing there, or a `None` tag, is the whole of authorization failing.
+2. Read that reference row and find the record with that `created_at`, which supplies `device_id`.
+3. Recompute `session_seed` and confirm it derives to `caller()`. The seed is a function of the record's immutable fields, so this catches a corrupted or stale index rather than trusting it.
+4. Check `valid_till`.
 
-Resolve `app_principal` to a locator through the principal index of `tracked-default-accounts.md` §9, then walk the session list recomputing `session_seed` until one derives to `caller()`. At ten entries that is roughly twenty hashes, negligible beside the signature insert and root-hash update the call already performs. A wrong `app_principal` simply fails to match, so nothing needs to be trusted.
+An expired record and a revoked one are the same outcome, since a revoked one is simply absent.
 
-Expired entries do not match, so an expired session and a revoked one produce one failure with no extra logic.
+Earlier drafts had the app pass its principal and had the canister iterate the session list recomputing seeds until one matched. The index replaces both: the public surface loses an argument, and the hot path loses the loop.
 
-### 6.4 What refresh writes
+### 7.3 What refresh writes
 
 Refresh stamps `last_refreshed`. Naively that is a stable write on every call, and since `with_account_mut` rewrites the entire `(anchor, app)` reference-list blob, it rewrites the whole row rather than one field.
 
@@ -374,15 +393,15 @@ The two timestamps are different fields for different jobs and both are needed:
 | Field | Lives on | Drives |
 | ----- | -------- | ------ |
 | `last_used` | the account reference | account eviction in `tracked-default-accounts.md` §6 |
-| `last_refreshed` | the session record | the §3.1 cap eviction and the user-facing session list |
+| `last_refreshed` | the session record | the §4.1 cap eviction and the user-facing session list |
 
-## 7. Revocation
+## 8. Revocation
 
-### 7.1 Two entry points, with different authentication
+### 8.1 Two entry points, with different authentication
 
 | Caller | Authenticated as | May revoke | Names a session by |
 | ------ | ---------------- | ---------- | ------------------ |
-| The app | its own session chain, so `caller()` is the session principal | only its own session | the app principal, as in §6 |
+| The app | its own session chain, so `caller()` is the session principal | only its own session | nothing, `caller()` is enough (§7.2) |
 | The II frontend | an anchor access method, via `check_authorization` | any session of that anchor | `(origin, account, created_at)`, or a whole `device_id` |
 
 Two sets of methods, and the split falls out of what each caller can prove and what each one knows.
@@ -390,7 +409,7 @@ Two sets of methods, and the split falls out of what each caller can prove and w
 **The app's method is sign-out**, and it is what a user pressing "log out" triggers:
 
 ```candid
-app_revoke_session : (record { app_principal : principal }) -> ();
+app_revoke_session : () -> ();
 ```
 
 ```mermaid
@@ -400,8 +419,8 @@ sequenceDiagram
     participant App as app frontend
     participant IIC as II canister
     User->>App: log out
-    App->>IIC: app_revoke_session { app_principal }<br/>signed with the session chain
-    Note over IIC: match caller() over the session list,<br/>remove that record
+    App->>IIC: app_revoke_session()<br/>signed with the session chain
+    Note over IIC: caller() -> principal index -> the record,<br/>remove it
     IIC-->>App: ()
     Note over App: discard the session chain and<br/>the app delegation locally
 ```
@@ -410,20 +429,9 @@ It needs no authorization check beyond the match refresh already performs, becau
 
 The app deliberately cannot revoke anything else. "Sign out everywhere" is the II frontend's operation, not something a dapp can trigger.
 
-### 7.2 The anchor-authenticated methods
+### 8.2 The anchor-authenticated methods
 
 ```candid
-list_sessions : (IdentityNumber) -> (variant { Ok : vec SessionInfo; Err : SessionListError });
-
-type SessionInfo = record {
-    origin : text;
-    account_number : opt AccountNumber;
-    device_id : nat32;
-    created_at : Timestamp;
-    valid_till : Timestamp;
-    last_refreshed : opt Timestamp;   // absent until first used, coarsened to the hour (§6.4)
-};
-
 revoke_session : (record {
     identity_number : IdentityNumber;
     origin : text;
@@ -437,9 +445,16 @@ revoke_session_device : (record {
 }) -> (variant { Ok; Err : SessionRevokeError });
 ```
 
-`list_sessions` is an update rather than a query for the same reason `identity_info` is: a query reply that a single malicious node could forge is not certified, and this one drives a security UI.
+They name sessions by locator, never by principal, so **they do not touch the principal index**. It is on the app-facing path only (§7.2).
 
-These paths name sessions by locator, never by principal, so **they do not touch the principal index**. It is on the refresh path only.
+**There is no session listing method, deliberately.** A flat "every session of this anchor" call is the wrong shape: it returns a list whose length is bounded only by the caps, mixing every origin together, and it is not what a settings UI wants to render. The right decomposition is to list the *applications* an anchor has, then list sessions within one application, and that wants designing alongside whatever surface lists applications. Neither exists yet, so neither is specified here.
+
+What that leaves usable today:
+
+| Operation | Drivable now? |
+| --------- | ------------- |
+| Revoke a whole browser | Yes. `identity_info` already carries `session_devices` with their names (§9.1), so the UI can offer them |
+| Revoke one session | The method exists, but nothing enumerates sessions yet, so its UI arrives with the listing work |
 
 ```mermaid
 sequenceDiagram
@@ -448,24 +463,19 @@ sequenceDiagram
     participant IIF as II frontend
     participant IIC as II canister
     User->>IIF: open settings
-    IIF->>IIC: list_sessions(identity_number)
-    IIC-->>IIF: sessions with origin, account, device, created, valid_till
     IIF->>IIC: identity_info(identity_number)
-    IIC-->>IIF: devices with names
-    alt revoke one session
-        IIF->>IIC: revoke_session { .., created_at }
-    else sign out a whole browser
-        IIF->>IIC: revoke_session_device { .., device_id }
-        Note over IIC: delete the device and sweep the anchor's<br/>references in one message (§8.3)
-    end
+    IIC-->>IIF: session_devices with names
+    User->>IIF: sign out "Chrome on MacBook"
+    IIF->>IIC: revoke_session_device { identity_number, device_id }
+    Note over IIC: delete the device and sweep the anchor's<br/>references in one message (§9.3)
     IIC-->>IIF: Ok
 ```
 
-### 7.3 Latency
+### 8.3 Latency
 
-**Latency is exactly the app-delegation TTL.** Revocation stops new delegations being minted; one already issued stays valid until it expires. `mcp.rs` documents the same residue for its grants. Nothing short of the relying party checking with II on every call improves on it, which is why the TTL is the dial (§9).
+**Latency is exactly the app-delegation TTL.** Revocation stops new delegations being minted; one already issued stays valid until it expires. `mcp.rs` documents the same residue for its grants. Nothing short of the relying party checking with II on every call improves on it, which is why the TTL is the dial (§10).
 
-### 7.4 What an attacker gets
+### 8.4 What an attacker gets
 
 | Stolen | Today | After |
 | ------ | ----- | ----- |
@@ -478,9 +488,9 @@ The honest reading of the second row: a thief holding the session chain can refr
 
 ---
 
-## 8. Session devices
+## 9. Session devices
 
-### 8.1 Registry
+### 9.1 Registry
 
 A new additive field on `StorableAnchor`, following the pattern every field there already uses:
 
@@ -493,7 +503,7 @@ with `{ id, name, created_at }` per entry, **capped at 20** because the anchor b
 
 Reading needs no method: devices live on `StorableAnchor`, so they ride on `identity_info` alongside `mcp_config`, which is carried there for exactly this reason.
 
-### 8.2 The canister allocates the id, during the auth flow
+### 9.2 The canister allocates the id, during the auth flow
 
 There is no registration method. `prepare_account_delegation`'s `SessionRequest` carries `{ name, id: opt nat32 }`, and the canister resolves it:
 
@@ -504,23 +514,23 @@ There is no registration method. `prepare_account_delegation`'s `SessionRequest`
 
 The frontend caches the returned id per anchor and passes it back on every later auth flow, for every app. It does not choose the id, derive it, or influence it.
 
-The id comes from an explicit per-anchor `next_id`, monotonic and never reused. Computing `max(ids) + 1` instead would technically be safe given the eager sweep in §8.3, since no session survives referencing a deleted device, but it silently couples id safety to sweep completeness: a later move to lazy revocation would reintroduce misattribution with nothing visibly changing. Four bytes decouples it, and it matches the monotonic-and-never-reissued rule already established for account and application numbers.
+The id comes from an explicit per-anchor `next_id`, monotonic and never reused. Computing `max(ids) + 1` instead would technically be safe given the eager sweep in §9.3, since no session survives referencing a deleted device, but it silently couples id safety to sweep completeness: a later move to lazy revocation would reintroduce misattribution with nothing visibly changing. Four bytes decouples it, and it matches the monotonic-and-never-reissued rule already established for account and application numbers.
 
-### 8.3 Device revocation is an eager sweep
+### 9.3 Device revocation is an eager sweep
 
 `revoke_session_device` removes the device from the anchor and sweeps that anchor's references in the same message: the anchor-major range scan the eviction path already performs, bounded at 1000 rows by `tracked-default-accounts.md` §7.3, writing only rows that actually hold that device's sessions. Atomic, with no partially-revoked state.
 
 Doing it eagerly is what keeps refresh cheap. The alternative, marking a device revoked and checking it during refresh, makes revocation O(1) but adds an anchor read to a call that otherwise never touches the anchor, since refresh authenticates by session chain and never runs `check_authorization`. Refresh happens every few minutes per active session; revocation is rare.
 
-### 8.4 Where a device id may be supplied
+### 9.4 Where a device id may be supplied
 
-Only on a `prepare_account_delegation` call carrying `session`, which requires an anchor access method (§5.3). The session-authenticated form of that call takes no `SessionRequest` at all, so no dapp-reachable surface accepts a device id. Otherwise a dapp could pass an arbitrary id to misattribute its own session into a user's device list, or probe which ids exist by observing which are accepted.
+Only on a `prepare_account_delegation` call carrying `session`, which requires an anchor access method (§6.3). The session-authenticated form of that call takes no `SessionRequest` at all, so no dapp-reachable surface accepts a device id. Otherwise a dapp could pass an arbitrary id to misattribute its own session into a user's device list, or probe which ids exist by observing which are accepted.
 
-### 8.5 Per anchor, not per browser
+### 9.5 Per anchor, not per browser
 
 The frontend caches one id per anchor, which is deliberate. One id shared across an anchor's apps is exactly the correlation the user wants in their own session list, and no dapp ever sees it. A browser-global id would instead tie two of the user's anchors to one browser, which is what per-anchor separation exists to prevent.
 
-### 8.6 Two accepted limitations
+### 9.6 Two accepted limitations
 
 Registration is archived with the name redacted, following `Operation::CreateAccount { name: Private }`. Once per browser per anchor is rare enough to archive, unlike the per-sign-in events that design keeps out of the archive.
 
@@ -528,7 +538,7 @@ The name is self-reported by the client, so it is a label for the user rather th
 
 ---
 
-## 9. Cost, and the TTL dial
+## 10. Cost, and the TTL dial
 
 Revocation latency, app-delegation TTL and refresh rate are one number. Refresh volume is `N / T`, where `N` counts sessions **actively making calls**, not sessions stored:
 
@@ -539,7 +549,7 @@ Revocation latency, app-delegation TTL and refresh rate are one number. Refresh 
 
 Each is a replicated update that inserts a signature and updates the root hash, against a single canister on one subnet.
 
-Note the stable write from §6.4 does **not** scale with `1/T`, because the stamp is coalesced to a fixed interval. Lowering `T` multiplies the calls, not the writes.
+Note the stable write from §7.3 does **not** scale with `1/T`, because the stamp is coalesced to a fixed interval. Lowering `T` multiplies the calls, not the writes.
 
 
 
@@ -551,63 +561,64 @@ Signing several delegations ahead in one update looks like an escape and is not:
 
 ---
 
-## 10. Rollout, and what this changes in the previous design
+## 11. Rollout, and what this changes in the previous design
 
 There is no flag day and no ecosystem coordination, because nothing existing changes:
 
 | App | Gets |
 | --- | ---- |
 | Calls `icrc34_delegation`, as every app does today | Exactly what it gets now, a long-lived delegation, up to `MAX_EXPIRATION_PERIOD_NS`. Unconditionally: its behaviour does not depend on anything else the app called |
-| Calls `ii_session_delegation` (§5.2), on a client version that supports it | A session plus short-lived delegations, and refreshes itself |
+| Calls `ii_session_delegation` (§6.2), on a client version that supports it | A session plus short-lived delegations, and refreshes itself |
 
 `MAX_EXPIRATION_PERIOD_NS` is untouched. An app opts in by upgrading its client and calling `ii_session_delegation`, which is also when it acquires the refresh logic it needs. Lowering the cap for everyone is a separate decision for later, once adoption is real. MCP could skip all of this because its client is II's own server implementation.
 
 Two amendments to `tracked-default-accounts.md`:
 
-- **§6.1's eviction predicate** gains "and holds no unexpired session" (§3.2).
-- **D24** currently says resolution "never accepts a principal argument", and refresh necessarily does. The invariant that actually matters is narrower:
+- **§7.1's eviction predicate** gains "and holds no unexpired session" (§4.2).
+- **D24** says resolution "never accepts a principal argument", and nothing here does: the app-facing methods take no principal and no locator, resolving `caller()` through the index instead (§7.1). So the decision holds as written, and the invariant behind it is worth stating positively:
 
   > No method returns a locator, an anchor, or anything derived from one unless `caller()` proves possession of a session for it.
 
-  A caller-supplied `app_principal` is fine under that. Success returns only a delegation the caller could already obtain, and the argument needs no trust because the seed recomputation verifies it: a wrong principal simply fails to match (§6.3). What stays banned is a lookup that takes a principal and answers with its locator.
+  Its extension to session principals is the `session_created_at` tag: a session entry in the index resolves only to a mint, never to an account identity.
 
-  An earlier version of this section also required unknown-principal and no-session-for-this-caller to be one indistinguishable failure. That is not needed. A canister-signature principal's public key encodes the issuing canister, so anyone holding a delegation chain already knows a principal is II-derived, and the failure modes reveal nothing further: not the anchor, not the origin, not the account. Distinguishable errors are the better trade, since they are what makes a client's own failures diagnosable.
+  An earlier draft of this design also required unknown-principal and no-session-for-this-caller to be one indistinguishable failure, back when a principal was an argument. With no such argument the question is moot, and it was not needed anyway: a canister-signature principal's public key encodes the issuing canister, so anyone holding a delegation chain already knows a principal is II-derived, and the failure modes reveal nothing further. Distinguishable errors are the better trade, since they are what makes a client's own failures diagnosable.
 
-Also out of scope: whether to fold MCP's grant into this mechanism. The value shapes are close, but MCP's grant is a principal-keyed row precisely because it has no account reference to hang off, and its one-session-per-anchor rule would become a special case of §3.1's cap. Unifying is cleaner and touches shipped behaviour.
+Also out of scope: whether to fold MCP's grant into this mechanism. The value shapes are close, but MCP's grant is a principal-keyed row precisely because it has no account reference to hang off, and its one-session-per-anchor rule would become a special case of §4.1's cap. Unifying is cleaner and touches shipped behaviour.
 
 ---
 
-## 11. Decisions
+## 12. Decisions
 
 | # | Decision | § |
 | - | -------- | - |
-| S1 | A session is `(created_at, valid_till, last_refreshed, device_id)` on the account reference; only `last_refreshed` is mutable | 3 |
-| S2 | Ten sessions per account reference: reuse an unexpired session for the same locator and device, else prune expired and drop the least recently used. Creating a session never fails on the cap | 3.1 |
-| S3 | A row holding an unexpired session is not evictable | 3.2 |
-| S4 | Expired entries are pruned only when the list is written for another reason, so refresh never writes | 3.2 |
-| S5 | `session_seed = H(salt, "session", anchor, application, account, created_at, device_id)`, no allocator state | 4 |
-| S6 | A same-round collision for one account is a typed retryable error, not disambiguated | 4.1 |
-| S6a | Only immutable record fields feed the seed, so `last_refreshed` is excluded | 4 |
-| S7 | The canister signs the session to a non-extractable II key; II extends the chain to the app's key, sharing no private key | 5.1 |
+| S1 | A session is `(created_at, valid_till, last_refreshed, device_id)` on the account reference; only `last_refreshed` is mutable | 4 |
+| S2 | Ten sessions per account reference: reuse an unexpired session for the same locator and device, else prune expired and drop the least recently used. Creating a session never fails on the cap | 4.1 |
+| S3 | A row holding an unexpired session is not evictable | 4.2 |
+| S4 | Expired entries are pruned only when the list is written for another reason, so refresh never writes | 4.2 |
+| S5 | `session_seed = H(salt, "session", anchor, application, account, created_at, device_id)`, no allocator state | 5 |
+| S6 | A same-round collision for one account is a typed retryable error, not disambiguated | 5.1 |
+| S6a | Only immutable record fields feed the seed, so `last_refreshed` is excluded | 5 |
+| S7 | The canister signs the session to a non-extractable II key; II extends the chain to the app's key, sharing no private key | 6.1 |
 | S7a | No method serves both frontends. Audience is in the name (`app_` for app frontends, unprefixed for II's), so the `app_` set is public API and the rest is internal | API changes |
-| S7b | Refresh is its own pair, `app_prepare_delegation` / `app_get_delegation`, taking `app_principal` and never an `identity_number` | 6.1 |
-| S7c | Session creation rides on the II frontend's existing pair as two optional fields, rather than a parallel pair. Minting a session requires an access method, so a session cannot spawn or extend itself | 5.3 |
-| S8 | The app's hop carries `targets: [ii_canister_id]` as a developer guardrail, and expires with the session rather than sooner | 5.1, 7.4 |
-| S9 | `ii_session_delegation` returns the session chain and the app principal only. The app mints its own app delegations, so `icrc34_delegation` is untouched and unconditional | 5.2 |
-| S10 | No account number in the request: the user picks the account in II's UI | 5.2 |
-| S10a | One app keypair, carrying both the session chain and the app delegation | 5.2 |
-| S11 | Refresh takes `app_principal` only; `created_at` is not an argument, so the keypair alone suffices | 6.2 |
-| S12 | Refresh resolves through the principal index and iterates the capped session list | 6.3 |
-| S13 | Refresh stamps `last_refreshed` and `last_used`, coalesced to at most one write per hour per session | 6.4 |
-| S14 | Two revocation surfaces: the app revokes only its own session via its session chain, the II frontend revokes any via an access method | 7.1 |
-| S15 | App-side sign-out returns nothing and always succeeds, so it is idempotent | 7.1 |
-| S15a | Session errors are distinguishable, not collapsed: there is no oracle to hide from | 6.1, 10 |
-| S16 | Anchor-authenticated methods name sessions by locator, so the principal index is on the refresh path only | 7.2 |
-| S17 | Revocation latency is exactly the app-delegation TTL, by construction | 7.3 |
-| S17a | The app-delegation TTL is 5 minutes, matching MCP | 9 |
-| S18 | Device registry is `StorableAnchor` field 7, capped at 20, read through `identity_info` | 8.1 |
-| S19 | Device registration is not a method. `SessionRequest { name, id }` on the existing prepare resolves or registers, and returns the id; the canister allocates from a monotonic per-anchor `next_id` | 8.2 |
-| S20 | Device revocation is an eager atomic sweep, so refresh never reads the anchor | 8.3 |
-| S21 | Only the access-method form of prepare accepts a `SessionRequest`, so no dapp-reachable surface takes a device id | 8.4 |
-| S22 | The device id is per anchor, never browser-global | 8.5 |
-| S23 | Nothing changes for apps on `icrc34_delegation`; opting in means upgrading the client | 10 |
+| S7b | Refresh is its own pair, `app_prepare_delegation` / `app_get_delegation`, naming nothing at all | 7.1 |
+| S7c | Session creation rides on the II frontend's existing pair as two optional fields, rather than a parallel pair. Minting a session requires an access method, so a session cannot spawn or extend itself | 6.3 |
+| S8 | The app's hop carries `targets: [ii_canister_id]` as a developer guardrail, and expires with the session rather than sooner | 6.1, 8.4 |
+| S9 | `ii_session_delegation` returns the session chain and the app principal only. The app mints its own app delegations, so `icrc34_delegation` is untouched and unconditional | 6.2 |
+| S10 | No account number in the request: the user picks the account in II's UI | 6.2 |
+| S10a | One app keypair, carrying both the session chain and the app delegation | 6.2 |
+| S11 | App-facing methods take no principal and no locator. `caller()` resolves through the existing principal index, extended with a `session_created_at` tag rather than a second map | 7.1, 7.2 |
+| S12 | Matching is one index lookup plus a seed recomputation that verifies it, not a loop over the session list | 7.2 |
+| S13 | Refresh stamps `last_refreshed` and `last_used`, coalesced to at most one write per hour per session | 7.4 |
+| S14 | Two revocation surfaces: the app revokes only its own session via its session chain, the II frontend revokes any via an access method | 8.1 |
+| S15 | App-side sign-out returns nothing and always succeeds, so it is idempotent | 8.1 |
+| S15a | Session errors are distinguishable, not collapsed: there is no oracle to hide from | 7.1, 11 |
+| S16 | Anchor-authenticated methods name sessions by locator, so the principal index is on the app-facing path only | 8.2 |
+| S16a | No session listing method. Application listing, then per-application sessions, is the right shape and is deferred | 8.2 |
+| S17 | Revocation latency is exactly the app-delegation TTL, by construction | 8.3 |
+| S17a | The app-delegation TTL is 5 minutes, matching MCP | 10 |
+| S18 | Device registry is `StorableAnchor` field 7, capped at 20, read through `identity_info` | 9.1 |
+| S19 | Device registration is not a method. `SessionRequest { name, id }` on the existing prepare resolves or registers, and returns the id; the canister allocates from a monotonic per-anchor `next_id` | 9.2 |
+| S20 | Device revocation is an eager atomic sweep, so refresh never reads the anchor | 9.3 |
+| S21 | Only the access-method form of prepare accepts a `SessionRequest`, so no dapp-reachable surface takes a device id | 9.4 |
+| S22 | The device id is per anchor, never browser-global | 9.5 |
+| S23 | Nothing changes for apps on `icrc34_delegation`; opting in means upgrading the client | 11 |
