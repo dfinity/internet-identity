@@ -26,7 +26,7 @@ An app delegation is unrevocable for as long as it is valid, which is up to 30 d
 
 ### 1.1 Nothing revokes a delegation today
 
-A delegation is self-contained: the client holds a canister-signed artifact valid until its `expiration`. `DEFAULT_EXPIRATION_PERIOD_NS` is 30 minutes and `MAX_EXPIRATION_PERIOD_NS` is 30 days, with the app choosing via `maxTimeToLive`. The signature only has to exist in the signature map long enough to be fetched, so there is nothing left to remove afterwards. The only lever that invalidates an outstanding delegation is rotating the salt, which invalidates every principal in the canister.
+A delegation is self-contained: the client holds a canister-signed artifact valid until its `expiration`. `DEFAULT_EXPIRATION_PERIOD_NS` is 30 minutes and `MAX_EXPIRATION_PERIOD_NS` is 30 days, with the app choosing via `maxTimeToLive`. The signature only has to exist in the signature map long enough to be fetched, so there is nothing left in the canister to remove afterwards, and verification does not consult the canister again. There is no lever at all: nothing II can do reaches a delegation it has already handed out. Rotating the salt would not help either, since it changes what future derivations produce without touching an already-signed artifact, and it would strand every existing principal in the canister while revoking nothing.
 
 ### 1.2 The shape already exists for MCP
 
@@ -51,7 +51,7 @@ So the minting half of this design is already built and shipping. What MCP does 
 ## 2. Goals
 
 1. App delegations short enough that a stolen one expires quickly.
-2. A revocable session behind them, so access can be ended without waiting for a delegation to expire and without rotating the salt.
+2. A revocable session behind them, so access can be ended without waiting for a delegation to expire.
 3. Sessions visible and revocable per browser, not only per app.
 4. No new browser plumbing on the refresh path: no navigation, no popup, no iframe.
 
