@@ -912,6 +912,7 @@ pub(super) async fn stamp_recovery_delegation(
             &seed,
             expiration,
             None,
+            None,
         );
     });
     crate::update_root_hash();

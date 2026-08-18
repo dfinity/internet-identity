@@ -435,6 +435,7 @@ async fn prepare_delegation(
         session_key,
         max_time_to_live,
         None,
+        None,
         // The legacy endpoint has no read-only option.
         DelegationAccess::Unrestricted,
         &ii_domain,
@@ -465,6 +466,7 @@ fn get_delegation(
         None,
         session_key,
         expiration,
+        None,
         // The legacy endpoint has no read-only option.
         DelegationAccess::Unrestricted,
     )
@@ -573,6 +575,7 @@ async fn prepare_account_delegation(
     session_key: SessionKey,
     max_ttl: Option<u64>,
     permissions: Option<Permissions>,
+    targets: Option<Vec<Principal>>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
     match check_authz_and_record_activity(anchor_number) {
         Ok(ii_domain) => {
@@ -583,6 +586,7 @@ async fn prepare_account_delegation(
                 session_key,
                 max_ttl,
                 None,
+                targets,
                 // An omitted `permissions` argument means unrestricted (see
                 // `impl From<Option<Permissions>> for DelegationAccess`): this
                 // preserves the original behavior for callers of the
@@ -605,6 +609,7 @@ fn get_account_delegation(
     session_key: SessionKey,
     expiration: Timestamp,
     permissions: Option<Permissions>,
+    targets: Option<Vec<Principal>>,
 ) -> Result<SignedDelegation, AccountDelegationError> {
     match check_authorization(anchor_number) {
         Ok(_) => account_management::get_account_delegation(
@@ -613,6 +618,7 @@ fn get_account_delegation(
             account_number,
             session_key,
             expiration,
+            targets,
             // See `prepare_account_delegation`: an omitted `permissions`
             // argument means an unrestricted delegation (backwards-compatible
             // with the original form).

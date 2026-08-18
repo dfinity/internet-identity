@@ -1028,6 +1028,7 @@ export const idlFactory = ({ IDL }) => {
           SessionKey,
           Timestamp,
           IDL.Opt(Permissions),
+          IDL.Opt(IDL.Vec(IDL.Principal)),
         ],
         [
           IDL.Variant({
@@ -1304,6 +1305,7 @@ export const idlFactory = ({ IDL }) => {
           SessionKey,
           IDL.Opt(IDL.Nat64),
           IDL.Opt(Permissions),
+          IDL.Opt(IDL.Vec(IDL.Principal)),
         ],
         [
           IDL.Variant({

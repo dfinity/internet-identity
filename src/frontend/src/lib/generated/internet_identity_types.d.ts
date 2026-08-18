@@ -2028,6 +2028,7 @@ export interface _SERVICE {
       SessionKey,
       Timestamp,
       [] | [Permissions],
+      [] | [Array<Principal>],
     ],
     { 'Ok' : SignedDelegation } |
       { 'Err' : AccountDelegationError }
@@ -2344,6 +2345,7 @@ export interface _SERVICE {
       SessionKey,
       [] | [bigint],
       [] | [Permissions],
+      [] | [Array<Principal>],
     ],
     { 'Ok' : PrepareAccountDelegation } |
       { 'Err' : AccountDelegationError }

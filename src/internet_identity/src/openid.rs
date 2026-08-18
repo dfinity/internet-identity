@@ -140,7 +140,7 @@ impl OpenIdCredential {
 
         state::signature_map_mut(|sigs| {
             // Unrestricted: the OpenID flow has no read-only option.
-            add_delegation_signature(sigs, session_key, seed.as_ref(), expiration, None);
+            add_delegation_signature(sigs, session_key, seed.as_ref(), expiration, None, None);
         });
         update_root_hash();
 

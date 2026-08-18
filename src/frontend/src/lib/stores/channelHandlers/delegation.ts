@@ -167,6 +167,7 @@ export const handleDelegationRequest =
             sessionPublicKey,
             maxTimeToLive !== undefined ? [maxTimeToLive] : [],
             permissions,
+            [],
           )
           .then(throwCanisterError);
 
@@ -179,6 +180,7 @@ export const handleDelegationRequest =
               sessionPublicKey,
               expiration,
               permissions,
+              [],
             )
             .then(throwCanisterError)
             .then(transformSignedDelegation)

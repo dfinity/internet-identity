@@ -85,6 +85,7 @@ export const cliAuthorize = async ({
       // The user's choice (read-only by default); passed explicitly so it
       // is honored regardless of the backend's omitted-arg default.
       toPermissionsArg(accessLevel),
+      [],
     )
     .then(throwCanisterError);
 
@@ -98,6 +99,7 @@ export const cliAuthorize = async ({
         expiration,
         // Must match the value passed to `prepare_account_delegation` above.
         toPermissionsArg(accessLevel),
+        [],
       )
       .then(throwCanisterError)
       .then(transformSignedDelegation)

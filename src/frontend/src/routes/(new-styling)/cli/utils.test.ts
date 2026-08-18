@@ -71,6 +71,7 @@ describe("cliAuthorize access-level wiring", () => {
       expect.anything(),
       [BigInt(TTL_MINUTES) * BigInt(60) * BigInt(1_000_000_000)],
       [{ queries: null }],
+      [],
     );
     // `get` must echo the same value or the signature lookup fails.
     expect(actor.get_account_delegation.mock.calls[0][5]).toEqual([

@@ -127,21 +127,21 @@ pub(crate) fn der_encode_canister_sig_key(seed: Vec<u8>) -> Vec<u8> {
     CanisterSigPublicKey::new(my_canister_id, seed).to_der()
 }
 
-/// Adds a delegation signature for `pk` to the signature map. `permissions`
-/// is the delegation's optional `permissions` field (folded into the signed
-/// message when present) — pass `access.permissions()` of a
-/// [`DelegationAccess`], or `None` for flows that never restrict.
+/// Adds a delegation signature for `pk` to the signature map. `targets` and
+/// `permissions` are the delegation's optional restricting fields, folded into
+/// the signed message when present — pass `None` for flows that never restrict.
 pub fn add_delegation_signature(
     sigs: &mut SignatureMap,
     pk: PublicKey,
     seed: &[u8],
     expiration: Timestamp,
+    targets: Option<&Vec<Vec<u8>>>,
     permissions: Option<&str>,
 ) {
     let inputs = CanisterSigInputs {
         domain: DELEGATION_SIG_DOMAIN,
         seed,
-        message: &delegation_signature_msg_with_permissions(&pk, expiration, None, permissions),
+        message: &delegation_signature_msg_with_permissions(&pk, expiration, targets, permissions),
     };
     sigs.add_signature(&inputs);
 }
@@ -266,6 +266,42 @@ mod test {
     /// independently, so any drift in the composition silently invalidates
     /// every read-only delegation — this test makes drift a visible failure
     /// and doubles as a reference vector for agent implementers.
+    #[test]
+    fn should_fold_targets_into_message() {
+        let targets = vec![b"canister-a".to_vec(), b"canister-b".to_vec()];
+        let scoped = delegation_signature_msg_with_permissions(
+            SESSION_PUBKEY,
+            EXPIRATION,
+            Some(&targets),
+            None,
+        );
+        assert_ne!(
+            scoped,
+            delegation_signature_msg_with_permissions(SESSION_PUBKEY, EXPIRATION, None, None),
+            "targets must change the signable"
+        );
+        assert_eq!(
+            scoped,
+            delegation_signature_msg_with_permissions(
+                SESSION_PUBKEY,
+                EXPIRATION,
+                Some(&targets),
+                None
+            ),
+            "same targets must produce the same signable"
+        );
+        assert_ne!(
+            scoped,
+            delegation_signature_msg_with_permissions(
+                SESSION_PUBKEY,
+                EXPIRATION,
+                Some(&vec![b"canister-b".to_vec(), b"canister-a".to_vec()]),
+                None
+            ),
+            "target order is part of the signable"
+        );
+    }
+
     #[test]
     fn should_pin_queries_permissions_msg() {
         let msg = delegation_signature_msg_with_permissions(

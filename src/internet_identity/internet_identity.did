@@ -1882,7 +1882,11 @@ service : (opt InternetIdentityInit) -> {
         // calls authenticated through it. Omitted (`null`) or `opt (all)`
         // yields an unrestricted delegation — the original behavior, preserved
         // for existing callers and matching the interface spec.
-        permissions : opt Permissions
+        permissions : opt Permissions,
+        // Restricts the delegation to these canisters; omitted/`null` is
+        // unrestricted. Must match the value passed to `get_account_delegation`
+        // (it is folded into the signed delegation).
+        targets : opt vec principal
     ) -> (variant { Ok : PrepareAccountDelegation; Err : AccountDelegationError });
 
     get_account_delegation : (
@@ -1893,7 +1897,9 @@ service : (opt InternetIdentityInit) -> {
         expiration : Timestamp,
         // Must match the value passed to `prepare_account_delegation` (including
         // the omitted/`null` case, which means unrestricted).
-        permissions : opt Permissions
+        permissions : opt Permissions,
+        // Must match the value passed to `prepare_account_delegation`.
+        targets : opt vec principal
     ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
 
     // Read the identity's synced trusted-MCP-server config (master toggle + the

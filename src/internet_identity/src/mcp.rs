@@ -511,6 +511,7 @@ impl McpSession {
             session_key,
             capped_ttl,
             Some(self.grant.expires_at_ns),
+            None,
             DelegationAccess::from_read_only(self.grant.read_only),
             &None,
         )
@@ -543,6 +544,7 @@ impl McpSession {
             account_number,
             session_key,
             expiration,
+            None,
             DelegationAccess::from_read_only(self.grant.read_only),
         )
     }

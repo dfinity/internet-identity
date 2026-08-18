@@ -17,6 +17,7 @@ use crate::{
     },
     update_root_hash,
 };
+use candid::Principal;
 use ic_canister_sig_creation::{signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN};
 use ic_cdk::{api::time, caller};
 use ic_stable_structures::DefaultMemoryImpl;
@@ -305,6 +306,7 @@ pub async fn prepare_account_delegation(
     session_key: SessionKey,
     max_ttl: Option<u64>,
     max_expiration: Option<Timestamp>,
+    targets: Option<Vec<Principal>>,
     access: DelegationAccess,
     ii_domain: &Option<IIDomain>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
@@ -351,12 +353,16 @@ pub async fn prepare_account_delegation(
     let effective_duration_ns = expiration.saturating_sub(time());
     let seed = account.calculate_seed();
 
+    let target_bytes: Option<Vec<Vec<u8>>> = targets
+        .as_ref()
+        .map(|ts| ts.iter().map(|p| p.as_slice().to_vec()).collect());
     state::signature_map_mut(|sigs| {
         add_delegation_signature(
             sigs,
             session_key,
             seed.as_ref(),
             expiration,
+            target_bytes.as_ref(),
             access.permissions(),
         );
     });
@@ -381,9 +387,14 @@ pub fn get_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
+    targets: Option<Vec<Principal>>,
     access: DelegationAccess,
 ) -> Result<SignedDelegation, AccountDelegationError> {
     check_frontend_length(origin);
+
+    let target_bytes: Option<Vec<Vec<u8>>> = targets
+        .as_ref()
+        .map(|ts| ts.iter().map(|p| p.as_slice().to_vec()).collect());
 
     storage_borrow(|storage| {
         let account = storage
@@ -403,7 +414,7 @@ pub fn get_account_delegation(
                 message: &delegation_signature_msg_with_permissions(
                     &session_key,
                     expiration,
-                    None,
+                    target_bytes.as_ref(),
                     permissions,
                 ),
             };
@@ -412,7 +423,7 @@ pub fn get_account_delegation(
                     delegation: Delegation {
                         pubkey: session_key,
                         expiration,
-                        targets: None,
+                        targets,
                         permissions: permissions.map(str::to_string),
                     },
                     signature: ByteBuf::from(signature),
