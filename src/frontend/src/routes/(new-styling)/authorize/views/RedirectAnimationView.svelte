@@ -1,6 +1,7 @@
 <script lang="ts">
   import { establishedChannelStore } from "$lib/stores/channelStore";
   import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
+  import { originLabel } from "$lib/utils/urlUtils";
   import { t } from "$lib/stores/locale.store";
   import { draw, fade, scale } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
@@ -21,7 +22,7 @@
   // of a broken image; keyed by value so a later (valid) logo still renders.
   let failedLogo = $state<string>();
   const logo = $derived(dapp.logo !== failedLogo ? dapp.logo : undefined);
-  const hostname = $derived(new URL($establishedChannelStore.origin).hostname);
+  const hostname = $derived(originLabel($establishedChannelStore.origin));
 </script>
 
 <div class="flex min-h-[100dvh] flex-col items-center justify-center px-8">

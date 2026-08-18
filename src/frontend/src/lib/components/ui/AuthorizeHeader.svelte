@@ -2,6 +2,7 @@
   import Badge from "$lib/components/ui/Badge.svelte";
   import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
   import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
+  import { originLabel } from "$lib/utils/urlUtils";
   import type { HTMLAttributes } from "svelte/elements";
   import { GlobeIcon } from "@lucide/svelte";
 
@@ -11,7 +12,9 @@
 
   const { class: className, origin, ...props }: Props = $props();
 
-  const hostname = $derived(new URL(origin).hostname);
+  // Shown as the trust anchor for the app-provided metadata below, so it
+  // keeps any scheme/port that distinguishes this origin from another.
+  const hostname = $derived(originLabel(origin));
   // App-provided (permissionless) display metadata; the hostname badge below
   // stays visible regardless, as the trust anchor the user can verify.
   const metadataStore = $derived(getAppMetadataStore(origin));

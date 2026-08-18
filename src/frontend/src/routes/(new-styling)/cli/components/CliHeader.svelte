@@ -7,6 +7,7 @@
     getAppMetadataStore,
     type AppMetadata,
   } from "$lib/stores/app-metadata.store";
+  import { originLabel } from "$lib/utils/urlUtils";
 
   interface Props {
     /** Hostname of the app the CLI is being authorized for, or undefined for
@@ -28,7 +29,7 @@
   let failedLogo = $state<string>();
   const logo = $derived(app.logo !== failedLogo ? app.logo : undefined);
   const hostname = $derived(
-    appOrigin !== undefined ? new URL(appOrigin).hostname : undefined,
+    appOrigin !== undefined ? originLabel(appOrigin) : undefined,
   );
 </script>
 
