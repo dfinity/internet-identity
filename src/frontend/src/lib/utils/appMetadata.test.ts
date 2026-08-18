@@ -1,4 +1,5 @@
 import {
+  APP_METADATA_FETCH_TIMEOUT_MILLIS,
   APP_METADATA_PATH,
   MAX_APP_DESCRIPTION_LENGTH,
   MAX_APP_LOGO_SIZE,
@@ -130,6 +131,53 @@ test("should return undefined when the fetch fails (e.g. missing CORS headers)",
   setupFetchMock(new TypeError("Failed to fetch"));
 
   expect(await fetchAppMetadata(ORIGIN)).toBeUndefined();
+});
+
+test("should abort and give up when the origin never responds", async () => {
+  // A hanging origin must not leave the request pending forever: the timeout
+  // aborts the signal and the metadata falls back. Guards against the timeout
+  // being removed or scoped so it can't fire.
+  vi.useFakeTimers();
+  try {
+    const fetchMock = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(
+              new DOMException("The operation was aborted.", "AbortError"),
+            ),
+          );
+        }),
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const metadata = fetchAppMetadata(ORIGIN);
+    await vi.advanceTimersByTimeAsync(APP_METADATA_FETCH_TIMEOUT_MILLIS);
+
+    await expect(metadata).resolves.toBeUndefined();
+    expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("should keep waiting until the timeout elapses", async () => {
+  // Sanity check on the guard above: the signal must not be aborted early,
+  // otherwise the test would pass even with a near-zero timeout.
+  vi.useFakeTimers();
+  try {
+    const fetchMock = vi.fn(
+      (_url: string, _init?: RequestInit) => new Promise<Response>(() => {}),
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    void fetchAppMetadata(ORIGIN);
+    await vi.advanceTimersByTimeAsync(APP_METADATA_FETCH_TIMEOUT_MILLIS - 1);
+
+    expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(false);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test("should return undefined on redirects", async () => {

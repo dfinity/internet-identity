@@ -480,7 +480,13 @@
   });
 </script>
 
-{#snippet upgradePanel()}
+<!-- `showsAppOrigin` tells the panel whether the view rendered beneath it
+     displays the *same* origin this panel's metadata came from (the channel
+     origin). App-provided names are permissionless, so one may only be shown
+     next to the hostname that vouches for it; wrappers that show no origin
+     (upgrade success, the SSO fail-safe) or a different one (attribute consent
+     shows the effective/derivation origin) get the generic copy instead. -->
+{#snippet upgradePanel(showsAppOrigin: boolean)}
   <div
     class={[
       "relative overflow-hidden rounded-xl border-1 transition-all duration-200 max-sm:mx-4",
@@ -509,7 +515,7 @@
       <h2
         class="mx-6 mb-3 text-center text-lg font-medium text-balance text-black dark:text-white"
       >
-        {#if dapp.name !== undefined}
+        {#if showsAppOrigin && dapp.name !== undefined}
           {@const application = dapp.name}
           {$t`${application} has moved to the new Internet Identity`}
         {:else}
@@ -567,13 +573,13 @@
   {/if}
 {/snippet}
 
-{#snippet panelWrapper(content: Snippet)}
+{#snippet panelWrapper(content: Snippet, showsAppOrigin = false)}
   <div
     class="grid w-full flex-1 items-center max-sm:items-stretch sm:w-100 sm:max-w-100"
   >
     <div class="relative col-start-1 row-start-1 flex min-w-0 flex-col gap-5">
       {#if $GUIDED_UPGRADE || $MIN_GUIDED_UPGRADE}
-        {@render upgradePanel()}
+        {@render upgradePanel(showsAppOrigin)}
       {/if}
       <AuthPanel
         class={[
@@ -605,11 +611,13 @@
        "First sign-in with X" dialog instead of proceeding. -->
   {@render panelWrapper(ssoNormalLoginContent)}
 {:else if selectedIdentity !== undefined}
-  <!-- Returning user with a selected identity — show account selection. -->
-  {@render panelWrapper(continueContent)}
+  <!-- Returning user with a selected identity — show account selection.
+       Its header shows the channel origin, so the panel may name the app. -->
+  {@render panelWrapper(continueContent, true)}
 {:else}
-  <!-- New user or no identity selected — show authentication methods. -->
-  {@render panelWrapper(authWizardContent)}
+  <!-- New user or no identity selected — show authentication methods.
+       Its header shows the channel origin, so the panel may name the app. -->
+  {@render panelWrapper(authWizardContent, true)}
 {/if}
 
 {#snippet attributeConsentContent()}

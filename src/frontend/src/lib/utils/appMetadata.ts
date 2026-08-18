@@ -77,7 +77,7 @@ export const APP_LOGO_CONTENT_TYPES = [
 /** Time budget per resource, spanning the connection and the body read; the
  *  UI renders a fallback in the meantime, so a slow origin only delays its
  *  own polish, never the sign-in flow. */
-const FETCH_TIMEOUT_MILLIS = 10_000;
+export const APP_METADATA_FETCH_TIMEOUT_MILLIS = 10_000;
 
 /**
  * Read the body with a hard byte cap, cancelling the stream as soon as the
@@ -137,7 +137,10 @@ const fetchCapped = async (
   // without it. The timer stays armed until the body has been read, so a
   // slow origin can't keep the request pending indefinitely.
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MILLIS);
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    APP_METADATA_FETCH_TIMEOUT_MILLIS,
+  );
   try {
     const response = await fetch(url.href, {
       // fail on redirects
