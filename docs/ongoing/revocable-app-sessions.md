@@ -144,10 +144,13 @@ SessionRecord {
     valid_till: Timestamp,
     last_refreshed: Option<Timestamp>,  // None until the first refresh
     device_id: u32,
+    read_only: bool,                    // from the consent that created it
 }
 ```
 
-Nothing else. `created_at`, `valid_till` and `device_id` are fixed for the session's life; `last_refreshed` is the only mutable field.
+Nothing else. Every field except `last_refreshed` is fixed for the session's life, which is also why `last_refreshed` is the only one absent from the seed (§5).
+
+`read_only` is here rather than being a per-call argument because it describes what the session authorizes, so it has to be part of what a user sees and revokes. Same as MCP's grant.
 
 `last_refreshed` exists for the user rather than for the canister. "This browser used this app 3 minutes ago" against "5 weeks ago" is what makes a session list worth reading, and it is the signal that lets someone spot a session they do not recognise *still being used* rather than merely still existing. §7.3 covers what it costs.
 
@@ -191,7 +194,7 @@ The construction needs no allocator: no counter cell, nothing to retire. Uniquen
 
 The `device_id` is an input so a session's device attribution cannot be rewritten in storage without invalidating the session.
 
-Only the record's **immutable** fields feed the seed, which is why `last_refreshed` is not one. A mutable input would change the session's principal every time it was stamped.
+Only the record's **immutable** fields feed the seed, which is why `last_refreshed` is not one. A mutable input would change the session's principal every time it was stamped. `read_only` is immutable and could be an input, but is deliberately not one: it is a property of the authority, not of the identity, and binding it would mean a consent change had to mint a new principal.
 
 ### 5.1 A same-timestamp collision is an error
 
@@ -258,8 +261,9 @@ Session creation rides on the II frontend's existing pair rather than getting on
 session : opt SessionRequest;
 
 type SessionRequest = record {
-    name : text;        // labels the browser, e.g. "Chrome on MacBook"
-    id : opt nat32;     // the frontend's cached session-device id
+    name : text;                    // labels the browser, e.g. "Chrome on MacBook"
+    id : opt nat32;                 // the frontend's cached session-device id
+    permissions : opt Permissions;  // the consented access level, fixed for the session
 };
 
 // Added to its response.
@@ -341,8 +345,6 @@ sequenceDiagram
 ```candid
 app_prepare_delegation : (record {
     session_key : SessionKey;        // the key the app delegation targets
-    max_ttl : opt nat64;             // clamped to the app-delegation TTL
-    permissions : opt Permissions;
 }) -> (variant { Ok : record { user_key : PublicKey; expiration : Timestamp }; Err : AppSessionError });
 
 app_get_delegation : (record {
@@ -350,6 +352,12 @@ app_get_delegation : (record {
     expiration : Timestamp;          // must match the prepared value
 }) -> (variant { Ok : SignedDelegation; Err : AppSessionError }) query;
 ```
+
+`session_key` is the one thing the app has to say, because a delegation names the public key it delegates to and the canister signs over those bytes. `caller()` is the chain's root, not its leaf, so the key cannot be recovered from the call. `expiration` on the `get` exists for the same reason it does on `get_account_delegation`: it selects which prepared signature to witness.
+
+**No TTL argument.** The app-delegation lifetime is a property of this design, fixed at 5 minutes (§10), not something a caller asks for. Accepting a requested value would only invite an app to ask for longer and make revocation latency a per-app variable.
+
+**No permissions argument either.** Whether a session mints queries-only delegations is decided once, by the user, at the consent that created it, and then holds for everything that session ever mints. Letting it vary per call would mean the record could not describe what it authorizes. That is what MCP already does with `read_only` on its grant, and an earlier draft of this design got it backwards by arguing for a per-request value.
 
 **The locator is not an argument. It arrives as caller info on the ingress message.** II already does this for the gated-SSO session: `openid/sso_bundle.rs` reads a canister-signed bundle off the call with `ic0::msg_caller_info_signer` and `ic0::msg_caller_info_data`, and `prepare_icrc3_attributes` gates `sso:<domain>` attributes on it (`main.rs:2303`). Sessions use the same mechanism with their own bundle.
 
@@ -371,8 +379,6 @@ This is a separate pair from `prepare_account_delegation`, not an option on it. 
 Nothing here creates a session. A session comes only from `prepare_account_delegation` with a `SessionRequest`, which requires an access method (§6.3), so a stolen chain cannot extend its own lifetime or spawn siblings. The internal `max_expiration` parameter that `main.rs` currently passes `None` is what carries `valid_till` into the signature, so a minted delegation cannot outlive its session.
 
 `AppSessionError` distinguishes its cases (no such session, expired, no match) rather than collapsing them. See §11 for why there is no oracle to hide from.
-
-One asymmetry with MCP: its `read_only` is a property of the grant, applied to everything the session mints. A session record here has no access field, so `permissions` stays a per-request argument.
 
 ### 7.2 Matching
 
@@ -601,7 +607,8 @@ Also out of scope: whether to fold MCP's grant into this mechanism. The value sh
 
 | # | Decision | § |
 | - | -------- | - |
-| S1 | A session is `(created_at, valid_till, last_refreshed, device_id)` on the account reference; only `last_refreshed` is mutable | 4 |
+| S1 | A session is `(created_at, valid_till, last_refreshed, device_id, read_only)` on the account reference; only `last_refreshed` is mutable | 4 |
+| S1a | `read_only` is a property of the session, set from the consent that created it, never a per-call argument. As with MCP's grant | 4, 7.1 |
 | S2 | Ten sessions per account reference: reuse an unexpired session for the same locator and device, else prune expired and drop the least recently used. Creating a session never fails on the cap | 4.1 |
 | S3 | A row holding an unexpired session is not evictable | 4.2 |
 | S4 | Expired entries are pruned only when the list is written for another reason, so refresh never writes | 4.2 |
@@ -625,7 +632,7 @@ Also out of scope: whether to fold MCP's grant into this mechanism. The value sh
 | S16 | Anchor-authenticated methods name sessions by locator, so the principal index is on the app-facing path only | 8.2 |
 | S16a | No session listing method. Application listing, then per-application sessions, is the right shape and is deferred | 8.2 |
 | S17 | Revocation latency is exactly the app-delegation TTL, by construction | 8.3 |
-| S17a | The app-delegation TTL is 5 minutes, matching MCP | 10 |
+| S17a | The app-delegation TTL is 5 minutes, matching MCP, and is not requestable by the app | 10, 7.1 |
 | S18 | Device registry is `StorableAnchor` field 7, capped at 20, read through `identity_info` | 9.1 |
 | S19 | Device registration is not a method. `SessionRequest { name, id }` on the existing prepare resolves or registers, and returns the id; the canister allocates from a monotonic per-anchor `next_id` | 9.2 |
 | S20 | Device revocation is an eager atomic sweep, so refresh never reads the anchor | 9.3 |
