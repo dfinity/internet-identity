@@ -66,8 +66,12 @@ export const MAX_APP_NAME_LENGTH = 40;
  *  whitespace normalization. */
 export const MAX_APP_DESCRIPTION_LENGTH = 120;
 
-/** Maximum size of the logo asset in bytes (256 KiB). */
-export const MAX_APP_LOGO_SIZE = 262_144;
+/** Maximum size of the logo asset in bytes (1 MiB). Deliberately generous:
+ *  since the asset is re-encoded before it is rendered (see
+ *  {@link transcodeToObjectUrl}), this bounds only the download, not what ends
+ *  up held or displayed — so the cap should not be the reason an app that
+ *  simply exported its logo without optimizing it loses it. */
+export const MAX_APP_LOGO_SIZE = 1_048_576;
 
 /** Content types the logo asset may be served with. `image/svg+xml` is
  *  deliberately absent: every logo is re-encoded from its decoded pixels (see
