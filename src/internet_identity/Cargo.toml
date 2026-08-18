@@ -19,9 +19,13 @@ base64.workspace = true
 rsa.workspace = true
 minicbor = { workspace = true, features = ["std", "derive"] }
 
-# DNSSEC verifier deps
-p256.workspace = true
+# DNSSEC verifier deps; the `ecdh` feature is added for push RFC 8291 sealing.
+p256 = { workspace = true, features = ["ecdh"] }
 ed25519-dalek.workspace = true
+
+# Push notifications: RFC 8291 payload sealing (ECDH via p256 above).
+hkdf = { version = "0.12", default-features = false }
+aes-gcm = { version = "0.10", default-features = false, features = ["aes", "alloc"] }
 
 # Captcha deps
 lodepng = "*"

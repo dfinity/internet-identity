@@ -3,4 +3,5 @@
 
 pub mod endpoint_hash;
 pub mod jwt_pool;
+pub mod seal;
 pub mod subscription;
