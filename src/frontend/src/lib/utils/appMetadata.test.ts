@@ -322,21 +322,6 @@ test("should reject the whole document when a field has the wrong type", async (
   }
 });
 
-test("should reject the whole document when a text field is blank", async () => {
-  for (const body of [
-    { name: "", description: "An example app" },
-    { name: "   ", description: "An example app" },
-    { name: "Example App", description: "\t\n" },
-  ]) {
-    setupFetchMock(Response.json(body));
-
-    expect(
-      await fetchAppMetadata(ORIGIN),
-      JSON.stringify(body),
-    ).toBeUndefined();
-  }
-});
-
 test("should name the offending field when rejecting a document", async () => {
   // The console warning is the only signal an app's developers get, so it has
   // to say which field is at fault.
@@ -368,19 +353,19 @@ test("should normalize whitespace in text fields", async () => {
   });
 });
 
-test("should reject documents whose text fields carry control or bidi characters", async () => {
-  // These can visually reorder or hide parts of a name on the sign-in screen.
-  // Rejecting is both safer than stripping and visible to the app: a name that
-  // renders as something else than it reads is a bug in the file.
+test("should reject documents whose text fields carry reordering controls", async () => {
+  // Control characters, and the bidi embeddings and overrides: the latter make
+  // text render in an order other than the one it is written in, which is how a
+  // name could read as something it doesn't contain.
   for (const char of [
     "\u0000", // NUL
     "\u0007", // BEL
     "\u001b", // ESC
-    "\u061c", // arabic letter mark
-    "\u200b", // zero-width space
-    "\u200f", // right-to-left mark
+    "\u202a", // left-to-right embedding
+    "\u202b", // right-to-left embedding
+    "\u202c", // pop directional formatting
+    "\u202d", // left-to-right override
     "\u202e", // right-to-left override
-    "\u2066", // left-to-right isolate
     "\ufeff", // zero-width no-break space
   ]) {
     setupFetchMock(
@@ -390,6 +375,59 @@ test("should reject documents whose text fields carry control or bidi characters
     expect(
       await fetchAppMetadata(ORIGIN),
       char.codePointAt(0)?.toString(16),
+    ).toBeUndefined();
+  }
+});
+
+test("should accept the bidi characters mixed-direction names need", async () => {
+  // These only hint at where neutral characters land, or isolate a run; none of
+  // them can reorder text. Refusing them would break exactly the names that
+  // need them: RTL text with an embedded Latin word, or ending in punctuation
+  // whose side would otherwise follow the paragraph direction.
+  for (const name of [
+    `\u200fשלום Example!`, // RTL mark
+    `Example \u200eעברית`, // LTR mark
+    `\u061cالعربية Example`, // arabic letter mark
+    `\u2068Example\u2069 في المتجر`, // first-strong isolate, balanced
+    `\u2066Example\u2069 و\u2067עברית\u2069`, // nested, balanced
+    `ราคา\u200bถูก`, // zero-width space as a Thai line-break opportunity
+  ]) {
+    setupFetchMock(Response.json({ name }));
+
+    expect(await fetchAppMetadata(ORIGIN), name).toEqual({ name });
+  }
+});
+
+test("should reject unbalanced bidi isolates", async () => {
+  // An isolate only contains its contents while it is closed. Left open, it
+  // runs to the end of the paragraph -- past the app's own name and into the
+  // sentence II renders around it.
+  for (const name of [
+    `Example\u2066`, // opened, never closed
+    `\u2069Example`, // closed without being opened
+    `\u2066Example\u2069\u2069`, // one close too many
+    `\u2068\u2067Example\u2069`, // one close too few
+  ]) {
+    setupFetchMock(Response.json({ name, description: "An example" }));
+
+    expect(await fetchAppMetadata(ORIGIN), name).toBeUndefined();
+  }
+});
+
+test("should reject text fields with nothing visible in them", async () => {
+  // Whitespace, bidi marks, isolate controls and zero-width characters all
+  // render as nothing, so a field made only of those is an absent field.
+  for (const name of [
+    "   ",
+    "\u200b\u200b",
+    "\u200e\u200f",
+    ` \u2066\u2069 `,
+  ]) {
+    setupFetchMock(Response.json({ name, description: "An example" }));
+
+    expect(
+      await fetchAppMetadata(ORIGIN),
+      JSON.stringify(name),
     ).toBeUndefined();
   }
 });

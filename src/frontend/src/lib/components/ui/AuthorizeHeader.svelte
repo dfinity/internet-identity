@@ -74,7 +74,11 @@
       <Ellipsis text={hostname} position="middle" />
     </Badge>
     {#if metadata.description !== undefined}
+      <!-- `dir="auto"` resolves the direction from the text itself and isolates
+           it from the rest of the screen, so an RTL description reads correctly
+           and can't reorder anything around it. -->
       <p
+        dir="auto"
         class="text-text-tertiary line-clamp-2 max-w-[85%] text-center text-sm text-balance"
       >
         {metadata.description}

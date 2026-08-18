@@ -25,7 +25,9 @@
  *   timeout spanning both the connection and the body read.
  * - Bodies are read with hard byte caps, enforced up front via
  *   `Content-Length` and chunk-by-chunk while streaming, so an origin can't
- *   make the authorization page buffer an arbitrarily large response.
+ *   make the authorization page buffer an arbitrarily large response. They
+ *   stream into a `Blob`, so the payload lives in the browser's blob store
+ *   with only one chunk at a time in the JS heap.
  * - A document is applied only if every field it carries meets the
  *   requirements: one bad field rejects the whole document, with a console
  *   warning naming it, so the app's developers can see and fix the mistake
@@ -102,43 +104,44 @@ export const APP_LOGO_RENDER_SIZE = 512;
 export const APP_METADATA_FETCH_TIMEOUT_MILLIS = 10_000;
 
 /**
- * Read the body with a hard byte cap, cancelling the stream as soon as the
- * cap is crossed rather than buffering an arbitrarily large body first and
- * measuring it afterwards (mirrors the capped reader in `authCallbacks.ts`).
- * Returns `undefined` when the cap is exceeded.
+ * Read the body into a `Blob` under a hard byte cap, stopping the download as
+ * soon as the cap is crossed rather than buffering an arbitrarily large body
+ * first and measuring it afterwards.
+ *
+ * Piping through a counting transform is what keeps this off the JS heap: the
+ * bytes accumulate in the browser's blob store and only one chunk at a time is
+ * a JS buffer, so an attacker-controlled payload is never materialized as one.
+ * Erroring the transform aborts the source stream, which is what makes the cap
+ * bound the transfer and not just the result.
  */
 const readBodyCapped = async (
   response: Response,
   maxBytes: number,
-): Promise<Uint8Array | undefined> => {
+): Promise<Blob | undefined> => {
   if (response.body === null) {
     // No streamable body (older environments): read, then enforce the cap.
-    const buffer = new Uint8Array(await response.arrayBuffer());
-    return buffer.byteLength > maxBytes ? undefined : buffer;
+    const blob = await response.blob();
+    return blob.size > maxBytes ? undefined : blob;
   }
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
   let received = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    received += value.byteLength;
-    if (received > maxBytes) {
-      // Stop pulling from the network instead of buffering the rest.
-      await reader.cancel().catch(() => undefined);
-      return undefined;
-    }
-    chunks.push(value);
+  const capped = response.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform: (chunk, controller) => {
+        received += chunk.byteLength;
+        if (received > maxBytes) {
+          controller.error(new Error(`Response exceeds ${maxBytes} bytes`));
+          return;
+        }
+        controller.enqueue(chunk);
+      },
+    }),
+  );
+  try {
+    // The headers come along so the blob keeps the response's content type.
+    return await new Response(capped, { headers: response.headers }).blob();
+  } catch {
+    return undefined;
   }
-  const body = new Uint8Array(received);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return body;
 };
 
 /**
@@ -152,7 +155,7 @@ const fetchCapped = async (
   url: URL,
   accept: string,
   maxBytes: number,
-): Promise<{ response: Response; body: Uint8Array } | undefined> => {
+): Promise<{ response: Response; blob: Blob } | undefined> => {
   // AbortController + setTimeout matches the rest of the FE (e.g.
   // `lib/utils/dnssec/doh.ts`, `lib/utils/ssoDiscovery.ts`); we avoid
   // `AbortSignal.timeout` because the project still supports browsers
@@ -184,8 +187,8 @@ const fetchCapped = async (
       await response.body?.cancel().catch(() => undefined);
       return undefined;
     }
-    const body = await readBodyCapped(response, maxBytes);
-    return body === undefined ? undefined : { response, body };
+    const blob = await readBodyCapped(response, maxBytes);
+    return blob === undefined ? undefined : { response, blob };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -212,16 +215,61 @@ const reject = (field: string, problem: string): typeof INVALID => {
 
 /** Characters an app-provided text field must not contain: control characters
  *  (except the ASCII whitespace ones \t \n \v \f \r, which are normalized to
- *  spaces below) together with zero-width and bidi formatting characters,
- *  which could otherwise be used to visually spoof the sign-in screen.
+ *  spaces below), the bidi embeddings and overrides U+202A-U+202E, and the
+ *  deprecated U+FEFF.
  *
- *  The zero-width joiners U+200C/U+200D are deliberately allowed: ZWNJ drives
- *  correct shaping in scripts such as Persian and ZWJ holds emoji sequences
- *  together (dropping it decays one joined emoji into two), and neither is a
- *  control or bidi character. */
+ *  Only the reordering controls are refused. An override makes text render in
+ *  an order other than the one it is written in, which is what would let a name
+ *  read as something it doesn't contain; the embeddings are deprecated in
+ *  favour of the isolates for the same reason.
+ *
+ *  Deliberately allowed, because mixed-direction and non-Latin names need them:
+ *  the bidi marks U+200E/U+200F/U+061C, which are zero-width hints that only
+ *  affect where neutral characters (punctuation, digits) land at a direction
+ *  boundary -- exactly what an Arabic name ending in "!" or a Hebrew name with
+ *  an embedded Latin word requires; the bidi isolates U+2066-U+2069, the
+ *  mechanism Unicode recommends for embedding a run of unknown direction (kept
+ *  contained by {@link hasBalancedIsolates}); and the zero-width characters
+ *  U+200B-U+200D, which carry meaning in several scripts -- line-break
+ *  opportunities in Thai and Khmer, shaping in Persian, and holding emoji
+ *  sequences together. */
 const FORBIDDEN_CHARACTERS =
   // eslint-disable-next-line no-control-regex
-  /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u061c\u200b\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/;
+  /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u202a-\u202e\ufeff]/;
+
+/** Bidi isolate initiators (LRI, RLI, FSI) and the terminator (PDI). */
+const ISOLATE_INITIATORS = "\u2066\u2067\u2068";
+const ISOLATE_TERMINATOR = "\u2069";
+
+/**
+ * Whether the value closes every bidi isolate it opens, and closes none it
+ * didn't open.
+ *
+ * An isolate contains its contents, so it cannot reorder the text around it --
+ * but only while it is balanced. An unbalanced one runs to the end of the
+ * paragraph, which for a name interpolated into one of II's own sentences means
+ * past the app's string and into II's text. Requiring balance is what makes
+ * "an app can style its own name, never the screen around it" true.
+ */
+const hasBalancedIsolates = (value: string): boolean => {
+  let depth = 0;
+  for (const char of value) {
+    if (ISOLATE_INITIATORS.includes(char)) {
+      depth += 1;
+    } else if (char === ISOLATE_TERMINATOR) {
+      depth -= 1;
+      if (depth < 0) {
+        return false;
+      }
+    }
+  }
+  return depth === 0;
+};
+
+/** Characters that render as nothing: whitespace, the bidi marks and isolate
+ *  controls, and the zero-width characters. A field made only of these reads as
+ *  absent, so it is refused rather than displayed as a blank name. */
+const INVISIBLE_CHARACTERS = /[\s\u061c\u200b-\u200f\u2066-\u2069]/g;
 
 /**
  * Validate an app-provided text field, returning the value to display (with
@@ -229,9 +277,9 @@ const FORBIDDEN_CHARACTERS =
  * {@link INVALID} when it is present but does not meet the requirements.
  *
  * The length limit is applied to the value as served, counted in Unicode code
- * points, so it is exactly what the published JSON Schema expresses — a
- * document that validates against the schema is one II accepts. Whitespace
- * normalization is presentation only and never rescues an over-long value.
+ * points, so it is what the published JSON Schema expresses (which can capture
+ * every rule here except the isolate balance). Whitespace normalization is
+ * presentation only and never rescues a value that breaks a requirement.
  */
 const validateTextField = (
   value: unknown,
@@ -250,12 +298,15 @@ const validateTextField = (
   if (FORBIDDEN_CHARACTERS.test(value)) {
     return reject(
       field,
-      "must not contain control or bidirectional formatting characters",
+      "must not contain control characters, or bidirectional embeddings and overrides",
     );
   }
+  if (!hasBalancedIsolates(value)) {
+    return reject(field, "must close every bidirectional isolate it opens");
+  }
   const normalized = value.replace(/\s+/g, " ").trim();
-  if (normalized.length === 0) {
-    return reject(field, "must not be blank");
+  if (normalized.replace(INVISIBLE_CHARACTERS, "").length === 0) {
+    return reject(field, "must contain at least one visible character");
   }
   return normalized;
 };
@@ -302,12 +353,11 @@ const validateLogoUrl = (value: unknown, origin: string): Validated<URL> => {
  * there is no point at which it could be revoked while still in use.
  */
 const transcodeToObjectUrl = async (
-  bytes: Uint8Array,
-  contentType: string,
+  blob: Blob,
 ): Promise<string | undefined> => {
-  const bitmap = await createImageBitmap(
-    new Blob([bytes as Uint8Array<ArrayBuffer>], { type: contentType }),
-  );
+  // The blob goes to the decoder as it came off the network, so the encoded
+  // image is never a JS buffer either.
+  const bitmap = await createImageBitmap(blob);
   try {
     if (
       bitmap.width === 0 ||
@@ -357,10 +407,10 @@ const fetchLogoObjectUrl = async (url: URL): Promise<string | undefined> => {
   if (!APP_LOGO_CONTENT_TYPES.includes(contentType)) {
     return undefined;
   }
-  if (result.body.byteLength === 0) {
+  if (result.blob.size === 0) {
     return undefined;
   }
-  return await transcodeToObjectUrl(result.body, contentType);
+  return await transcodeToObjectUrl(result.blob);
 };
 
 /**
@@ -396,8 +446,12 @@ export const fetchAppMetadata = async (
     }
     // Fatal decoding: malformed UTF-8 rejects the file (via the catch below)
     // instead of silently turning into U+FFFD on the sign-in screen.
+    // The document is at most 8 KiB and has to be parsed, so this one does
+    // become a JS string — unlike the logo, which never leaves the blob store.
     const parsed: unknown = JSON.parse(
-      new TextDecoder("utf-8", { fatal: true }).decode(result.body),
+      new TextDecoder("utf-8", { fatal: true }).decode(
+        await result.blob.arrayBuffer(),
+      ),
     );
     if (
       parsed === null ||

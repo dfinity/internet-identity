@@ -357,7 +357,9 @@ Requirements:
 
 - All fields are optional, and unknown fields are ignored, so that fields added in the future do not invalidate documents for older versions of Internet Identity. A document that carries no field Internet Identity knows is ignored; a valid document replaces any curated fallback entry wholesale.
 - A field that is present but does not meet the requirements below invalidates **the whole document**, which is then ignored — the offending field is not simply dropped. An application whose file is wrong therefore sees none of its metadata applied, instead of shipping a file that is silently half-applied on a screen it does not control; Internet Identity also logs which field is at fault to the browser console.
-- `name` must not exceed 40 characters and `description` must not exceed 120 characters, counted in Unicode code points on the value as served. Neither may be blank, and neither may contain control characters (other than the ASCII whitespace characters `\t`, `\n`, `\v`, `\f` and `\r`) or zero-width and bidirectional formatting characters, which could otherwise make the rendered text read differently from what it contains. The zero-width joiners U+200C and U+200D are allowed, since they are needed for correct shaping in scripts such as Persian and for emoji sequences.
+- `name` must not exceed 40 characters and `description` must not exceed 120 characters, counted in Unicode code points on the value as served. Neither may contain control characters (other than the ASCII whitespace characters `\t`, `\n`, `\v`, `\f` and `\r`), the bidirectional embeddings and overrides U+202A–U+202E, or U+FEFF. Only these reordering controls are refused: an override makes text render in an order other than the one it is written in, which is what would let a name read as something it does not contain, and the embeddings are deprecated in favour of the isolates for the same reason.
+- The characters that mixed-direction and non-Latin names legitimately need are accepted: the bidirectional marks U+200E, U+200F and U+061C (zero-width hints that only affect where neutral characters such as punctuation and digits land at a direction boundary), the bidirectional isolates U+2066–U+2069, and the zero-width characters U+200B–U+200D (line-break opportunities in scripts such as Thai and Khmer, shaping in scripts such as Persian, and emoji sequences). Isolates must be **balanced**, however: a field must close every isolate it opens and close none it did not open, since an unbalanced isolate would extend past the application's own text and reorder what Internet Identity renders around it.
+- A field must contain at least one visible character — one that is neither whitespace nor one of the invisible characters above — so that a field which renders as nothing is treated as absent rather than displayed as a blank name.
 - Before being displayed, `name` and `description` have runs of whitespace collapsed to single spaces and are trimmed. This is presentation only, applied after the requirements above are checked: it never rescues a value that violates them.
 - `logo` must be a URL (relative URLs are resolved against the document's origin) pointing to a raster image _on that same origin_. It must be served with one of the content types `image/png`, `image/jpeg`, `image/webp`, `image/gif` or `image/avif`, must not exceed 1 MiB, and must decode to an image of at most 4096 pixels per axis. Internet Identity downloads the logo (it is never hotlinked), so both the metadata document and the logo asset must be readable cross-origin (see the CORS note below).
 - The logo is not rendered as served: Internet Identity decodes it, draws it once into a canvas scaled to at most 512 pixels on its longest side, and renders that re-encoding from a `blob:` URL. What is displayed is therefore an image Internet Identity produced itself — still (an animated image is flattened to its first frame), bounded in size, and held in the browser's blob store rather than in the page's DOM or its JavaScript heap. `image/svg+xml` is not accepted, because a vector image cannot be put through that step across the browsers Internet Identity supports; applications with a vector logo serve a rasterized copy of it here.
@@ -366,7 +368,7 @@ Requirements:
 
 ### JSON Schema {#app-metadata-schema}
 
-The schema below expresses the requirements above, so a document that validates against it is one Internet Identity accepts (whitespace normalization happens after validation and is not part of it). Validating in CI is the easiest way to catch a mistake before it costs the application its metadata.
+The schema below expresses the requirements above, with one exception it cannot state: that bidirectional isolates must be balanced. Whitespace normalization happens after validation and is not part of it either. Validating in CI is the easiest way to catch a mistake before it costs the application its metadata.
 
 ```json
 {
@@ -380,16 +382,16 @@ The schema below expresses the requirements above, so a document that validates 
       "type": "string",
       "minLength": 1,
       "maxLength": 40,
-      "pattern": "\\S",
-      "not": { "pattern": "[\\u0000-\\u0008\\u000e-\\u001f\\u007f-\\u009f\\u061c\\u200b\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069\\ufeff]" }
+      "pattern": "[^\\s\\u061c\\u200b-\\u200f\\u2066-\\u2069]",
+      "not": { "pattern": "[\\u0000-\\u0008\\u000e-\\u001f\\u007f-\\u009f\\u202a-\\u202e\\ufeff]" }
     },
     "description": {
       "description": "Short description or tagline of the application",
       "type": "string",
       "minLength": 1,
       "maxLength": 120,
-      "pattern": "\\S",
-      "not": { "pattern": "[\\u0000-\\u0008\\u000e-\\u001f\\u007f-\\u009f\\u061c\\u200b\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069\\ufeff]" }
+      "pattern": "[^\\s\\u061c\\u200b-\\u200f\\u2066-\\u2069]",
+      "not": { "pattern": "[\\u0000-\\u0008\\u000e-\\u001f\\u007f-\\u009f\\u202a-\\u202e\\ufeff]" }
     },
     "logo": {
       "description": "URL of the raster application logo, on the same origin as this document",
