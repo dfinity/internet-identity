@@ -302,6 +302,19 @@ const BUCKET_SIZE_IN_PAGES: u16 = 128;
 const MAX_MANAGED_MEMORY_SIZE: u64 = 256 * GB;
 const MAX_MANAGED_WASM_PAGES: u64 = MAX_MANAGED_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES;
 
+/// Per-anchor cap on reference-list rows that hold nothing but a tracked default
+/// account. Reaching it always means victims exist, so it evicts rather than blocking.
+const MAX_EVICTABLE_DEFAULT_ACCOUNTS: u64 = 500;
+
+/// Evicting down to a watermark rather than to the cap amortizes the victim scan
+/// across subsequent sign-ins.
+const EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK: u64 = MAX_EVICTABLE_DEFAULT_ACCOUNTS * 9 / 10;
+
+/// Bounds one message's eviction work, so an anchor that somehow arrives far above the
+/// cap cannot turn its own sign-in into a message that exceeds the instruction limit.
+const MAX_EVICTIONS_PER_CALL: u64 =
+    MAX_EVICTABLE_DEFAULT_ACCOUNTS - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK;
+
 /// The maximum number of anchors this canister can store.
 pub const MAX_ENTRIES: u64 = (MAX_MANAGED_WASM_PAGES - BUCKET_SIZE_IN_PAGES as u64) // deduct one bucket for the archive entries buffer
     * WASM_PAGE_SIZE_IN_BYTES
@@ -1741,6 +1754,7 @@ impl<M: Memory + Clone> Storage<M> {
                 last_used: Some(now),
             }],
         )?;
+        self.evict_idle_tracked_defaults(anchor_number, application_number)?;
         Ok(Some(()))
     }
 
@@ -1768,7 +1782,113 @@ impl<M: Memory + Clone> Storage<M> {
                 account_number: None,
                 last_used: None,
             }],
-        )
+        )?;
+        self.evict_idle_tracked_defaults(anchor_number, application_number)
+    }
+
+    /// Removes a reference-list row and everything derived from it.
+    ///
+    /// An empty row is never written in its place: absent and empty are opposites, and
+    /// an empty row would deny the anchor its default account at this origin forever.
+    fn remove_reference_list(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+    ) -> Result<(), StorageError> {
+        let key = (anchor_number, application_number);
+        let Some(previous) = self
+            .stable_account_reference_list_memory
+            .get(&key)
+            .map(Vec::<AccountReference>::from)
+        else {
+            return Ok(());
+        };
+        let application = self
+            .stable_application_memory
+            .get(&application_number)
+            .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
+
+        self.stable_account_reference_list_memory.remove(&key);
+        self.stable_anchor_application_config_memory.remove(&key);
+
+        let deltas = ReferenceListDeltas::between(&previous, &[]);
+        self.apply_reference_counter_deltas(anchor_number, application_number, application, deltas);
+
+        Ok(())
+    }
+
+    /// Rows that hold nothing but a tracked default account, so removing the whole row
+    /// costs the anchor nothing: the default is reconstructed at the same principal on
+    /// next use.
+    ///
+    /// A default sharing its row with a named account is deliberately excluded.
+    /// Removing its reference would leave a row that reads as "the default was moved
+    /// away", and the anchor would lose the default account at that origin.
+    fn evictable_default_rows(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> Vec<(ApplicationNumber, Option<Timestamp>)> {
+        self.stable_account_reference_list_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .filter_map(|((_, application_number), list)| {
+                let references = list.into_vec();
+                match references.as_slice() {
+                    [only] if only.account_number.is_none() => {
+                        Some((application_number, only.last_used))
+                    }
+                    _ => None,
+                }
+            })
+            .collect()
+    }
+
+    /// Cheap upper bound on the evictable rows, from two fields that already exist.
+    ///
+    /// Every reference list holds at most one reference without an account number, and
+    /// `stored_accounts` counts the references that have one, so the difference counts
+    /// every tracked default, evictable or not.
+    fn tracked_default_account_upper_bound(&self, anchor_number: AnchorNumber) -> u64 {
+        let counter = self.get_account_counter(anchor_number);
+        counter
+            .stored_account_references
+            .saturating_sub(counter.stored_accounts)
+    }
+
+    /// Drops the least recently used evictable defaults once the anchor is at the cap.
+    ///
+    /// `last_used: None` means never used, sorts oldest, and is dropped first.
+    fn evict_idle_tracked_defaults(
+        &mut self,
+        anchor_number: AnchorNumber,
+        just_written: ApplicationNumber,
+    ) -> Result<(), StorageError> {
+        if self.tracked_default_account_upper_bound(anchor_number) < MAX_EVICTABLE_DEFAULT_ACCOUNTS
+        {
+            return Ok(());
+        }
+
+        let mut candidates: Vec<_> = self
+            .evictable_default_rows(anchor_number)
+            .into_iter()
+            .filter(|(application_number, _)| *application_number != just_written)
+            .collect();
+        if candidates.len() as u64 <= EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK {
+            return Ok(());
+        }
+
+        candidates.sort_by_key(|(application_number, last_used)| (*last_used, *application_number));
+
+        let victims = u64::min(
+            candidates.len() as u64 - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK,
+            MAX_EVICTIONS_PER_CALL,
+        );
+        for (application_number, _) in candidates.into_iter().take(victims as usize) {
+            self.remove_reference_list(anchor_number, application_number)?;
+        }
+
+        Ok(())
     }
 
     pub fn lookup_anchor_application_config(
