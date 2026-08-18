@@ -7,7 +7,7 @@ use std::borrow::Cow;
 
 /// Vectors are not supported yet in ic-stable-structures, this file
 /// implements a struct to wrap this vector so it can be stored.
-#[derive(Encode, Decode, Clone, Ord, Eq, PartialEq, PartialOrd, Default)]
+#[derive(Encode, Decode, Clone, Debug, Ord, Eq, PartialEq, PartialOrd, Default)]
 #[cbor(transparent)]
 pub struct StorableAccountReferenceList(#[n(0)] Vec<StorableAccountReference>);
 

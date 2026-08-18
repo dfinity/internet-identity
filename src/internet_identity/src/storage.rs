@@ -1700,6 +1700,11 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
+    /// Stamps `last_used`, tracking the default account on first use at an origin.
+    ///
+    /// A named account cannot be created from nothing, so it is only stamped where a
+    /// reference already exists. A default account is reconstructible from
+    /// `(anchor, origin)`, so its first use is what materializes the reference.
     pub fn set_account_last_used(
         &mut self,
         anchor_number: AnchorNumber,
@@ -1707,15 +1712,62 @@ impl<M: Memory + Clone> Storage<M> {
         account_number: Option<AccountNumber>,
         now: Timestamp,
     ) -> Result<Option<()>, StorageError> {
-        let application_number = self.lookup_application_number_with_origin(&origin);
+        if let Some(application_number) = self.lookup_application_number_with_origin(&origin) {
+            if self
+                .lookup_account_references(anchor_number, application_number)
+                .is_some()
+            {
+                return self.with_account_mut(
+                    anchor_number,
+                    Some(application_number),
+                    account_number,
+                    |account_reference, _| {
+                        account_reference.last_used = Some(now);
+                    },
+                );
+            }
+        }
 
-        self.with_account_mut(
+        if account_number.is_some() {
+            return Ok(None);
+        }
+
+        let application_number = self.lookup_or_insert_application_number_with_origin(&origin);
+        self.write_reference_list(
             anchor_number,
             application_number,
-            account_number,
-            |account_reference, _| {
-                account_reference.last_used = Some(now);
-            },
+            vec![AccountReference {
+                account_number: None,
+                last_used: Some(now),
+            }],
+        )?;
+        Ok(Some(()))
+    }
+
+    /// Upholds the invariant that an `AnchorApplicationConfig` row for `(anchor, app)`
+    /// implies a reference-list row for it, which is what makes the reference-list row
+    /// the single marker of a relationship between an anchor and an application.
+    ///
+    /// Choosing a default account is not signing in with it, so `last_used` stays unset.
+    pub fn ensure_account_reference_list(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+    ) -> Result<(), StorageError> {
+        if self
+            .lookup_account_references(anchor_number, application_number)
+            .is_some()
+        {
+            return Ok(());
+        }
+
+        self.write_reference_list(
+            anchor_number,
+            application_number,
+            vec![AccountReference {
+                account_number: None,
+                last_used: None,
+            }],
         )
     }
 

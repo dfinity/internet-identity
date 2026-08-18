@@ -2,15 +2,16 @@ use canister_tests::{
     api::internet_identity::{
         api_v2::{
             create_account, get_account_delegation, get_account_delegation_with_read_only,
-            get_accounts, prepare_account_delegation, prepare_account_delegation_with_read_only,
-            update_account, AccountDelegationParams,
+            get_accounts, get_default_account, prepare_account_delegation,
+            prepare_account_delegation_with_read_only, set_default_account, update_account,
+            AccountDelegationParams,
         },
         get_delegation, prepare_delegation,
     },
     flows,
     framework::{
-        device_data_2, env, install_ii_with_archive, principal_1, principal_2, time,
-        verify_delegation,
+        device_data_2, env, get_metrics, install_ii_with_archive, parse_metric, principal_1,
+        principal_2, time, verify_delegation,
     },
 };
 use internet_identity_interface::internet_identity::types::{
@@ -1349,77 +1350,6 @@ fn should_update_last_used_after_prepare_account_delegation() -> Result<(), Reje
     Ok(())
 }
 
-/// Verifies that the last_used field is not updated after prepare_account_delegation
-/// for synthetic accounts when the user doesn't have any other account.
-#[test]
-fn should_not_update_last_used_synthetic_account_after_prepare_account_delegation(
-) -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
-    let user_number = flows::register_anchor(&env, canister_id);
-    let frontend_hostname = "https://some-dapp.com".to_string();
-    let pub_session_key = ByteBuf::from("session public key");
-
-    // Retrieve the account before prepare_account_delegation to verify last_used is None
-    let accounts_before = get_accounts(
-        &env,
-        canister_id,
-        principal_1(),
-        user_number,
-        frontend_hostname.clone(),
-    )
-    .unwrap()
-    .unwrap();
-
-    let account_before = accounts_before
-        .iter()
-        .find(|account| account.account_number.is_none())
-        .expect("Account should exist in the list");
-
-    assert_eq!(
-        account_before.last_used, None,
-        "last_used should be None before prepare_account_delegation"
-    );
-
-    // Call prepare_account_delegation for the created account
-    let params = AccountDelegationParams::new(
-        &env,
-        canister_id,
-        principal_1(),
-        user_number,
-        frontend_hostname.clone(),
-        None,
-        pub_session_key,
-    );
-
-    prepare_account_delegation(&params, None).unwrap().unwrap();
-
-    // Retrieve the account again to check last_used
-    let accounts_list = get_accounts(
-        &env,
-        canister_id,
-        principal_1(),
-        user_number,
-        frontend_hostname,
-    )
-    .unwrap()
-    .unwrap();
-
-    // Find the created account in the list (it should be at index 1, after the default account)
-    let updated_account = accounts_list
-        .iter()
-        .find(|account| account.account_number.is_none())
-        .expect("Account should exist in the list");
-
-    // Verify last_used is now populated
-    assert!(
-        updated_account.last_used.is_none(),
-        "last_used should not be populated after prepare_account_delegation for synthetic accounts"
-    );
-
-    Ok(())
-}
-
 /// Verifies that last_used is tracked independently for different accounts.
 #[test]
 fn should_update_last_used_independently_for_different_accounts() -> Result<(), RejectResponse> {
@@ -1582,6 +1512,97 @@ fn should_update_last_used_independently_for_different_accounts() -> Result<(), 
         account_1_last_used,
         account_2_last_used
     );
+
+    Ok(())
+}
+
+/// Verifies that signing in with the default account at an origin the anchor holds no
+/// account at records the sign-in, which is the common case the canister used to discard.
+#[test]
+fn should_track_the_default_account_on_first_sign_in() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let origin = "https://untouched-dapp.com".to_string();
+
+    let accounts_before = get_accounts(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin.clone(),
+    )?
+    .unwrap();
+    assert_eq!(accounts_before.len(), 1);
+    assert_eq!(accounts_before[0].account_number, None);
+    assert_eq!(accounts_before[0].last_used, None);
+
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin.clone(),
+        None,
+        ByteBuf::from(vec![1; 32]),
+    );
+    prepare_account_delegation(&params, None)?.unwrap();
+
+    let accounts_after =
+        get_accounts(&env, canister_id, principal_1(), identity_number, origin)?.unwrap();
+    assert_eq!(accounts_after.len(), 1);
+    assert_eq!(accounts_after[0].account_number, None);
+    assert!(accounts_after[0].last_used.is_some());
+
+    Ok(())
+}
+
+/// Verifies Invariant A: choosing a default account records the relationship without
+/// claiming the default account was used.
+#[test]
+fn should_track_a_chosen_default_account_without_marking_it_used() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let origin = "https://untouched-dapp.com".to_string();
+    let (references_before, _) = parse_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_total_account_references_count",
+    );
+
+    set_default_account(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin.clone(),
+        None,
+    )?
+    .unwrap();
+
+    let default_account = get_default_account(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin.clone(),
+    )?
+    .unwrap();
+    assert_eq!(default_account.account_number, None);
+    assert_eq!(default_account.last_used, None);
+
+    let accounts =
+        get_accounts(&env, canister_id, principal_1(), identity_number, origin)?.unwrap();
+    assert_eq!(accounts.len(), 1);
+    assert_eq!(accounts[0].last_used, None);
+
+    // The reference row is what makes the relationship visible to the counters; without
+    // it the config row would be the only record, and nothing counts those.
+    let (references_after, _) = parse_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_total_account_references_count",
+    );
+    assert_eq!(references_after, references_before + 1.0);
 
     Ok(())
 }

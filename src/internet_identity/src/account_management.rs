@@ -159,6 +159,7 @@ pub fn set_default_account_for_origin(
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
+    check_frontend_length(&origin);
     let application_number = storage_borrow_mut(|storage| {
         storage.lookup_or_insert_application_number_with_origin(&origin)
     });
@@ -183,8 +184,12 @@ pub fn set_default_account_for_origin(
     };
 
     storage_borrow_mut(|storage| {
+        storage
+            .ensure_account_reference_list(anchor_number, application_number)
+            .map_err(|err| SetDefaultAccountError::InternalCanisterError(err.to_string()))?;
         storage.set_anchor_application_config(anchor_number, application_number, config);
-    });
+        Ok::<(), SetDefaultAccountError>(())
+    })?;
 
     Ok(account)
 }
@@ -351,6 +356,13 @@ pub async fn prepare_account_delegation(
     let effective_duration_ns = expiration.saturating_sub(time());
     let seed = account.calculate_seed();
 
+    // Ahead of the signature, so a bookkeeping failure is a failed sign-in rather than
+    // a delegation nobody recorded.
+    storage_borrow_mut(|storage| {
+        storage.set_account_last_used(anchor_number, origin.clone(), account_number, time())
+    })
+    .map_err(|err| AccountDelegationError::InternalCanisterError(err.to_string()))?;
+
     state::signature_map_mut(|sigs| {
         add_delegation_signature(
             sigs,
@@ -361,11 +373,6 @@ pub async fn prepare_account_delegation(
         );
     });
     update_root_hash();
-
-    storage_borrow_mut(|storage| {
-        let _ =
-            storage.set_account_last_used(anchor_number, origin.clone(), account_number, time());
-    });
 
     delegation_bookkeeping(origin, ii_domain.clone(), effective_duration_ns);
 
