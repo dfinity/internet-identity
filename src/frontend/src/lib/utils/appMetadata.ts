@@ -32,9 +32,12 @@
  *   instead of shipping a half-applied file that looks subtly wrong.
  * - The logo must live on the app's own origin. It is downloaded via `fetch`
  *   (II's CSP `connect-src` allows any https origin, unlike `img-src`),
- *   checked against an image content-type allowlist and a size cap, and only
- *   then rendered — as a `data:` URL, which `img-src` already permits. The
- *   logo asset itself is thus never hotlinked.
+ *   checked against an image content-type allowlist and a size cap, and then
+ *   decoded and re-encoded by II before it is rendered from a `blob:` URL. So
+ *   the bytes reaching the `<img>` are a still raster II produced itself: the
+ *   app's file is never hotlinked, nothing about it has to be trusted to be an
+ *   image, and no attacker-controlled payload ends up in the DOM or the JS
+ *   heap (which a `data:` URL would put in both).
  * - Every failure mode (missing file, CORS, timeout, invalid JSON, …) yields
  *   `undefined` rather than an error: metadata is a display nicety and must
  *   never break the sign-in flow.
@@ -45,7 +48,7 @@ export interface AppMetadata {
   name?: string;
   /** Short description of the app. */
   description?: string;
-  /** Ready-to-render `<img src>` value (a `data:` URL for fetched logos). */
+  /** Ready-to-render `<img src>` value (a `blob:` URL for fetched logos). */
   logo?: string;
 }
 
@@ -66,15 +69,28 @@ export const MAX_APP_DESCRIPTION_LENGTH = 120;
 /** Maximum size of the logo asset in bytes (256 KiB). */
 export const MAX_APP_LOGO_SIZE = 262_144;
 
-/** Content types the logo asset may be served with. */
+/** Content types the logo asset may be served with. `image/svg+xml` is
+ *  deliberately absent: every logo is re-encoded from its decoded pixels (see
+ *  {@link transcodeToObjectUrl}), which is what lets II guarantee that what it
+ *  renders is a still image of bounded size, and SVG cannot be decoded that
+ *  way across the browsers II supports. Apps serve a raster logo instead. */
 export const APP_LOGO_CONTENT_TYPES = [
   "image/png",
   "image/jpeg",
   "image/webp",
   "image/gif",
   "image/avif",
-  "image/svg+xml",
 ];
+
+/** Largest source image II will re-encode, per axis. The size cap alone does
+ *  not bound this: a small file can declare enormous dimensions, and the
+ *  decoded bitmap costs about four bytes per pixel. */
+export const MAX_APP_LOGO_DIMENSION = 4_096;
+
+/** Longest side of the re-encoded logo. The screens render it at roughly
+ *  80–200 CSS pixels, so this is headroom for high-density displays and
+ *  nothing more. */
+export const APP_LOGO_RENDER_SIZE = 512;
 
 /** Time budget per resource, spanning the connection and the body read; the
  *  UI renders a fallback in the meantime, so a slow origin only delays its
@@ -265,23 +281,67 @@ const validateLogoUrl = (value: unknown, origin: string): Validated<URL> => {
   return url;
 };
 
-const toBase64 = (bytes: Uint8Array): string => {
-  // Convert in chunks: spreading the whole buffer into one
-  // `String.fromCharCode` call can overflow the argument limit.
-  const chunkSize = 0x8000;
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+/**
+ * Re-encode the downloaded bytes as an image II has produced itself, and hand
+ * back a `blob:` URL for it.
+ *
+ * `createImageBitmap` rejects anything that isn't an image the browser can
+ * decode, so the content-type header is never taken on trust. The bitmap is
+ * then drawn once into a canvas and encoded again, which flattens an animation
+ * to its first frame, drops whatever else rode along in the original container,
+ * and scales the result down to what the screens actually render.
+ *
+ * The result is handed over as a `blob:` URL rather than a `data:` URL so the
+ * bytes stay in the browser's blob store instead of being copied into the DOM
+ * and the JS heap as a base64 string. The URL lives as long as the page: the
+ * metadata store fetches once per origin and nothing supersedes the value, so
+ * there is no point at which it could be revoked while still in use.
+ */
+const transcodeToObjectUrl = async (
+  bytes: Uint8Array,
+  contentType: string,
+): Promise<string | undefined> => {
+  const bitmap = await createImageBitmap(
+    new Blob([bytes as Uint8Array<ArrayBuffer>], { type: contentType }),
+  );
+  try {
+    if (
+      bitmap.width === 0 ||
+      bitmap.height === 0 ||
+      bitmap.width > MAX_APP_LOGO_DIMENSION ||
+      bitmap.height > MAX_APP_LOGO_DIMENSION
+    ) {
+      return undefined;
+    }
+    const scale = Math.min(
+      1,
+      APP_LOGO_RENDER_SIZE / Math.max(bitmap.width, bitmap.height),
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+    if (context === null) {
+      return undefined;
+    }
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      // WebP keeps logos small and preserves transparency; browsers that
+      // can't encode it fall back to PNG on their own, which does too.
+      canvas.toBlob(resolve, "image/webp"),
+    );
+    return blob === null ? undefined : URL.createObjectURL(blob);
+  } finally {
+    bitmap.close();
   }
-  return btoa(binary);
 };
 
 /**
- * Download the logo asset and re-encode it as a `data:` URL so it can be
- * rendered under II's strict `img-src` CSP (which does not allow arbitrary
- * https origins) and so the size and content type can be enforced up front.
+ * Download the logo asset, check it against the content-type allowlist and the
+ * size cap, and return a `blob:` URL for II's own re-encoding of it (see
+ * {@link transcodeToObjectUrl}).
  */
-const fetchLogoAsDataUrl = async (url: URL): Promise<string | undefined> => {
+const fetchLogoObjectUrl = async (url: URL): Promise<string | undefined> => {
   const result = await fetchCapped(url, "image/*", MAX_APP_LOGO_SIZE);
   if (result === undefined) {
     return undefined;
@@ -296,7 +356,7 @@ const fetchLogoAsDataUrl = async (url: URL): Promise<string | undefined> => {
   if (result.body.byteLength === 0) {
     return undefined;
   }
-  return `data:${contentType};base64,${toBase64(result.body)}`;
+  return await transcodeToObjectUrl(result.body, contentType);
 };
 
 /**
@@ -368,10 +428,10 @@ export const fetchAppMetadata = async (
       // document its failures aren't necessarily authoring mistakes (a 500 or
       // a dropped connection is transient). Losing just the logo is the better
       // outcome here: the name and description still render.
-      metadata.logo = await fetchLogoAsDataUrl(logoUrl).catch(() => undefined);
+      metadata.logo = await fetchLogoObjectUrl(logoUrl).catch(() => undefined);
       if (metadata.logo === undefined) {
         console.warn(
-          `Ignoring the \`logo\` in ${APP_METADATA_PATH}: it could not be loaded as an image of an allowed type within ${MAX_APP_LOGO_SIZE} bytes.`,
+          `Ignoring the \`logo\` in ${APP_METADATA_PATH}: it could not be decoded as a still image of an allowed type, within ${MAX_APP_LOGO_SIZE} bytes and ${MAX_APP_LOGO_DIMENSION} pixels per axis.`,
         );
       }
     }

@@ -1,7 +1,9 @@
 import {
+  APP_LOGO_RENDER_SIZE,
   APP_METADATA_FETCH_TIMEOUT_MILLIS,
   APP_METADATA_PATH,
   MAX_APP_DESCRIPTION_LENGTH,
+  MAX_APP_LOGO_DIMENSION,
   MAX_APP_LOGO_SIZE,
   MAX_APP_METADATA_SIZE,
   MAX_APP_NAME_LENGTH,
@@ -10,6 +12,10 @@ import {
 import { beforeEach, expect, test, vi } from "vitest";
 
 beforeEach(() => {
+  // Drop the previous test's canvas/decoder stubs, so a test that needs them
+  // has to install them itself rather than inheriting them by accident.
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   // A rejected document logs a warning naming the offending field, which is
   // how an app's developers find out. Silence it by default; the test below
   // asserts on it explicitly.
@@ -35,9 +41,40 @@ const IMAGE_FETCH_OPTS = expect.objectContaining({
 });
 
 const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
-const PNG_DATA_URL = `data:image/png;base64,${btoa(
-  String.fromCharCode(...PNG_BYTES),
-)}`;
+const LOGO_OBJECT_URL =
+  "blob:https://id.ai/00000000-0000-0000-0000-000000000000";
+
+/**
+ * jsdom implements neither image decoding nor canvas, so the re-encoding step
+ * is stubbed: `createImageBitmap` reports whatever dimensions (or failure) the
+ * test wants, and the canvas hands back a fixed blob. Returns the stubs so a
+ * test can assert on what II drew and how large it drew it.
+ */
+const setupImageMock = ({
+  width = 64,
+  height = 64,
+  decodable = true,
+}: { width?: number; height?: number; decodable?: boolean } = {}) => {
+  const close = vi.fn();
+  const createImageBitmap = vi.fn(() =>
+    decodable
+      ? Promise.resolve({ width, height, close } as unknown as ImageBitmap)
+      : Promise.reject(new Error("The source image could not be decoded.")),
+  );
+  vi.stubGlobal("createImageBitmap", createImageBitmap);
+  const drawImage = vi.fn();
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    drawImage,
+  } as unknown as CanvasRenderingContext2D);
+  const toBlob = vi
+    .spyOn(HTMLCanvasElement.prototype, "toBlob")
+    .mockImplementation((callback, type) =>
+      callback(new Blob(["re-encoded"], { type: type ?? "image/png" })),
+    );
+  const createObjectURL = vi.fn(() => LOGO_OBJECT_URL);
+  URL.createObjectURL = createObjectURL;
+  return { createImageBitmap, drawImage, toBlob, createObjectURL, close };
+};
 
 const imageResponse = (
   bytes: Uint8Array<ArrayBuffer> = PNG_BYTES,
@@ -78,18 +115,24 @@ test("should fetch metadata from the well-known path with hardened options", asy
   );
 });
 
-test("should fetch a same-origin logo and inline it as a data url", async () => {
+test("should fetch a same-origin logo and render it from a blob url", async () => {
   const fetchMock = setupFetchMock(
     Response.json({ name: "Example App", logo: "/assets/logo.png" }),
     imageResponse(),
   );
+  const { createObjectURL, toBlob } = setupImageMock();
 
   const result = await fetchAppMetadata(ORIGIN);
 
   expect(result).toEqual({
     name: "Example App",
-    logo: PNG_DATA_URL,
+    logo: LOGO_OBJECT_URL,
   });
+  // The rendered bytes are II's own re-encoding, held in the browser's blob
+  // store: no attacker-controlled payload reaches the DOM or the JS heap, as a
+  // `data:` URL would.
+  expect(toBlob).toHaveBeenCalledOnce();
+  expect(createObjectURL).toHaveBeenCalledOnce();
   expect(fetchMock).toHaveBeenNthCalledWith(1, METADATA_URL, JSON_FETCH_OPTS);
   expect(fetchMock).toHaveBeenNthCalledWith(
     2,
@@ -100,18 +143,17 @@ test("should fetch a same-origin logo and inline it as a data url", async () => 
 
 test("should resolve relative logo paths against the app origin", async () => {
   const fetchMock = setupFetchMock(
-    Response.json({ logo: "logo.svg" }),
-    imageResponse(PNG_BYTES, "image/svg+xml"),
+    Response.json({ logo: "assets/logo.webp" }),
+    imageResponse(PNG_BYTES, "image/webp"),
   );
+  setupImageMock();
 
   const result = await fetchAppMetadata(ORIGIN);
 
-  expect(result?.logo).toBe(
-    `data:image/svg+xml;base64,${btoa(String.fromCharCode(...PNG_BYTES))}`,
-  );
+  expect(result?.logo).toBe(LOGO_OBJECT_URL);
   expect(fetchMock).toHaveBeenNthCalledWith(
     2,
-    `${ORIGIN}/logo.svg`,
+    `${ORIGIN}/assets/logo.webp`,
     IMAGE_FETCH_OPTS,
   );
 });
@@ -407,6 +449,7 @@ test("should drop logos served with a non-image content type", async () => {
     Response.json({ name: "Example App", logo: "/logo.png" }),
     imageResponse(PNG_BYTES, "text/html"),
   );
+  setupImageMock();
 
   expect(await fetchAppMetadata(ORIGIN)).toEqual({ name: "Example App" });
 });
@@ -416,8 +459,78 @@ test("should accept content types regardless of casing and parameters", async ()
     Response.json({ logo: "/logo.png" }),
     imageResponse(PNG_BYTES, "IMAGE/PNG; charset=binary"),
   );
+  setupImageMock();
 
-  expect((await fetchAppMetadata(ORIGIN))?.logo).toBe(PNG_DATA_URL);
+  expect((await fetchAppMetadata(ORIGIN))?.logo).toBe(LOGO_OBJECT_URL);
+});
+
+test("should drop svg logos, which cannot be re-encoded", async () => {
+  // Every logo is rendered from II's own re-encoding of the decoded pixels,
+  // which is what bounds it and guarantees it is a still image; SVG can't go
+  // through that across browsers, so it is not an accepted content type.
+  setupFetchMock(
+    Response.json({ name: "Example App", logo: "/logo.svg" }),
+    imageResponse(PNG_BYTES, "image/svg+xml"),
+  );
+  setupImageMock();
+
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({ name: "Example App" });
+});
+
+test("should drop logos that do not decode as an image", async () => {
+  // The content-type header is the app's claim; decoding is the check. HTML or
+  // a corrupt file served as `image/png` never reaches an `<img>`.
+  setupFetchMock(
+    Response.json({ name: "Example App", logo: "/logo.png" }),
+    imageResponse(),
+  );
+  setupImageMock({ decodable: false });
+
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({ name: "Example App" });
+});
+
+test("should drop logos whose decoded dimensions exceed the cap", async () => {
+  // The byte cap doesn't bound this: a small file can declare enormous
+  // dimensions, and the decoded bitmap costs about four bytes per pixel.
+  setupFetchMock(
+    Response.json({ name: "Example App", logo: "/logo.png" }),
+    imageResponse(),
+  );
+  const { drawImage } = setupImageMock({
+    width: MAX_APP_LOGO_DIMENSION + 1,
+    height: 8,
+  });
+
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({ name: "Example App" });
+  expect(drawImage).not.toHaveBeenCalled();
+});
+
+test("should scale logos down to the size the screens render", async () => {
+  setupFetchMock(Response.json({ logo: "/logo.png" }), imageResponse());
+  const { drawImage, close } = setupImageMock({
+    width: APP_LOGO_RENDER_SIZE * 4,
+    height: APP_LOGO_RENDER_SIZE * 2,
+  });
+
+  expect((await fetchAppMetadata(ORIGIN))?.logo).toBe(LOGO_OBJECT_URL);
+  // Longest side capped, aspect ratio kept.
+  expect(drawImage).toHaveBeenCalledWith(
+    expect.anything(),
+    0,
+    0,
+    APP_LOGO_RENDER_SIZE,
+    APP_LOGO_RENDER_SIZE / 2,
+  );
+  // The decoded bitmap is released rather than left to the collector.
+  expect(close).toHaveBeenCalledOnce();
+});
+
+test("should keep a logo that is already smaller than the render size", async () => {
+  setupFetchMock(Response.json({ logo: "/logo.png" }), imageResponse());
+  const { drawImage } = setupImageMock({ width: 48, height: 32 });
+
+  expect((await fetchAppMetadata(ORIGIN))?.logo).toBe(LOGO_OBJECT_URL);
+  expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 48, 32);
 });
 
 test("should drop logos exceeding the size limit", async () => {
@@ -425,6 +538,7 @@ test("should drop logos exceeding the size limit", async () => {
     Response.json({ name: "Example App", logo: "/logo.png" }),
     imageResponse(new Uint8Array(MAX_APP_LOGO_SIZE + 1)),
   );
+  setupImageMock();
 
   expect(await fetchAppMetadata(ORIGIN)).toEqual({ name: "Example App" });
 });
@@ -434,6 +548,7 @@ test("should drop empty logos", async () => {
     Response.json({ name: "Example App", logo: "/logo.png" }),
     imageResponse(new Uint8Array(0)),
   );
+  setupImageMock();
 
   expect(await fetchAppMetadata(ORIGIN)).toEqual({ name: "Example App" });
 });
