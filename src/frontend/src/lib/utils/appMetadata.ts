@@ -188,9 +188,13 @@ const cleanTextField = (
     // Strip control and invisible formatting characters, except the ASCII
     // whitespace ones (\t \n \v \f \r), which the next step collapses into
     // regular spaces (stripping them instead would join adjacent words).
+    // The zero-width joiners U+200C/U+200D are also kept: ZWNJ drives correct
+    // shaping in scripts such as Persian and ZWJ holds emoji sequences
+    // together (stripping it decays one joined emoji into two), and neither
+    // is a control or bidi character.
     .replace(
       // eslint-disable-next-line no-control-regex
-      /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u061c\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g,
+      /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u061c\u200b\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g,
       "",
     )
     .replace(/\s+/g, " ")

@@ -278,6 +278,18 @@ test("should strip control and bidi characters and normalize whitespace", async 
   });
 });
 
+test("should preserve the zero-width joiners scripts and emoji need", async () => {
+  // ZWNJ (U+200C) drives correct shaping in scripts such as Persian, and ZWJ
+  // (U+200D) holds emoji sequences together. Neither is a control or bidi
+  // character, so stripping them would silently mangle legitimate names --
+  // a single joined emoji would decay into two.
+  const name = "Acme \u{1f469}\u200d\u{1f4bb}";
+  const description = "Zero\u200cwidth non-joiner survives too";
+  setupFetchMock(Response.json({ name, description }));
+
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({ name, description });
+});
+
 test("should count text limits in code points, not UTF-16 units", async () => {
   // Each emoji is one code point but two UTF-16 units: a name of exactly
   // MAX_APP_NAME_LENGTH emoji is within the documented limit.
