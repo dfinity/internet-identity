@@ -14,7 +14,7 @@ flowchart LR
     IIC["II canister"]
     DC["dapp canister"]
 
-    App -->|"ii_session_delegation"| IIF
+    App -->|"ii_session_delegation (session only)"| IIF
     IIF -->|"app_session_prepare / _get<br/>session_device_register<br/>app_session_list / _revoke_one / _revoke_device"| IIC
     App -->|"app_session_prepare_delegation / _get_delegation<br/>app_session_revoke"| IIC
     App -->|"app delegation"| DC
@@ -168,22 +168,33 @@ flowchart LR
 - The canister signs the session identity to a **non-extractable** key the II frontend generates, and the frontend stores the pair keyed by `(anchor, account, origin)`.
 - To give the app access, the frontend **extends the chain** to a public key the app supplies. No private key is shared and neither side loses non-extractability.
 - `caller()` derives from the chain's root, the canister-signature key over `session_seed`, so it is the session principal at any chain depth. The canister-side lookup is depth-agnostic.
-- The app's hop carries its own shorter expiry and `targets: [ii_canister_id]`. II has never set `targets`, though `delegation_signature_msg_with_permissions` already accepts them. This is a guardrail rather than a defence: see §7.4.
+- The app's hop carries `targets: [ii_canister_id]`. II has never set `targets`, though `delegation_signature_msg_with_permissions` already accepts them. This is a guardrail rather than a defence: see §7.4.
+- **Both hops expire with the session**, at `valid_till`. Giving the app's hop a shorter expiry was an earlier idea and it is a bad one: the app would have to return to the II frontend, and therefore navigate, every time its hop lapsed, which is the cadence this design exists to remove. It would also buy nothing, since a thief holding the hop can refresh for as long as it lasts either way, and revocation is the actual control (§7.4).
 
 ### 5.2 The JSON-RPC method
 
 The app talks to the II frontend over the existing authorize transport. One new II-specific method, `ii_session_delegation`:
 
 ```
-params:  { sessionPublicKey, accountNumber? }
-result:  { appDelegation, sessionDelegation, appPrincipal }
+params:  { sessionPublicKey }
+result:  { sessionDelegation, appPrincipal }
 ```
 
 It is namespaced `ii_` rather than extending `icrc34_delegation`, for the same reason `prompt` and `hint` ride on the authorize URL instead of the ICRC request: it is not part of the standard, its response carries an artifact the standard has no field for, and apps that do not want a session should not be handed one.
 
-`appDelegation` is the short-lived chain for dapp canisters. `sessionDelegation` is the session chain extended to `sessionPublicKey`. `appPrincipal` is what the app sends back on refresh; it is derivable as `self_authenticating(user_key)`, so the field is a convenience that removes a class of client bug. Both delegations come back together so the app can make its first call without a second round trip.
+**No account number.** Which account a session is for is decided during the ceremony, by the user, in II's own UI. The app has no way to enumerate an anchor's accounts and no business naming one, exactly as it cannot today with `icrc34_delegation`.
 
-The session's `valid_till` is deliberately **not** returned. The app refreshes until a refresh fails and then re-authenticates, which is the correct fail-closed behaviour, and `valid_till` is read only by II's own check and by the settings UI.
+**It returns the session and nothing else.** `sessionDelegation` is the session chain extended to `sessionPublicKey`. The app then mints its own first app delegation through `app_session_prepare_delegation` (§6), the same call it will use for every subsequent one. So the new flow does not involve `icrc34_delegation` at all, and that method keeps behaving for legacy apps exactly as it does today (§10).
+
+That is deliberately not the same as having `icrc34_delegation` return a shorter delegation when a session was requested. Making its TTL depend on whether some other method was called earlier is hidden coupling, and it fails in the worst direction: an app that asks for a session but has not implemented refresh would silently start receiving 5-minute delegations. With a session-only response, an app that cannot refresh simply never calls the method.
+
+The cost is one canister round trip before the app's first call, once per sign-in. It buys one artifact per method and no conditional behaviour anywhere.
+
+**One keypair, two chains.** The app delegation targets the same `sessionPublicKey` the session chain terminates at, so the app holds one key with two chains over it: the session chain, which `targets` restricts to the II canister, and the app delegation, which works against dapp canisters. A second keypair would protect nothing, since anything that reaches one reaches the other, and the guardrail against confusing the two is `targets`, not key separation.
+
+`appPrincipal` is load-bearing rather than a convenience here: it is the argument every refresh takes, and the app cannot derive it from the session chain, whose root is a different seed. It is `self_authenticating` of the *app delegation's* user key, which the app does not have yet at this point.
+
+The session's expiry needs no field. It is the `expiration` on the session chain's own hops (§5.1), so the app already has it.
 
 ### 5.3 First sign-in
 
@@ -200,16 +211,16 @@ sequenceDiagram
         IIC-->>IIF: device_id (allocated by the canister)
     end
     IIF->>IIC: app_session_prepare { .., device_id, session_key = II key }
-    Note over IIC: prune expired, evict oldest if at cap (§3.1)<br/>write (created_at, valid_till, device_id)
+    Note over IIC: prune expired, evict least recently used if at cap (§3.1)<br/>write (created_at, valid_till, last_refreshed = None, device_id)
     IIC-->>IIF: user_key, expiration, created_at
     IIF->>IIC: app_session_get { .., expiration }
     IIC-->>IIF: session delegation
     Note over IIF: store (keypair, chain) by (anchor, account, origin)<br/>extend the chain to sessionPublicKey
-    IIF->>IIC: app_session_prepare_delegation { app_principal, sessionPublicKey }
-    IIC-->>IIF: expiration
-    IIF->>IIC: app_session_get_delegation { .., expiration }
-    IIC-->>IIF: app delegation
-    IIF-->>App: { appDelegation, sessionDelegation, appPrincipal }
+    IIF-->>App: { sessionDelegation, appPrincipal }
+    App->>IIC: app_session_prepare_delegation { app_principal, sessionPublicKey }<br/>signed with the session chain
+    IIC-->>App: expiration
+    App->>IIC: app_session_get_delegation { .., expiration }
+    IIC-->>App: app delegation
 ```
 
 The anchor-authenticated half of that flow, all checked with `check_authorization(identity_number)`:
@@ -249,17 +260,14 @@ sequenceDiagram
     App->>IIF: ii_session_delegation { sessionPublicKey }
     alt stored session still valid
         Note over IIF: no ceremony, extend the stored chain
-        IIF->>IIC: app_session_prepare_delegation { app_principal, sessionPublicKey }
-        IIC-->>IIF: expiration
-        IIF->>IIC: app_session_get_delegation { .., expiration }
-        IIC-->>IIF: app delegation
     else revoked, expired, or nothing stored
         Note over IIF: fall through to the ceremony (§5.3)
     end
-    IIF-->>App: { appDelegation, sessionDelegation, appPrincipal }
+    IIF-->>App: { sessionDelegation, appPrincipal }
+    Note over App: mints its own app delegation as in §5.3
 ```
 
-Minting goes through the canister, which is what makes the result revocable. Extending the chain alone would be an offline operation nothing could revoke.
+Extending the chain is an offline operation, so it is not what makes anything revocable. What does is that the app delegation itself can only come from the canister, which checks the session record on every mint.
 
 **When this actually avoids a ceremony is narrower than it looks.** Signing out of an app revokes its session (§7.1), so returning to that app afterwards is a ceremony, correctly. The stored session helps when the user did not sign out: a closed tab, an expired app delegation, or a *sibling subdomain* asking for the first time. That last case is the main one, and it is why the frontend keeps the session at all.
 
@@ -512,7 +520,7 @@ There is no flag day and no ecosystem coordination, because nothing existing cha
 
 | App | Gets |
 | --- | ---- |
-| Calls `icrc34_delegation`, as every app does today | Exactly what it gets now, a long-lived delegation, up to `MAX_EXPIRATION_PERIOD_NS` |
+| Calls `icrc34_delegation`, as every app does today | Exactly what it gets now, a long-lived delegation, up to `MAX_EXPIRATION_PERIOD_NS`. Unconditionally: its behaviour does not depend on anything else the app called |
 | Calls `ii_session_delegation` (§5.2), on a client version that supports it | A session plus short-lived delegations, and refreshes itself |
 
 `MAX_EXPIRATION_PERIOD_NS` is untouched. An app opts in by upgrading its client and calling `ii_session_delegation`, which is also when it acquires the refresh logic it needs. Lowering the cap for everyone is a separate decision for later, once adoption is real. MCP could skip all of this because its client is II's own server implementation.
@@ -544,9 +552,10 @@ Also out of scope: whether to fold MCP's grant into this mechanism. The value sh
 | S6 | A same-round collision for one account is a typed retryable error, not disambiguated | 4.1 |
 | S6a | Only immutable record fields feed the seed, so `last_refreshed` is excluded | 4 |
 | S7 | The canister signs the session to a non-extractable II key; II extends the chain to the app's key, sharing no private key | 5.1 |
-| S8 | The app's hop carries a shorter expiry and `targets: [ii_canister_id]`, as a developer guardrail rather than a defence | 5.1, 7.4 |
-| S9 | `ii_session_delegation` returns both delegations and the app principal; `icrc34_delegation` is untouched | 5.2 |
-| S10 | The session's `valid_till` is not returned to the app | 5.2 |
+| S8 | The app's hop carries `targets: [ii_canister_id]` as a developer guardrail, and expires with the session rather than sooner | 5.1, 7.4 |
+| S9 | `ii_session_delegation` returns the session chain and the app principal only. The app mints its own app delegations, so `icrc34_delegation` is untouched and unconditional | 5.2 |
+| S10 | No account number in the request: the user picks the account in II's UI | 5.2 |
+| S10a | One app keypair, carrying both the session chain and the app delegation | 5.2 |
 | S11 | Refresh takes `app_principal` only; `created_at` is not an argument, so the keypair alone suffices | 6.2 |
 | S12 | Refresh resolves through the principal index and iterates the capped session list | 6.3 |
 | S13 | Refresh stamps `last_refreshed` and `last_used`, coalesced to at most one write per hour per session | 6.4 |
