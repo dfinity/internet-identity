@@ -261,9 +261,8 @@ Session creation rides on the II frontend's existing pair rather than getting on
 session : opt SessionRequest;
 
 type SessionRequest = record {
-    name : text;                    // labels the browser, e.g. "Chrome on MacBook"
-    id : opt nat32;                 // the frontend's cached session-device id
-    permissions : opt Permissions;  // the consented access level, fixed for the session
+    name : text;        // labels the browser, e.g. "Chrome on MacBook"
+    id : opt nat32;     // the frontend's cached session-device id
 };
 
 // Added to its response.
@@ -277,7 +276,9 @@ session_info_bundle_signature : opt blob;   // witnesses the bundle (§7.1)
 session : opt bool;       // true fetches the session delegation
 ```
 
-With `session` present the call signs the *session* identity for that locator instead of the account identity, creating or reusing the record. Registering a device is therefore not a call of its own either: the frontend passes the name it would have registered with plus whatever id it has cached, and the canister resolves the rest (§9.2).
+With `session` present the call signs the *session* identity for that locator instead of the account identity, creating or reusing the record.
+
+The method's existing `permissions` argument is what sets the session's `read_only`, so nothing new is needed for it. Its meaning extends rather than changes: with `session` absent it applies to the app delegation being minted, as today, and with `session` present it is recorded on the session and applies to everything that session ever mints. Registering a device is therefore not a call of its own either: the frontend passes the name it would have registered with plus whatever id it has cached, and the canister resolves the rest (§9.2).
 
 Both fields are additive and optional, so today's callers are unaffected. And because this pair is internal (see the method index), extending it costs nothing in compatibility.
 
@@ -357,7 +358,7 @@ app_get_delegation : (record {
 
 **No TTL argument.** The app-delegation lifetime is a property of this design, fixed at 5 minutes (§10), not something a caller asks for. Accepting a requested value would only invite an app to ask for longer and make revocation latency a per-app variable.
 
-**No permissions argument either.** Whether a session mints queries-only delegations is decided once, by the user, at the consent that created it, and then holds for everything that session ever mints. Letting it vary per call would mean the record could not describe what it authorizes. That is what MCP already does with `read_only` on its grant, and an earlier draft of this design got it backwards by arguing for a per-request value.
+**No permissions argument either.** Whether a session mints queries-only delegations is decided once, by the user, at the consent that created it, and then holds for everything that session ever mints. Letting it vary per call would mean the record could not describe what it authorizes. It is set once from `prepare_account_delegation`'s existing `permissions` argument (§6.3). That is what MCP already does with `read_only` on its grant, and an earlier draft of this design got it backwards by arguing for a per-request value.
 
 **The locator is not an argument. It arrives as caller info on the ingress message.** II already does this for the gated-SSO session: `openid/sso_bundle.rs` reads a canister-signed bundle off the call with `ic0::msg_caller_info_signer` and `ic0::msg_caller_info_data`, and `prepare_icrc3_attributes` gates `sso:<domain>` attributes on it (`main.rs:2303`). Sessions use the same mechanism with their own bundle.
 
@@ -608,7 +609,7 @@ Also out of scope: whether to fold MCP's grant into this mechanism. The value sh
 | # | Decision | § |
 | - | -------- | - |
 | S1 | A session is `(created_at, valid_till, last_refreshed, device_id, read_only)` on the account reference; only `last_refreshed` is mutable | 4 |
-| S1a | `read_only` is a property of the session, set from the consent that created it, never a per-call argument. As with MCP's grant | 4, 7.1 |
+| S1a | `read_only` is a property of the session, taken from `prepare_account_delegation`'s existing `permissions` argument at creation, never a per-refresh argument. As with MCP's grant | 4, 6.3, 7.1 |
 | S2 | Ten sessions per account reference: reuse an unexpired session for the same locator and device, else prune expired and drop the least recently used. Creating a session never fails on the cap | 4.1 |
 | S3 | A row holding an unexpired session is not evictable | 4.2 |
 | S4 | Expired entries are pruned only when the list is written for another reason, so refresh never writes | 4.2 |
