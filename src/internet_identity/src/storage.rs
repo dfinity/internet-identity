@@ -1009,7 +1009,36 @@ impl<M: Memory + Clone> Storage<M> {
             });
     }
 
+    /// Resolve the anchor holding this credential for `discovery_domain`, the
+    /// domain the login was verified through (`None` for a configured provider).
     pub fn lookup_anchor_with_openid_credential(
+        &self,
+        key: &OpenIdCredentialKey,
+        discovery_domain: Option<&str>,
+    ) -> Option<AnchorNumber> {
+        let anchor_number = self.anchor_number_with_openid_credential(key)?;
+        let anchor = self.read(anchor_number).ok()?;
+        let (iss, sub, aud) = key;
+        anchor
+            .openid_credentials()
+            .iter()
+            .any(|cred| {
+                &cred.iss == iss
+                    && &cred.sub == sub
+                    && &cred.aud == aud
+                    && cred.sso_domain.as_deref() == discovery_domain
+            })
+            .then_some(anchor_number)
+    }
+
+    /// Whether this credential is registered on any anchor. Registration
+    /// uniqueness spans all discovery domains.
+    pub fn is_openid_credential_registered(&self, key: &OpenIdCredentialKey) -> bool {
+        self.anchor_number_with_openid_credential(key).is_some()
+    }
+
+    /// The `(iss, sub, aud)` index read behind both lookups above.
+    fn anchor_number_with_openid_credential(
         &self,
         key: &OpenIdCredentialKey,
     ) -> Option<AnchorNumber> {

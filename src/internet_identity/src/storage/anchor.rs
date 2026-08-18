@@ -899,11 +899,16 @@ impl Anchor {
         true
     }
 
+    /// Refresh a stored credential from a newly verified one. `sso_domain` is
+    /// part of what identifies the stored credential, so it has to match.
     pub fn update_openid_credential(
         &mut self,
         openid_credential: OpenIdCredential,
     ) -> Result<(), AnchorError> {
         let index = self.openid_credential_index(&openid_credential.key())?;
+        if self.openid_credentials[index].sso_domain != openid_credential.sso_domain {
+            return Err(AnchorError::OpenIdCredentialSsoDomainMismatch);
+        }
         self.openid_credentials[index] = OpenIdCredential {
             // Don't update last usage timestamp, below `set_openid_credential_usage_timestamp`
             // method should be used instead to update the timestamp explicitly.
@@ -1261,6 +1266,7 @@ pub enum AnchorError {
     },
     OpenIdCredentialAlreadyRegistered,
     OpenIdCredentialNotFound,
+    OpenIdCredentialSsoDomainMismatch,
     ReservedMetadataKey {
         key: String,
     },
@@ -1308,6 +1314,7 @@ impl fmt::Display for AnchorError {
             AnchorError::RecoveryPhraseCredentialIdMismatch => write!(f, "Devices with key type seed_phrase must not have a credential id."),
             AnchorError::OpenIdCredentialAlreadyRegistered => write!(f, "OpenID credential has already been registered on this or another anchor."),
             AnchorError::OpenIdCredentialNotFound => write!(f, "OpenID credential not found."),
+            AnchorError::OpenIdCredentialSsoDomainMismatch => write!(f, "OpenID credential is stored for a different SSO discovery domain."),
             AnchorError::NameTooLong {limit} => write!(f, "Name is too long. Maximum length of name is {limit}."),
             AnchorError::TooManyOpenIdCredentials { limit, num_credentials } => write!(f, "Too many OpenID credentials. Maximum number of OpenID credentials is {limit}. Current number of OpenID credentials is {num_credentials}."),
         }
