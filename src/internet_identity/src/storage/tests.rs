@@ -455,7 +455,7 @@ fn should_set_account_last_used() {
         Some(account_number),
         timestamp,
     );
-    assert!(result.is_some());
+    assert!(result.unwrap().is_some());
 
     // Verify last_used was updated
     let read_account = storage
@@ -476,7 +476,7 @@ fn should_set_account_last_used() {
         Some(account_number),
         new_timestamp,
     );
-    assert!(result.is_some());
+    assert!(result.unwrap().is_some());
 
     // Verify last_used was updated to the new timestamp
     let read_account = storage
@@ -504,7 +504,7 @@ fn should_set_account_last_used_for_synthethic_account() {
     // Set last_used for the synthetic account (account_number = None)
     let timestamp = 555555u64;
     let result = storage.set_account_last_used(anchor_number, origin.clone(), None, timestamp);
-    assert!(result.is_none());
+    assert!(result.unwrap().is_none());
 
     // Verify last_used was updated for the synthetic account
     let read_account = storage
@@ -542,7 +542,7 @@ fn should_set_account_last_used_for_synthetic_account_with_reference() {
     // Set last_used for the synthetic account (account_number = None)
     let timestamp = 555555u64;
     let result = storage.set_account_last_used(anchor_number, origin.clone(), None, timestamp);
-    assert!(result.is_some());
+    assert!(result.unwrap().is_some());
 
     // Verify last_used was updated for the synthetic account
     let read_account = storage
@@ -578,7 +578,7 @@ fn should_return_none_when_setting_last_used_for_nonexistent_account() {
     );
 
     // Should return None because the account doesn't exist
-    assert!(result.is_none());
+    assert!(result.unwrap().is_none());
 }
 
 #[test]
@@ -597,7 +597,7 @@ fn should_return_none_when_setting_last_used_for_nonexistent_origin() {
     let result = storage.set_account_last_used(anchor_number, nonexistent_origin, None, timestamp);
 
     // Should return None because the origin/application doesn't exist
-    assert!(result.is_none());
+    assert!(result.unwrap().is_none());
 }
 
 fn sample_device() -> Device {
@@ -2122,5 +2122,233 @@ fn test_anchor_storage_migration_round_trip() {
             "Test case '{}' failed",
             label
         );
+    }
+}
+
+mod reference_list_write_path_tests {
+    use crate::storage::account::{AccountReference, CreateAccountParams};
+    use crate::storage::StorageError;
+    use crate::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        (storage, anchor_number)
+    }
+
+    #[test]
+    fn rejects_writing_an_empty_list() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+
+        let result = storage.write_reference_list(anchor_number, application_number, vec![]);
+
+        assert!(matches!(
+            result,
+            Err(StorageError::EmptyAccountReferenceList { .. })
+        ));
+        assert!(storage
+            .lookup_account_references(anchor_number, application_number)
+            .is_none());
+    }
+
+    #[test]
+    fn rejects_writing_for_an_unknown_application_without_writing_anything() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let unknown_application_number = 42u64;
+
+        let result = storage.write_reference_list(
+            anchor_number,
+            unknown_application_number,
+            vec![AccountReference {
+                account_number: None,
+                last_used: None,
+            }],
+        );
+
+        assert!(matches!(
+            result,
+            Err(StorageError::OriginNotFoundForApplicationNumber { .. })
+        ));
+        assert!(storage
+            .lookup_account_references(anchor_number, unknown_application_number)
+            .is_none());
+        assert_eq!(
+            storage.get_account_counter(anchor_number),
+            crate::storage::account::AccountsCounter::default()
+        );
+        assert_eq!(
+            storage
+                .get_total_accounts_counter()
+                .stored_account_references,
+            0
+        );
+    }
+
+    #[test]
+    fn a_zero_delta_write_still_requires_a_live_application() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let references = vec![AccountReference {
+            account_number: Some(1),
+            last_used: None,
+        }];
+        storage
+            .write_reference_list(anchor_number, application_number, references.clone())
+            .unwrap();
+        storage
+            .stable_application_memory
+            .remove(&application_number);
+
+        let result = storage.write_reference_list(anchor_number, application_number, references);
+
+        assert!(matches!(
+            result,
+            Err(StorageError::OriginNotFoundForApplicationNumber { .. })
+        ));
+    }
+
+    #[test]
+    fn derives_counters_from_added_references() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+
+        storage
+            .write_reference_list(
+                anchor_number,
+                application_number,
+                vec![
+                    AccountReference {
+                        account_number: None,
+                        last_used: None,
+                    },
+                    AccountReference {
+                        account_number: Some(7),
+                        last_used: None,
+                    },
+                ],
+            )
+            .unwrap();
+
+        let anchor_counter = storage.get_account_counter(anchor_number);
+        assert_eq!(anchor_counter.stored_account_references, 2);
+        assert_eq!(anchor_counter.stored_accounts, 1);
+
+        let application = storage.lookup_application_with_origin(&origin).unwrap();
+        assert_eq!(application.stored_account_references, 2);
+        assert_eq!(application.stored_accounts, 1);
+
+        assert_eq!(
+            storage
+                .get_total_accounts_counter()
+                .stored_account_references,
+            2
+        );
+    }
+
+    #[test]
+    fn materializing_a_default_moves_only_the_account_counter() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+
+        storage
+            .write_reference_list(
+                anchor_number,
+                application_number,
+                vec![AccountReference {
+                    account_number: None,
+                    last_used: None,
+                }],
+            )
+            .unwrap();
+        storage
+            .write_reference_list(
+                anchor_number,
+                application_number,
+                vec![AccountReference {
+                    account_number: Some(3),
+                    last_used: None,
+                }],
+            )
+            .unwrap();
+
+        let anchor_counter = storage.get_account_counter(anchor_number);
+        assert_eq!(anchor_counter.stored_account_references, 1);
+        assert_eq!(anchor_counter.stored_accounts, 1);
+
+        let application = storage.lookup_application_with_origin(&origin).unwrap();
+        assert_eq!(application.stored_account_references, 1);
+        assert_eq!(application.stored_accounts, 1);
+    }
+
+    #[test]
+    fn rewriting_an_unchanged_list_leaves_counters_alone() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let references = vec![AccountReference {
+            account_number: Some(1),
+            last_used: None,
+        }];
+
+        storage
+            .write_reference_list(anchor_number, application_number, references.clone())
+            .unwrap();
+        let after_first_write = storage.get_account_counter(anchor_number);
+
+        storage
+            .write_reference_list(
+                anchor_number,
+                application_number,
+                vec![AccountReference {
+                    account_number: Some(1),
+                    last_used: Some(123),
+                }],
+            )
+            .unwrap();
+
+        assert_eq!(
+            storage.get_account_counter(anchor_number),
+            after_first_write
+        );
+    }
+
+    #[test]
+    fn written_counters_match_a_rebuild() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        for origin in ["https://a.com", "https://b.com", "https://c.com"] {
+            let origin = origin.to_string();
+            storage
+                .create_additional_account(CreateAccountParams {
+                    anchor_number,
+                    name: "account".to_string(),
+                    origin: origin.clone(),
+                })
+                .unwrap();
+            storage
+                .create_additional_account(CreateAccountParams {
+                    anchor_number,
+                    name: "another account".to_string(),
+                    origin,
+                })
+                .unwrap();
+        }
+
+        let written = storage.get_account_counter(anchor_number);
+        storage.rebuild_identity_account_counters(anchor_number);
+
+        assert_eq!(storage.get_account_counter(anchor_number), written);
+        assert_eq!(written.stored_account_references, 9);
+        assert_eq!(written.stored_accounts, 6);
     }
 }
