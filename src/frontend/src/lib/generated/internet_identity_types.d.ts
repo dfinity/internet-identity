@@ -943,6 +943,12 @@ export interface IdentityInfo {
    */
   'created_at' : [] | [Timestamp],
   /**
+   * Browsers this anchor has signed in from (absent when it has never
+   * created a session), so the Settings UI can offer "sign this browser
+   * out" without a separate call.
+   */
+  'session_devices' : [] | [Array<SessionDeviceInfo>],
+  /**
    * The anchor's synced trusted-MCP-server config (absent when the
    * anchor never wrote one). Carried here rather than read from the
    * mcp_get_config query so the Settings UI has a certified value to
@@ -1528,6 +1534,20 @@ export type Salt = Uint8Array | number[];
 export type SessionDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
+/**
+ * A browser an anchor has signed in from. The name is self-reported by the
+ * client, so it is a label for the user rather than evidence about where a
+ * session came from.
+ */
+export interface SessionDeviceInfo {
+  'id' : number,
+  'name' : string,
+  'created_at' : Timestamp,
+  /**
+   * Advanced by a sign-in from this browser and by every session refresh it drives.
+   */
+  'last_used' : Timestamp,
+}
 export type SessionKey = PublicKey;
 export type SetDefaultAccountError = {
     'NoSuchOrigin' : { 'anchor_number' : UserNumber }

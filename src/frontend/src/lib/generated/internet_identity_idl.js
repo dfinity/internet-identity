@@ -559,6 +559,12 @@ export const idlFactory = ({ IDL }) => {
     'address' : IDL.Text,
     'last_used' : IDL.Opt(Timestamp),
   });
+  const SessionDeviceInfo = IDL.Record({
+    'id' : IDL.Nat32,
+    'name' : IDL.Text,
+    'created_at' : Timestamp,
+    'last_used' : Timestamp,
+  });
   const McpConfig = IDL.Record({
     'url' : IDL.Opt(IDL.Text),
     'enabled' : IDL.Bool,
@@ -575,6 +581,7 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Opt(IDL.Text),
     'email_recovery' : IDL.Opt(IDL.Vec(EmailRecoveryCredential)),
     'created_at' : IDL.Opt(Timestamp),
+    'session_devices' : IDL.Opt(IDL.Vec(SessionDeviceInfo)),
     'mcp_config' : IDL.Opt(McpConfig),
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
