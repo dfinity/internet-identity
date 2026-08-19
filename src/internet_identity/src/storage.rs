@@ -885,6 +885,8 @@ impl<M: Memory + Clone> Storage<M> {
             created_at_ns: _,
             name: _,
             verified_emails: _,
+            session_devices: _,
+            next_session_device_id: _,
         }) = previous_anchor_maybe
         {
             (

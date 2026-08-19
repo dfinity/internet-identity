@@ -24,6 +24,7 @@ pub mod openid_credential_key;
 pub mod openid_jwks;
 pub mod passkey_credential;
 pub mod recovery_key;
+pub mod session_device;
 pub mod session_device_id;
 pub mod session_record;
 pub mod special_device_migration;

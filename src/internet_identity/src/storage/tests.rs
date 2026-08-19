@@ -1316,6 +1316,8 @@ fn test_anchor_storage_migration_round_trip() {
             "empty anchor",
             storage.allocate_anchor(now).unwrap(),
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 0,
                 devices: vec![],
                 openid_credentials: vec![],
@@ -1348,6 +1350,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 1,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("recovery_key_pubkey"),
@@ -1391,6 +1395,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 2,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("passkey_pubkey"),
@@ -1434,6 +1440,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 3,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("passkey_no_origin"),
@@ -1477,6 +1485,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 4,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("recovery_passkey"),
@@ -1520,6 +1530,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 5,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("recovery_passkey_no_origin"),
@@ -1563,6 +1575,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 6,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("browser_storage_key_auth"),
@@ -1606,6 +1620,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 7,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("browser_storage_key_recovery"),
@@ -1663,6 +1679,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 8,
                 devices: vec![
                     Device {
@@ -1707,6 +1725,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 9,
                 devices: vec![],
                 openid_credentials: vec![openid_credential(1)],
@@ -1726,6 +1746,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 10,
                 devices: vec![],
                 openid_credentials: vec![],
@@ -1758,6 +1780,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 11,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("unknown_keytype_passkey"),
@@ -1808,6 +1832,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 12,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("device_with_metadata"),
@@ -1845,6 +1871,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 13,
                 devices: vec![],
                 openid_credentials: vec![],
@@ -1877,6 +1905,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 14,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("protected_recovery_key"),
@@ -1923,6 +1953,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 15,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("protected_passkey"),
@@ -1968,6 +2000,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 16,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("unusual_device"),
@@ -2011,6 +2045,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 17,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("recovery_phrase_custom_alias"),
@@ -2054,6 +2090,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 18,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("platform_passkey"),
@@ -2097,6 +2135,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number: 19,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("unknown_keytype_passkey_2"),
