@@ -1946,6 +1946,75 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
+    /// Indexes one batch of existing reference-list rows. Entries are only inserted,
+    /// never removed, so a batch that runs twice writes the same values.
+    pub fn backfill_account_principal_index_batch(
+        &mut self,
+        cursor: Option<(AnchorNumber, ApplicationNumber)>,
+        batch_size: u64,
+    ) -> AccountPrincipalIndexBackfillOutcome {
+        let mut outcome = AccountPrincipalIndexBackfillOutcome {
+            next_cursor: cursor,
+            ..Default::default()
+        };
+
+        if batch_size == 0 {
+            outcome.is_done = true;
+            return outcome;
+        }
+        let Some(salt) = self.salt().copied() else {
+            return outcome;
+        };
+
+        use std::ops::Bound as RangeBound;
+        let range = match cursor {
+            Some(cursor) => (RangeBound::Excluded(cursor), RangeBound::Unbounded),
+            None => (RangeBound::Unbounded, RangeBound::Unbounded),
+        };
+
+        let mut examined = 0u64;
+        let rows: Vec<_> = self
+            .stable_account_reference_list_memory
+            .range(range)
+            .take(batch_size as usize)
+            .map(|(key, list)| {
+                examined += 1;
+                outcome.next_cursor = Some(key);
+                (key, Vec::<AccountReference>::from(list))
+            })
+            .collect();
+
+        for ((anchor_number, application_number), references) in rows {
+            let Some(origin) = self
+                .stable_application_memory
+                .get(&application_number)
+                .map(|application| application.origin)
+            else {
+                continue;
+            };
+
+            for (principal, locator) in self.account_principals(
+                anchor_number,
+                application_number,
+                &origin,
+                &salt,
+                &references,
+            ) {
+                if self.lookup_account_with_principal_memory.get(&principal)
+                    == Some(locator.clone())
+                {
+                    continue;
+                }
+                self.lookup_account_with_principal_memory
+                    .insert(principal, locator);
+                outcome.indexed += 1;
+            }
+        }
+
+        outcome.is_done = examined < batch_size;
+        outcome
+    }
+
     /// Keeps the principal index in step with one reference-list write, diffing values
     /// rather than keys.
     fn sync_account_principal_index(
@@ -2815,6 +2884,13 @@ impl<M: Memory + Clone> Storage<M> {
             ),
         ])
     }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct AccountPrincipalIndexBackfillOutcome {
+    pub next_cursor: Option<(AnchorNumber, ApplicationNumber)>,
+    pub indexed: u64,
+    pub is_done: bool,
 }
 
 #[cfg(not(test))]

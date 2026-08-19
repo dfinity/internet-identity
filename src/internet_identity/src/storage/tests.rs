@@ -3554,3 +3554,133 @@ mod account_principal_index_tests {
         );
     }
 }
+
+mod account_principal_index_backfill_tests {
+    use crate::delegation::canister_sig_principal;
+    use crate::storage::account::{Account, AccountReference};
+    use crate::storage::canister_id;
+    use crate::Storage;
+    use candid::Principal;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    const SALT: [u8; 32] = [17u8; 32];
+
+    fn storage_with_rows(rows: u64) -> (Storage<VectorMemory>, Vec<AnchorNumber>) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt(SALT);
+        let mut anchors = vec![];
+        for index in 0..rows {
+            let anchor = storage.allocate_anchor(0).unwrap();
+            let anchor_number = anchor.anchor_number();
+            storage.write(anchor).unwrap();
+            anchors.push(anchor_number);
+            let application_number = storage
+                .lookup_or_insert_application_number_with_origin(&format!("https://d-{index}.com"));
+            storage
+                .write_reference_list(
+                    anchor_number,
+                    application_number,
+                    vec![AccountReference {
+                        account_number: None,
+                        last_used: Some(index + 1),
+                    }],
+                )
+                .unwrap();
+        }
+        (storage, anchors)
+    }
+
+    fn clear_index(storage: &mut Storage<VectorMemory>) {
+        let keys: Vec<Principal> = storage
+            .lookup_account_with_principal_memory
+            .iter()
+            .map(|(key, _)| key)
+            .collect();
+        for key in keys {
+            storage.lookup_account_with_principal_memory.remove(&key);
+        }
+    }
+
+    #[test]
+    fn a_sweep_indexes_every_pre_existing_row() {
+        let (mut storage, anchors) = storage_with_rows(5);
+        clear_index(&mut storage);
+        assert_eq!(storage.lookup_account_with_principal_memory.len(), 0);
+
+        let outcome = storage.backfill_account_principal_index_batch(None, 100);
+
+        assert!(outcome.is_done);
+        assert_eq!(outcome.indexed, 5);
+        assert_eq!(storage.lookup_account_with_principal_memory.len(), 5);
+        for (index, anchor_number) in anchors.iter().enumerate() {
+            let account =
+                Account::new(*anchor_number, format!("https://d-{index}.com"), None, None);
+            let principal = canister_sig_principal(
+                canister_id(),
+                account.calculate_seed_with_salt(&SALT).to_vec(),
+            );
+            assert_eq!(
+                storage
+                    .lookup_account_with_principal_memory
+                    .get(&principal)
+                    .unwrap()
+                    .anchor_number,
+                *anchor_number
+            );
+        }
+    }
+
+    #[test]
+    fn a_sweep_resumes_from_its_cursor() {
+        let (mut storage, _) = storage_with_rows(5);
+        clear_index(&mut storage);
+
+        let first = storage.backfill_account_principal_index_batch(None, 2);
+        assert!(!first.is_done);
+        assert_eq!(first.indexed, 2);
+
+        let second = storage.backfill_account_principal_index_batch(first.next_cursor, 2);
+        assert!(!second.is_done);
+        assert_eq!(second.indexed, 2);
+
+        let third = storage.backfill_account_principal_index_batch(second.next_cursor, 2);
+        assert!(third.is_done);
+        assert_eq!(third.indexed, 1);
+        assert_eq!(storage.lookup_account_with_principal_memory.len(), 5);
+    }
+
+    #[test]
+    fn a_repeated_sweep_writes_nothing_new() {
+        let (mut storage, _) = storage_with_rows(3);
+
+        let outcome = storage.backfill_account_principal_index_batch(None, 100);
+
+        assert!(outcome.is_done);
+        assert_eq!(outcome.indexed, 0);
+        assert_eq!(storage.lookup_account_with_principal_memory.len(), 3);
+    }
+
+    #[test]
+    fn a_sweep_without_a_salt_indexes_nothing_and_stays_unfinished() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor).unwrap();
+
+        let outcome = storage.backfill_account_principal_index_batch(None, 100);
+
+        assert!(!outcome.is_done);
+        assert_eq!(outcome.indexed, 0);
+    }
+
+    #[test]
+    fn an_empty_batch_size_finishes_immediately() {
+        let (mut storage, _) = storage_with_rows(3);
+
+        let outcome = storage.backfill_account_principal_index_batch(None, 0);
+
+        assert!(outcome.is_done);
+        assert_eq!(outcome.indexed, 0);
+    }
+}
