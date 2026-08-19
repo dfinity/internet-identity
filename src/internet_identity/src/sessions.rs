@@ -11,6 +11,7 @@ use crate::delegation::{
 use crate::sessions::device_key::verify_device_keys;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
 use crate::storage::account::{Account, ReadAccountParams, SessionRecord};
+use crate::storage::storable::account_locator::StorableAccountLocator;
 use crate::storage::{CreateSessionParams, StorageError};
 use crate::{update_root_hash, DAY_NS, MINUTE_NS};
 use candid::Principal;
@@ -308,7 +309,19 @@ pub fn app_prepare_delegation(
     request: AppPrepareDelegationRequest,
 ) -> Result<AppPrepareDelegationResponse, AppSessionError> {
     let now = time();
-    let (account, session) = authorize_session(now)?;
+    let (locator, account, session) = authorize_session(now)?;
+
+    storage_borrow_mut(|storage| {
+        storage.stamp_session_refresh(
+            locator.anchor_number,
+            locator.application_number,
+            locator.account_number,
+            session.created_at,
+            session.device_id,
+            now,
+        )
+    })
+    .map_err(|err| AppSessionError::InternalCanisterError(err.to_string()))?;
 
     let expiration = u64::min(
         now.saturating_add(APP_DELEGATION_TTL_NS),
@@ -338,7 +351,7 @@ pub fn app_get_delegation(
     request: AppGetDelegationRequest,
 ) -> Result<SignedDelegation, AppSessionError> {
     let now = time();
-    let (account, session) = authorize_session(now)?;
+    let (_, account, session) = authorize_session(now)?;
 
     if request.expiration > now.saturating_add(APP_DELEGATION_TTL_NS)
         || request.expiration > session.valid_till
@@ -380,7 +393,9 @@ pub fn app_get_delegation(
 /// The session index is keyed by the principal a session's chain is rooted at, so a hit is
 /// itself the proof that the caller is that session: nothing is named in the request and
 /// nothing is attached to it.
-fn authorize_session(now: Timestamp) -> Result<(Account, SessionRecord), AppSessionError> {
+fn authorize_session(
+    now: Timestamp,
+) -> Result<(StorableAccountLocator, Account, SessionRecord), AppSessionError> {
     let handle = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
         .ok_or(AppSessionError::NoMatchingSession)?;
     let locator = storage_borrow(|storage| storage.lookup_account_with_principal(handle.account()))
@@ -407,7 +422,7 @@ fn authorize_session(now: Timestamp) -> Result<(Account, SessionRecord), AppSess
     if session.is_expired(now) {
         return Err(AppSessionError::NoMatchingSession);
     }
-    Ok((account, session))
+    Ok((locator, account, session))
 }
 
 fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {
