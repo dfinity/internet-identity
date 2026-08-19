@@ -1,0 +1,11 @@
+From: Alice Example <alice@example.com>
+To: airdrop@CANISTER_DOMAIN
+Cc: Bob <bob@example.com>, carol@example.com
+Subject: Airdrop invite 1b3ae1cd030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0
+Authentication-Results: mx.example; dkim=pass header.d=example.com
+
+Hi! I want to participate in the ICP airdrop.
+The app is at https://CANISTER_DOMAIN — thanks!
+
+--
+Sent from my phone
