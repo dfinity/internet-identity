@@ -4,6 +4,7 @@
 
 use super::webpush::seal::{drop_origin_seals, seal_devices_for_origin};
 use super::webpush::subscription::has_subscribed_device;
+use super::well_known::fetch_and_cache;
 use super::{authorize_query, authorize_update, check_enabled, feature_enabled, validate_origin};
 use crate::delegation::der_encode_canister_sig_key;
 use crate::state::{storage_borrow, storage_borrow_mut};
@@ -80,7 +81,7 @@ fn clear_consent(
     Ok(())
 }
 
-fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
+pub(crate) fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
     if validate_origin(&origin).is_err() {
         return false;
     }
@@ -147,6 +148,7 @@ pub async fn grant_consent(
         now_ns,
     )?;
     seal_devices_for_origin(anchor_number, &origin, now_ns).await;
+    fetch_and_cache(origin, now_ns).await;
     Ok(())
 }
 
