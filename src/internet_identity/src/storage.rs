@@ -1957,6 +1957,43 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(count)
     }
 
+    /// Removes one session. Returns whether anything was removed.
+    pub fn remove_session(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+        created_at: Timestamp,
+        device_id: SessionDeviceId,
+    ) -> Result<bool, StorageError> {
+        // One browser holds one session per account, so the browser identifies it. The
+        // creation time is a guard: it stops a caller removing a session that replaced the
+        // one it matched.
+        let present = self
+            .lookup_account_references(anchor_number, application_number)
+            .map(|list| {
+                list.into_iter()
+                    .map(AccountReference::from)
+                    .any(|reference| {
+                        reference.account_number == account_number
+                            && reference.sessions.iter().any(|session| {
+                                session.device_id == device_id && session.created_at == created_at
+                            })
+                    })
+            })
+            .unwrap_or(false);
+        if !present {
+            return Ok(false);
+        }
+
+        let dropped =
+            self.drop_session(anchor_number, application_number, account_number, device_id)?;
+        if dropped > 0 {
+            self.change_session_count(anchor_number, dropped, 0)?;
+        }
+        Ok(dropped > 0)
+    }
+
     /// Walks the anchor's rows once and reclaims down to the watermark, taking sessions in
     /// [`SessionRecord::reclaim_order`]: dead ones first, then the least recently used.
     ///
@@ -2140,6 +2177,44 @@ impl<M: Memory + Clone> Storage<M> {
             return Ok(());
         }
         self.write(anchor)
+    }
+
+    /// Removes one browser's session from one account reference, index entry included, and
+    /// reports whether anything went. Keyed by browser rather than by creation time, since
+    /// two browsers signing in during one round share a `created_at`.
+    fn drop_session(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+        device_id: SessionDeviceId,
+    ) -> Result<usize, StorageError> {
+        let mut references: Vec<AccountReference> =
+            match self.lookup_account_references(anchor_number, application_number) {
+                Some(list) => list.into_iter().map(Into::into).collect(),
+                None => return Ok(0),
+            };
+        let Some(reference) = references
+            .iter_mut()
+            .find(|reference| reference.account_number == account_number)
+        else {
+            return Ok(0);
+        };
+        let dropped: Vec<SessionRecord> = reference
+            .sessions
+            .iter()
+            .filter(|session| session.device_id == device_id)
+            .cloned()
+            .collect();
+        if dropped.is_empty() {
+            return Ok(0);
+        }
+        reference
+            .sessions
+            .retain(|session| session.device_id != device_id);
+        self.write_reference_list(anchor_number, application_number, references)?;
+        self.unindex_sessions(anchor_number, application_number, account_number, &dropped);
+        Ok(dropped.len())
     }
 
     /// Drops the index entries of sessions that have just been removed from a row.
