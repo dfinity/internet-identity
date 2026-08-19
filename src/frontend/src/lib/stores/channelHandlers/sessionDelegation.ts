@@ -2,17 +2,20 @@ import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 import {
   Base64ToBytesCodec,
   Base64ToPublicKeyCodec,
+  INTERACTION_REQUIRED_ERROR_CODE,
   INVALID_PARAMS_ERROR_CODE,
   OriginSchema,
   StringToBigIntCodec,
 } from "$lib/utils/transport/utils";
 import {
+  authorizationPromptStore,
   authorizationStore,
   authorizedStore,
 } from "$lib/stores/authorization.store";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import {
   appSessionsForOrigin,
+  discardAppSession,
   storeAppSession,
   type AppSessionRecord,
 } from "$lib/stores/app-session.store";
@@ -20,14 +23,23 @@ import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 import { toPermissionsArg } from "$lib/utils/accessLevel";
 import { retryFor, throwCanisterError, waitForStore } from "$lib/utils/utils";
-import { canisterId } from "$lib/globals";
+import { agentOptions, canisterId } from "$lib/globals";
+import { Actor, HttpAgent } from "@icp-sdk/core/agent";
+import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
+import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { Principal } from "@icp-sdk/core/principal";
 import {
   Delegation,
   DelegationChain,
+  DelegationIdentity,
   ECDSAKeyIdentity,
 } from "@icp-sdk/core/identity";
 import type { PublicKey, Signature } from "@icp-sdk/core/agent";
+import { get } from "svelte/store";
+import {
+  chooseSilentSession,
+  type SilentDenial,
+} from "../../../routes/(new-styling)/authorize/silentReauth";
 import { serializeAuthorizationRequest } from "$lib/stores/channelHandlers/serialize";
 import { withBrowserProof } from "$lib/stores/browser-key.store";
 import { describeBrowser } from "$lib/stores/channelHandlers/describeBrowser";
@@ -114,6 +126,30 @@ const extendToApp = async (
   );
 
 /**
+ * Whether the canister still holds the session this record names.
+ *
+ * A record can outlive its session: revoking from settings or from another app leaves
+ * this browser's copy in place. Answering from the record alone would hand the app a
+ * chain that cannot mint, and the failure would surface later as something the client
+ * cannot tell apart from a real error.
+ */
+const sessionIsLive = async (record: AppSessionRecord): Promise<boolean> => {
+  try {
+    const identity = DelegationIdentity.fromDelegation(
+      await ECDSAKeyIdentity.fromKeyPair(record.keyPair),
+      DelegationChain.fromJSON(JSON.parse(record.chainJson)),
+    );
+    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+      agent: HttpAgent.createSync({ ...agentOptions, identity }),
+      canisterId,
+    });
+    return await actor.check_session();
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Obtains the session an app re-issues its own delegations from.
  *
  * The response carries a session and nothing else: the app mints its first app
@@ -132,6 +168,19 @@ export const handleSessionDelegationRequest =
     }
     const requestId = request.id;
 
+    const isSilent = get(authorizationPromptStore).prompt === "none";
+    const deny = async (reason: SilentDenial) => {
+      await channel.send({
+        jsonrpc: "2.0",
+        id: requestId,
+        error: {
+          code: INTERACTION_REQUIRED_ERROR_CODE,
+          message: "Interaction required",
+          data: { reason },
+        },
+      });
+    };
+
     const parsed = SessionParamsCodec.safeParse(request.params);
     if (!parsed.success) {
       await channel.send({
@@ -142,7 +191,12 @@ export const handleSessionDelegationRequest =
           message: z.prettifyError(parsed.error),
         },
       });
-      onError("invalid-request");
+      // A malformed request is still a protocol error rather than a denial, so the code
+      // stays INVALID_PARAMS. What the silent path must not do is render: it was asked to
+      // answer without showing the user anything, and that holds however it fails.
+      if (!isSilent) {
+        onError("invalid-request");
+      }
       return;
     }
 
@@ -154,6 +208,10 @@ export const handleSessionDelegationRequest =
           derivationOrigin: params.icrc95DerivationOrigin,
         });
         if (validation.result === "invalid") {
+          if (isSilent) {
+            await deny("login_required");
+            return;
+          }
           onError("unverified-origin");
           return;
         }
@@ -162,11 +220,30 @@ export const handleSessionDelegationRequest =
           params.icrc95DerivationOrigin ?? channel.origin,
         );
 
-        const held = await appSessionsForOrigin(effectiveOrigin);
-        const reusable = held.length === 1 ? held[0] : undefined;
-        if (reusable !== undefined) {
+        const { prompt, hint } = get(authorizationPromptStore);
+        // Silence is something an app asks for. Anything else, an absent `prompt` included,
+        // runs the ceremony, so a held session is never handed over without the user
+        // seeing a screen they did not request.
+        const held =
+          prompt === "none" ? await appSessionsForOrigin(effectiveOrigin) : [];
+        const chosen = chooseSilentSession({ held, hint });
+
+        let usable =
+          "record" in chosen
+            ? held.find((entry) => entry.record === chosen.record)
+            : undefined;
+        if (usable && !(await sessionIsLive(usable.record))) {
+          await discardAppSession({
+            identityNumber: usable.identityNumber,
+            accountNumber: usable.accountNumber,
+            origin: effectiveOrigin,
+          });
+          usable = undefined;
+        }
+
+        if (usable) {
           const chain = await extendToApp(
-            reusable.record,
+            usable.record,
             params.sessionPublicKey,
           );
           await channel.send({
@@ -176,6 +253,11 @@ export const handleSessionDelegationRequest =
               chain,
             }),
           });
+          return;
+        }
+
+        if (isSilent) {
+          await deny("denial" in chosen ? chosen.denial : "login_required");
           return;
         }
 
@@ -193,6 +275,10 @@ export const handleSessionDelegationRequest =
         });
       } catch (error) {
         console.error(error);
+        if (isSilent) {
+          await deny("login_required");
+          return;
+        }
         onError("delegation-failed");
       }
     });
