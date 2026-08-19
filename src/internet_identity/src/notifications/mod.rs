@@ -6,7 +6,10 @@
 //! `anchor_number` — keeping the storage logic testable off-canister.
 
 pub mod consent;
+pub mod send;
+pub mod sender;
 pub mod webpush;
+pub mod well_known;
 
 use crate::authz_utils::{check_authorization, check_authz_and_record_activity};
 use internet_identity_interface::internet_identity::types::AnchorNumber;
