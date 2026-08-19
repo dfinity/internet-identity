@@ -6,6 +6,7 @@ pub mod jwt_pool;
 pub mod rfc8291;
 pub mod seal;
 pub mod subscription;
+pub mod vapid_jwt;
 
 /// Relay endpoints run ~200-300 bytes; capped at 1 KiB.
 pub const MAX_ENDPOINT_LEN: usize = 1024;

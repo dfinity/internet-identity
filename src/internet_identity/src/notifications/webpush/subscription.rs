@@ -140,10 +140,16 @@ pub async fn subscribe_device(
 pub fn unsubscribe_device(anchor_number: AnchorNumber, endpoint: String) -> Result<(), String> {
     check_enabled()?;
     authorize_update(anchor_number)?;
-    let endpoint_hash = StorableEndpointSha256::from_endpoint(&endpoint);
-    remove_subscription(anchor_number, &endpoint);
-    drop_device_seals(anchor_number, &endpoint_hash);
+    prune_device(anchor_number, &endpoint);
     Ok(())
+}
+
+/// Tears a device down completely: subscription, JWT pool, and seals.
+/// Unauthenticated because the relay (via a 410), not the user, triggers it.
+pub(crate) fn prune_device(anchor_number: AnchorNumber, endpoint: &str) {
+    let endpoint_hash = StorableEndpointSha256::from_endpoint(endpoint);
+    remove_subscription(anchor_number, endpoint);
+    drop_device_seals(anchor_number, &endpoint_hash);
 }
 
 /// Whether `anchor_number` has at least one subscribed device (any endpoint).
