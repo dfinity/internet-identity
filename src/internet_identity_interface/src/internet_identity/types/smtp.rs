@@ -275,6 +275,64 @@ pub fn validate_message(message: &SmtpMessage) -> Result<(), SmtpResponse> {
     Ok(())
 }
 
+/// Reject header field bodies carrying characters a conforming MTA
+/// would not send.
+///
+/// Deliberately not part of [`validate_message`]: an `Err` from that
+/// becomes the `SmtpResponse` the gateway bounces on, and a bounce for
+/// a malformed value would be addressed to whatever envelope sender the
+/// message claimed. The inbound path calls this and drops the message
+/// while still answering `Ok`.
+pub fn validate_header_values(message: &SmtpMessage) -> Result<(), SmtpResponse> {
+    for header in &message.headers {
+        validate_header_value_chars(&header.name, &header.value)?;
+    }
+    Ok(())
+}
+
+/// Reject C0 control characters in a header field body. HTAB is legal
+/// inside a field body (RFC 5322 §3.2.2), and a `CRLF` immediately
+/// followed by SP or HTAB is folding white space (§2.2.3) rather than a
+/// line break. Every other CR or LF ends the field early, so a value
+/// carrying one describes two headers instead of the one the caller
+/// declared; the remaining C0 bytes cannot appear in a field body at
+/// all.
+///
+/// The gateway can hand us the field body with its terminating CRLF
+/// still attached, so one trailing CR/LF run is dropped before the scan.
+fn validate_header_value_chars(name: &str, value: &str) -> Result<(), SmtpResponse> {
+    let bytes = value.trim_end_matches(['\r', '\n']).as_bytes();
+    let crlf_err = || {
+        smtp_err(
+            SMTP_ERR_SYNTAX_ERROR,
+            format!("Header '{name}' value contains a malformed CR/LF sequence"),
+        )
+    };
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\t' => i += 1,
+            b'\r' => {
+                if bytes.get(i + 1).copied() != Some(b'\n')
+                    || !matches!(bytes.get(i + 2).copied(), Some(b' ' | b'\t'))
+                {
+                    return Err(crlf_err());
+                }
+                i += 2;
+            }
+            b'\n' => return Err(crlf_err()),
+            b if b < 0x20 => {
+                return Err(smtp_err(
+                    SMTP_ERR_SYNTAX_ERROR,
+                    format!("Header '{name}' value contains a control character"),
+                ));
+            }
+            _ => i += 1,
+        }
+    }
+    Ok(())
+}
+
 /// Enforce RFC 5322 §3.6 header occurrence rules: `From` and `Date`
 /// must appear exactly once; `Sender`, `Reply-To`, `To`, `Cc`, `Bcc`,
 /// `Subject`, `Message-ID`, `In-Reply-To`, and `References` must not
@@ -511,6 +569,67 @@ mod tests {
         };
         let resp = validate_message(&msg).unwrap_err();
         assert!(err_msg(&resp).contains("Body size"));
+    }
+
+    #[test]
+    fn validate_header_values_rejects_embedded_bare_newline() {
+        let mut headers = minimal_headers();
+        headers.push(header("Subject", "hello\nX-Injected: yes"));
+        let resp = validate_header_values(&message_with(headers)).unwrap_err();
+        assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
+        assert!(err_msg(&resp).contains("malformed CR/LF"));
+    }
+
+    #[test]
+    fn validate_header_values_rejects_embedded_crlf_without_folding_wsp() {
+        let mut headers = minimal_headers();
+        headers.push(header("Subject", "hello\r\nX-Injected: yes"));
+        let resp = validate_header_values(&message_with(headers)).unwrap_err();
+        assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
+        assert!(err_msg(&resp).contains("malformed CR/LF"));
+    }
+
+    #[test]
+    fn validate_header_values_rejects_lone_cr() {
+        let mut headers = minimal_headers();
+        headers.push(header("Subject", "hello\rworld"));
+        let resp = validate_header_values(&message_with(headers)).unwrap_err();
+        assert!(err_msg(&resp).contains("malformed CR/LF"));
+    }
+
+    #[test]
+    fn validate_header_values_accepts_folded_value() {
+        let mut headers = minimal_headers();
+        headers.push(header(
+            "Subject",
+            "first line\r\n second line\r\n\tthird line",
+        ));
+        assert!(validate_header_values(&message_with(headers)).is_ok());
+    }
+
+    #[test]
+    fn validate_header_values_accepts_value_with_gateway_trailing_crlf() {
+        let mut headers = minimal_headers();
+        headers.push(header("Subject", "hello\r\n"));
+        assert!(validate_header_values(&message_with(headers)).is_ok());
+    }
+
+    #[test]
+    fn validate_header_values_accepts_htab_in_value() {
+        let mut headers = minimal_headers();
+        headers.push(header("Subject", "hello\tworld"));
+        assert!(validate_header_values(&message_with(headers)).is_ok());
+    }
+
+    #[test]
+    fn validate_header_values_rejects_c0_control_characters() {
+        for value in ["hello\0world", "hello\x07world", "hello\x1bworld"] {
+            let mut headers = minimal_headers();
+            headers.push(header("Subject", value));
+            let resp = validate_header_values(&message_with(headers)).unwrap_err();
+            assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
+            assert!(err_msg(&resp).contains("control character"));
+        }
     }
 
     #[test]
