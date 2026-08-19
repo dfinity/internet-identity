@@ -418,11 +418,17 @@ An expired record and a revoked one are the same outcome, since a revoked one is
 
 Refresh stamps `last_refreshed`. Naively that is a stable write on every call, and since `with_account_mut` rewrites the entire `(anchor, app)` reference-list blob, it rewrites the whole row rather than one field.
 
-**Coalesce it.** Persist only when the stamp would advance by more than a coarsening interval, proposed at one hour. A security signal needs hour resolution, not five-minute resolution: nobody distinguishes "used 4 minutes ago" from "used 9 minutes ago", while "an hour ago" against "five weeks ago" is the entire point. That turns twelve writes per hour per session into one.
+**Write it every time.** An earlier revision of this design coalesced the stamp to at most one write an hour, on the grounds that finer resolution had no reader. It now has three, and each of them is harmed by an hour of slack:
 
-It is also small next to what the call already does. Every refresh inserts a canister signature and calls `update_root_hash()`, which rehashes the certified tree. A BTreeMap overwrite of a few hundred bytes is minor beside that. So the reason to coalesce is not that one write is expensive, it is that twelve per hour per active session is pointless when one carries the same information.
+- The §4.1 session cap evicts the smallest `last_refreshed`. Within a coarsening interval every session looks equally idle, so the eviction picks arbitrarily among them.
+- The device registry cap in §9.1 orders on the same signal, and an hour is long enough to drop a browser that is in use.
+- The user-facing reading this field exists for. "Used 3 minutes ago" that can be an hour stale does not answer the question it is there to answer.
 
-**The same coalesced write should stamp the reference's `last_used` as well.** An earlier version of this design had refresh deliberately skip it, purely to avoid a write; once the write happens anyway, keeping `last_used` honest is free, and it keeps the account-level eviction in `tracked-default-accounts.md` accurate for accounts that are only ever reached through a session.
+The write is small next to what the call already does. Every refresh inserts a canister signature and calls `update_root_hash()`, which rehashes the certified tree. A BTreeMap overwrite of a few hundred bytes is minor beside that.
+
+**The same write stamps the reference's `last_used` as well.** An earlier version of this design had refresh deliberately skip it, purely to avoid a write; once the write happens anyway, keeping `last_used` honest is free, and it keeps the account-level eviction in `tracked-default-accounts.md` accurate for accounts that are only ever reached through a session.
+
+**And it stamps the device registry's `last_used`,** so §9.1's cap can order on use. This is an anchor write on a call that §9.3 otherwise keeps off the anchor entirely; that section covers what the trade buys.
 
 The two timestamps are different fields for different jobs and both are needed:
 
@@ -430,6 +436,7 @@ The two timestamps are different fields for different jobs and both are needed:
 | ----- | -------- | ------ |
 | `last_used` | the account reference | account eviction in `tracked-default-accounts.md` §6 |
 | `last_refreshed` | the session record | the §4.1 cap eviction and the user-facing session list |
+| `last_used` | the device record | the §9.1 registry cap eviction and the settings device list |
 
 ## 8. Revocation
 
@@ -535,9 +542,15 @@ A new additive field on `StorableAnchor`, following the pattern every field ther
 pub session_devices: Option<Vec<StorableSessionDevice>>,
 ```
 
-with `{ id, name, created_at }` per entry, **capped at 20** because the anchor blob is read on nearly every authenticated path, so an unbounded list taxes far more than sessions.
+with `{ id, name, created_at, last_used }` per entry, **capped at 20** because the anchor blob is read on nearly every authenticated path, so an unbounded list taxes far more than sessions.
 
-Reading needs no method: devices live on `StorableAnchor`, so they ride on `identity_info` alongside `mcp_config`, which is carried there for exactly this reason.
+**At the cap, registration evicts the smallest `last_used`** rather than failing, for the same reason §4.1 gives for sessions: the user is signing in on a new browser and the only thing that could refuse them is internal bookkeeping.
+
+Ordering on use rather than on `created_at` is load-bearing, not a nicety. Clearing browser storage loses the cached id (§9.6), so every wipe enrols a fresh record and the wiping browser always holds the newest `created_at`. Under enrolment order it is therefore never its own victim: twenty wipes evict twenty genuinely-used browsers instead. Since eviction also ends the dropped browser's sessions, that signs the user out on devices they never touched. Ordering on `last_used` makes each wipe's throwaway records evict each other.
+
+`last_used` advances on a sign-in from that browser and on every session refresh it drives (§7.3). Sign-in alone would be too coarse a signal: a browser holding an app open for weeks without a fresh ceremony would read as idle and lose the cap to one that signed in once and went dark.
+
+Reading needs no method: devices live on `StorableAnchor`, so they ride on `identity_info` alongside `mcp_config`, which is carried there for exactly this reason. `last_used` rides along with them, which is what lets the settings list say when a browser was last used rather than only when it was added — the question someone deciding what to sign out is actually asking.
 
 ### 9.2 The canister allocates the id, during the auth flow
 
@@ -560,7 +573,9 @@ Deleting a device record is therefore a separate operation from signing one out,
 
 The sweep runs over that anchor's references in one message: the anchor-major range scan the eviction path already performs, bounded at 1000 rows by `tracked-default-accounts.md` §7.3, writing only rows that actually hold that device's sessions. Atomic, with no partially-revoked state.
 
-Doing it eagerly is what keeps refresh cheap. The alternative, marking a device revoked and checking it during refresh, makes revocation O(1) but adds an anchor read to a call that otherwise never touches the anchor, since refresh authenticates by session chain and never runs `check_authorization`. Refresh happens every few minutes per active session; revocation is rare.
+The alternative is to mark a device revoked and check the mark during refresh, which makes revocation O(1) and pushes the cost onto every refresh. The eager sweep is still the right shape, but on a stronger ground than cost: it leaves no partially-revoked state and no window in which a revoked session is merely ignored rather than gone. Revocation is rare, and paying for it once where it happens is worth an unambiguous outcome.
+
+An earlier revision of this design justified the sweep by noting that refresh never touches the anchor at all, since it authenticates by session chain and never runs `check_authorization`. §7.3 has since spent that property: stamping the device's `last_used` is an anchor write on the refresh path. It buys the device list a use signal that a sign-in stamp cannot give it (§9.1), and the eager sweep does not depend on it.
 
 ### 9.4 Where a device id may be supplied
 
@@ -574,7 +589,7 @@ The frontend caches one id per anchor, which is deliberate. One id shared across
 
 Registration is archived with the name redacted, following `Operation::CreateAccount { name: Private }`. Once per browser per anchor is rare enough to archive, unlike the per-sign-in events that design keeps out of the archive.
 
-The name is self-reported by the client, so it is a label for the user rather than evidence about where a session came from. And clearing browser storage produces a second entry for the same physical device, so the settings UI needs a way to delete stale ones.
+The name is self-reported by the client, so it is a label for the user rather than evidence about where a session came from. And clearing browser storage produces a second entry for the same physical device. The §9.1 cap keeps that bounded and spends itself on the throwaway records rather than on the browsers the user recognises, so repeated wipes cost a cluttered list rather than a lost sign-in; a way to delete stale entries outright still belongs with the listing work.
 
 ---
 
@@ -589,7 +604,7 @@ Revocation latency, app-delegation TTL and refresh rate are one number. Refresh 
 
 Each is a replicated update that inserts a signature and updates the root hash, against a single canister on one subnet.
 
-Note the stable write from §7.3 does **not** scale with `1/T`, because the stamp is coalesced to a fixed interval. Lowering `T` multiplies the calls, not the writes.
+Note the stable writes from §7.3 scale with `1/T` alongside the calls, since every refresh stamps. Lowering `T` multiplies both.
 
 
 
@@ -649,7 +664,7 @@ Also out of scope: whether to fold MCP's grant into this mechanism. The value sh
 | S10a | One app keypair, carrying both the session chain and the app delegation | 6.2 |
 | S11 | The locator arrives as canister-signed caller info on the ingress message, read with `msg_caller_info_signer` / `msg_caller_info_data` as the gated-SSO bundle already is, never as a call argument | 7.1 |
 | S12 | Resolve the principal through the existing index, then match `caller()` by seed over the at-most-ten records. The match is what stops an app delegation renewing itself | 7.2 |
-| S13 | Refresh stamps `last_refreshed` and `last_used`, coalesced to at most one write per hour per session | 7.4 |
+| S13 | Every refresh stamps `last_refreshed`, the reference's `last_used`, and the device's `last_used` | 7.4 |
 | S14 | Two revocation surfaces: the app revokes only its own session via its session chain, the II frontend revokes any via an access method | 8.1 |
 | S15 | App-side sign-out returns nothing and always succeeds, so it is idempotent | 8.1 |
 | S15a | Session errors are distinguishable, not collapsed: there is no oracle to hide from | 7.1, 11 |
@@ -657,9 +672,9 @@ Also out of scope: whether to fold MCP's grant into this mechanism. The value sh
 | S16a | No session listing method. Application listing, then per-application sessions, is the right shape and is deferred | 8.2 |
 | S17 | Revocation latency is exactly the app-delegation TTL, by construction | 8.3 |
 | S17a | The app-delegation TTL is 5 minutes, matching MCP, and is not requestable by the app | 10, 7.1 |
-| S18 | Device registry is `StorableAnchor` field 7, capped at 20, read through `identity_info` | 9.1 |
+| S18 | Device registry is `StorableAnchor` field 7, capped at 20 with least-recently-used eviction, read through `identity_info` | 9.1 |
 | S19 | Device registration is not a method. `device_name` and `device_id` on `prepare_account_session` resolve or register, and the id comes back in the response; the canister allocates from a monotonic per-anchor `next_id` | 9.2 |
-| S20 | Signing a browser out is an eager atomic sweep of its sessions, so refresh never reads the anchor. The device record survives, so ids stay stable and deleting a record is a separate, deferred operation | 9.3 |
+| S20 | Signing a browser out is an eager atomic sweep of its sessions, leaving no partially-revoked state. The device record survives, so ids stay stable and deleting a record is a separate, deferred operation | 9.3 |
 | S21 | Only `prepare_account_session` accepts a device id, so no dapp-reachable surface takes one | 9.4 |
 | S22 | The device id is per anchor, never browser-global | 9.5 |
 | S23 | Nothing changes for apps on `icrc34_delegation`; opting in means upgrading the client | 11 |
