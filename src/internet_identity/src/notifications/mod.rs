@@ -6,6 +6,7 @@
 //! `anchor_number` — keeping the storage logic testable off-canister.
 
 pub mod consent;
+pub mod delivery;
 pub mod send;
 pub mod sender;
 pub mod webpush;
