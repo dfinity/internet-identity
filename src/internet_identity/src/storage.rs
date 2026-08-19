@@ -301,6 +301,17 @@ const BUCKET_SIZE_IN_PAGES: u16 = 128;
 const MAX_MANAGED_MEMORY_SIZE: u64 = 256 * GB;
 const MAX_MANAGED_WASM_PAGES: u64 = MAX_MANAGED_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES;
 
+/// Per-anchor cap on reference-list rows that hold nothing but a tracked default
+/// account.
+const MAX_EVICTABLE_DEFAULT_ACCOUNTS: u64 = 500;
+
+/// Eviction target, below the cap.
+const EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK: u64 = MAX_EVICTABLE_DEFAULT_ACCOUNTS * 9 / 10;
+
+/// Bounds one message's eviction work.
+const MAX_EVICTIONS_PER_CALL: u64 =
+    MAX_EVICTABLE_DEFAULT_ACCOUNTS - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK;
+
 /// The maximum number of anchors this canister can store.
 pub const MAX_ENTRIES: u64 = (MAX_MANAGED_WASM_PAGES - BUCKET_SIZE_IN_PAGES as u64) // deduct one bucket for the archive entries buffer
     * WASM_PAGE_SIZE_IN_BYTES
@@ -1694,6 +1705,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
+    /// Stamps `last_used`, tracking the default account on first use at an origin.
     pub fn set_account_last_used(
         &mut self,
         anchor_number: AnchorNumber,
@@ -1701,16 +1713,152 @@ impl<M: Memory + Clone> Storage<M> {
         account_number: Option<AccountNumber>,
         now: Timestamp,
     ) -> Result<Option<()>, StorageError> {
-        let application_number = self.lookup_application_number_with_origin(&origin);
+        if let Some(application_number) = self.lookup_application_number_with_origin(&origin) {
+            if self
+                .lookup_account_references(anchor_number, application_number)
+                .is_some()
+            {
+                return self.with_account_mut(
+                    anchor_number,
+                    Some(application_number),
+                    account_number,
+                    |account_reference, _| {
+                        account_reference.last_used = Some(now);
+                    },
+                );
+            }
+        }
 
-        self.with_account_mut(
+        if account_number.is_some() {
+            return Ok(None);
+        }
+
+        let application_number = self.lookup_or_insert_application_number_with_origin(&origin);
+        self.write_reference_list(
             anchor_number,
             application_number,
-            account_number,
-            |account_reference, _| {
-                account_reference.last_used = Some(now);
-            },
-        )
+            vec![AccountReference {
+                account_number: None,
+                last_used: Some(now),
+            }],
+        )?;
+        self.evict_idle_tracked_defaults(anchor_number, application_number)?;
+        Ok(Some(()))
+    }
+
+    /// Writes the reference-list row an `AnchorApplicationConfig` row implies, leaving
+    /// `last_used` unset.
+    pub fn ensure_account_reference_list(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+    ) -> Result<(), StorageError> {
+        if self
+            .lookup_account_references(anchor_number, application_number)
+            .is_some()
+        {
+            return Ok(());
+        }
+
+        self.write_reference_list(
+            anchor_number,
+            application_number,
+            vec![AccountReference {
+                account_number: None,
+                last_used: None,
+            }],
+        )?;
+        self.evict_idle_tracked_defaults(anchor_number, application_number)
+    }
+
+    /// Removes a reference-list row and everything derived from it.
+    fn remove_reference_list(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+    ) -> Result<(), StorageError> {
+        let key = (anchor_number, application_number);
+        let Some(previous) = self
+            .stable_account_reference_list_memory
+            .get(&key)
+            .map(Vec::<AccountReference>::from)
+        else {
+            return Ok(());
+        };
+        let application = self
+            .stable_application_memory
+            .get(&application_number)
+            .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
+
+        self.stable_account_reference_list_memory.remove(&key);
+        self.stable_anchor_application_config_memory.remove(&key);
+
+        let deltas = ReferenceListDeltas::between(&previous, &[]);
+        self.apply_reference_counter_deltas(anchor_number, application_number, application, deltas);
+
+        Ok(())
+    }
+
+    /// Rows whose only reference is a tracked default.
+    fn evictable_default_rows(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> Vec<(ApplicationNumber, Option<Timestamp>)> {
+        self.stable_account_reference_list_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .filter_map(|((_, application_number), list)| {
+                let references = list.into_vec();
+                match references.as_slice() {
+                    [tracked_default] if tracked_default.account_number.is_none() => {
+                        Some((application_number, tracked_default.last_used))
+                    }
+                    _ => None,
+                }
+            })
+            .collect()
+    }
+
+    /// Upper bound on an anchor's evictable rows, from counters that already exist.
+    fn tracked_default_account_upper_bound(&self, anchor_number: AnchorNumber) -> u64 {
+        let counter = self.get_account_counter(anchor_number);
+        counter
+            .stored_account_references
+            .saturating_sub(counter.stored_accounts)
+    }
+
+    /// Drops the least recently used evictable defaults once the anchor is at the cap.
+    fn evict_idle_tracked_defaults(
+        &mut self,
+        anchor_number: AnchorNumber,
+        just_written: ApplicationNumber,
+    ) -> Result<(), StorageError> {
+        if self.tracked_default_account_upper_bound(anchor_number) < MAX_EVICTABLE_DEFAULT_ACCOUNTS
+        {
+            return Ok(());
+        }
+
+        let mut candidates: Vec<_> = self
+            .evictable_default_rows(anchor_number)
+            .into_iter()
+            .filter(|(application_number, _)| *application_number != just_written)
+            .collect();
+        if candidates.len() as u64 <= EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK {
+            return Ok(());
+        }
+
+        candidates.sort_by_key(|(application_number, last_used)| (*last_used, *application_number));
+
+        let victims = u64::min(
+            candidates.len() as u64 - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK,
+            MAX_EVICTIONS_PER_CALL,
+        );
+        for (application_number, _) in candidates.into_iter().take(victims as usize) {
+            self.remove_reference_list(anchor_number, application_number)?;
+        }
+
+        Ok(())
     }
 
     pub fn lookup_anchor_application_config(
@@ -1819,14 +1967,34 @@ impl<M: Memory + Clone> Storage<M> {
             application.stored_accounts,
             application.stored_account_references,
         );
-        self.stable_application_memory.insert(
-            application_number,
-            StorableApplication {
-                origin: application.origin,
-                stored_accounts,
-                stored_account_references,
-            },
-        );
+        if stored_account_references == 0 {
+            self.remove_unreferenced_application(application_number, &application.origin);
+        } else {
+            self.stable_application_memory.insert(
+                application_number,
+                StorableApplication {
+                    origin: application.origin,
+                    stored_accounts,
+                    stored_account_references,
+                },
+            );
+        }
+    }
+
+    /// Retires an application no anchor references any more. The number is never
+    /// reissued.
+    fn remove_unreferenced_application(
+        &mut self,
+        application_number: ApplicationNumber,
+        origin: &str,
+    ) {
+        self.stable_application_memory.remove(&application_number);
+
+        let origin_key = StorableOriginSha256::from_origin(&origin.to_string());
+        if self.lookup_application_with_origin_memory.get(&origin_key) == Some(application_number) {
+            self.lookup_application_with_origin_memory
+                .remove(&origin_key);
+        }
     }
 
     /// This is for testing purposes only, DO NOT use anywhere else!
