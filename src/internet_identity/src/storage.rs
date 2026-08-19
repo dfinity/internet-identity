@@ -1957,6 +1957,51 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(count)
     }
 
+    /// Removes the sessions an anchor names by locator and creation time. Two browsers
+    /// signing in during the same round share a `created_at`, so this can match both.
+    pub fn revoke_account_sessions(
+        &mut self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+        account_number: Option<AccountNumber>,
+        created_at: Timestamp,
+    ) -> Result<u64, StorageError> {
+        let Some(application_number) = self.lookup_application_number_with_origin(origin) else {
+            return Ok(0);
+        };
+        let Some(references) = self.lookup_account_references(anchor_number, application_number)
+        else {
+            return Ok(0);
+        };
+        let mut references: Vec<AccountReference> =
+            references.into_iter().map(Into::into).collect();
+
+        let Some(reference) = references
+            .iter_mut()
+            .find(|reference| reference.account_number == account_number)
+        else {
+            return Ok(0);
+        };
+
+        let dropped: Vec<SessionRecord> = reference
+            .sessions
+            .iter()
+            .filter(|session| session.created_at == created_at)
+            .cloned()
+            .collect();
+        if dropped.is_empty() {
+            return Ok(0);
+        }
+        reference
+            .sessions
+            .retain(|session| session.created_at != created_at);
+
+        self.write_reference_list(anchor_number, application_number, references)?;
+        self.unindex_sessions(anchor_number, application_number, account_number, &dropped);
+        self.change_session_count(anchor_number, dropped.len(), 0)?;
+        Ok(dropped.len() as u64)
+    }
+
     /// Removes one session. Returns whether anything was removed.
     pub fn remove_session(
         &mut self,

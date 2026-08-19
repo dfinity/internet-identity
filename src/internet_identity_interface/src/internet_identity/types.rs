@@ -845,3 +845,25 @@ pub enum AppSessionError {
     NoMatchingSession,
     InternalCanisterError(String),
 }
+
+/// Revokes one session of an anchor, named by where it was created.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RevokeAccountSessionRequest {
+    pub identity_number: IdentityNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub created_at: Timestamp,
+}
+
+/// Signs one browser out of every app it is signed into.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RevokeDeviceSessionsRequest {
+    pub identity_number: IdentityNumber,
+    pub device_id: SessionDeviceId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SessionRevokeError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}

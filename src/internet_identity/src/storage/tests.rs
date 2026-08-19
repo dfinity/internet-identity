@@ -4984,3 +4984,142 @@ mod session_removal_tests {
             .is_some());
     }
 }
+
+mod session_revocation_tests {
+    use crate::storage::account::AccountReference;
+    use crate::storage::CreateSessionParams;
+    use crate::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        (storage, anchor_number)
+    }
+
+    fn create(
+        storage: &mut Storage<VectorMemory>,
+        anchor_number: AnchorNumber,
+        origin: &str,
+        device_id: u32,
+        now: u64,
+    ) {
+        storage
+            .create_session(CreateSessionParams {
+                anchor_number,
+                origin: origin.to_string(),
+                account_number: None,
+                device_id,
+                valid_till: u64::MAX,
+                read_only: false,
+                now,
+            })
+            .unwrap();
+    }
+
+    fn device_ids(
+        storage: &Storage<VectorMemory>,
+        anchor_number: AnchorNumber,
+        origin: &str,
+    ) -> Vec<u32> {
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin.to_string())
+            .unwrap();
+        storage
+            .lookup_account_references(anchor_number, application_number)
+            .unwrap()
+            .into_iter()
+            .map(AccountReference::from)
+            .find(|reference| reference.account_number.is_none())
+            .unwrap()
+            .sessions
+            .into_iter()
+            .map(|session| session.device_id)
+            .collect()
+    }
+
+    #[test]
+    fn signing_a_browser_out_sweeps_every_application() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        create(&mut storage, anchor_number, "https://a.com", 1, 1_000);
+        create(&mut storage, anchor_number, "https://b.com", 1, 1_000);
+        create(&mut storage, anchor_number, "https://a.com", 2, 1_000);
+
+        let removed = storage.revoke_device_sessions(anchor_number, 1).unwrap();
+
+        assert_eq!(removed, 2);
+        assert_eq!(
+            device_ids(&storage, anchor_number, "https://a.com"),
+            vec![2]
+        );
+        assert_eq!(
+            device_ids(&storage, anchor_number, "https://b.com"),
+            Vec::<u32>::new()
+        );
+    }
+
+    #[test]
+    fn signing_a_browser_out_leaves_another_anchor_alone() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let other = storage.allocate_anchor(0).unwrap();
+        let other_anchor_number = other.anchor_number();
+        storage.write(other).unwrap();
+        create(&mut storage, anchor_number, "https://a.com", 1, 1_000);
+        create(&mut storage, other_anchor_number, "https://a.com", 1, 1_000);
+
+        storage.revoke_device_sessions(anchor_number, 1).unwrap();
+
+        assert_eq!(
+            device_ids(&storage, other_anchor_number, "https://a.com"),
+            vec![1]
+        );
+    }
+
+    #[test]
+    fn signing_out_a_browser_with_nothing_to_revoke_writes_nothing() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        create(&mut storage, anchor_number, "https://a.com", 1, 1_000);
+
+        let removed = storage.revoke_device_sessions(anchor_number, 9).unwrap();
+
+        assert_eq!(removed, 0);
+        assert_eq!(
+            device_ids(&storage, anchor_number, "https://a.com"),
+            vec![1]
+        );
+    }
+
+    #[test]
+    fn revoking_by_creation_time_covers_same_round_siblings() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        create(&mut storage, anchor_number, "https://a.com", 1, 1_000);
+        create(&mut storage, anchor_number, "https://a.com", 2, 1_000);
+        create(&mut storage, anchor_number, "https://a.com", 3, 2_000);
+
+        let removed = storage
+            .revoke_account_sessions(anchor_number, &"https://a.com".to_string(), None, 1_000)
+            .unwrap();
+
+        assert_eq!(removed, 2);
+        assert_eq!(
+            device_ids(&storage, anchor_number, "https://a.com"),
+            vec![3]
+        );
+    }
+
+    #[test]
+    fn revoking_at_an_unknown_origin_is_a_no_op() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        let removed = storage
+            .revoke_account_sessions(anchor_number, &"https://nope.com".to_string(), None, 1_000)
+            .unwrap();
+
+        assert_eq!(removed, 0);
+    }
+}

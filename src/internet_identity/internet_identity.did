@@ -1092,6 +1092,23 @@ type AppGetDelegationRequest = record {
     expiration : Timestamp;
 };
 
+type RevokeAccountSessionRequest = record {
+    identity_number : UserNumber;
+    origin : text;
+    account_number : opt AccountNumber;
+    created_at : Timestamp;
+};
+
+type RevokeDeviceSessionsRequest = record {
+    identity_number : UserNumber;
+    device_id : nat32;
+};
+
+type SessionRevokeError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
 type AppSessionError = variant {
     // No usable session behind this caller: revoked, expired, pruned, or never one at
     // all. One outcome, because which of those it is depends on whether a prune has run
@@ -1971,6 +1988,12 @@ service : (opt InternetIdentityInit) -> {
     // that retries, or that signs out twice, does not have to reason about whether its
     // session was already gone. An app can revoke only its own session.
     app_revoke_session : () -> ();
+
+    // Revocation from the user's own settings, authenticated by an anchor access method
+    // rather than by a session chain. Sessions are named by locator, never by principal,
+    // so these do not touch the principal index.
+    revoke_account_session : (RevokeAccountSessionRequest) -> (variant { Ok; Err : SessionRevokeError });
+    revoke_device_sessions : (RevokeDeviceSessionsRequest) -> (variant { Ok; Err : SessionRevokeError });
 
     prepare_account_delegation : (
         anchor_number : UserNumber,
