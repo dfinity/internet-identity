@@ -5,7 +5,9 @@
 
 import { bufFromBufLike } from "$lib/utils/utils";
 
-const SERVICE_WORKER_URL = "/push-sw.js";
+// SvelteKit bundles the worker here; it is registered on opt-in rather than on
+// every load (kit.serviceWorker.register is off).
+const SERVICE_WORKER_URL = "/service-worker.js";
 
 export interface PushSubscriptionKeys {
   endpoint: string;
@@ -25,7 +27,9 @@ export const requestNotificationPermission = async (): Promise<boolean> =>
   (await Notification.requestPermission()) === "granted";
 
 const registerServiceWorker = async (): Promise<ServiceWorkerRegistration> => {
-  await navigator.serviceWorker.register(SERVICE_WORKER_URL);
+  await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
+    type: "module",
+  });
   return navigator.serviceWorker.ready;
 };
 

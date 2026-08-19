@@ -19,12 +19,16 @@ const config = {
       lib: "src/frontend/src/lib",
       routes: "src/frontend/src/routes",
       assets: "src/frontend/static",
+      serviceWorker: "src/frontend/src/service-worker",
       hooks: {
         client: "src/frontend/src/hooks.client",
         server: "src/frontend/src/hooks.server",
         universal: "src/frontend/src/hooks",
       },
     },
+    // The push worker is registered explicitly at opt-in (not on every load),
+    // so SvelteKit only bundles it.
+    serviceWorker: { register: false },
     // The OpenID provider's `response_mode=form_post` callback is a
     // cross-origin form POST to /callback, which SvelteKit's CSRF origin
     // check would reject with a 403 before the server hook that forwards it
