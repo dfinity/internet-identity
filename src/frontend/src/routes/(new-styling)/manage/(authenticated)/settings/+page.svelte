@@ -5,6 +5,9 @@
   import { fromCanisterMcpConfig } from "$lib/utils/mcpConfig";
   import CliAccessSection from "./components/CliAccessSection.svelte";
   import McpTrustedServersSection from "./components/McpTrustedServersSection.svelte";
+  import SessionDevicesSection from "./components/SessionDevicesSection.svelte";
+  import { fromCanisterSessionDevices } from "./sessionDevices";
+  import { currentDeviceId } from "$lib/stores/browser-key.store";
   import type { PageProps } from "./$types";
 
   const { data }: PageProps = $props();
@@ -14,6 +17,19 @@
   // rather than on the forgeable `mcp_get_config` query.
   const mcpConfig = $derived(
     fromCanisterMcpConfig(data.identityInfo.mcp_config),
+  );
+
+  // Read from this browser's own key record rather than from the canister, which has no
+  // way to tell which browser is asking: `identity_info` is signed by an access method.
+  let thisBrowser = $state<number | undefined>(undefined);
+  $effect(() => {
+    void currentDeviceId($authenticatedStore.identityNumber).then(
+      (id) => (thisBrowser = id),
+    );
+  });
+
+  const sessionDevices = $derived(
+    fromCanisterSessionDevices(data.identityInfo.session_devices, thisBrowser),
   );
 </script>
 
@@ -31,5 +47,9 @@
   <McpTrustedServersSection
     identityNumber={$authenticatedStore.identityNumber}
     {mcpConfig}
+  />
+  <SessionDevicesSection
+    identityNumber={$authenticatedStore.identityNumber}
+    devices={sessionDevices}
   />
 </div>
