@@ -274,6 +274,7 @@ type PrepareAccountSessionResponse = record {
     created_at : Timestamp;
     device_id : nat32;               // echo, cached by the frontend
     session_info_bundle : blob;      // bytes; the signature comes from the get (§7.1)
+    account_principal : principal;   // what apps see for this account; stored with the session
 };
 
 type GetAccountSessionRequest = record {
@@ -298,6 +299,10 @@ get_account_session : (GetAccountSessionRequest)
 Both are gated by `check_authorization(identity_number)`. The shape follows `SsoPrepareDelegationRequest` and `SsoGetDelegationRequest`: flat records, prepare returning the bundle bytes and get witnessing its signature.
 
 `permissions` here is what sets the session's `read_only` (§4), so it is fixed once at the consent that created the session rather than being chosen per refresh (§7.1).
+
+`account_principal` is the principal the *app* will resolve to, derived from the account seed rather than the session seed. It is not something the frontend can compute, and it is not in the session chain either, whose root is the session key — the two seed families are domain separated (§5). Returning it here is what lets the frontend store it with the session, which is how `silent-reauth-redirect.md` §5 matches a `hint`.
+
+An app never needs to be told: `app_prepare_delegation` already returns `user_key` over the account seed, so `Principal.selfAuthenticating(user_key)` is the same value, and that is how the principal reaches the cookie a `hint` later comes from. The II frontend could obtain it the same way, by minting once from the session it just created, but that spends a canister signature and a `update_root_hash()` on a value this response can carry for free. This method is gated by `check_authorization(identity_number)`, so the field tells the II frontend something for its own bookkeeping rather than widening what an app can reach.
 
 Registering a device is not a call of its own either. The frontend passes the name it would have registered with plus whatever id it has cached, and the canister resolves the rest (§9.2).
 
@@ -658,6 +663,7 @@ Also out of scope: whether to fold MCP's grant into this mechanism. The value sh
 | S7a | No method serves both frontends. Audience is in the name (`app_` for app frontends, unprefixed for II's), so the `app_` set is public API and the rest is internal | API changes |
 | S7b | Refresh is its own pair, `app_prepare_delegation` / `app_get_delegation`, identifying the account by principal and never by `identity_number` | 7.1 |
 | S7c | Session creation is its own pair, `prepare_account_session` / `get_account_session`, leaving `prepare_account_delegation` untouched. Minting a session requires an access method, so a session cannot spawn or extend itself | 6.3 |
+| S7d | `prepare_account_session` returns the account principal, so the II frontend can store it with the session and match a `hint` without minting to learn it. An anchor-gated method, so it widens nothing an app can reach | 6.3 |
 | S8 | The app's hop carries `targets: [ii_canister_id]` as a developer guardrail, and expires with the session rather than sooner | 6.1, 8.4 |
 | S9 | `ii_session_delegation` returns the session chain plus the caller-info bundle and its signature. The app mints its own app delegations, so `icrc34_delegation` is untouched and unconditional | 6.2 |
 | S10 | No account number in the request: the user picks the account in II's UI | 6.2 |
