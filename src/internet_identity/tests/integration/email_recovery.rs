@@ -2251,10 +2251,12 @@ fn recovery_rejects_crlf_spliced_from_header() {
     let resp = api::smtp_request(&env, canister_id, &forged).expect("smtp_request call");
     assert!(matches!(resp, SmtpResponse::Ok {}));
 
-    // The attack must fail closed: the forged sender doesn't resolve to a
-    // single mailbox, so verification ends in AddressMismatch and never
-    // reaches RecoveryReady. (Pre-fix, the lenient parser resolved the
-    // smuggled `victim@` and this reached RecoveryReady — a takeover.)
+    // The attack must fail closed. The spliced value carries a bare CRLF,
+    // so the message is dropped on arrival and the challenge is left
+    // untouched rather than flipped to `Failed` — an unauthenticated
+    // sender must not be able to cancel someone else's pending challenge.
+    // (Pre-fix, the lenient parser resolved the smuggled `victim@` and
+    // this reached RecoveryReady — a takeover.)
     let status = drive_doh_resolution(
         &env,
         canister_id,
@@ -2262,11 +2264,8 @@ fn recovery_rejects_crlf_spliced_from_header() {
         &signer.public_txt_record(),
     );
     assert!(
-        matches!(
-            status,
-            EmailChallengeStatus::Failed(EmailChallengeError::AddressMismatch)
-        ),
-        "CRLF-spliced From must be rejected with AddressMismatch, got {status:?}"
+        matches!(status, EmailChallengeStatus::Pending),
+        "CRLF-spliced From must leave the challenge pending, got {status:?}"
     );
     assert!(
         !matches!(status, EmailChallengeStatus::RecoveryReady { .. }),
