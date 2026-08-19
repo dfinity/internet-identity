@@ -315,6 +315,9 @@ const MAX_EVICTABLE_DEFAULT_ACCOUNTS: u64 = 500;
 /// Eviction target, below the cap.
 const EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK: u64 = MAX_EVICTABLE_DEFAULT_ACCOUNTS * 9 / 10;
 
+/// Bounds the victim scan, which runs on the sign-in path.
+const MAX_ROWS_SCANNED_FOR_EVICTION: usize = 2 * MAX_EVICTABLE_DEFAULT_ACCOUNTS as usize;
+
 /// Bounds one message's eviction work.
 const MAX_EVICTIONS_PER_CALL: u64 =
     MAX_EVICTABLE_DEFAULT_ACCOUNTS - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK;
@@ -1755,10 +1758,7 @@ impl<M: Memory + Clone> Storage<M> {
         self.write_reference_list(
             anchor_number,
             application_number,
-            vec![AccountReference {
-                account_number: None,
-                last_used: Some(now),
-            }],
+            vec![AccountReference::new(None, Some(now))],
         )?;
         self.evict_idle_tracked_defaults(anchor_number, application_number)?;
         Ok(Some(()))
@@ -1781,10 +1781,7 @@ impl<M: Memory + Clone> Storage<M> {
         self.write_reference_list(
             anchor_number,
             application_number,
-            vec![AccountReference {
-                account_number: None,
-                last_used: None,
-            }],
+            vec![AccountReference::new(None, None)],
         )?;
         self.evict_idle_tracked_defaults(anchor_number, application_number)
     }
@@ -1829,7 +1826,7 @@ impl<M: Memory + Clone> Storage<M> {
                 (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
             )
             .filter_map(|((_, application_number), list)| {
-                let references = list.into_vec();
+                let references: Vec<AccountReference> = list.into();
                 match references.as_slice() {
                     [tracked_default] if tracked_default.account_number.is_none() => {
                         Some((application_number, tracked_default.last_used))
@@ -1837,6 +1834,7 @@ impl<M: Memory + Clone> Storage<M> {
                     _ => None,
                 }
             })
+            .take(MAX_ROWS_SCANNED_FOR_EVICTION)
             .collect()
     }
 
@@ -2321,23 +2319,15 @@ impl<M: Memory + Clone> Storage<M> {
                 // If no list exists for this anchor & application,
                 // Create and insert the default and additional account.
                 // This is because we don't create default accounts explicitly.
-                let additional_account_reference = AccountReference {
-                    account_number: Some(account_number),
-                    last_used,
-                };
-                let default_account_reference = AccountReference {
-                    account_number: None,
-                    last_used,
-                };
+                let additional_account_reference =
+                    AccountReference::new(Some(account_number), last_used);
+                let default_account_reference = AccountReference::new(None, last_used);
                 vec![default_account_reference, additional_account_reference]
             }
             Some(existing_storable_list) => {
                 // If the list exists, push the new account and reinsert it to memory
                 let mut refs_vec: Vec<AccountReference> = existing_storable_list.into();
-                refs_vec.push(AccountReference {
-                    account_number: Some(account_number),
-                    last_used,
-                });
+                refs_vec.push(AccountReference::new(Some(account_number), last_used));
                 refs_vec
             }
         };
@@ -2597,11 +2587,7 @@ impl<M: Memory + Clone> Storage<M> {
                 // If no list exists for this anchor & application,
                 // Create and insert the default account.
                 // This is because we don't create default accounts explicitly.
-                vec![AccountReference {
-                    account_number: Some(new_account_number),
-                    // The `last_used` field will be set when the user signs with this account.
-                    last_used: None,
-                }]
+                vec![AccountReference::new(Some(new_account_number), None)]
             }
             Some(existing_storable_list) => {
                 // If the list exists, update the default account reference with the new account number.
