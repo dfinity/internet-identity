@@ -173,6 +173,13 @@ export const EMAIL_RECOVERY_SETUP = createFeatureFlagStore(
 /// field, regardless of agent language.
 export const READ_ONLY_MODE = createFeatureFlagStore("READ_ONLY_MODE", false);
 
+/// Offers the push-notification opt-in during sign-in. Off by default; the
+/// backend gates delivery behind its own flag, so both sides must be enabled.
+export const PUSH_NOTIFICATIONS = createFeatureFlagStore(
+  "PUSH_NOTIFICATIONS",
+  false,
+);
+
 export default {
   DOMAIN_COMPATIBILITY,
   HARDWARE_KEY_TEST,
@@ -183,4 +190,5 @@ export default {
   EMAIL_RECOVERY,
   EMAIL_RECOVERY_SETUP,
   READ_ONLY_MODE,
+  PUSH_NOTIFICATIONS,
 } as Record<string, FeatureFlagStore>;
