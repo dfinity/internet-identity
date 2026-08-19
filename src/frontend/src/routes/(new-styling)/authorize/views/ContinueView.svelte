@@ -9,7 +9,7 @@
     AuthenticationV2Events,
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
+  import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { plural, t } from "$lib/stores/locale.store";
   import Toggle from "$lib/components/ui/Toggle.svelte";
@@ -176,6 +176,11 @@
   let isEditAccountDialogVisibleForNumber = $state<
     AccountNumber | PRIMARY_ACCOUNT_NUMBER | null
   >(null);
+  // The fallback label the edit dialog opened with. The live value can change
+  // while the dialog is open (the app's metadata resolves asynchronously),
+  // which would shift an unnamed account's baseline under an untouched form
+  // and persist the stale fallback as an explicit name on save.
+  let editDialogFallbackName = $state<string>();
 
   const isEditAccountDialogVisibleFor = $derived(
     accounts?.find(
@@ -186,14 +191,28 @@
   const isAccountLimitReached = $derived(
     accounts !== undefined && accounts.length >= 5,
   );
-  const dapps = getDapps();
-  const application = $derived(
-    dapps.find((dapp) => dapp.hasOrigin(displayOrigin))?.name,
+  // The app's metadata is published on the origin its identity is derived for
+  // (`effectiveOrigin`), which is also where its accounts live — so the account
+  // labels below stay stable no matter which of its origins the user signs in
+  // from. `displayOrigin` remains what the header shows.
+  const metadataStore = $derived(
+    getAppMetadataStore(effectiveOrigin, displayOrigin),
   );
+  const application = $derived($metadataStore.name);
   const dappName = $derived(application ?? new URL(displayOrigin).hostname);
-  const primaryAccountName = $derived(
-    application !== undefined ? $t`My ${application} account` : $t`My account`,
-  );
+  // Account names are capped at 32 characters in `EditAccount`; a longer
+  // (e.g. app-provided) name would make the fallback label unsaveable there,
+  // so it falls back to the generic label instead.
+  const MAX_ACCOUNT_NAME_LENGTH = 32;
+  const primaryAccountName = $derived.by(() => {
+    if (application !== undefined) {
+      const label = $t`My ${application} account`;
+      if (label.length <= MAX_ACCOUNT_NAME_LENGTH) {
+        return label;
+      }
+    }
+    return $t`My account`;
+  });
   const existingNames = $derived(
     accounts?.map((account) => account.name[0] ?? primaryAccountName) ?? [],
   );
@@ -390,6 +409,12 @@
       isCreateAccountDialogVisible = false;
     }
   };
+  const openEditAccountDialog = (
+    accountNumber: AccountNumber | PRIMARY_ACCOUNT_NUMBER,
+  ): void => {
+    editDialogFallbackName = primaryAccountName;
+    isEditAccountDialogVisibleForNumber = accountNumber;
+  };
   const handleEditAccount = async (account: {
     name: string;
     isDefaultSignIn: boolean;
@@ -405,7 +430,10 @@
         return;
       }
       const nameChanged =
-        account.name !== (accounts[index].name[0] ?? primaryAccountName);
+        account.name !==
+        (accounts[index].name[0] ??
+          editDialogFallbackName ??
+          primaryAccountName);
       const defaultChanged =
         account.isDefaultSignIn &&
         defaultAccountNumber !== accounts[index].account_number[0];
@@ -544,8 +572,7 @@
       </button>
       <button
         class="btn btn-tertiary btn-sm btn-icon my-3 me-3 shrink-0"
-        onclick={() =>
-          (isEditAccountDialogVisibleForNumber = account.account_number[0])}
+        onclick={() => openEditAccountDialog(account.account_number[0])}
         aria-label={$t`Edit ${name}`}
       >
         <PencilIcon class="size-5" />
@@ -617,7 +644,7 @@
   {#if header}
     {@render header()}
   {:else}
-    <AuthorizeHeader origin={displayOrigin} />
+    <AuthorizeHeader origin={displayOrigin} metadataOrigin={effectiveOrigin} />
     <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
       {$t`Continue to ${dappName}`}
     </h1>
@@ -713,7 +740,10 @@
 
 {#if isEditAccountDialogVisibleFor !== undefined}
   {@const account = {
-    name: isEditAccountDialogVisibleFor.name[0] ?? primaryAccountName,
+    name:
+      isEditAccountDialogVisibleFor.name[0] ??
+      editDialogFallbackName ??
+      primaryAccountName,
     isDefaultSignIn:
       defaultAccountNumber === isEditAccountDialogVisibleForNumber,
   }}

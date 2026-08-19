@@ -335,6 +335,81 @@ To prevent misuse of this feature, the number of alternative origins _must not_ 
 In order to allow Internet Identity to read the path `/.well-known/ii-alternative-origins`, the CORS response header [`Access-Control-Allow-Origin`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin) must be set and allow the Internet Identity origin being used, for example `https://id.ai`, `https://identity.internetcomputer.org`, or `https://identity.ic0.app`.
 :::
 
+## App metadata
+
+Internet Identity displays the name and logo of the client application on its authorization screens (e.g. "Continue to _App_"). Any application can provide this metadata itself — permissionlessly, without being included in any curated list — by serving a JSON document at the path `/.well-known/ii-app-metadata` (on the origin identified below):
+
+```json
+{
+  "name": "Example App",
+  "description": "A short tagline shown on the sign-in screen",
+  "logo": "/logo.png"
+}
+```
+
+Internet Identity fetches this document when the authorization flow starts, from the origin the application's identity is derived for: the `derivationOrigin` of the authorization request once it has been validated (see [Alternative frontend origins](#alternative-frontend-origins)), and the origin the request came from otherwise. An application therefore publishes the document once, on the origin its principals and its Internet Identity accounts are bound to, and all of its alternative frontend origins — which that origin has certified as its own — present the same name, description and logo, with nothing to keep in sync between them. When the document is missing or invalid, Internet Identity falls back to the curated metadata it ships for a small list of known applications (a transitional mechanism that this document supersedes), and otherwise to displaying the origin only.
+
+Since the file is under the sole control of the origin serving it, the metadata is exactly as trustworthy as that origin itself: it does not certify or verify the application's identity in any way. Internet Identity therefore always displays the origin the user is signing in from alongside this metadata, as the value users can actually verify. Ordinary `https` origins on the default port are shown as their hostname (`https://example.com` as `example.com`); an origin whose scheme or port would otherwise be hidden is shown in full (for example `https://example.com:8443`), since those components distinguish origins that derive different principals.
+
+When the document comes from a `derivationOrigin`, the displayed origin is one that origin has itself listed as an alternative frontend origin, in a certified document, and it is that origin's principals the user receives — so the presentation still comes from the origin the sign-in is bound to, and no origin can present itself using metadata of an origin that has not vouched for it.
+
+Requirements:
+
+- All fields are optional, and unknown fields are ignored, so that fields added in the future do not invalidate documents for older versions of Internet Identity. A document that carries no field Internet Identity knows is ignored; a valid document replaces any curated fallback entry wholesale.
+- A field that is present but does not meet the requirements below invalidates **the whole document**, which is then ignored — the offending field is not simply dropped. An application whose file is wrong therefore sees none of its metadata applied, instead of shipping a file that is silently half-applied on a screen it does not control; Internet Identity also logs which field is at fault to the browser console.
+- `name` must not exceed 40 characters and `description` must not exceed 120 characters, counted in Unicode code points on the value as served. Neither may contain control characters (other than the ASCII whitespace characters `\t`, `\n`, `\v`, `\f` and `\r`), the bidirectional embeddings and overrides U+202A–U+202E, or U+FEFF. Only these reordering controls are refused: an override makes text render in an order other than the one it is written in, which is what would let a name read as something it does not contain, and the embeddings are deprecated in favour of the isolates for the same reason.
+- The characters that mixed-direction and non-Latin names legitimately need are accepted: the bidirectional marks U+200E, U+200F and U+061C (zero-width hints that only affect where neutral characters such as punctuation and digits land at a direction boundary), the bidirectional isolates U+2066–U+2069, and the zero-width characters U+200B–U+200D (line-break opportunities in scripts such as Thai and Khmer, shaping in scripts such as Persian, and emoji sequences). Isolates must be **balanced**, however: a field must close every isolate it opens and close none it did not open, since an unbalanced isolate would extend past the application's own text and reorder what Internet Identity renders around it.
+- A field must contain at least one visible character — one that is neither whitespace nor one of the invisible characters above — so that a field which renders as nothing is treated as absent rather than displayed as a blank name.
+- Before being displayed, `name` and `description` have runs of whitespace collapsed to single spaces and are trimmed. This is presentation only, applied after the requirements above are checked: it never rescues a value that violates them.
+- `logo` must be a URL (relative URLs are resolved against the document's origin) pointing to a raster image _on that same origin_. It must be served with one of the content types `image/png`, `image/jpeg`, `image/webp`, `image/gif` or `image/avif`, must not exceed 1 MiB, and must decode to an image of at most 4096 pixels per axis. Internet Identity downloads the logo (it is never hotlinked), so both the metadata document and the logo asset must be readable cross-origin (see the CORS note below).
+- The logo is not rendered as served: Internet Identity decodes it, draws it once into a canvas scaled to at most 512 pixels on its longest side, and renders that re-encoding from a `blob:` URL. What is displayed is therefore an image Internet Identity produced itself — still (an animated image is flattened to its first frame), bounded in size, and held in the browser's blob store rather than in the page's DOM or its JavaScript heap. `image/svg+xml` is not accepted, because a vector image cannot be put through that step across the browsers Internet Identity supports; applications with a vector logo serve a rasterized copy of it here.
+- Unlike the fields of the document, a logo that cannot be fetched, decoded, or does not meet the asset requirements above costs the application only its logo: fetching a second resource can fail transiently, and the name and description are still used.
+- The metadata document must not exceed 8 KiB, must be answered with a `200` HTTP status code and must not redirect (Internet Identity _will not_ follow redirects for either the document or the logo).
+
+### JSON Schema {#app-metadata-schema}
+
+The schema below expresses the requirements above, with one exception it cannot state: that bidirectional isolates must be balanced. Whitespace normalization happens after validation and is not part of it either. Validating in CI is the easiest way to catch a mistake before it costs the application its metadata.
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "II App Metadata",
+  "description": "Display metadata (name, description, logo) shown by Internet Identity on authorization screens for the origin serving this document.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "Display name of the application",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40,
+      "pattern": "[^\\s\\u061c\\u200b-\\u200f\\u2066-\\u2069]",
+      "not": { "pattern": "[\\u0000-\\u0008\\u000e-\\u001f\\u007f-\\u009f\\u202a-\\u202e\\ufeff]" }
+    },
+    "description": {
+      "description": "Short description or tagline of the application",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "pattern": "[^\\s\\u061c\\u200b-\\u200f\\u2066-\\u2069]",
+      "not": { "pattern": "[\\u0000-\\u0008\\u000e-\\u001f\\u007f-\\u009f\\u202a-\\u202e\\ufeff]" }
+    },
+    "logo": {
+      "description": "URL of the raster application logo, on the same origin as this document",
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
+```
+
+:::note
+In order to allow Internet Identity to read the path `/.well-known/ii-app-metadata` as well as the logo asset it references, the CORS response header [`Access-Control-Allow-Origin`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin) must be set on both responses and allow the Internet Identity origin being used, for example `https://id.ai`, `https://identity.internetcomputer.org`, or `https://identity.ic0.app`.
+:::
+
+:::note
+Unlike `/.well-known/ii-alternative-origins`, this document has no security semantics for principal derivation, so it may be served by any web server — the application does not need to be hosted on ICP. For applications hosted in an ICP asset canister, the file is served like any other asset (and must be certified when served via a non-raw domain).
+:::
+
 ## The Internet Identity Service Backend interface
 
 This section describes the interface that the backend canister provides.
