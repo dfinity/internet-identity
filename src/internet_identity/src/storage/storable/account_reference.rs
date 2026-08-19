@@ -6,7 +6,7 @@ use internet_identity_interface::internet_identity::types::Timestamp;
 use minicbor::{Decode, Encode};
 use std::borrow::Cow;
 
-#[derive(Encode, Decode, Clone, Ord, Eq, PartialEq, PartialOrd, Default)]
+#[derive(Encode, Decode, Clone, Debug, Ord, Eq, PartialEq, PartialOrd, Default)]
 #[cbor(map)]
 pub struct StorableAccountReference {
     #[n(0)]
