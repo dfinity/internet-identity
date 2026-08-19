@@ -2049,8 +2049,8 @@ impl<M: Memory + Clone> Storage<M> {
     /// Returns the requested `Account`.
     /// If the anchor doesn't own this `Account`, returns None.
     /// If the `Account` is default but has been moved/deleted, returns None.
-    /// If the `Account` is default but ALL `Account`s for this origin have been moved or deleted, returns a default `Account`.
-    /// If the `Account` number doesn't esist, returns a default `Account`.
+    /// If the `Account` is default and ALL `Account`s for this origin have been moved or deleted, returns None.
+    /// If nothing has ever happened at this origin, returns a default `Account`.
     /// If the `Account` number exists but the `Account` doesn't exist, returns None.
     /// If the `Account` exists, returns it as `Account`.
     /// Optionally an application number can be passed if it is already known, so we don't look it up more than necessary.
@@ -2080,22 +2080,11 @@ impl<M: Memory + Clone> Storage<M> {
                         application_number.unwrap(),
                     )
                 {
-                    // if the list exists but is empty, we should still return a synthetic default account
-                    // this should only happen if a named account was created, and then both it and the
-                    // default account references were moved/deleted.
-                    // XXX WARNING: this is done for the case that a user might have moved/deleted a default account
-                    // and then reached the maximum accounts limit. If we don't return a synthetic default account here,
-                    // they would be locked out of their account.
-                    // However: if we implement account transfers at some point, and default accounts can be transfered,
-                    // this would allow a user to regain access to their transferred default account.
-                    if acc_ref_vec.is_empty() {
-                        return Some(Account::new(
-                            params.anchor_number,
-                            params.origin.clone(),
-                            None,
-                            None,
-                        ));
-                    }
+                    // An empty list means every account here was given away. The anchor
+                    // must not regain the default account's principal, so it falls
+                    // through to `None`. An anchor in that state and at the materialized
+                    // cap can no longer use this origin's default account, which is
+                    // correct: the account is no longer theirs.
 
                     // if there is a default account in the list, we return it
                     // else we return None, account has been moved or deleted

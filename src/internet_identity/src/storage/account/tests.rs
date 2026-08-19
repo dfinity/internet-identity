@@ -493,13 +493,8 @@ fn should_count_accounts_different_anchors() {
     );
 }
 
-// XXX WARNING: this functionality exists for the case that a user might have moved/deleted a default account
-// and then reached the maximum accounts limit. If we don't return a synthetic default account here,
-// they would be locked out of their account.
-// However: if we implement account transfers at some point, and default accounts can be transfered,
-// this would allow a user to regain access to their transferred default account.
 #[test]
-fn should_read_default_account_with_empty_reference_list() {
+fn should_not_read_a_default_account_from_an_empty_reference_list() {
     // Setup storage
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
@@ -522,11 +517,34 @@ fn should_read_default_account_with_empty_reference_list() {
         origin: &origin,
         known_app_num: Some(app_num),
     };
-    let default_account = storage.read_account(read_params).unwrap();
 
-    // 4. Verify we get a synthetic default account
-    let expected_account = Account::synthetic(anchor_number, origin.clone());
-    assert_eq!(default_account, expected_account);
+    // 4. An empty list means the default account was given away and must not be
+    //    reconstructed at the same principal.
+    assert_eq!(storage.read_account(read_params), None);
+}
+
+#[test]
+fn should_read_a_synthetic_default_account_when_no_reference_list_exists() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    let anchor_number: AnchorNumber = 10_000;
+    let origin: FrontendHostname = "https://some.origin".to_string();
+    let app_num = storage.lookup_or_insert_application_number_with_origin(&origin);
+
+    let default_account = storage
+        .read_account(ReadAccountParams {
+            account_number: None,
+            anchor_number,
+            origin: &origin,
+            known_app_num: Some(app_num),
+        })
+        .unwrap();
+
+    assert_eq!(
+        default_account,
+        Account::synthetic(anchor_number, origin.clone())
+    );
 }
 
 #[test]
