@@ -3,8 +3,10 @@
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { fromCanisterMcpConfig } from "$lib/utils/mcpConfig";
+  import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
   import CliAccessSection from "./components/CliAccessSection.svelte";
   import McpTrustedServersSection from "./components/McpTrustedServersSection.svelte";
+  import NotificationsSection from "./components/NotificationsSection.svelte";
   import type { PageProps } from "./$types";
 
   const { data }: PageProps = $props();
@@ -32,4 +34,7 @@
     identityNumber={$authenticatedStore.identityNumber}
     {mcpConfig}
   />
+  {#if $PUSH_NOTIFICATIONS}
+    <NotificationsSection identityNumber={$authenticatedStore.identityNumber} />
+  {/if}
 </div>
