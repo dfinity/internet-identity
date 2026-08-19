@@ -97,9 +97,11 @@ This is the same shape as the caveat carried through from `read_certified_sso_bu
 
 ## 5. `hint` rules
 
-`hint` is a principal, resolved through the principal index of `tracked-default-accounts.md` §9 to a locator.
+`hint` is a principal: the one an app resolves to for the account behind a session, which is the same value `app_prepare_delegation` hands the app as `user_key`. That is how it reaches the cookie a sibling reads it from (§2).
 
 It exists because one origin can hold more than one session: the user has signed in there under more than one identity, or under more than one account of one identity. Without a hint II would have to guess, and guessing wrong signs the user in as the wrong persona.
+
+**Matching happens in the frontend, against the principal stored with each session.** The keypairs the re-issue needs are the frontend's, so the candidates are the records it holds for the origin, and `prepare_account_session` returns `account_principal` for exactly this (`revocable-app-sessions.md` §6.3). The alternative would be to resolve the hint canister-side through the principal index of `tracked-default-accounts.md` §9, which needs a method that does not exist and a call on the one path that has to answer without rendering.
 
 | Case | Outcome |
 | ---- | ------- |
@@ -151,7 +153,8 @@ One outcome for every session-related case, so a client's fallback is a single b
 | R2 | `prompt=none` renders nothing and returns either a session chain or `interaction_required` | 4 |
 | R3 | `prompt=none` never creates a session, since it has no access method to authorize one | 4 |
 | R4 | `hint` selects among the requesting origin's sessions and can never name another origin's | 4 |
+| R4a | The frontend matches a `hint` against the `account_principal` stored with each session, rather than resolving it canister-side | 5 |
 | R5 | The II frontend returns the session chain and lets the app mint its own delegation, as on first sign-in | 3 |
 | R6 | Several sessions with no hint is `interaction_required`, not a guess | 5 |
 | R7 | Every session-related failure is one outcome, so the client fallback is one branch | 7 |
-| R8 | Nothing in the canister changes. Sibling sharing and sign-out propagation fall out of one session per `(anchor, application)` | 2, 6 |
+| R8 | This design adds no canister change of its own. Sibling sharing and sign-out propagation fall out of one session per `(anchor, application)`, and the `account_principal` R4a matches on is specified in `revocable-app-sessions.md` §6.3 | 2, 6 |
