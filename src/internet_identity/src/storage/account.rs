@@ -8,7 +8,7 @@ use ic_cdk::trap;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountInfo, AccountNameValidationError, AccountNumber, AnchorNumber, ApplicationNumber,
-    FrontendHostname, Timestamp, UserKey,
+    FrontendHostname, SessionDeviceId, Timestamp, UserKey,
 };
 use serde::{Deserialize, Serialize};
 
@@ -56,6 +56,56 @@ pub struct AccountsCounter {
 pub struct AccountReference {
     pub account_number: Option<AccountNumber>, // None is the unreserved synthetic account
     pub last_used: Option<Timestamp>,
+    pub sessions: Vec<SessionRecord>,
+}
+
+impl AccountReference {
+    pub fn new(account_number: Option<AccountNumber>, last_used: Option<Timestamp>) -> Self {
+        Self {
+            account_number,
+            last_used,
+            sessions: vec![],
+        }
+    }
+}
+
+/// A revocable session at one account. Only `last_refreshed` is mutable, which is why
+/// it is the one field absent from the seed.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct SessionRecord {
+    pub created_at: Timestamp,
+    pub valid_till: Timestamp,
+    pub last_refreshed: Option<Timestamp>,
+    pub device_id: SessionDeviceId,
+    pub read_only: bool,
+}
+
+impl SessionRecord {
+    pub fn is_expired(&self, now: Timestamp) -> bool {
+        self.valid_till <= now
+    }
+
+    /// How long this session stayed in service: the span from its creation to the last time
+    /// its app asked for a delegation. Bounded by the session's own lifetime.
+    pub fn demonstrated_use(&self) -> u64 {
+        self.last_refreshed
+            .map_or(0, |refreshed| refreshed.saturating_sub(self.created_at))
+    }
+
+    /// What the caps reclaim on, ascending: dead sessions first, then live ones by how
+    /// recently used, extended by how long they stayed in service.
+    ///
+    /// The extension is what separates an app in weekly use from one opened once and
+    /// abandoned, which recency alone gets backwards — the abandoned one was touched more
+    /// recently. `device_id` only makes the order total.
+    pub fn reclaim_order(&self, now: Timestamp) -> (bool, Timestamp, SessionDeviceId) {
+        let last_used = self.last_refreshed.unwrap_or(self.created_at);
+        (
+            !self.is_expired(now),
+            last_used.saturating_add(self.demonstrated_use()),
+            self.device_id,
+        )
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -141,10 +191,7 @@ impl Account {
     // Used in tests (for now)
     #[allow(dead_code)]
     pub fn to_reference(&self) -> AccountReference {
-        AccountReference {
-            account_number: self.account_number,
-            last_used: self.last_used,
-        }
+        AccountReference::new(self.account_number, self.last_used)
     }
 
     pub fn to_info(&self) -> AccountInfo {

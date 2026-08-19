@@ -14,6 +14,8 @@ pub type CanisterSigPublicKeyDer = PublicKey;
 pub type FrontendHostname = String;
 pub type ApplicationNumber = u64;
 pub type Timestamp = u64; // in nanos since epoch
+/// Per-anchor label for one browser, so a browser's sessions can be revoked together.
+pub type SessionDeviceId = u32;
 pub type Signature = ByteBuf;
 pub type DeviceConfirmationCode = String;
 pub type FailedAttemptsCounter = u8;
