@@ -22,6 +22,7 @@
     actorForIdentity,
     purgeSession,
   } from "$lib/stores/session-delegation.store";
+  import { purgeAppSessions } from "$lib/stores/app-session.store";
   import { throwCanisterError, isCanisterError } from "$lib/utils/utils";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
   import type {
@@ -263,6 +264,7 @@
               err.type === "Unauthorized"
             ) {
               void purgeSession(selectedIdentityNumber);
+              void purgeAppSessions(selectedIdentityNumber);
             } else {
               throw err;
             }
@@ -351,6 +353,7 @@
             err.type === "Unauthorized"
           ) {
             void purgeSession(selectedIdentityNumber);
+            void purgeAppSessions(selectedIdentityNumber);
           } else {
             throw err;
           }
@@ -482,6 +485,7 @@
               err.type === "Unauthorized"
             ) {
               void purgeSession(selectedIdentityNumber);
+              void purgeAppSessions(selectedIdentityNumber);
             } else {
               throw err;
             }
