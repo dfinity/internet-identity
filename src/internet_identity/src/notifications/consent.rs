@@ -4,7 +4,9 @@
 
 use super::webpush::seal::{drop_origin_seals, seal_devices_for_origin};
 use super::webpush::subscription::has_any_subscription;
+use super::well_known::fetch_and_cache;
 use super::{authorize_query, authorize_update, check_enabled, feature_enabled, validate_origin};
+use crate::delegation::get_principal;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::notifications::consent::StorableNotificationConsent;
@@ -74,7 +76,7 @@ fn clear_consent(
     Ok(())
 }
 
-fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
+pub(crate) fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
     if validate_origin(&origin).is_err() {
         return false;
     }
@@ -96,9 +98,10 @@ pub async fn grant_consent(
     check_enabled()?;
     authorize_update(anchor_number)?;
     let now_ns = ic_cdk::api::time();
-    let recipient = crate::delegation::get_principal(anchor_number, origin.clone());
+    let recipient = get_principal(anchor_number, origin.clone());
     set_consent(anchor_number, origin.clone(), recipient, now_ns)?;
     seal_devices_for_origin(anchor_number, &origin, now_ns).await;
+    fetch_and_cache(origin, now_ns).await;
     Ok(())
 }
 
@@ -107,7 +110,7 @@ pub async fn grant_consent(
 pub fn revoke_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> Result<(), String> {
     check_enabled()?;
     authorize_update(anchor_number)?;
-    let recipient = crate::delegation::get_principal(anchor_number, origin.clone());
+    let recipient = get_principal(anchor_number, origin.clone());
     clear_consent(anchor_number, origin.clone(), recipient)?;
     drop_origin_seals(anchor_number, &origin);
     Ok(())

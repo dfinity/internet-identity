@@ -372,6 +372,13 @@ fn webpush_unsubscribe_device(anchor_number: AnchorNumber, endpoint: String) -> 
 }
 
 #[update]
+fn notification_send(
+    request: notifications::send::NotificationSendRequest,
+) -> notifications::send::NotificationSendResponse {
+    notifications::send::notification_send(request)
+}
+
+#[update]
 async fn notification_grant_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
@@ -894,6 +901,9 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::init_from_stable_memory();
     // load the persistent state after initializing storage as it manages the respective stable cell
     state::load_persistent_state();
+    // The send buffer didn't survive the upgrade; bump the epoch so
+    // senders resend unacked notifications.
+    notifications::send::bump_buffer_epoch();
 
     initialize(maybe_arg);
 }

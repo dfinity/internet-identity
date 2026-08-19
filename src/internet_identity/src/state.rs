@@ -154,6 +154,9 @@ pub struct PersistentState {
     pub mcp_official_url: Option<String>,
     /// Deploy flag for the notifications feature. `None`/`Some(false)` => disabled; `Some(true)` => enabled.
     pub notifications_enabled: Option<bool>,
+    /// Bumped on every upgrade. When changed, the sender canister will now that the receiver canister has been upgraded and that it should re-send any pending notifications.
+    /// The sender buffer lives in heap so on upgrade it will just clear out.
+    pub notifications_buffer_epoch: Option<u64>,
 }
 
 impl Default for PersistentState {
@@ -183,6 +186,7 @@ impl Default for PersistentState {
             doh_config: None,
             mcp_official_url: None,
             notifications_enabled: None,
+            notifications_buffer_epoch: None,
         }
     }
 }

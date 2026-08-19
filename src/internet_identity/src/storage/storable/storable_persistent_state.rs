@@ -48,6 +48,7 @@ pub struct StorablePersistentState {
     doh_config: Option<DohConfig>,
     mcp_official_url: Option<String>,
     notifications_enabled: Option<bool>,
+    notifications_buffer_epoch: Option<u64>,
 }
 
 impl Storable for StorablePersistentState {
@@ -100,6 +101,7 @@ impl From<PersistentState> for StorablePersistentState {
             doh_config: s.doh_config,
             mcp_official_url: s.mcp_official_url,
             notifications_enabled: s.notifications_enabled,
+            notifications_buffer_epoch: s.notifications_buffer_epoch,
         }
     }
 }
@@ -130,6 +132,7 @@ impl From<StorablePersistentState> for PersistentState {
             doh_config: s.doh_config,
             mcp_official_url: s.mcp_official_url,
             notifications_enabled: s.notifications_enabled,
+            notifications_buffer_epoch: s.notifications_buffer_epoch,
         }
     }
 }
@@ -188,6 +191,7 @@ mod tests {
             doh_config: None,
             mcp_official_url: None,
             notifications_enabled: None,
+            notifications_buffer_epoch: None,
         };
 
         pretty_assertions::assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -222,6 +226,7 @@ mod tests {
             doh_config: None,
             mcp_official_url: None,
             notifications_enabled: None,
+            notifications_buffer_epoch: None,
         };
         pretty_assertions::assert_eq!(PersistentState::default(), expected_defaults);
     }
