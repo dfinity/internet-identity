@@ -236,6 +236,57 @@ fn should_write_and_update_openid_credential_lookup() {
     );
 }
 
+#[test]
+fn should_look_up_openid_credential_only_for_its_own_sso_domain() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    let mut sso_credential = openid_credential(0);
+    sso_credential.sso_domain = Some("gate.example.org".to_string());
+    let direct_credential = openid_credential(1);
+
+    let mut anchor = storage.allocate_anchor(0).unwrap();
+    anchor
+        .add_openid_credential(sso_credential.clone())
+        .unwrap();
+    anchor
+        .add_openid_credential(direct_credential.clone())
+        .unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.write(anchor).unwrap();
+
+    assert_eq!(
+        storage
+            .lookup_anchor_with_openid_credential(&sso_credential.key(), Some("gate.example.org")),
+        Some(anchor_number)
+    );
+    assert_eq!(
+        storage
+            .lookup_anchor_with_openid_credential(&sso_credential.key(), Some("other.example.org")),
+        None
+    );
+    assert_eq!(
+        storage.lookup_anchor_with_openid_credential(&sso_credential.key(), None),
+        None
+    );
+
+    assert_eq!(
+        storage.lookup_anchor_with_openid_credential(&direct_credential.key(), None),
+        Some(anchor_number)
+    );
+    assert_eq!(
+        storage.lookup_anchor_with_openid_credential(
+            &direct_credential.key(),
+            Some("gate.example.org")
+        ),
+        None
+    );
+
+    assert!(storage.is_openid_credential_registered(&sso_credential.key()));
+    assert!(storage.is_openid_credential_registered(&direct_credential.key()));
+    assert!(!storage.is_openid_credential_registered(&openid_credential(2).key()));
+}
+
 /// The SSO stable-id index is reconciled from the anchors' stored credentials
 /// on every `write()`: a credential carrying a `stable_id` gets an entry, and
 /// removing or moving that credential removes or moves the entry — no orphans.
