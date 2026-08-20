@@ -2,7 +2,12 @@
   import { ArrowRightIcon, GlobeIcon, TerminalIcon } from "@lucide/svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
+  import { readable } from "svelte/store";
+  import {
+    getAppMetadataStore,
+    type AppMetadata,
+  } from "$lib/stores/app-metadata.store";
+  import { originLabel } from "$lib/utils/urlUtils";
 
   interface Props {
     /** Hostname of the app the CLI is being authorized for, or undefined for
@@ -12,14 +17,22 @@
 
   const { appOrigin }: Props = $props();
 
-  const apps = getDapps();
-  const app = $derived(
+  // The CLI flow has no separate derivation origin: `--app <domain>` is both
+  // the origin shown here and the one the linked principal is derived for, so
+  // this origin is where the app's metadata is published.
+  const emptyMetadataStore = readable<AppMetadata>({});
+  const metadataStore = $derived(
     appOrigin !== undefined
-      ? apps.find((a) => a.hasOrigin(appOrigin))
-      : undefined,
+      ? getAppMetadataStore(appOrigin)
+      : emptyMetadataStore,
   );
+  const app = $derived($metadataStore);
+  // A logo that fails to decode falls back to the default icon instead of a
+  // broken image; keyed by value so a later (valid) logo still renders.
+  let failedLogo = $state<string>();
+  const logo = $derived(app.logo !== failedLogo ? app.logo : undefined);
   const hostname = $derived(
-    appOrigin !== undefined ? new URL(appOrigin).hostname : undefined,
+    appOrigin !== undefined ? originLabel(appOrigin) : undefined,
   );
 </script>
 
@@ -29,15 +42,16 @@
       <div
         class={[
           "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
-          app?.logoSrc === undefined &&
+          logo === undefined &&
             "border-border-tertiary text-fg-primary bg-bg-primary border",
         ]}
       >
-        {#if app?.logoSrc !== undefined}
+        {#if logo !== undefined}
           <img
-            src={app.logoSrc}
-            alt={`${app.name} logo`}
+            src={logo}
+            alt={`${app.name ?? hostname} logo`}
             class="h-20 max-w-50 object-contain"
+            onerror={() => (failedLogo = app.logo)}
           />
         {:else}
           <div

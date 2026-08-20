@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSameOrigin } from "./urlUtils";
+import { isSameOrigin, originLabel } from "./urlUtils";
 
 describe("urlUtils", () => {
   describe("isSameOrigin", () => {
@@ -69,6 +69,38 @@ describe("urlUtils", () => {
     it("should handle invalid URLs by falling back to string comparison", () => {
       expect(isSameOrigin("invalid-url", "invalid-url")).toBe(true);
       expect(isSameOrigin("invalid-url", "another-invalid-url")).toBe(false);
+    });
+  });
+
+  describe("originLabel", () => {
+    it("should collapse ordinary https origins to their hostname", () => {
+      expect(originLabel("https://example.com")).toBe("example.com");
+      expect(originLabel("https://example.com:443")).toBe("example.com");
+      expect(originLabel("https://sub.example.com/path")).toBe(
+        "sub.example.com",
+      );
+    });
+
+    it("should keep a non-default port, which distinguishes the origin", () => {
+      // https://example.com and https://example.com:8443 are different
+      // origins deriving different principals, so they must not share a label.
+      expect(originLabel("https://example.com:8443")).toBe(
+        "https://example.com:8443",
+      );
+      expect(originLabel("https://example.com:8443")).not.toBe(
+        originLabel("https://example.com"),
+      );
+    });
+
+    it("should keep a non-https scheme rather than hide it", () => {
+      expect(originLabel("http://example.com")).toBe("http://example.com");
+      expect(originLabel("http://localhost:5173")).toBe(
+        "http://localhost:5173",
+      );
+    });
+
+    it("should show unparseable values verbatim", () => {
+      expect(originLabel("not-an-origin")).toBe("not-an-origin");
     });
   });
 });

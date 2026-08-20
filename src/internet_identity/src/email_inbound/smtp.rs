@@ -64,8 +64,8 @@ use internet_identity_interface::internet_identity::types::email_challenge::{
 };
 use internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryCredential;
 use internet_identity_interface::internet_identity::types::smtp::{
-    smtp_err, validate_smtp_request, SmtpRequest, SmtpResponse, SMTP_ERR_MAILBOX_UNAVAILABLE,
-    SMTP_ERR_SYNTAX_ERROR, SMTP_ERR_USER_NOT_LOCAL,
+    smtp_err, validate_header_values, validate_smtp_request, SmtpRequest, SmtpResponse,
+    SMTP_ERR_MAILBOX_UNAVAILABLE, SMTP_ERR_SYNTAX_ERROR, SMTP_ERR_USER_NOT_LOCAL,
 };
 use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};
 
@@ -236,6 +236,15 @@ pub fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
             return SmtpResponse::Ok {};
         }
     };
+
+    // A header value carrying a control character or a bare CR/LF did
+    // not come from a conforming MTA, and is not the value that was
+    // signed. Drop it here rather than returning an error: the response
+    // goes back as a bounce to whatever envelope sender the message
+    // claimed, so per-message problems answer `Ok` (see the module note).
+    if validate_header_values(message).is_err() {
+        return SmtpResponse::Ok {};
+    }
 
     // Extract the canister-issued nonce from the Subject header. If
     // there's no Subject, no II-Recovery- prefix, or no pending
