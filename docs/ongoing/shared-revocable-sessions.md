@@ -1,13 +1,14 @@
 # Shared revocable sessions
 
-**Status:** Overview. The designs are the three docs in [§5](#5-read-further); this page is the shape of them.
-**Last updated:** 2026-08-18
+**Author:** sea-snake — **Date:** 2026-08-19 — **Status:** Overview, RFC for review
 
-Today a sign-in is a bearer token that nobody can take back for up to 30 days. This replaces it with a short-lived delegation over a revocable session, which also lets sibling subdomains share one sign-in.
+This page is the shape of three designs, linked at the end. Read it first; read those for detail.
 
----
+## Context
 
-## 1. Today
+When a user signs in to a dapp with Internet Identity, the dapp receives a **delegation**: a signed artifact naming a key, valid for up to 30 days, chosen by the dapp.
+
+Verifying it never calls back into II. That is what makes it fast and cheap, and it is also why, once II hands it over, II is out of the loop entirely.
 
 ```mermaid
 flowchart LR
@@ -17,19 +18,33 @@ flowchart LR
     A -.->|"never contacts II again"| II
 ```
 
-The delegation is a self-contained signed artifact. Once II hands it over, II is out of the loop.
+## Problem
 
-| Property | Today |
+A sign-in is a bearer token nobody can take back.
+
+| | Today |
 | -------- | ----- |
-| Lifetime | Up to 30 days, chosen by the app |
-| Revocation | **None at all.** Verification never calls back into II, so nothing II can do reaches an issued delegation |
-| Stolen delegation | Full access at that dapp for whatever remains of its 30 days |
+| Revocation | **None at all.** Nothing II can do reaches a delegation it has already issued |
+| A stolen delegation | Full access at that dapp for whatever remains of its 30 days |
 | Signing out | Local only. Clearing browser state invalidates nothing already issued |
 | Visibility | Neither the user nor II can see, list, or end an active sign-in |
 
----
+There is a second, related gap: sibling subdomains cannot share a sign-in.
 
-## 2. After
+```mermaid
+flowchart TB
+    subgraph now["today"]
+        C1["chat.example.com"] -->|"own ceremony"| D1[["own delegation"]]
+        H1["hr.example.com"] -->|"own ceremony"| D2[["own delegation"]]
+        D1 -.->|"signing out here"| N1(["leaves the other signed in"])
+    end
+```
+
+A user signs in separately on each, and signing out of one leaves the others signed in.
+
+## Solution
+
+Split the one long-lived artifact into two: a **session** the canister holds and the user can end, and a **short-lived delegation** the app carries.
 
 ```mermaid
 flowchart LR
@@ -41,26 +56,26 @@ flowchart LR
     U -->|"revoke a session<br/>or a whole browser"| C
 ```
 
-The long-lived thing becomes a **session**: a canister record the user can see and end. The thing the app carries becomes short-lived, and getting a new one means asking II, which is what gives II a say again.
+Getting a fresh delegation means asking II, and that is what gives II a say again.
 
-| Property | After | Why |
+| | After | Why |
 | -------- | ----- | --- |
-| Lifetime | 5 minutes | Matches what MCP already mints |
-| Revocation | Latency is exactly the delegation lifetime | Revoking stops new mints; one already issued runs out |
-| Stolen delegation | At most 5 minutes | |
-| Stolen session chain | Revocable, and `targets` stops it reaching dapp canisters directly | The real protection is that it can be revoked at all |
+| Delegation lifetime | 5 minutes | Matches what MCP already mints |
+| Revocation | Takes effect within one delegation lifetime | Revoking stops new mints; one already issued runs out |
+| A stolen delegation | At most 5 minutes of access | |
+| A stolen session chain | Revocable, and `targets` stops it reaching dapp canisters directly | The real protection is that it can be revoked at all |
 | Signing out | Actually revokes, canister-side | The app's own sign-out removes its session record |
-| Visibility | Per browser, with a last-used timestamp | "This device used this app 3 minutes ago" against "5 weeks ago" |
-| Cost | One update call per active session per 5 minutes | No browser round trip. The app calls the canister directly |
+| Visibility | Per browser, with a last-used timestamp | "This browser used this app 3 minutes ago" against "5 weeks ago" |
+| Cost | One update call per active session per 5 minutes | The app calls the canister directly — no browser round trip |
 
-Two properties worth noting because they are not obvious:
+Two properties that are easy to miss:
 
-- **A session cannot renew or clone itself.** Creating one needs an anchor access method, which a session does not have, so a stolen chain can only mint short delegations until revoked.
-- **Refresh needs no browser.** The app talks to the canister directly, so there is no popup, no iframe, and no navigation on the five-minute cadence.
+- **A session cannot renew or clone itself.** Creating one requires an anchor access method, which a session does not have. A stolen chain can only mint short delegations until it is revoked.
+- **Refresh needs no browser.** The app talks to the canister directly, so there is no popup, iframe, or navigation on the five-minute cadence.
 
 ---
 
-## 3. Sibling subdomains
+## How siblings share one sign-in
 
 ```mermaid
 flowchart TB
@@ -77,7 +92,7 @@ That is not a copy between apps and not a cookie trick. There is one record and 
 
 ---
 
-## 4. What changes where
+## What changes where
 
 ```mermaid
 flowchart LR
@@ -101,7 +116,7 @@ No existing method changes shape or behaviour, so nothing breaks and nothing has
 
 ---
 
-## 5. Read further
+## Read further
 
 | Doc | Covers |
 | --- | ------ |
