@@ -1,6 +1,8 @@
-# Account tracking: defaults, reaping, and principal lookup
+# Recording which dapps an identity uses
 
-**Authors:** sea-snake — **Date:** Aug 20, 2026
+**Authors:** sea-snake
+
+**Date:** Aug 20, 2026
 
 **Target audience:** Engineers, Security Reviewers
 
@@ -8,7 +10,7 @@
 
 ## Summary
 
-Internet Identity does not record which dapps an identity uses. The account a user gets at a dapp is derived on demand — II hashes the identity number, the dapp's origin and a secret salt, and the result is the principal — so signing in writes nothing at all. Only accounts a user has explicitly named get stored, and almost nobody names one.
+Internet Identity does not record which dapps an identity uses. The account a user gets at a dapp is computed on demand rather than stored: II hashes the identity number, the dapp's origin and a secret value, and the result is the principal. Signing in therefore writes nothing at all. Only accounts a user has explicitly named get stored, and almost nobody names one.
 
 That has three consequences. A user cannot be shown where they are signed in. The list of dapp origins II has seen only grows, because nothing in this part of storage has ever been deleted. And there is no way back from a principal to the account behind it, which the revocable-sessions design needs in order to authorise a caller that never says who it is.
 
@@ -18,53 +20,49 @@ Recording a used dapp costs one small row rather than a whole account, and dropp
 
 ## Context
 
-Internet Identity gives a user a different principal at every dapp, so two dapps cannot tell they are talking to the same person.
+An Internet Identity is a number, called an anchor. When a user signs in to a dapp with it, the dapp does not learn that number. Instead it receives a principal that is specific to the pair of that identity and that dapp, so the same user appears as a different principal at every site they visit. Two dapps comparing what they see cannot work out that they are talking to the same person. This is the central privacy property of the system.
 
-Those principals are derived rather than stored. II hashes the identity number together with the dapp's origin and a salt only the canister holds, and the result is the principal. No record is needed for that, and none is kept: the account a user gets at a dapp by signing in exists only as a derivation.
+II produces that principal by hashing three things together: the identity number, the dapp's origin, and a secret value held only inside the canister. The result is fully determined by those inputs, so II can compute it whenever it needs to and never has to store it. Signing in at a dapp therefore writes nothing.
 
-A user can also create a named account at a dapp, to keep a second persona at the same site. Those do need a stored record, since the name has to be kept somewhere.
-
-So II keeps records for accounts users named, and nothing for the ones it derives on demand. Since almost nobody names an account, II has no record of which dapps an identity has used.
+We call the account a user gets this way their default account at that dapp. A user can also create a second account at the same dapp, with a name they choose, to keep two separate personas there. A named account does have to be stored, because the name has to be kept somewhere and because its principal is derived from an account number rather than from the origin alone.
 
 ```mermaid
 flowchart LR
-    U([user signs in at a dapp]) --> Q{"did they name<br/>the account?"}
-    Q -->|"no — the default,<br/>and the common case"| N["nothing is stored"]
-    Q -->|"yes, rare"| S["a record is stored"]
-    N -.->|"the principal is derived<br/>from anchor + origin + salt"| P(["sign-in works,<br/>leaves no trace"])
+    U([user signs in at a dapp]) --> Q{"named account?"}
+    Q -->|"no, the default:<br/>almost every sign-in"| N["nothing is written"]
+    Q -->|"yes, rarely"| S["a record is written"]
+    N -.->|"the principal is computed<br/>from identity + origin + secret"| P(["sign-in works,<br/>no record kept"])
 ```
 
-The derivation is one-way, because the salt is hashed in. II can produce the principal for a given identity and dapp, but cannot start from a principal and say which identity produced it.
+So II holds records for the accounts users have named, and no record at all for the ones it computes on demand. Because naming an account is rare, this means II has no record of which dapps an identity has used.
+
+Two further points matter for what follows.
+
+The hash runs one way only. II can compute the principal for a given identity and dapp, but it cannot start from a principal and work out which identity produced it.
+
+II does keep one record per dapp origin it has ever encountered, shared by all identities, holding the origin string and a count of how many accounts refer to it. This is how an origin gets a short internal number instead of being stored as a string in every account.
 
 ## Problem
 
-Three things follow.
+Three problems follow from having no record of use.
 
-**A user cannot be shown where they are signed in.** There is nothing to list, so neither "which dapps have I used" nor "sign me out of that one" can be answered.
+**A user cannot be shown where they are signed in.** There is no list to render, so a settings screen cannot answer "which dapps have I used" or offer to sign the user out of one.
 
-**The dapp registry only grows.** II stores one record per dapp origin it has ever seen, shared across all identities, and nothing has ever been deleted from it: there is no removal path anywhere in this part of storage, and the reference counts only ever rise. That is tolerable today because only named accounts create these records. Recording every sign-in would mean every new dapp mints a record nothing will ever reclaim.
+**Recording use would make the dapp list grow without limit.** Nothing in this part of storage has ever been deleted. There is no removal path for any of these records, and the per-dapp counts only ever increase. That is survivable today because only named accounts create records. If every first sign-in at a new dapp created one, each would stay for the lifetime of the canister.
 
-**Revocable app sessions cannot be built.** `revocable-app-sessions.md` needs the reverse direction: given the principal an app is calling with, which identity and account is that? A one-way derivation cannot answer it, so the answer has to be recorded as it is produced. The session refresh path reads that index on every call it authorises.
-
-These are not independent:
+**Revocable app sessions cannot be built.** The design in `revocable-app-sessions.md` needs the opposite direction of the hash: given the principal an app is calling with, which identity and account does it belong to? A one-way hash cannot answer that, so the answer has to be written down as it is produced. The session refresh path reads it on every call it authorises.
 
 ```mermaid
 flowchart LR
-    T["record what a user<br/>signs in to"] -->|"every new dapp<br/>mints a record"| G["registry grows<br/>without bound"]
-    G -->|"needs"| R["reclaim unused<br/>dapp records"]
-    R -->|"can only fire once a<br/>record stops being referenced"| E["drop the least<br/>recently used"]
+    T["record which dapps<br/>an identity uses"] -->|"each new dapp<br/>adds a record"| G["dapp list grows<br/>without limit"]
+    G -->|"needs"| R["delete dapp records<br/>nothing refers to"]
+    R -->|"only possible once a<br/>count can reach zero"| E["drop the records<br/>an identity stopped using"]
     E -->|"needs"| T
-    T -->|"makes the record complete"| I["index accounts<br/>by principal"]
+    T -->|"makes the record complete"| I["look up an account<br/>from its principal"]
     E -->|"keeps it bounded"| I
 ```
 
-| Change                  | Alone it fails because                                             |
-| ----------------------- | ------------------------------------------------------------------ |
-| Recording sign-ins      | the registry then grows forever                                    |
-| Reclaiming dapp records | nothing would ever make a reference count fall, so it is dead code |
-| The principal index     | it needs the record to be both complete and bounded                |
-
----
+None of the four can ship alone. Recording use is what makes the dapp list grow. Deleting unused dapp records is what bounds it, and that can only happen once a count can fall, which requires dropping records an identity no longer uses. And the lookup is only affordable once the thing it indexes has a bound.
 
 ## Out of scope
 
@@ -74,46 +72,73 @@ flowchart LR
 
 ## Approach
 
-II keeps three kinds of record in this part of storage, and it is worth seeing them before the changes:
+Four changes, described here in terms of what is stored rather than in terms of the code.
 
-```mermaid
-erDiagram
-    IDENTITY["identity (anchor)"]
-    DAPP["dapp record<br/>origin, reference count"]
-    USE["use of a dapp by an identity<br/>which accounts, when last used"]
-    ACCOUNT["named account<br/>the name the user chose"]
-    IDENTITY ||--o{ USE : "one per dapp it has used"
-    DAPP ||--o{ USE : "counted by"
-    USE ||--o{ ACCOUNT : "names, when the user named one"
-```
+**1. Write a small record the first time an identity uses a dapp.**
 
-Today the middle row only exists where a user named an account. Everything else about a sign-in is derived and stored nowhere.
+Today a record only exists where a user named an account. We add one for the default account as well: the same kind of row, with no name attached, holding when it was last used. It is a few bytes, against a whole account record, and it turns that row into a complete list of the dapps an identity has used.
 
-**Record the use.** The first time an identity signs in at a dapp, write the middle row with no account named. That is a few bytes, against a whole account record, and it makes the row a complete list of the dapps an identity has used.
+**2. Limit how many of those an identity can hold, and drop the ones it stopped using.**
 
-**Bound it, and drop the least recently used.** Each identity gets a limit on how many of these no-name rows it can hold. At the limit, the one used longest ago is dropped. Dropping it costs the user nothing: the account was derived, so signing in there again recreates the row and derives the same principal it had before. A row holding a live session is not eligible, so this cannot take a session away.
+Each identity gets a limit of 500 of these no-name rows. On reaching it, II deletes the ones used longest ago, down to 450 so that the work is spread across later sign-ins rather than repeated on every one.
 
-**Reclaim dapp records nothing refers to.** Once rows can disappear, a dapp's reference count can reach zero, and the dapp record can go with it. Its number is retired rather than reissued.
+Dropping one costs the user nothing. The account was never stored, only computed, so signing in at that dapp again writes a fresh row and produces the identical principal it had before. The user sees no difference; only the record of having been there is lost.
 
-**Index accounts by the principal they derive to.** With the list complete and bounded, II can afford a map from derived principal back to the account it belongs to. That map is what the session refresh path reads to turn a calling app into an account.
+Two rows are never dropped: one that also holds a named account, since that account cannot be recomputed, and one holding a session that has not expired, so cleaning up idle records can never take away a session the user is relying on.
 
-The four are one change, not four. Recording every use is what makes the dapp list grow; reclaiming is what bounds it; reclaiming only ever fires because rows are dropped; and the index is only affordable once the thing it indexes is bounded. All four maintain state derived from the same row, so they share one write path.
+**3. Delete a dapp record once no identity refers to it.**
+
+With rows now able to disappear, a dapp's count of referring accounts can reach zero, and the record can be removed along with the entry that maps its origin string to its internal number. That number is not handed out again, so a later sign-in at the same origin gets a new one.
+
+**4. Keep a map from a principal back to the account it belongs to.**
+
+For every account that has a row, II records which principal it derives to and which identity, dapp and account that principal means. This is the reverse direction the one-way hash cannot give, and it is what the session refresh path reads.
+
+The map is internal. No method takes a principal and reports anything about it, because that would let anyone look up any principal they observe on chain and learn which identity it belongs to.
+
+### Why they ship together
+
+The limit in change 2 is what makes change 1 safe to write, and change 3 is only reachable because change 2 lets a count fall. Change 4 is only affordable once 1 has made the record complete and 2 has bounded it. All four read and write the same row, so they share one write path, which keeps the counts and the map consistent by construction rather than by every caller remembering to update them.
 
 ---
 
 ## Specification
 
-Storage shapes, the write path, caps, counters, the reap sequence and the requirement checklist are in [tracked-default-accounts-spec.md](tracked-default-accounts-spec.md).
+Storage shapes, the write path, limits, counts, the deletion sequence and the requirement checklist are in [tracked-default-accounts-spec.md](tracked-default-accounts-spec.md).
 
 ## Implementation stages
 
-| PR    | Change                                                                                                                                                                                                                                                          |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #4232 | [One write path for the reference list](tracked-default-accounts-spec.md#one-write-path-for-the-reference-list)                                                                                                                                                 |
-| #4233 | [Monotonic application numbers](tracked-default-accounts-spec.md#the-allocator-must-become-monotonic)                                                                                                                                                           |
-| #4234 | [An empty list is not a default](tracked-default-accounts-spec.md#read_account-must-stop-special-casing-the-empty-list)                                                                                                                                         |
-| #4235 | [Tracking](tracked-default-accounts-spec.md#tracking-default-accounts), [eviction](tracked-default-accounts-spec.md#eviction), [caps](tracked-default-accounts-spec.md#caps-and-counters), and [reaping](tracked-default-accounts-spec.md#reaping-applications) |
-| #4238 | [Index accounts by derived principal](tracked-default-accounts-spec.md#the-principal-index)                                                                                                                                                                     |
-| #4240 | [Backfill the index for existing accounts](tracked-default-accounts-spec.md#backfill)                                                                                                                                                                           |
+The work is ordered so that each stage is safe to release on its own, and so that
+nothing starts writing new records before the limits that bound them exist.
 
-Storage lands first and is inert until something writes a tracked default, so each stage is safe to merge on its own. Reaping ships with the tracking that makes it fire.
+**Stage 1. Route every write through one function.** Today several call sites update the
+rows, the per-dapp counts and the origin map separately. They are consolidated into a
+single function that takes the new state of a row and works out the rest. No behaviour
+changes. This is a prerequisite for everything after it: the counts have to be correct by
+construction before anything relies on them reaching zero.
+
+**Stage 2. Stop reusing internal dapp numbers.** Numbers are currently handed out from
+the number of records that exist, which will collide once records can be deleted. They
+come from a counter that only increases instead. No behaviour changes yet, because
+nothing deletes.
+
+**Stage 3. Fix the read that treats an emptied row as absent.** A row that has been
+emptied is not the same as a row that never existed, and today the read path conflates
+them. Small correctness fix, independent of the rest.
+
+**Stage 4. Start recording use, with the limit and the cleanup.** This is the behavioural
+change: first use of a dapp writes a row, the limit drops rows an identity stopped using,
+and a dapp record with no remaining references is deleted. Stages 1 to 3 make this safe
+to turn on.
+
+**Stage 5. Maintain the principal map going forward.** Every write to a row also records
+the principal the account derives to. From this point the map is correct for anything
+written after it, and incomplete for what came before.
+
+**Stage 6. Fill in the map for accounts that already exist.** A background sweep walks
+existing rows in batches after each upgrade, adding the entries stage 5 could not know
+about. Until it finishes the map has gaps, so no feature may depend on a lookup
+succeeding until it reports done.
+
+Storage stages are inert until stage 4 turns on the writing, so releasing them early
+carries no user-visible risk.
