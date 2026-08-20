@@ -51,15 +51,23 @@ So the return address II is given is a whole URL and an allow-listed one, not a 
 
 ## `prompt=none` rules
 
-**Renders nothing, ever.** No consent screen, no account picker, no error page. Either the redirect carries a session chain or it carries `interaction_required`.
+#### Renders nothing, ever
 
-**Never creates a session.** A session comes only from `prepare_account_session`, which requires an anchor access method. `prompt=none` has no ceremony and therefore no access method, so it can only ever re-issue from a session that already exists. This is the same rule that stops a stolen session chain spawning siblings, and it is what keeps `prompt=none` from being a way to obtain authority rather than exercise it.
+No consent screen, no account picker, no error page. Either the redirect carries a session chain or it carries `interaction_required`.
 
-**Resolves only sessions belonging to the requesting origin.** The `hint` selects _among_ the sessions II holds for the origin being authorized. It never names an origin. Without this, any page could redirect to II with someone else's principal as the hint and collect a delegation.
+#### Never creates a session
+
+A session comes only from `prepare_account_session`, which requires an anchor access method. `prompt=none` has no ceremony and therefore no access method, so it can only ever re-issue from a session that already exists. This is the same rule that stops a stolen session chain spawning siblings, and it is what keeps `prompt=none` from being a way to obtain authority rather than exercise it.
+
+#### Resolves only sessions belonging to the requesting origin
+
+The `hint` selects _among_ the sessions II holds for the origin being authorized. It never names an origin. Without this, any page could redirect to II with someone else's principal as the hint and collect a delegation.
 
 This is the same shape as the caveat carried through from `read_certified_sso_bundle`: a value that resolves to something valid is not thereby a value that describes the caller, so the origin is checked separately rather than inferred. Here the origin comes from the authorize request, which the callback allowlist and `ii-alternative-origins` have already validated.
 
-**No new consent.** Silently re-issuing to a sibling is inside consent already given: the user signed in for this derivation origin, and the siblings are the ones that origin's `ii-alternative-origins` authorizes. The set of apps that can be silently signed in is exactly the set the user's own domain declared.
+#### No new consent
+
+Silently re-issuing to a sibling is inside consent already given: the user signed in for this derivation origin, and the siblings are the ones that origin's `ii-alternative-origins` authorizes. The set of apps that can be silently signed in is exactly the set the user's own domain declared.
 
 ---
 
@@ -69,9 +77,13 @@ This is the same shape as the caveat carried through from `read_certified_sso_bu
 
 It exists because one origin can hold more than one session: the user has signed in there under more than one identity, or under more than one account of one identity. Without a hint II would have to guess, and guessing wrong signs the user in as the wrong persona.
 
-**Matching happens in the frontend, against the principal stored with each session.** The keypairs the re-issue needs are the frontend's, so the candidates are the records it holds for the origin, and `prepare_account_session` returns `account_principal` for exactly this.
+#### Matching happens in the frontend, against the principal stored with each session
 
-**A held record is not proof the session still exists.** Revoking from II settings or from another app deletes the canister record and leaves this browser's copy in place. Answering from the record alone would hand the app a chain that cannot mint, and the failure would surface at the app's first refresh as something the client cannot tell apart from a real error.
+The keypairs the re-issue needs are the frontend's, so the candidates are the records it holds for the origin, and `prepare_account_session` returns `account_principal` for exactly this.
+
+#### A held record is not proof the session still exists
+
+Revoking from II settings or from another app deletes the canister record and leaves this browser's copy in place. Answering from the record alone would hand the app a chain that cannot mint, and the failure would surface at the app's first refresh as something the client cannot tell apart from a real error.
 
 So the frontend checks first:
 
@@ -127,15 +139,48 @@ One outcome for every session-related case, so a client's fallback is a single b
 
 ## Requirements
 
-| #   | Requirement                                                                                                                                                                                                                              | Where               |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| R1  | `prompt` and `hint` travel as authorize-URL parameters, not in the ICRC request, matching how the client already sends them                                                                                                              | Solution            |
-| R1a | They are the only new values II receives. `next` and `returnTo` are app-side and never reach it, and the return address stays the URL transport's allow-listed `callbackUrl`                                                             | The flow            |
-| R2  | `prompt=none` renders nothing and returns either a session chain or `interaction_required`                                                                                                                                               | `prompt=none` rules |
-| R3  | `prompt=none` never creates a session, since it has no access method to authorize one                                                                                                                                                    | `prompt=none` rules |
-| R4  | `hint` selects among the requesting origin's sessions and can never name another origin's                                                                                                                                                | `prompt=none` rules |
-| R4a | The frontend matches a `hint` against the `account_principal` stored with each session, then confirms with `check_session` that the canister still holds it                                                                              | `hint` rules        |
-| R5  | The II frontend returns the session chain and lets the app mint its own delegation, as on first sign-in                                                                                                                                  | The flow            |
-| R6  | Several sessions with no hint is `interaction_required`, not a guess                                                                                                                                                                     | `hint` rules        |
-| R7  | Every session-related failure is one JSON-RPC code, `interaction_required`. The payload carries a `reason` — `login_required` or `account_selection_required` — which a client may use to word its prompt but does not need to branch on | Failure modes       |
-| R8  | The only canister change this design needs is `check_session`; the `account_principal` R4a matches on is specified in [revocable-app-sessions-spec.md](revocable-app-sessions-spec.md)                                                   | `hint` rules        |
+Normative statements the implementation must satisfy, grouped by what they constrain.
+
+### What reaches II
+
+| #    | Requirement                                                                                                                                        |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IN-1 | The two new values MUST travel as authorize-URL parameters, matching how the client already sends them, and MUST NOT be added to the ICRC request. |
+| IN-2 | They MUST be the only new values II receives. The app's own return address MUST stay app-side and MUST NOT reach II.                               |
+| IN-3 | The redirect destination MUST remain the allow-listed callback the URL transport already uses.                                                     |
+| IN-4 | Both values MUST survive a round trip through an external identity provider, so a silent request that needs one is still answered silently.        |
+| IN-5 | An unreadable value MUST degrade to an interactive sign-in rather than fail the request, because both are preferences and neither is a credential. |
+
+### Answering silently
+
+| #     | Requirement                                                                                                                                         |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SIL-1 | A silent request MUST render nothing: no consent screen, no account picker, no error page.                                                          |
+| SIL-2 | A silent request MUST NOT create a session, having no access method with which to authorise one.                                                    |
+| SIL-3 | A silent request MUST be answered only from sessions held for the origin being authorised.                                                          |
+| SIL-4 | The frontend MUST confirm with the canister that a session it holds a record for still exists, and MUST discard the record and deny if it does not. |
+| SIL-5 | The frontend MUST return the session chain and let the app mint its own delegation, exactly as on first sign-in.                                    |
+
+### Choosing between sessions
+
+| #     | Requirement                                                                                                            |
+| ----- | ---------------------------------------------------------------------------------------------------------------------- |
+| SEL-1 | The selector MUST be the account principal an app resolves to, so it can only name a session the origin already holds. |
+| SEL-2 | Selection MUST happen in the frontend, against the principal stored with each session.                                 |
+| SEL-3 | A selector resolving to another origin's session MUST be refused.                                                      |
+| SEL-4 | More than one candidate, with nothing to choose between them, MUST be refused rather than guessed.                     |
+| SEL-5 | A request forcing a fresh ceremony MUST bypass held sessions entirely.                                                 |
+
+### Failing
+
+| #      | Requirement                                                                                                          |
+| ------ | -------------------------------------------------------------------------------------------------------------------- |
+| FAIL-1 | Every session-related failure MUST report one outcome, so a client needs a single fallback branch.                   |
+| FAIL-2 | That outcome MUST be distinguishable from a transport or protocol error.                                             |
+| FAIL-3 | The outcome MAY carry a reason a client can use to word its prompt, but MUST NOT require the client to branch on it. |
+
+### Scope
+
+| #       | Requirement                                                                                                                                                                                               |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SCOPE-1 | The only canister change this design requires is the liveness query. Sharing between subdomains and sign-out propagation MUST follow from subdomains resolving to one account, and therefore one session. |
