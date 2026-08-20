@@ -1,8 +1,4 @@
-# Revocable app sessions — specification
-
-**Authors:** sea-snake — **Date:** Aug 20, 2026
-
-**Target audience:** implementers, and agents generating code from this document
+# Revocable app sessions: specification
 
 **Design:** [revocable-app-sessions.md](revocable-app-sessions.md) covers what this builds and why. This document assumes it and does not repeat it.
 
