@@ -117,7 +117,7 @@ This falls out of the previous designs rather than needing anything:
 
 So "sign in on one and the others are signed in" is not a copy between apps. There is one session and the siblings take turns re-issuing from it.
 
-The same fact makes the client doc's other promise true. "Sign out of one and the others follow" holds because `app_revoke_session` removes the record they all share, not merely because the cookie was cleared. A sibling that ignored the cookie would still find nothing to re-issue from.
+The same fact makes sign-out propagate. "Sign out of one and the others follow" holds because `app_revoke_session` removes the record they all share, not merely because the cookie was cleared. A sibling that ignored the cookie would still find nothing to re-issue from.
 
 ---
 
@@ -136,6 +136,19 @@ One outcome for every session-related case, so a client's fallback is a single b
 `prompt=login`, and an absent `prompt`, run the interactive flow exactly as today.
 
 ---
+
+## Constants
+
+| Constant                    | Value                                          | Note                                                                                                                      |
+| --------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `interaction_required` code | 3002                                           | In ICRC-25's 3xxx user-action range, so a client can tell a request needing a ceremony from a transport or protocol error |
+| Reason values               | `login_required`, `account_selection_required` | Carried in the error payload. A client may use them to word its prompt; it does not have to branch on them                |
+| Local record expiry margin  | 5 minutes                                      | A record within this of its expiry is not treated as usable, so a chain is never handed over that dies mid-request        |
+
+Two pieces of frontend state this design relies on. The two authorize-URL parameters are
+journalled so they survive a round trip through an external identity provider, and the
+browser id is cached per identity so a returning browser is recognised rather than
+re-registered.
 
 ## Requirements
 
