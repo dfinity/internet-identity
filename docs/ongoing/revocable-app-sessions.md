@@ -84,7 +84,9 @@ An app is told nothing about the identity behind the account. Not the identity n
 
 Revoking deletes the record rather than marking it, so there is nothing left for a later call to overlook. A call that cannot resolve a usable session gets one error, whatever the cause, so a client has a single failure to handle.
 
-**The mechanism is not new.** A narrower version already runs for MCP servers, II's own server integration, storing a grant, minting 5-minute delegations against it, and revoking by deleting it. That covers minting and revocation. What it does not cover, because one internal client does not need it, is many sessions per identity, a place to keep them, and a user-facing way to see and end them.
+### The mechanism is not new
+
+A narrower version already runs for MCP servers, II's own server integration, storing a grant, minting 5-minute delegations against it, and revoking by deleting it. That covers minting and revocation. What it does not cover, because one internal client does not need it, is many sessions per identity, a place to keep them, and a user-facing way to see and end them.
 
 ## System overview
 
@@ -102,19 +104,17 @@ The canister does not take a caller's word for which account it is calling about
 
 ### Security properties
 
-A reviewer will ask these first, so they are stated here rather than left to the specification.
+A reviewer will ask these first, so they are answered here rather than left to the
+specification.
 
-**A browser cannot claim to be another browser.** The client caches an id and presents it on the next sign-in, but it does not get to choose one. An id the identity does not already hold resolves to a fresh registration rather than to somebody else's entry, so a hostile page can neither attach its session to a browser the user recognises nor hide its own from the list.
-
-**The 5-minute ceiling is enforced by the canister, not requested by the app.** Both halves of the mint re-derive it, so an app cannot ask for longer and cannot have a delegation witnessed that outlives its session. Without that, revocation would be advisory.
-
-**A stolen chain is bounded but not harmless.** It mints 5-minute delegations until the session is revoked, and the user's lever is the browser list. This is why the leaf key `AuthClient` generates should be non-extractable, and why the browser list carries a last-used time: a session the user does not recognise is the signal to act.
-
-**The chain cannot be used against an app canister.** The app's hop is restricted to the II canister when the II frontend constructs it, and the restriction is part of what the canister signs over, so an app that reaches for the session chain where it meant its app delegation fails visibly rather than appearing to work.
-
-**Eviction cannot destroy a live session.** `tracked-default-accounts.md` reclaims idle rows, and a session lives on such a row. A row holding an unexpired session is excluded from eviction, so driving a user through many apps cannot be used to knock out their sessions elsewhere.
-
-**Attaching the bundle relies on an IC extension.** Carrying canister-signed caller information on an ingress message is a protocol feature currently being specified, and the same one the identity-attributes work uses. Until it is available on mainnet, this design cannot ship.
+| Question                                             | Answer                                                                                                                                                                                                                                                                               |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Can a browser claim to be another browser?           | No. The client caches an id and presents it on the next sign-in but does not choose one. An id the identity does not already hold registers a new browser instead, so a hostile page can neither attach its session to a browser the user recognises nor hide its own from the list. |
+| Can an app ask for a longer delegation?              | No. Both halves of the mint derive the 5-minute ceiling themselves, and neither will witness a delegation that outlives its session. Were it requestable, revocation would be advisory.                                                                                              |
+| What does a stolen session chain get?                | 5-minute delegations until the session is revoked, and nothing else. It cannot create a session or extend its own life. The user's lever is the browser list, which is why it carries a last-used time: a session they do not recognise is the signal to act.                        |
+| Can the chain be used against an app's own canister? | No. Its final hop is restricted to the II canister, and that restriction is part of what is signed, so an app reaching for the chain where it meant its delegation fails visibly rather than appearing to work.                                                                      |
+| Can cleaning up idle records destroy a live session? | No. A row holding an unexpired session is not eligible for eviction, so driving a user through many apps cannot knock out their sessions elsewhere.                                                                                                                                  |
+| What does this depend on shipping first?             | Carrying canister-signed caller information on an ingress message, an IC protocol extension still being specified. Until it is on mainnet, this cannot ship.                                                                                                                         |
 
 ### The flow, end to end
 
@@ -139,32 +139,48 @@ The detail needed to build this, exact interfaces, storage shapes, algorithms, c
 The order is chosen so that storage exists before anything writes to it, and so that
 nothing user-facing appears before the mechanism behind it works.
 
-**Stage 1. Add somewhere to keep a session.** The record gains its place on the
+### Stage 1. Add somewhere to keep a session
+
+The record gains its place on the
 per-account row, with the fields listed in the approach. Nothing creates one yet, so this
 changes no behaviour and can be released on its own.
 
-**Stage 2. Add the browser registry.** Each identity gets a list of the browsers it has
+### Stage 2. Add the browser registry
+
+Each identity gets a list of the browsers it has
 signed in from, with a limit of 20 and least-recently-used replacement. Also inert until
 something registers a browser.
 
-**Stage 3. Create sessions and mint from them.** The behavioural change. Signing in
+### Stage 3. Create sessions and mint from them
+
+The behavioural change. Signing in
 records a session and registers the browser, and the two app-facing methods mint 5-minute
 delegations against it. From here an app that opts in gets short delegations.
 
-**Stage 4. Record that a session is still in use.** Each mint stamps the session and the
+### Stage 4. Record that a session is still in use
+
+Each mint stamps the session and the
 browser, which is what makes the browser list worth reading and what the limits order on.
 
-**Stage 5. Let an app end its own session.** The app's sign-out becomes real: it deletes
+### Stage 5. Let an app end its own session
+
+The app's sign-out becomes real: it deletes
 its own record and nothing else.
 
-**Stage 6. Let the user end sessions from II.** One session, or every session a browser
+### Stage 6. Let the user end sessions from II
+
+One session, or every session a browser
 holds, from settings.
 
-**Stage 7. Hand apps a session instead of a plain delegation.** The frontend request that
+### Stage 7. Hand apps a session instead of a plain delegation
+
+The frontend request that
 returns a session chain rather than a delegation. Until this ships, no app can reach any
 of the above.
 
-**Stage 8. Show the browser list.** The settings screen that lists browsers, when each was
+### Stage 8. Show the browser list
+
+The settings screen that lists browsers, when each was
 last used, and offers to sign one out.
 
 Stages 1 and 2 are storage only. Stage 3 is the point of no return for the data model.
