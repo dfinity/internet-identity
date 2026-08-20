@@ -163,7 +163,7 @@ flowchart TD
     A["write_reference_list(anchor, app, current)"] --> B[read previous row]
     B --> C[diff previous vs current]
     C --> D[anchor counters]
-    C --> E["application counter, reap at 0 ([reaping](#reaping-applications))"]
+    C --> E["application count, remove at 0"]
     C --> F["principal index ([the principal index](#the-principal-index))"]
 ```
 
@@ -172,7 +172,7 @@ Deletion is the same path with no current row, used by eviction ([remove the row
 | Delta                                | Anchor counters                              | Application counter                                                         | Principal index                                                                                                    |
 | ------------------------------------ | -------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Reference added                      | `references += 1`, `accounts += 1` if `Some` | `+= 1`                                                                      | insert                                                                                                             |
-| Row removed by eviction              | `references -= 1`                            | `-= 1`, reap at 0                                                           | remove                                                                                                             |
+| Row removed by eviction              | `references -= 1`                            | `-= 1`, remove at 0                                                         | remove                                                                                                             |
 | Reference removed by a move (future) | no change                                    | no change ([tombstones must not decrement](#tombstones-must-not-decrement)) | update to the new owner                                                                                            |
 | Reference mutated in place           | no change                                    | no change                                                                   | re-insert if the value changed ([index maintenance](#maintenance-and-the-case-the-credential-indexes-do-not-have)) |
 
@@ -221,7 +221,7 @@ It also ensures a tracked default reference exists. For `account_number: None` t
 
 > **Invariant A:** a config row for `(anchor, app)` implies a reference-list row for `(anchor, app)`.
 
-This makes the reference-list row the single canonical marker of a relationship, which is what [the reap predicate](#the-predicate-is-the-existing-reference-counter) counts. Without it, an application could be reaped while config rows survive, and those rows would be inherited by whatever claimed the number next.
+This makes the reference-list row the single canonical marker of a relationship, which is what [the removal condition](#the-condition-is-the-existing-reference-count) counts. Without it, an application could be removed while config rows survive, and those rows would be inherited by whatever claimed the number next.
 
 ---
 
@@ -324,7 +324,7 @@ Without moves, creating an account and holding one are the same event, so the si
 | Anchor `stored_accounts`                        | Not decremented today                                                                                                                                                    |
 | Global cell `stored_account_references`         | Decrement on eviction, becomes a live gauge                                                                                                                              |
 | Global cell `stored_accounts`                   | Never touched, it is the `AccountNumber` allocator                                                                                                                       |
-| `StorableApplication.stored_account_references` | Decrement on eviction. This is the reap predicate ([the reap predicate](#the-predicate-is-the-existing-reference-counter))                                               |
+| `StorableApplication.stored_account_references` | Decrement on eviction. This is the removal condition ([the removal condition](#the-condition-is-the-existing-reference-count))                                           |
 | `StorableApplication.stored_accounts`           | Not decremented today. Cannot serve as a removal predicate: it is 0 for any application whose anchors hold only default accounts, which is the case this feature creates |
 
 Two of those rules are properties of what the write path is asked to do, not of what it can do. The deltas it applies are signed, and the same arithmetic serves both the anchor and the application counters, so a decrement is representable and merely never produced: only rows whose single entry is a default are removed, and such a row contributes nothing to the account counts. The global cell is the exception, and is protected explicitly, because it doubles as the `AccountNumber` allocator and must never fall.
@@ -333,25 +333,25 @@ Two of those rules are properties of what the write path is asked to do, not of 
 
 ---
 
-## Reaping applications
+## Removing unreferenced applications
 
-### The predicate is the existing reference counter
+### The condition is the existing reference count
 
 `StorableApplication.stored_account_references` is incremented once per reference created, in `update_counters`. Nothing has ever been removed, so its stored value is an accurate live count of references at that application today, not a historical sum ([nothing is ever removed](#nothing-is-ever-removed)). No new field and no migration are needed; it only has to start being decremented, which [the single write path](#one-write-path-for-the-reference-list) makes a property of one function rather than eight.
 
-| Event                                                                                      | Effect                                     |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| Reference created                                                                          | `stored_account_references += 1`           |
-| Row removed by eviction ([remove the row, never empty it](#remove-the-row-never-empty-it)) | `stored_account_references -= 1`           |
-| Reaches 0                                                                                  | Reap ([the reap sequence](#reap-sequence)) |
+| Event                                                                                      | Effect                                            |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| Reference created                                                                          | `stored_account_references += 1`                  |
+| Row removed by eviction ([remove the row, never empty it](#remove-the-row-never-empty-it)) | `stored_account_references -= 1`                  |
+| Reaches 0                                                                                  | Remove ([the remove sequence](#removal-sequence)) |
 
 There is no rebuild path, because the reference-list map is keyed `(anchor, app)` and cannot be scanned application-major without walking every anchor. The counter is authoritative by construction, which is the main reason the write path is consolidated.
 
-For the same reason, a missing application row must fail loudly rather than being skipped. Skipping is unreachable while every caller inserts first, but once reaping exists a stale reference-list row would make the counter drift invisibly. The write path returns `OriginNotFoundForApplicationNumber` instead.
+For the same reason, a missing application row must fail loudly rather than being skipped. Skipping is unreachable while every caller inserts first, but once removal exists a stale reference-list row would make the counter drift invisibly. The write path returns `OriginNotFoundForApplicationNumber` instead.
 
 ### Tombstones must not decrement
 
-A reference count and a row count agree everywhere except on the empty tombstone of [the three-state encoding](#the-reference-list-becomes-a-three-state-encoding), which holds zero references while its row is still alive. Left alone, that would let the counter reach 0 with a tombstone still present, and reaping would erase the tombstone and allow a moved-away default to be reconstructed at the same principal, which is precisely what the encoding exists to prevent.
+A reference count and a row count agree everywhere except on the empty tombstone of [the three-state encoding](#the-reference-list-becomes-a-three-state-encoding), which holds zero references while its row is still alive. Left alone, that would let the counter reach 0 with a tombstone still present, and removal would erase the tombstone and allow a moved-away default to be reconstructed at the same principal, which is precisely what the encoding exists to prevent.
 
 The rule, which only takes effect once moves exist:
 
@@ -367,18 +367,18 @@ against the eviction path:
 
 ```
 A has [None] at X                    references = 1
-evict                                references = 0     row removed -> reap
+evict                                references = 0     row removed -> application removed
 ```
 
-With two anchors at the same application, a tombstone held by one keeps the count above zero while the other evicts, so the application is not reaped ([tombstones keep applications alive](#tombstones-keep-applications-alive)).
+With two anchors at the same application, a tombstone held by one keeps the count above zero while the other evicts, so the application is not removed ([tombstones keep applications alive](#tombstones-keep-applications-alive)).
 
 ### The allocator must become monotonic
 
-`lookup_or_insert_application_number_with_origin` (`storage.rs:1481`) derives a new number from `lookup_application_with_origin_memory.len()`. That is correct only while nothing is ever removed. It does not merely reuse a reaped number, it collides with a live one:
+`lookup_or_insert_application_number_with_origin` (`storage.rs:1481`) derives a new number from `lookup_application_with_origin_memory.len()`. That is correct only while nothing is ever removed. It does not merely reuse a removed number, it collides with a live one:
 
 ```
 applications {0, 1, 2} exist        len() == 3
-reap 1                              len() == 2
+remove 1                            len() == 2
 next new origin is assigned 2       already owned by a live application
 ```
 
@@ -386,11 +386,11 @@ The two origins then share one account universe: every `(anchor, 2)` reference l
 
 #### Change
 
-Allocate from a monotonic `StableCell<u64>` at memory index 33 (next free), seeded on first use with the current `stable_application_memory.len()`, since existing numbers are dense from 0. Reaped numbers are retired, never reissued. The `u64` space makes exhaustion irrelevant.
+Allocate from a monotonic `StableCell<u64>` at memory index 33 (next free), seeded on first use with the current `stable_application_memory.len()`, since existing numbers are dense from 0. Removed numbers are retired, never reissued. The `u64` space makes exhaustion irrelevant.
 
-An alternative is `last_key_value() + 1`, which needs no new memory and is safe given a correct count, but it reuses the number of a reaped highest application. Retiring numbers outright is the conservative choice and removes a class of future footgun where some later structure keys on `ApplicationNumber` and is forgotten here.
+An alternative is `last_key_value() + 1`, which needs no new memory and is safe given a correct count, but it reuses the number of a removed highest application. Retiring numbers outright is the conservative choice and removes a class of future footgun where some later structure keys on `ApplicationNumber` and is forgotten here.
 
-### Reap sequence
+### Removal sequence
 
 ```mermaid
 flowchart TD
@@ -402,19 +402,19 @@ flowchart TD
     E --> Z
 ```
 
-Nothing else is keyed by `ApplicationNumber`: reference-list rows are gone by definition at zero, config rows cannot outlive them by Invariant A, and principal index entries are removed by the same diff ([reaping leaves no dangling entries](#reaping-leaves-no-dangling-entries)). After a reap, `lookup_application_number_with_origin` returns `None` for the origin, so `read_account` returns a synthetic default, which is the correct answer for an anchor with no state there. A later sign-in at the same origin allocates a fresh number.
+Nothing else is keyed by `ApplicationNumber`: reference-list rows are gone by definition at zero, config rows cannot outlive them by Invariant A, and principal index entries are removed by the same diff ([removal leaves no dangling entries](#removal-leaves-no-dangling-entries)). After a remove, `lookup_application_number_with_origin` returns `None` for the origin, so `read_account` returns a synthetic default, which is the correct answer for an anchor with no state there. A later sign-in at the same origin allocates a fresh number.
 
-`ApplicationNumber` never appears in `internet_identity.did`, so reaping and renumbering are invisible to clients.
+`ApplicationNumber` never appears in `internet_identity.did`, so removal and renumbering are invisible to clients.
 
-### Legacy applications reap on the same predicate
+### Existing applications use the same condition
 
-Because `stored_account_references` is already accurate for every existing application ([the reap predicate](#the-predicate-is-the-existing-reference-counter)), applications created before this change are reaped by the same rule as new ones, with no migration and no carve-out. The existing tail of origins is reclaimed as its anchors' defaults age out, rather than persisting forever.
+Because `stored_account_references` is already accurate for every existing application ([the removal condition](#the-condition-is-the-existing-reference-count)), applications created before this change are removed by the same rule as new ones, with no migration and no carve-out. The existing tail of origins is reclaimed as its anchors' defaults age out, rather than persisting forever.
 
 ### Tombstones keep applications alive
 
 Empty-list rows ([the three-state encoding](#the-reference-list-becomes-a-three-state-encoding)) are never evicted and retain their count ([tombstones must not decrement](#tombstones-must-not-decrement)), so an application referenced only by tombstones stays above zero forever.
 
-The set this covers is narrower than "any origin touched by a move". A tombstone is only created for an anchor whose own default account was materialized and then moved away, since that is the only anchor that could otherwise reproduce the principal ([out of scope](#out-of-scope)). Anchors that merely received an account and passed it on fall back to a plain default row and are reaped normally.
+The set this covers is narrower than "any origin touched by a move". A tombstone is only created for an anchor whose own default account was materialized and then moved away, since that is the only anchor that could otherwise reproduce the principal ([out of scope](#out-of-scope)). Anchors that merely received an account and passed it on fall back to a plain default row and are removed normally.
 
 ---
 
@@ -499,9 +499,9 @@ Three rules that make this safe:
 
 A refresh stamps `last_used` on the reference it resolved, exactly as `prepare_account_delegation` does. This is what keeps [eviction](#eviction) and [the principal index](#the-principal-index) consistent: without it an evicted tracked default would deny a caller holding a perfectly valid delegation. With it, anything actively making calls is at the top of the LRU and never a victim, so only genuinely idle defaults are dropped, and recovery is one sign-in.
 
-### Reaping leaves no dangling entries
+### Removal leaves no dangling entries
 
-An application is reaped only at zero references, and zero references means zero index entries, because both are maintained by the same diff. So a reaped application number can never be left with an index entry pointing at it. Worth asserting in a test, since it is the kind of invariant a later change can quietly break.
+An application is removed only at zero references, and zero references means zero index entries, because both are maintained by the same diff. So a removed application number can never be left with an index entry pointing at it. Worth asserting in a test, since it is the kind of invariant a later change can quietly break.
 
 ---
 
@@ -517,7 +517,9 @@ Not designed here. What this design constrains:
 
 - **A move in must backfill the recipient's own default reference**, exactly as `create_additional_account` does. Otherwise the recipient's row is `[Some(n)]` with no `None` reference, which [the three-state encoding](#the-reference-list-becomes-a-three-state-encoding) reads as "the default was moved away", and the recipient loses its own default account at an origin it gave nothing away at.
 
-- **A tombstone is only correct when the anchor's own default left.** With that backfill, a recipient's row falls back to `[None]` and then to absent once the received account moves on, so it stays reapable like any other. The unreapable case is narrow: an anchor that materialized its own default at an origin and then moved that account away. Only that anchor can reproduce the principal, since the seed derives from its `seed_from_anchor` (`storage/account.rs:172`), so only that anchor's row has to remember.
+- #### A tombstone is only correct when the anchor's own default left
+
+With that backfill, a recipient's row falls back to `[None]` and then to absent once the received account moves on, so it stays removable like any other. The unremovable case is narrow: an anchor that materialized its own default at an origin and then moved that account away. Only that anchor can reproduce the principal, since the seed derives from its `seed_from_anchor` (`storage/account.rs:172`), so only that anchor's row has to remember.
 
 - A move that empties a row must not decrement the application counter ([tombstones must not decrement](#tombstones-must-not-decrement)), and its index removal must be compare-and-delete ([index maintenance](#maintenance-and-the-case-the-credential-indexes-do-not-have)).
 
@@ -528,11 +530,11 @@ Not designed here. What this design constrains:
 | Consequence                                                   | Detail                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Sign-in becomes a write path                                  | First sign-in at an origin creates an application row, an origin index entry, a reference-list row, and an index entry                                                                                                                                                                                                                      |
-| Application growth is bounded, existing applications included | Reaping applies to legacy applications on the same predicate, with no migration ([legacy applications](#legacy-applications-reap-on-the-same-predicate)). Only applications held alive by a tombstone persist ([tombstones keep applications alive](#tombstones-keep-applications-alive))                                                   |
+| Application growth is bounded, existing applications included | Removal applies to legacy applications on the same predicate, with no migration ([legacy applications](#existing-applications-use-the-same-condition)). Only applications held alive by a tombstone persist ([tombstones keep applications alive](#tombstones-keep-applications-alive))                                                     |
 | The index roughly doubles the subsystem's footprint           | One entry per reference, at a 29 byte key plus a small value, bounded per anchor by [what an anchor can accumulate](#what-an-anchor-can-accumulate)                                                                                                                                                                                         |
 | Anchor to origin becomes joinable in stable memory            | The canister records per anchor every origin signed into and when, the origin in cleartext on `StorableApplication`, joined through the reference-list key. This is the point of the feature, is a different scope from the browser-local last-used store, and is worth a changelog line. The per-anchor cap doubles as the retention bound |
 | No upgrade cost                                               | All of this lives in stable structures, not the Candid-serialized anchor blob. Only the index needs a backfill, and it is externally driven rather than run at upgrade                                                                                                                                                                      |
-| Not archived                                                  | Tracked-default creation, eviction, and reaping must not go through `post_account_operation_bookkeeping`, or every first sign-in at an origin becomes a permanent replicated archive entry. Sign-in does not touch the archive today and must not start                                                                                     |
+| Not archived                                                  | Tracked-default creation, eviction, and removal must not go through `post_account_operation_bookkeeping`, or every first sign-in at an origin becomes a permanent replicated archive entry. Sign-in does not touch the archive today and must not start                                                                                     |
 
 ---
 
