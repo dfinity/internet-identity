@@ -1102,6 +1102,9 @@ test.describe("Authorize with gated non-sub (Entra) SSO", () => {
     userId: string,
   ): Promise<void> => {
     const popup = await startGatedLogin(page, signInWithOpenId, userId);
+    // Armed early (60s to span the steps below) so the close isn't missed; the
+    // app reuses a named window, so the next login needs a fresh one to open.
+    const popupClosePromise = popup.waitForEvent("close", { timeout: 60_000 });
     await expect(
       popup.getByRole("heading", {
         name: `First sign-in with ${SSO_ENTRA_NAME}`,
@@ -1112,6 +1115,7 @@ test.describe("Authorize with gated non-sub (Entra) SSO", () => {
     const normalPopup = await normalPopupPromise;
     await signInWithOpenId(normalPopup, userId);
     await expect(page.locator("#principal")).toBeVisible({ timeout: 25_000 });
+    await popupClosePromise;
   };
 
   test("first gated 1-click prompts one normal sign-in, then reaches the app", async ({
