@@ -1,6 +1,8 @@
 # Silent re-auth over the redirect transport
 
-**Authors:** sea-snake — **Date:** Aug 20, 2026
+**Authors:** sea-snake
+
+**Date:** Aug 20, 2026
 
 **Target audience:** Engineers, Security Reviewers, Community Developers
 
@@ -20,15 +22,19 @@ The cookie never holds key material, and a hint can only pick from sessions II a
 
 ## Context
 
-Sibling subdomains of one domain should share a sign-in: sign in on `chat.example.com` and `hr.example.com` is signed in too; sign out of one and the others follow.
+A dapp often runs as several subdomains of one domain: `chat.example.com` and `hr.example.com` belonging to `example.com`. A user thinks of these as one product and expects one sign-in to cover them.
 
-The client half of that already exists, specified in `@icp-sdk/auth` ([shared-sessions.md](https://github.com/dfinity/icp-js-auth/blob/5aa78d5f64714d6e8e7781e256562035c09018c6/docs/src/content/docs/shared-sessions.md)). It puts three pieces in place:
+They do not get that today. Each subdomain is a separate origin, so each gets its own principal and its own sign-in, and signing out of one leaves the others signed in.
 
-| Piece                                                                                                 | Effect                                                                         |
-| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| A shared `derivationOrigin`, authorized by `ii-alternative-origins`                                   | Every sibling resolves to the same principal                                   |
-| A cookie scoped to the parent domain, holding only a principal and an expiry — never key material     | Siblings can see _that_ a session exists                                       |
-| A `/reauth` page using `transport: 'redirect'`, `prompt: 'none'`, `hint: <principal from the cookie>` | Re-issues this app's own delegation, then returns the user to its own `?next=` |
+Two mechanisms already exist that get most of the way there. A dapp can nominate a shared **derivation origin**, so that every subdomain resolves to the same principal instead of one each, provided the nominated origin publishes a list authorising them. And a browser cookie can be scoped to the parent domain, so all the subdomains can read it.
+
+The client half is built on those two and is already specified in `@icp-sdk/auth` ([shared-sessions.md](https://github.com/dfinity/icp-js-auth/blob/5aa78d5f64714d6e8e7781e256562035c09018c6/docs/src/content/docs/shared-sessions.md)). It puts three pieces in place:
+
+| Piece                                                                                               | Effect                                                                                   |
+| --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| A shared derivation origin, authorised by a list the nominated origin publishes                     | Every subdomain resolves to the same principal, so to the same account                   |
+| A cookie scoped to the parent domain, holding only a principal and an expiry, never key material    | Siblings can see _that_ a session exists                                                 |
+| A page that sends the user to II asking for a silent answer, carrying the principal from the cookie | Gets a delegation for this subdomain's own key, then returns the user to where they were |
 
 The cookie is not II's mechanism and II never sees it. It is how the _siblings_ discover that a session is worth asking for. All II sees is the `hint`.
 
@@ -42,7 +48,7 @@ flowchart LR
 
 ## Problem
 
-A sibling arriving at II has no local session, only a hint that one exists. For the flow to feel like a shared sign-in, II has to answer **without rendering anything** — no consent screen, no account picker, no spinner — because the user did not ask to visit II and should never see it.
+A sibling arriving at II has no local session, only a hint that one exists. For the flow to feel like a shared sign-in, II has to answer **without rendering anything**, no consent screen, no account picker, no spinner, because the user did not ask to visit II and should never see it.
 
 II cannot do that today.
 
@@ -91,8 +97,15 @@ The flow, the `prompt=none` and `hint` rules, failure modes and the requirement 
 
 ## Implementation stages
 
-| PR    | Stage                                                                       |
-| ----- | --------------------------------------------------------------------------- |
-| #4248 | `prompt` and `hint`, the no-UI path, and the `check_session` liveness query |
+**Stage 1. Read the two parameters.** `prompt` and `hint` are parsed off the authorize URL
+and held for the request. Nothing acts on them yet, so this changes no behaviour.
 
-Sibling sharing and sign-out propagation need no work of their own: they follow from siblings resolving to one account, and therefore one session.
+**Stage 2. Add the liveness query.** `check_session` on the canister, so the frontend can
+confirm a session it holds a record for still exists.
+
+**Stage 3. Answer without rendering.** The path that resolves a session, checks it is
+live, extends its chain and delivers the redirect response, with `interaction_required`
+for every case it cannot satisfy. This is the point at which `prompt=none` starts working.
+
+Stage 3 depends on the session methods in `revocable-app-sessions.md` being in place, so
+this work follows that schedule rather than running beside it.
