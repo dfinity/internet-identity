@@ -1,13 +1,5 @@
 # Shared revocable sessions
 
-**Authors:** sea-snake
-
-**Date:** Aug 20, 2026
-
-**Target audience:** Engineers, Security Reviewers, Community Developers
-
-**Status:** Implementation
-
 ## Summary
 
 When a user signs in to an app, II gives it a signed statement that a key may act for the user until a stated expiry, for up to 30 days. Anything on the network can check that statement without asking II, which is what makes it cheap, and also means II cannot take it back. Signing out of the app clears the app's own storage and invalidates nothing. Separately, an app running as several subdomains cannot share one sign-in, so the user signs in on each and signing out of one leaves the others signed in.
