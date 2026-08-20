@@ -282,7 +282,7 @@ sequenceDiagram
 
 Requirements:
 
-- No more than 10 alternative origins can be listed in the `/.well-known/ii-alternative-origins` file.
+- No more than 100 alternative origins can be listed in the `/.well-known/ii-alternative-origins` file.
 - Derivation Origin must expose the `/.well-known/ii-alternative-origins` file.
 - The `/.well-known/ii-alternative-origins` file must be hosted by an ICP canister that must implement the `http_request` query call.
 - The alternative origins must be present in the file `/.well-known/ii-alternative-origins` of the derivation origin requested.
@@ -304,7 +304,7 @@ Requirements:
         "type": "string"
       },
       "minItems": 0,
-      "maxItems": 10,
+      "maxItems": 100,
       "uniqueItems": true
     }
   },
@@ -328,7 +328,7 @@ The path `/.well-known/ii-alternative-origins` will always be requested using th
 :::
 
 :::note
-To prevent misuse of this feature, the number of alternative origins _must not_ be greater than 10.
+To prevent misuse of this feature, the number of alternative origins _must not_ be greater than 100.
 :::
 
 :::note
