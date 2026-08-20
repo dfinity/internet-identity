@@ -90,12 +90,12 @@ Anchors are reverse-indexed by OpenID credential, passkey credential, passkey pu
 
 For a given `(anchor, app)`:
 
-| Row state                            | Meaning                        | Default account                                   |
-| ------------------------------------ | ------------------------------ | ------------------------------------------------- |
-| Absent                               | Nothing ever happened here     | Reconstructible, reads return a synthetic default |
-| Present, contains a `None` reference | Anchor holds a tracked default | Live, `last_used` on the reference                |
-| Present, no `None` reference         | Default was moved away         | Not reconstructible, reads return `None`          |
-| Present, empty                       | Everything here was moved away | Not reconstructible, permanent tombstone          |
+| Row state                            | Meaning                                               | Default account                                   |
+| ------------------------------------ | ----------------------------------------------------- | ------------------------------------------------- |
+| Absent                               | Nothing ever happened here                            | Reconstructible, reads return a synthetic default |
+| Present, contains a `None` reference | Anchor holds a tracked default                        | Live, `last_used` on the reference                |
+| Present, no `None` reference         | The default was named, or moved away once moves exist | Not reconstructible from the origin alone         |
+| Present, empty                       | Everything here was moved away                        | Not reconstructible, permanent tombstone          |
 
 Absence and emptiness are now opposites. Absence means nothing ever happened; emptiness means everything that was here left. That distinction is what lets a future move feature tell "you never had this" from "you gave this away". Without it, a moved-away default could be re-minted at the same principal by its former owner.
 
@@ -226,7 +226,9 @@ This makes the reference-list row the single canonical marker of a relationship,
 ### Predicate
 
 ```
-evictable(anchor, app)  <=>  list.len() == 1 && list[0].account_number.is_none()
+evictable(identity, app)  <=>  list.len() == 1
+                          && list[0].account_number.is_none()
+                          && list[0] holds no unexpired session
 ```
 
 Deliberately not "contains no `Some` references", which would also match the empty tombstone of [the three-state encoding](#the-reference-list-becomes-a-three-state-encoding).
@@ -264,10 +266,10 @@ Resolving a caller through the principal index also counts as usage and stamps `
 
 ### Two independent caps
 
-| Cap                                                               | Counts                         | Behaviour on hit                                                                |
-| ----------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------- |
-| Materialized accounts, 500, existing (`account_management.rs:36`) | `stored_accounts` per anchor   | Hard error. `create_account` and default materialization fail, as they do today |
-| Evictable defaults, 500, new                                      | Rows that are exactly `[None]` | Evict the LRU down to a watermark. Sign-in never fails                          |
+| Cap                                                               | Counts                                                       | Behaviour on hit                                                                |
+| ----------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| Materialized accounts, 500, existing (`account_management.rs:36`) | `stored_accounts` per anchor                                 | Hard error. `create_account` and default materialization fail, as they do today |
+| Evictable defaults, 500, new                                      | Rows that are exactly `[None]` and hold no unexpired session | Evict the LRU down to a watermark. Sign-in never fails                          |
 
 The caps are isolated. A default sharing its row with named accounts is not counted by the second, because such a default exists only where a named account does and is therefore already paid for by the first.
 
@@ -293,11 +295,11 @@ The bound is loosest for an anchor holding 500 non-evictable defaults, whose upp
 
 ### What an anchor can accumulate
 
-| Rows                                    | Bound    | Why                                                                                            |
-| --------------------------------------- | -------- | ---------------------------------------------------------------------------------------------- |
-| Rows holding at least one named account | 500      | Each needs a named account at that application, and the materialized cap allows 500 per anchor |
-| Rows that are exactly `[None]`          | 500      | The new cap counts precisely these                                                             |
-| **Total**                               | **1000** |                                                                                                |
+| Rows                                                         | Bound    | Why                                                                                            |
+| ------------------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------- |
+| Rows holding at least one named account                      | 500      | Each needs a named account at that application, and the materialized cap allows 500 per anchor |
+| Rows that are exactly `[None]` and hold no unexpired session | 500      | The new cap counts precisely these                                                             |
+| **Total**                                                    | **1000** |                                                                                                |
 
 References come out higher than rows, because a row can hold several:
 
@@ -443,7 +445,7 @@ One entry per reference, so the steady-state size is the reference count, bounde
 | Named account | `account_seed(n, origin)`     | `n` is globally unique and retired, never reissued |
 | Default       | `anchor_seed(anchor, origin)` | unique per `(anchor, origin)`                      |
 
-Collision between the two families is prevented by the `ACCOUNT_SEED_PREFIX` domain separator in `calculate_account_seed`.
+Collision between the two families is prevented by the `ACCOUNT_SEED_PREFIX` domain separator the account seed is built with.
 
 The one real risk is that a materialized default derives from `seed_from_anchor`, producing the same principal as the anchor's synthetic default at that origin. The two never coexist, because `create_default_account` replaces the `None` entry in place rather than appending. Once moves exist, what stops an anchor from acquiring a fresh `None` reference that collides with the account it gave away is the tombstone ([the three-state encoding](#the-reference-list-becomes-a-three-state-encoding)). So the empty-row rule is load-bearing for this index too, and any future "tidy up empty rows" would corrupt the lookup as well as re-mint principals.
 
@@ -534,6 +536,23 @@ With that backfill, a recipient's row falls back to `[None]` and then to absent 
 
 ---
 
+## Constants
+
+| Constant                                  | Value           | What it bounds                                                          |
+| ----------------------------------------- | --------------- | ----------------------------------------------------------------------- |
+| Rows holding only a default, per identity | 500             | Reaching it evicts; it does not refuse a sign-in                        |
+| Eviction watermark                        | 450             | Eviction trims towards this, so an active identity sits between the two |
+| Evictions per message                     | 50              | The rest is taken by later sign-ins                                     |
+| Rows examined while choosing a victim     | 1000            | Bounds the scan on the sign-in path                                     |
+| Named accounts per identity               | 500             | Pre-existing, counted separately                                        |
+| Backfill batch                            | 2000 rows       | Per timer tick                                                          |
+| Backfill interval                         | 1 second        | Timer installed from both install and upgrade                           |
+| Application number allocator              | memory index 33 | Monotonic, never reissues                                               |
+| Principal index                           | memory index 34 | Principal to identity, app and account                                  |
+
+Eviction takes the least recently used eligible row, breaking ties on the application
+number. A row that has never been used sorts before every row that has.
+
 ## Requirements
 
 Normative statements the implementation must satisfy, grouped by the part of the system
@@ -568,17 +587,17 @@ Who may write, and what a write must keep consistent.
 
 The limit, what it is allowed to do when it cannot be satisfied, and what cleanup follows.
 
-| #       | Requirement                                                                                                                                                                                                |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| LIMIT-1 | An identity MUST be limited to 500 rows whose only entry is a default account, counted separately from the 500-account limit.                                                                              |
-| LIMIT-2 | Reaching the limit MUST NOT cause a sign-in to fail.                                                                                                                                                       |
-| LIMIT-3 | The limit is advisory: with no eligible row, eviction MUST do nothing and the sign-in MUST proceed, so an identity holding ineligible rows MAY exceed 500.                                                 |
-| LIMIT-4 | A row is eligible only if its single entry is a default account holding no unexpired session.                                                                                                              |
-| LIMIT-5 | Eviction MUST remove the row and the configuration row for the same key, and MUST NOT leave an empty row behind.                                                                                           |
-| LIMIT-6 | Eviction MUST take the least recently used eligible rows first, MUST leave the row the current sign-in wrote alone, MUST remove at most 50 rows per message, and MUST examine at most 1000 while choosing. |
-| LIMIT-7 | Evicting a row MUST NOT change the principal its account derives to, so the account stays usable and identical afterwards.                                                                                 |
-| LIMIT-8 | An application record whose reference count reaches zero MUST be removed together with its origin-to-number entry.                                                                                         |
-| LIMIT-9 | An application number MUST NOT be reissued once its record is removed.                                                                                                                                     |
+| #       | Requirement                                                                                                                                                                                                            |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LIMIT-1 | An identity MUST be limited to 500 rows whose only entry is a default account, counted separately from the 500-account limit.                                                                                          |
+| LIMIT-2 | Reaching the limit MUST NOT cause a sign-in to fail.                                                                                                                                                                   |
+| LIMIT-3 | The limit is advisory: with no eligible row, eviction MUST do nothing and the sign-in MUST proceed, so an identity holding ineligible rows MAY exceed 500.                                                             |
+| LIMIT-4 | A row is eligible only if its single entry is a default account holding no unexpired session.                                                                                                                          |
+| LIMIT-5 | Eviction MUST remove the row and the configuration row for the same key, and MUST NOT leave an empty row behind.                                                                                                       |
+| LIMIT-6 | Eviction MUST take the least recently used eligible rows first, MUST leave the row the current sign-in wrote alone, MUST remove at most 50 rows per message, and MUST consider at most 1000 candidates while choosing. |
+| LIMIT-7 | Evicting a row MUST NOT change the principal its account derives to, so the account stays usable and identical afterwards.                                                                                             |
+| LIMIT-8 | An application record whose reference count reaches zero MUST be removed together with its origin-to-number entry.                                                                                                     |
+| LIMIT-9 | An application number MUST NOT be reissued once its record is removed.                                                                                                                                                 |
 
 ### Looking up an account from a principal
 
