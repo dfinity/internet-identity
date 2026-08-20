@@ -66,20 +66,23 @@ Answering silently also must not become a way to get something for free. A page 
 
 ## Out of scope
 
-- **Anything the client already specifies.** The cookie, the `derivationOrigin` setup and the `/reauth` page belong to `@icp-sdk/auth`; II never sees the cookie.
-- **Sharing across unrelated domains.** Only siblings that already resolve to the same principal through a shared `derivationOrigin` can share a session.
-- **Creating a session silently.** `prompt=none` can only re-issue from one that exists; it has no access method with which to authorise a new one.
+- **Anything the client already specifies.**  
+  The cookie, the `derivationOrigin` setup and the `/reauth` page belong to `@icp-sdk/auth`; II never sees the cookie.
+- **Sharing across unrelated domains.**  
+  Only siblings that already resolve to the same principal through a shared `derivationOrigin` can share a session.
+- **Creating a session silently.**  
+  `prompt=none` can only re-issue from one that exists; it has no access method with which to authorise a new one.
 
 ## Approach
 
 Two new authorize-URL parameters and a path through the authorize flow that renders nothing.
 
-| Item                                    | Change                                                                                               |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `prompt`                                | New. `none` answers from a held session or fails; `login` forces a ceremony; absent behaves as today |
-| `hint`                                  | New. A principal in text form, selecting which of the origin's sessions to re-issue from             |
-| A no-UI path through the authorize flow | Resolves the session, extends its chain, delivers the redirect response, renders nothing             |
-| `interaction_required`                  | A failure outcome distinguishable from every other, so the client falls back to a ceremony           |
+| Item                                    | Change                                                                                                                                                                               |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `prompt`                                | New. `none` answers from a held session or fails. `login` and an absent `prompt` both run the ceremony; `login` exists so a client can say so rather than to select a different path |
+| `hint`                                  | New. A principal in text form, selecting which of the origin's sessions to re-issue from                                                                                             |
+| A no-UI path through the authorize flow | Resolves the session, extends its chain, delivers the redirect response, renders nothing                                                                                             |
+| `interaction_required`                  | A failure outcome distinguishable from every other, so the client falls back to a ceremony                                                                                           |
 
 A hint selects; it does not grant. It can only pick from the sessions II already holds for the origin being authorized, and it is holding the session that confers anything, so a hint read out of a cookie an app can write is safe. A silent request also cannot create a session: creating one needs an access method, and a redirect carries none.
 

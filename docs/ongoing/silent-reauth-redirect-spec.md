@@ -2,7 +2,7 @@
 
 **Design:** [silent-reauth-redirect.md](silent-reauth-redirect.md) covers what this builds and why. This document assumes it and does not repeat it.
 
-**Depends on:** [revocable-app-sessions-spec.md](revocable-app-sessions-spec.md) for the session, its chain, and the caller-info bundle.
+**Depends on:** [revocable-app-sessions-spec.md](revocable-app-sessions-spec.md) for the session, its chain, the session handle that authenticates a chain-signed call, and the account principal `prepare_account_session` returns.
 
 ## The flow
 
@@ -30,8 +30,6 @@ sequenceDiagram
 The II frontend does not mint the app delegation here. It hands back the session chain and the app mints its own, exactly as on a first sign-in, so there is one path for that and not two.
 
 ### What actually reaches II, and what does not
-
-Worth being exact, because two of these look like II parameters and are not.
 
 | Value                   | Where it lives                                                                                                        | Does II see it                                                                                                               |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -88,7 +86,7 @@ So the frontend checks first:
 check_session : () -> (bool) query;
 ```
 
-The call is signed by the session chain with the caller-info bundle attached, so it authenticates exactly as a refresh does and names no identity. A `false` answer discards the local record and denies with `interaction_required`.
+The call is signed by the session chain and carries nothing else, so it authenticates exactly as a refresh does and names no identity. A `false` answer discards the local record and denies with `interaction_required`.
 
 It is a query, so a single node could forge the reply. That is acceptable here because the answer is advisory: every mint enforces the same conditions regardless, so a forged `true` costs one failed refresh and a forged `false` costs one unnecessary ceremony.
 
@@ -119,15 +117,15 @@ The same fact makes sign-out propagate. "Sign out of one and the others follow" 
 
 ## Failure modes
 
-| Situation                                                        | Outcome                                          |
-| ---------------------------------------------------------------- | ------------------------------------------------ |
-| No session held                                                  | `interaction_required`                           |
-| Session expired, or revoked from another app or from II settings | `interaction_required`                           |
-| Hint resolves to another origin's session                        | `interaction_required`                           |
-| Several sessions and no hint                                     | `interaction_required`                           |
-| Callback or derivation origin fails validation                   | The existing redirect-transport error, unchanged |
+| Situation                                                        | Outcome                                                                                      |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| No session held                                                  | `interaction_required`                                                                       |
+| Session expired, or revoked from another app or from II settings | `interaction_required`                                                                       |
+| Hint resolves to another origin's session                        | `interaction_required`                                                                       |
+| Several sessions and no hint                                     | `interaction_required`                                                                       |
+| Callback or derivation origin fails validation                   | `interaction_required` for a silent request, the existing redirect-transport error otherwise |
 
-One outcome for every session-related case, so a client's fallback is a single branch. That is not to hide anything: the `prompt=none` rules above already bound what it can be used to learn, since it only ever answers for the requesting origin.
+One outcome for every session-related case, so a client's fallback is a single branch. The `prompt=none` rules above already bound what a client can learn from it, since it only ever answers for the requesting origin.
 
 `prompt=login`, and an absent `prompt`, run the interactive flow exactly as today.
 
@@ -135,16 +133,18 @@ One outcome for every session-related case, so a client's fallback is a single b
 
 ## Constants
 
-| Constant                    | Value                                          | Note                                                                                                                      |
-| --------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `interaction_required` code | 3002                                           | In ICRC-25's 3xxx user-action range, so a client can tell a request needing a ceremony from a transport or protocol error |
-| Reason values               | `login_required`, `account_selection_required` | Carried in the error payload. A client may use them to word its prompt; it does not have to branch on them                |
-| Local record expiry margin  | 5 minutes                                      | A record within this of its expiry is not treated as usable, so a chain is never handed over that dies mid-request        |
+| Constant                    | Value                                          | Note                                                                                                                                                                                                                        |
+| --------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `interaction_required` code | 3002                                           | In ICRC-25's 3xxx user-action range, so a client can tell a request needing a ceremony from a transport or protocol error                                                                                                   |
+| Reason values               | `login_required`, `account_selection_required` | Carried in the error payload. A client may use them to word its prompt; it does not have to branch on them                                                                                                                  |
+| Local record expiry margin  | 5 minutes                                      | A record within this of its expiry is not treated as usable, so a chain is never handed over that dies mid-request. Half the shortest session a caller can request, so a session near that floor is never answered silently |
 
-Two pieces of frontend state this design relies on. The two authorize-URL parameters are
-journalled so they survive a round trip through an external identity provider, and the
-browser id is cached per identity so a returning browser is recognised rather than
-re-registered.
+Two pieces of browser state this relies on:
+
+| State                            | Where                                        | Why                                                                                                                                                                                                                                                         |
+| -------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The two authorize-URL parameters | `sessionStorage`, under one fixed key        | They must survive a round trip through an external identity provider, which navigates away and back. One key per tab is enough because a tab drives one authorize request at a time, and a fresh `/authorize` load that carries neither parameter clears it |
+| The browser keypair              | IndexedDB, one per identity, non-extractable | A returning browser proves which browser it is, and rotates the key at each sign-in                                                                                                                                                                         |
 
 ## Requirements
 
@@ -162,23 +162,25 @@ Normative statements the implementation must satisfy, grouped by what they const
 
 ### Answering silently
 
-| #     | Requirement                                                                                                                                         |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SIL-1 | A silent request MUST render nothing: no consent screen, no account picker, no error page.                                                          |
-| SIL-2 | A silent request MUST NOT create a session, having no access method with which to authorise one.                                                    |
-| SIL-3 | A silent request MUST be answered only from sessions held for the origin being authorised.                                                          |
-| SIL-4 | The frontend MUST confirm with the canister that a session it holds a record for still exists, and MUST discard the record and deny if it does not. |
-| SIL-5 | The frontend MUST return the session chain and let the app mint its own delegation, exactly as on first sign-in.                                    |
+| #      | Requirement                                                                                                                                                                                                                                                      |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SIL-1  | A silent request that reaches the handler MUST render nothing: no consent screen, no account picker, no error page. A malformed one MUST still answer with a protocol error rather than a denial, and still render nothing.                                      |
+| SIL-1a | A failure that leaves II with no validated address to answer on — a rejected callback, or a transport that never establishes — MAY render, because the alternative is to answer nobody at all. Every failure reached with a channel in hand is covered by SIL-1. |
+| SIL-2  | A silent request MUST NOT create a session, having no access method with which to authorise one.                                                                                                                                                                 |
+| SIL-3  | A silent request MUST be answered only from sessions held for the origin being authorised.                                                                                                                                                                       |
+| SIL-4  | The frontend MUST confirm with the canister that a session it holds a record for still exists, and MUST discard the record and deny if it does not.                                                                                                              |
+| SIL-5  | The frontend MUST return the session chain and let the app mint its own delegation, exactly as on first sign-in.                                                                                                                                                 |
 
 ### Choosing between sessions
 
-| #     | Requirement                                                                                                            |
-| ----- | ---------------------------------------------------------------------------------------------------------------------- |
-| SEL-1 | The selector MUST be the account principal an app resolves to, so it can only name a session the origin already holds. |
-| SEL-2 | Selection MUST happen in the frontend, against the principal stored with each session.                                 |
-| SEL-3 | A selector resolving to another origin's session MUST be refused.                                                      |
-| SEL-4 | More than one candidate, with nothing to choose between them, MUST be refused rather than guessed.                     |
-| SEL-5 | A request forcing a fresh ceremony MUST bypass held sessions entirely.                                                 |
+| #     | Requirement                                                                                                                                                                |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SEL-1 | The selector MUST be the account principal an app resolves to, so it can only name a session the origin already holds.                                                     |
+| SEL-2 | Selection MUST happen in the frontend, against the principal stored with each session.                                                                                     |
+| SEL-3 | A selector resolving to another origin's session MUST be refused.                                                                                                          |
+| SEL-4 | More than one candidate, with nothing to choose between them, MUST be refused rather than guessed.                                                                         |
+| SEL-5 | A held session MUST be answered only when the request asks for silence. Everything else runs the ceremony, so silence is something an app opts into rather than a default. |
+| SEL-6 | `prompt=login` MUST behave exactly as an absent `prompt`. It is accepted so a client can state its intent, and it selects no separate path: both run the ceremony.         |
 
 ### Failing
 
