@@ -48,11 +48,11 @@ erDiagram
 
 Seed derivation (`storage/account.rs:166`):
 
-| Account | Seed |
-| ------- | ---- |
-| Default, not materialized | `anchor_seed(anchor_number, origin)` |
-| Default, materialized | `anchor_seed(seed_from_anchor, origin)` |
-| Named | `account_seed(account_number, origin)` |
+| Account                   | Seed                                    |
+| ------------------------- | --------------------------------------- |
+| Default, not materialized | `anchor_seed(anchor_number, origin)`    |
+| Default, materialized     | `anchor_seed(seed_from_anchor, origin)` |
+| Named                     | `account_seed(account_number, origin)`  |
 
 The first two are byte identical. A default account's principal is a pure function of `(anchor, origin)`, both permanent, so the account is reconstructible from nothing and safe to delete. A named account's principal depends on an `AccountNumber` drawn from a never-reissued allocator, so deleting one destroys its principal.
 
@@ -70,21 +70,22 @@ The per-application counters are accurate for what exists, since increments have
 
 ### There is no reverse index from a principal
 
-Anchors are reverse-indexed by OpenID credential, passkey credential, passkey public key, recovery phrase principal, and email recovery address. Accounts have no such index. Given the principal a dapp sees, the canister cannot determine which anchor, application, or account produced it, because the seed is hashed.
+Anchors are reverse-indexed by OpenID credential, passkey credential, passkey public key, recovery phrase principal, and email recovery address. Accounts have no such index. Given the principal an app sees, the canister cannot determine which anchor, application, or account produced it, because the seed is hashed.
 
 ---
+
 ## Glossary
 
-| Term | Meaning |
-| ---- | ------- |
-| **Application** | Internal record for a dapp origin, addressed by `ApplicationNumber`. Never exposed in Candid. |
-| **Materialized account** | Account with a row in `stable_account_memory`, i.e. one carrying a name. Consumes an `AccountNumber`. |
-| **Default account** | The account an anchor gets at an origin without doing anything. Seed derives from `(anchor, origin)`. |
-| **Synthetic default** | Default account with no stored state at all, conjured on read. |
-| **Tracked default** | Default account with an `AccountReference` but no `StorableAccount`. Introduced here. |
-| **Reference list** | `Vec<AccountReference>` stored at `(anchor, app)`. The only record of which accounts an anchor holds at an application. |
-| **Evictable default** | Tracked default that is the only entry in its row, so deleting the whole row costs the anchor nothing. The unit the new cap counts ([the two caps](#two-independent-caps)). A default sharing its row with named accounts is not evictable ([the eviction predicate](#predicate)). |
-| **Derived principal** | What a dapp sees as the caller: `self_authenticating(der_encode_canister_sig_key(seed))`. |
+| Term                     | Meaning                                                                                                                                                                                                                                                                            |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Application**          | Internal record for an app origin, addressed by `ApplicationNumber`. Never exposed in Candid.                                                                                                                                                                                       |
+| **Materialized account** | Account with a row in `stable_account_memory`, i.e. one carrying a name. Consumes an `AccountNumber`.                                                                                                                                                                              |
+| **Default account**      | The account an anchor gets at an origin without doing anything. Seed derives from `(anchor, origin)`.                                                                                                                                                                              |
+| **Synthetic default**    | Default account with no stored state at all, conjured on read.                                                                                                                                                                                                                     |
+| **Tracked default**      | Default account with an `AccountReference` but no `StorableAccount`. Introduced here.                                                                                                                                                                                              |
+| **Reference list**       | `Vec<AccountReference>` stored at `(anchor, app)`. The only record of which accounts an anchor holds at an application.                                                                                                                                                            |
+| **Evictable default**    | Tracked default that is the only entry in its row, so deleting the whole row costs the anchor nothing. The unit the new cap counts ([the two caps](#two-independent-caps)). A default sharing its row with named accounts is not evictable ([the eviction predicate](#predicate)). |
+| **Derived principal**    | What an app sees as the caller: `self_authenticating(der_encode_canister_sig_key(seed))`.                                                                                                                                                                                           |
 
 ---
 
@@ -92,12 +93,12 @@ Anchors are reverse-indexed by OpenID credential, passkey credential, passkey pu
 
 For a given `(anchor, app)`:
 
-| Row state | Meaning | Default account |
-| --------- | ------- | --------------- |
-| Absent | Nothing ever happened here | Reconstructible, reads return a synthetic default |
-| Present, contains a `None` reference | Anchor holds a tracked default | Live, `last_used` on the reference |
-| Present, no `None` reference | Default was moved away | Not reconstructible, reads return `None` |
-| Present, empty | Everything here was moved away | Not reconstructible, permanent tombstone |
+| Row state                            | Meaning                        | Default account                                   |
+| ------------------------------------ | ------------------------------ | ------------------------------------------------- |
+| Absent                               | Nothing ever happened here     | Reconstructible, reads return a synthetic default |
+| Present, contains a `None` reference | Anchor holds a tracked default | Live, `last_used` on the reference                |
+| Present, no `None` reference         | Default was moved away         | Not reconstructible, reads return `None`          |
+| Present, empty                       | Everything here was moved away | Not reconstructible, permanent tombstone          |
 
 Absence and emptiness are now opposites. Absence means nothing ever happened; emptiness means everything that was here left. That distinction is what lets a future move feature tell "you never had this" from "you gave this away". Without it, a moved-away default could be re-minted at the same principal by its former owner.
 
@@ -136,15 +137,15 @@ stateDiagram-v2
 
 Everything below hangs off state derived from the reference list: two anchor counters, one application counter, and the principal index. Today the list is written at six sites, and this design adds two more.
 
-| Site | Effect |
-| ---- | ------ |
-| `storage.rs:1622`, `1643` (`with_account_mut`) | Rewrites the list on every sign-in and rename, adds no entries |
-| `storage.rs:1897` (`create_additional_account`, new list) | Two entries |
-| `storage.rs:1910` (`create_additional_account`, push) | One entry |
-| `storage.rs:2193` (`create_default_account`, new list) | One entry |
-| `storage.rs:2222` (`create_default_account`, existing list) | Mutates the `None` reference in place |
-| New in [tracking default accounts](#tracking-default-accounts) (`set_account_last_used`) | One entry |
-| New in [Invariant A](#invariant-a) (`set_default_account_for_origin`) | One entry |
+| Site                                                                                     | Effect                                                         |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `storage.rs:1622`, `1643` (`with_account_mut`)                                           | Rewrites the list on every sign-in and rename, adds no entries |
+| `storage.rs:1897` (`create_additional_account`, new list)                                | Two entries                                                    |
+| `storage.rs:1910` (`create_additional_account`, push)                                    | One entry                                                      |
+| `storage.rs:2193` (`create_default_account`, new list)                                   | One entry                                                      |
+| `storage.rs:2222` (`create_default_account`, existing list)                              | Mutates the `None` reference in place                          |
+| New in [tracking default accounts](#tracking-default-accounts) (`set_account_last_used`) | One entry                                                      |
+| New in [Invariant A](#invariant-a) (`set_default_account_for_origin`)                    | One entry                                                      |
 
 Keeping three kinds of derived state correct at eight call sites is a convention, not a guarantee. The anchor indexes already solved this: `write()` (`storage.rs:855-864`) is the single place a `StorableAnchor` is stored, so it holds previous and current side by side and calls each `sync_*` function itself. No caller has to remember.
 
@@ -161,12 +162,12 @@ flowchart TD
 
 Deletion is the same path with no current row, used by eviction ([remove the row, never empty it](#remove-the-row-never-empty-it)).
 
-| Delta | Anchor counters | Application counter | Principal index |
-| ----- | --------------- | ------------------- | --------------- |
-| Reference added | `references += 1`, `accounts += 1` if `Some` | `+= 1` | insert |
-| Row removed by eviction | `references -= 1` | `-= 1`, reap at 0 | remove |
-| Reference removed by a move (future) | no change | no change ([tombstones must not decrement](#tombstones-must-not-decrement)) | update to the new owner |
-| Reference mutated in place | no change | no change | re-insert if the value changed ([index maintenance](#maintenance-and-the-case-the-credential-indexes-do-not-have)) |
+| Delta                                | Anchor counters                              | Application counter                                                         | Principal index                                                                                                    |
+| ------------------------------------ | -------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Reference added                      | `references += 1`, `accounts += 1` if `Some` | `+= 1`                                                                      | insert                                                                                                             |
+| Row removed by eviction              | `references -= 1`                            | `-= 1`, reap at 0                                                           | remove                                                                                                             |
+| Reference removed by a move (future) | no change                                    | no change ([tombstones must not decrement](#tombstones-must-not-decrement)) | update to the new owner                                                                                            |
+| Reference mutated in place           | no change                                    | no change                                                                   | re-insert if the value changed ([index maintenance](#maintenance-and-the-case-the-credential-indexes-do-not-have)) |
 
 Two guards belong here rather than at the call sites:
 
@@ -258,16 +259,16 @@ Resolving a caller through the principal index also counts as usage and stamps `
 
 ### Two independent caps
 
-| Cap | Counts | Behaviour on hit |
-| --- | ------ | ---------------- |
-| Materialized accounts, 500, existing (`account_management.rs:36`) | `stored_accounts` per anchor | Hard error. `create_account` and default materialization fail, as they do today |
-| Evictable defaults, 500, new | Rows that are exactly `[None]` | Evict the LRU down to a watermark. Sign-in never fails |
+| Cap                                                               | Counts                         | Behaviour on hit                                                                |
+| ----------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------- |
+| Materialized accounts, 500, existing (`account_management.rs:36`) | `stored_accounts` per anchor   | Hard error. `create_account` and default materialization fail, as they do today |
+| Evictable defaults, 500, new                                      | Rows that are exactly `[None]` | Evict the LRU down to a watermark. Sign-in never fails                          |
 
 The caps are isolated. A default sharing its row with named accounts is not counted by the second, because such a default exists only where a named account does and is therefore already paid for by the first.
 
-**The second cap is advisory, not enforced.** The trigger is a cheap upper bound, while eviction operates on the exact evictable set, and the two can disagree: a row holding a live session is not evictable, so an anchor with many of those reaches the bound with no victims to take. When that happens eviction does nothing and the sign-in proceeds. So the guarantee is *"sign-in never fails on this cap"*, not *"an anchor never exceeds it"* — and the steady-state ceiling is the watermark, 450, rather than 500, because eviction stops there.
+**The second cap is advisory, not enforced.** The trigger is a cheap upper bound, while eviction operates on the exact evictable set, and the two can disagree: a row holding a live session is not evictable, so an anchor with many of those reaches the bound with no victims to take. When that happens eviction does nothing and the sign-in proceeds. So the guarantee is _"sign-in never fails on this cap"_, not _"an anchor never exceeds it"_ — and the steady-state ceiling is the watermark, 450, rather than 500, because eviction stops there.
 
-500 is an anti-abuse parameter, not a capacity plan. Expected footprint is driven by active anchors times mean distinct dapps per anchor, nowhere near the cap. Per reference the cost is a 16 byte fixed key plus a roughly 12 byte CBOR value (`account_number: None` is omitted, so only the timestamp is encoded) plus node overhead. 500 is chosen for symmetry with the existing cap.
+500 is an anti-abuse parameter, not a capacity plan. Expected footprint is driven by active anchors times mean distinct apps per anchor, nowhere near the cap. Per reference the cost is a 16 byte fixed key plus a roughly 12 byte CBOR value (`account_number: None` is omitted, so only the timestamp is encoded) plus node overhead. 500 is chosen for symmetry with the existing cap.
 
 ### Gauging the second cap
 
@@ -283,20 +284,20 @@ The bound is loosest for an anchor holding 500 non-evictable defaults, whose upp
 
 ### What an anchor can accumulate
 
-| Rows | Bound | Why |
-| ---- | ----- | --- |
-| Rows holding at least one named account | 500 | Each needs a named account at that application, and the materialized cap allows 500 per anchor |
-| Rows that are exactly `[None]` | 500 | The new cap counts precisely these |
-| **Total** | **1000** | |
+| Rows                                    | Bound    | Why                                                                                            |
+| --------------------------------------- | -------- | ---------------------------------------------------------------------------------------------- |
+| Rows holding at least one named account | 500      | Each needs a named account at that application, and the materialized cap allows 500 per anchor |
+| Rows that are exactly `[None]`          | 500      | The new cap counts precisely these                                                             |
+| **Total**                               | **1000** |                                                                                                |
 
 References come out higher than rows, because a row can hold several:
 
-| References | Bound | Why |
-| ---------- | ----- | --- |
-| Named-account references | 500 | One per materialized account, capped |
-| Default references sharing a row with named accounts | 500 | At most one per row of the first kind above |
-| Sole default references | 500 | The new cap |
-| **Total** | **1500** | |
+| References                                           | Bound    | Why                                         |
+| ---------------------------------------------------- | -------- | ------------------------------------------- |
+| Named-account references                             | 500      | One per materialized account, capped        |
+| Default references sharing a row with named accounts | 500      | At most one per row of the first kind above |
+| Sole default references                              | 500      | The new cap                                 |
+| **Total**                                            | **1500** |                                             |
 
 The gap between the two totals is the reason [gauging the second cap](#gauging-the-second-cap)'s subtraction is an upper bound rather than the evictable count: it can read as high as 1000 while only 500 of those defaults are actually evictable.
 
@@ -304,14 +305,14 @@ Without moves, creating an account and holding one are the same event, so the si
 
 ### Counter rules
 
-| Counter | Rule |
-| ------- | ---- |
-| Anchor `stored_account_references` | Decrement on eviction, a real removal |
-| Anchor `stored_accounts` | Never decremented |
-| Global cell `stored_account_references` | Decrement on eviction, becomes a live gauge |
-| Global cell `stored_accounts` | Never touched, it is the `AccountNumber` allocator |
-| `StorableApplication.stored_account_references` | Decrement on eviction. This is the reap predicate ([the reap predicate](#the-predicate-is-the-existing-reference-counter)) |
-| `StorableApplication.stored_accounts` | Never decremented. Cannot serve as a reap predicate: it is 0 for any application whose anchors hold only default accounts, which is the case this feature creates |
+| Counter                                         | Rule                                                                                                                                                              |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Anchor `stored_account_references`              | Decrement on eviction, a real removal                                                                                                                             |
+| Anchor `stored_accounts`                        | Never decremented                                                                                                                                                 |
+| Global cell `stored_account_references`         | Decrement on eviction, becomes a live gauge                                                                                                                       |
+| Global cell `stored_accounts`                   | Never touched, it is the `AccountNumber` allocator                                                                                                                |
+| `StorableApplication.stored_account_references` | Decrement on eviction. This is the reap predicate ([the reap predicate](#the-predicate-is-the-existing-reference-counter))                                        |
+| `StorableApplication.stored_accounts`           | Never decremented. Cannot serve as a reap predicate: it is 0 for any application whose anchors hold only default accounts, which is the case this feature creates |
 
 `rebuild_identity_account_counters` stays correct as written. With no move feature both anchor fields are still exactly derivable from the reference lists, so `check_or_rebuild_max_anchor_accounts` keeps self-healing for the materialized cap and for the [gauging the second cap](#gauging-the-second-cap) upper bound.
 
@@ -323,11 +324,11 @@ Without moves, creating an account and holding one are the same event, so the si
 
 `StorableApplication.stored_account_references` is incremented once per reference created, in `update_counters`. Nothing has ever been removed, so its stored value is an accurate live count of references at that application today, not a historical sum ([nothing is ever removed](#nothing-is-ever-removed)). No new field and no migration are needed; it only has to start being decremented, which [the single write path](#one-write-path-for-the-reference-list) makes a property of one function rather than eight.
 
-| Event | Effect |
-| ----- | ------ |
-| Reference created | `stored_account_references += 1` |
-| Row removed by eviction ([remove the row, never empty it](#remove-the-row-never-empty-it)) | `stored_account_references -= 1` |
-| Reaches 0 | Reap ([the reap sequence](#reap-sequence)) |
+| Event                                                                                      | Effect                                     |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------ |
+| Reference created                                                                          | `stored_account_references += 1`           |
+| Row removed by eviction ([remove the row, never empty it](#remove-the-row-never-empty-it)) | `stored_account_references -= 1`           |
+| Reaches 0                                                                                  | Reap ([the reap sequence](#reap-sequence)) |
 
 There is no rebuild path, because the reference-list map is keyed `(anchor, app)` and cannot be scanned application-major without walking every anchor. The counter is authoritative by construction, which is the main reason the write path is consolidated.
 
@@ -424,10 +425,10 @@ One entry per reference, so the steady-state size is the reference count, bounde
 
 ### The map is injective
 
-| Reference | Seed | Unique because |
-| --------- | ---- | -------------- |
-| Named account | `account_seed(n, origin)` | `n` is globally unique and retired, never reissued |
-| Default | `anchor_seed(anchor, origin)` | unique per `(anchor, origin)` |
+| Reference     | Seed                          | Unique because                                     |
+| ------------- | ----------------------------- | -------------------------------------------------- |
+| Named account | `account_seed(n, origin)`     | `n` is globally unique and retired, never reissued |
+| Default       | `anchor_seed(anchor, origin)` | unique per `(anchor, origin)`                      |
 
 Collision between the two families is prevented by the `ACCOUNT_SEED_PREFIX` domain separator in `calculate_account_seed`.
 
@@ -441,11 +442,11 @@ One difference matters. The credential indexes diff **keys** only, because their
 
 So the diff builds `BTreeMap<Principal, StorableAccountLocator>` for previous and current, and applies:
 
-| Case | Action |
-| ---- | ------ |
-| In previous, not in current | remove |
-| In current, not in previous | insert |
-| In both, value differs | insert, overwriting |
+| Case                        | Action              |
+| --------------------------- | ------------------- |
+| In previous, not in current | remove              |
+| In current, not in previous | insert              |
+| In both, value differs      | insert, overwriting |
 
 Computing a principal requires the account row, since only `stable_account_memory` says whether a `Some(n)` reference is a named account or a materialized default. The diff reads it for each changed reference.
 
@@ -474,7 +475,7 @@ The index turns an account principal back into the account it was derived for. I
 Three rules that make this safe:
 
 - **The index has no Candid surface.** No method takes a principal and returns anything about it. A caller-supplied variant would let anyone deanonymize any principal they observe on chain.
-- **The anchor is never returned to a caller.** Per-origin derivation exists so that two dapps cannot correlate their users; handing an app the anchor number would defeat that. This is also why the session bundle names the account by principal rather than by the numbers behind it.
+- **The anchor is never returned to a caller.** Per-origin derivation exists so that two apps cannot correlate their users; handing an app the anchor number would defeat that. This is also why the session bundle names the account by principal rather than by the numbers behind it.
 - **A miss and a resolved-but-not-permitted are indistinguishable** to the caller, in error shape and in anything else observable. Otherwise the API is an oracle for whether a principal is known to II. The session design collapses every such case into one error for exactly this reason.
 
 A refresh stamps `last_used` on the reference it resolved, exactly as `prepare_account_delegation` does. This is what keeps [eviction](#eviction) and [the principal index](#the-principal-index) consistent: without it an evicted tracked default would deny a caller holding a perfectly valid delegation. With it, anything actively making calls is at the top of the LRU and never a victim, so only genuinely idle defaults are dropped, and recovery is one sign-in.
@@ -503,43 +504,43 @@ An application is reaped only at zero references, and zero references means zero
 
 ## Consequences to accept
 
-| Consequence | Detail |
-| ----------- | ------ |
-| Sign-in becomes a write path | First sign-in at an origin creates an application row, an origin index entry, a reference-list row, and an index entry |
-| Application growth is bounded, existing applications included | Reaping applies to legacy applications on the same predicate, with no migration ([legacy applications](#legacy-applications-reap-on-the-same-predicate)). Only applications held alive by a tombstone persist ([tombstones keep applications alive](#tombstones-keep-applications-alive)) |
-| The index roughly doubles the subsystem's footprint | One entry per reference, at a 29 byte key plus a small value, bounded per anchor by [what an anchor can accumulate](#what-an-anchor-can-accumulate) |
-| Anchor to origin becomes joinable in stable memory | The canister records per anchor every origin signed into and when, the origin in cleartext on `StorableApplication`, joined through the reference-list key. This is the point of the feature, is a different scope from the browser-local last-used store, and is worth a changelog line. The per-anchor cap doubles as the retention bound |
-| No upgrade cost | All of this lives in stable structures, not the Candid-serialized anchor blob. Only the index needs a backfill, and it is externally driven rather than run at upgrade |
-| Not archived | Tracked-default creation, eviction, and reaping must not go through `post_account_operation_bookkeeping`, or every first sign-in at an origin becomes a permanent replicated archive entry. Sign-in does not touch the archive today and must not start |
+| Consequence                                                   | Detail                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign-in becomes a write path                                  | First sign-in at an origin creates an application row, an origin index entry, a reference-list row, and an index entry                                                                                                                                                                                                                      |
+| Application growth is bounded, existing applications included | Reaping applies to legacy applications on the same predicate, with no migration ([legacy applications](#legacy-applications-reap-on-the-same-predicate)). Only applications held alive by a tombstone persist ([tombstones keep applications alive](#tombstones-keep-applications-alive))                                                   |
+| The index roughly doubles the subsystem's footprint           | One entry per reference, at a 29 byte key plus a small value, bounded per anchor by [what an anchor can accumulate](#what-an-anchor-can-accumulate)                                                                                                                                                                                         |
+| Anchor to origin becomes joinable in stable memory            | The canister records per anchor every origin signed into and when, the origin in cleartext on `StorableApplication`, joined through the reference-list key. This is the point of the feature, is a different scope from the browser-local last-used store, and is worth a changelog line. The per-anchor cap doubles as the retention bound |
+| No upgrade cost                                               | All of this lives in stable structures, not the Candid-serialized anchor blob. Only the index needs a backfill, and it is externally driven rather than run at upgrade                                                                                                                                                                      |
+| Not archived                                                  | Tracked-default creation, eviction, and reaping must not go through `post_account_operation_bookkeeping`, or every first sign-in at an origin becomes a permanent replicated archive entry. Sign-in does not touch the archive today and must not start                                                                                     |
 
 ---
 
 ## Requirements
 
-| # | Requirement | Where |
-| - | ----------- | ----- |
-| D1 | Reference list is a three-state encoding, absent is not empty | Three-state encoding |
-| D2 | Delete the `is_empty()` synthetic-default branch in `read_account` | Empty-list case |
-| D3 | All reference-list writes go through one function that diffs previous against current and derives counters and index entries | Single write path |
-| D4 | That function rejects writing an empty list, which is reserved for the future move path | Single write path |
-| D5 | Eviction removes the row, never writes back an empty vector | Remove the row |
-| D6 | Eviction predicate is `len() == 1 && [0].account_number.is_none()` | Eviction predicate |
-| D7 | Defaults are never evicted while a materialized account exists at that key | Eviction predicate |
-| D8 | The cap is 500 evictable defaults per anchor, isolated from the 500 materialized cap, and **advisory**: eviction runs down to the watermark and does nothing when it finds no victims, so an anchor holding non-evictable rows sits above the cap rather than being refused. Sign-in never fails on it | Two caps |
-| D9 | `stored_account_references - stored_accounts` is the cheap upper bound on that cap; the eviction scan is authoritative | Gauging the cap |
-| D10 | LRU victim found by on-demand scan with batch eviction to a watermark, not a stored pointer | Victim selection |
-| D11 | `last_used: None` means never used and sorts oldest; neither creating a named account nor choosing a default stamps it | Never used |
-| D12 | Eviction also removes the `AnchorApplicationConfig` row for the key | Remove the row |
-| D13 | Tracked-default creation, eviction, and reaping are never archived | Consequences |
-| D14 | `set_default_account_for_origin` ensures a reference-list row exists, Invariant A | Invariant A |
-| D15 | The reap predicate is the existing `StorableApplication.stored_account_references`, which is accurate today and only needs decrementing. No new field, no migration | Reap predicate |
-| D16 | A move that empties a row does not decrement; the count converts into the tombstone | Tombstones |
-| D17 | Application numbers come from a monotonic cell at memory index 33 and are retired on reap, never reissued | Monotonic allocator |
-| D18 | Reaching zero removes the application row and the origin index entry, for legacy and new applications alike | Reap sequence, Legacy applications |
-| D19 | A missing application row on a reference-list write fails loudly instead of being skipped. `write_reference_list` and `remove_reference_list` return `OriginNotFoundForApplicationNumber`; the counter arithmetic moved into `apply_reference_counter_deltas` | Reap predicate |
-| D20 | The principal index maps derived principal to `(anchor, application, account)` at memory index 34 | Key and value |
-| D21 | The index diff compares values, not just keys, so materializing a default updates its entry in place | Index maintenance |
-| D22 | Index writes check the salt synchronously and return a typed error when it is unset. The account-mutating **endpoints** await `ensure_salt_set` on entry, ahead of the cap check, so the check and the write it guards still land in one message | Salt check |
-| D23 | The index is populated by a cursor-driven batched backfill, driven by an in-canister interval timer installed from `init` and `post_upgrade`, 2,000 rows a batch. A hidden query reports progress | Backfill |
-| D24 | The index is read by the session refresh path in `revocable-app-sessions.md`, which resolves the account principal carried in a caller-info bundle. It has no Candid surface of its own and never returns the anchor to a caller | Use |
-| D25 | A session refresh stamps `last_used` on the reference it resolves, so an account in active use is never evicted | Use, Never used |
+| #   | Requirement                                                                                                                                                                                                                                                                                            | Where                              |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| D1  | Reference list is a three-state encoding, absent is not empty                                                                                                                                                                                                                                          | Three-state encoding               |
+| D2  | Delete the `is_empty()` synthetic-default branch in `read_account`                                                                                                                                                                                                                                     | Empty-list case                    |
+| D3  | All reference-list writes go through one function that diffs previous against current and derives counters and index entries                                                                                                                                                                           | Single write path                  |
+| D4  | That function rejects writing an empty list, which is reserved for the future move path                                                                                                                                                                                                                | Single write path                  |
+| D5  | Eviction removes the row, never writes back an empty vector                                                                                                                                                                                                                                            | Remove the row                     |
+| D6  | Eviction predicate is `len() == 1 && [0].account_number.is_none()`                                                                                                                                                                                                                                     | Eviction predicate                 |
+| D7  | Defaults are never evicted while a materialized account exists at that key                                                                                                                                                                                                                             | Eviction predicate                 |
+| D8  | The cap is 500 evictable defaults per anchor, isolated from the 500 materialized cap, and **advisory**: eviction runs down to the watermark and does nothing when it finds no victims, so an anchor holding non-evictable rows sits above the cap rather than being refused. Sign-in never fails on it | Two caps                           |
+| D9  | `stored_account_references - stored_accounts` is the cheap upper bound on that cap; the eviction scan is authoritative                                                                                                                                                                                 | Gauging the cap                    |
+| D10 | LRU victim found by on-demand scan with batch eviction to a watermark, not a stored pointer                                                                                                                                                                                                            | Victim selection                   |
+| D11 | `last_used: None` means never used and sorts oldest; neither creating a named account nor choosing a default stamps it                                                                                                                                                                                 | Never used                         |
+| D12 | Eviction also removes the `AnchorApplicationConfig` row for the key                                                                                                                                                                                                                                    | Remove the row                     |
+| D13 | Tracked-default creation, eviction, and reaping are never archived                                                                                                                                                                                                                                     | Consequences                       |
+| D14 | `set_default_account_for_origin` ensures a reference-list row exists, Invariant A                                                                                                                                                                                                                      | Invariant A                        |
+| D15 | The reap predicate is the existing `StorableApplication.stored_account_references`, which is accurate today and only needs decrementing. No new field, no migration                                                                                                                                    | Reap predicate                     |
+| D16 | A move that empties a row does not decrement; the count converts into the tombstone                                                                                                                                                                                                                    | Tombstones                         |
+| D17 | Application numbers come from a monotonic cell at memory index 33 and are retired on reap, never reissued                                                                                                                                                                                              | Monotonic allocator                |
+| D18 | Reaching zero removes the application row and the origin index entry, for legacy and new applications alike                                                                                                                                                                                            | Reap sequence, Legacy applications |
+| D19 | A missing application row on a reference-list write fails loudly instead of being skipped. `write_reference_list` and `remove_reference_list` return `OriginNotFoundForApplicationNumber`; the counter arithmetic moved into `apply_reference_counter_deltas`                                          | Reap predicate                     |
+| D20 | The principal index maps derived principal to `(anchor, application, account)` at memory index 34                                                                                                                                                                                                      | Key and value                      |
+| D21 | The index diff compares values, not just keys, so materializing a default updates its entry in place                                                                                                                                                                                                   | Index maintenance                  |
+| D22 | Index writes check the salt synchronously and return a typed error when it is unset. The account-mutating **endpoints** await `ensure_salt_set` on entry, ahead of the cap check, so the check and the write it guards still land in one message                                                       | Salt check                         |
+| D23 | The index is populated by a cursor-driven batched backfill, driven by an in-canister interval timer installed from `init` and `post_upgrade`, 2,000 rows a batch. A hidden query reports progress                                                                                                      | Backfill                           |
+| D24 | The index is read by the session refresh path in `revocable-app-sessions.md`, which resolves the account principal carried in a caller-info bundle. It has no Candid surface of its own and never returns the anchor to a caller                                                                       | Use                                |
+| D25 | A session refresh stamps `last_used` on the reference it resolves, so an account in active use is never evicted                                                                                                                                                                                        | Use, Never used                    |
