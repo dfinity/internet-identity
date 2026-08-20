@@ -24,9 +24,9 @@ Apps do not implement any of it. `AuthClient` holds the session and re-mints on 
 
 ## Context
 
-When a user signs in to a dapp with Internet Identity, the dapp does not get a password or a token it can send to a server. It gets a **delegation**: a short signed statement saying that a particular public key is allowed to act for a particular principal, until a stated expiry. The dapp holds the matching private key and signs its calls with it.
+When a user signs in to an app with Internet Identity, the app does not get a password or a token it can send to a server. It gets a **delegation**: a short signed statement saying that a particular public key is allowed to act for a particular principal, until a stated expiry. The app holds the matching private key and signs its calls with it.
 
-The delegation is signed by the II canister, and anything on the network can check that signature on its own. That is what makes it cheap: a dapp canister receiving a call verifies the signature and the expiry and nothing else. It never asks II whether the delegation is still good, because there is nothing in the format that would let it ask.
+The delegation is signed by the II canister, and anything on the network can check that signature on its own. That is what makes it cheap: an app canister receiving a call verifies the signature and the expiry and nothing else. It never asks II whether the delegation is still good, because there is nothing in the format that would let it ask.
 
 The app decides how long the delegation lasts when it requests one. The current maximum is 30 days.
 
@@ -36,7 +36,7 @@ sequenceDiagram
     actor U as user
     participant A as app
     participant II as II canister
-    participant D as dapp canister
+    participant D as app canister
     U->>II: signs in
     II-->>A: delegation, valid up to 30 days
     A->>D: calls, signed with it
@@ -53,7 +53,7 @@ The practical effects:
 
 |                     | Today                                                     |
 | ------------------- | --------------------------------------------------------- |
-| A stolen delegation | Works at that dapp until it expires, up to 30 days        |
+| A stolen delegation | Works at that app until it expires, up to 30 days         |
 | Signing out         | Clears local state. Invalidates nothing already issued    |
 | Visibility          | Neither the user nor II can list or end an active sign-in |
 
@@ -94,7 +94,7 @@ Revoking deletes the record rather than marking it, so there is nothing left for
 | II frontend           | Untrusted (user device) | Runs the ceremony, creates the session, holds the non-extractable key the chain is rooted at, extends the chain to the app's key |
 | II canister           | Trusted (IC replicas)   | Stores sessions, signs session identities and account bundles, mints app delegations, enforces caps and revocation               |
 | IC protocol (ingress) | Trusted (IC replicas)   | Verifies the signature on the attached bundle before the message reaches the canister                                            |
-| Dapp canister         | Trusted (IC replicas)   | Sees an ordinary delegation for the account's principal. Unchanged by this design                                                |
+| App canister          | Trusted (IC replicas)   | Sees an ordinary delegation for the account's principal. Unchanged by this design                                                |
 
 A compromised app or II frontend cannot forge a session, because sessions exist only in canister state and creating one requires an access method.
 
@@ -110,9 +110,9 @@ A reviewer will ask these first, so they are stated here rather than left to the
 
 **A stolen chain is bounded but not harmless.** It mints 5-minute delegations until the session is revoked, and the user's lever is the browser list. This is why the leaf key `AuthClient` generates should be non-extractable, and why the browser list carries a last-used time: a session the user does not recognise is the signal to act.
 
-**The chain cannot be used against a dapp canister.** The app's hop is restricted to the II canister when the II frontend constructs it, and the restriction is part of what the canister signs over, so an app that reaches for the session chain where it meant its app delegation fails visibly rather than appearing to work.
+**The chain cannot be used against an app canister.** The app's hop is restricted to the II canister when the II frontend constructs it, and the restriction is part of what the canister signs over, so an app that reaches for the session chain where it meant its app delegation fails visibly rather than appearing to work.
 
-**Eviction cannot destroy a live session.** `tracked-default-accounts.md` reclaims idle rows, and a session lives on such a row. A row holding an unexpired session is excluded from eviction, so driving a user through many dapps cannot be used to knock out their sessions elsewhere.
+**Eviction cannot destroy a live session.** `tracked-default-accounts.md` reclaims idle rows, and a session lives on such a row. A row holding an unexpired session is excluded from eviction, so driving a user through many apps cannot be used to knock out their sessions elsewhere.
 
 **Attaching the bundle relies on an IC extension.** Carrying canister-signed caller information on an ingress message is a protocol feature currently being specified, and the same one the identity-attributes work uses. Until it is available on mainnet, this design cannot ship.
 

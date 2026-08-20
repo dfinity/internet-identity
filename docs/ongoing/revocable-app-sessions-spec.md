@@ -12,8 +12,8 @@
 
 | Term                   | Meaning                                                                                                                                                          |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **App delegation**     | The short-lived delegation the app uses against dapp canisters. What is up to 30 days today.                                                                     |
-| **Account reference**  | The row `tracked-default-accounts.md` keeps per (identity, dapp, account), recording that the account is in use. Where a session is stored.                      |
+| **App delegation**     | The short-lived delegation the app uses against app canisters. What is up to 30 days today.                                                                      |
+| **Account reference**  | The row `tracked-default-accounts.md` keeps per (identity, app, account), recording that the account is in use. Where a session is stored.                       |
 | **Session**            | A record on that row, plus the canister-signed identity derived from it. Long-lived and revocable.                                                               |
 | **Session chain**      | The delegation chain rooted at the session identity. Held by the II frontend, extended to the app.                                                               |
 | **Refresh**            | The app calling the II canister with its session chain to mint a new app delegation. No browser involvement.                                                     |
@@ -33,7 +33,7 @@ flowchart LR
     App["app frontend<br/>(@icp-sdk/auth)"]
     IIF["II frontend<br/>id.ai"]
     IIC["II canister"]
-    DC["dapp canister"]
+    DC["app canister"]
 
     App -->|"ii_session_delegation (session only)"| IIF
     IIF -->|"prepare/get_account_session<br/>revoke_account_session / revoke_device_sessions"| IIC
@@ -41,7 +41,7 @@ flowchart LR
     App -->|"app delegation"| DC
 ```
 
-Three things deliberately never happen: the dapp canister never talks to II, the app never goes through the II frontend to refresh, and the II frontend never holds or uses the app's key.
+Three things deliberately never happen: the app canister never talks to II, the app never goes through the II frontend to refresh, and the II frontend never holds or uses the app's key.
 
 ### One audience per method
 
@@ -58,7 +58,7 @@ Three things deliberately never happen: the dapp canister never talks to II, the
 That is not tidiness. Three things follow from it:
 
 - **The two audiences cannot share an argument list.** The II frontend's calls name the anchor with `identity_number`, which an app cannot supply and must never learn, so the app-facing calls name nothing at all and take their context from caller info instead.
-- **The `app_` set is public API.** Every dapp and every client library depends on it, so it has to stay small and stable, and any change to it is a compatibility event.
+- **The `app_` set is public API.** Every app and every client library depends on it, so it has to stay small and stable, and any change to it is a compatibility event.
 - **The unprefixed set is internal.** Only the II frontend calls it, and the frontend ships with the canister, so it can be changed freely and in the same release. That is where complexity belongs when there is a choice about where to put it.
 
 `prepare_account_delegation` and `get_account_delegation` appear in neither list, because nothing touches them. Sessions get their own pair ([first sign-in](#first-sign-in)), so no existing method changes shape or behaviour.
@@ -213,7 +213,7 @@ That is deliberately not the same as having `icrc34_delegation` return a shorter
 
 The cost is one canister round trip before the app's first call, once per sign-in. It buys one artifact per method and no conditional behaviour anywhere.
 
-**One keypair, two chains.** The app delegation targets the same `sessionPublicKey` the session chain terminates at, so the app holds one key with two chains over it: the session chain, which `targets` restricts to the II canister, and the app delegation, which works against dapp canisters. A second keypair would protect nothing, since anything that reaches one reaches the other, and the guardrail against confusing the two is `targets`, not key separation.
+**One keypair, two chains.** The app delegation targets the same `sessionPublicKey` the session chain terminates at, so the app holds one key with two chains over it: the session chain, which `targets` restricts to the II canister, and the app delegation, which works against app canisters. A second keypair would protect nothing, since anything that reaches one reaches the other, and the guardrail against confusing the two is `targets`, not key separation.
 
 `sessionInfoBundle` and its signature are what the app's agent attaches as caller info to every app-facing call ([the app-facing pair](#the-app-facing-pair)). The app stores them beside the session keypair and never parses them.
 
@@ -392,7 +392,7 @@ Neither input needs to be trusted. The bundle is authenticated, and its contents
 
 **Requiring the match is what stops an app delegation renewing itself.** `caller()` on this path could in principle be the account's own principal rather than a session's, since a holder of an app delegation can sign as it. That caller resolves to a locator perfectly well, but no session record's seed will ever equal it, because the two seed families are domain-separated by the `"session"` tag. Without that rejection an app delegation could mint its own replacement forever and revocation would mean nothing.
 
-**An expired record, a revoked one, and one that never matched are all one outcome.** Which of them a caller hit depends on whether a prune has happened to run, so distinguishing them would hand apps an answer they cannot rely on — and it would tell a dapp whether the user actively revoked or merely let the session lapse, which is not its business. `NoMatchingSession` covers all three.
+**An expired record, a revoked one, and one that never matched are all one outcome.** Which of them a caller hit depends on whether a prune has happened to run, so distinguishing them would hand apps an answer they cannot rely on — and it would tell an app whether the user actively revoked or merely let the session lapse, which is not its business. `NoMatchingSession` covers all three.
 
 ### What refresh writes
 
@@ -450,7 +450,7 @@ sequenceDiagram
 
 It needs no authorization check beyond the match refresh already performs, because a caller cannot produce another session's principal, so it can only ever remove its own. It **returns nothing and always succeeds**, which makes sign-out idempotent: a client that retries, or that signs out twice, gets the same answer without having to reason about whether its session was already gone.
 
-The app deliberately cannot revoke anything else. "Sign out everywhere" is the II frontend's operation, not something a dapp can trigger.
+The app deliberately cannot revoke anything else. "Sign out everywhere" is the II frontend's operation, not something an app can trigger.
 
 ### The anchor-authenticated methods
 
@@ -500,14 +500,14 @@ sequenceDiagram
 
 ### What an attacker gets
 
-| Stolen         | Today                                     | After                                              |
-| -------------- | ----------------------------------------- | -------------------------------------------------- |
-| App delegation | up to 30 days of dapp access, unrevocable | at most one TTL                                    |
-| Session chain  | no equivalent exists                      | can mint app delegations until the user revokes it |
+| Stolen         | Today                                    | After                                              |
+| -------------- | ---------------------------------------- | -------------------------------------------------- |
+| App delegation | up to 30 days of app access, unrevocable | at most one TTL                                    |
+| Session chain  | no equivalent exists                     | can mint app delegations until the user revokes it |
 
 The honest reading of the second row: a thief holding the session chain can refresh, so `targets: [ii_canister_id]` is **not** what stops them. What changes their position is that the session is revocable at all, and that the user can see it in a list and end it.
 
-`targets` earns its place as a **developer guardrail**: it makes an app that reaches for the session chain where it meant the app delegation fail immediately and visibly, instead of appearing to work while using a long-lived credential against dapp canisters.
+`targets` earns its place as a **developer guardrail**: it makes an app that reaches for the session chain where it meant the app delegation fail immediately and visibly, instead of appearing to work while using a long-lived credential against app canisters.
 
 ---
 
@@ -559,11 +559,11 @@ An earlier revision of this design justified the sweep by noting that refresh ne
 
 ### Where a device id may be supplied
 
-Only on `prepare_account_session`, which requires an anchor access method ([first sign-in](#first-sign-in)). No app-facing method takes a device id, or any argument that could carry one, so no dapp-reachable surface accepts one. Otherwise a dapp could pass an arbitrary id to misattribute its own session into a user's device list, or probe which ids exist by observing which are accepted.
+Only on `prepare_account_session`, which requires an anchor access method ([first sign-in](#first-sign-in)). No app-facing method takes a device id, or any argument that could carry one, so no app-reachable surface accepts one. Otherwise an app could pass an arbitrary id to misattribute its own session into a user's device list, or probe which ids exist by observing which are accepted.
 
 ### Per anchor, not per browser
 
-The frontend caches one id per anchor, which is deliberate. One id shared across an anchor's apps is exactly the correlation the user wants in their own session list, and no dapp ever sees it. A browser-global id would instead tie two of the user's anchors to one browser, which is what per-anchor separation exists to prevent.
+The frontend caches one id per anchor, which is deliberate. One id shared across an anchor's apps is exactly the correlation the user wants in their own session list, and no app ever sees it. A browser-global id would instead tie two of the user's anchors to one browser, which is what per-anchor separation exists to prevent.
 
 ### Two accepted limitations
 
@@ -654,6 +654,6 @@ Also out of scope: whether to fold MCP's grant into this mechanism. The value sh
 | S18  | Device registry is `StorableAnchor` field 7 with its allocator in field 8, capped at 20, least-recently-used eviction, read through `identity_info`                                                                                                                                                                | Registry                                       |
 | S19  | Device registration is not a method. `device_name` and `device_id` on `prepare_account_session` resolve or register, and the id comes back in the response; the canister allocates from a monotonic per-anchor `next_id`                                                                                           | Id allocation                                  |
 | S20  | Signing a browser out is an eager atomic sweep of its sessions, leaving no partially-revoked state. The device record survives, so ids stay stable and deleting a record is a separate, deferred operation                                                                                                         | Eager sweep                                    |
-| S21  | Only `prepare_account_session` accepts a device id, so no dapp-reachable surface takes one                                                                                                                                                                                                                         | Where a device id may be supplied              |
+| S21  | Only `prepare_account_session` accepts a device id, so no app-reachable surface takes one                                                                                                                                                                                                                          | Where a device id may be supplied              |
 | S22  | The device id is per anchor, never browser-global                                                                                                                                                                                                                                                                  | Per anchor                                     |
 | S23  | Nothing changes for apps on `icrc34_delegation`; opting in means upgrading the client                                                                                                                                                                                                                              | Rollout                                        |
