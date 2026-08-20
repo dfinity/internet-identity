@@ -22,11 +22,11 @@ The cookie never holds key material, and a hint can only pick from sessions II a
 
 ## Context
 
-A dapp often runs as several subdomains of one domain: `chat.example.com` and `hr.example.com` belonging to `example.com`. A user thinks of these as one product and expects one sign-in to cover them.
+An app often runs as several subdomains of one domain: `chat.example.com` and `hr.example.com` belonging to `example.com`. A user thinks of these as one product and expects one sign-in to cover them.
 
 They do not get that today. Each subdomain is a separate origin, so each gets its own principal and its own sign-in, and signing out of one leaves the others signed in.
 
-Two mechanisms already exist that get most of the way there. A dapp can nominate a shared **derivation origin**, so that every subdomain resolves to the same principal instead of one each, provided the nominated origin publishes a list authorising them. And a browser cookie can be scoped to the parent domain, so all the subdomains can read it.
+Two mechanisms already exist that get most of the way there. An app can nominate a shared **derivation origin**, so that every subdomain resolves to the same principal instead of one each, provided the nominated origin publishes a list authorising them. And a browser cookie can be scoped to the parent domain, so all the subdomains can read it.
 
 The client half is built on those two and is already specified in `@icp-sdk/auth` ([shared-sessions.md](https://github.com/dfinity/icp-js-auth/blob/5aa78d5f64714d6e8e7781e256562035c09018c6/docs/src/content/docs/shared-sessions.md)). It puts three pieces in place:
 
