@@ -42,6 +42,15 @@ export const redirectToPrimaryOrigin = (): boolean => {
   if (pathname === "/" && hash === "#authorize") {
     return false;
   }
+  // Same exchange, response leg: only this document can finish it, the redirect
+  // session that re-wraps the delegation lives in this origin's `sessionStorage`.
+  const bounced = new URLSearchParams(hash.replace(/^#/, ""));
+  if (
+    bounced.has("redirect_message") &&
+    bounced.get("redirect_origin") === primaryOrigin
+  ) {
+    return false;
+  }
   if (KEEP_ON_CURRENT_ORIGIN.includes(pathname)) {
     return false;
   }
