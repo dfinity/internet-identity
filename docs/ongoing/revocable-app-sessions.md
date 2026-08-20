@@ -1,13 +1,5 @@
 # Revocable app sessions
 
-**Authors:** sea-snake
-
-**Date:** Aug 20, 2026
-
-**Target audience:** Engineers, Security Reviewers, Community Developers
-
-**Status:** Implementation
-
 **Depends on:** `tracked-default-accounts.md`, which supplies the account reference a session is stored on and the principal index the refresh path resolves through.
 
 ## Summary
