@@ -1,93 +1,64 @@
 # Account tracking: defaults, reaping, and principal lookup
 
-**Author:** sea-snake — **Date:** 2026-08-19 — **Status:** Draft, RFC for review
+**Author:** sea-snake — **Date:** 2026-08-19 — **Status:** Implemented; see the landing table below
 
 **Scope:** canister storage and bookkeeping. No Candid change to existing methods, no frontend change.
 
 ## Context
 
-Every identity gets an account at every dapp it signs in to. Almost all of them are **default accounts**: the user creates nothing and names nothing, and the account's principal is derived from `(anchor, origin)` alone. Only accounts the user explicitly names get a stored record.
+Internet Identity hands a user a **different principal at every dapp**. Two dapps cannot tell they are talking to the same person, and that is the property the whole system exists to protect.
 
-Signing in with a default account therefore persists **nothing** — no timestamp, no reference row, no application record. Since that is the common case, the canister's picture of what an identity uses is limited to the small minority of named accounts.
+Those principals are *derived*, not stored. II hashes the identity's anchor number together with the dapp's origin and a salt only the canister holds, and the result is the principal. Nothing has to be written down for that to work, and nothing is: the account a user gets at a dapp simply by signing in exists purely as a derivation.
+
+A user can also create a **named account** at a dapp — a second persona at the same site. Those do need a stored record, because a name has to live somewhere.
+
+So II keeps records for accounts users named, and nothing at all for the ones it derives on demand. Since almost nobody names an account, the consequence is:
+
+**II has no record of which dapps an identity has used.**
 
 ```mermaid
 flowchart LR
-    U([user signs in]) --> Q{"named the<br/>account?"}
-    Q -->|"yes, rare"| S["reference row written<br/>account row written<br/>application row written"]
-    Q -->|"no — the default,<br/>the common case"| N["nothing written"]
-    N -.->|"principal still derives<br/>from (anchor, origin)"| P(["works fine, leaves no trace"])
+    U([user signs in at a dapp]) --> Q{"did they name<br/>the account?"}
+    Q -->|"no — the default,<br/>and the common case"| N["nothing is stored"]
+    Q -->|"yes, rare"| S["a record is stored"]
+    N -.->|"the principal is derived<br/>from anchor + origin + salt"| P(["sign-in works,<br/>leaves no trace"])
 ```
 
-Two more gaps come from the same design:
-
-- **Nothing is ever removed.** No account, application, or reference-list row is ever deleted, and no counter is ever decremented. The origin registry grows for the life of the canister.
-- **There is no reverse index from a principal.** Anchors are reverse-indexed five different ways (OpenID credential, passkey credential, passkey public key, recovery principal, recovery email). Accounts, not at all. Given the principal a dapp sees, II cannot tell which identity produced it, because the seed is hashed.
+Because the salt is hashed in, the derivation is one-way: II can produce the principal for a given identity and dapp, but cannot take a principal and say which identity it came from.
 
 ## Problem
 
-Three things are blocked, each for a different reason:
+Three things follow from that, and they are the three this design addresses.
 
-1. **"Which dapps have I signed in to?" is unanswerable.** The common case leaves no trace.
-2. **Recording it would grow the registry without bound.** Every sign-in at a new origin mints an application row, from an operation with no per-anchor cap and no reaping.
-3. **Revocable app sessions can't be built.** `revocable-app-sessions.md` needs II to resolve an app's principal back to an account, in order to authorize a caller that never says who it is.
+**1. A user cannot be shown where they are signed in.** Not "which dapps have I used", not "sign me out of that one" — II has nothing to list.
+
+**2. The dapp registry only grows.** II already stores one record per dapp origin it has ever seen, and nothing has ever been deleted from it — no removal path exists anywhere in this subsystem, and no counter is ever decremented. Today that is tolerable because only named accounts create records. Start recording every sign-in and every new dapp mints a record that nothing will ever reclaim.
+
+**3. Revocable app sessions cannot be built.** `revocable-app-sessions.md` needs the reverse direction: given the principal a dapp is calling with, which identity and account is that? The one-way derivation cannot answer it, so the answer has to be indexed as it is produced. That index is on the refresh path of the session design — it is what turns a caller into an account without the caller naming one.
 
 And they cannot land separately:
 
 ```mermaid
 flowchart LR
-    T["track defaults"] -->|"every new origin<br/>mints a row"| G["registry grows<br/>without bound"]
-    G -->|"needs"| R["reaping"]
-    R -->|"only fires when a<br/>reference count falls"| E["eviction"]
+    T["record what a user<br/>signs in to"] -->|"every new dapp<br/>mints a record"| G["registry grows<br/>without bound"]
+    G -->|"needs"| R["reclaim unused<br/>dapp records"]
+    R -->|"can only fire once a<br/>record stops being referenced"| E["drop the least<br/>recently used"]
     E -->|"needs"| T
-    T -->|"makes the list complete"| I["principal index"]
+    T -->|"makes the record complete"| I["index accounts<br/>by principal"]
     E -->|"keeps it bounded"| I
 ```
 
 | Change | Alone it fails because |
 | ------ | ---------------------- |
-| Tracking | the registry then grows forever |
-| Reaping | it is dead code — eviction is the only thing that makes a reference count fall |
-| Principal index | it needs the list to be both complete and bounded |
-
-## Solution
-
-Record a default account as a reference row carrying no name — a **tracked default**. That makes the list a complete record of what an anchor uses, and costs one row rather than a whole account.
-
-Bound it per anchor, resolving the cap by evicting the least recently used tracked default. **Eviction is non-destructive**, which is what makes a cap acceptable here: a default's principal is a pure function of `(anchor, origin)`, both permanent, so evicting drops a timestamp and the account comes back at the identical principal on next use.
-
-With rows now able to disappear, reference counts can fall, so an application can be **reaped** once nothing references it. And with the list complete and bounded, accounts can be **indexed by derived principal**, giving II the reverse lookup that sessions need.
-
-All three maintain state derived from the same structure, so they share a single write path.
-
-### How it is being landed
-
-| PR | Change |
-| -- | ------ |
-| #4232 | [One write path for the reference list](#one-write-path-for-the-reference-list) |
-| #4233 | [Monotonic application numbers](#the-allocator-must-become-monotonic) |
-| #4234 | [An empty list is not a default](#read_account-must-stop-special-casing-the-empty-list) |
-| #4235 | [Tracking](#tracking-default-accounts), [eviction](#eviction), [caps](#caps-and-counters), and [reaping](#reaping-applications) |
-| #4238 | [Index accounts by derived principal](#the-principal-index) |
-| #4240 | [Backfill the index for existing accounts](#backfill) |
+| Recording sign-ins | the registry then grows forever |
+| Reclaiming dapp records | nothing would ever make a reference count fall, so it is dead code |
+| The principal index | it needs the record to be both complete and bounded |
 
 ---
 
-## Glossary
+## The records II keeps today
 
-| Term | Meaning |
-| ---- | ------- |
-| **Application** | Internal record for a dapp origin, addressed by `ApplicationNumber`. Never exposed in Candid. |
-| **Materialized account** | Account with a row in `stable_account_memory`, i.e. one carrying a name. Consumes an `AccountNumber`. |
-| **Default account** | The account an anchor gets at an origin without doing anything. Seed derives from `(anchor, origin)`. |
-| **Synthetic default** | Default account with no stored state at all, conjured on read. |
-| **Tracked default** | Default account with an `AccountReference` but no `StorableAccount`. Introduced here. |
-| **Reference list** | `Vec<AccountReference>` stored at `(anchor, app)`. The only record of which accounts an anchor holds at an application. |
-| **Evictable default** | Tracked default that is the only entry in its row, so deleting the whole row costs the anchor nothing. The unit the new cap counts ([the two caps](#two-independent-caps)). A default sharing its row with named accounts is not evictable ([the eviction predicate](#predicate)). |
-| **Derived principal** | What a dapp sees as the caller: `self_authenticating(der_encode_canister_sig_key(seed))`. |
-
----
-
-## How storage works today
+Everything above is deliberately free of storage vocabulary. The rest of this document needs it, so here it is once.
 
 ```mermaid
 erDiagram
@@ -148,6 +119,43 @@ The per-application counters are accurate for what exists, since increments have
 ### There is no reverse index from a principal
 
 Anchors are reverse-indexed by OpenID credential, passkey credential, passkey public key, recovery phrase principal, and email recovery address. Accounts have no such index. Given the principal a dapp sees, the canister cannot determine which anchor, application, or account produced it, because the seed is hashed.
+
+---
+## Glossary
+
+| Term | Meaning |
+| ---- | ------- |
+| **Application** | Internal record for a dapp origin, addressed by `ApplicationNumber`. Never exposed in Candid. |
+| **Materialized account** | Account with a row in `stable_account_memory`, i.e. one carrying a name. Consumes an `AccountNumber`. |
+| **Default account** | The account an anchor gets at an origin without doing anything. Seed derives from `(anchor, origin)`. |
+| **Synthetic default** | Default account with no stored state at all, conjured on read. |
+| **Tracked default** | Default account with an `AccountReference` but no `StorableAccount`. Introduced here. |
+| **Reference list** | `Vec<AccountReference>` stored at `(anchor, app)`. The only record of which accounts an anchor holds at an application. |
+| **Evictable default** | Tracked default that is the only entry in its row, so deleting the whole row costs the anchor nothing. The unit the new cap counts ([the two caps](#two-independent-caps)). A default sharing its row with named accounts is not evictable ([the eviction predicate](#predicate)). |
+| **Derived principal** | What a dapp sees as the caller: `self_authenticating(der_encode_canister_sig_key(seed))`. |
+
+---
+
+## Solution
+
+Record a default account as a reference row carrying no name — a **tracked default**. That makes the list a complete record of what an anchor uses, and costs one row rather than a whole account.
+
+Bound it per anchor, resolving the cap by evicting the least recently used tracked default. **Eviction is non-destructive**, which is what makes a cap acceptable here: a default's principal is a pure function of `(anchor, origin)`, both permanent, so evicting drops a timestamp and the account comes back at the identical principal on next use.
+
+With rows now able to disappear, reference counts can fall, so an application can be **reaped** once nothing references it. And with the list complete and bounded, accounts can be **indexed by derived principal**, giving II the reverse lookup that sessions need.
+
+All three maintain state derived from the same structure, so they share a single write path.
+
+### How it is being landed
+
+| PR | Change |
+| -- | ------ |
+| #4232 | [One write path for the reference list](#one-write-path-for-the-reference-list) |
+| #4233 | [Monotonic application numbers](#the-allocator-must-become-monotonic) |
+| #4234 | [An empty list is not a default](#read_account-must-stop-special-casing-the-empty-list) |
+| #4235 | [Tracking](#tracking-default-accounts), [eviction](#eviction), [caps](#caps-and-counters), and [reaping](#reaping-applications) |
+| #4238 | [Index accounts by derived principal](#the-principal-index) |
+| #4240 | [Backfill the index for existing accounts](#backfill) |
 
 ---
 
@@ -326,7 +334,9 @@ Resolving a caller through the principal index also counts as usage and stamps `
 | Materialized accounts, 500, existing (`account_management.rs:36`) | `stored_accounts` per anchor | Hard error. `create_account` and default materialization fail, as they do today |
 | Evictable defaults, 500, new | Rows that are exactly `[None]` | Evict the LRU down to a watermark. Sign-in never fails |
 
-The caps are isolated. The second counts **evictable** defaults only, so reaching it always means 500 victims are available and the eviction always succeeds. A default sharing its row with named accounts is not counted by it, because such a default exists only where a named account does and is therefore already paid for by the first cap.
+The caps are isolated. A default sharing its row with named accounts is not counted by the second, because such a default exists only where a named account does and is therefore already paid for by the first.
+
+**The second cap is advisory, not enforced.** The trigger is a cheap upper bound, while eviction operates on the exact evictable set, and the two can disagree: a row holding a live session is not evictable, so an anchor with many of those reaches the bound with no victims to take. When that happens eviction does nothing and the sign-in proceeds. So the guarantee is *"sign-in never fails on this cap"*, not *"an anchor never exceeds it"* — and the steady-state ceiling is the watermark, 450, rather than 500, because eviction stops there.
 
 500 is an anti-abuse parameter, not a capacity plan. Expected footprint is driven by active anchors times mean distinct dapps per anchor, nowhere near the cap. Per reference the cost is a 16 byte fixed key plus a roughly 12 byte CBOR value (`account_number: None` is omitted, so only the timestamp is encoded) plus node overhead. 500 is chosen for symmetry with the existing cap.
 
@@ -392,7 +402,7 @@ Without moves, creating an account and holding one are the same event, so the si
 
 There is no rebuild path, because the reference-list map is keyed `(anchor, app)` and cannot be scanned application-major without walking every anchor. The counter is authoritative by construction, which is the main reason the write path is consolidated.
 
-For the same reason, `update_counters` (`storage.rs:1701`) must stop silently skipping when the application row is missing. Its `if let Some(mut application) = ...` is unreachable today because every caller inserts first, but once reaping exists a stale reference-list row would make the counter drift invisibly. It should fail loudly instead.
+For the same reason, a missing application row must fail loudly rather than being skipped. Skipping is unreachable while every caller inserts first, but once reaping exists a stale reference-list row would make the counter drift invisibly. The write path returns `OriginNotFoundForApplicationNumber` instead.
 
 ### Tombstones must not decrement
 
@@ -510,37 +520,35 @@ So the diff builds `BTreeMap<Principal, StorableAccountLocator>` for previous an
 
 Computing a principal requires the account row, since only `stable_account_memory` says whether a `Some(n)` reference is a named account or a materialized default. The diff reads it for each changed reference.
 
-Once moves exist, a removal must be **compare-and-delete**: only remove the entry if the stored locator still names this anchor. A move is two writes on two different keys, and an unconditional removal applied after the recipient's insertion would delete a live entry.
+A removal is **compare-and-delete**: only remove the entry if the stored locator still names this anchor. Nothing exercises it until moves exist, but the guard is cheap and its absence would be silent. A move is two writes on two different keys, and an unconditional removal applied after the recipient's insertion would delete a live entry.
 
 ### The salt is checked, not awaited
 
-`calculate_seed` reads `state::salt()`, which traps when unset (`state.rs:273-280`). The salt is set lazily by `ensure_salt_set()` on delegation paths, never at canister init, so account mutation paths can in principle run before it exists.
+`calculate_seed` reads `state::salt()`, which traps when unset (`state.rs:273-280`). The salt is written exactly once — `update_salt` and `init_salt` both trap if it is already set, so it can never be unset or rotated — by `ensure_salt_set()` on a delegation path. On any live canister that happened long ago. On a freshly installed one it has not happened yet, which is not hypothetical: it is why `create_account` on a fresh canister failed 11 integration tests.
 
-The index write therefore checks synchronously and returns a `StorageError` when the salt is missing, following `session_delegation.rs:85-91`, which does exactly this and returns a typed error rather than trapping.
+The index write therefore checks synchronously and returns a `StorageError` when the salt is missing, following `session_delegation.rs:85-91`, which does the same rather than trapping.
 
-It must **not** be fixed by awaiting `ensure_salt_set()` in those paths. `create_account` currently runs `check_or_rebuild_max_anchor_accounts` and its insert in a single message, so the cap check and the write are atomic. An await in front of them opens an interleaving point where two concurrent calls both pass the same cap check before either write lands, and both commit. The same applies to `update_account`'s materialization check.
+**Where the await goes matters.** `create_account` runs its cap check and its insert in one message, so the two are atomic; an await between them would open an interleaving where two concurrent calls both pass the same check before either write lands. So the await sits at the **endpoint**, ahead of the cap check rather than between check and write. The pair still lands in one message, and on a live canister the await resolves immediately because the salt is already set.
 
 ### Backfill
 
-Existing references have no entries. The sweep follows the batched-migration convention already used in this repo by `migrate_sso_credentials_batch` (removed in #4192 once complete): an externally driven method taking a `cursor` and `batch_size`, returning the next cursor, done when a batch examines fewer keys than requested.
+Existing references have no entries. A cursor-driven sweep fills them, 2,000 rows a batch, driven by an in-canister interval timer installed from both `init` and `post_upgrade` — the convention `migrate_sso_credentials_batch` established (removed in #4192 once complete). A batch that examines fewer keys than requested is the last one. A hidden query reports `(indexed, is_done)` so the rollout can be watched.
 
-The size is already measurable rather than estimated. `internet_identity_total_account_references_count` (`http/metrics.rs:57`) reports the exact number of references, which is exactly the number of entries to write. It is small today, because reference rows only exist where an account was created or a default materialized, not per sign-in.
+The size is measurable rather than estimated: `internet_identity_total_account_references_count` (`http/metrics.rs:57`) reports the exact number of references, which is exactly the number of entries to write. It is small today, because reference rows only exist where an account was created or a default materialized, not per sign-in.
 
 A sweep is preferred over lazy fill because it makes a lookup miss unambiguous. With lazy fill a miss would mean "unknown principal or not yet indexed", and [what it is used for](#what-it-is-used-for) turns a miss into a denial.
 
 ### What it is used for
 
-The index lets II resolve the caller behind an app delegation. It does **not** expose the anchor.
-
-Today, when something calls II claiming to act for an origin, II has no cryptographic way to confirm the caller's delegation was minted for that origin. With the index, `caller()` resolves to `(anchor, application, account)` and II can verify the origin rather than trust a parameter, so a delegation minted for origin X cannot authorize anything scoped to origin Y.
+The index turns an account principal back into the account it was derived for. Its consumer is the session refresh path in `revocable-app-sessions.md`: an app calls with a canister-signed bundle naming its own account principal, and II resolves that to `(anchor, application, account)` in order to find the sessions to match the caller against. Without the index there is no way back from a principal, because the salt is hashed in.
 
 Three rules that make this safe:
 
-- **Resolution is on `caller()` only.** No method accepts a principal as an argument. A caller-supplied variant would let anyone deanonymize any principal they observe on chain.
-- **The anchor is never returned.** Per-origin derivation exists so that two dapps cannot correlate their users. Returning the anchor number to a caller would defeat that for every app that asks.
-- **A miss and a resolved-but-not-permitted must be indistinguishable** to the caller, in error shape and in anything else observable. Otherwise the API is an oracle for whether a principal is known to II.
+- **The index has no Candid surface.** No method takes a principal and returns anything about it. A caller-supplied variant would let anyone deanonymize any principal they observe on chain.
+- **The anchor is never returned to a caller.** Per-origin derivation exists so that two dapps cannot correlate their users; handing an app the anchor number would defeat that. This is also why the session bundle names the account by principal rather than by the numbers behind it.
+- **A miss and a resolved-but-not-permitted are indistinguishable** to the caller, in error shape and in anything else observable. Otherwise the API is an oracle for whether a principal is known to II. The session design collapses every such case into one error for exactly this reason.
 
-Resolution stamps `last_used` on the reference, exactly as `prepare_account_delegation` does. This is what keeps [eviction](#eviction) and [the principal index](#the-principal-index) consistent: without it an evicted tracked default would deny a caller holding a perfectly valid delegation. With it, anything actively making calls is at the top of the LRU and never a victim, so only genuinely idle defaults are dropped, and recovery is one sign-in.
+A refresh stamps `last_used` on the reference it resolved, exactly as `prepare_account_delegation` does. This is what keeps [eviction](#eviction) and [the principal index](#the-principal-index) consistent: without it an evicted tracked default would deny a caller holding a perfectly valid delegation. With it, anything actively making calls is at the top of the LRU and never a victim, so only genuinely idle defaults are dropped, and recovery is one sign-in.
 
 ### Reaping leaves no dangling entries
 
@@ -588,7 +596,7 @@ An application is reaped only at zero references, and zero references means zero
 | D5 | Eviction removes the row, never writes back an empty vector | Remove the row |
 | D6 | Eviction predicate is `len() == 1 && [0].account_number.is_none()` | Eviction predicate |
 | D7 | Defaults are never evicted while a materialized account exists at that key | Eviction predicate |
-| D8 | The new cap is 500 evictable defaults per anchor, isolated from the 500 materialized cap. Sign-in never fails on it, since reaching it always means victims exist | Two caps |
+| D8 | The cap is 500 evictable defaults per anchor, isolated from the 500 materialized cap, and **advisory**: eviction runs down to the watermark and does nothing when it finds no victims, so an anchor holding non-evictable rows sits above the cap rather than being refused. Sign-in never fails on it | Two caps |
 | D9 | `stored_account_references - stored_accounts` is the cheap upper bound on that cap; the eviction scan is authoritative | Gauging the cap |
 | D10 | LRU victim found by on-demand scan with batch eviction to a watermark, not a stored pointer | Victim selection |
 | D11 | `last_used: None` means never used and sorts oldest; neither creating a named account nor choosing a default stamps it | Never used |
@@ -599,10 +607,10 @@ An application is reaped only at zero references, and zero references means zero
 | D16 | A move that empties a row does not decrement; the count converts into the tombstone | Tombstones |
 | D17 | Application numbers come from a monotonic cell at memory index 33 and are retired on reap, never reissued | Monotonic allocator |
 | D18 | Reaching zero removes the application row and the origin index entry, for legacy and new applications alike | Reap sequence, Legacy applications |
-| D19 | `update_counters` fails loudly instead of silently skipping when the application row is missing | Reap predicate |
+| D19 | A missing application row on a reference-list write fails loudly instead of being skipped. `write_reference_list` and `remove_reference_list` return `OriginNotFoundForApplicationNumber`; the counter arithmetic moved into `apply_reference_counter_deltas` | Reap predicate |
 | D20 | The principal index maps derived principal to `(anchor, application, account)` at memory index 34 | Key and value |
 | D21 | The index diff compares values, not just keys, so materializing a default updates its entry in place | Index maintenance |
-| D22 | Index writes check the salt synchronously and error when it is unset. No await is added to any account mutation path | Salt check |
-| D23 | The index is populated by a cursor-driven batched backfill, sized by `internet_identity_total_account_references_count` | Backfill |
-| D24 | Resolution is `caller()`-only, never returns the anchor, and never accepts a principal argument | Use |
-| D25 | Resolving a caller stamps `last_used`, so an account in active use is never evicted | Use, Never used |
+| D22 | Index writes check the salt synchronously and return a typed error when it is unset. The account-mutating **endpoints** await `ensure_salt_set` on entry, ahead of the cap check, so the check and the write it guards still land in one message | Salt check |
+| D23 | The index is populated by a cursor-driven batched backfill, driven by an in-canister interval timer installed from `init` and `post_upgrade`, 2,000 rows a batch. A hidden query reports progress | Backfill |
+| D24 | The index is read by the session refresh path in `revocable-app-sessions.md`, which resolves the account principal carried in a caller-info bundle. It has no Candid surface of its own and never returns the anchor to a caller | Use |
+| D25 | A session refresh stamps `last_used` on the reference it resolves, so an account in active use is never evicted | Use, Never used |
