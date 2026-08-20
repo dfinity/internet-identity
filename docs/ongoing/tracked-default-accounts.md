@@ -46,11 +46,11 @@ II does keep one record per app origin it has ever encountered, shared by all id
 
 Three problems follow from having no record of use.
 
-**A user cannot be shown where they are signed in.** There is no list to render, so a settings screen cannot answer "which apps have I used" or offer to sign the user out of one.
+1. A user cannot be shown where they are signed in. There is no list to render, so a settings screen cannot answer "which apps have I used" or offer to sign the user out of one.
 
-**Recording use would make the app list grow without limit.** Nothing in this part of storage has ever been deleted. There is no removal path for any of these records, and the per-app counts only ever increase. That is survivable today because only named accounts create records. If every first sign-in at a new app created one, each would stay for the lifetime of the canister.
+2. Recording use would make the app list grow without limit. Nothing in this part of storage has ever been deleted. There is no removal path for any of these records, and the per-app counts only ever increase. That is survivable today because only named accounts create records. If every first sign-in at a new app created one, each would stay for the lifetime of the canister.
 
-**Revocable app sessions cannot be built.** The design in `revocable-app-sessions.md` needs the opposite direction of the hash: given the principal an app is calling with, which identity and account does it belong to? A one-way hash cannot answer that, so the answer has to be written down as it is produced. The session refresh path reads it on every call it authorises.
+3. Revocable app sessions cannot be built. The design in `revocable-app-sessions.md` needs the opposite direction of the hash: given the principal an app is calling with, which identity and account does it belong to? A one-way hash cannot answer that, so the answer has to be written down as it is produced. The session refresh path reads it on every call it authorises.
 
 ```mermaid
 flowchart LR
@@ -74,11 +74,11 @@ None of the four can ship alone. Recording use is what makes the app list grow. 
 
 Four changes, described here in terms of what is stored rather than in terms of the code.
 
-**1. Write a small record the first time an identity uses an app.**
+### 1. Write a small record the first time an identity uses an app
 
 Today a record only exists where a user named an account. We add one for the default account as well: the same kind of row, with no name attached, holding when it was last used. It is a few bytes, against a whole account record, and it turns that row into a complete list of the apps an identity has used.
 
-**2. Limit how many of those an identity can hold, and drop the ones it stopped using.**
+### 2. Limit how many of those an identity can hold, and drop the ones it stopped using
 
 Each identity gets a limit of 500 of these no-name rows. On reaching it, II deletes the ones used longest ago, down to 450 so that the work is spread across later sign-ins rather than repeated on every one.
 
@@ -86,11 +86,11 @@ Dropping one costs the user nothing. The account was never stored, only computed
 
 Two rows are never dropped: one that also holds a named account, since that account cannot be recomputed, and one holding a session that has not expired, so cleaning up idle records can never take away a session the user is relying on.
 
-**3. Delete an app record once no identity refers to it.**
+### 3. Delete an app record once no identity refers to it
 
 With rows now able to disappear, an app's count of referring accounts can reach zero, and the record can be removed along with the entry that maps its origin string to its internal number. That number is not handed out again, so a later sign-in at the same origin gets a new one.
 
-**4. Keep a map from a principal back to the account it belongs to.**
+### 4. Keep a map from a principal back to the account it belongs to
 
 For every account that has a row, II records which principal it derives to and which identity, app and account that principal means. This is the reverse direction the one-way hash cannot give, and it is what the session refresh path reads.
 
@@ -111,31 +111,43 @@ Storage shapes, the write path, limits, counts, the deletion sequence and the re
 The work is ordered so that each stage is safe to release on its own, and so that
 nothing starts writing new records before the limits that bound them exist.
 
-**Stage 1. Route every write through one function.** Today several call sites update the
+### Stage 1. Route every write through one function
+
+Today several call sites update the
 rows, the per-app counts and the origin map separately. They are consolidated into a
 single function that takes the new state of a row and works out the rest. No behaviour
 changes. This is a prerequisite for everything after it: the counts have to be correct by
 construction before anything relies on them reaching zero.
 
-**Stage 2. Stop reusing internal app numbers.** Numbers are currently handed out from
+### Stage 2. Stop reusing internal app numbers
+
+Numbers are currently handed out from
 the number of records that exist, which will collide once records can be deleted. They
 come from a counter that only increases instead. No behaviour changes yet, because
 nothing deletes.
 
-**Stage 3. Fix the read that treats an emptied row as absent.** A row that has been
+### Stage 3. Fix the read that treats an emptied row as absent
+
+A row that has been
 emptied is not the same as a row that never existed, and today the read path conflates
 them. Small correctness fix, independent of the rest.
 
-**Stage 4. Start recording use, with the limit and the cleanup.** This is the behavioural
+### Stage 4. Start recording use, with the limit and the cleanup
+
+This is the behavioural
 change: first use of an app writes a row, the limit drops rows an identity stopped using,
 and an app record with no remaining references is deleted. Stages 1 to 3 make this safe
 to turn on.
 
-**Stage 5. Maintain the principal map going forward.** Every write to a row also records
+### Stage 5. Maintain the principal map going forward
+
+Every write to a row also records
 the principal the account derives to. From this point the map is correct for anything
 written after it, and incomplete for what came before.
 
-**Stage 6. Fill in the map for accounts that already exist.** A background sweep walks
+### Stage 6. Fill in the map for accounts that already exist
+
+A background sweep walks
 existing rows in batches after each upgrade, adding the entries stage 5 could not know
 about. Until it finishes the map has gaps, so no feature may depend on a lookup
 succeeding until it reports done.
