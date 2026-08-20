@@ -4,23 +4,31 @@
 
 ## Summary
 
-Sibling subdomains of one domain should share a sign-in: sign in on `chat.example.com` and `hr.example.com` is signed in too, and signing out of one signs out the others.
+An app often runs as several subdomains of one domain, and a user expects one sign-in to
+cover all of them. Today each subdomain is a separate origin with its own principal and its
+own sign-in, and signing out of one leaves the others signed in.
 
-The client half of this already exists in `@icp-sdk/auth`. A cookie scoped to the parent domain tells a sibling that a session exists and which account it belongs to, and the sibling sends the user to II to have a delegation issued for its own key. What is missing is II's half: it has no way to answer such a request without showing the user a screen, no way to be told which session to answer from when an identity has several at one origin, and no way to fail that the client can tell apart from a real error.
+The client side of the fix already exists in `@icp-sdk/auth`. What is missing is II's side:
+it cannot answer an authorize request without rendering something, cannot be told which
+session to answer from when an identity has several at one origin, and cannot fail in a way
+a client can tell apart from a real error.
 
-This adds two parameters to the authorize URL and a path through the authorize flow that renders nothing. `prompt=none` means answer only if you already can. `hint` carries the account principal from the cookie and selects among the sessions II holds for the requesting origin. If neither can be satisfied, II returns `interaction_required` and the client falls back to a normal sign-in.
-
-The cookie never holds key material, and a hint can only pick from sessions II already has for that origin, so a page cannot use one to acquire authority it was not given.
+This adds two parameters to the authorize URL, `prompt` and `hint`, and a path through the
+authorize flow that renders nothing. A `hint` can only select among the sessions II already
+holds for the origin doing the asking, so a page cannot use one to obtain authority it was
+not given.
 
 ## Context
 
 An app often runs as several subdomains of one domain: `chat.example.com` and `hr.example.com` belonging to `example.com`. A user thinks of these as one product and expects one sign-in to cover them.
 
-They do not get that today. Each subdomain is a separate origin, so each gets its own principal and its own sign-in, and signing out of one leaves the others signed in.
+By default each subdomain is a separate origin, so each gets its own principal and its own sign-in.
 
-Two mechanisms already exist that get most of the way there. An app can nominate a shared **derivation origin**, so that every subdomain resolves to the same principal instead of one each, provided the nominated origin publishes a list authorising them. And a browser cookie can be scoped to the parent domain, so all the subdomains can read it.
+An app can already opt out of that. It nominates one origin as the **derivation origin** for the whole set, and that origin publishes a list of the subdomains it speaks for. Every subdomain in the list then resolves to the same principal, so to the same account. What they still do not share is a sign-in: resolving to one account does not mean one of them can use another's delegation, because a delegation names a specific key.
 
-The client half is built on those two and is already specified in `@icp-sdk/auth` ([shared-sessions.md](https://github.com/dfinity/icp-js-auth/blob/5aa78d5f64714d6e8e7781e256562035c09018c6/docs/src/content/docs/shared-sessions.md)). It puts three pieces in place:
+The second existing mechanism is a browser cookie scoped to the parent domain, which every subdomain in the set can read.
+
+The client side is built on those two, and is already specified in `@icp-sdk/auth` ([shared-sessions.md](https://github.com/dfinity/icp-js-auth/blob/5aa78d5f64714d6e8e7781e256562035c09018c6/docs/src/content/docs/shared-sessions.md)). It puts three pieces in place:
 
 | Piece                                                                                               | Effect                                                                                   |
 | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
@@ -54,8 +62,6 @@ flowchart TB
     D -->|"no distinct outcome"| X3["client cannot tell 'needs a ceremony'<br/>from a real error"]
 ```
 
-Three gaps: no way to be told "answer only if you already can", no way to be told which session to answer from, and no way to fail that a client can distinguish from a real error.
-
 Answering silently also must not become a way to get something for free. A page that can send a user to II must not be able to collect a delegation for a session it does not own.
 
 ## Out of scope
@@ -75,11 +81,9 @@ Two new authorize-URL parameters and a path through the authorize flow that rend
 | A no-UI path through the authorize flow | Resolves the session, extends its chain, delivers the redirect response, renders nothing             |
 | `interaction_required`                  | A failure outcome distinguishable from every other, so the client falls back to a ceremony           |
 
-A hint selects; it does not grant. It can only pick from the sessions II already holds for the origin being authorized, and it is holding the session that confers anything, so a hint read out of a cookie an app can write is safe. `prompt=none` also cannot create a session, because creating one needs an access method and a silent request has none.
+A hint selects; it does not grant. It can only pick from the sessions II already holds for the origin being authorized, and it is holding the session that confers anything, so a hint read out of a cookie an app can write is safe. A silent request also cannot create a session: creating one needs an access method, and a redirect carries none.
 
-Almost all of this is the II frontend using methods `revocable-app-sessions.md` already specifies. It needs one addition, `check_session`: a query that confirms the canister still holds the session the frontend's local record names. Without it a session revoked from settings or from another app would still be answered from the local copy, and the app would fail at its first mint with an error it could not tell apart from a real one.
-
----
+Almost all of this is the II frontend using methods [revocable-app-sessions.md](revocable-app-sessions.md) already specifies. It needs one addition, `check_session`: a query that confirms the canister still holds the session the frontend's local record names. Without it a session revoked from settings or from another app would still be answered from the local copy, and the app would fail at its first mint with an error it could not tell apart from a real one.
 
 ---
 
