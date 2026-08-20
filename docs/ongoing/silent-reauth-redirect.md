@@ -1,13 +1,5 @@
 # Silent re-auth over the redirect transport
 
-**Authors:** sea-snake
-
-**Date:** Aug 20, 2026
-
-**Target audience:** Engineers, Security Reviewers, Community Developers
-
-**Status:** Implementation
-
 **Depends on:** [revocable-app-sessions.md](revocable-app-sessions.md) for the session this re-issues from.
 
 ## Summary
