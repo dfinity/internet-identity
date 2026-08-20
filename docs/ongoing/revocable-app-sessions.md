@@ -1,6 +1,8 @@
 # Revocable app sessions
 
-**Authors:** sea-snake — **Date:** Aug 20, 2026
+**Authors:** sea-snake
+
+**Date:** Aug 20, 2026
 
 **Target audience:** Engineers, Security Reviewers, Community Developers
 
@@ -20,11 +22,13 @@ A narrower version of this already runs for one internal client, with 5-minute m
 
 Apps do not implement any of it. `AuthClient` holds the session and re-mints on its own schedule, so an app author still writes a sign-in call and gets an identity.
 
-## Problem
+## Context
 
-Internet Identity gives an app a **delegation** at sign-in: a canister-signed artifact naming the app's key and an expiry. The app chooses the lifetime through `maxTimeToLive`, up to `MAX_EXPIRATION_PERIOD_NS`, which is 30 days.
+When a user signs in to a dapp with Internet Identity, the dapp does not get a password or a token it can send to a server. It gets a **delegation**: a short signed statement saying that a particular public key is allowed to act for a particular principal, until a stated expiry. The dapp holds the matching private key and signs its calls with it.
 
-Verification is self-contained. The signature only has to exist in the signature map long enough to be fetched; after that the delegation stands on its own and nothing consults II again.
+The delegation is signed by the II canister, and anything on the network can check that signature on its own. That is what makes it cheap: a dapp canister receiving a call verifies the signature and the expiry and nothing else. It never asks II whether the delegation is still good, because there is nothing in the format that would let it ask.
+
+The app decides how long the delegation lasts when it requests one. The current maximum is 30 days.
 
 ```mermaid
 sequenceDiagram
@@ -33,23 +37,27 @@ sequenceDiagram
     participant A as app
     participant II as II canister
     participant D as dapp canister
-    U->>II: ceremony
+    U->>II: signs in
     II-->>A: delegation, valid up to 30 days
     A->>D: calls, signed with it
     Note over A,D: II is never consulted again
 ```
 
+## Problem
+
+Because nothing consults II after the fact, a delegation cannot be withdrawn. Once II has signed one it is usable until its expiry, and no action by the user or by II reaches it.
+
 Nor is there an indirect way to invalidate one. II derives an account's principal by hashing a secret salt together with the identity and the origin; rotating that salt would change every future derivation without touching an artifact already signed, so it would break every existing principal and revoke nothing.
 
-So:
+The practical effects:
 
 |                     | Today                                                     |
 | ------------------- | --------------------------------------------------------- |
-| A stolen delegation | Works at that dapp until it expires — up to 30 days       |
+| A stolen delegation | Works at that dapp until it expires, up to 30 days        |
 | Signing out         | Clears local state. Invalidates nothing already issued    |
 | Visibility          | Neither the user nor II can list or end an active sign-in |
 
-The same gap prevents signing one browser out. II holds no record that a given browser is signed in anywhere, so there is nothing to list and nothing to delete.
+The same gap prevents a user from signing one browser out. II keeps no record that a given browser is signed in anywhere, so there is nothing to show the user and nothing to delete.
 
 ## Out of scope
 
@@ -63,7 +71,7 @@ The same gap prevents signing one browser out. II holds no record that a given b
 
 1. **Store a session.** Signing in records a session against the account the user chose, on the per-account row that `tracked-default-accounts.md` introduces: when it was created, when it expires, when it was last used, which browser it came from, and the access level the user consented to.
 2. **Hand the app a chain, not a credential.** The canister signs the session to a key the II frontend generates and cannot export, and the frontend extends that chain to a key the app supplies. The app's hop is restricted to the II canister, so the chain can be used to ask II for delegations and for nothing else.
-3. **Give the app a way to say which account it means.** II signs a small blob naming that account's principal, and the app attaches it to every call. The protocol verifies the signature before the message reaches the canister, so II can read the account off the call without the app being able to name one it was not given. The blob holds the principal and nothing else — none of the numbers II uses internally.
+3. **Give the app a way to say which account it means.** II signs a small blob naming that account's principal, and the app attaches it to every call. The protocol verifies the signature before the message reaches the canister, so II can read the account off the call without the app being able to name one it was not given. The blob holds the principal and nothing else, none of the numbers II uses internally.
 4. **Mint short delegations on demand.** The app calls `app_prepare_delegation` / `app_get_delegation` with that chain and gets a 5-minute delegation for its account principal. This is a direct canister call: no popup, no iframe, no navigation.
 5. **Revoke by deleting the record.** No new delegation can be minted, and the one already out expires within five minutes.
 6. **Group sessions by browser.** Each session records which browser created it, so the settings UI can list browsers and end all of one browser's sessions at once.
@@ -76,7 +84,7 @@ An app is told nothing about the identity behind the account. Not the identity n
 
 Revoking deletes the record rather than marking it, so there is nothing left for a later call to overlook. A call that cannot resolve a usable session gets one error, whatever the cause, so a client has a single failure to handle.
 
-**The mechanism is not new.** A narrower version already runs for MCP servers — II's own server integration — storing a grant, minting 5-minute delegations against it, and revoking by deleting it. That covers minting and revocation. What it does not cover, because one internal client does not need it, is many sessions per identity, a place to keep them, and a user-facing way to see and end them.
+**The mechanism is not new.** A narrower version already runs for MCP servers, II's own server integration, storing a grant, minting 5-minute delegations against it, and revoking by deleting it. That covers minting and revocation. What it does not cover, because one internal client does not need it, is many sessions per identity, a place to keep them, and a user-facing way to see and end them.
 
 ## System overview
 
@@ -124,20 +132,47 @@ Bob signs in to `chat.example.com`, which needs to call its own canister on his 
 
 ## Specification
 
-The detail needed to build this — exact interfaces, storage shapes, algorithms, caps, and the requirement checklist — is in [revocable-app-sessions-spec.md](revocable-app-sessions-spec.md).
+The detail needed to build this, exact interfaces, storage shapes, algorithms, caps, and the requirement checklist, is in [revocable-app-sessions-spec.md](revocable-app-sessions-spec.md).
 
 ## Implementation stages
 
-| PR    | Stage                                                                                   |
-| ----- | --------------------------------------------------------------------------------------- |
-| #4241 | Store a session on the account reference                                                |
-| #4242 | Register the browser a session came from                                                |
-| #4243 | Create sessions and mint app delegations from them                                      |
-| #4244 | Record that a session is still in use                                                   |
-| #4245 | Let an app sign its own session out                                                     |
-| #4246 | Revoke from the user's own settings                                                     |
-| #4247 | Hand apps a session over `ii_session_delegation`                                        |
-| #4248 | Answer a silent re-auth without rendering, including the liveness check `check_session` |
-| #4249 | Sign a browser out from settings                                                        |
+The order is chosen so that storage exists before anything writes to it, and so that
+nothing user-facing appears before the mechanism behind it works.
 
-Storage lands first and is inert until something creates a session, so each stage is safe to merge on its own.
+**Stage 1. Add somewhere to keep a session.** The record gains its place on the
+per-account row, with the fields listed in the approach. Nothing creates one yet, so this
+changes no behaviour and can be released on its own.
+
+**Stage 2. Add the browser registry.** Each identity gets a list of the browsers it has
+signed in from, with a limit of 20 and least-recently-used replacement. Also inert until
+something registers a browser.
+
+**Stage 3. Create sessions and mint from them.** The behavioural change. Signing in
+records a session and registers the browser, and the two app-facing methods mint 5-minute
+delegations against it. From here an app that opts in gets short delegations.
+
+**Stage 4. Record that a session is still in use.** Each mint stamps the session and the
+browser, which is what makes the browser list worth reading and what the limits order on.
+
+**Stage 5. Let an app end its own session.** The app's sign-out becomes real: it deletes
+its own record and nothing else.
+
+**Stage 6. Let the user end sessions from II.** One session, or every session a browser
+holds, from settings.
+
+**Stage 7. Hand apps a session instead of a plain delegation.** The frontend request that
+returns a session chain rather than a delegation. Until this ships, no app can reach any
+of the above.
+
+**Stage 8. Show the browser list.** The settings screen that lists browsers, when each was
+last used, and offers to sign one out.
+
+Stages 1 and 2 are storage only. Stage 3 is the point of no return for the data model.
+Stages 5 to 8 are independent of each other and can be released in any order once stage 4
+is in.
+
+### Prerequisite
+
+Attaching signed caller information to an ingress message is an IC protocol extension that
+is still being specified. Stages 3 onward depend on it being available, so the schedule
+follows that work rather than leading it.
