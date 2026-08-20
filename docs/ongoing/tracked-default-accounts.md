@@ -1,13 +1,5 @@
 # Recording which apps an identity uses
 
-**Authors:** sea-snake
-
-**Date:** Aug 20, 2026
-
-**Target audience:** Engineers, Security Reviewers
-
-**Status:** Implementation
-
 ## Summary
 
 Internet Identity does not record which apps an identity uses. The account a user gets at an app is computed on demand rather than stored: II hashes the identity number, the app's origin and a secret value, and the result is the principal. Signing in therefore writes nothing at all. Only accounts a user has explicitly named get stored, and almost nobody names one.

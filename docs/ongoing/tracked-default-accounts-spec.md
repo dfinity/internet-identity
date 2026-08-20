@@ -1,8 +1,4 @@
-# Account tracking — specification
-
-**Authors:** sea-snake — **Date:** Aug 20, 2026
-
-**Target audience:** implementers, and agents generating code from this document
+# Recording which apps an identity uses: specification
 
 **Design:** [tracked-default-accounts.md](tracked-default-accounts.md) covers what this builds and why. This document assumes it and does not repeat it.
 
