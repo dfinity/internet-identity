@@ -268,9 +268,9 @@ type PrepareAccountSessionRequest = record {
     identity_number : IdentityNumber;
     origin : FrontendHostname;
     account_number : opt AccountNumber;
-    session_key : SessionKey;        // the II frontend's own key
+    session_key : SessionKey;        // the browser's own key, and what identifies it
     device_name : text;              // labels the browser, e.g. "Chrome on MacBook"
-    device_id : opt nat32;           // cached by the frontend; absent or unknown registers one
+
     permissions : opt Permissions;   // the consented access level, fixed for the session
     valid_for : opt nat64;           // clamped to the session bounds below
 };
@@ -279,7 +279,6 @@ type PrepareAccountSessionResponse = record {
     user_key : PublicKey;
     expiration : Timestamp;          // the session's valid_till
     created_at : Timestamp;
-    device_id : nat32;               // echo, cached by the frontend
     session_info_bundle : blob;      // bytes; the signature comes from the get ([the app-facing pair](#the-app-facing-pair))
     account_principal : principal;   // what apps see for this account; stored with the session
 };
@@ -311,7 +310,7 @@ get_account_session : (GetAccountSessionRequest)
 
 An app never needs to be told: `app_prepare_delegation` already returns `user_key` over the account seed, so `Principal.selfAuthenticating(user_key)` is the same value, and that is how the principal reaches the cookie a `hint` later comes from. The II frontend could obtain it the same way, by minting once from the session it just created, but that spends a canister signature and a `update_root_hash()` on a value this response can carry for free. Both halves require an access method, so this tells the II frontend something for its own bookkeeping rather than widening what an app can reach.
 
-Registering a device is not a call of its own either. The frontend passes the name it would have registered with plus whatever id it has cached, and the canister resolves the rest ([id allocation](#the-canister-allocates-the-id-during-the-auth-flow)).
+Registering a device is not a call of its own either. The frontend passes the name it would have registered with plus whatever id it has cached, and the canister resolves the rest ([id allocation](#the-session-key-identifies-the-browser)).
 
 ```mermaid
 sequenceDiagram
@@ -321,9 +320,9 @@ sequenceDiagram
     participant IIC as II canister
     App->>IIF: ii_session_delegation { sessionPublicKey }
     Note over IIF: ceremony (passkey or OpenID)
-    IIF->>IIC: prepare_account_session { .., session_key = II key,<br/>device_name, device_id: cached or absent }
+    IIF->>IIC: prepare_account_session { .., session_key = II key,<br/>device_name, session_key = the browser's key }
     Note over IIC: resolve or register the device<br/>reuse an unexpired session for this locator+device,<br/>else prune, evict LRU at cap, create ([the session cap](#the-cap-evicts-it-never-blocks))
-    IIC-->>IIF: { user_key, expiration = valid_till, created_at,<br/>device_id, session_info_bundle }
+    IIC-->>IIF: { user_key, expiration = valid_till, created_at,<br/>session_info_bundle, account_principal }
     IIF->>IIC: get_account_session { .., expiration }
     IIC-->>IIF: session delegation + bundle signature
     Note over IIF: cache session_id for this anchor<br/>store (keypair, chain) by (anchor, account, origin)<br/>extend the chain to sessionPublicKey
@@ -588,30 +587,68 @@ pub session_devices: Option<Vec<StorableSessionDevice>>,
 pub next_session_device_id: Option<StorableSessionDeviceId>,
 ```
 
-with `{ id, name, created_at, last_used }` per entry, **capped at 20** because the anchor blob is read on nearly every authenticated path, so an unbounded list taxes far more than sessions.
+with `{ id, key, name, created_at, last_used }` per entry, where `key` is the browser's public session key and what the entry is looked up by, **capped at 20** because the anchor blob is read on nearly every authenticated path, so an unbounded list taxes far more than sessions. The key is the browser's public key and is what the entry is looked up by; the id exists for the methods that name a browser.
 
 #### At the cap, registration evicts the least recently used
 
 Rather than failing, for the same reason [the session cap](#the-cap-evicts-it-never-blocks) gives for sessions: the user is signing in on a new browser and the only thing that could refuse them is internal bookkeeping.
 
-Ordering on use rather than on `created_at` is load-bearing, not a nicety. Clearing browser storage loses the cached id ([the accepted limitations](#two-accepted-limitations)), so every wipe enrols a fresh record and the wiping browser always holds the newest `created_at`. Under enrolment order it is therefore never its own victim: twenty wipes evict twenty genuinely-used browsers instead. Since eviction also ends the dropped browser's sessions, that signs the user out on devices they never touched. Ordering on `last_used` makes each wipe's throwaway records evict each other.
+Ordering on use rather than on `created_at` is load-bearing, not a nicety. Clearing browser storage loses the browser's key ([the accepted limitations](#two-accepted-limitations)), so every wipe enrols a fresh record and the wiping browser always holds the newest `created_at`. Under enrolment order it is therefore never its own victim: twenty wipes evict twenty genuinely-used browsers instead. Since eviction also ends the dropped browser's sessions, that signs the user out on devices they never touched. Ordering on `last_used` makes each wipe's throwaway records evict each other.
 
 `last_used` advances on a sign-in from that browser and on every session refresh it drives ([what refresh writes](#what-refresh-writes)). Sign-in alone would be too coarse a signal: a browser holding an app open for weeks without a fresh ceremony would read as idle and lose the cap to one that signed in once and went dark.
 
 Reading needs no method: devices live on `StorableAnchor`, so they ride on `identity_info` alongside `mcp_config`, which is carried there for exactly this reason. `last_used` rides along with them, which is what lets the settings list say when a browser was last used rather than only when it was added — the question someone deciding what to sign out is actually asking.
 
-### The canister allocates the id, during the auth flow
+### The session key identifies the browser
 
-There is no registration method. `prepare_account_session` carries `device_name` and `device_id : opt nat32`, and the canister resolves them:
+There is no registration method, and nothing in the request names a browser. The frontend
+keeps one key per browser, non-extractable, in IndexedDB, and passes its public half as
+`session_key` — the same field session creation already takes, because that key is what the
+session chain gets rooted at.
 
-| Passed                          | Result                                                                     |
-| ------------------------------- | -------------------------------------------------------------------------- |
-| an id it knows                  | use that device, leave its name alone                                      |
-| an id it does not know, or none | register a device with `device_name` and return the new id in the response |
+The canister looks the browser up by that key:
 
-The frontend caches the returned id per anchor and passes it back on every later auth flow, for every app. It does not choose the id, derive it, or influence it.
+| Presented                        | Result                                                |
+| -------------------------------- | ----------------------------------------------------- |
+| a key the identity already holds | use that browser, leave its name alone                |
+| a key it has not seen            | register a browser under that key, with `device_name` |
 
-The id comes from an explicit per-identity counter, monotonic and never reused. That is load-bearing rather than belt and braces: registry eviction deletes device records, so without a counter a dropped id could be handed to a different browser and a stale cached id would resolve to somebody else's entry.
+That is the whole mechanism. No signature, no challenge, and no verification: the security
+comes from what the key is for rather than from proving possession of it.
+
+#### Why presenting someone else's key gains nothing
+
+The call is signed by an access method, as it must be, so the IC's replay protection covers
+that signature and not anything in the payload. An attacker who has stolen an access method
+can therefore put any public key they like in `session_key`, including one lifted from an
+observed request, and have their sign-in attributed to a browser the user recognises.
+
+It buys them nothing. The session is minted to the key they named, so signing with it needs
+the private half, which stays in the legitimate browser's IndexedDB and cannot be exported.
+Substitute a key they do hold and they are, by construction, a browser the identity has never
+seen — a new entry in the list. In practice the impersonation attempt lands on the reuse path
+anyway: same browser, same consent, so the canister returns the existing session.
+
+So the guarantee is not that a browser cannot be named by someone else. It is that **an
+attacker who wants a session they can actually use must appear as a browser the user does not
+recognise**, which is what the list exists to show.
+
+#### One key per browser rather than per session
+
+Session creation currently generates a fresh key each time. Making it one per browser is what
+gives the key a stable meaning; the cost is that every session from a browser shares a root
+key. That is not new exposure, since they already share one IndexedDB, and the private half
+never leaves it.
+
+This key is for the auth path only. The dashboard's own session store is a separate thing and
+stays as it is.
+
+#### The internal id
+
+The registry still assigns a small id per browser, from a per-identity counter, monotonic and
+never reused. It is what `revoke_device_sessions` names and what `identity_info` reports, so
+neither has to carry a public key. A caller never supplies it, and the frontend caches
+nothing: the key it holds is what identifies it.
 
 ### Signing a browser out is an eager sweep
 
@@ -784,14 +821,15 @@ created, how an app uses it, how it ends, and how browsers are tracked.
 
 ### Tracking browsers
 
-| #     | Requirement                                                                                                                                                   |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| DEV-1 | Each identity MUST keep a list of the browsers it has signed in from, holding an id, a self-reported name, when it was first seen, and when it was last used. |
-| DEV-2 | The list MUST be limited to 20 entries, and reaching the limit MUST drop the least recently used rather than refuse the sign-in.                              |
-| DEV-3 | Dropping an entry MUST also end that browser's sessions, since a session whose browser is not listed could not otherwise be signed out.                       |
-| DEV-4 | A browser id MUST come from a per-identity counter and MUST NOT be reissued.                                                                                  |
-| DEV-5 | An id the identity does not hold MUST register a new browser rather than resolve to an existing one.                                                          |
-| DEV-6 | Only session creation MAY accept a browser id, and no app-facing method MAY accept one.                                                                       |
-| DEV-7 | The last-used stamp MUST advance on a sign-in from that browser and on every refresh it drives.                                                               |
-| DEV-8 | Signing a browser out MUST leave its entry in place, so the browser stays recognisable and signing in again reuses it.                                        |
-| DEV-9 | Registering a browser MUST be archived with the self-reported name redacted.                                                                                  |
+| #      | Requirement                                                                                                                                                                                              |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DEV-1  | Each identity MUST keep a list of the browsers it has signed in from, holding the browser's public session key, an internal id, a self-reported name, when it was first seen, and when it was last used. |
+| DEV-2  | A browser MUST be identified by the public session key the request already carries. Nothing else in the request MAY name a browser.                                                                      |
+| DEV-3  | A key the identity already holds MUST resolve to that browser. A key it has not seen MUST register a new one.                                                                                            |
+| DEV-4  | The frontend MUST keep one non-extractable key per browser rather than one per session, so the key has a stable meaning.                                                                                 |
+| DEV-5  | The list MUST be limited to 20 entries, and reaching the limit MUST drop the least recently used rather than refuse the sign-in.                                                                         |
+| DEV-6  | Dropping an entry MUST also end that browser's sessions, since a session whose browser is not listed could not otherwise be signed out.                                                                  |
+| DEV-7  | The internal id MUST come from a per-identity counter and MUST NOT be reissued. It is what the revocation method and `identity_info` name; a caller MUST NOT supply it.                                  |
+| DEV-8  | The last-used stamp MUST advance on a sign-in from that browser and on every refresh it drives.                                                                                                          |
+| DEV-9  | Signing a browser out MUST leave its entry in place, so the browser stays recognisable and signing in again reuses it.                                                                                   |
+| DEV-10 | Registering a browser MUST be archived with the self-reported name redacted.                                                                                                                             |

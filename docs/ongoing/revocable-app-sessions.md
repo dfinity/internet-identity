@@ -66,7 +66,7 @@ The same gap prevents a user from signing one browser out. II keeps no record th
 3. **Give the app a way to say which account it means.** II signs a small blob naming that account's principal, and the app attaches it to every call. The protocol verifies the signature before the message reaches the canister, so II can read the account off the call without the app being able to name one it was not given. The blob holds the principal and nothing else, none of the numbers II uses internally.
 4. **Mint short delegations on demand.** The app calls `app_prepare_delegation` / `app_get_delegation` with that chain and gets a 5-minute delegation for its account principal. This is a direct canister call: no popup, no iframe, no navigation.
 5. **Revoke by deleting the record.** No new delegation can be minted, and the one already out expires within five minutes.
-6. **Group sessions by browser.** Each session records which browser created it, so the settings UI can list browsers and end all of one browser's sessions at once.
+6. **Group sessions by browser.** The key a session is rooted at is kept per browser rather than per session, so it identifies the browser as well. Every session records which browser created it, so settings can list browsers and end all of one browser's sessions at once. A sign-in performed with a stolen access method necessarily uses a different key, so it shows up as a browser the user does not recognise.
 
 ### Core principles
 
@@ -97,14 +97,14 @@ The canister does not take a caller's word for which account it is calling about
 A reviewer will ask these first, so they are answered here rather than left to the
 specification.
 
-| Question                                             | Answer                                                                                                                                                                                                                                                                               |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Can a browser claim to be another browser?           | No. The client caches an id and presents it on the next sign-in but does not choose one. An id the identity does not already hold registers a new browser instead, so a hostile page can neither attach its session to a browser the user recognises nor hide its own from the list. |
-| Can an app ask for a longer delegation?              | No. Both halves of the mint derive the 5-minute ceiling themselves, and neither will witness a delegation that outlives its session.                                                                                                                                                 |
-| What does a stolen session chain get?                | 5-minute delegations until the session is revoked, and nothing else. It cannot create a session or extend its own life. The user's lever is the browser list, which is why it carries a last-used time:a session they do not recognise is what tells them to act.                    |
-| Can the chain be used against an app's own canister? | No. Its final hop is restricted to the II canister, and that restriction is part of what is signed, so an app reaching for the chain where it meant its delegation fails immediately rather than appearing to work.                                                                  |
-| Can cleaning up idle records destroy a live session? | No. A row holding an unexpired session is not eligible for eviction,                                                                                                                                                                                                                 |
-| What does this depend on shipping first?             | Carrying canister-signed caller information on an ingress message, an IC protocol extension still being specified. Until it is on mainnet, this cannot ship.                                                                                                                         |
+| Question                                                   | Answer                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Can an attacker hide inside a browser the user recognises? | Not usefully. They can name someone else's browser, because the name is a public key in the request, but the session is then minted to that key and they cannot sign with it. To get a session they can use they must name a key they hold, which the identity has never seen, so they appear as a new browser. That is the signal the list exists to give. |
+| Can an app ask for a longer delegation?                    | No. Both halves of the mint derive the 5-minute ceiling themselves, and neither will witness a delegation that outlives its session.                                                                                                                                                                                                                        |
+| What does a stolen session chain get?                      | 5-minute delegations until the session is revoked, and nothing else. It cannot create a session or extend its own life. The user's lever is the browser list, which is why it carries a last-used time:a session they do not recognise is what tells them to act.                                                                                           |
+| Can the chain be used against an app's own canister?       | No. Its final hop is restricted to the II canister, and that restriction is part of what is signed, so an app reaching for the chain where it meant its delegation fails immediately rather than appearing to work.                                                                                                                                         |
+| Can cleaning up idle records destroy a live session?       | No. A row holding an unexpired session is not eligible for eviction,                                                                                                                                                                                                                                                                                        |
+| What does this depend on shipping first?                   | Carrying canister-signed caller information on an ingress message, an IC protocol extension still being specified. Until it is on mainnet, this cannot ship.                                                                                                                                                                                                |
 
 ### The flow, end to end
 
@@ -136,8 +136,9 @@ changes no behaviour and can be released on its own.
 
 ### Stage 2. Add the browser registry
 
-Each identity gets a list of the browsers it has signed in from, with a limit of 20 and least-recently-used replacement. Also inert until
-something registers a browser.
+Each identity gets a list of the browsers it has signed in from, keyed by the public key that
+browser's sessions are rooted at, with a limit of 20 and least-recently-used replacement.
+Inert until something registers a browser.
 
 ### Stage 3. Create sessions and mint from them
 
