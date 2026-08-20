@@ -66,9 +66,12 @@ Answering silently also must not become a way to get something for free. A page 
 
 ## Out of scope
 
-- **Anything the client already specifies.** The cookie, the `derivationOrigin` setup and the `/reauth` page belong to `@icp-sdk/auth`; II never sees the cookie.
-- **Sharing across unrelated domains.** Only siblings that already resolve to the same principal through a shared `derivationOrigin` can share a session.
-- **Creating a session silently.** `prompt=none` can only re-issue from one that exists; it has no access method with which to authorise a new one.
+- **Anything the client already specifies.**  
+  The cookie, the `derivationOrigin` setup and the `/reauth` page belong to `@icp-sdk/auth`; II never sees the cookie.
+- **Sharing across unrelated domains.**  
+  Only siblings that already resolve to the same principal through a shared `derivationOrigin` can share a session.
+- **Creating a session silently.**  
+  `prompt=none` can only re-issue from one that exists; it has no access method with which to authorise a new one.
 
 ## Approach
 
