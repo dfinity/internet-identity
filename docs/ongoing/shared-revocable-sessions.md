@@ -1,8 +1,18 @@
 # Shared revocable sessions
 
-**Author:** sea-snake — **Date:** 2026-08-19 — **Status:** Overview, RFC for review
+**Authors:** sea-snake — **Date:** Aug 20, 2026
 
-This page is the shape of three designs, linked at the end. Read it first; read those for detail.
+**Target audience:** Engineers, Security Reviewers, Community Developers
+
+**Status:** Implementation
+
+## Summary
+
+A sign-in today is a bearer token nobody can take back. II hands an app a delegation valid for up to 30 days, verification never consults II again, and signing out clears the app's own storage without invalidating anything. Sibling subdomains cannot share a sign-in either, so a user signs in separately on each and signing out of one leaves the others signed in.
+
+This is the shape of three designs that together replace that. The long-lived artifact becomes a **session** the canister holds and the user can end; the thing the app carries becomes a **5-minute delegation** it re-mints from that session. Revoking stops new mints, so access ends within one delegation lifetime. Sessions are grouped per browser, so a user can see the browsers they are signed in from and sign one out of everything. And because siblings sharing a `derivationOrigin` resolve to one account, they share one session — sign in on one and the others re-issue silently.
+
+Read this page first. Each design is linked at the end, with a separate specification for implementers.
 
 ## Context
 
@@ -42,7 +52,7 @@ flowchart TB
 
 A user signs in separately on each, and signing out of one leaves the others signed in.
 
-## Solution
+## Approach
 
 Split the one long-lived artifact into two: a **session** the canister holds and the user can end, and a **short-lived delegation** the app carries.
 
@@ -61,6 +71,7 @@ Getting a fresh delegation means asking II, and that is what gives II a say agai
 | | After | Why |
 | -------- | ----- | --- |
 | Delegation lifetime | 5 minutes | Matches what MCP already mints |
+| Session lifetime | Up to 30 days, and revocable at any point in it | The length is not what changed; being able to end it is |
 | Revocation | Takes effect within one delegation lifetime | Revoking stops new mints; one already issued runs out |
 | A stolen delegation | At most 5 minutes of access | |
 | A stolen session chain | Revocable, and `targets` stops it reaching dapp canisters directly | The real protection is that it can be revoked at all |
@@ -94,23 +105,17 @@ That is not a copy between apps and not a cookie trick. There is one record and 
 
 ## What changes where
 
-```mermaid
-flowchart LR
-    subgraph pub["public API, small and stable"]
-        P1["app_prepare_delegation"]
-        P2["app_get_delegation"]
-        P3["app_revoke_session"]
-    end
-    subgraph int["internal, II frontend only"]
-        I1["prepare/get_account_session"]
-        I2["revoke_account_session"]
-        I3["revoke_device_sessions"]
-    end
-    subgraph un["untouched"]
-        U1["prepare/get_account_delegation"]
-        U2["icrc34_delegation"]
-    end
-```
+| Method | Who calls it | New? | What it does |
+| ------ | ------------ | ---- | ------------ |
+| `app_prepare_delegation` / `app_get_delegation` | app frontend, via `AuthClient` | New | Mints a 5-minute delegation from a live session |
+| `app_revoke_session` | app frontend, via `AuthClient` | New | The app's own sign-out. Deletes its session record |
+| `check_session` | II frontend | New | Whether a session is still live, for the silent path |
+| `prepare_account_session` / `get_account_session` | II frontend | New | Creates a session and signs its identity |
+| `revoke_account_session` / `revoke_device_sessions` | II frontend | New | Ends one session, or every session a browser holds |
+| `prepare_account_delegation` / `get_account_delegation` | app frontend | Untouched | The delegation flow as it works today |
+| `icrc34_delegation` | app frontend | Untouched | Unchanged, and unaware of any of this |
+
+The three `app_`-prefixed methods are the whole public surface, and none of them names an identity. Everything unprefixed is the II frontend's, which ships with the canister.
 
 No existing method changes shape or behaviour, so nothing breaks and nothing has to move at once. An app opts in by upgrading its client; until it does, it gets exactly what it gets today.
 
@@ -118,9 +123,13 @@ No existing method changes shape or behaviour, so nothing breaks and nothing has
 
 ## Read further
 
-| Doc | Covers |
-| --- | ------ |
-| [Account tracking, reaping, and principal lookup](tracked-default-accounts.md) | The storage this is built on: tracking every account, reaping dead applications, and the index that resolves a principal to an account |
-| [Revocable app sessions](revocable-app-sessions.md) | The session record, its identity and chain, refresh, revocation, and session devices |
-| [Silent re-auth over the redirect transport](silent-reauth-redirect.md) | `prompt=none`, `hint`, and what II supplies for the sibling flow |
-| [Shared sessions, client side](https://github.com/dfinity/icp-js-auth/blob/5aa78d5f64714d6e8e7781e256562035c09018c6/docs/src/content/docs/shared-sessions.md) | What an app does: `derivationOrigin`, the cookie, and the `/reauth` page |
+Each feature has a design doc for what and why, and a specification for how.
+
+| Design | Specification | Covers |
+| ------ | ------------- | ------ |
+| [Account tracking](tracked-default-accounts.md) | [spec](tracked-default-accounts-spec.md) | The storage this is built on: recording which dapps an identity uses, reclaiming unused dapp records, and the index that resolves a principal to an account |
+| [Revocable app sessions](revocable-app-sessions.md) | [spec](revocable-app-sessions-spec.md) | The session record, its identity and chain, refresh, revocation, and session devices |
+| [Silent re-auth over the redirect transport](silent-reauth-redirect.md) | [spec](silent-reauth-redirect-spec.md) | `prompt=none`, `hint`, and what II supplies for the sibling flow |
+| [Shared sessions, client side](https://github.com/dfinity/icp-js-auth/blob/5aa78d5f64714d6e8e7781e256562035c09018c6/docs/src/content/docs/shared-sessions.md) | — | What an app does: `derivationOrigin`, the cookie, and the `/reauth` page |
+
+Apps do not implement any of the above. `AuthClient` holds the session, attaches the caller-info bundle and re-mints on its own schedule, so an app author sees a sign-in call and an identity, as today.
