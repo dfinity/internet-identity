@@ -131,21 +131,12 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
   await page.locator("#hostUrl").fill("https://localhost:5173");
 
-  // Set up alternative origins with 11 entries (exceeding the 10 limit)
+  // Set up alternative origins with 101 entries (exceeding the 100 limit)
   const tooManyOrigins = JSON.stringify({
-    alternativeOrigins: [
-      "https://a0.com",
-      "https://a1.com",
-      "https://a2.com",
-      "https://a3.com",
-      "https://a4.com",
-      "https://a5.com",
-      "https://a6.com",
-      "https://a7.com",
-      "https://a8.com",
-      "https://a9.com",
-      "https://a10.com",
-    ],
+    alternativeOrigins: Array.from(
+      { length: 101 },
+      (_, index) => `https://a${index}.com`,
+    ),
   });
 
   await page.locator("#newAlternativeOrigins").fill(tooManyOrigins);
