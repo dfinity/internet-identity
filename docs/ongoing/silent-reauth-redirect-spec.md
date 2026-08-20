@@ -1,8 +1,4 @@
-# Silent re-auth over the redirect transport — specification
-
-**Authors:** sea-snake — **Date:** Aug 20, 2026
-
-**Target audience:** implementers, and agents generating code from this document
+# Silent re-auth over the redirect transport: specification
 
 **Design:** [silent-reauth-redirect.md](silent-reauth-redirect.md) covers what this builds and why. This document assumes it and does not repeat it.
 
