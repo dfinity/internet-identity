@@ -37,15 +37,15 @@ The II frontend does not mint the app delegation here. It hands back the session
 
 Worth being exact, because two of these look like II parameters and are not.
 
-| Value | Where it lives | Does II see it |
-| ----- | -------------- | -------------- |
-| `prompt=none` | Query param on the authorize URL, set by the client as an II extension | Yes, below |
-| `hint=<principal text>` | Query param on the authorize URL, likewise | Yes, below |
-| `callbackUrl` | The ICRC-167 URL transport's own return address: a full, query-less URL of the form `https://chat.example.com/reauth` | Yes, and it is validated against that origin's `ii-auth-callbacks`. Unchanged by this design |
-| `next=/some/path` | A query param the app puts on **its own** `/reauth` URL | No. Never sent to II |
-| `returnTo` | An `AuthClient` option, which `/reauth` sets from `next` | No. The client journals it so it survives the round trip, then does `location.replace(returnTo)` once the flow has completed |
+| Value                   | Where it lives                                                                                                        | Does II see it                                                                                                               |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `prompt=none`           | Query param on the authorize URL, set by the client as an II extension                                                | Yes, below                                                                                                                   |
+| `hint=<principal text>` | Query param on the authorize URL, likewise                                                                            | Yes, below                                                                                                                   |
+| `callbackUrl`           | The ICRC-167 URL transport's own return address: a full, query-less URL of the form `https://chat.example.com/reauth` | Yes, and it is validated against that origin's `ii-auth-callbacks`. Unchanged by this design                                 |
+| `next=/some/path`       | A query param the app puts on **its own** `/reauth` URL                                                               | No. Never sent to II                                                                                                         |
+| `returnTo`              | An `AuthClient` option, which `/reauth` sets from `next`                                                              | No. The client journals it so it survives the round trip, then does `location.replace(returnTo)` once the flow has completed |
 
-So the return address II is given is a whole URL and an allow-listed one, not a path. Where the user lands *within* the app afterwards is the app's business, handled entirely on its side, and II has no part in it. That separation is what keeps the callback allow-list meaningful: it enumerates a small fixed set of pages, and it would be worthless if II accepted an arbitrary path or URL alongside it.
+So the return address II is given is a whole URL and an allow-listed one, not a path. Where the user lands _within_ the app afterwards is the app's business, handled entirely on its side, and II has no part in it. That separation is what keeps the callback allow-list meaningful: it enumerates a small fixed set of pages, and it would be worthless if II accepted an arbitrary path or URL alongside it.
 
 ---
 
@@ -55,7 +55,7 @@ So the return address II is given is a whole URL and an allow-listed one, not a 
 
 **Never creates a session.** A session comes only from `prepare_account_session`, which requires an anchor access method. `prompt=none` has no ceremony and therefore no access method, so it can only ever re-issue from a session that already exists. This is the same rule that stops a stolen session chain spawning siblings, and it is what keeps `prompt=none` from being a way to obtain authority rather than exercise it.
 
-**Resolves only sessions belonging to the requesting origin.** The `hint` selects *among* the sessions II holds for the origin being authorized. It never names an origin. Without this, any page could redirect to II with someone else's principal as the hint and collect a delegation.
+**Resolves only sessions belonging to the requesting origin.** The `hint` selects _among_ the sessions II holds for the origin being authorized. It never names an origin. Without this, any page could redirect to II with someone else's principal as the hint and collect a delegation.
 
 This is the same shape as the caveat carried through from `read_certified_sso_bundle`: a value that resolves to something valid is not thereby a value that describes the caller, so the origin is checked separately rather than inferred. Here the origin comes from the authorize request, which the callback allowlist and `ii-alternative-origins` have already validated.
 
@@ -84,12 +84,12 @@ The call is signed by the session chain with the caller-info bundle attached, so
 
 It is a query, so a single node could forge the reply. That is acceptable here because the answer is advisory: every mint enforces the same conditions regardless, so a forged `true` costs one failed refresh and a forged `false` costs one unnecessary ceremony.
 
-| Case | Outcome |
-| ---- | ------- |
-| Absent, exactly one session held for the origin | Use it |
-| Absent, several held | `interaction_required`. Picking for the user is worse than asking |
-| Present, resolves to a session held for this origin | Use it |
-| Present, resolves elsewhere or nowhere | `interaction_required` |
+| Case                                                | Outcome                                                           |
+| --------------------------------------------------- | ----------------------------------------------------------------- |
+| Absent, exactly one session held for the origin     | Use it                                                            |
+| Absent, several held                                | `interaction_required`. Picking for the user is worse than asking |
+| Present, resolves to a session held for this origin | Use it                                                            |
+| Present, resolves elsewhere or nowhere              | `interaction_required`                                            |
 
 A hint is a preference, not a credential. It is safe for it to come from a cookie the app can read and write, because it can only select from what II already holds for that origin, and holding the session is what confers anything.
 
@@ -111,13 +111,13 @@ The same fact makes the client doc's other promise true. "Sign out of one and th
 
 ## Failure modes
 
-| Situation | Outcome |
-| --------- | ------- |
-| No session held | `interaction_required` |
-| Session expired, or revoked from another app or from II settings | `interaction_required` |
-| Hint resolves to another origin's session | `interaction_required` |
-| Several sessions and no hint | `interaction_required` |
-| Callback or derivation origin fails validation | The existing redirect-transport error, unchanged |
+| Situation                                                        | Outcome                                          |
+| ---------------------------------------------------------------- | ------------------------------------------------ |
+| No session held                                                  | `interaction_required`                           |
+| Session expired, or revoked from another app or from II settings | `interaction_required`                           |
+| Hint resolves to another origin's session                        | `interaction_required`                           |
+| Several sessions and no hint                                     | `interaction_required`                           |
+| Callback or derivation origin fails validation                   | The existing redirect-transport error, unchanged |
 
 One outcome for every session-related case, so a client's fallback is a single branch. That is not to hide anything: the `prompt=none` rules above already bound what it can be used to learn, since it only ever answers for the requesting origin.
 
@@ -127,15 +127,15 @@ One outcome for every session-related case, so a client's fallback is a single b
 
 ## Requirements
 
-| # | Requirement | Where |
-| - | ----------- | ----- |
-| R1 | `prompt` and `hint` travel as authorize-URL parameters, not in the ICRC request, matching how the client already sends them | Solution |
-| R1a | They are the only new values II receives. `next` and `returnTo` are app-side and never reach it, and the return address stays the URL transport's allow-listed `callbackUrl` | The flow |
-| R2 | `prompt=none` renders nothing and returns either a session chain or `interaction_required` | `prompt=none` rules |
-| R3 | `prompt=none` never creates a session, since it has no access method to authorize one | `prompt=none` rules |
-| R4 | `hint` selects among the requesting origin's sessions and can never name another origin's | `prompt=none` rules |
-| R4a | The frontend matches a `hint` against the `account_principal` stored with each session, then confirms with `check_session` that the canister still holds it | `hint` rules |
-| R5 | The II frontend returns the session chain and lets the app mint its own delegation, as on first sign-in | The flow |
-| R6 | Several sessions with no hint is `interaction_required`, not a guess | `hint` rules |
-| R7 | Every session-related failure is one JSON-RPC code, `interaction_required`. The payload carries a `reason` — `login_required` or `account_selection_required` — which a client may use to word its prompt but does not need to branch on | Failure modes |
-| R8 | The only canister change this design needs is `check_session`; the `account_principal` R4a matches on is specified in [revocable-app-sessions-spec.md](revocable-app-sessions-spec.md) | `hint` rules |
+| #   | Requirement                                                                                                                                                                                                                              | Where               |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| R1  | `prompt` and `hint` travel as authorize-URL parameters, not in the ICRC request, matching how the client already sends them                                                                                                              | Solution            |
+| R1a | They are the only new values II receives. `next` and `returnTo` are app-side and never reach it, and the return address stays the URL transport's allow-listed `callbackUrl`                                                             | The flow            |
+| R2  | `prompt=none` renders nothing and returns either a session chain or `interaction_required`                                                                                                                                               | `prompt=none` rules |
+| R3  | `prompt=none` never creates a session, since it has no access method to authorize one                                                                                                                                                    | `prompt=none` rules |
+| R4  | `hint` selects among the requesting origin's sessions and can never name another origin's                                                                                                                                                | `prompt=none` rules |
+| R4a | The frontend matches a `hint` against the `account_principal` stored with each session, then confirms with `check_session` that the canister still holds it                                                                              | `hint` rules        |
+| R5  | The II frontend returns the session chain and lets the app mint its own delegation, as on first sign-in                                                                                                                                  | The flow            |
+| R6  | Several sessions with no hint is `interaction_required`, not a guess                                                                                                                                                                     | `hint` rules        |
+| R7  | Every session-related failure is one JSON-RPC code, `interaction_required`. The payload carries a `reason` — `login_required` or `account_selection_required` — which a client may use to word its prompt but does not need to branch on | Failure modes       |
+| R8  | The only canister change this design needs is `check_session`; the `account_principal` R4a matches on is specified in [revocable-app-sessions-spec.md](revocable-app-sessions-spec.md)                                                   | `hint` rules        |
