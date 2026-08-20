@@ -4,7 +4,7 @@
 
 When a user signs in to an app, II gives it a signed statement that a key may act for the user until a stated expiry, for up to 30 days. Anything on the network can check that statement without asking II, which is what makes it cheap, and also means II cannot take it back. Signing out of the app clears the app's own storage and invalidates nothing. Separately, an app running as several subdomains cannot share one sign-in, so the user signs in on each and signing out of one leaves the others signed in.
 
-Three designs together replace that. The canister keeps a session for the account the user signed in with, and the app holds a chain rooted at it that can only be used to ask II for delegations. The app mints itself a 5-minute delegation whenever it needs one. Deleting the session stops further mints, so access ends within five minutes. Because the canister now records which browser each session came from, a user can see the browsers they are signed in from and sign one out of every app at once. And because subdomains that share a derivation origin resolve to the same account, they share one session, so signing in on one lets the others get delegations without another sign-in.
+Three designs together replace that. The II canister keeps a session for the account the user signed in with, and the app holds a chain rooted at it that can only be used to ask II for delegations. The app mints itself a 5-minute delegation whenever it needs one. Deleting the session stops further mints, so access ends within five minutes. Because the II canister now records which browser each session came from, a user can see the browsers they are signed in from and sign one out of every app at once. And because subdomains that share a derivation origin resolve to the same account, they share one session, so signing in on one lets the others get delegations without another sign-in.
 
 Read this page first. The three designs are linked at the end, each with a separate specification for implementers.
 
@@ -33,7 +33,7 @@ flowchart LR
 
 ## Problem
 
-A sign-in is a bearer token nobody can take back.
+A sign-in hands over a bearer token nobody can take back.
 
 |                     | Today                                                                         |
 | ------------------- | ----------------------------------------------------------------------------- |
@@ -59,15 +59,15 @@ A user signs in separately on each, and signing out of one leaves the others sig
 
 Across all three designs:
 
-- The sign-in itself does not change.
-- An app that does not upgrade its client keeps exactly what it has today. No existing method changes shape or behaviour.
+- Nothing an app calls changes shape or behaviour, so an app that does not upgrade its client keeps exactly what it has today.
+- The ceremony a user sees does not change. What changes behind it is that a sign-in records which app it was for.
 - Listing the individual sessions behind a browser is not built. The browser list is.
 - Removing a browser from the list, as opposed to signing it out, is not built.
 - An app that needs authority while it cannot reach II is not served by this.
 
 ## Approach
 
-Split the one long-lived artifact into two: a **session** the canister holds and the user can end, and a **short-lived delegation** the app carries.
+Split the one long-lived artifact into two: a **session** the II canister holds and the user can end, and a **short-lived delegation** the app carries.
 
 ```mermaid
 flowchart LR
@@ -81,21 +81,22 @@ flowchart LR
 
 Getting a fresh delegation means asking II, and that is what gives II a say again.
 
-|                        | After                                                                                                             | Why                                                              |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Delegation lifetime    | 5 minutes                                                                                                         | Matches what II already mints for its own server integration     |
-| Session lifetime       | Up to 30 days, and revocable at any point in it                                                                   | The lifetime is unchanged. What changes is that it can be ended  |
-| Revocation             | Takes effect within one delegation lifetime                                                                       | Revoking stops new mints; one already issued runs out            |
-| A stolen delegation    | At most 5 minutes of access                                                                                       |                                                                  |
-| A stolen session chain | Revocable, and its final hop is restricted to the II canister, so it cannot be used against an app's own canister | Being able to revoke it is the protection that matters           |
-| Signing out            | Actually revokes, canister-side                                                                                   | The app's own sign-out removes its session record                |
-| Visibility             | Per browser, with a last-used timestamp                                                                           | "This browser used this app 3 minutes ago" against "5 weeks ago" |
-| Cost                   | One update call per active session per 5 minutes                                                                  | The app calls the canister directly, no browser round trip       |
+|                        | After                                                                     | Why                                                                                                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Delegation lifetime    | 5 minutes                                                                 | Matches what II already mints for MCP servers                                                                                                                                          |
+| Session lifetime       | Up to 30 days, and revocable at any point in it                           | Thirty days still bounds a sign-in. What changes is where that bound lives, and that it can be ended                                                                                   |
+| Revocation             | Takes effect within one delegation lifetime                               | Revoking stops new mints; one already issued runs out                                                                                                                                  |
+| A stolen delegation    | At most 5 minutes of access                                               | Its lifetime is the ceiling on how long a theft is useful, and refreshing again means asking II, which can refuse                                                                      |
+| A stolen session chain | Mints five-minute delegations until the user revokes it, and nothing more | Revocability is the whole protection. Restricting the chain's final hop to the II canister is a developer guardrail, not a defence against a thief, who can refresh with it either way |
+| Signing out            | Actually revokes, in the II canister                                      | The app's own sign-out removes its session record                                                                                                                                      |
+| Visibility             | Per browser, with a last-used timestamp                                   | "This browser used this app 3 minutes ago" against "5 weeks ago"                                                                                                                       |
+| Cost                   | One update call per active session per 5 minutes                          | The app calls the canister directly, no browser round trip                                                                                                                             |
 
 Two properties that are easy to miss:
 
-- A session cannot renew or clone itself: Creating one requires a passkey or an OpenID sign-in, which a session does not have. A stolen chain can only mint short delegations until it is revoked.
-- Refresh needs no browser: The app talks to the canister directly, so there is no popup, iframe, or navigation on the five-minute cadence.
+- **A session cannot renew or clone itself.**  
+  Creating one requires a passkey or an OpenID sign-in, which a session does not have. A stolen chain can only mint short delegations until it is revoked.
+- Refresh needs no browser: The app talks to the II canister directly, so there is no popup, iframe, or navigation on the five-minute cadence.
 
 ---
 
@@ -103,7 +104,7 @@ Two properties that are easy to miss:
 
 ```mermaid
 flowchart TB
-    S[("one session record<br/>per identity, app and account")]
+    S[("one session record per identity,<br/>app, account and browser")]
     C["chat.example.com"] -->|"prompt=none, by redirect"| S
     H["hr.example.com"] -->|"prompt=none, by redirect"| S
     S -->|"5-minute delegation"| C
@@ -125,10 +126,10 @@ No credential is copied between the subdomains. Each asks II for a delegation to
 | `check_session`                                         | II frontend                    | New       | Whether a session is still live, for the silent path |
 | `prepare_account_session` / `get_account_session`       | II frontend                    | New       | Creates a session and signs its identity             |
 | `revoke_account_session` / `revoke_device_sessions`     | II frontend                    | New       | Ends one session, or every session a browser holds   |
-| `prepare_account_delegation` / `get_account_delegation` | app frontend                   | Untouched | The delegation flow as it works today                |
+| `prepare_account_delegation` / `get_account_delegation` | II frontend                    | Untouched | The delegation flow as it works today                |
 | `icrc34_delegation`                                     | app frontend                   | Untouched | Unchanged, and unaware of any of this                |
 
-Of the new methods, only the three `app_`-prefixed ones are callable by an app, and none of them names an identity. The unprefixed ones are for the II frontend, and require an identity access method that an app has no way to present.
+Of the new methods, the three `app_`-prefixed ones are callable by anything holding a session chain, and none of them names an identity. `check_session` is chain-authenticated too, because the silent path has no access method to offer; all it reveals is whether a session the caller already holds is still live. The remaining unprefixed methods require an access method an app has no way to present.
 
 No existing method changes shape or behaviour, so nothing breaks and nothing has to move at once. An app opts in by upgrading its client; until it does, it gets exactly what it gets today.
 
@@ -140,6 +141,9 @@ The three designs are not independent. Account tracking has to land first: it su
 row a session is stored on and the index that resolves an app's principal back to an
 account. Sessions come next, ending with the settings screen that lists browsers. Silent
 re-auth is last and smallest, and only becomes reachable once sessions exist.
+
+None of it reaches an app until `AuthClient` implements the client half, which is a follow-up
+rather than part of these designs.
 
 Each design's own stages are listed in its doc.
 
@@ -154,4 +158,6 @@ Each feature has a design doc for what and why, and a specification for how.
 | [Silent re-auth over the redirect transport](silent-reauth-redirect.md)                                                                                       | [spec](silent-reauth-redirect-spec.md)   | `prompt=none`, `hint`, and what II supplies for the sibling flow                                                                                          |
 | [Shared sessions, client side](https://github.com/dfinity/icp-js-auth/blob/5aa78d5f64714d6e8e7781e256562035c09018c6/docs/src/content/docs/shared-sessions.md) | none                                     | What an app does: `derivationOrigin`, the cookie, and the `/reauth` page                                                                                  |
 
-Apps do not implement any of the above. `AuthClient`, the client library apps already use, holds the session and re-mints on its own schedule, so an app author sees a sign-in call and an identity, as today.
+`AuthClient` is what implements this, not app code. It holds the session and re-mints on its own schedule, so an app author still sees a sign-in call and an identity.
+
+Two caveats. `AuthClient` support does not exist yet and is a follow-up to these three designs, so none of this is reachable by an app until it ships. And an app that wants its subdomains to share a sign-in nominates a derivation origin and serves a `/reauth` route itself, as the client-side doc describes.
