@@ -6,17 +6,17 @@
 
 ## Glossary
 
-| Term                   | Meaning                                                                                                                                                          |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **App delegation**     | The short-lived delegation the app uses against app canisters. What is up to 30 days today.                                                                      |
-| **Account reference**  | The row `tracked-default-accounts.md` keeps per (identity, app, account), recording that the account is in use. Where a session is stored.                       |
-| **Session**            | A record on that row, plus the canister-signed identity derived from it. Long-lived and revocable.                                                               |
-| **Session chain**      | The delegation chain rooted at the session identity. Held by the II frontend, extended to the app.                                                               |
-| **Refresh**            | The app calling the II canister with its session chain to mint a new app delegation. No browser involvement.                                                     |
-| **Caller-info bundle** | A canister-signed blob the app attaches to every call, naming its account principal. How II knows which account a call is about without the app supplying it.    |
-| **Silent re-auth**     | The app asking II for a delegation again, answered from II's stored session with no ceremony.                                                                    |
-| **Session device**     | A per-anchor label for one browser, so a browser's sessions can be listed and revoked together.                                                                  |
-| **Locator**            | The `(anchor, application, account)` triple that identifies one account internally. Never leaves the canister: an app is only ever told the account's principal. |
+| Term                   | Meaning                                                                                                                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **App delegation**     | The short-lived delegation the app uses against app canisters. What is up to 30 days today.                                                                                       |
+| **Account reference**  | The row [tracked-default-accounts-spec.md](tracked-default-accounts-spec.md) keeps per (identity, app, account), recording that the account is in use. Where a session is stored. |
+| **Session**            | A record on that row, plus the canister-signed identity derived from it. Long-lived and revocable.                                                                                |
+| **Session chain**      | The delegation chain rooted at the session identity. Held by the II frontend, extended to the app.                                                                                |
+| **Refresh**            | The app calling the II canister with its session chain to mint a new app delegation. No browser involvement.                                                                      |
+| **Caller-info bundle** | A canister-signed blob the app attaches to every call, naming its account principal. How II knows which account a call is about without the app supplying it.                     |
+| **Silent re-auth**     | The app asking II for a delegation again, answered from II's stored session with no ceremony.                                                                                     |
+| **Session device**     | A per-anchor label for one browser, so a browser's sessions can be listed and revoked together.                                                                                   |
+| **Locator**            | The `(anchor, application, account)` triple that identifies one account internally. Never leaves the canister: an app is only ever told the account's principal.                  |
 
 ---
 
@@ -52,6 +52,11 @@ Three things deliberately never happen: the app canister never talks to II, the 
 #### No method serves both frontends
 
 Each is authenticated exactly one way, so its authorization is unconditional and auditable rather than a branch. Where both frontends need the same outcome, as with revocation, they get separate methods. The audience is in the name: `app_` marks the app frontend, following the `mcp_` precedent, and unprefixed methods are the II frontend's.
+
+`check_session` is the one exception, and worth naming as such. It is called by the II
+frontend, so it is unprefixed, but it authenticates by session chain like the `app_` methods
+because the silent path has no access method to offer. It reveals only whether a session the
+caller already holds is still live.
 
 That is not tidiness. Three things follow from it:
 
@@ -104,7 +109,7 @@ Nothing existing is removed, and nothing existing changes behaviour, so no app h
 
 ## The session record
 
-A session is an entry in a list on the account reference introduced by `tracked-default-accounts.md`:
+A session is an entry in a list on the account reference introduced by [tracked-default-accounts-spec.md](tracked-default-accounts-spec.md#the-records-ii-keeps-today):
 
 ```rust
 SessionRecord {
@@ -124,7 +129,7 @@ Nothing else. Every field except `last_refreshed` is fixed for the session's lif
 
 Consequences of putting sessions on the reference rather than in their own map:
 
-- Sessions inherit the per-anchor caps of `tracked-default-accounts.md` [what refresh writes](#what-refresh-writes), so they are bounded without new accounting.
+- Sessions get their own cap, ten per account reference. The row they live on is exempt from the row eviction in [tracked-default-accounts-spec.md](tracked-default-accounts-spec.md#bounding-growth) while a session is unexpired, which is why an identity may exceed the row cap.
 - Revoking, expiring and evicting all reuse machinery that already exists.
 - The row is written on create, on remove, on every refresh ([what refresh writes](#write-it-every-time)), and on any sign-in or rename that touches it.
 
@@ -145,7 +150,7 @@ The cap also bounds the per-refresh match in [matching](#matching), which walks 
 
 ### Two further rules
 
-- **A row holding an unexpired session is not evictable.** This extends the eviction predicate in `tracked-default-accounts.md` [the chain shape](#chain-shape). Without it, evicting an account reference would silently destroy a working session.
+- **A row holding an unexpired session is not evictable.** This extends the [eviction predicate](tracked-default-accounts-spec.md#predicate) in `tracked-default-accounts-spec.md`. Without it, evicting an account reference would silently destroy a working session.
 - **Expired entries are pruned only when the list is written for another reason**, such as creating a session. Pruning on refresh would reintroduce a write on the hot path.
 
 ---
@@ -153,16 +158,35 @@ The cap also bounds the per-refresh match in [matching](#matching), which walks 
 ## Session identity
 
 ```
-session_seed = H(salt, "session", anchor, application, account, created_at, device_id)
+session_seed = H(salt, "session", account_seed, created_at, device_id)
 ```
 
-with every field length-prefixed and the account tagged present or absent so `(anchor, app, None)` cannot collide with `(anchor, app, Some(n))`.
+with every field length-prefixed. `account_seed` is the account's own seed, the one its
+principal derives from.
 
-The construction needs no allocator: no counter cell, nothing to retire. Uniqueness across anchors is structural, since the locator is an input. Unguessability comes from the salt, exactly as it does for `account_seed`, which hashes the salt together with a plainly sequential `AccountNumber`.
+Building on the account's seed rather than on the identity, application and account numbers
+is what makes a session survive anything that leaves the account's principal unchanged.
+Naming a default account is exactly that: it gains an account number and a name, and keeps
+deriving from the identity it was conjured from, so its principal is unchanged. Had the
+numbers been inputs, naming an account would have changed every session's seed and signed
+the user out of every app using it.
 
-The `device_id` is an input so a session's device attribution cannot be rewritten in storage without invalidating the session.
+The construction needs no allocator: no counter cell, nothing to retire. Uniqueness across
+identities and apps is inherited from the account seed, which already distinguishes them.
+Unguessability comes from the salt, which is hashed into the account seed and again here.
 
-Only the record's **immutable** fields feed the seed, which is why `last_refreshed` is not one. A mutable input would change the session's principal every time it was stamped. `read_only` is immutable and could be an input, but is deliberately not one: it is a property of the authority, not of the identity, and binding it would mean a consent change had to mint a new principal.
+`created_at` and `device_id` are inputs, so a session's attribution cannot be rewritten in
+storage without invalidating the session.
+
+Only the record's **immutable** fields feed the seed, which is why `last_refreshed` is not
+one: a mutable input would change the session's principal every time it was stamped.
+`read_only` is immutable and could be an input, but deliberately is not. It is a property of
+the authority rather than of the identity, and binding it would mean a consent change had
+to mint a new principal.
+
+The `"session"` tag keeps the two seed families apart, so a caller holding an app delegation
+for the account cannot derive to any of its sessions. That is what stops an app delegation
+minting its own replacement.
 
 ### One browser, one session per account
 
@@ -283,9 +307,9 @@ get_account_session : (GetAccountSessionRequest)
 
 `permissions` here is what sets the session's `read_only` ([the session record](#the-session-record)), so it is fixed once at the consent that created the session rather than being chosen per refresh ([the app-facing pair](#the-app-facing-pair)).
 
-`account_principal` is the principal the _app_ will resolve to, derived from the account seed rather than the session seed. It is not something the frontend can compute, and it is not in the session chain either, whose root is the session key — the two seed families are domain separated ([session identity](#session-identity)). Returning it here is what lets the frontend store it with the session, which is how `silent-reauth-redirect.md` [session identity](#session-identity) matches a `hint`.
+`account_principal` is the principal the _app_ will resolve to, derived from the account seed rather than the session seed. It is not something the frontend can compute, and it is not in the session chain either, whose root is the session key — the two seed families are domain separated ([session identity](#session-identity)). Returning it here is what lets the frontend store it with the session, which is what the silent re-auth design matches a `hint` against.
 
-An app never needs to be told: `app_prepare_delegation` already returns `user_key` over the account seed, so `Principal.selfAuthenticating(user_key)` is the same value, and that is how the principal reaches the cookie a `hint` later comes from. The II frontend could obtain it the same way, by minting once from the session it just created, but that spends a canister signature and a `update_root_hash()` on a value this response can carry for free. This method is gated by `check_authorization(identity_number)`, so the field tells the II frontend something for its own bookkeeping rather than widening what an app can reach.
+An app never needs to be told: `app_prepare_delegation` already returns `user_key` over the account seed, so `Principal.selfAuthenticating(user_key)` is the same value, and that is how the principal reaches the cookie a `hint` later comes from. The II frontend could obtain it the same way, by minting once from the session it just created, but that spends a canister signature and a `update_root_hash()` on a value this response can carry for free. Both halves require an access method, so this tells the II frontend something for its own bookkeeping rather than widening what an app can reach.
 
 Registering a device is not a call of its own either. The frontend passes the name it would have registered with plus whatever id it has cached, and the canister resolves the rest ([id allocation](#the-canister-allocates-the-id-during-the-auth-flow)).
 
@@ -381,7 +405,7 @@ II already does this for the gated-SSO session: `openid/sso_bundle.rs` reads a c
 
 Not the anchor number, not the application number, not the account number. Those are II's alone: an anchor number handed to two apps is a cross-origin correlator, which is the one property per-origin derivation exists to deny. The principal is a value the app already holds, so the bundle tells it nothing new.
 
-That is what the principal index of `tracked-default-accounts.md` is for. II resolves the principal to a locator, and only then knows which reference row to read. Without the index there is no way back from a principal, because the salt is hashed into the derivation.
+That is what the [principal index](tracked-default-accounts-spec.md#the-principal-index) is for. II resolves the principal to a locator, and only then knows which reference row to read. Without the index there is no way back from a principal, because the salt is hashed into the derivation.
 
 The bundle carries no expiry either. An expiry inside it would be self-certifying — the canister would be trusting a window it signed — and redundant, because the session record is read anyway and is the copy revocation deletes.
 
@@ -396,11 +420,11 @@ Issuance mirrors `prepare_sso_attr_bundle` / `get_sso_attr_bundle_signature` and
 
 One caveat carried over verbatim from that code, because it is the easy mistake: a valid bundle only proves II signed it under the caller's seed. It does **not** by itself prove the bundle describes the caller. So the locator read out of it is still checked against `caller()` by the seed match in [matching](#matching), the same way `main.rs:2303` re-checks `bundle.origin` against the serving origin instead of trusting it.
 
-So nothing about sessions needs new storage either. `tracked-default-accounts.md` [session devices](#session-devices) already indexes app principals to their locator, and resolving one is what that index is for. Session principals are not indexed, not stored as keys anywhere, and never looked up.
+So sessions need no new map. They add a field to the account reference, and two to the anchor. the [principal index](tracked-default-accounts-spec.md#the-principal-index) already maps app principals to their locator, and resolving one is what that index is for. Session principals are not indexed, not stored as keys anywhere, and never looked up.
 
 This is a separate pair from `prepare_account_delegation`, not an option on it. Both mint an app delegation, but they are different operations: this one proves a live session and identifies the account by its principal, that one proves an access method and names the anchor outright. Merging them would mean one method with two authorizers and two argument shapes, and would drag the II frontend's internal surface into public API ([one audience per method](#one-audience-per-method)).
 
-Nothing here creates a session. A session comes only from `prepare_account_session`, which requires an access method ([first sign-in](#first-sign-in)), so a stolen chain cannot extend its own lifetime or spawn siblings. The internal `max_expiration` parameter that `main.rs` currently passes `None` is what carries `valid_till` into the signature, so a minted delegation cannot outlive its session.
+Nothing here creates a session. A session comes only from `prepare_account_session`, which requires an access method ([first sign-in](#first-sign-in)), so a stolen chain cannot extend its own lifetime or spawn siblings. The ceiling is computed where the delegation is minted, as the earlier of five minutes from now and the session's own expiry, and re-derived rather than trusted when the signature is witnessed, so a minted delegation cannot outlive its session.
 
 `AppSessionError` has two cases a caller can act on: no bundle was attached or II did not sign it, and a bundle II signed with no usable session behind it. Expiry, revocation and a caller that never matched all fall into the second, because which one it is depends on whether a prune has run.
 
@@ -438,7 +462,7 @@ The write is small next to what the call already does. Every refresh inserts a c
 
 #### The same write stamps the reference
 
-Since the write happens anyway, keeping `last_used` honest is free, and it keeps the account-level eviction in `tracked-default-accounts.md` accurate for accounts that are only ever reached through a session.
+Since the write happens anyway, keeping `last_used` honest is free, and it keeps [account eviction](tracked-default-accounts-spec.md#bounding-growth) accurate for accounts that are only ever reached through a session.
 
 #### And the browser registry
 
@@ -448,7 +472,7 @@ The two timestamps are different fields for different jobs and both are needed:
 
 | Field            | Lives on              | Drives                                                                                               |
 | ---------------- | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| `last_used`      | the account reference | account eviction in `tracked-default-accounts.md` [creating a session](#creating-a-session)          |
+| `last_used`      | the account reference | [account eviction](tracked-default-accounts-spec.md#bounding-growth)                                 |
 | `last_refreshed` | the session record    | the [the session cap](#the-cap-evicts-it-never-blocks) cap eviction and the user-facing session list |
 | `last_used`      | the device record     | the [the registry](#registry) registry cap eviction and the settings device list                     |
 
@@ -504,7 +528,7 @@ revoke_device_sessions : (record {
 }) -> (variant { Ok; Err : SessionRevokeError });
 ```
 
-They name sessions by locator, never by principal, so **they do not touch the principal index**. It is on the app-facing path only ([matching](#matching)).
+They name a session by where it was created, never by principal, so neither needs the index to resolve anything. Both still write the reference row, so both read the index and depend on the salt as any write does; no entry changes value.
 
 #### There is no session listing method, deliberately
 
@@ -560,6 +584,8 @@ A new additive field on `StorableAnchor`, following the pattern every field ther
 ```rust
 #[n(7)]
 pub session_devices: Option<Vec<StorableSessionDevice>>,
+#[n(8)]
+pub next_session_device_id: Option<StorableSessionDeviceId>,
 ```
 
 with `{ id, name, created_at, last_used }` per entry, **capped at 20** because the anchor blob is read on nearly every authenticated path, so an unbounded list taxes far more than sessions.
@@ -585,7 +611,7 @@ There is no registration method. `prepare_account_session` carries `device_name`
 
 The frontend caches the returned id per anchor and passes it back on every later auth flow, for every app. It does not choose the id, derive it, or influence it.
 
-The id comes from an explicit per-anchor `next_id`, monotonic and never reused. Since [the eager sweep](#signing-a-browser-out-is-an-eager-sweep) does not delete device records, an id cannot come up for reuse in the first place, so this is belt and braces rather than load-bearing today. It stays explicit because it will matter the moment records can be deleted, and it matches the monotonic-and-never-reissued rule already established for account and application numbers.
+The id comes from an explicit per-identity counter, monotonic and never reused. That is load-bearing rather than belt and braces: registry eviction deletes device records, so without a counter a dropped id could be handed to a different browser and a stale cached id would resolve to somebody else's entry.
 
 ### Signing a browser out is an eager sweep
 
@@ -593,7 +619,7 @@ The id comes from an explicit per-anchor `next_id`, monotonic and never reused. 
 
 Deleting a device record is therefore a separate operation from signing one out, and it is not specified here. [the accepted limitations](#two-accepted-limitations) is where it is wanted, to clear the duplicate a storage wipe leaves behind, and it belongs with the listing work.
 
-The sweep runs over that anchor's references in one message: the anchor-major range scan the eviction path already performs, bounded at 1000 rows by `tracked-default-accounts.md` [what refresh writes](#what-refresh-writes), writing only rows that actually hold that device's sessions. Atomic, with no partially-revoked state.
+The sweep runs over that anchor's references in one message: the anchor-major range scan the eviction path already performs, bounded by [the eviction scan limit](tracked-default-accounts-spec.md#bounding-growth), writing only rows that actually hold that device's sessions. Atomic, with no partially-revoked state.
 
 The alternative is to mark a device revoked and check the mark during refresh, which makes revocation O(1) and pushes the cost onto every refresh. The eager sweep is still the right shape, but on a stronger ground than cost: it leaves no partially-revoked state and no window in which a revoked session is merely ignored rather than gone. Revocation is rare, and paying for it once where it happens is worth an unambiguous outcome.
 
