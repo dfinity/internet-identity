@@ -97,13 +97,19 @@ The flow, the `prompt=none` and `hint` rules, failure modes and the requirement 
 
 ## Implementation stages
 
-**Stage 1. Read the two parameters.** `prompt` and `hint` are parsed off the authorize URL
+### Stage 1. Read the two parameters
+
+`prompt` and `hint` are parsed off the authorize URL
 and held for the request. Nothing acts on them yet, so this changes no behaviour.
 
-**Stage 2. Add the liveness query.** `check_session` on the canister, so the frontend can
+### Stage 2. Add the liveness query
+
+`check_session` on the canister, so the frontend can
 confirm a session it holds a record for still exists.
 
-**Stage 3. Answer without rendering.** The path that resolves a session, checks it is
+### Stage 3. Answer without rendering
+
+The path that resolves a session, checks it is
 live, extends its chain and delivers the redirect response, with `interaction_required`
 for every case it cannot satisfy. This is the point at which `prompt=none` starts working.
 
