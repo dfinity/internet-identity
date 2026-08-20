@@ -10,7 +10,7 @@
 
 ## The records II keeps today
 
-Everything above is deliberately free of storage vocabulary. The rest of this document needs it, so here it is once.
+The feature doc describes this without storage vocabulary. This document needs it, so here it is once.
 
 ```mermaid
 erDiagram
@@ -27,6 +27,7 @@ erDiagram
     ACCOUNT_REFERENCE {
         opt_u64 account_number "None = default account"
         opt_u64 last_used
+        vec sessions "added by revocable-app-sessions"
     }
     ACCOUNT {
         u64 account_number PK
@@ -190,7 +191,7 @@ No new stable structure or storable type for this part. A tracked default is an 
 AccountReference { account_number: None, last_used: Some(t) }
 ```
 
-`create_additional_account` (`storage.rs:1851`) already writes exactly this when backfilling a default alongside a new named account. Only the timing changes: eagerly on delegation issuance, rather than as a side effect of creating a named account.
+`create_additional_account` (`storage.rs:1851`) already writes this reference when backfilling a default alongside a new named account, except that it leaves `last_used` unset, which is correct there because creating a named account is not a use of the default. What changes is that a sign-in now writes it eagerly, with the timestamp set.
 
 ```mermaid
 flowchart TD
@@ -208,7 +209,7 @@ flowchart TD
     G --> Z
 ```
 
-`set_account_last_used` (`storage.rs:1652`) uses the inserting application lookup, and creates the reference list in the not-found case instead of returning `None`.
+`set_account_last_used` (`storage.rs:1652`) resolves the application with the non-inserting lookup first, and only falls through to the inserting one on the path that creates a reference. That ordering matters for one case: a named account at an origin with no application record returns `Ok(None)` and creates nothing, because a named account cannot be conjured from an origin alone.
 
 ### Invariant A
 
@@ -276,7 +277,9 @@ The caps are isolated. A default sharing its row with named accounts is not coun
 
 #### The second cap is advisory, not enforced
 
-The trigger is a cheap upper bound, while eviction operates on the exact evictable set, and the two can disagree: a row holding a live session is not evictable, so an anchor with many of those reaches the bound with no victims to take. When that happens eviction does nothing and the sign-in proceeds. So the guarantee is _"sign-in never fails on this cap"_, not _"an anchor never exceeds it"_ — and the steady-state ceiling is the watermark, 450, rather than 500, because eviction stops there.
+The trigger is a cheap upper bound, while eviction operates on the exact evictable set, and the two can disagree: a row holding a live session is not evictable, so an anchor with many of those reaches the bound with no victims to take. When that happens eviction does nothing and the sign-in proceeds. So the guarantee is _"sign-in never fails on this cap"_, not _"an anchor never exceeds it"_.
+
+Nor is the watermark a ceiling. Eviction only triggers once the bound reaches 500, then trims towards 450, so an active anchor oscillates between the two rather than settling at either. And because one message evicts at most `MAX_EVICTIONS_PER_CALL` rows, a single sign-in may not reach the watermark at all; the remainder is taken by later sign-ins.
 
 500 is an anti-abuse parameter, not a capacity plan. Expected footprint is driven by active anchors times mean distinct apps per anchor, nowhere near the cap. Per reference the cost is a 16 byte fixed key plus a roughly 12 byte CBOR value (`account_number: None` is omitted, so only the timestamp is encoded) plus node overhead. 500 is chosen for symmetry with the existing cap.
 
@@ -315,14 +318,16 @@ Without moves, creating an account and holding one are the same event, so the si
 
 ### Counter rules
 
-| Counter                                         | Rule                                                                                                                                                              |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Anchor `stored_account_references`              | Decrement on eviction, a real removal                                                                                                                             |
-| Anchor `stored_accounts`                        | Never decremented                                                                                                                                                 |
-| Global cell `stored_account_references`         | Decrement on eviction, becomes a live gauge                                                                                                                       |
-| Global cell `stored_accounts`                   | Never touched, it is the `AccountNumber` allocator                                                                                                                |
-| `StorableApplication.stored_account_references` | Decrement on eviction. This is the reap predicate ([the reap predicate](#the-predicate-is-the-existing-reference-counter))                                        |
-| `StorableApplication.stored_accounts`           | Never decremented. Cannot serve as a reap predicate: it is 0 for any application whose anchors hold only default accounts, which is the case this feature creates |
+| Counter                                         | Rule                                                                                                                                                                     |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Anchor `stored_account_references`              | Decrement on eviction, a real removal                                                                                                                                    |
+| Anchor `stored_accounts`                        | Not decremented today                                                                                                                                                    |
+| Global cell `stored_account_references`         | Decrement on eviction, becomes a live gauge                                                                                                                              |
+| Global cell `stored_accounts`                   | Never touched, it is the `AccountNumber` allocator                                                                                                                       |
+| `StorableApplication.stored_account_references` | Decrement on eviction. This is the reap predicate ([the reap predicate](#the-predicate-is-the-existing-reference-counter))                                               |
+| `StorableApplication.stored_accounts`           | Not decremented today. Cannot serve as a removal predicate: it is 0 for any application whose anchors hold only default accounts, which is the case this feature creates |
+
+Two of those rules are properties of what the write path is asked to do, not of what it can do. The deltas it applies are signed, and the same arithmetic serves both the anchor and the application counters, so a decrement is representable and merely never produced: only rows whose single entry is a default are removed, and such a row contributes nothing to the account counts. The global cell is the exception, and is protected explicitly, because it doubles as the `AccountNumber` allocator and must never fall.
 
 `rebuild_identity_account_counters` stays correct as written. With no move feature both anchor fields are still exactly derivable from the reference lists, so `check_or_rebuild_max_anchor_accounts` keeps self-healing for the materialized cap and for the [gauging the second cap](#gauging-the-second-cap) upper bound.
 
