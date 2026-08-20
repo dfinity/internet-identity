@@ -53,9 +53,16 @@ type ChannelStore = Readable<Channel | undefined> & {
 
 const getTransports = (): Transport[] => {
   const primaryOrigin = getPrimaryOrigin();
+  // Off the primary origin this document is on its way there, and both of these
+  // transports pin the signer origin the moment the client answers their
+  // handshake — stranding it on a document that is being replaced. Only the
+  // legacy transport belongs here; it carries its request across the redirect.
+  const offPrimaryOrigin =
+    primaryOrigin !== undefined && window.location.origin !== primaryOrigin;
   return [
-    new PostMessageTransport(),
-    new UrlTransport(),
+    ...(offPrimaryOrigin
+      ? []
+      : [new PostMessageTransport(), new UrlTransport()]),
     new LegacyTransport(
       // Redirect requests and responses between related origins and primary origin
       primaryOrigin !== undefined
