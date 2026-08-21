@@ -6,11 +6,20 @@
 //! addresses, group syntax, or a missing/duplicated header all map to
 //! a verifier failure.
 //!
-//! This module is a deliberately minimal parser: enough to spot the
-//! valid single-mailbox case and reject everything else. We do *not*
-//! try to decode RFC 2047 encoded-words, comments, or quoted-pair
-//! sequences inside display names — those are display concerns and
-//! don't affect the domain we extract for alignment.
+//! Rather than implement RFC 5322 in general, this module matches the
+//! `From:` value against the three mailbox forms the email-recovery
+//! flow actually receives:
+//!
+//! ```text
+//! local@domain
+//! Display Name <local@domain>
+//! "Quoted Display Name" <local@domain>
+//! ```
+//!
+//! An absent display name (`<local@domain>`) is the degenerate case of
+//! the latter two. Everything else — comments, quoted-pair escapes,
+//! RFC 2047 encoded-words, address lists, group syntax — is refused
+//! rather than interpreted.
 
 use internet_identity_interface::internet_identity::types::smtp::SmtpMessage;
 
@@ -59,9 +68,7 @@ fn parse_single_mailbox_domain(value: &str) -> Result<String, String> {
 /// (`local@domain`, no angle brackets, no display name).
 ///
 /// This is the shared front half of [`parse_single_mailbox_domain`]:
-/// it locates the address-spec and enforces the "exactly one mailbox"
-/// rule (rejecting address-lists, group syntax, whitespace inside a
-/// bare addr-spec, and a second `@`), but returns the whole
+/// it matches one of the supported mailbox forms and returns the whole
 /// `local@domain` slice instead of only the domain. Callers that need
 /// the full mailbox — the email-recovery inbound path, which matches
 /// the verified sender against the anchor's registered address —
@@ -75,130 +82,109 @@ pub(crate) fn parse_single_mailbox_addr_spec(value: &str) -> Result<&str, String
     if value.is_empty() {
         return Err("empty From: value".to_string());
     }
+    let (address_part, in_angle_brackets) = find_address_spec(value)?;
+    validate_addr_spec(address_part, in_angle_brackets)?;
+    Ok(address_part)
+}
 
-    // Reject group syntax: `name: a@x, b@y;`. The `:` followed by `;`
-    // somewhere later is the giveaway. We also reject any unquoted top-
-    // level `,` because that would be an address-list with multiple
-    // entries — DMARC requires exactly one.
-    let (address_part, in_angle_brackets) = match find_address_spec(value)? {
-        Some(spec) => spec,
-        None => return Err("could not locate address-spec".to_string()),
-    };
+/// Characters that only occur in the RFC 5322 constructs this module
+/// declines to implement: quoted strings, comments, and quoted-pair
+/// escapes.
+const UNSUPPORTED_CHARS: [char; 4] = ['"', '(', ')', '\\'];
 
-    // Bare addr-spec (no angle brackets) must be a single token: no
-    // whitespace at all. With angle brackets, the inside has already
-    // been carved out so anything outside is display-name territory.
-    // Without them, `"Alice alice@example.com"` or `"alice @example.com"`
-    // would otherwise slip through with domain == example.com.
-    if !in_angle_brackets && address_part.chars().any(char::is_whitespace) {
-        return Err("From: addr-spec contains whitespace".to_string());
+fn reject_unsupported(part: &str, label: &str) -> Result<(), String> {
+    match part.chars().find(|c| UNSUPPORTED_CHARS.contains(c)) {
+        Some(c) => Err(format!("From: {label} uses unsupported syntax '{c}'")),
+        None => Ok(()),
     }
+}
 
+fn reject_list_or_group(part: &str) -> Result<(), String> {
+    if part.contains(',') {
+        return Err("From: contains an address list, not a single mailbox".to_string());
+    }
+    if part.contains(':') {
+        return Err("From: contains group syntax, not a single mailbox".to_string());
+    }
+    Ok(())
+}
+
+/// Split `value` into display name and `addr-spec` at the angle
+/// brackets, returning `(addr-spec, in_angle_brackets)`.
+///
+/// The brackets are counted over the whole value rather than tracked
+/// against quoting state, so a `<` or `>` inside a quoted display name
+/// is refused alongside a genuinely nested one.
+fn find_address_spec(value: &str) -> Result<(&str, bool), String> {
+    let opens = value.matches('<').count();
+    let closes = value.matches('>').count();
+    if opens > 1 {
+        return Err("nested '<' in From: value".to_string());
+    }
+    if closes > 1 {
+        return Err("multiple '>' in From: value".to_string());
+    }
+    match (opens, closes) {
+        (0, 0) => Ok((value, false)),
+        (0, _) => Err("'>' without matching '<' in From: value".to_string()),
+        (_, 0) => Err("unclosed '<' in From: value".to_string()),
+        _ => {
+            let start = value.find('<').expect("counted one '<'");
+            let end = value.find('>').expect("counted one '>'");
+            if start > end {
+                return Err("malformed angle-bracket pair in From:".to_string());
+            }
+            if !value[end + 1..].trim().is_empty() {
+                return Err("trailing content after '>' in From: value".to_string());
+            }
+            validate_display_name(value[..start].trim())?;
+            Ok((value[start + 1..end].trim(), true))
+        }
+    }
+}
+
+/// A display name is absent, one quoted string, or one plain run. `,`
+/// and `:` are ordinary text inside quotes; unquoted they would make
+/// the value an address list or a group, so they are refused there.
+fn validate_display_name(display: &str) -> Result<(), String> {
+    if display.is_empty() {
+        return Ok(());
+    }
+    match display.strip_prefix('"') {
+        Some(rest) => {
+            let inner = rest
+                .strip_suffix('"')
+                .ok_or_else(|| "malformed quoted display name in From:".to_string())?;
+            reject_unsupported(inner, "display name")
+        }
+        None => {
+            reject_list_or_group(display)?;
+            reject_unsupported(display, "display name")
+        }
+    }
+}
+
+/// The `addr-spec`: one whitespace-free token carrying exactly one `@`
+/// and none of the unsupported syntax. `in_angle_brackets` only shapes
+/// the whitespace diagnostic — the rule itself is the same either way.
+fn validate_addr_spec(addr: &str, in_angle_brackets: bool) -> Result<(), String> {
+    reject_list_or_group(addr)?;
+    if addr.chars().any(char::is_whitespace) {
+        return Err(if in_angle_brackets {
+            "From: addr-spec contains whitespace inside '<...>'".to_string()
+        } else {
+            "From: addr-spec contains whitespace".to_string()
+        });
+    }
     // Exactly one `@`, so "the domain" is the same slice no matter
     // which side a caller splits from. RFC 5322 does permit a quoted
     // local-part to carry an `@` (`"a@b"@example.com`), but accepting
     // one means a first-`@` split and a last-`@` split disagree about
     // the domain — and this parser feeds both.
-    if address_part.matches('@').count() != 1 {
+    if addr.matches('@').count() != 1 {
         return Err("From: addr-spec must contain exactly one '@'".to_string());
     }
-
-    Ok(address_part)
-}
-
-/// Walk the value looking for the address-spec. The grammar we accept:
-///
-/// - `local@domain`                  — bare addr-spec
-/// - `<local@domain>`                — angle-addr (display name absent)
-/// - `Display Name <local@domain>`   — name-addr
-/// - `"Quoted, Name" <local@domain>` — name-addr with quoted display
-///
-/// Returns `(addr-spec, in_angle_brackets)`. `in_angle_brackets` is
-/// `true` when the addr-spec came from inside `<...>` — the caller uses
-/// that to relax whitespace rules outside the brackets (display name)
-/// while still rejecting whitespace inside the bare addr-spec form.
-///
-/// Rejects on an unquoted top-level `,` (address-list), any `:` outside
-/// angle brackets / quotes (group syntax), or a `>` without a preceding
-/// `<`.
-fn find_address_spec(value: &str) -> Result<Option<(&str, bool)>, String> {
-    let bytes = value.as_bytes();
-    let mut in_quotes = false;
-    let mut angle_start: Option<usize> = None;
-    let mut angle_end: Option<usize> = None;
-    let mut i = 0;
-    while i < bytes.len() {
-        let b = bytes[i];
-        // RFC 5322 §3.2.4: inside a quoted-string a backslash escapes
-        // the next character (notably an embedded `"`). Without this
-        // we'd close the quoted region prematurely on something like
-        // `"Alice \"Ops, Inc\"" <alice@example.com>` and then
-        // misinterpret the comma as an address-list separator.
-        if in_quotes && b == b'\\' && i + 1 < bytes.len() {
-            i += 2;
-            continue;
-        }
-        if b == b'"' {
-            in_quotes = !in_quotes;
-            i += 1;
-            continue;
-        }
-        if in_quotes {
-            i += 1;
-            continue;
-        }
-        if b == b'<' {
-            if angle_start.is_some() {
-                return Err("nested '<' in From: value".to_string());
-            }
-            if angle_end.is_some() {
-                return Err("'<' after '>' in From: value".to_string());
-            }
-            angle_start = Some(i + 1);
-            i += 1;
-            continue;
-        }
-        if b == b'>' {
-            if angle_start.is_none() {
-                return Err("'>' without matching '<' in From: value".to_string());
-            }
-            if angle_end.is_some() {
-                return Err("multiple '>' in From: value".to_string());
-            }
-            angle_end = Some(i);
-            i += 1;
-            continue;
-        }
-        if angle_start.is_some() && angle_end.is_none() {
-            // Inside angle brackets — anything goes (no further checks).
-            i += 1;
-            continue;
-        }
-        // Outside angle brackets (or after the closing `>`): only
-        // whitespace is permitted as trailing content. Anything else
-        // after `>` would be a malformed mailbox like `<a@b> garbage`.
-        if angle_end.is_some() && !b.is_ascii_whitespace() {
-            return Err("trailing content after '>' in From: value".to_string());
-        }
-        if b == b',' {
-            return Err("From: contains an address list, not a single mailbox".to_string());
-        }
-        if b == b':' {
-            return Err("From: contains group syntax, not a single mailbox".to_string());
-        }
-        i += 1;
-    }
-
-    if let (Some(start), Some(end)) = (angle_start, angle_end) {
-        if start > end {
-            return Err("malformed angle-bracket pair in From:".to_string());
-        }
-        return Ok(Some((value[start..end].trim(), true)));
-    }
-    if angle_start.is_some() {
-        return Err("unclosed '<' in From: value".to_string());
-    }
-    Ok(Some((value.trim(), false)))
+    reject_unsupported(addr, "addr-spec")
 }
 
 #[cfg(test)]
@@ -390,5 +376,80 @@ mod tests {
         let m = message_with(&["<alice@example.com>>"]);
         let err = extract_from_domain(&m).unwrap_err();
         assert!(err.contains("multiple '>'"));
+    }
+
+    #[test]
+    fn accepts_the_supported_mailbox_forms() {
+        for value in [
+            "alice@example.com",
+            "<alice@example.com>",
+            "Alice Smith <alice@example.com>",
+            "\"Smith, Alice\" <alice@example.com>",
+        ] {
+            let m = message_with(&[value]);
+            assert_eq!(
+                extract_from_domain(&m).unwrap(),
+                "example.com",
+                "should accept {value}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_parenthesized_comment() {
+        let m = message_with(&["Alice (Ops) <alice@example.com>"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("unsupported syntax"));
+    }
+
+    #[test]
+    fn rejects_quoted_pair_escape() {
+        let m = message_with(&["\"Alice \\\"Ops\\\"\" <alice@example.com>"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("unsupported syntax"));
+    }
+
+    #[test]
+    fn rejects_unterminated_quoted_display_name() {
+        let m = message_with(&["\"Alice <alice@example.com>"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("malformed quoted display name"));
+    }
+
+    #[test]
+    fn rejects_trailing_content_after_quoted_display_name() {
+        let m = message_with(&["\"Alice\"Smith <alice@example.com>"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("malformed quoted display name"));
+    }
+
+    #[test]
+    fn rejects_address_list_before_angle_addr() {
+        // The unquoted display name is where a second mailbox would sit
+        // if the value were an address list rather than one mailbox.
+        let m = message_with(&["alice@example.com, Bob <bob@example.com>"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("address list"));
+    }
+
+    #[test]
+    fn rejects_group_syntax_before_angle_addr() {
+        let m = message_with(&["Recipients: Bob <bob@example.com>"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("group"));
+    }
+
+    #[test]
+    fn rejects_whitespace_inside_angle_brackets() {
+        let m = message_with(&["<alice @example.com>"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("whitespace"));
+    }
+
+    #[test]
+    fn rejects_angle_bracket_inside_quoted_display_name() {
+        let m = message_with(&["\"Alice <other@example.org>\" <alice@example.com>"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("nested '<'"));
     }
 }

@@ -53,9 +53,18 @@ type ChannelStore = Readable<Channel | undefined> & {
 
 const getTransports = (): Transport[] => {
   const primaryOrigin = getPrimaryOrigin();
+  // A document loaded from a related origin is already redirecting to the
+  // primary origin. An ICRC-29 client pins the signer origin as soon as it
+  // answers the handshake, so establishing one here would leave it talking to a
+  // document that is about to be replaced, until its disconnect timeout closes
+  // the window. The legacy transport is exempt: it takes its own request to the
+  // primary origin rather than handshaking here.
+  const offPrimaryOrigin =
+    primaryOrigin !== undefined && window.location.origin !== primaryOrigin;
   return [
-    new PostMessageTransport(),
-    new UrlTransport(),
+    ...(offPrimaryOrigin
+      ? []
+      : [new PostMessageTransport(), new UrlTransport()]),
     new LegacyTransport(
       // Redirect requests and responses between related origins and primary origin
       primaryOrigin !== undefined

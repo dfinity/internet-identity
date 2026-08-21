@@ -3,7 +3,7 @@ import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 import { wrapError } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
 
-const MAX_ALTERNATIVE_ORIGINS = 10;
+const MAX_ALTERNATIVE_ORIGINS = 100;
 type ValidationResult =
   { result: "valid" } | { result: "invalid"; message: string };
 
