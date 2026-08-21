@@ -37,9 +37,20 @@ export const redirectToPrimaryOrigin = (): boolean => {
     return false;
   }
   const { pathname, search, hash } = window.location;
-  // Legacy AuthClient, the legacy transport carries the request across the
-  // redirect itself and bounces the response back to this origin.
+  // Legacy transport, outgoing leg: the dapp posts its request to this document
+  // and the transport takes it to the primary origin itself.
   if (pathname === "/" && hash === "#authorize") {
+    return false;
+  }
+  // Legacy transport, return leg: the primary origin bounced the response back
+  // to this origin, and only this document can finish it — the redirect session
+  // that re-wraps the delegation for the dapp lives in this origin's
+  // `sessionStorage`, and the dapp is holding this window.
+  const bounced = new URLSearchParams(hash.replace(/^#/, ""));
+  if (
+    bounced.has("redirect_message") &&
+    bounced.get("redirect_origin") === primaryOrigin
+  ) {
     return false;
   }
   if (KEEP_ON_CURRENT_ORIGIN.includes(pathname)) {
