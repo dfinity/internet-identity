@@ -12,9 +12,9 @@ authorise an app that never says who it is.
 
 This design writes a small row the first time an identity uses an app, caps how many of
 those an identity keeps, deletes app records nothing refers to any more, and indexes
-accounts by the principal they derive to. Recording is cheap and losing a row is harmless:
-the account is computed, so it returns at the identical principal the next time the user
-signs in there.
+accounts by the principal they derive to. Recording is cheap, and losing a row costs little: the account is computed, so it returns at
+the identical principal the next time the user signs in there. What a dropped row does cost is
+any session stored on it, which means a fresh sign-in rather than a lost account.
 
 ## Context
 
@@ -22,7 +22,7 @@ An Internet Identity is a number, called an identity. When a user signs in to an
 
 II produces that principal by hashing three things together: the identity number, the app's origin, and a secret value held only inside the canister. The result is fully determined by those inputs, so II can compute it whenever it needs to and never has to store it.
 
-We call the account a user gets this way their default account at that app. A user can also create a second account at the same app, with a name they choose, to keep two separate personas there. A named account does have to be stored, because the name has to be kept somewhere and because its principal is derived from an account number rather than from the origin alone.
+We call the account a user gets this way their default account at that app. A user can also create a second account at the same app, with a name they choose, to keep two separate personas there. A named account does have to be stored, because the name has to be kept somewhere and because its principal is derived from an account number rather than from the identity and origin the default uses.
 
 ```mermaid
 flowchart LR
@@ -36,7 +36,7 @@ So II holds records for the accounts users have named, and no record at all for 
 
 The hash runs one way only. II can compute the principal for a given identity and app, but it cannot start from a principal and work out which identity produced it.
 
-II does keep one record per app origin it has ever encountered, shared by all identities, holding the origin string and a count of how many accounts refer to it. This is how an origin gets a short internal number instead of being stored as a string in every account.
+II does keep one record per app origin it has ever encountered, shared by all identities, holding the origin string and two counts: how many accounts name it, and how many references point at it. The second is what can fall back to zero, so it is the one that decides when an app record can go. This is how an origin gets a short internal number instead of being stored as a string in every account.
 
 ## Problem
 
@@ -60,9 +60,12 @@ None of these can ship alone. Recording use is what makes the list grow; the cap
 
 ## Out of scope
 
-- **Moving an account between identities.** The encoding this design introduces reserves the shape a move would need, and the constraints a future move feature must respect are noted in the specification, but no move path is designed here.
-- **Showing the user their app list.** This makes the data exist. The settings surface that renders it is separate work.
-- **Per-app session listing.** Covered by `revocable-app-sessions.md`, and deferred there too.
+- **Moving an account between identities.**  
+  The encoding this design introduces reserves the shape a move would need, and the constraints a future move feature must respect are noted in the specification, but no move path is designed here.
+- **Showing the user their app list.**  
+  This makes the data exist. The settings surface that renders it is separate work.
+- **Per-app session listing.**  
+  Covered by `revocable-app-sessions.md`, and deferred there too.
 
 ## Approach
 
@@ -78,7 +81,7 @@ Each identity gets a limit of 500 of these no-name rows. On reaching it, II dele
 
 Dropping one costs the user nothing. The account was never stored, only computed, so signing in at that app again writes a fresh row and produces the identical principal it had before. The user sees no difference; only the record of having been there is lost.
 
-Two rows are never dropped: one that also holds a named account, since that account cannot be recomputed, and one holding a session that has not expired, so cleaning up idle records can never take away a session the user is relying on.
+One row is never dropped: one that also holds a named account, since that account cannot be recomputed. A row holding a live session is not spared, and losing one signs that browser out of that app until the next sign-in. Sparing them instead would let an identity sit above its limit for as long as something kept refreshing.
 
 ### 3. Delete an app record once no identity refers to it
 
@@ -130,6 +133,6 @@ written after it, and incomplete for what came before.
 
 ### Stage 6. Fill in the map for accounts that already exist
 
-A background sweep walks existing rows in batches after each upgrade, adding the entries stage 5 could not know
+A background sweep walks existing rows in batches, on a timer the canister starts for itself, adding the entries stage 5 could not know
 about. Until it finishes the map has gaps, so no feature may depend on a lookup
 succeeding until it reports done.
