@@ -588,6 +588,38 @@ fn should_update_openid_credential() {
 }
 
 #[test]
+fn should_reject_openid_credential_update_with_a_different_sso_domain() {
+    let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+    let mut stored = openid_credential(0);
+    stored.sso_domain = Some("gate.example.org".to_string());
+    anchor.add_openid_credential(stored.clone()).unwrap();
+
+    let mut foreign_domain = stored.clone();
+    foreign_domain.sso_domain = Some("other.example.org".to_string());
+    assert_eq!(
+        anchor.update_openid_credential(foreign_domain),
+        Err(AnchorError::OpenIdCredentialSsoDomainMismatch)
+    );
+
+    let mut no_domain = stored.clone();
+    no_domain.sso_domain = None;
+    assert_eq!(
+        anchor.update_openid_credential(no_domain),
+        Err(AnchorError::OpenIdCredentialSsoDomainMismatch)
+    );
+
+    assert_eq!(anchor.openid_credentials, vec![stored.clone()]);
+
+    let mut same_domain = stored.clone();
+    same_domain.metadata = HashMap::from([(
+        "name".to_string(),
+        MetadataEntryV2::String("Updated Name".to_string()),
+    )]);
+    assert_eq!(anchor.update_openid_credential(same_domain.clone()), Ok(()));
+    assert_eq!(anchor.openid_credentials, vec![same_domain]);
+}
+
+#[test]
 fn should_enforce_max_number_of_openid_credentials() {
     let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
     for i in 0..100 {

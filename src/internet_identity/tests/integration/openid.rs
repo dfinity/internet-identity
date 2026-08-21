@@ -1814,6 +1814,129 @@ mod sso_gating {
         Ok(())
     }
 
+    #[test]
+    fn foreign_discovery_domain_cannot_resolve_or_relabel() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        let (ii_client_jwt, jwks) = token(II_CLIENT, II_CLIENT_SUB, &[]);
+        let app_clients_a = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses_a = responses(well_known(&app_clients_a, false, "sub"), jwks.clone());
+        let identity_number =
+            register_with_ii_client_credential(&env, canister_id, &responses_a, &ii_client_jwt);
+
+        let app_clients_b = format!(r#"{{"{GATED_ORIGIN}":"{FOREIGN_PER_APP_CLIENT}"}}"#);
+        let responses_b = responses_on_domain(
+            FOREIGN_DOMAIN,
+            well_known(&app_clients_b, false, "sub"),
+            jwks,
+        );
+        let session_key = ByteBuf::from("dapp session key");
+
+        let ungated_via_b = drive_sso_until_ready(&env, &responses_b, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &ii_client_jwt,
+                &test_salt(),
+                &session_key,
+                FOREIGN_DOMAIN,
+                UNGATED_ORIGIN,
+            )
+            .unwrap()
+        });
+        assert!(
+            matches!(ungated_via_b, Err(OpenIdDelegationError::NoSuchAnchor)),
+            "sso_prepare_delegation through a foreign domain must not resolve, got {ungated_via_b:?}"
+        );
+
+        let openid_via_b = drive_sso_until_ready(&env, &responses_b, || {
+            api::openid_prepare_delegation_with_discovery(
+                &env,
+                canister_id,
+                test_principal(),
+                &ii_client_jwt,
+                &test_salt(),
+                &session_key,
+                Some(FOREIGN_DOMAIN),
+            )
+            .unwrap()
+        });
+        assert!(
+            matches!(openid_via_b, Err(OpenIdDelegationError::NoSuchAnchor)),
+            "openid_prepare_delegation through a foreign domain must not resolve, got {openid_via_b:?}"
+        );
+
+        assert_eq!(
+            stored_sso_domain(&env, canister_id, identity_number)?,
+            Some(GATE_DOMAIN.to_string()),
+            "the stored discovery domain must survive a login through another domain"
+        );
+
+        let (gated_b_jwt, _) = token_for(
+            &test_principal_b(),
+            FOREIGN_PER_APP_CLIENT,
+            II_CLIENT_SUB,
+            &[],
+        );
+        let gated_via_b = drive_sso_until_ready(&env, &responses_b, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal_b(),
+                &gated_b_jwt,
+                &test_salt(),
+                &session_key,
+                FOREIGN_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        });
+        assert!(
+            matches!(gated_via_b, Err(OpenIdDelegationError::NoSuchAnchor)),
+            "got {gated_via_b:?}"
+        );
+
+        let via_a = expect_ready(drive_sso_until_ready(&env, &responses_a, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &ii_client_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                UNGATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(via_a.anchor_number, identity_number);
+
+        Ok(())
+    }
+
+    fn stored_sso_domain(
+        env: &PocketIc,
+        canister_id: Principal,
+        identity_number: u64,
+    ) -> Result<Option<String>, RejectResponse> {
+        let info = canister_tests::api::internet_identity::api_v2::identity_info(
+            env,
+            canister_id,
+            test_principal(),
+            identity_number,
+        )?
+        .expect("identity_info");
+        Ok(info
+            .openid_credentials
+            .expect("openid credentials")
+            .into_iter()
+            .find(|cred| cred.aud == II_CLIENT)
+            .expect("II-client credential")
+            .sso_domain)
+    }
+
     /// A token minted for a different client is refused at a gated origin.
     #[test]
     fn refused_gate_mints_no_delegation() -> Result<(), RejectResponse> {
