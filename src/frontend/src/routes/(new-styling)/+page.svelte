@@ -14,6 +14,7 @@
   import { beforeNavigate, preloadData } from "$app/navigation";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { purgeAppDelegations } from "$lib/stores/app-delegation.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import {
@@ -111,6 +112,7 @@
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
     void purgeSession(identityNumber);
+    void purgeAppDelegations(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {

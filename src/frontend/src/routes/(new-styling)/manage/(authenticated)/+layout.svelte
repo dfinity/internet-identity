@@ -26,6 +26,7 @@
   import { DelegationIdentity } from "@icp-sdk/core/identity";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { purgeAppDelegations } from "$lib/stores/app-delegation.store";
   import { sessionStore } from "$lib/stores/session.store";
   import { locales, localeStore, t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -115,10 +116,16 @@
     window.location.replace("/");
   };
 
-  const handleConfirmSignOutAndRemove = () => {
+  const handleConfirmSignOutAndRemove = async () => {
     const identityNumber = $authenticatedStore.identityNumber;
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void purgeSession(identityNumber);
+    // Awaited, unlike the other call sites: navigating away can cancel a pending
+    // IndexedDB delete, and a surviving app delegation would let an app be
+    // signed in again silently after the user chose to sign out.
+    await Promise.all([
+      purgeSession(identityNumber),
+      purgeAppDelegations(identityNumber),
+    ]);
     sessionStore.reset();
     window.location.replace("/");
   };
@@ -130,6 +137,7 @@
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
     void purgeSession(identityNumber);
+    void purgeAppDelegations(identityNumber);
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
       const identityName =

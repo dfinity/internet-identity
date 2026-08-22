@@ -7,11 +7,14 @@
   } from "$lib/stores/attributeConsent.store";
   import {
     authorizationContextStore,
+    authorizationPromptStore,
     authorizationStore,
     authorizedStore,
   } from "$lib/stores/authorization.store";
+  import { resolvePromptParams, stripPromptParams } from "./promptParams";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { purgeAppDelegations } from "$lib/stores/app-delegation.store";
   import { authenticationStore } from "$lib/stores/authentication.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
@@ -61,6 +64,20 @@
     }
     return "normal" as const;
   })();
+
+  // --- Sign-in preferences from the URL (captured once, before the channel) ---
+  // Read here rather than in the request handler so nothing downstream depends on
+  // the address bar: the handler re-runs on a resumed flow, by which point the
+  // params are long gone from the URL. Runs during component init, so it is
+  // settled before `$effect.pre` establishes the channel and the first request
+  // is dispatched.
+  authorizationPromptStore.set(
+    resolvePromptParams(
+      new URL(window.location.href),
+      flow === "openid-resume",
+    ),
+  );
+  stripPromptParams();
 
   // --- Channel establishment ---
   $effect.pre(() => {
@@ -190,6 +207,7 @@
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
     void purgeSession(identityNumber);
+    void purgeAppDelegations(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {

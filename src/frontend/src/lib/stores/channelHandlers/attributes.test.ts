@@ -1,4 +1,11 @@
-import { resolveAttributeGroups } from "./attributes";
+import { afterEach, describe, expect, it } from "vitest";
+import type { Channel, JsonResponse } from "$lib/utils/transport/utils";
+import { INTERACTION_REQUIRED_ERROR_CODE } from "$lib/utils/transport/utils";
+import { authorizationPromptStore } from "$lib/stores/authorization.store";
+import {
+  handleIcrc3ConsentAttributes,
+  resolveAttributeGroups,
+} from "./attributes";
 
 const GOOGLE_ISSUER = "https://accounts.google.com";
 const APPLE_ISSUER = "https://appleid.apple.com";
@@ -407,5 +414,66 @@ describe("resolveAttributeGroups", () => {
       expect(groups[0].options[0].displayValue).toBe("plain");
       expect(arrayOf(groups[0].options[0].rawValue)).toEqual(arrayOf(utf8));
     });
+  });
+});
+
+describe("handleIcrc3ConsentAttributes under ?prompt=none", () => {
+  const APP_ORIGIN = "https://docs.example.com";
+
+  const channel = (): Channel & { sent: JsonResponse[] } => {
+    const sent: JsonResponse[] = [];
+    const addEventListener: Channel["addEventListener"] = () => () => {};
+    return {
+      sent,
+      origin: APP_ORIGIN,
+      closed: false,
+      resumeToken: "test-resume-token",
+      addEventListener,
+      send: (response: JsonResponse) => {
+        sent.push(response);
+        return Promise.resolve();
+      },
+      close: () => Promise.resolve(),
+    };
+  };
+
+  const attributesRequest = {
+    jsonrpc: "2.0" as const,
+    id: 1,
+    method: "ii-icrc3-attributes",
+    params: { keys: ["email"], nonce: "AAAA" },
+  };
+
+  afterEach(() => {
+    authorizationPromptStore.set({});
+  });
+
+  it("errors instead of waiting for a consent that will never be asked for", async () => {
+    // The canister certifies attributes over the app's per-request nonce, so
+    // nothing cached can answer this. Left to block, a batched delegation on the
+    // redirect transport would never be delivered and the user would sit on
+    // Internet Identity — exactly what prompt=none rules out.
+    authorizationPromptStore.set({ prompt: "none" });
+    const c = channel();
+
+    await handleIcrc3ConsentAttributes(c, () => {})(attributesRequest);
+
+    expect(c.sent).toHaveLength(1);
+    expect(c.sent[0]).toMatchObject({
+      error: {
+        code: INTERACTION_REQUIRED_ERROR_CODE,
+        data: { reason: "consent_required" },
+      },
+    });
+  });
+
+  it("does not short-circuit a request that may show the consent screen", async () => {
+    const c = channel();
+
+    void handleIcrc3ConsentAttributes(c, () => {})(attributesRequest);
+    await Promise.resolve();
+
+    // Still pending: it waits for the flow and the user, as it always has.
+    expect(c.sent).toEqual([]);
   });
 });

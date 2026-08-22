@@ -145,10 +145,10 @@ const passthrough = (request: JsonRequest): DelegationInterceptor => ({
 
 // Location/history stubs — the transport reads the request from the current
 // URL hash and delivers the response by navigating the tab.
-let assignMock: ReturnType<typeof vi.fn>;
+let replaceMock: ReturnType<typeof vi.fn>;
 
 const installLocation = (hash: string): void => {
-  assignMock = vi.fn();
+  replaceMock = vi.fn();
   Object.defineProperty(window, "location", {
     configurable: true,
     writable: true,
@@ -158,7 +158,7 @@ const installLocation = (hash: string): void => {
       pathname: "/authorize",
       search: "",
       hash,
-      assign: assignMock,
+      replace: replaceMock,
     },
   });
 };
@@ -206,8 +206,8 @@ describe("UrlChannel", () => {
 
     await channel.send(response);
 
-    expect(assignMock).toHaveBeenCalledOnce();
-    const url = new URL(assignMock.mock.calls[0][0]);
+    expect(replaceMock).toHaveBeenCalledOnce();
+    const url = new URL(replaceMock.mock.calls[0][0]);
     expect(`${url.origin}${url.pathname}`).toBe(CALLBACK);
     const fragment = new URLSearchParams(url.hash.slice(1));
     expect(fragment.get("state")).toBe("state-123");
@@ -224,12 +224,12 @@ describe("UrlChannel", () => {
     const respB: JsonResponse = { jsonrpc: "2.0", id: 2, result: "B" };
 
     await channel.send(respB); // out of order; still waits for both
-    expect(assignMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
     await channel.send(respA);
 
-    expect(assignMock).toHaveBeenCalledOnce();
+    expect(replaceMock).toHaveBeenCalledOnce();
     const fragment = new URLSearchParams(
-      new URL(assignMock.mock.calls[0][0]).hash.slice(1),
+      new URL(replaceMock.mock.calls[0][0]).hash.slice(1),
     );
     // Batch responses are an array in request order.
     expect(JSON.parse(fragment.get("message") ?? "")).toEqual([respA, respB]);
@@ -243,7 +243,7 @@ describe("UrlChannel", () => {
     ]);
 
     await channel.send({ jsonrpc: "2.0", id: 1, result: "A" });
-    expect(assignMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
     // Request 2 errors → abort the batch and redirect now, without waiting for 3.
     await channel.send({
       jsonrpc: "2.0",
@@ -251,10 +251,10 @@ describe("UrlChannel", () => {
       error: { code: 4000, message: "boom" },
     });
 
-    expect(assignMock).toHaveBeenCalledOnce();
+    expect(replaceMock).toHaveBeenCalledOnce();
     const message = JSON.parse(
       new URLSearchParams(
-        new URL(assignMock.mock.calls[0][0]).hash.slice(1),
+        new URL(replaceMock.mock.calls[0][0]).hash.slice(1),
       ).get("message") ?? "",
     );
     expect(message[0]).toEqual({ jsonrpc: "2.0", id: 1, result: "A" });
@@ -272,7 +272,7 @@ describe("UrlChannel", () => {
     const channel = newChannel(false, [{ jsonrpc: "2.0", id: 1, method: "m" }]);
     await channel.send({ jsonrpc: "2.0", id: 1, result: 1 });
     await channel.send({ jsonrpc: "2.0", id: 1, result: 2 });
-    expect(assignMock).toHaveBeenCalledOnce();
+    expect(replaceMock).toHaveBeenCalledOnce();
   });
 
   it("rejects send on a closed channel", async () => {
@@ -354,7 +354,7 @@ describe("UrlTransport.establishChannel", () => {
       installLocation(`#${params.toString()}`);
 
       await expect(new UrlTransport().establishChannel()).rejects.toThrow();
-      expect(assignMock).not.toHaveBeenCalled();
+      expect(replaceMock).not.toHaveBeenCalled();
     },
   );
 
@@ -373,7 +373,7 @@ describe("UrlTransport.establishChannel", () => {
       installLocation(`#${params.toString()}`);
 
       await expect(new UrlTransport().establishChannel()).rejects.toThrow();
-      expect(assignMock).not.toHaveBeenCalled();
+      expect(replaceMock).not.toHaveBeenCalled();
     },
   );
 
@@ -407,7 +407,7 @@ describe("UrlTransport.establishChannel", () => {
     installLocation(`#${params.toString()}`);
 
     await expect(new UrlTransport().establishChannel()).rejects.toThrow();
-    expect(assignMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 
   it("rejects a request without an id (a notification cannot be answered)", async () => {
@@ -415,7 +415,7 @@ describe("UrlTransport.establishChannel", () => {
     stubAllowList([CALLBACK]);
 
     await expect(new UrlTransport().establishChannel()).rejects.toThrow();
-    expect(assignMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 
   it("rejects a message larger than the cap before parsing", async () => {
@@ -427,7 +427,7 @@ describe("UrlTransport.establishChannel", () => {
     installLocation(`#${params.toString()}`);
 
     await expect(new UrlTransport().establishChannel()).rejects.toThrow();
-    expect(assignMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 
   it("rejects a batch with too many requests", async () => {
@@ -439,7 +439,7 @@ describe("UrlTransport.establishChannel", () => {
     installLocation(hashFor(batch));
 
     await expect(new UrlTransport().establishChannel()).rejects.toThrow();
-    expect(assignMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 
   it("rejects a batch with duplicate request ids", async () => {
@@ -450,7 +450,7 @@ describe("UrlTransport.establishChannel", () => {
     installLocation(hashFor(batch));
 
     await expect(new UrlTransport().establishChannel()).rejects.toThrow();
-    expect(assignMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 
   it("journals distinct ephemeral keys for numeric and string ids that stringify alike", async () => {
@@ -492,7 +492,7 @@ describe("UrlTransport.establishChannel", () => {
   const messageFrom = (): unknown =>
     JSON.parse(
       new URLSearchParams(
-        new URL(assignMock.mock.calls[0][0]).hash.slice(1),
+        new URL(replaceMock.mock.calls[0][0]).hash.slice(1),
       ).get("message") ?? "",
     );
 
@@ -516,7 +516,7 @@ describe("UrlTransport.establishChannel", () => {
     expect(seen).toEqual([request]);
 
     await resumed.send({ jsonrpc: "2.0", id: 1, result: { ok: 1 } });
-    expect(assignMock).toHaveBeenCalledOnce();
+    expect(replaceMock).toHaveBeenCalledOnce();
     expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull(); // cleared on delivery
   });
 
@@ -587,7 +587,7 @@ describe("UrlTransport.establishChannel", () => {
     stubAllowList([CALLBACK]);
     const first = await new UrlTransport().establishChannel();
     await first.send({ jsonrpc: "2.0", id: 1, result: "A" });
-    expect(assignMock).not.toHaveBeenCalled(); // batch not complete, no redirect
+    expect(replaceMock).not.toHaveBeenCalled(); // batch not complete, no redirect
 
     // Redirect, then resume: request 1's response is restored from storage.
     installLocation("#");
@@ -597,7 +597,7 @@ describe("UrlTransport.establishChannel", () => {
     expect(seen.map((r) => r.id)).toEqual([2]); // only the unanswered one
 
     await resumed.send({ jsonrpc: "2.0", id: 2, result: "B" });
-    expect(assignMock).toHaveBeenCalledOnce();
+    expect(replaceMock).toHaveBeenCalledOnce();
     expect(messageFrom()).toEqual([
       { jsonrpc: "2.0", id: 1, result: "A" },
       { jsonrpc: "2.0", id: 2, result: "B" },

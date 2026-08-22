@@ -30,8 +30,50 @@ export type Authorized = {
   maxTimeToLive?: bigint;
 };
 
+/** What the app asked for about the sign-in itself, via `/authorize` query
+ *  params. Inspired by OpenID Connect's `prompt` and `login_hint`.
+ *
+ *  - `none`: answer from a cached delegation or fail; never show the user
+ *    anything. The app is promising it can handle the failure.
+ *  - `login`: run a full ceremony, ignoring any cached delegation.
+ *
+ *  Absent behaves as `login`, so an app that has not opted in sees no change
+ *  and the sign-in screen stays where a user can switch identity or account.
+ *  Room is left for an `auto` value meaning "re-issue when unambiguous,
+ *  otherwise show the sign-in screen". Unrecognised values are ignored and
+ *  behave as absent.
+ *
+ *  Sending the param at all is also what opts an app into having its delegation
+ *  kept for re-issue: an app that has never heard of `prompt` cannot call
+ *  `ii-forget-delegation` either, so keeping one for it would leave something
+ *  nothing clears until it expires. */
+export type AuthorizationPrompt = "none" | "login";
+
+export type AuthorizationPromptContext = {
+  prompt?: AuthorizationPrompt;
+  /** The principal the app last received, identifying which cached delegation
+   *  to re-issue when the user has more than one to choose from. */
+  hint?: string;
+};
+
 const contextInternal = writable<AuthorizationContext | undefined>();
+const promptInternal = writable<AuthorizationPromptContext>({});
 const authorizedInternal = writable<Authorized | undefined>();
+
+/**
+ * Kept separate from {@link AuthorizationContext} rather than folded into it,
+ * for two reasons. It is populated from the page URL before any request
+ * arrives, whereas the context describes a parsed request, and the authorize
+ * layout gates rendering on the context existing at all. Writing URL state into
+ * the context would make the sign-in UI paint before there is a request to
+ * answer.
+ */
+export const authorizationPromptStore = {
+  subscribe: promptInternal.subscribe,
+  /** Called once by the authorize layout, from the page URL. */
+  set: (context: AuthorizationPromptContext): void =>
+    promptInternal.set(context),
+};
 
 export const authorizationStore = {
   /** Called by the channel handler once the delegation request is parsed.

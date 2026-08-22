@@ -39,6 +39,7 @@
   import { handleError } from "$lib/components/utils/error";
   import { authenticationStore } from "$lib/stores/authentication.store";
   import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { purgeAppDelegations } from "$lib/stores/app-delegation.store";
   import { authenticateWithSession } from "$lib/utils/authentication";
   import { goto, preloadData } from "$app/navigation";
   import { page } from "$app/state";
@@ -159,6 +160,7 @@
       showEmailRecoveryDialog = false;
       authenticationStore.reset();
       void purgeSession(success.identityNumber);
+      void purgeAppDelegations(success.identityNumber);
       handleError(error);
     }
   };
@@ -201,6 +203,7 @@
       showRecoveryDialog = false;
       authenticationStore.reset();
       void purgeSession(identityNumber);
+      void purgeAppDelegations(identityNumber);
       handleError(error);
     }
   };

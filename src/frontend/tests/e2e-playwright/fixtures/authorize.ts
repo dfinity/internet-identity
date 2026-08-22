@@ -26,6 +26,17 @@ export type AuthorizeConfig = {
        * page rather than picking one silently.
        */
       sso?: string;
+      /**
+       * Sets `?prompt=`. `"none"` asks II to answer from a delegation it
+       * already holds for this app and to error rather than render anything;
+       * `"login"` forces a ceremony. Omitted behaves as `"login"`.
+       */
+      prompt?: "none" | "login";
+      /**
+       * Sets `?hint=<principal>`, naming which stored delegation to re-issue
+       * when the user has more than one for this app.
+       */
+      hint?: string;
       attributes?: string[];
       useIcrc3Attributes?: boolean;
       icrc3Nonce?: Uint8Array;
@@ -106,6 +117,14 @@ export const test = base.extend<{
       }
       if ("sso" in authorizeConfig && authorizeConfig.sso !== undefined) {
         queryParams.push(`sso=${encodeURIComponent(authorizeConfig.sso)}`);
+      }
+      if ("prompt" in authorizeConfig && authorizeConfig.prompt !== undefined) {
+        queryParams.push(
+          `prompt=${encodeURIComponent(authorizeConfig.prompt)}`,
+        );
+      }
+      if ("hint" in authorizeConfig && authorizeConfig.hint !== undefined) {
+        queryParams.push(`hint=${encodeURIComponent(authorizeConfig.hint)}`);
       }
       const querySuffix =
         queryParams.length > 0 ? `?${queryParams.join("&")}` : "";

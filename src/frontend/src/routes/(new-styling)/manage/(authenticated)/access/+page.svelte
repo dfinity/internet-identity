@@ -24,6 +24,7 @@
   import { canisterId } from "$lib/globals";
   import { authenticationStore } from "$lib/stores/authentication.store";
   import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { purgeAppDelegations } from "$lib/stores/app-delegation.store";
   import { authenticateWithPasskey } from "$lib/utils/authentication/passkey";
   import { authenticateWithJWT } from "$lib/utils/authentication/jwt";
   import {
@@ -395,7 +396,14 @@
       if (isCurrentAccessMethod($authenticatedStore, removingAccessMethod)) {
         const identityNumber = $authenticatedStore.identityNumber;
         lastUsedIdentitiesStore.removeIdentity(identityNumber);
-        void purgeSession(identityNumber);
+        // Awaited, unlike the other call sites: navigating away can cancel a
+        // pending IndexedDB delete, and a surviving app delegation would let an
+        // app be signed in again silently after the access method it belonged to
+        // was removed.
+        await Promise.all([
+          purgeSession(identityNumber),
+          purgeAppDelegations(identityNumber),
+        ]);
         sessionStore.reset();
         location.replace("/login");
         return;

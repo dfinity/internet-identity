@@ -49,6 +49,10 @@ test.describe("Authorize over the redirect transport", () => {
     // Two hops, never one: a one-hop chain would be the canister signing
     // directly to the RP key, but what the canister certifies transits the IC
     // and must be inert on its own.
+    //
+    // Exactly two, also: none of these flows sends `?prompt=`, so Internet
+    // Identity keeps no delegation for re-issue and adds no hop of its own. A
+    // third hop here would mean it started caching for apps that never asked.
     const { delegations } = authorizedDelegation;
     expect(delegations).toHaveLength(2);
     // The canister-certified inner hop (delegations[0]) targets the intermediate
