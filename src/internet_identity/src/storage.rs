@@ -105,11 +105,12 @@ use identity_jose::jwk::Jwk;
 use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::delegation::{self, check_frontend_length};
+use crate::delegation::{calculate_session_seed_with_salt, canister_sig_principal};
 use crate::openid::OpenIdCredentialKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
-use crate::storage::account::AccountReference;
+use crate::storage::account::{AccountReference, SessionRecord};
 use crate::storage::anchor::Anchor;
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
@@ -123,6 +124,7 @@ use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
+use crate::storage::storable::session_handle::StorableSessionHandle;
 use internet_identity_interface::internet_identity::types::*;
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
@@ -212,6 +214,7 @@ const MCP_REGISTRATION_MEMORY_INDEX: u8 = 31u8;
 const SSO_STABLE_ID_INDEX_MEMORY_INDEX: u8 = 32u8;
 const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
+const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -297,6 +300,8 @@ const NEXT_APPLICATION_NUMBER_MEMORY_ID: MemoryId =
 
 /// Reverse index from the principal a dapp sees to the account that produced it:
 /// `self_authenticating(der_encode_canister_sig_key(seed)) -> (anchor, application, account)`.
+const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX);
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX);
 
@@ -406,6 +411,15 @@ pub struct Storage<M: Memory> {
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountLocator, ManagedMemory<M>>,
+    /// This canister's own id, which session and account principals derive from. Set once
+    /// at init; a fixed default keeps derivations consistent in unit tests, which run
+    /// outside a canister.
+    canister_id: Principal,
+    /// Where a session lives, keyed by the principal its chain is rooted at. An app-facing
+    /// call carries nothing but that principal, so this is what turns `caller()` into a
+    /// session.
+    lookup_session_with_principal_memory:
+        StableBTreeMap<Principal, StorableSessionHandle, ManagedMemory<M>>,
     /// Counter that counts how often there was a discrepancy between the anchor accounts counter and the actual number of accounts
     stable_account_counter_discrepancy_counter_memory:
         StableCell<StorableDiscrepancyCounter, ManagedMemory<M>>,
@@ -544,6 +558,8 @@ impl<M: Memory + Clone> Storage<M> {
         let next_application_number_memory = memory_manager.get(NEXT_APPLICATION_NUMBER_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
+        let lookup_session_with_principal_memory =
+            memory_manager.get(LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_ID);
         let stable_account_counter_discrepancy_counter_memory =
             memory_manager.get(STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_ID);
         let lookup_anchor_with_openid_credential_memory =
@@ -630,6 +646,10 @@ impl<M: Memory + Clone> Storage<M> {
                 .expect("next_application_number_memory"),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
+            ),
+            canister_id: Principal::management_canister(),
+            lookup_session_with_principal_memory: StableBTreeMap::init(
+                lookup_session_with_principal_memory,
             ),
             lookup_account_with_principal_memory: StableBTreeMap::init(
                 lookup_account_with_principal_memory,
@@ -890,6 +910,7 @@ impl<M: Memory + Clone> Storage<M> {
             verified_emails: _,
             session_devices: _,
             next_session_device_id: _,
+            session_count: _,
         }) = previous_anchor_maybe
         {
             (
@@ -1766,6 +1787,338 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(Some(()))
     }
 
+    // Called by the sign-in ceremony, which lands two PRs up.
+    #[allow(dead_code)]
+    /// Signs one browser out of everything, in a single message.
+    pub fn revoke_device_sessions(
+        &mut self,
+        anchor_number: AnchorNumber,
+        device_id: SessionDeviceId,
+    ) -> Result<u64, StorageError> {
+        let affected: Vec<(ApplicationNumber, Vec<AccountReference>)> = self
+            .stable_account_reference_list_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .filter_map(|((_, application_number), list)| {
+                let references: Vec<AccountReference> = list.into();
+                references
+                    .iter()
+                    .any(|reference| {
+                        reference
+                            .sessions
+                            .iter()
+                            .any(|session| session.device_id == device_id)
+                    })
+                    .then_some((application_number, references))
+            })
+            .collect();
+
+        let mut removed = 0u64;
+        for (application_number, mut references) in affected {
+            let mut dropped: Vec<(Option<AccountNumber>, SessionRecord)> = vec![];
+            for reference in &mut references {
+                let account_number = reference.account_number;
+                reference.sessions.retain(|session| {
+                    if session.device_id == device_id {
+                        dropped.push((account_number, session.clone()));
+                        return false;
+                    }
+                    true
+                });
+            }
+            removed += dropped.len() as u64;
+            self.write_reference_list(anchor_number, application_number, references)?;
+            for (account_number, session) in &dropped {
+                self.unindex_sessions(
+                    anchor_number,
+                    application_number,
+                    *account_number,
+                    std::slice::from_ref(session),
+                );
+            }
+        }
+        if removed > 0 {
+            self.change_session_count(anchor_number, removed as usize, 0)?;
+        }
+
+        Ok(removed)
+    }
+
+    /// Tells storage which canister it is, so the principals it derives match the ones
+    /// callers arrive as.
+    pub fn set_canister_id(&mut self, canister_id: Principal) {
+        self.canister_id = canister_id;
+    }
+
+    /// The principal a session's chain is rooted at, which is what an app-facing call
+    /// arrives as. `None` only when the salt is unset or the account is gone, both of
+    /// which make the session unusable anyway.
+    fn session_principal(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+        session: &SessionRecord,
+    ) -> Option<Principal> {
+        let salt = self.salt().copied()?;
+        let account = self.read_account(ReadAccountParams {
+            account_number,
+            anchor_number,
+            origin: &self
+                .stable_application_memory
+                .get(&application_number)?
+                .origin,
+            known_app_num: Some(application_number),
+        })?;
+        let seed = calculate_session_seed_with_salt(
+            &salt,
+            &account.calculate_seed_with_salt(&salt),
+            session.created_at,
+            session.device_id,
+        );
+        Some(canister_sig_principal(self.canister_id, seed.to_vec()))
+    }
+
+    /// Moves the count without considering the cap, for the paths that only remove.
+    fn change_session_count(
+        &mut self,
+        anchor_number: AnchorNumber,
+        removed: usize,
+        added: usize,
+    ) -> Result<u32, StorageError> {
+        let mut anchor = self.read(anchor_number)?;
+        anchor.session_count = anchor
+            .session_count
+            .saturating_sub(removed as u32)
+            .saturating_add(added as u32);
+        let count = anchor.session_count;
+        self.write(anchor)?;
+        Ok(count)
+    }
+
+    /// Drops the index entries of sessions that have just been removed from a row.
+    fn unindex_sessions(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+        removed: &[SessionRecord],
+    ) {
+        for session in removed {
+            if let Some(principal) =
+                self.session_principal(anchor_number, application_number, account_number, session)
+            {
+                self.lookup_session_with_principal_memory.remove(&principal);
+            }
+        }
+    }
+
+    // Called by the sign-in ceremony, which lands two PRs up.
+    #[allow(dead_code)]
+    /// The account a session handle names, together with its sessions.
+    pub fn account_with_sessions(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+    ) -> Option<(Account, Vec<SessionRecord>)> {
+        let origin = self
+            .stable_application_memory
+            .get(&application_number)
+            .map(|application| application.origin)?;
+        let references: Vec<AccountReference> = self
+            .lookup_account_references(anchor_number, application_number)?
+            .into_iter()
+            .map(Into::into)
+            .collect();
+        let reference = references
+            .into_iter()
+            .find(|reference| reference.account_number == account_number)?;
+        let account = self.read_account(ReadAccountParams {
+            account_number,
+            anchor_number,
+            origin: &origin,
+            known_app_num: Some(application_number),
+        })?;
+        Some((account, reference.sessions))
+    }
+
+    // Called by the sign-in ceremony, which lands two PRs up.
+    #[allow(dead_code)]
+    pub fn account_sessions(
+        &self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+        account_number: Option<AccountNumber>,
+    ) -> Option<Vec<SessionRecord>> {
+        let application_number = self.lookup_application_number_with_origin(origin)?;
+        let references: Vec<AccountReference> = self
+            .lookup_account_references(anchor_number, application_number)?
+            .into_iter()
+            .map(Into::into)
+            .collect();
+        references
+            .into_iter()
+            .find(|reference| reference.account_number == account_number)
+            .map(|reference| reference.sessions)
+    }
+
+    // Called by the sign-in ceremony, which lands two PRs up.
+    #[allow(dead_code)]
+    /// Creates the session `prepare_account_session` mints an identity from, replacing
+    /// whatever this browser already held at this account.
+    pub fn create_session(
+        &mut self,
+        params: CreateSessionParams,
+    ) -> Result<SessionRecord, StorageError> {
+        let CreateSessionParams {
+            anchor_number,
+            origin,
+            account_number,
+            device_id,
+            valid_till,
+            read_only,
+            now,
+        } = params;
+
+        // The row this session lands in has to exist first, but an existing one must not be
+        // written here: the single write at the end of this function carries `last_used`.
+        let application_number = match self.lookup_application_number_with_origin(&origin) {
+            Some(application_number)
+                if self
+                    .lookup_account_references(anchor_number, application_number)
+                    .is_some() =>
+            {
+                application_number
+            }
+            _ => {
+                if account_number.is_some() {
+                    return Err(StorageError::MissingAccount {
+                        anchor_number,
+                        name: origin,
+                    });
+                }
+                let application_number =
+                    self.lookup_or_insert_application_number_with_origin(&origin);
+                self.write_reference_list(
+                    anchor_number,
+                    application_number,
+                    vec![AccountReference::new(None, Some(now))],
+                )?;
+                self.evict_idle_tracked_defaults(anchor_number, application_number)?;
+                application_number
+            }
+        };
+
+        let mut references: Vec<AccountReference> = self
+            .lookup_account_references(anchor_number, application_number)
+            .ok_or(StorageError::MissingAccount {
+                anchor_number,
+                name: origin,
+            })?
+            .into_iter()
+            .map(Into::into)
+            .collect();
+
+        let reference = references
+            .iter_mut()
+            .find(|reference| reference.account_number == account_number)
+            .ok_or(StorageError::MissingAccount {
+                anchor_number,
+                name: String::new(),
+            })?;
+        reference.last_used = Some(now);
+
+        // A ceremony replaces whatever this browser held here, rather than reusing it: the
+        // copy of an old session's chain stops working at the user's next sign-in instead of
+        // at its expiry.
+        let mut dropped: Vec<(Option<AccountNumber>, SessionRecord)> = vec![];
+        reference.sessions.retain(|session| {
+            if session.device_id == device_id {
+                dropped.push((account_number, session.clone()));
+                return false;
+            }
+            true
+        });
+
+        let session = SessionRecord {
+            created_at: now,
+            valid_till,
+            last_refreshed: None,
+            device_id,
+            read_only,
+        };
+        reference.sessions.push(session.clone());
+
+        // The whole row, not just the reference being written: this row is about to be
+        // rewritten anyway, and a dead session on a sibling reference has nothing else
+        // coming for it.
+        for reference in references.iter_mut() {
+            let account_number = reference.account_number;
+            reference.sessions.retain(|session| {
+                if session.is_expired(now) {
+                    dropped.push((account_number, session.clone()));
+                    return false;
+                }
+                true
+            });
+        }
+
+        self.write_reference_list(anchor_number, application_number, references)?;
+        for (account_number, session) in &dropped {
+            self.unindex_sessions(
+                anchor_number,
+                application_number,
+                *account_number,
+                std::slice::from_ref(session),
+            );
+        }
+        if let Some(principal) =
+            self.session_principal(anchor_number, application_number, account_number, &session)
+        {
+            self.lookup_session_with_principal_memory.insert(
+                principal,
+                StorableSessionHandle {
+                    account_principal: self
+                        .account_principal_of(anchor_number, application_number, account_number)
+                        .map(|p| p.as_slice().to_vec())
+                        .unwrap_or_default(),
+                    device_id,
+                    created_at: session.created_at,
+                },
+            );
+        }
+        self.change_session_count(anchor_number, dropped.len(), 1)?;
+
+        Ok(session)
+    }
+
+    // Called by the sign-in ceremony, which lands two PRs up.
+    #[allow(dead_code)]
+    /// The principal an app sees for an account, which is what a session handle names.
+    fn account_principal_of(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+    ) -> Option<Principal> {
+        let salt = self.salt().copied()?;
+        let account = self.read_account(ReadAccountParams {
+            account_number,
+            anchor_number,
+            origin: &self
+                .stable_application_memory
+                .get(&application_number)?
+                .origin,
+            known_app_num: Some(application_number),
+        })?;
+        Some(canister_sig_principal(
+            self.canister_id,
+            account.calculate_seed_with_salt(&salt).to_vec(),
+        ))
+    }
+
     /// Writes the reference-list row an `AnchorApplicationConfig` row implies, leaving
     /// `last_used` unset.
     pub fn ensure_account_reference_list(
@@ -1808,6 +2161,23 @@ impl<M: Memory + Clone> Storage<M> {
             .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
 
         self.sync_account_principal_index(anchor_number, application_number, &previous, &[])?;
+
+        // The row's sessions go with it, so their index entries have to go too. A browser
+        // keeps its id, and evicting a row leaves the account's principal untouched, so an
+        // entry left behind here would be waiting for the next sign-in at this origin.
+        let mut dropped = 0usize;
+        for reference in &previous {
+            self.unindex_sessions(
+                anchor_number,
+                application_number,
+                reference.account_number,
+                &reference.sessions,
+            );
+            dropped += reference.sessions.len();
+        }
+        if dropped > 0 {
+            self.change_session_count(anchor_number, dropped, 0)?;
+        }
 
         self.stable_account_reference_list_memory.remove(&key);
         self.stable_anchor_application_config_memory.remove(&key);
@@ -2874,6 +3244,18 @@ impl<M: Memory + Clone> Storage<M> {
     }
 }
 
+// Constructed by the sign-in ceremony, which lands two PRs up.
+#[allow(dead_code)]
+pub struct CreateSessionParams {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub device_id: SessionDeviceId,
+    pub valid_till: Timestamp,
+    pub read_only: bool,
+    pub now: Timestamp,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct AccountPrincipalIndexBackfillOutcome {
     pub next_cursor: Option<(AnchorNumber, ApplicationNumber)>,
@@ -2966,6 +3348,12 @@ pub enum StorageError {
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
     },
+    /// Reclaiming ran and the identity is still at the session cap. Unreachable unless
+    /// reclaiming stopped honouring its contract, which is why it is an error rather than a
+    /// refused sign-in: the sign-in is the thing this cap must never fail.
+    SessionCapNotReclaimed {
+        anchor_number: AnchorNumber,
+    },
     /// Tried to bind a recovery email that's already on a different
     /// anchor. The "one anchor per address" invariant from design
     /// §8.2 is enforced at the storage layer; the caller surfaces
@@ -3042,6 +3430,10 @@ impl fmt::Display for StorageError {
             Self::EmailRecoveryAddressAlreadyBound { existing_anchor } => write!(
                 f,
                 "recovery email is already bound to a different anchor ({existing_anchor})",
+            ),
+            Self::SessionCapNotReclaimed { anchor_number } => write!(
+                f,
+                "anchor {anchor_number} is at the session cap and reclaiming freed nothing"
             ),
         }
     }

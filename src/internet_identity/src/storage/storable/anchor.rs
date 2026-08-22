@@ -40,6 +40,11 @@ pub struct StorableAnchor {
     /// Monotonic per-anchor allocator for `session_devices`. Ids are never reused.
     #[n(8)]
     pub next_session_device_id: Option<StorableSessionDeviceId>,
+    /// Live sessions this anchor holds, as a trigger for the session cap rather than a
+    /// source of truth: expiry removes a session with no write to observe, so this can
+    /// over-count until a reclaim pass prunes and corrects it.
+    #[n(9)]
+    pub session_count: Option<u32>,
 }
 
 impl Storable for StorableAnchor {

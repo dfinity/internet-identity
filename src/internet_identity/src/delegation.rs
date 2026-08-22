@@ -124,6 +124,35 @@ pub fn calculate_account_seed_with_salt(
     hash_bytes(blob)
 }
 
+const SESSION_SEED_PREFIX: &str = "session";
+
+/// The seed of a session's canister-signed identity.
+///
+/// Built on the account's own seed, so a session survives anything that leaves the
+/// account's principal unchanged, including naming a default account. `device_id` and
+/// `created_at` are inputs, so a session's attribution cannot be rewritten in storage
+/// without invalidating it. Unguessability comes from the salt.
+pub fn calculate_session_seed_with_salt(
+    salt: &[u8; 32],
+    account_seed: &Hash,
+    created_at: Timestamp,
+    device_id: SessionDeviceId,
+) -> Hash {
+    fn push_field(blob: &mut Vec<u8>, data: &[u8]) {
+        blob.extend_from_slice(&(data.len() as u64).to_be_bytes());
+        blob.extend_from_slice(data);
+    }
+
+    let mut blob: Vec<u8> = vec![];
+    push_field(&mut blob, salt);
+    push_field(&mut blob, SESSION_SEED_PREFIX.as_bytes());
+    push_field(&mut blob, account_seed);
+    push_field(&mut blob, &created_at.to_be_bytes());
+    push_field(&mut blob, &device_id.to_be_bytes());
+
+    hash_bytes(blob)
+}
+
 fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(value.as_ref());
