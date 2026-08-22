@@ -807,6 +807,20 @@ export const idlFactory = ({ IDL }) => {
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
   });
+  const RevokeAccountSessionRequest = IDL.Record({
+    'origin' : IDL.Text,
+    'created_at' : Timestamp,
+    'account_number' : IDL.Opt(AccountNumber),
+    'identity_number' : UserNumber,
+  });
+  const SessionRevokeError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
+  const RevokeDeviceSessionsRequest = IDL.Record({
+    'device_id' : IDL.Nat32,
+    'identity_number' : UserNumber,
+  });
   const SetDefaultAccountError = IDL.Variant({
     'NoSuchOrigin' : IDL.Record({ 'anchor_number' : UserNumber }),
     'NoSuchAnchor' : IDL.Null,
@@ -1440,6 +1454,16 @@ export const idlFactory = ({ IDL }) => {
       ),
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
     'replace' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
+    'revoke_account_session' : IDL.Func(
+        [RevokeAccountSessionRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : SessionRevokeError })],
+        [],
+      ),
+    'revoke_device_sessions' : IDL.Func(
+        [RevokeDeviceSessionsRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : SessionRevokeError })],
+        [],
+      ),
     'set_default_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber)],
         [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : SetDefaultAccountError })],
