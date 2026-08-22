@@ -1,5 +1,5 @@
 use crate::internet_identity::types::openid::OpenIdCredentialData;
-use crate::internet_identity::types::{CredentialId, PublicKey, Timestamp};
+use crate::internet_identity::types::{CredentialId, PublicKey, SessionDeviceId, Timestamp};
 use candid::{CandidType, Deserialize, Principal};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -77,6 +77,15 @@ pub struct IdentityAuthnInfo {
     pub recovery_authn_methods: Vec<AuthnMethod>,
 }
 
+/// A browser this anchor has signed in from. The name is self-reported by the client.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SessionDeviceInfo {
+    pub id: SessionDeviceId,
+    pub name: String,
+    pub created_at: Timestamp,
+    pub last_used: Timestamp,
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct IdentityInfo {
     pub authn_methods: Vec<AuthnMethodData>,
@@ -99,6 +108,8 @@ pub struct IdentityInfo {
     /// `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
     pub verified_emails:
         Option<Vec<crate::internet_identity::types::verified_email::VerifiedEmail>>,
+    /// Browsers this anchor has signed in from. `None` if it has never created a session.
+    pub session_devices: Option<Vec<SessionDeviceInfo>>,
     /// The anchor's synced trusted-MCP-server config (master toggle +
     /// trusted server URL). `None` for an anchor that never wrote one.
     ///

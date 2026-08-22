@@ -75,6 +75,8 @@ mod tests {
 
     fn anchor_with(address: Option<&str>) -> Anchor {
         let mut a = Anchor {
+            session_devices: vec![],
+            next_session_device_id: 0,
             anchor_number: 1,
             devices: vec![],
             openid_credentials: vec![],
