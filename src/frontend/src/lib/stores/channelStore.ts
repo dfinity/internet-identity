@@ -23,6 +23,7 @@ import {
   handlePermissions,
 } from "$lib/stores/channelHandlers/icrc25";
 import { handleDelegationRequest } from "$lib/stores/channelHandlers/delegation";
+import { handleSessionDelegationRequest } from "$lib/stores/channelHandlers/sessionDelegation";
 import {
   handleLegacyAttributes,
   handleIcrc3OneClickOpenIdAttributes,
@@ -98,6 +99,10 @@ export const channelStore: ChannelStore = {
       channel.addEventListener(
         "request",
         handleDelegationRequest(channel, onError),
+      );
+      channel.addEventListener(
+        "request",
+        handleSessionDelegationRequest(channel, onError),
       );
       channel.addEventListener(
         "request",
