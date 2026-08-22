@@ -8,6 +8,8 @@ base64.workspace = true
 flate2 = "1.0"
 hex.workspace = true
 lazy_static.workspace = true
+# Signs the browser-key proof `prepare_account_session` requires.
+p256.workspace = true
 regex.workspace = true
 serde.workspace = true
 serde_cbor.workspace = true
