@@ -505,6 +505,9 @@ msgstr "Створено {0}"
 msgid "Created {date}"
 msgstr "Створено {date}"
 
+msgid "Created on the old Internet Identity site. Can only be used to <0>recover</0>, when upgrading from an identity number."
+msgstr "Створено на старому сайті Internet Identity. Може використовуватися лише для <0>відновлення</0>, при переході з номера ідентифікатора."
+
 msgid "Creating account..."
 msgstr "Створення облікового запису..."
 
