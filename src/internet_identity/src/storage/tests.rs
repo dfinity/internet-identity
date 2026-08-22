@@ -4611,3 +4611,283 @@ mod session_consent_change_tests {
         assert_eq!(held, vec![false, true]);
     }
 }
+
+mod session_refresh_stamp_tests {
+    use crate::storage::account::{AccountReference, SessionRecord};
+    use crate::storage::CreateSessionParams;
+    use crate::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::{AnchorNumber, ApplicationNumber};
+    use pretty_assertions::assert_eq;
+    use serde_bytes::ByteBuf;
+
+    const ORIGIN: &str = "https://example.com";
+
+    fn storage_with_session() -> (Storage<VectorMemory>, AnchorNumber, ApplicationNumber, u64) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        let session = storage
+            .create_session(CreateSessionParams {
+                anchor_number,
+                origin: ORIGIN.to_string(),
+                account_number: None,
+                device_id: 1,
+                valid_till: u64::MAX,
+                read_only: false,
+                now: 1_000,
+            })
+            .unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        (
+            storage,
+            anchor_number,
+            application_number,
+            session.created_at,
+        )
+    }
+
+    fn reference(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> AccountReference {
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        storage
+            .lookup_account_references(anchor_number, application_number)
+            .unwrap()
+            .into_iter()
+            .map(AccountReference::from)
+            .find(|reference| reference.account_number.is_none())
+            .unwrap()
+    }
+
+    fn session_of(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> SessionRecord {
+        reference(storage, anchor_number).sessions.remove(0)
+    }
+
+    #[test]
+    fn a_refresh_stamps_the_session_and_the_reference() {
+        let (mut storage, anchor_number, application_number, created_at) = storage_with_session();
+
+        let stamped = storage
+            .stamp_session_refresh(
+                anchor_number,
+                application_number,
+                None,
+                created_at,
+                1,
+                2_000,
+            )
+            .unwrap();
+
+        assert!(stamped);
+        assert_eq!(
+            session_of(&storage, anchor_number).last_refreshed,
+            Some(2_000)
+        );
+        assert_eq!(reference(&storage, anchor_number).last_used, Some(2_000));
+    }
+
+    #[test]
+    fn every_refresh_advances_the_stamp() {
+        let (mut storage, anchor_number, application_number, created_at) = storage_with_session();
+
+        for now in [1_001, 1_002, 1_003] {
+            assert!(storage
+                .stamp_session_refresh(anchor_number, application_number, None, created_at, 1, now)
+                .unwrap());
+            assert_eq!(
+                session_of(&storage, anchor_number).last_refreshed,
+                Some(now)
+            );
+        }
+    }
+
+    /// The row is rewritten anyway, so the refresh is where a dead sibling is collected —
+    /// index entry and session count included, since nothing else will come for them.
+    #[test]
+    fn a_refresh_collects_the_dead_sessions_beside_it() {
+        let (mut storage, anchor_number, application_number, created_at) = storage_with_session();
+
+        let dead = storage
+            .create_session(CreateSessionParams {
+                anchor_number,
+                origin: ORIGIN.to_string(),
+                account_number: None,
+                device_id: 9,
+                valid_till: 1_500,
+                read_only: false,
+                now: 1_000,
+            })
+            .unwrap();
+        let dead_principal = storage
+            .session_principal(anchor_number, application_number, None, &dead)
+            .unwrap();
+        assert!(storage.lookup_session_with_principal(dead_principal).is_some());
+        assert_eq!(storage.read(anchor_number).unwrap().session_count, 2);
+
+        assert!(storage
+            .stamp_session_refresh(anchor_number, application_number, None, created_at, 1, 2_000)
+            .unwrap());
+
+        let sessions = reference(&storage, anchor_number).sessions;
+        assert_eq!(sessions.len(), 1, "the expired sibling was left behind");
+        assert_eq!(sessions[0].device_id, 1);
+        assert!(
+            storage.lookup_session_with_principal(dead_principal).is_none(),
+            "the expired sibling's index entry outlived it"
+        );
+        assert_eq!(storage.read(anchor_number).unwrap().session_count, 1);
+    }
+
+    #[test]
+    fn a_stamp_for_a_session_that_is_gone_writes_nothing() {
+        let (mut storage, anchor_number, application_number, _) = storage_with_session();
+
+        let wrote = storage
+            .stamp_session_refresh(anchor_number, application_number, None, 9_999, 1, 5_000)
+            .unwrap();
+
+        assert!(!wrote);
+    }
+
+    #[test]
+    fn stamping_leaves_a_second_device_alone() {
+        let (mut storage, anchor_number, application_number, created_at) = storage_with_session();
+        storage
+            .create_session(CreateSessionParams {
+                anchor_number,
+                origin: ORIGIN.to_string(),
+                account_number: None,
+                device_id: 2,
+                valid_till: u64::MAX,
+                read_only: false,
+                now: 1_000,
+            })
+            .unwrap();
+        let now = 2_000;
+
+        storage
+            .stamp_session_refresh(anchor_number, application_number, None, created_at, 1, now)
+            .unwrap();
+
+        let sessions = reference(&storage, anchor_number).sessions;
+        assert_eq!(sessions.len(), 2);
+        let stamped = sessions.iter().find(|s| s.device_id == 1).unwrap();
+        let untouched = sessions.iter().find(|s| s.device_id == 2).unwrap();
+        assert_eq!(stamped.last_refreshed, Some(now));
+        assert_eq!(untouched.last_refreshed, None);
+    }
+
+    fn storage_with_registered_device() -> (
+        Storage<VectorMemory>,
+        AnchorNumber,
+        ApplicationNumber,
+        u64,
+        u32,
+    ) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let mut anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        let (device_id, _) = anchor
+            .resolve_session_device(
+                ByteBuf::from(vec![1; 91]),
+                ByteBuf::from(vec![2; 91]),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+        storage.write(anchor).unwrap();
+        let session = storage
+            .create_session(CreateSessionParams {
+                anchor_number,
+                origin: ORIGIN.to_string(),
+                account_number: None,
+                device_id,
+                valid_till: u64::MAX,
+                read_only: false,
+                now: 1_000,
+            })
+            .unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        (
+            storage,
+            anchor_number,
+            application_number,
+            session.created_at,
+            device_id,
+        )
+    }
+
+    fn device_last_used(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> u64 {
+        storage.read(anchor_number).unwrap().session_devices()[0].last_used
+    }
+
+    #[test]
+    fn a_refresh_advances_the_device_registry() {
+        let (mut storage, anchor_number, application_number, created_at, device_id) =
+            storage_with_registered_device();
+
+        storage
+            .stamp_session_refresh(
+                anchor_number,
+                application_number,
+                None,
+                created_at,
+                device_id,
+                9_000,
+            )
+            .unwrap();
+
+        assert_eq!(device_last_used(&storage, anchor_number), 9_000);
+    }
+
+    #[test]
+    fn a_refresh_leaves_the_device_enrolment_timestamp_alone() {
+        let (mut storage, anchor_number, application_number, created_at, device_id) =
+            storage_with_registered_device();
+
+        storage
+            .stamp_session_refresh(
+                anchor_number,
+                application_number,
+                None,
+                created_at,
+                device_id,
+                9_000,
+            )
+            .unwrap();
+
+        let device = storage.read(anchor_number).unwrap().session_devices()[0].clone();
+        assert_eq!(device.created_at, 1_000);
+        assert_eq!(device.last_used, 9_000);
+    }
+
+    #[test]
+    fn a_refresh_for_a_device_the_anchor_never_registered_still_stamps_the_session() {
+        let (mut storage, anchor_number, application_number, created_at) = storage_with_session();
+
+        let stamped = storage
+            .stamp_session_refresh(
+                anchor_number,
+                application_number,
+                None,
+                created_at,
+                1,
+                9_000,
+            )
+            .unwrap();
+
+        assert!(stamped);
+        assert_eq!(
+            session_of(&storage, anchor_number).last_refreshed,
+            Some(9_000)
+        );
+    }
+}
