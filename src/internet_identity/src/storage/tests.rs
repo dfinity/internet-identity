@@ -3571,8 +3571,6 @@ mod account_principal_index_tests {
             other_anchor_number
         );
     }
-
-
 }
 
 mod account_principal_index_backfill_tests {
@@ -3875,7 +3873,7 @@ mod session_creation_tests {
     use crate::delegation::calculate_session_seed_with_salt;
     use crate::storage::account::{AccountReference, CreateAccountParams, SessionRecord};
     use crate::storage::{
-        CreateSessionParams,
+        CreateSessionParams, MAX_SESSIONS_PER_ANCHOR, SESSIONS_WATERMARK_PER_ANCHOR,
     };
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
@@ -4006,12 +4004,255 @@ mod session_creation_tests {
         assert!(sessions.iter().any(|s| s.device_id == 0));
     }
 
+    /// The per-identity cap reclaims to a watermark rather than blocking, taking expired
+    /// records first and then the least recently used.
+    #[test]
+    fn the_session_cap_reclaims_to_the_watermark() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let application_number =
+            storage.lookup_or_insert_application_number_with_origin(&ORIGIN.to_string());
 
+        let sessions: Vec<SessionRecord> = (0..MAX_SESSIONS_PER_ANCHOR)
+            .map(|device_id| SessionRecord {
+                created_at: 1_000,
+                valid_till: 1_000_000,
+                // Device 0 is the stalest live one; device 1 has already expired.
+                last_refreshed: Some(500_000 + device_id as u64),
+                device_id,
+                read_only: false,
+            })
+            .map(|mut session| {
+                if session.device_id == 1 {
+                    session.valid_till = 2_000;
+                }
+                session
+            })
+            .collect();
+        storage
+            .write_reference_list(
+                anchor_number,
+                application_number,
+                vec![AccountReference {
+                    account_number: None,
+                    last_used: Some(1),
+                    sessions,
+                }],
+            )
+            .unwrap();
+        let mut anchor = storage.read(anchor_number).unwrap();
+        anchor.session_count = MAX_SESSIONS_PER_ANCHOR;
+        storage.write(anchor).unwrap();
 
+        let mut params = params(anchor_number, 9_999, 600_000);
+        params.valid_till = 1_000_000;
+        storage.create_session(params).unwrap();
 
+        let remaining = sessions_of(&storage, anchor_number);
+        assert_eq!(
+            remaining.len(),
+            SESSIONS_WATERMARK_PER_ANCHOR as usize + 1,
+            "reclaims to the watermark and then admits the session it made room for"
+        );
+        // The expired one and the stalest live one are gone; the freshest are not.
+        assert!(!remaining.iter().any(|s| s.device_id == 1));
+        assert!(!remaining.iter().any(|s| s.device_id == 0));
+        assert!(remaining
+            .iter()
+            .any(|s| s.device_id == MAX_SESSIONS_PER_ANCHOR - 1));
+        assert!(remaining.iter().any(|s| s.device_id == 9_999));
+    }
 
+    #[test]
+    fn the_cap_is_never_exceeded_however_many_sign_ins_arrive() {
+        let (mut storage, anchor_number) = storage_with_anchor();
 
+        for device_id in 0..(MAX_SESSIONS_PER_ANCHOR + 120) {
+            let mut params = params(anchor_number, device_id, 600_000 + device_id as u64);
+            params.valid_till = 100_000_000;
+            storage.create_session(params).unwrap();
 
+            let stored = sessions_of(&storage, anchor_number).len();
+            assert!(
+                stored <= MAX_SESSIONS_PER_ANCHOR as usize,
+                "{stored} stored after {device_id} sign-ins"
+            );
+            assert_eq!(
+                storage.read(anchor_number).unwrap().session_count as usize,
+                stored,
+                "the counter parted ways with the rows after {device_id} sign-ins"
+            );
+        }
+    }
+
+    #[test]
+    fn an_over_counting_anchor_is_corrected_rather_than_denied() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        storage
+            .create_session(params(anchor_number, 1, 1_000))
+            .unwrap();
+
+        // Nothing observes a session expiring, so the count drifts up. The cap must be
+        // enforced against what the rows hold, not against the drift.
+        let mut anchor = storage.read(anchor_number).unwrap();
+        anchor.session_count = MAX_SESSIONS_PER_ANCHOR;
+        storage.write(anchor).unwrap();
+
+        storage
+            .create_session(params(anchor_number, 2, 2_000))
+            .unwrap();
+
+        assert_eq!(sessions_of(&storage, anchor_number).len(), 2);
+        assert_eq!(storage.read(anchor_number).unwrap().session_count, 2);
+    }
+
+    /// Two rows, both holding a default account, and both holding sessions for the same
+    /// browser ids. Reclaiming must take only the sessions it selected.
+    #[test]
+    fn reclaiming_takes_only_the_sessions_it_selected() {
+        const OTHER_ORIGIN: &str = "https://other.example";
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        // Two rows of this size put the identity two over the watermark, so the pass selects
+        // exactly two victims — one in each row.
+        const PER_ROW: u32 = SESSIONS_WATERMARK_PER_ANCHOR / 2 + 1;
+        let row = |expired_device: u32| -> Vec<AccountReference> {
+            let sessions = (0..PER_ROW)
+                .map(|device_id| {
+                    if device_id == expired_device {
+                        SessionRecord {
+                            created_at: 1,
+                            valid_till: 2,
+                            last_refreshed: None,
+                            device_id,
+                            read_only: false,
+                        }
+                    } else {
+                        SessionRecord {
+                            created_at: 1_000,
+                            valid_till: 100_000_000,
+                            last_refreshed: Some(500_000),
+                            device_id,
+                            read_only: false,
+                        }
+                    }
+                })
+                .collect();
+            vec![AccountReference {
+                account_number: None,
+                last_used: Some(1),
+                sessions,
+            }]
+        };
+
+        let first = storage.lookup_or_insert_application_number_with_origin(&ORIGIN.to_string());
+        let second =
+            storage.lookup_or_insert_application_number_with_origin(&OTHER_ORIGIN.to_string());
+        storage
+            .write_reference_list(anchor_number, first, row(0))
+            .unwrap();
+        storage
+            .write_reference_list(anchor_number, second, row(1))
+            .unwrap();
+
+        let mut anchor = storage.read(anchor_number).unwrap();
+        anchor.session_count = MAX_SESSIONS_PER_ANCHOR;
+        storage.write(anchor).unwrap();
+
+        let mut params = params(anchor_number, 9_999, 600_000);
+        params.valid_till = 100_000_000;
+        storage.create_session(params).unwrap();
+
+        let devices = |application_number| -> Vec<u32> {
+            let references: Vec<AccountReference> = storage
+                .lookup_account_references(anchor_number, application_number)
+                .unwrap()
+                .into_iter()
+                .map(Into::into)
+                .collect();
+            let mut ids: Vec<u32> = references
+                .into_iter()
+                .flat_map(|reference| reference.sessions)
+                .map(|session| session.device_id)
+                .collect();
+            ids.sort_unstable();
+            ids
+        };
+
+        let first_devices = devices(first);
+        let second_devices = devices(second);
+
+        assert!(
+            !first_devices.contains(&0),
+            "the expired session selected in the first row should be gone"
+        );
+        assert!(
+            !second_devices.contains(&1),
+            "the expired session selected in the second row should be gone"
+        );
+        assert!(
+            first_devices.contains(&1),
+            "the first row's live session for browser 1 was not selected and must survive"
+        );
+        assert!(
+            second_devices.contains(&0),
+            "the second row's live session for browser 0 was not selected and must survive"
+        );
+    }
+
+    /// The flood bound, exercised through the cap rather than through the order alone: a
+    /// session the user has actually kept alive survives a row full of sign-ins nobody
+    /// came back to, even though every one of them is newer than it.
+    #[test]
+    fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let application_number =
+            storage.lookup_or_insert_application_number_with_origin(&ORIGIN.to_string());
+
+        let mut sessions = vec![SessionRecord {
+            created_at: 1_000,
+            valid_till: 100_000_000,
+            last_refreshed: Some(400_000),
+            device_id: 1,
+            read_only: false,
+        }];
+        sessions.extend(
+            (2..=MAX_SESSIONS_PER_ANCHOR).map(|device_id| SessionRecord {
+                created_at: 500_000,
+                valid_till: 100_000_000,
+                last_refreshed: None,
+                device_id,
+                read_only: false,
+            }),
+        );
+        storage
+            .write_reference_list(
+                anchor_number,
+                application_number,
+                vec![AccountReference {
+                    account_number: None,
+                    last_used: Some(1),
+                    sessions,
+                }],
+            )
+            .unwrap();
+        let mut anchor = storage.read(anchor_number).unwrap();
+        anchor.session_count = MAX_SESSIONS_PER_ANCHOR;
+        storage.write(anchor).unwrap();
+
+        let mut params = params(anchor_number, 9_999, 600_000);
+        params.valid_till = 100_000_000;
+        storage.create_session(params).unwrap();
+
+        let remaining = sessions_of(&storage, anchor_number);
+        assert!(
+            remaining.iter().any(|session| session.device_id == 1),
+            "the session that was kept alive was reclaimed"
+        );
+        assert!(
+            remaining.len() < MAX_SESSIONS_PER_ANCHOR as usize,
+            "nothing was reclaimed, so the test proves nothing"
+        );
+    }
 
     #[test]
     fn a_named_account_can_hold_its_own_sessions() {
