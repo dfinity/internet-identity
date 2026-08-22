@@ -19,6 +19,16 @@ export interface AccountInfo {
   'last_used' : [] | [Timestamp],
 }
 export type AccountNumber = bigint;
+export type AccountSessionError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal } |
+  { 'NoSuchSession' : null } |
+  { 'NoSuchAccount' : null } |
+  {
+    /**
+     * The browser's key is unusable, or its signature does not verify against it.
+     */
+    'InvalidDeviceKey' : null
+  };
 export interface AccountUpdate { 'name' : [] | [string] }
 export type AddTentativeDeviceResponse = {
     /**
@@ -688,6 +698,16 @@ export type GetAccountError = {
       'anchor_number' : UserNumber,
     }
   };
+export interface GetAccountSessionRequest {
+  'session_key' : SessionKey,
+  'origin' : FrontendHostname,
+  'account_number' : [] | [AccountNumber],
+  'expiration' : Timestamp,
+  'identity_number' : UserNumber,
+}
+export interface GetAccountSessionResponse {
+  'signed_delegation' : SignedDelegation,
+}
 export type GetAccountsError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export type GetAttributesError = { 'AuthorizationError' : Principal } |
@@ -1317,6 +1337,63 @@ export type Permissions = { 'all' : null } |
 export interface PrepareAccountDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
+}
+export interface PrepareAccountSessionRequest {
+  /**
+   * The consented access level, fixed for the session's life.
+   */
+  'permissions' : [] | [Permissions],
+  /**
+   * The II frontend's own key. The app never sees this chain's private key.
+   */
+  'session_key' : SessionKey,
+  /**
+   * Clamped to the session maximum.
+   */
+  'valid_for' : [] | [bigint],
+  'origin' : FrontendHostname,
+  /**
+   * Labels the browser in the user's session list, e.g. "Chrome on MacBook".
+   */
+  'device_name' : string,
+  'account_number' : [] | [AccountNumber],
+  /**
+   * Signature over session_key and next_device_key, verified with device_key.
+   */
+  'device_key_signature' : Uint8Array | number[],
+  /**
+   * The browser's own public key, DER-encoded, as the registry currently holds it. A
+   * key this anchor has not seen registers a browser under it.
+   */
+  'device_key' : PublicKey,
+  'identity_number' : UserNumber,
+  /**
+   * What the browser rotates to once this sign-in succeeds.
+   */
+  'next_device_key' : PublicKey,
+  /**
+   * Signature by next_device_key over session_key and device_key, proving the browser
+   * holds the key it is announcing.
+   */
+  'next_device_key_signature' : Uint8Array | number[],
+}
+export interface PrepareAccountSessionResponse {
+  'user_key' : PublicKey,
+  /**
+   * Which browser this sign-in was attributed to, so the settings list can mark the one
+   * the user is looking at. Not a credential: a caller never presents it.
+   */
+  'device_id' : number,
+  'created_at' : Timestamp,
+  /**
+   * The session's valid_till.
+   */
+  'expiration' : Timestamp,
+  /**
+   * The principal apps see for this account, so the frontend can tell its own
+   * sessions apart without minting a delegation to learn it.
+   */
+  'account_principal' : Principal,
 }
 export type PrepareAttributeError = { 'AuthorizationError' : Principal } |
   { 'ValidationError' : { 'problems' : Array<string> } } |
@@ -2049,6 +2126,11 @@ export interface _SERVICE {
     { 'Ok' : SignedDelegation } |
       { 'Err' : AccountDelegationError }
   >,
+  'get_account_session' : ActorMethod<
+    [GetAccountSessionRequest],
+    { 'Ok' : GetAccountSessionResponse } |
+      { 'Err' : AccountSessionError }
+  >,
   /**
    * Multiple accounts
    */
@@ -2340,6 +2422,17 @@ export interface _SERVICE {
     ],
     { 'Ok' : PrepareAccountDelegation } |
       { 'Err' : AccountDelegationError }
+  >,
+  /**
+   * Creates or reuses a revocable session at one account and signs its identity to
+   * the II frontend's own key. Called only by the II frontend, which ships with the
+   * canister; requires an anchor access method, so a session can neither spawn nor
+   * extend itself.
+   */
+  'prepare_account_session' : ActorMethod<
+    [PrepareAccountSessionRequest],
+    { 'Ok' : PrepareAccountSessionResponse } |
+      { 'Err' : AccountSessionError }
   >,
   /**
    * Attribute sharing protocol
