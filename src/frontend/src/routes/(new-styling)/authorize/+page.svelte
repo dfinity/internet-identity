@@ -29,6 +29,11 @@
   import type { AccessLevel } from "$lib/utils/accessLevel";
   import AuthWizardView from "./views/AuthWizardView.svelte";
   import AttributeConsentView from "./views/AttributeConsentView.svelte";
+  import NotifOptInView from "./views/NotifOptInView.svelte";
+  import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
+  import { isPushSupported } from "$lib/utils/notifications/pushSubscription";
+  import { enableNotifications } from "$lib/utils/notifications/enableNotifications";
+  import { actorForIdentity } from "$lib/stores/session-delegation.store";
   import {
     type AttributeConsent,
     attributeConsentStore,
@@ -186,12 +191,82 @@
   const handleSsoNormalLoginCancel = () => {
     ssoNormalLogin = undefined;
   };
+  // Authorize args stashed while the notification opt-in is shown, so Allow/Not
+  // now can resume the exact same authorization afterwards.
+  let notifOptIn = $state<{
+    accountNumber: Promise<bigint | undefined>;
+    accessLevel: AccessLevel;
+    maxTimeToLive?: bigint;
+  }>();
+
   const handleAuthorize = (
     accountNumber: Promise<bigint | undefined>,
     accessLevel: AccessLevel,
     maxTimeToLive?: bigint,
   ) => {
     authorizationStore.authorize(accountNumber, accessLevel, maxTimeToLive);
+  };
+
+  // ContinueView's authorize: offer notifications first when eligible, otherwise
+  // authorize straight away. Only this path opts in — the 1-click and
+  // upgrade-success flows authorize directly.
+  const handleContinueAuthorize = (
+    accountNumber: Promise<bigint | undefined>,
+    accessLevel: AccessLevel,
+    maxTimeToLive?: bigint,
+  ) => {
+    const effectiveOrigin = get(authorizationStore)?.effectiveOrigin;
+    if (
+      $PUSH_NOTIFICATIONS &&
+      isPushSupported() &&
+      selectedIdentity !== undefined &&
+      effectiveOrigin !== undefined &&
+      notifOptIn === undefined
+    ) {
+      notifOptIn = { accountNumber, accessLevel, maxTimeToLive };
+      return;
+    }
+    authorizationStore.authorize(accountNumber, accessLevel, maxTimeToLive);
+  };
+
+  const resumeAuthorize = () => {
+    const args = notifOptIn;
+    if (args === undefined) {
+      return;
+    }
+    notifOptIn = undefined;
+    authorizationStore.authorize(
+      args.accountNumber,
+      args.accessLevel,
+      args.maxTimeToLive,
+    );
+  };
+
+  // Opting in never blocks sign-in: a failure toasts and still authorizes.
+  const handleNotifAllow = async () => {
+    const args = notifOptIn;
+    const effectiveOrigin = get(authorizationStore)?.effectiveOrigin;
+    if (
+      args !== undefined &&
+      effectiveOrigin !== undefined &&
+      selectedIdentity !== undefined
+    ) {
+      try {
+        const identityNumber = selectedIdentity.identityNumber;
+        const actor = await actorForIdentity(identityNumber);
+        if (actor !== undefined) {
+          await enableNotifications({
+            identityNumber,
+            accountNumber: await args.accountNumber,
+            origin: effectiveOrigin,
+            actor,
+          });
+        }
+      } catch {
+        toaster.error({ title: $t`Couldn't turn on notifications.` });
+      }
+    }
+    resumeAuthorize();
   };
 
   const handleAttributeConsent = (consent: AttributeConsent) => {
@@ -617,6 +692,9 @@
   <!-- 1-click SSO hit the normal-login-required fail-safe — show the one-step
        "First sign-in with X" dialog instead of proceeding. -->
   {@render panelWrapper(ssoNormalLoginContent)}
+{:else if notifOptIn !== undefined}
+  <!-- User chose to authorize — offer notifications before redirecting. -->
+  {@render panelWrapper(notifOptInContent)}
 {:else if selectedIdentity !== undefined}
   <!-- Returning user with a selected identity — show account selection.
        Its header shows the channel origin, so the panel may name the app. -->
@@ -643,12 +721,20 @@
   <UpgradeSuccessView onAuthorize={handleAuthorize} />
 {/snippet}
 
+{#snippet notifOptInContent()}
+  <NotifOptInView
+    appName={dapp?.name}
+    onAllow={handleNotifAllow}
+    onSkip={resumeAuthorize}
+  />
+{/snippet}
+
 {#snippet continueContent()}
   <ContinueView
     effectiveOrigin={$authorizationContextStore.effectiveOrigin}
     displayOrigin={$establishedChannelStore.origin}
     requestedMaxTimeToLive={$requestedMaxTimeToLiveStore}
-    onAuthorize={handleAuthorize}
+    onAuthorize={handleContinueAuthorize}
   />
 {/snippet}
 
