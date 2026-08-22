@@ -77,6 +77,7 @@ mod tests {
         let mut a = Anchor {
             session_devices: vec![],
             next_session_device_id: 0,
+            session_count: 0,
             anchor_number: 1,
             devices: vec![],
             openid_credentials: vec![],

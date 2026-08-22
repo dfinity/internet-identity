@@ -290,6 +290,7 @@ pub fn init_new() {
         memory,
     );
     storage_replace(storage);
+    storage_borrow_mut(|storage| storage.set_canister_id(ic_cdk::id()));
 }
 
 pub fn init_from_stable_memory() {
@@ -298,6 +299,7 @@ pub fn init_from_stable_memory() {
     });
     let storage = Storage::from_memory(DefaultMemoryImpl::default());
     storage_replace(storage);
+    storage_borrow_mut(|storage| storage.set_canister_id(ic_cdk::id()));
 }
 
 pub fn save_persistent_state() {
