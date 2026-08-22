@@ -6,4 +6,5 @@
 //! the generic parts.
 
 pub mod consent;
+pub mod sender;
 pub mod webpush;
