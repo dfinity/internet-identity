@@ -67,6 +67,7 @@ mod mcp_registration;
 
 mod openid;
 mod session_delegation;
+mod sessions;
 mod single_flight_cache;
 mod state;
 mod stats;
