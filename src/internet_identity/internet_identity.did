@@ -1075,6 +1075,31 @@ type AccountSessionError = variant {
     InternalCanisterError : text;
 };
 
+type AppPrepareDelegationRequest = record {
+    // The key the app delegation delegates to. Nothing about the account is named:
+    // the caller's own session chain is what identifies it.
+    session_key : SessionKey;
+};
+
+type AppPrepareDelegationResponse = record {
+    user_key : PublicKey;
+    expiration : Timestamp;
+};
+
+type AppGetDelegationRequest = record {
+    session_key : SessionKey;
+    // Must match the prepared value.
+    expiration : Timestamp;
+};
+
+type AppSessionError = variant {
+    // No usable session behind this caller: revoked, expired, pruned, or never one at
+    // all. One outcome, because which of those it is depends on whether a prune has run
+    // yet, and because an app can act on none of them differently.
+    NoMatchingSession;
+    InternalCanisterError : text;
+};
+
 type IdentityInfo = record {
     authn_methods : vec AuthnMethodData;
     authn_method_registration : opt AuthnMethodRegistrationInfo;
@@ -1935,6 +1960,12 @@ service : (opt InternetIdentityInit) -> {
     // extend itself.
     prepare_account_session : (PrepareAccountSessionRequest) -> (variant { Ok : PrepareAccountSessionResponse; Err : AccountSessionError });
     get_account_session : (GetAccountSessionRequest) -> (variant { Ok : GetAccountSessionResponse; Err : AccountSessionError }) query;
+
+    // Mints a short-lived app delegation from a live session. Called by app frontends
+    // with the session chain, so revoking the session ends access within one delegation
+    // lifetime.
+    app_prepare_delegation : (AppPrepareDelegationRequest) -> (variant { Ok : AppPrepareDelegationResponse; Err : AppSessionError });
+    app_get_delegation : (AppGetDelegationRequest) -> (variant { Ok : SignedDelegation; Err : AppSessionError }) query;
 
     prepare_account_delegation : (
         anchor_number : UserNumber,
