@@ -1,9 +1,10 @@
 //! One subscription row per device, keyed `(anchor, sha256(endpoint))`.
 
 use super::super::{authorize_update, check_enabled};
+use super::seal::{drop_device_seals, reseal_device};
 use super::{
-    validate_jwt_pool, validate_param_len, AUTH_LEN, MAX_ENDPOINT_LEN,
-    MAX_SUBSCRIPTIONS_PER_ANCHOR, P256DH_LEN, VAPID_PUBKEY_LEN,
+    validate_jwt_pool, validate_p256dh, validate_param_len, AUTH_LEN, MAX_ENDPOINT_LEN,
+    MAX_SUBSCRIPTIONS_PER_ANCHOR, VAPID_PUBKEY_LEN,
 };
 use crate::state::storage_borrow_mut;
 use crate::storage::storable::notifications::webpush::endpoint_hash::StorableEndpointSha256;
@@ -25,7 +26,7 @@ pub(super) fn add_subscription(
     // Report every invalid field at once rather than failing on the first.
     let errors: Vec<String> = [
         validate_param_len(endpoint.len(), 1..=MAX_ENDPOINT_LEN, "endpoint"),
-        validate_param_len(p256dh.len(), P256DH_LEN..=P256DH_LEN, "p256dh"),
+        validate_p256dh(&p256dh),
         validate_param_len(auth.len(), AUTH_LEN..=AUTH_LEN, "auth"),
         validate_param_len(
             vapid_public_key.len(),
@@ -75,14 +76,15 @@ pub(super) fn add_subscription(
                 {
                     // The key came from the scan just above, so the removal must
                     // hit; a miss means the row vanished underneath us. The JWT
-                    // pool rides on the same row, so it goes with it.
+                    // pool rides on the same row, and the device's seals go too.
                     let removed = storage
                         .webpush_subscriptions_memory
-                        .remove(&(anchor_number, oldest_hash));
+                        .remove(&(anchor_number, oldest_hash.clone()));
                     debug_assert!(
                         removed.is_some(),
                         "evicted a subscription that was not present"
                     );
+                    storage.remove_webpush_seals_for_device(anchor_number, &oldest_hash);
                 }
             }
         }
@@ -106,7 +108,7 @@ pub(super) fn remove_subscription(anchor_number: AnchorNumber, endpoint: &str) {
 
 /// Idempotent: re-subscribing the same endpoint overwrites in place.
 #[allow(clippy::too_many_arguments)]
-pub fn subscribe_device(
+pub async fn subscribe_device(
     anchor_number: AnchorNumber,
     endpoint: String,
     p256dh: Vec<u8>,
@@ -117,24 +119,30 @@ pub fn subscribe_device(
 ) -> Result<(), String> {
     check_enabled()?;
     authorize_update(anchor_number)?;
+    let now_ns = ic_cdk::api::time();
+    let endpoint_hash = StorableEndpointSha256::from_endpoint(&endpoint);
     add_subscription(
         anchor_number,
         endpoint,
-        p256dh,
-        auth,
+        p256dh.clone(),
+        auth.clone(),
         vapid_public_key,
         jwt_signatures,
         jwt_issued_at_ns,
-        ic_cdk::api::time(),
+        now_ns,
     )
-    .map_err(|errors| errors.join("; "))
+    .map_err(|errors| errors.join("; "))?;
+    reseal_device(anchor_number, endpoint_hash, &p256dh, &auth, now_ns).await;
+    Ok(())
 }
 
 /// Removes this device's subscription. Idempotent.
 pub fn unsubscribe_device(anchor_number: AnchorNumber, endpoint: String) -> Result<(), String> {
     check_enabled()?;
     authorize_update(anchor_number)?;
+    let endpoint_hash = StorableEndpointSha256::from_endpoint(&endpoint);
     remove_subscription(anchor_number, &endpoint);
+    drop_device_seals(anchor_number, &endpoint_hash);
     Ok(())
 }
 
@@ -342,6 +350,43 @@ mod tests {
         assert!(
             !oldest_still_present,
             "the oldest subscription (lowest created_at_ns) should have been evicted"
+        );
+    }
+
+    #[test]
+    fn eviction_drops_the_evicted_device_seals() {
+        use crate::storage::storable::application::StorableOriginSha256;
+        use crate::storage::storable::notifications::webpush::seal::StorableWebPushSeal;
+
+        setup();
+        let anchor = 1;
+        let oldest_endpoint = "https://relay.example/0";
+
+        for i in 0..MAX_SUBSCRIPTIONS_PER_ANCHOR {
+            subscribe(anchor, &format!("https://relay.example/{i}"), i).unwrap();
+        }
+        // Seal the oldest device for an origin, as consent would have.
+        let oldest_hash = StorableEndpointSha256::from_endpoint(oldest_endpoint);
+        let origin_hash = StorableOriginSha256::from_origin(&"https://app.example".to_string());
+        storage_borrow_mut(|s| {
+            s.add_webpush_seal(
+                (anchor, oldest_hash.clone(), origin_hash.clone()),
+                StorableWebPushSeal {
+                    blob: vec![1u8; 10],
+                    created_at_ns: 0,
+                },
+            );
+        });
+
+        subscribe(anchor, "https://relay.example/new", 1_000).unwrap();
+
+        let seal_survived = storage_borrow(|s| {
+            s.webpush_seal_memory
+                .contains_key(&(anchor, oldest_hash, origin_hash))
+        });
+        assert!(
+            !seal_survived,
+            "the evicted device's seals must be dropped with its subscription"
         );
     }
 }

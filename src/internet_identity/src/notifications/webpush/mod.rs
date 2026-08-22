@@ -3,6 +3,8 @@
 use std::ops::RangeInclusive;
 
 pub mod jwt_pool;
+pub mod rfc8291;
+pub mod seal;
 pub mod subscription;
 
 /// Relay endpoints run ~200-300 bytes; capped at 1 KiB.
@@ -43,6 +45,17 @@ fn validate_param_len(
     Ok(())
 }
 
+/// Length plus curve validity: an unparseable `p256dh` could never be sealed,
+/// so reject it here with an actionable error instead of silently storing a
+/// subscription that never becomes deliverable.
+fn validate_p256dh(p256dh: &[u8]) -> Result<(), String> {
+    validate_param_len(p256dh.len(), P256DH_LEN..=P256DH_LEN, "p256dh")?;
+    if !rfc8291::validate_device_public_key(p256dh) {
+        return Err("p256dh is not a valid SEC1 P-256 point".to_string());
+    }
+    Ok(())
+}
+
 /// Not verified: garbage only breaks the uploader's own delivery, and 30
 /// ECDSA verifications per subscribe isn't worth it.
 fn validate_jwt_pool(signatures: &[Vec<u8>]) -> Result<(), String> {
@@ -62,7 +75,15 @@ pub(crate) mod fixtures {
     use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 
     pub(crate) fn valid_p256dh() -> Vec<u8> {
-        vec![4u8; P256DH_LEN]
+        use p256::elliptic_curve::sec1::ToEncodedPoint;
+        // A real, fixed SEC1 point: the length-only fixture can't pass the curve
+        // check `add_subscription` now runs.
+        let secret = p256::SecretKey::from_slice(&[1u8; 32]).expect("fixed scalar is valid");
+        secret
+            .public_key()
+            .to_encoded_point(false)
+            .as_bytes()
+            .to_vec()
     }
 
     pub(crate) fn valid_auth() -> Vec<u8> {
