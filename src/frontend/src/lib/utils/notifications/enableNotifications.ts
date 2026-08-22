@@ -5,6 +5,7 @@
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import { agentOptions } from "$lib/globals";
 import { throwTextCanisterError } from "$lib/utils/utils";
 import { generateVapidKeypair, signJwtPool } from "./vapidPool";
 import {
@@ -64,6 +65,7 @@ export const enableNotifications = async ({
       identityNumber,
       accountNumber,
       origin,
+      host: agentOptions.host ?? self.location.origin,
       actor,
     }),
   );
