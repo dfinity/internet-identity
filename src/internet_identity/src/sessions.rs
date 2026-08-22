@@ -396,6 +396,35 @@ pub fn app_get_delegation(
 fn authorize_session(
     now: Timestamp,
 ) -> Result<(StorableAccountLocator, Account, SessionRecord), AppSessionError> {
+    let matched = match_session()?;
+    if matched.2.is_expired(now) {
+        return Err(AppSessionError::NoMatchingSession);
+    }
+    Ok(matched)
+}
+
+/// Signs the caller's own session out. A caller cannot produce another session's
+/// principal, so the seed match is the whole authorization. Always succeeds.
+pub fn app_revoke_session() {
+    let Ok((locator, _, session)) = match_session() else {
+        return;
+    };
+    // Trapping rather than reporting success: the caller is told nothing either way, so a
+    // storage failure that left the session live would end as a silent no-op. A trap rolls
+    // the message back and reaches the caller as a reject.
+    storage_borrow_mut(|storage| {
+        storage.remove_session(
+            locator.anchor_number,
+            locator.application_number,
+            locator.account_number,
+            session.created_at,
+            session.device_id,
+        )
+    })
+    .expect("failed to remove a session that was just matched");
+}
+
+fn match_session() -> Result<(StorableAccountLocator, Account, SessionRecord), AppSessionError> {
     let handle = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
         .ok_or(AppSessionError::NoMatchingSession)?;
     let locator = storage_borrow(|storage| storage.lookup_account_with_principal(handle.account()))
@@ -419,9 +448,7 @@ fn authorize_session(
             session.device_id == handle.device_id && session.created_at == handle.created_at
         })
         .ok_or(AppSessionError::NoMatchingSession)?;
-    if session.is_expired(now) {
-        return Err(AppSessionError::NoMatchingSession);
-    }
+
     Ok((locator, account, session))
 }
 

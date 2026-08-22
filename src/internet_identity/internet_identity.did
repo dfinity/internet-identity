@@ -1967,6 +1967,11 @@ service : (opt InternetIdentityInit) -> {
     app_prepare_delegation : (AppPrepareDelegationRequest) -> (variant { Ok : AppPrepareDelegationResponse; Err : AppSessionError });
     app_get_delegation : (AppGetDelegationRequest) -> (variant { Ok : SignedDelegation; Err : AppSessionError }) query;
 
+    // Signs the calling session out. Returns nothing and always succeeds, so a client
+    // that retries, or that signs out twice, does not have to reason about whether its
+    // session was already gone. An app can revoke only its own session.
+    app_revoke_session : () -> ();
+
     prepare_account_delegation : (
         anchor_number : UserNumber,
         origin : FrontendHostname,

@@ -4909,3 +4909,96 @@ mod session_refresh_stamp_tests {
         );
     }
 }
+
+mod session_removal_tests {
+    use crate::storage::account::AccountReference;
+    use crate::storage::CreateSessionParams;
+    use crate::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    const ORIGIN: &str = "https://example.com";
+
+    fn storage_with_sessions(devices: &[u32]) -> (Storage<VectorMemory>, AnchorNumber, u64) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        for device_id in devices {
+            storage
+                .create_session(CreateSessionParams {
+                    anchor_number,
+                    origin: ORIGIN.to_string(),
+                    account_number: None,
+                    device_id: *device_id,
+                    valid_till: u64::MAX,
+                    read_only: false,
+                    now: 1_000,
+                })
+                .unwrap();
+        }
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        (storage, anchor_number, application_number)
+    }
+
+    fn sessions(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> Vec<u32> {
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        storage
+            .lookup_account_references(anchor_number, application_number)
+            .unwrap()
+            .into_iter()
+            .map(AccountReference::from)
+            .find(|reference| reference.account_number.is_none())
+            .unwrap()
+            .sessions
+            .into_iter()
+            .map(|session| session.device_id)
+            .collect()
+    }
+
+    #[test]
+    fn removing_a_session_leaves_the_others() {
+        let (mut storage, anchor_number, application_number) = storage_with_sessions(&[1, 2, 3]);
+
+        let removed = storage
+            .remove_session(anchor_number, application_number, None, 1_000, 2)
+            .unwrap();
+
+        assert!(removed);
+        assert_eq!(sessions(&storage, anchor_number), vec![1, 3]);
+    }
+
+    #[test]
+    fn removing_a_session_twice_reports_nothing_removed() {
+        let (mut storage, anchor_number, application_number) = storage_with_sessions(&[1]);
+        storage
+            .remove_session(anchor_number, application_number, None, 1_000, 1)
+            .unwrap();
+
+        let removed = storage
+            .remove_session(anchor_number, application_number, None, 1_000, 1)
+            .unwrap();
+
+        assert!(!removed);
+        assert_eq!(sessions(&storage, anchor_number), Vec::<u32>::new());
+    }
+
+    #[test]
+    fn removing_the_last_session_keeps_the_reference() {
+        let (mut storage, anchor_number, application_number) = storage_with_sessions(&[1]);
+
+        storage
+            .remove_session(anchor_number, application_number, None, 1_000, 1)
+            .unwrap();
+
+        assert!(storage
+            .lookup_account_references(anchor_number, application_number)
+            .is_some());
+    }
+}
