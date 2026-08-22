@@ -362,9 +362,9 @@ pub async fn prepare_account_delegation(
     });
     update_root_hash();
 
-    // Update last used timestamp
     storage_borrow_mut(|storage| {
-        storage.set_account_last_used(anchor_number, origin.clone(), account_number, time());
+        let _ =
+            storage.set_account_last_used(anchor_number, origin.clone(), account_number, time());
     });
 
     delegation_bookkeeping(origin, ii_domain.clone(), effective_duration_ns);
