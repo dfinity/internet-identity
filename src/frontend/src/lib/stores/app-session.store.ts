@@ -21,6 +21,8 @@ export interface AppSessionRecord {
    *  once a surface exists that lists them. */
   /** Names this session to `revoke_account_session`, which is how one session is revoked
    *  once a surface exists that lists them. */
+  /** Names this session to `revoke_account_session`, which is how one session is revoked
+   *  once a surface exists that lists them. */
   createdAtNanos: bigint;
   /** What the user consented to when this session was created. Recorded for display; the
    *  canister enforces it at every mint, and an app cannot request a level of its own. */

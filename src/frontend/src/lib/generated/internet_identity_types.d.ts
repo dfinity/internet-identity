@@ -2044,6 +2044,13 @@ export interface _SERVICE {
     { 'Ok' : IdRegNextStepResult } |
       { 'Err' : CheckCaptchaError }
   >,
+  /**
+   * Whether the calling session is still usable. For the II frontend's silent
+   * re-auth path, which must decide whether it can answer without rendering
+   * anything. Advisory: a query reply is not certified, and every mint enforces
+   * the same conditions regardless of the answer here.
+   */
+  'check_session' : ActorMethod<[], boolean>,
   'config' : ActorMethod<[], InternetIdentityInit>,
   'create_account' : ActorMethod<
     [UserNumber, FrontendHostname, string],

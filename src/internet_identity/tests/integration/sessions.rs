@@ -826,6 +826,71 @@ fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
     Ok(())
 }
 
+/// The silent re-auth path answers from a locally held record, so it needs a way to ask
+/// whether that record still stands for a session the canister has since lost.
+#[test]
+fn should_report_a_live_session_as_live() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::check_session;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    assert!(check_session(&env, canister_id, session_principal,)?);
+
+    Ok(())
+}
+
+#[test]
+fn should_report_a_revoked_session_as_gone() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::check_session;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (prepared, session_principal) = create_session(&env, canister_id, identity_number);
+
+    revoke_account_session(
+        &env,
+        canister_id,
+        principal_1(),
+        RevokeAccountSessionRequest {
+            identity_number,
+            origin: ORIGIN.to_string(),
+            account_number: None,
+            created_at: prepared.created_at,
+        },
+    )?
+    .unwrap();
+
+    assert!(!check_session(&env, canister_id, session_principal,)?);
+
+    Ok(())
+}
+
+#[test]
+fn should_report_an_expired_session_as_gone() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::check_session;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let mut request = session_request(identity_number);
+    request.valid_for = Some(10 * 60 * 1_000_000_000);
+    let prepared = prepare_account_session(&env, canister_id, principal_1(), request)?.unwrap();
+    let session_principal = Principal::self_authenticating(&prepared.user_key);
+
+    env.advance_time(Duration::from_secs(11 * 60));
+    // `check_session` is a query, so it sees the latest certified state: without a round the
+    // canister's clock has not moved and the session is not yet expired from its view.
+    env.tick();
+
+    assert!(!check_session(&env, canister_id, session_principal)?);
+
+    Ok(())
+}
+
 /// Naming a default account keeps its principal, so it must keep its sessions. Before the
 /// session seed was built on the account seed, naming it signed the user out of every app
 /// using that account.

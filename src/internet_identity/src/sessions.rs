@@ -404,6 +404,13 @@ fn authorize_session(
     Ok(matched)
 }
 
+/// Whether the calling session is still usable, for the II frontend's silent re-auth
+/// path. Advisory: a query reply is not certified, and the refresh path enforces the
+/// same conditions on every mint regardless of the answer here.
+pub fn check_session() -> bool {
+    authorize_session(time()).is_ok()
+}
+
 /// Signs the caller's own session out. A caller cannot produce another session's
 /// principal, so the seed match is the whole authorization. Always succeeds.
 pub fn app_revoke_session() {

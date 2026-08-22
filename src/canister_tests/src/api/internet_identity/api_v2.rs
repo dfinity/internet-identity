@@ -789,6 +789,15 @@ pub fn get_account_session(
     query_candid_as(env, canister_id, sender, "get_account_session", (request,)).map(|(x,)| x)
 }
 
+/// The II frontend's liveness check, called as the query it is declared as.
+pub fn check_session(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<bool, RejectResponse> {
+    query_candid_as(env, canister_id, sender, "check_session", ()).map(|(x,)| x)
+}
+
 pub fn app_prepare_delegation(
     env: &PocketIc,
     canister_id: CanisterId,
