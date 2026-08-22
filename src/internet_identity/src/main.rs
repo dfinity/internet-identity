@@ -527,6 +527,11 @@ fn app_revoke_session() {
 }
 
 #[query]
+fn check_session() -> bool {
+    sessions::check_session()
+}
+
+#[query]
 fn app_get_delegation(
     request: AppGetDelegationRequest,
 ) -> Result<SignedDelegation, AppSessionError> {

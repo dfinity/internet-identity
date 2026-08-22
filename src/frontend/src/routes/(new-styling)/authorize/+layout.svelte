@@ -10,6 +10,8 @@
     authorizationStore,
     authorizedStore,
   } from "$lib/stores/authorization.store";
+  import { authorizationPromptStore } from "$lib/stores/authorization.store";
+  import { resolvePromptParams, stripPromptParams } from "./promptParams";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { purgeSession } from "$lib/stores/session-delegation.store";
   import { authenticationStore } from "$lib/stores/authentication.store";
@@ -61,6 +63,16 @@
     }
     return "normal" as const;
   })();
+
+  // Set before the channel is established, so the delegation handler has the prompt
+  // context by the time a request arrives.
+  authorizationPromptStore.set(
+    resolvePromptParams(
+      new URL(window.location.href),
+      flow === "openid-resume",
+    ),
+  );
+  stripPromptParams();
 
   // --- Channel establishment ---
   $effect.pre(() => {
