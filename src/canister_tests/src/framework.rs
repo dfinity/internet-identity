@@ -361,6 +361,70 @@ pub fn restore_compressed_stable_memory(env: &PocketIc, canister_id: CanisterId,
     env.set_stable_memory(canister_id, buffer, BlobCompression::Gzip);
 }
 
+/// A browser key of the kind `prepare_account_session` demands a proof from.
+///
+/// The DER encoding and the domain prefix have to match what the canister verifies,
+/// so both are spelled out here rather than derived.
+pub struct BrowserKey {
+    signing_key: p256::ecdsa::SigningKey,
+}
+
+/// The SPKI header WebCrypto emits for an `ECDSA` P-256 public key, ahead of the 65-byte
+/// uncompressed point.
+const P256_SPKI_HEADER: [u8; 26] = [
+    0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a,
+    0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00,
+];
+
+const DEVICE_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-device-key";
+const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-device-successor";
+
+impl BrowserKey {
+    pub fn new(seed: u8) -> Self {
+        Self {
+            signing_key: p256::ecdsa::SigningKey::from_bytes(&[seed; 32].into())
+                .expect("failed to build a browser key"),
+        }
+    }
+
+    /// The key a browser rotates to after `self`, so a test can walk the chain.
+    pub fn successor(&self) -> Self {
+        let mut seed = [0u8; 32];
+        seed.copy_from_slice(&self.signing_key.to_bytes());
+        seed[0] = seed[0].wrapping_add(1);
+        Self {
+            signing_key: p256::ecdsa::SigningKey::from_bytes(&seed.into())
+                .expect("failed to build a browser key"),
+        }
+    }
+
+    pub fn public_key(&self) -> PublicKey {
+        let point = p256::ecdsa::VerifyingKey::from(&self.signing_key).to_encoded_point(false);
+        let mut der = P256_SPKI_HEADER.to_vec();
+        der.extend_from_slice(point.as_bytes());
+        ByteBuf::from(der)
+    }
+
+    pub fn sign(&self, session_key: &SessionKey, next_device_key: &PublicKey) -> ByteBuf {
+        self.sign_with(DEVICE_KEY_SIGNATURE_DOMAIN, session_key, next_device_key)
+    }
+
+    /// The successor's own signature, proving the browser holds the key it announces.
+    pub fn sign_as_successor(&self, session_key: &SessionKey, device_key: &PublicKey) -> ByteBuf {
+        self.sign_with(SUCCESSOR_KEY_SIGNATURE_DOMAIN, session_key, device_key)
+    }
+
+    fn sign_with(&self, domain: &[u8], session_key: &SessionKey, other: &PublicKey) -> ByteBuf {
+        use p256::ecdsa::signature::Signer;
+
+        let mut message = domain.to_vec();
+        message.extend_from_slice(session_key);
+        message.extend_from_slice(other);
+        let signature: p256::ecdsa::Signature = self.signing_key.sign(&message);
+        ByteBuf::from(signature.to_bytes().to_vec())
+    }
+}
+
 pub const PUBKEY_1: &str = "test";
 pub const PUBKEY_2: &str = "some other key";
 pub const RECOVERY_PUBKEY_1: &str = "recovery 1";

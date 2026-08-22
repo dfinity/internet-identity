@@ -1318,6 +1318,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 0,
                 devices: vec![],
                 openid_credentials: vec![],
@@ -1352,6 +1353,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 1,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("recovery_key_pubkey"),
@@ -1397,6 +1399,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 2,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("passkey_pubkey"),
@@ -1442,6 +1445,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 3,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("passkey_no_origin"),
@@ -1487,6 +1491,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 4,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("recovery_passkey"),
@@ -1532,6 +1537,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 5,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("recovery_passkey_no_origin"),
@@ -1577,6 +1583,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 6,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("browser_storage_key_auth"),
@@ -1622,6 +1629,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 7,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("browser_storage_key_recovery"),
@@ -1681,6 +1689,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 8,
                 devices: vec![
                     Device {
@@ -1727,6 +1736,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 9,
                 devices: vec![],
                 openid_credentials: vec![openid_credential(1)],
@@ -1748,6 +1758,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 10,
                 devices: vec![],
                 openid_credentials: vec![],
@@ -1782,6 +1793,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 11,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("unknown_keytype_passkey"),
@@ -1834,6 +1846,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 12,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("device_with_metadata"),
@@ -1873,6 +1886,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 13,
                 devices: vec![],
                 openid_credentials: vec![],
@@ -1907,6 +1921,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 14,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("protected_recovery_key"),
@@ -1955,6 +1970,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 15,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("protected_passkey"),
@@ -2002,6 +2018,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 16,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("unusual_device"),
@@ -2047,6 +2064,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 17,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("recovery_phrase_custom_alias"),
@@ -2092,6 +2110,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 18,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("platform_passkey"),
@@ -2137,6 +2156,7 @@ fn test_anchor_storage_migration_round_trip() {
             Anchor {
                 session_devices: vec![],
                 next_session_device_id: 0,
+                session_count: 0,
                 anchor_number: 19,
                 devices: vec![Device {
                     pubkey: ByteBuf::from("unknown_keytype_passkey_2"),
@@ -3551,6 +3571,8 @@ mod account_principal_index_tests {
             other_anchor_number
         );
     }
+
+
 }
 
 mod account_principal_index_backfill_tests {
@@ -3683,6 +3705,7 @@ mod account_principal_index_backfill_tests {
 mod session_record_tests {
     use crate::storage::account::{AccountReference, SessionRecord};
     use crate::storage::storable::account_reference::StorableAccountReference;
+    use crate::storage::MAX_EVICTABLE_DEFAULT_ACCOUNTS;
     use crate::{Storage, DAY_NS, MINUTE_NS};
     use ic_stable_structures::{Storable, VectorMemory};
     use internet_identity_interface::internet_identity::types::AnchorNumber;
@@ -3751,8 +3774,8 @@ mod session_record_tests {
     #[test]
     fn a_row_holding_a_session_is_evictable_like_any_other() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        let origin = "https://has-a-session.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&"https://example.com".to_string());
         storage
             .write_reference_list(
                 anchor_number,
@@ -3768,6 +3791,51 @@ mod session_record_tests {
         assert_eq!(storage.evictable_default_rows(anchor_number).len(), 1);
     }
 
+    /// Eviction orders on the row's `last_used`, which every refresh stamps, so a session
+    /// in use keeps its row at the newest end and survives the cap on its own.
+    #[test]
+    fn a_refreshed_session_keeps_its_row_and_a_stale_one_does_not() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let stale = "https://never-came-back.com".to_string();
+        let refreshed = "https://still-in-use.com".to_string();
+        let stale_application = storage.lookup_or_insert_application_number_with_origin(&stale);
+        let refreshed_application =
+            storage.lookup_or_insert_application_number_with_origin(&refreshed);
+
+        for (application, last_used) in [(stale_application, 1), (refreshed_application, u64::MAX)]
+        {
+            storage
+                .write_reference_list(
+                    anchor_number,
+                    application,
+                    vec![AccountReference {
+                        account_number: None,
+                        last_used: Some(last_used),
+                        sessions: vec![session(1, u64::MAX)],
+                    }],
+                )
+                .unwrap();
+        }
+
+        for index in 0..MAX_EVICTABLE_DEFAULT_ACCOUNTS {
+            storage
+                .set_account_last_used(
+                    anchor_number,
+                    format!("https://app-{index}.com"),
+                    None,
+                    index + 2,
+                )
+                .unwrap();
+        }
+
+        assert!(storage
+            .lookup_account_references(anchor_number, stale_application)
+            .is_none());
+        assert!(storage
+            .lookup_account_references(anchor_number, refreshed_application)
+            .is_some());
+    }
+
     #[test]
     fn reclaim_order_ranks_dead_sessions_first() {
         let now = 1_000;
@@ -3780,27 +3848,6 @@ mod session_record_tests {
 
         assert!(expired.reclaim_order(now) < live.reclaim_order(now));
         assert!(expired.reclaim_order(now) < live_untouched.reclaim_order(now));
-    }
-
-    #[test]
-    fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
-        let now = 100 * DAY_NS;
-        let held = SessionRecord {
-            last_refreshed: Some(now - DAY_NS),
-            ..session(now - 20 * DAY_NS, now + DAY_NS)
-        };
-        // Created after the session it would have to outrank, which under a plain recency
-        // order would protect it.
-        let flood: Vec<SessionRecord> = (0..500)
-            .map(|index| SessionRecord {
-                device_id: index,
-                ..session(now - 1, now + DAY_NS)
-            })
-            .collect();
-
-        assert!(flood
-            .iter()
-            .all(|session| session.reclaim_order(now) < held.reclaim_order(now)));
     }
 
     #[test]
@@ -3821,5 +3868,674 @@ mod session_record_tests {
             one_sitting.reclaim_order(now) < weekly.reclaim_order(now),
             "the more recently touched session goes first, having stayed in service for minutes"
         );
+    }
+}
+
+mod session_creation_tests {
+    use crate::delegation::calculate_session_seed_with_salt;
+    use crate::storage::account::{AccountReference, CreateAccountParams, SessionRecord};
+    use crate::storage::{
+        CreateSessionParams, MAX_SESSIONS_PER_ANCHOR, SESSIONS_WATERMARK_PER_ANCHOR,
+    };
+    use crate::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    const SALT: [u8; 32] = [17u8; 32];
+    const ORIGIN: &str = "https://example.com";
+
+    fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt(SALT);
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        (storage, anchor_number)
+    }
+
+    fn params(anchor_number: AnchorNumber, device_id: u32, now: u64) -> CreateSessionParams {
+        CreateSessionParams {
+            anchor_number,
+            origin: ORIGIN.to_string(),
+            account_number: None,
+            device_id,
+            valid_till: now + 10_000,
+            read_only: false,
+            now,
+        }
+    }
+
+    fn sessions_of(
+        storage: &Storage<VectorMemory>,
+        anchor_number: AnchorNumber,
+    ) -> Vec<SessionRecord> {
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        let references: Vec<AccountReference> = storage
+            .lookup_account_references(anchor_number, application_number)
+            .unwrap()
+            .into_iter()
+            .map(Into::into)
+            .collect();
+        references
+            .into_iter()
+            .find(|reference| reference.account_number.is_none())
+            .unwrap()
+            .sessions
+    }
+
+    #[test]
+    fn creating_a_session_tracks_the_account_and_stores_the_record() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        let session = storage
+            .create_session(params(anchor_number, 1, 1_000))
+            .unwrap();
+
+        assert_eq!(session.created_at, 1_000);
+        assert_eq!(session.valid_till, 11_000);
+        assert_eq!(session.last_refreshed, None);
+        assert_eq!(session.device_id, 1);
+        assert_eq!(sessions_of(&storage, anchor_number), vec![session]);
+    }
+
+    /// A ceremony replaces the browser's session rather than reusing it, so a copy of the
+    /// old one stops working at the user's next sign-in instead of at its expiry.
+    #[test]
+    fn the_same_device_replaces_its_session() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let first = storage
+            .create_session(params(anchor_number, 1, 1_000))
+            .unwrap();
+
+        let again = storage
+            .create_session(params(anchor_number, 1, 5_000))
+            .unwrap();
+
+        assert_ne!(again.created_at, first.created_at);
+        assert_eq!(sessions_of(&storage, anchor_number).len(), 1);
+    }
+
+    #[test]
+    fn a_different_device_gets_its_own_session() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        storage
+            .create_session(params(anchor_number, 1, 1_000))
+            .unwrap();
+
+        storage
+            .create_session(params(anchor_number, 2, 1_000))
+            .unwrap();
+
+        assert_eq!(sessions_of(&storage, anchor_number).len(), 2);
+    }
+
+    #[test]
+    fn expired_sessions_are_pruned_when_the_list_is_written() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        for device_id in 0..3 {
+            storage
+                .create_session(params(anchor_number, device_id, 1_000))
+                .unwrap();
+        }
+
+        storage
+            .create_session(params(anchor_number, 9, 20_000))
+            .unwrap();
+
+        let sessions = sessions_of(&storage, anchor_number);
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].device_id, 9);
+    }
+
+    /// There is no per-reference cap: one browser holds one session per account, so the
+    /// reference is bounded by the browser registry rather than by a number of its own.
+    #[test]
+    fn one_reference_holds_one_session_per_browser() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        for device_id in 0..12u32 {
+            let mut p = params(anchor_number, device_id, 1_000);
+            p.valid_till = 1_000_000;
+            storage.create_session(p).unwrap();
+        }
+
+        let sessions = sessions_of(&storage, anchor_number);
+        assert_eq!(sessions.len(), 12);
+        assert!(sessions.iter().any(|s| s.device_id == 0));
+    }
+
+    /// The per-identity cap reclaims to a watermark rather than blocking, taking expired
+    /// records first and then the least recently used.
+    #[test]
+    fn the_session_cap_reclaims_to_the_watermark() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let application_number =
+            storage.lookup_or_insert_application_number_with_origin(&ORIGIN.to_string());
+
+        let sessions: Vec<SessionRecord> = (0..MAX_SESSIONS_PER_ANCHOR)
+            .map(|device_id| SessionRecord {
+                created_at: 1_000,
+                valid_till: 1_000_000,
+                // Device 0 is the stalest live one; device 1 has already expired.
+                last_refreshed: Some(500_000 + device_id as u64),
+                device_id,
+                read_only: false,
+            })
+            .map(|mut session| {
+                if session.device_id == 1 {
+                    session.valid_till = 2_000;
+                }
+                session
+            })
+            .collect();
+        storage
+            .write_reference_list(
+                anchor_number,
+                application_number,
+                vec![AccountReference {
+                    account_number: None,
+                    last_used: Some(1),
+                    sessions,
+                }],
+            )
+            .unwrap();
+        let mut anchor = storage.read(anchor_number).unwrap();
+        anchor.session_count = MAX_SESSIONS_PER_ANCHOR;
+        storage.write(anchor).unwrap();
+
+        let mut params = params(anchor_number, 9_999, 600_000);
+        params.valid_till = 1_000_000;
+        storage.create_session(params).unwrap();
+
+        let remaining = sessions_of(&storage, anchor_number);
+        assert_eq!(
+            remaining.len(),
+            SESSIONS_WATERMARK_PER_ANCHOR as usize + 1,
+            "reclaims to the watermark and then admits the session it made room for"
+        );
+        // The expired one and the stalest live one are gone; the freshest are not.
+        assert!(!remaining.iter().any(|s| s.device_id == 1));
+        assert!(!remaining.iter().any(|s| s.device_id == 0));
+        assert!(remaining
+            .iter()
+            .any(|s| s.device_id == MAX_SESSIONS_PER_ANCHOR - 1));
+        assert!(remaining.iter().any(|s| s.device_id == 9_999));
+    }
+
+    #[test]
+    fn the_cap_is_never_exceeded_however_many_sign_ins_arrive() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        for device_id in 0..(MAX_SESSIONS_PER_ANCHOR + 120) {
+            let mut params = params(anchor_number, device_id, 600_000 + device_id as u64);
+            params.valid_till = 100_000_000;
+            storage.create_session(params).unwrap();
+
+            let stored = sessions_of(&storage, anchor_number).len();
+            assert!(
+                stored <= MAX_SESSIONS_PER_ANCHOR as usize,
+                "{stored} stored after {device_id} sign-ins"
+            );
+            assert_eq!(
+                storage.read(anchor_number).unwrap().session_count as usize,
+                stored,
+                "the counter parted ways with the rows after {device_id} sign-ins"
+            );
+        }
+    }
+
+    #[test]
+    fn an_over_counting_anchor_is_corrected_rather_than_denied() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        storage.create_session(params(anchor_number, 1, 1_000)).unwrap();
+
+        // Nothing observes a session expiring, so the count drifts up. The cap must be
+        // enforced against what the rows hold, not against the drift.
+        let mut anchor = storage.read(anchor_number).unwrap();
+        anchor.session_count = MAX_SESSIONS_PER_ANCHOR;
+        storage.write(anchor).unwrap();
+
+        storage.create_session(params(anchor_number, 2, 2_000)).unwrap();
+
+        assert_eq!(sessions_of(&storage, anchor_number).len(), 2);
+        assert_eq!(storage.read(anchor_number).unwrap().session_count, 2);
+    }
+
+    /// Two rows, both holding a default account, and both holding sessions for the same
+    /// browser ids. Reclaiming must take only the sessions it selected.
+    #[test]
+    fn reclaiming_takes_only_the_sessions_it_selected() {
+        const OTHER_ORIGIN: &str = "https://other.example";
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        // Two rows of this size put the identity two over the watermark, so the pass selects
+        // exactly two victims — one in each row.
+        const PER_ROW: u32 = SESSIONS_WATERMARK_PER_ANCHOR / 2 + 1;
+        let row = |expired_device: u32| -> Vec<AccountReference> {
+            let sessions = (0..PER_ROW)
+                .map(|device_id| {
+                    if device_id == expired_device {
+                        SessionRecord {
+                            created_at: 1,
+                            valid_till: 2,
+                            last_refreshed: None,
+                            device_id,
+                            read_only: false,
+                        }
+                    } else {
+                        SessionRecord {
+                            created_at: 1_000,
+                            valid_till: 100_000_000,
+                            last_refreshed: Some(500_000),
+                            device_id,
+                            read_only: false,
+                        }
+                    }
+                })
+                .collect();
+            vec![AccountReference {
+                account_number: None,
+                last_used: Some(1),
+                sessions,
+            }]
+        };
+
+        let first = storage.lookup_or_insert_application_number_with_origin(&ORIGIN.to_string());
+        let second =
+            storage.lookup_or_insert_application_number_with_origin(&OTHER_ORIGIN.to_string());
+        storage
+            .write_reference_list(anchor_number, first, row(0))
+            .unwrap();
+        storage
+            .write_reference_list(anchor_number, second, row(1))
+            .unwrap();
+
+        let mut anchor = storage.read(anchor_number).unwrap();
+        anchor.session_count = MAX_SESSIONS_PER_ANCHOR;
+        storage.write(anchor).unwrap();
+
+        let mut params = params(anchor_number, 9_999, 600_000);
+        params.valid_till = 100_000_000;
+        storage.create_session(params).unwrap();
+
+        let devices = |application_number| -> Vec<u32> {
+            let references: Vec<AccountReference> = storage
+                .lookup_account_references(anchor_number, application_number)
+                .unwrap()
+                .into_iter()
+                .map(Into::into)
+                .collect();
+            let mut ids: Vec<u32> = references
+                .into_iter()
+                .flat_map(|reference| reference.sessions)
+                .map(|session| session.device_id)
+                .collect();
+            ids.sort_unstable();
+            ids
+        };
+
+        let first_devices = devices(first);
+        let second_devices = devices(second);
+
+        assert!(
+            !first_devices.contains(&0),
+            "the expired session selected in the first row should be gone"
+        );
+        assert!(
+            !second_devices.contains(&1),
+            "the expired session selected in the second row should be gone"
+        );
+        assert!(
+            first_devices.contains(&1),
+            "the first row's live session for browser 1 was not selected and must survive"
+        );
+        assert!(
+            second_devices.contains(&0),
+            "the second row's live session for browser 0 was not selected and must survive"
+        );
+    }
+
+
+
+    /// The flood bound, exercised through the cap rather than through the order alone: a
+    /// session the user has actually kept alive survives a row full of sign-ins nobody
+    /// came back to, even though every one of them is newer than it.
+    #[test]
+    fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let application_number =
+            storage.lookup_or_insert_application_number_with_origin(&ORIGIN.to_string());
+
+        let mut sessions = vec![SessionRecord {
+            created_at: 1_000,
+            valid_till: 100_000_000,
+            last_refreshed: Some(400_000),
+            device_id: 1,
+            read_only: false,
+        }];
+        sessions.extend((2..=MAX_SESSIONS_PER_ANCHOR).map(|device_id| SessionRecord {
+            created_at: 500_000,
+            valid_till: 100_000_000,
+            last_refreshed: None,
+            device_id,
+            read_only: false,
+        }));
+        storage
+            .write_reference_list(
+                anchor_number,
+                application_number,
+                vec![AccountReference {
+                    account_number: None,
+                    last_used: Some(1),
+                    sessions,
+                }],
+            )
+            .unwrap();
+        let mut anchor = storage.read(anchor_number).unwrap();
+        anchor.session_count = MAX_SESSIONS_PER_ANCHOR;
+        storage.write(anchor).unwrap();
+
+        let mut params = params(anchor_number, 9_999, 600_000);
+        params.valid_till = 100_000_000;
+        storage.create_session(params).unwrap();
+
+        let remaining = sessions_of(&storage, anchor_number);
+        assert!(
+            remaining.iter().any(|session| session.device_id == 1),
+            "the session that was kept alive was reclaimed"
+        );
+        assert!(
+            remaining.len() < MAX_SESSIONS_PER_ANCHOR as usize,
+            "nothing was reclaimed, so the test proves nothing"
+        );
+    }
+
+    #[test]
+    fn a_named_account_can_hold_its_own_sessions() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let named = storage
+            .create_additional_account(CreateAccountParams {
+                anchor_number,
+                name: "named".to_string(),
+                origin: ORIGIN.to_string(),
+            })
+            .unwrap();
+        let mut p = params(anchor_number, 1, 1_000);
+        p.account_number = named.account_number;
+
+        storage.create_session(p).unwrap();
+
+        assert_eq!(sessions_of(&storage, anchor_number).len(), 0);
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        let references: Vec<AccountReference> = storage
+            .lookup_account_references(anchor_number, application_number)
+            .unwrap()
+            .into_iter()
+            .map(Into::into)
+            .collect();
+        let named_reference = references
+            .iter()
+            .find(|r| r.account_number == named.account_number)
+            .unwrap();
+        assert_eq!(named_reference.sessions.len(), 1);
+    }
+
+    #[test]
+    fn a_session_for_an_account_the_anchor_does_not_hold_is_refused() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let mut p = params(anchor_number, 1, 1_000);
+        p.account_number = Some(4_242);
+
+        let result = storage.create_session(p);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn an_expired_same_round_record_is_pruned_rather_than_colliding() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let application_number =
+            storage.lookup_or_insert_application_number_with_origin(&ORIGIN.to_string());
+        storage
+            .write_reference_list(
+                anchor_number,
+                application_number,
+                vec![AccountReference {
+                    account_number: None,
+                    last_used: Some(1),
+                    sessions: vec![SessionRecord {
+                        created_at: 1_000,
+                        // Already expired at `now`, so it is not reused, but it is still
+                        // present when the seed for the new record is derived.
+                        valid_till: 1_000,
+                        last_refreshed: None,
+                        device_id: 1,
+                        read_only: false,
+                    }],
+                }],
+            )
+            .unwrap();
+
+        // Pruning removes the expired record, so the guard does not fire here; the
+        // reachable shape is a live record the reuse step declined, which cannot happen.
+        let created = storage
+            .create_session(params(anchor_number, 1, 1_000))
+            .unwrap();
+        assert_eq!(created.created_at, 1_000);
+    }
+
+    /// Creating twice from one browser at one account replaces, so there is never a second
+    /// record to collide with in the same round.
+    #[test]
+    fn creating_twice_in_one_round_from_one_browser_yields_one_session() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let params = |read_only| CreateSessionParams {
+            anchor_number,
+            origin: ORIGIN.to_string(),
+            account_number: None,
+            device_id: 1,
+            valid_till: u64::MAX,
+            read_only,
+            now: 1_000,
+        };
+
+        let first = storage.create_session(params(false)).unwrap();
+        storage.create_session(params(false)).unwrap();
+        assert_eq!(sessions_of(&storage, anchor_number).len(), 1);
+
+        let replaced = storage.create_session(params(true)).unwrap();
+        assert_ne!(replaced.read_only, first.read_only);
+        assert_eq!(sessions_of(&storage, anchor_number).len(), 1);
+    }
+
+    #[test]
+    fn the_session_seed_binds_the_account_and_every_immutable_field() {
+        use crate::storage::account::Account;
+
+        let account = Account::new(10_000, ORIGIN.to_string(), None, None);
+        let account_seed = account.calculate_seed_with_salt(&SALT);
+        let other_account = Account::new(10_001, ORIGIN.to_string(), None, None);
+        let other_seed = other_account.calculate_seed_with_salt(&SALT);
+
+        let base = calculate_session_seed_with_salt(&SALT, &account_seed, 1_000, 1);
+
+        assert_ne!(
+            base,
+            calculate_session_seed_with_salt(&SALT, &other_seed, 1_000, 1)
+        );
+        assert_ne!(
+            base,
+            calculate_session_seed_with_salt(&SALT, &account_seed, 1_001, 1)
+        );
+        assert_ne!(
+            base,
+            calculate_session_seed_with_salt(&SALT, &account_seed, 1_000, 2)
+        );
+        assert_ne!(
+            base,
+            calculate_session_seed_with_salt(&[18u8; 32], &account_seed, 1_000, 1)
+        );
+        assert_eq!(
+            base,
+            calculate_session_seed_with_salt(&SALT, &account_seed, 1_000, 1)
+        );
+    }
+
+    #[test]
+    fn a_session_seed_is_distinct_from_the_account_seed_it_belongs_to() {
+        use crate::storage::account::Account;
+
+        let account = Account::new(10_000, ORIGIN.to_string(), None, None);
+        let account_seed = account.calculate_seed_with_salt(&SALT);
+        let session_seed = calculate_session_seed_with_salt(&SALT, &account_seed, 1_000, 1);
+
+        assert_ne!(account_seed, session_seed);
+    }
+
+    /// Naming a default account keeps its principal, so it must keep its sessions too.
+    #[test]
+    fn naming_a_default_account_leaves_its_session_identity_unchanged() {
+        use crate::storage::account::Account;
+
+        let default = Account::new(10_000, ORIGIN.to_string(), None, None);
+        let before = calculate_session_seed_with_salt(
+            &SALT,
+            &default.calculate_seed_with_salt(&SALT),
+            1_000,
+            1,
+        );
+
+        let named = Account::new_full(
+            10_000,
+            ORIGIN.to_string(),
+            Some("work".to_string()),
+            Some(7),
+            None,
+            Some(10_000),
+        );
+        let after = calculate_session_seed_with_salt(
+            &SALT,
+            &named.calculate_seed_with_salt(&SALT),
+            1_000,
+            1,
+        );
+
+        assert_eq!(before, after);
+    }
+}
+
+mod session_consent_change_tests {
+    use crate::storage::account::AccountReference;
+    use crate::storage::CreateSessionParams;
+    use crate::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    const ORIGIN: &str = "https://example.com";
+
+    fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        (storage, anchor_number)
+    }
+
+    fn create(
+        storage: &mut Storage<VectorMemory>,
+        anchor_number: AnchorNumber,
+        read_only: bool,
+        now: u64,
+    ) -> u64 {
+        storage
+            .create_session(CreateSessionParams {
+                anchor_number,
+                origin: ORIGIN.to_string(),
+                account_number: None,
+                device_id: 1,
+                valid_till: u64::MAX,
+                read_only,
+                now,
+            })
+            .unwrap()
+            .created_at
+    }
+
+    fn sessions(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> Vec<bool> {
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        storage
+            .lookup_account_references(anchor_number, application_number)
+            .unwrap()
+            .into_iter()
+            .map(AccountReference::from)
+            .find(|reference| reference.account_number.is_none())
+            .unwrap()
+            .sessions
+            .into_iter()
+            .map(|session| session.read_only)
+            .collect()
+    }
+
+    #[test]
+    fn the_same_consent_still_replaces_the_session() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let first = create(&mut storage, anchor_number, false, 1_000);
+
+        let again = create(&mut storage, anchor_number, false, 2_000);
+
+        assert_ne!(again, first);
+        assert_eq!(sessions(&storage, anchor_number), vec![false]);
+    }
+
+    #[test]
+    fn a_downgraded_consent_replaces_the_session() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let full_access = create(&mut storage, anchor_number, false, 1_000);
+
+        let read_only = create(&mut storage, anchor_number, true, 2_000);
+
+        assert_ne!(read_only, full_access);
+        assert_eq!(sessions(&storage, anchor_number), vec![true]);
+    }
+
+    #[test]
+    fn an_upgraded_consent_replaces_the_session() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        create(&mut storage, anchor_number, true, 1_000);
+
+        create(&mut storage, anchor_number, false, 2_000);
+
+        assert_eq!(sessions(&storage, anchor_number), vec![false]);
+    }
+
+    #[test]
+    fn a_consent_change_leaves_another_browser_alone() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        storage
+            .create_session(CreateSessionParams {
+                anchor_number,
+                origin: ORIGIN.to_string(),
+                account_number: None,
+                device_id: 2,
+                valid_till: u64::MAX,
+                read_only: false,
+                now: 1_000,
+            })
+            .unwrap();
+        create(&mut storage, anchor_number, false, 1_000);
+
+        create(&mut storage, anchor_number, true, 2_000);
+
+        let mut held = sessions(&storage, anchor_number);
+        held.sort_unstable();
+        assert_eq!(held, vec![false, true]);
     }
 }

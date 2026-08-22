@@ -386,6 +386,23 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
   });
+  const GetAccountSessionRequest = IDL.Record({
+    'session_key' : SessionKey,
+    'origin' : FrontendHostname,
+    'account_number' : IDL.Opt(AccountNumber),
+    'expiration' : Timestamp,
+    'identity_number' : UserNumber,
+  });
+  const GetAccountSessionResponse = IDL.Record({
+    'signed_delegation' : SignedDelegation,
+  });
+  const AccountSessionError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+    'NoSuchSession' : IDL.Null,
+    'NoSuchAccount' : IDL.Null,
+    'InvalidDeviceKey' : IDL.Null,
+  });
   const GetAccountsError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
@@ -685,6 +702,26 @@ export const idlFactory = ({ IDL }) => {
   const PrepareAccountDelegation = IDL.Record({
     'user_key' : UserKey,
     'expiration' : Timestamp,
+  });
+  const PrepareAccountSessionRequest = IDL.Record({
+    'permissions' : IDL.Opt(Permissions),
+    'session_key' : SessionKey,
+    'valid_for' : IDL.Opt(IDL.Nat64),
+    'origin' : FrontendHostname,
+    'device_name' : IDL.Text,
+    'account_number' : IDL.Opt(AccountNumber),
+    'device_key_signature' : IDL.Vec(IDL.Nat8),
+    'device_key' : PublicKey,
+    'identity_number' : UserNumber,
+    'next_device_key' : PublicKey,
+    'next_device_key_signature' : IDL.Vec(IDL.Nat8),
+  });
+  const PrepareAccountSessionResponse = IDL.Record({
+    'user_key' : PublicKey,
+    'device_id' : IDL.Nat32,
+    'created_at' : Timestamp,
+    'expiration' : Timestamp,
+    'account_principal' : IDL.Principal,
   });
   const PrepareAttributeRequest = IDL.Record({
     'origin' : FrontendHostname,
@@ -1039,6 +1076,16 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'get_account_session' : IDL.Func(
+        [GetAccountSessionRequest],
+        [
+          IDL.Variant({
+            'Ok' : GetAccountSessionResponse,
+            'Err' : AccountSessionError,
+          }),
+        ],
+        ['query'],
+      ),
     'get_accounts' : IDL.Func(
         [UserNumber, FrontendHostname],
         [
@@ -1291,6 +1338,16 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : PrepareAccountDelegation,
             'Err' : AccountDelegationError,
+          }),
+        ],
+        [],
+      ),
+    'prepare_account_session' : IDL.Func(
+        [PrepareAccountSessionRequest],
+        [
+          IDL.Variant({
+            'Ok' : PrepareAccountSessionResponse,
+            'Err' : AccountSessionError,
           }),
         ],
         [],

@@ -1017,6 +1017,64 @@ type SessionDeviceInfo = record {
     last_used : Timestamp;
 };
 
+type PrepareAccountSessionRequest = record {
+    identity_number : UserNumber;
+    origin : FrontendHostname;
+    account_number : opt AccountNumber;
+    // The II frontend's own key. The app never sees this chain's private key.
+    session_key : SessionKey;
+    // Labels the browser in the user's session list, e.g. "Chrome on MacBook".
+    device_name : text;
+    // The browser's own public key, DER-encoded, as the registry currently holds it. A
+    // key this anchor has not seen registers a browser under it.
+    device_key : PublicKey;
+    // What the browser rotates to once this sign-in succeeds.
+    next_device_key : PublicKey;
+    // Signature over session_key and next_device_key, verified with device_key.
+    device_key_signature : blob;
+    // Signature by next_device_key over session_key and device_key, proving the browser
+    // holds the key it is announcing.
+    next_device_key_signature : blob;
+    // The consented access level, fixed for the session's life.
+    permissions : opt Permissions;
+    // Clamped to the session maximum.
+    valid_for : opt nat64;
+};
+
+type PrepareAccountSessionResponse = record {
+    user_key : PublicKey;
+    // The session's valid_till.
+    expiration : Timestamp;
+    created_at : Timestamp;
+    // Which browser this sign-in was attributed to, so the settings list can mark the one
+    // the user is looking at. Not a credential: a caller never presents it.
+    device_id : nat32;
+    // The principal apps see for this account, so the frontend can tell its own
+    // sessions apart without minting a delegation to learn it.
+    account_principal : principal;
+};
+
+type GetAccountSessionRequest = record {
+    identity_number : UserNumber;
+    origin : FrontendHostname;
+    account_number : opt AccountNumber;
+    session_key : SessionKey;
+    expiration : Timestamp;
+};
+
+type GetAccountSessionResponse = record {
+    signed_delegation : SignedDelegation;
+};
+
+type AccountSessionError = variant {
+    Unauthorized : principal;
+    NoSuchAccount;
+    NoSuchSession;
+    // The browser's key is unusable, or its signature does not verify against it.
+    InvalidDeviceKey;
+    InternalCanisterError : text;
+};
+
 type IdentityInfo = record {
     authn_methods : vec AuthnMethodData;
     authn_method_registration : opt AuthnMethodRegistrationInfo;
@@ -1870,6 +1928,13 @@ service : (opt InternetIdentityInit) -> {
         account_number : opt AccountNumber, // Null is unreserved default account
         update : AccountUpdate
     ) ->  (variant { Ok : AccountInfo; Err: UpdateAccountError });
+
+    // Creates or reuses a revocable session at one account and signs its identity to
+    // the II frontend's own key. Called only by the II frontend, which ships with the
+    // canister; requires an anchor access method, so a session can neither spawn nor
+    // extend itself.
+    prepare_account_session : (PrepareAccountSessionRequest) -> (variant { Ok : PrepareAccountSessionResponse; Err : AccountSessionError });
+    get_account_session : (GetAccountSessionRequest) -> (variant { Ok : GetAccountSessionResponse; Err : AccountSessionError }) query;
 
     prepare_account_delegation : (
         anchor_number : UserNumber,
