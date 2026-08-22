@@ -1,5 +1,6 @@
 use crate::storage::account::AccountReference;
 use crate::storage::storable::account_number::StorableAccountNumber;
+use crate::storage::storable::session_record::StorableSessionRecord;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::Timestamp;
@@ -15,6 +16,8 @@ pub struct StorableAccountReference {
     // For example, it's not changed when the account is renamed.
     #[n(1)]
     pub last_used: Option<Timestamp>,
+    #[n(2)]
+    pub sessions: Option<Vec<StorableSessionRecord>>,
 }
 
 impl Storable for StorableAccountReference {
@@ -36,6 +39,12 @@ impl From<StorableAccountReference> for AccountReference {
         AccountReference {
             account_number: value.account_number,
             last_used: value.last_used,
+            sessions: value
+                .sessions
+                .unwrap_or_default()
+                .into_iter()
+                .map(Into::into)
+                .collect(),
         }
     }
 }
@@ -45,6 +54,11 @@ impl From<AccountReference> for StorableAccountReference {
         StorableAccountReference {
             account_number: value.account_number,
             last_used: value.last_used,
+            sessions: if value.sessions.is_empty() {
+                None
+            } else {
+                Some(value.sessions.into_iter().map(Into::into).collect())
+            },
         }
     }
 }

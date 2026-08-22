@@ -2179,10 +2179,7 @@ mod reference_list_write_path_tests {
         let result = storage.write_reference_list(
             anchor_number,
             unknown_application_number,
-            vec![AccountReference {
-                account_number: None,
-                last_used: None,
-            }],
+            vec![AccountReference::new(None, None)],
         );
 
         assert!(matches!(
@@ -2209,10 +2206,7 @@ mod reference_list_write_path_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
         let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
-        let references = vec![AccountReference {
-            account_number: Some(1),
-            last_used: None,
-        }];
+        let references = vec![AccountReference::new(Some(1), None)];
         storage
             .write_reference_list(anchor_number, application_number, references.clone())
             .unwrap();
@@ -2239,14 +2233,8 @@ mod reference_list_write_path_tests {
                 anchor_number,
                 application_number,
                 vec![
-                    AccountReference {
-                        account_number: None,
-                        last_used: None,
-                    },
-                    AccountReference {
-                        account_number: Some(7),
-                        last_used: None,
-                    },
+                    AccountReference::new(None, None),
+                    AccountReference::new(Some(7), None),
                 ],
             )
             .unwrap();
@@ -2277,20 +2265,14 @@ mod reference_list_write_path_tests {
             .write_reference_list(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: None,
-                    last_used: None,
-                }],
+                vec![AccountReference::new(None, None)],
             )
             .unwrap();
         storage
             .write_reference_list(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: Some(3),
-                    last_used: None,
-                }],
+                vec![AccountReference::new(Some(3), None)],
             )
             .unwrap();
 
@@ -2308,10 +2290,7 @@ mod reference_list_write_path_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
         let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
-        let references = vec![AccountReference {
-            account_number: Some(1),
-            last_used: None,
-        }];
+        let references = vec![AccountReference::new(Some(1), None)];
 
         storage
             .write_reference_list(anchor_number, application_number, references.clone())
@@ -2322,10 +2301,7 @@ mod reference_list_write_path_tests {
             .write_reference_list(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: Some(1),
-                    last_used: Some(123),
-                }],
+                vec![AccountReference::new(Some(1), Some(123))],
             )
             .unwrap();
 
@@ -2530,11 +2506,7 @@ mod default_account_tracking_tests {
             .unwrap();
         assert_eq!(
             storage.lookup_account_references(anchor_number, application_number),
-            Some(vec![AccountReference {
-                account_number: None,
-                last_used: Some(1_000),
-            }
-            .into()])
+            Some(vec![AccountReference::new(None, Some(1_000)).into()])
         );
     }
 
@@ -2575,10 +2547,7 @@ mod default_account_tracking_tests {
             .write_reference_list(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: Some(9),
-                    last_used: None,
-                }],
+                vec![AccountReference::new(Some(9), None)],
             )
             .unwrap();
 
@@ -2628,11 +2597,7 @@ mod default_account_tracking_tests {
 
         assert_eq!(
             storage.lookup_account_references(anchor_number, application_number),
-            Some(vec![AccountReference {
-                account_number: None,
-                last_used: None,
-            }
-            .into()])
+            Some(vec![AccountReference::new(None, None).into()])
         );
     }
 
@@ -2769,14 +2734,17 @@ mod tracked_default_eviction_tests {
                 .write_reference_list(
                     anchor_number,
                     application_number,
-                    vec![AccountReference {
-                        account_number: None,
-                        last_used: Some(index + 1),
-                    }],
+                    vec![AccountReference::new(None, Some(index + 1))],
                 )
                 .unwrap();
         }
-        let before = storage.evictable_default_rows(anchor_number).len() as u64;
+        let rows = |storage: &Storage<VectorMemory>| {
+            storage
+                .stable_account_reference_list_memory
+                .range((anchor_number, 0)..=(anchor_number, u64::MAX))
+                .count() as u64
+        };
+        let before = rows(&storage);
 
         storage
             .set_account_last_used(
@@ -2787,8 +2755,7 @@ mod tracked_default_eviction_tests {
             )
             .unwrap();
 
-        let after = storage.evictable_default_rows(anchor_number).len() as u64;
-        assert_eq!(before + 1 - after, MAX_EVICTIONS_PER_CALL);
+        assert_eq!(before + 1 - rows(&storage), MAX_EVICTIONS_PER_CALL);
     }
 
     #[test]
@@ -3031,10 +2998,7 @@ mod tracked_default_eviction_tests {
             .write_reference_list(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: Some(1),
-                    last_used: None,
-                }],
+                vec![AccountReference::new(Some(1), None)],
             )
             .unwrap();
 
@@ -3201,10 +3165,7 @@ mod application_removal_tests {
             .write_reference_list(
                 other_anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: None,
-                    last_used: Some(1_000),
-                }],
+                vec![AccountReference::new(None, Some(1_000))],
             )
             .unwrap();
 
@@ -3507,10 +3468,7 @@ mod account_principal_index_tests {
         let result = storage.write_reference_list(
             anchor_number,
             application_number,
-            vec![AccountReference {
-                account_number: None,
-                last_used: Some(1),
-            }],
+            vec![AccountReference::new(None, Some(1))],
         );
 
         assert!(matches!(result, Err(StorageError::SaltNotSet)));
@@ -3582,10 +3540,7 @@ mod account_principal_index_backfill_tests {
                 .write_reference_list(
                     anchor_number,
                     application_number,
-                    vec![AccountReference {
-                        account_number: None,
-                        last_used: Some(index + 1),
-                    }],
+                    vec![AccountReference::new(None, Some(index + 1))],
                 )
                 .unwrap();
         }
@@ -3682,5 +3637,149 @@ mod account_principal_index_backfill_tests {
 
         assert!(outcome.is_done);
         assert_eq!(outcome.indexed, 0);
+    }
+}
+
+mod session_record_tests {
+    use crate::storage::account::{AccountReference, SessionRecord};
+    use crate::storage::storable::account_reference::StorableAccountReference;
+    use crate::{Storage, DAY_NS, MINUTE_NS};
+    use ic_stable_structures::{Storable, VectorMemory};
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    fn session(created_at: u64, valid_till: u64) -> SessionRecord {
+        SessionRecord {
+            created_at,
+            valid_till,
+            last_refreshed: None,
+            device_id: 1,
+            read_only: false,
+        }
+    }
+
+    fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        (storage, anchor_number)
+    }
+
+    #[test]
+    fn a_reference_with_sessions_round_trips() {
+        let reference = AccountReference {
+            account_number: Some(3),
+            last_used: Some(9),
+            sessions: vec![session(1, 100), session(2, 200)],
+        };
+
+        let stored = StorableAccountReference::from(reference.clone());
+        let decoded =
+            AccountReference::from(StorableAccountReference::from_bytes(stored.to_bytes()));
+
+        assert_eq!(decoded, reference);
+    }
+
+    #[test]
+    fn a_reference_written_before_sessions_existed_decodes_with_none() {
+        let stored = StorableAccountReference {
+            account_number: Some(1),
+            last_used: Some(5),
+            sessions: None,
+        };
+
+        let decoded =
+            AccountReference::from(StorableAccountReference::from_bytes(stored.to_bytes()));
+
+        assert_eq!(decoded.sessions, vec![]);
+        assert_eq!(decoded.account_number, Some(1));
+        assert_eq!(decoded.last_used, Some(5));
+    }
+
+    #[test]
+    fn an_empty_session_list_is_not_stored() {
+        let reference = AccountReference::new(Some(1), None);
+
+        assert_eq!(StorableAccountReference::from(reference).sessions, None);
+    }
+
+    /// A row is evictable on its shape alone. Sparing one because it holds a live session
+    /// would leave the user with access that settings cannot show them, and a session
+    /// nobody can find is a session nobody can revoke.
+    #[test]
+    fn a_row_holding_a_session_is_evictable_like_any_other() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://has-a-session.com".to_string();
+        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        storage
+            .write_reference_list(
+                anchor_number,
+                application_number,
+                vec![AccountReference {
+                    account_number: None,
+                    last_used: Some(1),
+                    sessions: vec![session(1, u64::MAX)],
+                }],
+            )
+            .unwrap();
+
+        assert_eq!(storage.evictable_default_rows(anchor_number).len(), 1);
+    }
+
+    #[test]
+    fn reclaim_order_ranks_dead_sessions_first() {
+        let now = 1_000;
+        let expired = session(1, 500);
+        let live = SessionRecord {
+            last_refreshed: Some(900),
+            ..session(400, 10_000)
+        };
+        let live_untouched = session(400, 10_000);
+
+        assert!(expired.reclaim_order(now) < live.reclaim_order(now));
+        assert!(expired.reclaim_order(now) < live_untouched.reclaim_order(now));
+    }
+
+    #[test]
+    fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
+        let now = 100 * DAY_NS;
+        let held = SessionRecord {
+            last_refreshed: Some(now - DAY_NS),
+            ..session(now - 20 * DAY_NS, now + DAY_NS)
+        };
+        // Created after the session it would have to outrank, which under a plain recency
+        // order would protect it.
+        let flood: Vec<SessionRecord> = (0..500)
+            .map(|index| SessionRecord {
+                device_id: index,
+                ..session(now - 1, now + DAY_NS)
+            })
+            .collect();
+
+        assert!(flood
+            .iter()
+            .all(|session| session.reclaim_order(now) < held.reclaim_order(now)));
+    }
+
+    #[test]
+    fn an_app_in_weekly_use_outranks_one_opened_once_yesterday() {
+        let now = 100 * DAY_NS;
+        // Signed in three months ago, still being opened every few days.
+        let weekly = SessionRecord {
+            last_refreshed: Some(now - 3 * DAY_NS),
+            ..session(now - 90 * DAY_NS, now + DAY_NS)
+        };
+        // Signed in yesterday, used for five minutes, never opened again.
+        let one_sitting = SessionRecord {
+            last_refreshed: Some(now - DAY_NS + 5 * MINUTE_NS),
+            ..session(now - DAY_NS, now + DAY_NS)
+        };
+
+        assert!(
+            one_sitting.reclaim_order(now) < weekly.reclaim_order(now),
+            "the more recently touched session goes first, having stayed in service for minutes"
+        );
     }
 }
