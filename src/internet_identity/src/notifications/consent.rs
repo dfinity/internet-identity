@@ -2,6 +2,7 @@
 //! send path uses. Channel-agnostic: deliverability per channel is reported by
 //! [`consent_status`].
 
+use super::webpush::seal::{drop_origin_seals, seal_devices_for_origin};
 use super::webpush::subscription::has_any_subscription;
 use super::{authorize_query, authorize_update, check_enabled, feature_enabled, validate_origin};
 use crate::state::{storage_borrow, storage_borrow_mut};
@@ -88,11 +89,17 @@ fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
 // ---- caller-facing entry points (called from main.rs's thin wrappers) ----
 
 /// Grants `origin` permission to notify the caller's anchor.
-pub fn grant_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> Result<(), String> {
+pub async fn grant_consent(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+) -> Result<(), String> {
     check_enabled()?;
     authorize_update(anchor_number)?;
+    let now_ns = ic_cdk::api::time();
     let recipient = crate::delegation::get_principal(anchor_number, origin.clone());
-    set_consent(anchor_number, origin, recipient, ic_cdk::api::time())
+    set_consent(anchor_number, origin.clone(), recipient, now_ns)?;
+    seal_devices_for_origin(anchor_number, &origin, now_ns).await;
+    Ok(())
 }
 
 /// Revokes `origin`'s consent. Device subscriptions stay — they're shared
@@ -101,7 +108,9 @@ pub fn revoke_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> 
     check_enabled()?;
     authorize_update(anchor_number)?;
     let recipient = crate::delegation::get_principal(anchor_number, origin.clone());
-    clear_consent(anchor_number, origin, recipient)
+    clear_consent(anchor_number, origin.clone(), recipient)?;
+    drop_origin_seals(anchor_number, &origin);
+    Ok(())
 }
 
 /// Whether `origin` may notify this identity, and which channels can reach it.
