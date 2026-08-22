@@ -138,6 +138,32 @@ export const idlFactory = ({ IDL }) => {
       'device_registration_timeout' : Timestamp,
     }),
   });
+  const SessionKey = PublicKey;
+  const AppGetDelegationRequest = IDL.Record({
+    'session_key' : SessionKey,
+    'expiration' : Timestamp,
+  });
+  const Delegation = IDL.Record({
+    'permissions' : IDL.Opt(IDL.Text),
+    'pubkey' : PublicKey,
+    'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
+    'expiration' : Timestamp,
+  });
+  const SignedDelegation = IDL.Record({
+    'signature' : IDL.Vec(IDL.Nat8),
+    'delegation' : Delegation,
+  });
+  const AppSessionError = IDL.Variant({
+    'NoMatchingSession' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+  });
+  const AppPrepareDelegationRequest = IDL.Record({
+    'session_key' : SessionKey,
+  });
+  const AppPrepareDelegationResponse = IDL.Record({
+    'user_key' : PublicKey,
+    'expiration' : Timestamp,
+  });
   const IdentityNumber = IDL.Nat64;
   const AuthnMethodProtection = IDL.Variant({
     'Protected' : IDL.Null,
@@ -358,21 +384,10 @@ export const idlFactory = ({ IDL }) => {
     'nonce' : IDL.Text,
     'expires_at' : Timestamp,
   });
-  const SessionKey = PublicKey;
   const EmailRecoveryGetDelegationArgs = IDL.Record({
     'session_key' : SessionKey,
     'expiration' : Timestamp,
     'nonce' : IDL.Text,
-  });
-  const Delegation = IDL.Record({
-    'permissions' : IDL.Opt(IDL.Text),
-    'pubkey' : PublicKey,
-    'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
-    'expiration' : Timestamp,
-  });
-  const SignedDelegation = IDL.Record({
-    'signature' : IDL.Vec(IDL.Nat8),
-    'delegation' : Delegation,
   });
   const BufferedArchiveEntry = IDL.Record({
     'sequence_number' : IDL.Nat64,
@@ -885,6 +900,21 @@ export const idlFactory = ({ IDL }) => {
     'add_tentative_device' : IDL.Func(
         [UserNumber, DeviceData],
         [AddTentativeDeviceResponse],
+        [],
+      ),
+    'app_get_delegation' : IDL.Func(
+        [AppGetDelegationRequest],
+        [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : AppSessionError })],
+        ['query'],
+      ),
+    'app_prepare_delegation' : IDL.Func(
+        [AppPrepareDelegationRequest],
+        [
+          IDL.Variant({
+            'Ok' : AppPrepareDelegationResponse,
+            'Err' : AppSessionError,
+          }),
+        ],
         [],
       ),
     'authn_method_add' : IDL.Func(
