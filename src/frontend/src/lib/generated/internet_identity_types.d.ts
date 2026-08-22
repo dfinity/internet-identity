@@ -1208,11 +1208,12 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
-/**
- * Delivery channels a notification can travel over. Web Push is the only one
- * today; a second channel (email, SMS) in the future is a variant addition here rather than a
- * new endpoint, because consent is per app and not per channel.
- */
+export interface Notification {
+  'id' : Uint8Array | number[],
+  'urgency' : [] | [NotificationUrgency],
+  'recipient' : Principal,
+  'expires_at' : [] | [Timestamp],
+}
 export type NotificationChannel = { 'push' : null };
 /**
  * Whether an app may notify this identity, and whether anything can actually
@@ -1223,6 +1224,37 @@ export interface NotificationConsentStatus {
   'deliverable_channels' : [] | [Array<NotificationChannel>],
   'consented' : [] | [boolean],
 }
+export interface NotificationContent {
+  'url' : [] | [string],
+  'title' : string,
+  'body' : string,
+}
+export type NotificationRejection = { 'invalid' : null } |
+  { 'not_subscribed' : null } |
+  { 'no_consent' : null };
+/**
+ * App-facing request/response use records with all-opt fields so the surface
+ * can grow without a breaking candid change.
+ */
+export interface NotificationSendRequest {
+  'notifications' : [] | [Array<Notification>],
+}
+export interface NotificationSendResponse {
+  'buffer_epoch' : [] | [bigint],
+  'retry_after_ms' : [] | [number],
+  'rejected' : [] | [
+    Array<{ 'id' : Uint8Array | number[], 'reason' : NotificationRejection }>
+  ],
+  'accepted' : [] | [number],
+}
+/**
+ * Delivery channels a notification can travel over. Web Push is the only one
+ * today; a second channel (email, SMS) in the future is a variant addition here rather than a
+ * new endpoint, because consent is per app and not per channel.
+ */
+export type NotificationUrgency = { 'low' : null } |
+  { 'normal' : null } |
+  { 'high' : null };
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
@@ -2295,6 +2327,18 @@ export interface _SERVICE {
     [UserNumber, string],
     { 'Ok' : null } |
       { 'Err' : string }
+  >,
+  /**
+   * ===== Notifications: called by a sending dApp =====
+   * 
+   * A dApp authorizes its sender canisters by serving, at its origin,
+   * /.well-known/ii-notification-senders  ->  { "senders" : [ "<canister-id>", ... ] }
+   * II fetches and caches that list, so the origin a send targets is derived
+   * from caller() against it and is never passed in.
+   */
+  'notification_send' : ActorMethod<
+    [NotificationSendRequest],
+    NotificationSendResponse
   >,
   /**
    * The trailing `opt text` is the SSO discovery domain (null for a direct

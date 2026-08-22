@@ -647,6 +647,38 @@ export const idlFactory = ({ IDL }) => {
     'deliverable_channels' : IDL.Opt(IDL.Vec(NotificationChannel)),
     'consented' : IDL.Opt(IDL.Bool),
   });
+  const NotificationUrgency = IDL.Variant({
+    'low' : IDL.Null,
+    'normal' : IDL.Null,
+    'high' : IDL.Null,
+  });
+  const Notification = IDL.Record({
+    'id' : IDL.Vec(IDL.Nat8),
+    'urgency' : IDL.Opt(NotificationUrgency),
+    'recipient' : IDL.Principal,
+    'expires_at' : IDL.Opt(Timestamp),
+  });
+  const NotificationSendRequest = IDL.Record({
+    'notifications' : IDL.Opt(IDL.Vec(Notification)),
+  });
+  const NotificationRejection = IDL.Variant({
+    'invalid' : IDL.Null,
+    'not_subscribed' : IDL.Null,
+    'no_consent' : IDL.Null,
+  });
+  const NotificationSendResponse = IDL.Record({
+    'buffer_epoch' : IDL.Opt(IDL.Nat64),
+    'retry_after_ms' : IDL.Opt(IDL.Nat32),
+    'rejected' : IDL.Opt(
+      IDL.Vec(
+        IDL.Record({
+          'id' : IDL.Vec(IDL.Nat8),
+          'reason' : NotificationRejection,
+        })
+      )
+    ),
+    'accepted' : IDL.Opt(IDL.Nat32),
+  });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
@@ -1245,6 +1277,11 @@ export const idlFactory = ({ IDL }) => {
     'notification_revoke_consent' : IDL.Func(
         [UserNumber, IDL.Text],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'notification_send' : IDL.Func(
+        [NotificationSendRequest],
+        [NotificationSendResponse],
         [],
       ),
     'openid_credential_add' : IDL.Func(
