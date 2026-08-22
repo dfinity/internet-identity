@@ -123,6 +123,7 @@ use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::notifications::consent::StorableNotificationConsent;
 use crate::storage::storable::notifications::sender::StorableSenderOrigin;
 use crate::storage::storable::notifications::webpush::endpoint_hash::StorableEndpointSha256;
+use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::seal::StorableWebPushSeal;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
@@ -1649,6 +1650,50 @@ impl<M: Memory + Clone> Storage<M> {
         seal: StorableWebPushSeal,
     ) {
         self.webpush_seal_memory.insert(key, seal);
+    }
+
+    /// Retrieves what the dispatcher needs to build a Web Push for one origin.
+    /// For each of `anchor_number`'s devices that holds a seal for `origin_hash` it
+    /// returns `(endpoint, vapid_public_key, sealed_blob, jwt_pool)`: the relay URL
+    /// to POST to, the sealed payload that forms the body, and the VAPID key and JWT
+    /// pool that authorise the request. A device without a seal for this origin has
+    /// nothing to send, so it is skipped.
+    pub fn webpush_deliveries_for_origin(
+        &self,
+        anchor_number: AnchorNumber,
+        origin_hash: &StorableOriginSha256,
+    ) -> Vec<(String, Vec<u8>, Vec<u8>, StorableWebPushJwtPool)> {
+        let start = (anchor_number, StorableEndpointSha256::MIN);
+        let end = (anchor_number, StorableEndpointSha256::MAX);
+        let devices: Vec<(
+            StorableEndpointSha256,
+            String,
+            Vec<u8>,
+            Option<StorableWebPushJwtPool>,
+        )> = self
+            .webpush_subscriptions_memory
+            .range(start..=end)
+            .map(|((_, endpoint_hash), sub)| {
+                (
+                    endpoint_hash,
+                    sub.endpoint,
+                    sub.vapid_public_key,
+                    sub.jwt_pool,
+                )
+            })
+            .collect();
+        devices
+            .into_iter()
+            .filter_map(|(endpoint_hash, endpoint, vapid_public_key, jwt_pool)| {
+                let blob = self
+                    .webpush_seal_memory
+                    .get(&(anchor_number, endpoint_hash, origin_hash.clone()))?
+                    .blob;
+                // A subscription with no pool can't be authorised to a relay, so skip it.
+                let pool = jwt_pool?;
+                Some((endpoint, vapid_public_key, blob, pool))
+            })
+            .collect()
     }
 
     /// Drops every seal of one device. A device's seals are a contiguous range,
