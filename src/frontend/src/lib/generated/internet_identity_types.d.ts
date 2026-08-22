@@ -660,14 +660,6 @@ export interface EmailChallengeSubmitDkimLeafArg {
   'hops' : Array<SignedRRset>,
   'nonce' : string,
 }
-/**
- * Email-recovery types
- * ====================
- * See `docs/ongoing/email-recovery.md` for the full design. Covers
- * both halves of the flow: setup (binding a recovery email to an
- * anchor) and recovery (proving control of a previously-bound
- * address to obtain a signed delegation).
- */
 export interface EmailRecoveryCredential {
   'created_at' : Timestamp,
   'address' : string,
@@ -810,10 +802,6 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
-/**
- * ICRC-3 attribute sharing types
- * ==============================
- */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -1220,6 +1208,21 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+/**
+ * Delivery channels a notification can travel over. Web Push is the only one
+ * today; a second channel (email, SMS) in the future is a variant addition here rather than a
+ * new endpoint, because consent is per app and not per channel.
+ */
+export type NotificationChannel = { 'push' : null };
+/**
+ * Whether an app may notify this identity, and whether anything can actually
+ * reach them. Kept as a record so channels can be reported without changing the
+ * method signature.
+ */
+export interface NotificationConsentStatus {
+  'deliverable_channels' : [] | [Array<NotificationChannel>],
+  'consented' : [] | [boolean],
+}
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
@@ -2270,6 +2273,30 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   /**
+   * Report on the status of the consent for a given origin
+   */
+  'notification_consent_status' : ActorMethod<
+    [UserNumber, string],
+    NotificationConsentStatus
+  >,
+  /**
+   * Report the full list of consented apps for a given anchor
+   */
+  'notification_consented_origins' : ActorMethod<[UserNumber], Array<string>>,
+  /**
+   * ===== Notifications: II callable =====
+   */
+  'notification_grant_consent' : ActorMethod<
+    [UserNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  'notification_revoke_consent' : ActorMethod<
+    [UserNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
    * The trailing `opt text` is the SSO discovery domain (null for a direct
    * provider). For SSO sign-ins a cold discovery/JWKS cache yields the
    * `Pending` result arm — a retry signal, not an error: the caller re-calls
@@ -2466,6 +2493,39 @@ export interface _SERVICE {
   'verify_tentative_device' : ActorMethod<
     [UserNumber, string],
     VerifyTentativeDeviceResponse
+  >,
+  /**
+   * Check the status of the jwt pool so that we can issue more if needed.
+   */
+  'webpush_jwt_pool_status' : ActorMethod<
+    [UserNumber, string],
+    [] | [{ 'issued_at_ns' : bigint, 'remaining' : number }]
+  >,
+  'webpush_refresh_jwts' : ActorMethod<
+    [UserNumber, string, Array<Uint8Array | number[]>, bigint],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * Register the device push subscription and a pool of JWTs so that we don't have to store a VAPID key-pair in the canister.
+   */
+  'webpush_subscribe_device' : ActorMethod<
+    [
+      UserNumber,
+      string,
+      Uint8Array | number[],
+      Uint8Array | number[],
+      Uint8Array | number[],
+      Array<Uint8Array | number[]>,
+      bigint,
+    ],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  'webpush_unsubscribe_device' : ActorMethod<
+    [UserNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : string }
   >,
   'whoami' : ActorMethod<[], Principal>,
 }
