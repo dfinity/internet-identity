@@ -3568,6 +3568,35 @@ mod account_principal_index_tests {
             other_anchor_number
         );
     }
+
+    #[test]
+    fn a_principal_resolves_to_the_account_it_was_derived_for() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+        storage
+            .set_account_last_used(anchor_number, origin.clone(), None, 1_000)
+            .unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        let principal = default_account_principal(anchor_number, &origin);
+
+        let locator = storage.lookup_account_with_principal(principal).unwrap();
+
+        assert_eq!(locator.anchor_number, anchor_number);
+        assert_eq!(locator.application_number, application_number);
+        assert_eq!(locator.account_number, None);
+    }
+
+    #[test]
+    fn a_principal_that_was_never_derived_resolves_to_nothing() {
+        let (storage, _) = storage_with_anchor();
+
+        assert_eq!(
+            storage.lookup_account_with_principal(Principal::anonymous()),
+            None
+        );
+    }
 }
 
 mod account_principal_index_backfill_tests {
@@ -4194,6 +4223,57 @@ mod session_creation_tests {
             second_devices.contains(&0),
             "the second row's live session for browser 0 was not selected and must survive"
         );
+    }
+
+    /// A browser keeps its id across sign-ins, so an index entry left behind by a removal
+    /// would be waiting for whatever that browser creates next.
+    #[test]
+    fn signing_a_browser_out_removes_its_index_entries() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let session = storage
+            .create_session(params(anchor_number, 7, 1_000))
+            .unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        let principal = storage
+            .session_principal(anchor_number, application_number, None, &session)
+            .unwrap();
+        assert!(storage.lookup_session_with_principal(principal).is_some());
+
+        storage.revoke_device_sessions(anchor_number, 7).unwrap();
+
+        assert!(
+            storage.lookup_session_with_principal(principal).is_none(),
+            "the revoked session's entry outlived it"
+        );
+        assert_eq!(storage.read(anchor_number).unwrap().session_count, 0);
+    }
+
+    /// Row eviction leaves the account's principal untouched, so the same origin comes back
+    /// at the same account. Its sessions must not.
+    #[test]
+    fn evicting_a_row_removes_its_sessions_index_entries() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let session = storage
+            .create_session(params(anchor_number, 7, 1_000))
+            .unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        let principal = storage
+            .session_principal(anchor_number, application_number, None, &session)
+            .unwrap();
+
+        storage
+            .remove_reference_list(anchor_number, application_number)
+            .unwrap();
+
+        assert!(
+            storage.lookup_session_with_principal(principal).is_none(),
+            "an evicted row left its sessions resolvable"
+        );
+        assert_eq!(storage.read(anchor_number).unwrap().session_count, 0);
     }
 
     /// The flood bound, exercised through the cap rather than through the order alone: a

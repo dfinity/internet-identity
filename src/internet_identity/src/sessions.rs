@@ -10,18 +10,20 @@ use crate::delegation::{
 };
 use crate::sessions::device_key::verify_device_keys;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
-use crate::storage::account::{ReadAccountParams, SessionRecord};
+use crate::storage::account::{Account, ReadAccountParams, SessionRecord};
 use crate::storage::{CreateSessionParams, StorageError};
 use crate::{update_root_hash, DAY_NS, MINUTE_NS};
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::CanisterSigInputs;
 use ic_canister_sig_creation::DELEGATION_SIG_DOMAIN;
 use ic_cdk::api::time;
+use ic_cdk::caller;
 use ic_certification::Hash;
 use internet_identity_interface::archive::types::{Operation, Private};
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AccountSessionError, AnchorNumber, ApplicationNumber, Delegation,
-    FrontendHostname, GetAccountSessionRequest, GetAccountSessionResponse,
+    AccountNumber, AccountSessionError, AnchorNumber, AppGetDelegationRequest,
+    AppPrepareDelegationRequest, AppPrepareDelegationResponse, AppSessionError, ApplicationNumber,
+    Delegation, FrontendHostname, GetAccountSessionRequest, GetAccountSessionResponse,
     PrepareAccountSessionRequest, PrepareAccountSessionResponse, SignedDelegation, Timestamp,
 };
 use serde_bytes::ByteBuf;
@@ -296,4 +298,121 @@ fn account_principal(
         ic_cdk::id(),
         account.calculate_seed_with_salt(&salt).to_vec(),
     ))
+}
+
+/// The one window revocation cannot reach. Matches what MCP mints, and is not
+/// requestable by the app.
+pub const APP_DELEGATION_TTL_NS: u64 = 5 * MINUTE_NS;
+
+pub fn app_prepare_delegation(
+    request: AppPrepareDelegationRequest,
+) -> Result<AppPrepareDelegationResponse, AppSessionError> {
+    let now = time();
+    let (account, session) = authorize_session(now)?;
+
+    let expiration = u64::min(
+        now.saturating_add(APP_DELEGATION_TTL_NS),
+        session.valid_till,
+    );
+    let seed = account_seed(&account)?;
+    let access = DelegationAccess::from_read_only(session.read_only);
+
+    state::signature_map_mut(|sigs| {
+        add_delegation_signature(
+            sigs,
+            request.session_key,
+            seed.as_ref(),
+            expiration,
+            access.permissions(),
+        );
+    });
+    update_root_hash();
+
+    Ok(AppPrepareDelegationResponse {
+        user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+        expiration,
+    })
+}
+
+pub fn app_get_delegation(
+    request: AppGetDelegationRequest,
+) -> Result<SignedDelegation, AppSessionError> {
+    let now = time();
+    let (account, session) = authorize_session(now)?;
+
+    if request.expiration > now.saturating_add(APP_DELEGATION_TTL_NS)
+        || request.expiration > session.valid_till
+    {
+        return Err(AppSessionError::NoMatchingSession);
+    }
+
+    let seed = account_seed(&account)?;
+    let access = DelegationAccess::from_read_only(session.read_only);
+    let permissions = access.permissions();
+
+    state::assets_and_signatures(|certified_assets, sigs| {
+        let inputs = CanisterSigInputs {
+            domain: DELEGATION_SIG_DOMAIN,
+            seed: &seed,
+            message: &crate::delegation::delegation_signature_msg_with_permissions(
+                &request.session_key,
+                request.expiration,
+                None,
+                permissions,
+            ),
+        };
+        sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash()))
+    })
+    .map(|signature| SignedDelegation {
+        delegation: Delegation {
+            pubkey: request.session_key,
+            expiration: request.expiration,
+            targets: None,
+            permissions: permissions.map(str::to_string),
+        },
+        signature: ByteBuf::from(signature),
+    })
+    .map_err(|_| AppSessionError::NoMatchingSession)
+}
+
+/// Authenticates a refresh from `caller()` alone.
+///
+/// The session index is keyed by the principal a session's chain is rooted at, so a hit is
+/// itself the proof that the caller is that session: nothing is named in the request and
+/// nothing is attached to it.
+fn authorize_session(now: Timestamp) -> Result<(Account, SessionRecord), AppSessionError> {
+    let handle = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
+        .ok_or(AppSessionError::NoMatchingSession)?;
+    let locator = storage_borrow(|storage| storage.lookup_account_with_principal(handle.account()))
+        .ok_or(AppSessionError::NoMatchingSession)?;
+
+    let (account, sessions) = storage_borrow(|storage| {
+        storage.account_with_sessions(
+            locator.anchor_number,
+            locator.application_number,
+            locator.account_number,
+        )
+    })
+    .ok_or(AppSessionError::NoMatchingSession)?;
+
+    // The browser and the creation time together, because a browser keeps its id across
+    // sign-ins: on the browser alone, an index entry that outlived its session would
+    // authenticate its holder as whatever that browser created next.
+    let session = sessions
+        .into_iter()
+        .find(|session| {
+            session.device_id == handle.device_id && session.created_at == handle.created_at
+        })
+        .ok_or(AppSessionError::NoMatchingSession)?;
+    if session.is_expired(now) {
+        return Err(AppSessionError::NoMatchingSession);
+    }
+    Ok((account, session))
+}
+
+fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {
+    let salt = storage_borrow(|storage| storage.salt().copied()).ok_or_else(|| {
+        AppSessionError::InternalCanisterError(StorageError::SaltNotSet.to_string())
+    })?;
+    Ok(account.calculate_seed_with_salt(&salt))
 }

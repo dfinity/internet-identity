@@ -788,3 +788,29 @@ pub fn get_account_session(
 ) -> Result<Result<GetAccountSessionResponse, AccountSessionError>, RejectResponse> {
     query_candid_as(env, canister_id, sender, "get_account_session", (request,)).map(|(x,)| x)
 }
+
+pub fn app_prepare_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: AppPrepareDelegationRequest,
+) -> Result<Result<AppPrepareDelegationResponse, AppSessionError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_prepare_delegation",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_get_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: AppGetDelegationRequest,
+) -> Result<Result<SignedDelegation, AppSessionError>, RejectResponse> {
+    query_candid_as(env, canister_id, sender, "app_get_delegation", (request,)).map(|(x,)| x)
+}
