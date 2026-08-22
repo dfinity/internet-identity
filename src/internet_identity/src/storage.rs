@@ -87,7 +87,7 @@ use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use ic_stable_structures::cell::ValueError;
 use std::borrow::Cow;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 use std::io::Write;
 use std::ops::RangeInclusive;
@@ -104,7 +104,7 @@ use ic_stable_structures::{
 use identity_jose::jwk::Jwk;
 use internet_identity_interface::archive::types::BufferedEntry;
 
-use crate::delegation::check_frontend_length;
+use crate::delegation::{self, check_frontend_length};
 use crate::openid::OpenIdCredentialKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
@@ -114,6 +114,7 @@ use crate::storage::anchor::Anchor;
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
+use crate::storage::storable::account_locator::StorableAccountLocator;
 use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::account_reference::StorableAccountReference;
 use crate::storage::storable::accounts_counter::StorableAccountsCounter;
@@ -210,6 +211,7 @@ const MCP_GRANT_MEMORY_INDEX: u8 = 29u8;
 const MCP_REGISTRATION_MEMORY_INDEX: u8 = 31u8;
 const SSO_STABLE_ID_INDEX_MEMORY_INDEX: u8 = 32u8;
 const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
+const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -292,6 +294,11 @@ const SSO_STABLE_ID_INDEX_MEMORY_ID: MemoryId = MemoryId::new(SSO_STABLE_ID_INDE
 /// Monotonic `ApplicationNumber` allocator. A removed number is retired, never reissued.
 const NEXT_APPLICATION_NUMBER_MEMORY_ID: MemoryId =
     MemoryId::new(NEXT_APPLICATION_NUMBER_MEMORY_INDEX);
+
+/// Reverse index from the principal a dapp sees to the account that produced it:
+/// `self_authenticating(der_encode_canister_sig_key(seed)) -> (anchor, application, account)`.
+const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -393,6 +400,9 @@ pub struct Storage<M: Memory> {
     >,
     stable_account_counter_memory: StableCell<StorableAccountsCounter, ManagedMemory<M>>,
     next_application_number_memory: StableCell<StorableApplicationNumber, ManagedMemory<M>>,
+    lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    lookup_account_with_principal_memory:
+        StableBTreeMap<Principal, StorableAccountLocator, ManagedMemory<M>>,
     /// Counter that counts how often there was a discrepancy between the anchor accounts counter and the actual number of accounts
     stable_account_counter_discrepancy_counter_memory:
         StableCell<StorableDiscrepancyCounter, ManagedMemory<M>>,
@@ -529,6 +539,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(STABLE_DEFAULT_ACCOUNT_REFERENCE_MEMORY_ID);
         let stable_account_counter_memory = memory_manager.get(STABLE_ACCOUNT_COUNTER_MEMORY_ID);
         let next_application_number_memory = memory_manager.get(NEXT_APPLICATION_NUMBER_MEMORY_ID);
+        let lookup_account_with_principal_memory =
+            memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let stable_account_counter_discrepancy_counter_memory =
             memory_manager.get(STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_ID);
         let lookup_anchor_with_openid_credential_memory =
@@ -613,6 +625,12 @@ impl<M: Memory + Clone> Storage<M> {
             .expect("stable_account_counter_memory"),
             next_application_number_memory: StableCell::init(next_application_number_memory, 0)
                 .expect("next_application_number_memory"),
+            lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
+                lookup_account_with_principal_memory.clone(),
+            ),
+            lookup_account_with_principal_memory: StableBTreeMap::init(
+                lookup_account_with_principal_memory,
+            ),
             stable_account_counter_discrepancy_counter_memory: StableCell::init(
                 stable_account_counter_discrepancy_counter_memory,
                 StorableDiscrepancyCounter::default(),
@@ -1790,6 +1808,8 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&application_number)
             .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
 
+        self.sync_account_principal_index(anchor_number, application_number, &previous, &[])?;
+
         self.stable_account_reference_list_memory.remove(&key);
         self.stable_anchor_application_config_memory.remove(&key);
 
@@ -1917,11 +1937,101 @@ impl<M: Memory + Clone> Storage<M> {
 
         let deltas = ReferenceListDeltas::between(&previous, &current);
 
+        self.sync_account_principal_index(anchor_number, application_number, &previous, &current)?;
+
         self.stable_account_reference_list_memory
             .insert(key, current.into());
         self.apply_reference_counter_deltas(anchor_number, application_number, application, deltas);
 
         Ok(())
+    }
+
+    /// Keeps the principal index in step with one reference-list write, diffing values
+    /// rather than keys.
+    fn sync_account_principal_index(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        previous: &[AccountReference],
+        current: &[AccountReference],
+    ) -> Result<(), StorageError> {
+        let salt = *self.salt().ok_or(StorageError::SaltNotSet)?;
+        let origin = self
+            .stable_application_memory
+            .get(&application_number)
+            .map(|application| application.origin)
+            .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
+
+        let previous_entries =
+            self.account_principals(anchor_number, application_number, &origin, &salt, previous);
+        let current_entries =
+            self.account_principals(anchor_number, application_number, &origin, &salt, current);
+
+        for (principal, locator) in &previous_entries {
+            if current_entries.contains_key(principal) {
+                continue;
+            }
+            if self
+                .lookup_account_with_principal_memory
+                .get(principal)
+                .is_some_and(|stored| stored.anchor_number == locator.anchor_number)
+            {
+                self.lookup_account_with_principal_memory.remove(principal);
+            }
+        }
+
+        for (principal, locator) in current_entries {
+            if self.lookup_account_with_principal_memory.get(&principal) == Some(locator.clone()) {
+                continue;
+            }
+            self.lookup_account_with_principal_memory
+                .insert(principal, locator);
+        }
+
+        Ok(())
+    }
+
+    /// The principals a set of references derives to. A reference whose account row is
+    /// gone derives nothing and is skipped.
+    fn account_principals(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        origin: &FrontendHostname,
+        salt: &[u8; 32],
+        references: &[AccountReference],
+    ) -> BTreeMap<Principal, StorableAccountLocator> {
+        references
+            .iter()
+            .filter_map(|reference| {
+                let account = match reference.account_number {
+                    None => Account::new(anchor_number, origin.clone(), None, None),
+                    Some(account_number) => {
+                        let stored = self.stable_account_memory.get(&account_number)?;
+                        Account::new_full(
+                            anchor_number,
+                            origin.clone(),
+                            Some(stored.name),
+                            Some(account_number),
+                            reference.last_used,
+                            stored.seed_from_anchor,
+                        )
+                    }
+                };
+                let principal = delegation::canister_sig_principal(
+                    canister_id(),
+                    account.calculate_seed_with_salt(salt).to_vec(),
+                );
+                Some((
+                    principal,
+                    StorableAccountLocator {
+                        anchor_number,
+                        application_number,
+                        account_number: reference.account_number,
+                    },
+                ))
+            })
+            .collect()
     }
 
     fn apply_reference_counter_deltas(
@@ -2662,6 +2772,10 @@ impl<M: Memory + Clone> Storage<M> {
                 self.stable_account_reference_list_memory_wrapper.size(),
             ),
             (
+                "lookup_account_with_principal".to_string(),
+                self.lookup_account_with_principal_memory_wrapper.size(),
+            ),
+            (
                 "stable_anchor_application_config".to_string(),
                 self.stable_anchor_application_config_memory_wrapper.size(),
             ),
@@ -2701,6 +2815,18 @@ impl<M: Memory + Clone> Storage<M> {
             ),
         ])
     }
+}
+
+#[cfg(not(test))]
+fn canister_id() -> Principal {
+    ic_cdk::id()
+}
+
+/// `ic_cdk::id()` traps outside a canister, so the unit tests derive principals against
+/// a fixed canister id.
+#[cfg(test)]
+fn canister_id() -> Principal {
+    Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 7, 1, 1])
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2771,6 +2897,7 @@ pub enum StorageError {
         application_number: ApplicationNumber,
     },
     ErrorUpdatingAccountCounter,
+    SaltNotSet,
     EmptyAccountReferenceList {
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
@@ -2837,6 +2964,10 @@ impl fmt::Display for StorageError {
                 "Origin not found for application number {application_number}",
             ),
             Self::ErrorUpdatingAccountCounter => write!(f, "Error updating account counter"),
+            Self::SaltNotSet => write!(
+                f,
+                "the salt is not set, so an account principal cannot be derived"
+            ),
             Self::EmptyAccountReferenceList {
                 anchor_number,
                 application_number,

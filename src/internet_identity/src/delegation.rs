@@ -75,11 +75,17 @@ pub fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) ->
 }
 
 pub fn calculate_anchor_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> Hash {
-    let salt = state::salt();
+    calculate_anchor_seed_with_salt(&state::salt(), anchor_number, frontend)
+}
 
+pub fn calculate_anchor_seed_with_salt(
+    salt: &[u8; 32],
+    anchor_number: AnchorNumber,
+    frontend: &FrontendHostname,
+) -> Hash {
     let mut blob: Vec<u8> = vec![];
     blob.push(salt.len() as u8);
-    blob.extend_from_slice(&salt);
+    blob.extend_from_slice(salt);
 
     let anchor_number_str = anchor_number.to_string();
     let anchor_number_blob = anchor_number_str.bytes();
@@ -95,12 +101,14 @@ pub fn calculate_anchor_seed(anchor_number: AnchorNumber, frontend: &FrontendHos
 /// Calculate a seed only from an `AccountNumber` and `FrontendHostname`.
 /// This is only called when we're not dealing with a default account.
 /// The anchor number is not included because accounts are not tied to specific anchors.
-pub fn calculate_account_seed(account_number: AccountNumber, frontend: &FrontendHostname) -> Hash {
-    let salt = state::salt();
-
+pub fn calculate_account_seed_with_salt(
+    salt: &[u8; 32],
+    account_number: AccountNumber,
+    frontend: &FrontendHostname,
+) -> Hash {
     let mut blob: Vec<u8> = vec![];
     blob.push(salt.len() as u8);
-    blob.extend_from_slice(&salt);
+    blob.extend_from_slice(salt);
 
     blob.push(ACCOUNT_SEED_PREFIX.len() as u8);
     blob.extend(ACCOUNT_SEED_PREFIX.bytes());
@@ -123,8 +131,17 @@ fn hash_bytes(value: impl AsRef<[u8]>) -> Hash {
 }
 
 pub(crate) fn der_encode_canister_sig_key(seed: Vec<u8>) -> Vec<u8> {
-    let my_canister_id = id();
-    CanisterSigPublicKey::new(my_canister_id, seed).to_der()
+    der_encode_canister_sig_key_for(id(), seed)
+}
+
+pub(crate) fn der_encode_canister_sig_key_for(canister_id: Principal, seed: Vec<u8>) -> Vec<u8> {
+    CanisterSigPublicKey::new(canister_id, seed).to_der()
+}
+
+/// The principal a dapp sees for an account: the self-authenticating principal over
+/// the DER-encoded canister signature key for the account's seed.
+pub(crate) fn canister_sig_principal(canister_id: Principal, seed: Vec<u8>) -> Principal {
+    Principal::self_authenticating(der_encode_canister_sig_key_for(canister_id, seed))
 }
 
 /// Adds a delegation signature for `pk` to the signature map. `permissions`
