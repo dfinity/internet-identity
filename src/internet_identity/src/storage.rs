@@ -1794,8 +1794,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(Some(()))
     }
 
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
     /// Signs one browser out of everything, in a single message.
     pub fn revoke_device_sessions(
         &mut self,
@@ -1912,6 +1910,23 @@ impl<M: Memory + Clone> Storage<M> {
         self.write(anchor)
     }
 
+    /// Moves the count without considering the cap, for the paths that only remove.
+    fn change_session_count(
+        &mut self,
+        anchor_number: AnchorNumber,
+        removed: usize,
+        added: usize,
+    ) -> Result<u32, StorageError> {
+        let mut anchor = self.read(anchor_number)?;
+        anchor.session_count = anchor
+            .session_count
+            .saturating_sub(removed as u32)
+            .saturating_add(added as u32);
+        let count = anchor.session_count;
+        self.write(anchor)?;
+        Ok(count)
+    }
+
     /// Walks the anchor's rows once and reclaims down to the watermark, taking sessions in
     /// [`SessionRecord::reclaim_order`]: dead ones first, then the least recently used.
     ///
@@ -2017,23 +2032,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(remaining)
     }
 
-    /// Moves the count without considering the cap, for the paths that only remove.
-    fn change_session_count(
-        &mut self,
-        anchor_number: AnchorNumber,
-        removed: usize,
-        added: usize,
-    ) -> Result<u32, StorageError> {
-        let mut anchor = self.read(anchor_number)?;
-        anchor.session_count = anchor
-            .session_count
-            .saturating_sub(removed as u32)
-            .saturating_add(added as u32);
-        let count = anchor.session_count;
-        self.write(anchor)?;
-        Ok(count)
-    }
-
     /// Drops the index entries of sessions that have just been removed from a row.
     fn unindex_sessions(
         &mut self,
@@ -2051,8 +2049,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
     /// The account a session handle names, together with its sessions.
     pub fn account_with_sessions(
         &self,
@@ -2081,8 +2077,6 @@ impl<M: Memory + Clone> Storage<M> {
         Some((account, reference.sessions))
     }
 
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
     pub fn account_sessions(
         &self,
         anchor_number: AnchorNumber,
@@ -2101,8 +2095,6 @@ impl<M: Memory + Clone> Storage<M> {
             .map(|reference| reference.sessions)
     }
 
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
     /// Creates the session `prepare_account_session` mints an identity from, replacing
     /// whatever this browser already held at this account.
     pub fn create_session(
@@ -2235,8 +2227,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(session)
     }
 
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
     /// The principal an app sees for an account, which is what a session handle names.
     fn account_principal_of(
         &self,
@@ -3384,8 +3374,6 @@ impl<M: Memory + Clone> Storage<M> {
     }
 }
 
-// Constructed by the sign-in ceremony, which lands two PRs up.
-#[allow(dead_code)]
 pub struct CreateSessionParams {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
