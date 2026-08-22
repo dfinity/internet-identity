@@ -1858,10 +1858,26 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(removed)
     }
 
+    /// The account a principal a dapp sees was derived for.
+    pub fn lookup_account_with_principal(
+        &self,
+        principal: Principal,
+    ) -> Option<StorableAccountLocator> {
+        self.lookup_account_with_principal_memory.get(&principal)
+    }
+
     /// Tells storage which canister it is, so the principals it derives match the ones
     /// callers arrive as.
     pub fn set_canister_id(&mut self, canister_id: Principal) {
         self.canister_id = canister_id;
+    }
+
+    /// Where the session a caller authenticates as is stored.
+    pub fn lookup_session_with_principal(
+        &self,
+        principal: Principal,
+    ) -> Option<StorableSessionHandle> {
+        self.lookup_session_with_principal_memory.get(&principal)
     }
 
     /// The principal a session's chain is rooted at, which is what an app-facing call

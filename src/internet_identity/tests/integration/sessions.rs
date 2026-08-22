@@ -2,14 +2,15 @@
 
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2::{
-    get_account_session, prepare_account_session,
+    app_get_delegation, app_prepare_delegation, get_account_session, prepare_account_session,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
     env, install_ii_with_archive, principal_1, time, verify_delegation, BrowserKey,
 };
 use internet_identity_interface::internet_identity::types::{
-    AccountSessionError, GetAccountSessionRequest, PrepareAccountSessionRequest,
+    AccountSessionError, AppGetDelegationRequest, AppPrepareDelegationRequest, AppSessionError,
+    GetAccountSessionRequest, Permissions, PrepareAccountSessionRequest,
     PrepareAccountSessionResponse,
 };
 use pocket_ic::{PocketIc, RejectResponse};
@@ -18,6 +19,7 @@ use serde_bytes::ByteBuf;
 use std::time::Duration;
 
 const ORIGIN: &str = "https://some-dapp.com";
+const APP_DELEGATION_TTL_NS: u64 = 5 * 60 * 1_000_000_000;
 
 fn session_request(identity_number: u64) -> PrepareAccountSessionRequest {
     session_request_from(identity_number, &BrowserKey::new(1))
@@ -98,6 +100,42 @@ fn should_create_a_session_and_witness_its_delegation() -> Result<(), RejectResp
     Ok(())
 }
 
+#[test]
+fn should_replace_the_session_of_a_browser_signing_in_again() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+
+    let (first, first_principal) = create_session(&env, canister_id, identity_number);
+    env.advance_time(Duration::from_secs(60));
+
+    let second = prepare_account_session(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request(identity_number),
+    )?
+    .unwrap();
+
+    assert_ne!(second.created_at, first.created_at);
+    assert_ne!(second.user_key, first.user_key);
+
+    // The chain the first ceremony handed out stops working, which is what bounds a copy of
+    // it to the user's next sign-in rather than to its expiry.
+    assert_eq!(
+        app_prepare_delegation(
+            &env,
+            canister_id,
+            first_principal,
+            AppPrepareDelegationRequest {
+                session_key: ByteBuf::from(vec![7; 32]),
+            },
+        )?,
+        Err(AppSessionError::NoMatchingSession)
+    );
+
+    Ok(())
+}
 
 #[test]
 fn should_refuse_a_session_for_another_anchor() -> Result<(), RejectResponse> {
@@ -117,13 +155,308 @@ fn should_refuse_a_session_for_another_anchor() -> Result<(), RejectResponse> {
     Ok(())
 }
 
+#[test]
+fn should_mint_an_app_delegation_from_a_session() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+    let app_key = ByteBuf::from(vec![7; 32]);
 
+    let minted = app_prepare_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareDelegationRequest {
+            session_key: app_key.clone(),
+        },
+    )?
+    .unwrap();
 
+    assert!(minted.expiration <= time(&env) + APP_DELEGATION_TTL_NS);
+    assert!(minted.expiration > time(&env));
 
+    let signed = app_get_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppGetDelegationRequest {
+            session_key: app_key,
+            expiration: minted.expiration,
+        },
+    )?
+    .unwrap();
 
+    verify_delegation(&env, minted.user_key, &signed, &env.root_key().unwrap());
 
+    Ok(())
+}
 
+/// The minted delegation is for the account, not for the session, so it is the principal
+/// the dapp already knows, and the one the session response names.
+#[test]
+fn should_mint_the_accounts_own_principal() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::{
+        prepare_account_delegation, AccountDelegationParams,
+    };
 
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        ORIGIN.to_string(),
+        None,
+        ByteBuf::from(vec![9; 32]),
+    );
+    let by_access_method = prepare_account_delegation(&params, None)?.unwrap();
+
+    let (prepared, session_principal) = create_session(&env, canister_id, identity_number);
+    let by_session = app_prepare_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?
+    .unwrap();
+
+    assert_eq!(by_session.user_key, by_access_method.user_key);
+    assert_eq!(
+        prepared.account_principal,
+        Principal::self_authenticating(&by_access_method.user_key)
+    );
+
+    Ok(())
+}
+
+/// A caller the session index does not know is refused, whatever else it holds.
+#[test]
+fn should_refuse_a_caller_that_is_not_the_session() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, _) = create_session(&env, canister_id, identity_number);
+
+    let result = app_prepare_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?;
+
+    assert_eq!(result, Err(AppSessionError::NoMatchingSession));
+
+    Ok(())
+}
+
+#[test]
+fn should_refuse_a_refresh_once_the_session_has_expired() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let mut request = session_request(identity_number);
+    request.valid_for = Some(10 * 60 * 1_000_000_000);
+    let prepared = prepare_account_session(&env, canister_id, principal_1(), request)?.unwrap();
+    let session_principal = Principal::self_authenticating(&prepared.user_key);
+
+    env.advance_time(Duration::from_secs(11 * 60));
+
+    let result = app_prepare_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?;
+
+    assert_eq!(result, Err(AppSessionError::NoMatchingSession));
+
+    Ok(())
+}
+
+/// The 5-minute cap is a property of the design, not something the app asks for, so the
+/// `get` half re-derives it rather than trusting the value it is handed. Longer-lived
+/// delegations over the same account seed exist, and witnessing one here would hand the
+/// session an artifact that outlives it.
+#[test]
+fn should_refuse_an_app_delegation_longer_than_the_ttl() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::{
+        prepare_account_delegation, AccountDelegationParams,
+    };
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let app_key = ByteBuf::from(vec![7; 32]);
+
+    // A 30-day delegation over the same account seed, for the same key.
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        ORIGIN.to_string(),
+        None,
+        app_key.clone(),
+    );
+    let long_lived =
+        prepare_account_delegation(&params, Some(30 * 24 * 60 * 60 * 1_000_000_000))?.unwrap();
+    assert!(long_lived.expiration > time(&env) + APP_DELEGATION_TTL_NS);
+
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    let result = app_get_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppGetDelegationRequest {
+            session_key: app_key,
+            expiration: long_lived.expiration,
+        },
+    )?;
+
+    assert!(matches!(result, Err(AppSessionError::NoMatchingSession)));
+
+    Ok(())
+}
+
+/// A consent that differs from the held one is a different session, so a downgrade is
+/// not silently discarded.
+#[test]
+fn should_not_reuse_a_session_across_a_consent_change() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+
+    let full_access = prepare_account_session(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request(identity_number),
+    )?
+    .unwrap();
+
+    let mut downgraded = session_request(identity_number);
+    downgraded.permissions = Some(Permissions::Queries);
+    env.advance_time(Duration::from_secs(60));
+    let read_only = prepare_account_session(&env, canister_id, principal_1(), downgraded)?.unwrap();
+
+    assert_ne!(read_only.created_at, full_access.created_at);
+    assert_ne!(read_only.user_key, full_access.user_key);
+
+    let minted = app_prepare_delegation(
+        &env,
+        canister_id,
+        Principal::self_authenticating(&read_only.user_key),
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?
+    .unwrap();
+    let signed = app_get_delegation(
+        &env,
+        canister_id,
+        Principal::self_authenticating(&read_only.user_key),
+        AppGetDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+            expiration: minted.expiration,
+        },
+    )?
+    .unwrap();
+    assert_eq!(
+        signed.delegation.permissions,
+        Some("queries".to_string()),
+        "the downgraded consent must reach the minted delegation"
+    );
+
+    // The browser now holds one session, not two.
+    let refreshed_old = app_prepare_delegation(
+        &env,
+        canister_id,
+        Principal::self_authenticating(&full_access.user_key),
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?;
+    assert_eq!(refreshed_old, Err(AppSessionError::NoMatchingSession));
+
+    Ok(())
+}
+
+/// A session whose device the registry cap dropped could not be signed out from
+/// settings, so it goes with the record.
+#[test]
+fn should_end_the_sessions_of_a_browser_the_registry_dropped() -> Result<(), RejectResponse> {
+    const MAX_SESSION_DEVICES: u32 = 20;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+
+    let (_, first_principal) = create_session(&env, canister_id, identity_number);
+
+    for index in 0..MAX_SESSION_DEVICES {
+        let mut request = session_request_from(identity_number, &BrowserKey::new(index as u8 + 2));
+        request.device_name = format!("browser-{index}");
+        request.origin = format!("https://dapp-{index}.com");
+        prepare_account_session(&env, canister_id, principal_1(), request)?.unwrap();
+    }
+
+    let refreshed = app_prepare_delegation(
+        &env,
+        canister_id,
+        first_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?;
+    assert_eq!(refreshed, Err(AppSessionError::NoMatchingSession));
+
+    Ok(())
+}
+
+/// An app delegation cannot renew itself: its principal resolves to the locator, but no
+/// session's seed will ever equal it, because the two seed families are domain separated.
+#[test]
+fn should_refuse_an_app_delegation_renewing_itself() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    let minted = app_prepare_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?
+    .unwrap();
+    let account_principal = Principal::self_authenticating(&minted.user_key);
+
+    let result = app_prepare_delegation(
+        &env,
+        canister_id,
+        account_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?;
+
+    assert_eq!(result, Err(AppSessionError::NoMatchingSession));
+
+    Ok(())
+}
 
 /// Registering a browser happens once per browser per anchor, so it is rare enough to
 /// archive, unlike the per-sign-in events the account design keeps out of the archive.
@@ -187,6 +520,47 @@ fn should_archive_a_browser_registration_with_the_name_redacted() -> Result<(), 
     Ok(())
 }
 
+/// Naming a default account keeps its principal, so it must keep its sessions. Before the
+/// session seed was built on the account seed, naming it signed the user out of every app
+/// using that account.
+#[test]
+fn should_keep_a_session_alive_when_the_default_account_is_named() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::update_account;
+    use internet_identity_interface::internet_identity::types::AccountUpdate;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    // Naming the default account materializes it: the reference keeps its sessions and
+    // gains an account number.
+    update_account(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        ORIGIN.to_string(),
+        None,
+        AccountUpdate {
+            name: Some("work".to_string()),
+        },
+    )?
+    .unwrap();
+
+    let refreshed = app_prepare_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?;
+
+    assert!(refreshed.is_ok(), "naming an account ended its sessions");
+
+    Ok(())
+}
 
 /// A request naming an account the identity does not hold is the one failure a caller can
 /// provoke here, so it must be refused before anything is written. Otherwise a rejected
@@ -533,6 +907,49 @@ fn should_refuse_a_successor_another_browser_holds() -> Result<(), RejectRespons
     Ok(())
 }
 
+/// Rotation changes what the browser proves with, not which browser it is, and sessions
+/// record the browser. So a rotation must not cost the user their session.
+#[test]
+fn should_keep_the_browser_entry_across_a_rotation() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+
+    let browser = BrowserKey::new(1);
+    let first = prepare_account_session(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request_from(identity_number, &browser),
+    )?
+    .unwrap();
+
+    env.advance_time(Duration::from_secs(60));
+    let rotated = prepare_account_session(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request_from(identity_number, &browser.successor()),
+    )?
+    .unwrap();
+
+    // A ceremony replaces the session, so what a rotation must not cost is the browser's
+    // identity: same entry, new session.
+    assert_eq!(rotated.device_id, first.device_id);
+    assert_ne!(rotated.created_at, first.created_at);
+
+    assert!(app_prepare_delegation(
+        &env,
+        canister_id,
+        Principal::self_authenticating(&rotated.user_key),
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?
+    .is_ok());
+
+    Ok(())
+}
 
 /// A key nobody holds cannot be announced: without the successor's own signature, a key read
 /// off the wire could be planted as another browser's successor and claimed later.
@@ -586,3 +1003,43 @@ fn should_refuse_a_successor_another_browser_holds_even_when_proven() -> Result<
     Ok(())
 }
 
+/// A refresh names nothing and attaches nothing: the caller is resolved from its own
+/// signature, so an app that never held a session cannot mint by naming an account.
+#[test]
+fn should_mint_for_the_calling_session_and_nobody_else() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (prepared, session_principal) = create_session(&env, canister_id, identity_number);
+
+    let minted = app_prepare_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?
+    .unwrap();
+
+    // What the session mints is the account's own principal, unchanged by any of this.
+    assert_eq!(
+        Principal::self_authenticating(&minted.user_key),
+        prepared.account_principal
+    );
+
+    // The account principal is not a credential: holding it mints nothing.
+    assert_eq!(
+        app_prepare_delegation(
+            &env,
+            canister_id,
+            prepared.account_principal,
+            AppPrepareDelegationRequest {
+                session_key: ByteBuf::from(vec![7; 32]),
+            },
+        )?,
+        Err(AppSessionError::NoMatchingSession)
+    );
+
+    Ok(())
+}
