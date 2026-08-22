@@ -2048,6 +2048,86 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(remaining)
     }
 
+    /// Records that a session was used. Reports whether a session matched. The
+    /// reference's `last_used` rides on the same write.
+    pub fn stamp_session_refresh(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+        created_at: Timestamp,
+        device_id: SessionDeviceId,
+        now: Timestamp,
+    ) -> Result<bool, StorageError> {
+        let Some(references) = self.lookup_account_references(anchor_number, application_number)
+        else {
+            return Ok(false);
+        };
+        let mut references: Vec<AccountReference> =
+            references.into_iter().map(Into::into).collect();
+
+        let Some(reference) = references
+            .iter_mut()
+            .find(|reference| reference.account_number == account_number)
+        else {
+            return Ok(false);
+        };
+        let Some(session) = reference
+            .sessions
+            .iter_mut()
+            .find(|session| session.created_at == created_at && session.device_id == device_id)
+        else {
+            return Ok(false);
+        };
+
+        session.last_refreshed = Some(now);
+        reference.last_used = Some(now);
+
+        // This row is being rewritten anyway, so its dead sessions go now. It costs one
+        // pass over a list already in memory and no write of its own, and it means every
+        // row anyone still uses stays clean without anything having to sweep for it.
+        let mut expired: Vec<(Option<AccountNumber>, SessionRecord)> = vec![];
+        for reference in references.iter_mut() {
+            let account_number = reference.account_number;
+            reference.sessions.retain(|session| {
+                if session.is_expired(now) {
+                    expired.push((account_number, session.clone()));
+                    return false;
+                }
+                true
+            });
+        }
+
+        self.write_reference_list(anchor_number, application_number, references)?;
+        for (account_number, session) in &expired {
+            self.unindex_sessions(
+                anchor_number,
+                application_number,
+                *account_number,
+                std::slice::from_ref(session),
+            );
+        }
+        if !expired.is_empty() {
+            self.change_session_count(anchor_number, expired.len(), 0)?;
+        }
+        self.stamp_session_device_use(anchor_number, device_id, now)?;
+        Ok(true)
+    }
+
+    /// Advances the device registry's `last_used` for the browser driving this session.
+    fn stamp_session_device_use(
+        &mut self,
+        anchor_number: AnchorNumber,
+        device_id: SessionDeviceId,
+        now: Timestamp,
+    ) -> Result<(), StorageError> {
+        let mut anchor = self.read(anchor_number)?;
+        if !anchor.stamp_session_device_use(device_id, now) {
+            return Ok(());
+        }
+        self.write(anchor)
+    }
+
     /// Drops the index entries of sessions that have just been removed from a row.
     fn unindex_sessions(
         &mut self,
