@@ -3571,6 +3571,8 @@ mod account_principal_index_tests {
             other_anchor_number
         );
     }
+
+
 }
 
 mod account_principal_index_backfill_tests {
@@ -4087,9 +4089,7 @@ mod session_creation_tests {
     #[test]
     fn an_over_counting_anchor_is_corrected_rather_than_denied() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        storage
-            .create_session(params(anchor_number, 1, 1_000))
-            .unwrap();
+        storage.create_session(params(anchor_number, 1, 1_000)).unwrap();
 
         // Nothing observes a session expiring, so the count drifts up. The cap must be
         // enforced against what the rows hold, not against the drift.
@@ -4097,9 +4097,7 @@ mod session_creation_tests {
         anchor.session_count = MAX_SESSIONS_PER_ANCHOR;
         storage.write(anchor).unwrap();
 
-        storage
-            .create_session(params(anchor_number, 2, 2_000))
-            .unwrap();
+        storage.create_session(params(anchor_number, 2, 2_000)).unwrap();
 
         assert_eq!(sessions_of(&storage, anchor_number).len(), 2);
         assert_eq!(storage.read(anchor_number).unwrap().session_count, 2);
@@ -4199,6 +4197,8 @@ mod session_creation_tests {
         );
     }
 
+
+
     /// The flood bound, exercised through the cap rather than through the order alone: a
     /// session the user has actually kept alive survives a row full of sign-ins nobody
     /// came back to, even though every one of them is newer than it.
@@ -4215,15 +4215,13 @@ mod session_creation_tests {
             device_id: 1,
             read_only: false,
         }];
-        sessions.extend(
-            (2..=MAX_SESSIONS_PER_ANCHOR).map(|device_id| SessionRecord {
-                created_at: 500_000,
-                valid_till: 100_000_000,
-                last_refreshed: None,
-                device_id,
-                read_only: false,
-            }),
-        );
+        sessions.extend((2..=MAX_SESSIONS_PER_ANCHOR).map(|device_id| SessionRecord {
+            created_at: 500_000,
+            valid_till: 100_000_000,
+            last_refreshed: None,
+            device_id,
+            read_only: false,
+        }));
         storage
             .write_reference_list(
                 anchor_number,
