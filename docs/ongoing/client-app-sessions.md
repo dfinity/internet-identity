@@ -32,6 +32,7 @@ The library cannot call II's session methods at all, so the canister work has no
 - The browser key proof and the browser registry. Those are II's side and are specified in [revocable-app-sessions-spec.md](revocable-app-sessions-spec.md).
 - Listing an identity's sessions, or revoking another browser's, from an app. Both belong to II's settings, and an app is authenticated as one session.
 - Migrating delegations stored by an earlier version of the library. The storage change that carries this is already a breaking one.
+- Negotiating with a provider that has no session methods. `AuthClient` is for Internet Identity, so `signIn()` asks for a session and expects one. Nothing inspects advertised scopes to decide, and a deployment predating these methods is not a case the library carries code for.
 - Telling an application that its session is read-only. A session the user consented to for queries only mints delegations carrying a permissions field, and surfacing that wants an API of its own.
 
 ## Approach
@@ -126,10 +127,6 @@ An `InternalCanisterError`, a network failure, or an unreachable boundary node m
 
 `signOut()` calls `app_revoke_session` before clearing local state, so access ends within one app-delegation lifetime instead of running to the session's expiry. It clears local state even when the call fails, because a user who pressed sign out must not remain signed in on the device in front of them.
 
-### Talking to an II that has no session methods
-
-A library that only knows how to acquire a session would break against a deployment that predates these methods. The scopes returned when a connection is established say whether `ii_session_delegation` is available; where it is not, `signIn()` falls back to `icrc34_delegation` and behaves as it does today. An app therefore gets revocable sessions where the provider supports them and a working sign-in everywhere else, without choosing.
-
 ## Specification
 
 [client-app-sessions-spec.md](client-app-sessions-spec.md) states the requirements, the call sequences, and the constants.
@@ -139,6 +136,6 @@ A library that only knows how to acquire a session would break against a deploym
 1. **Mint app delegations from a session chain.**
    The refreshing identity, its failure classification, and the shared in-flight mint. Nothing produces a session chain yet, so this changes no behaviour and is safe to release on its own.
 2. **Acquire a session at sign-in, and carry the session's expiry in the hint.**
-   This is the stage that turns the feature on, and the two parts belong together: the hint becomes wrong the moment a five-minute delegation is what a sibling reads. The fallback for providers without the method lands here too, since this is the first stage that asks for a session.
+   This is the stage that turns the feature on, and the two parts belong together: the hint becomes wrong the moment a five-minute delegation is what a sibling reads.
 3. **Revoke at sign-out.**
    Harmless before stage 2 and only meaningful after it.

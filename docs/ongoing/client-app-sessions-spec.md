@@ -52,7 +52,7 @@ sequenceDiagram
 ## Acquiring a session
 
 **ACQ-1.**
-`signIn()` requests a session with `ii_session_delegation` when the provider's scopes include that method.
+`signIn()` requests a session with `ii_session_delegation`. Nothing checks first whether the provider offers it: this library is for Internet Identity, and a provider that cannot answer is a failed sign-in rather than a case to fall back from.
 
 **ACQ-2.**
 The request carries a session public key and, where the application configured one, a derivation origin. It carries no access level and no lifetime, both of which the user decides at consent.
@@ -197,17 +197,6 @@ Local state is cleared whether or not that call succeeded. A user who pressed si
 
 **END-3.**
 `app_revoke_session` returns nothing and always succeeds, so there is no error to surface and a repeated sign-out needs no special case.
-
-## Providers without session support
-
-**COMPAT-1.**
-Where the provider's scopes do not include `ii_session_delegation`, `signIn()` uses `icrc34_delegation`.
-
-**COMPAT-2.**
-The fallback path behaves as the library does today, including what it stores and what `isAuthenticated()` reports.
-
-**COMPAT-3.**
-An application cannot select between the two paths. Which one runs is a property of the provider, not a configuration option.
 
 ## Reaching the II canister
 
