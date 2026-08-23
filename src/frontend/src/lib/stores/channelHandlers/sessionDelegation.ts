@@ -37,6 +37,10 @@ export const SESSION_DELEGATION_METHOD = "ii_session_delegation";
 
 const SessionParamsCodec = z.object({
   sessionPublicKey: Base64ToPublicKeyCodec,
+  // How long the app is willing for the session to last. A ceiling rather than a
+  // request: what the user picks at consent wins, an SSO organization's cap
+  // narrows it further, and the canister clamps the result.
+  maxTimeToLive: z.optional(StringToBigIntCodec),
   icrc95DerivationOrigin: z.optional(OriginSchema),
 });
 
@@ -161,7 +165,10 @@ export const handleSessionDelegationRequest =
           params.icrc95DerivationOrigin ?? channel.origin,
         );
 
-        const created = await createSession(effectiveOrigin);
+        const created = await createSession(
+          effectiveOrigin,
+          params.maxTimeToLive,
+        );
         const chain = await extendToApp(
           created.record,
           params.sessionPublicKey,
@@ -182,8 +189,9 @@ export const handleSessionDelegationRequest =
 
 const createSession = async (
   effectiveOrigin: string,
+  requestedMaxTimeToLive: bigint | undefined,
 ): Promise<{ record: AppSessionRecord }> => {
-  authorizationStore.setRequestContext(effectiveOrigin, undefined);
+  authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
   const authorized = await waitForStore(authorizedStore);
   const [accountNumber, { identityNumber, actor, authMethod }] =
     await Promise.all([
@@ -194,12 +202,14 @@ const createSession = async (
   // outlive that, so an SSO identity sends a duration even when the user picked none.
   const ssoSessionMaxAgeNs =
     "openid" in authMethod ? authMethod.openid.ssoSessionMaxAgeNs : undefined;
+  // What the user picked wins over what the app asked for; the app's value is the
+  // ceiling that applies when the picker offered nothing.
+  const requested = authorized.maxTimeToLive ?? requestedMaxTimeToLive;
   const validFor =
     ssoSessionMaxAgeNs !== undefined &&
-    (authorized.maxTimeToLive === undefined ||
-      authorized.maxTimeToLive > ssoSessionMaxAgeNs)
+    (requested === undefined || requested > ssoSessionMaxAgeNs)
       ? ssoSessionMaxAgeNs
-      : authorized.maxTimeToLive;
+      : requested;
 
   const key = { identityNumber, accountNumber, origin: effectiveOrigin };
   const iiKey = await ECDSAKeyIdentity.generate({ extractable: false });
