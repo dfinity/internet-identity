@@ -32,6 +32,7 @@ The library cannot call II's session methods at all, so the canister work has no
 - The browser key proof and the browser registry. Those are II's side and are specified in [revocable-app-sessions-spec.md](revocable-app-sessions-spec.md).
 - Listing an identity's sessions, or revoking another browser's, from an app. Both belong to II's settings, and an app is authenticated as one session.
 - Migrating delegations stored by an earlier version of the library. The storage change that carries this is already a breaking one.
+- Telling an application that its session is read-only. A session the user consented to for queries only mints delegations carrying a permissions field, and surfacing that wants an API of its own.
 
 ## Approach
 
@@ -47,9 +48,38 @@ An app is handed an identity built on the second. The first never leaves `AuthCl
 
 ### Minting
 
-The identity handed to the app holds a five-minute app delegation and replaces it before it lapses, by calling `app_prepare_delegation` and then `app_get_delegation` signed as the session. Minting happens when a caller needs a delegation, and one mint is in flight at a time, so several calls arriving together wait on the same round trip rather than each starting one.
+The identity handed to the app carries a five-minute app delegation, obtained by calling `app_prepare_delegation` and then `app_get_delegation` signed as the session. An agent holds that identity and signs every request with it, possibly for hours, so the identity is what has to notice its delegation ageing: it mints from inside the per-request hook the agent already calls, and one mint is in flight at a time, so several requests arriving together wait on the same round trip.
 
-A background timer was the alternative, and it is worse: re-minting on a schedule keeps every open tab calling the canister for as long as it is open, including tabs nobody is looking at. Minting on demand costs one round trip on the first call after a lapse and nothing while the app is idle.
+The principal does not move when a delegation is replaced. `app_prepare_delegation` returns the account's own key as the delegation's root, so every app delegation is one hop from the same key, and an app that read the principal once can keep it.
+
+### Refreshing ahead of use, never on a clock
+
+Waiting until a delegation has expired means one request every five minutes pays for a mint, which an interactive app shows as a stall. Refreshing on a timer avoids that and is worse for two reasons, one of which has nothing to do with cost.
+
+`app_prepare_delegation` stamps the session's last-refreshed time, and that stamp is what II's settings screen shows the user as "this browser used this app 3 minutes ago", and what the session cap reclaims on. A timer refreshes whether or not anyone is looking at the tab, so the column stops meaning "in use" and starts meaning "has a tab open", which is not the reading the user is being offered. Minting only when a request needs one keeps that signal honest at no cost.
+
+So refresh is driven by requests. A request served while the delegation still has comfortable life left starts a mint in the background and uses the delegation it already has; the replacement is ready before any later request needs it.
+
+| Delegation life left when a request arrives | What happens                                            |
+| ------------------------------------------- | ------------------------------------------------------- |
+| More than the pre-mint threshold            | Served immediately, no call                             |
+| Between the block margin and that threshold | Served immediately, and a mint starts in the background |
+| Below the block margin, or nothing held     | The request waits for a mint                            |
+| No request arrives                          | Nothing happens                                         |
+
+Both thresholds come from what they have to cover rather than from what feels safe, because the cost of getting them wrong is structural. Minting before a delegation expires throws away the rest of its life, so an active session consumes lifetime at `TTL / (TTL - threshold)`: a pre-mint threshold of two minutes turns a five-minute refresh into a three-minute one and adds two thirds again to the update calls and stable writes of every active session, permanently. The threshold therefore covers the mint itself and a few request intervals of head start, and no more. The block margin covers a request's flight time, since the delegation has to still be valid when the replica verifies it.
+
+The case for a generous threshold is the app that makes a request every couple of minutes and sails past a narrow window, and it loses. Its cost is one stall per idle gap, in an app the user is not interacting with tightly, while a generous threshold is paid continuously by every active session.
+
+Two stalls are worth removing outright rather than absorbing, and both are hidden inside something the user is already waiting for. `signIn()` mints at the end of the ceremony, so the first call after signing in is instant. A page load that finds a stored session mints in the background while the page starts, without making `getIdentity()` wait for it.
+
+A delegation lasts `min(five minutes, what remains of the session)`, so near the end of a session a mint returns something shorter than the margin it was meant to satisfy. Refreshing on remaining life alone would then mint, find the result already too short, and mint again without end, each iteration an update call. A session with less than the block margin left is over, and the library treats it as over rather than minting against it.
+
+### Where the mint calls go
+
+This is the first thing in the library that calls a canister at all. Everything until now produced an identity and left the network to the application, which is why nothing in it is configured with a host.
+
+Nothing new has to be configured. The session chain names the II canister in its `targets`, so the canister id arrives with the session. The II canister is served by the same gateway that serves the II frontend, so the origin of the configured identity provider is the host to call it on, and a loopback origin is a local replica whose root key has to be fetched.
 
 ### What is stored
 

@@ -6,13 +6,16 @@
 
 ## Constants
 
-| Value                   | Where it comes from                               | Setting                                      |
-| ----------------------- | ------------------------------------------------- | -------------------------------------------- |
-| App delegation lifetime | `APP_DELEGATION_TTL_NS`, enforced by the canister | 5 minutes, not requestable                   |
-| Session lifetime        | chosen at consent, clamped by the canister        | 10 minutes to 30 days                        |
-| Re-mint margin          | this library                                      | 30 seconds before the app delegation expires |
+| Value                   | Where it comes from                               | Setting                    |
+| ----------------------- | ------------------------------------------------- | -------------------------- |
+| App delegation lifetime | `APP_DELEGATION_TTL_NS`, enforced by the canister | 5 minutes, not requestable |
+| Session lifetime        | chosen at consent, clamped by the canister        | 10 minutes to 30 days      |
+| Block margin            | this library                                      | 10 seconds                 |
+| Pre-mint threshold      | this library                                      | 45 seconds                 |
 
-The margin is 30 seconds because a delegation handed to a caller has to outlive the request it is about to be used for, and because anything much larger spends a noticeable fraction of a five-minute delegation not using it.
+The block margin covers a request's flight time, because the delegation has to still be valid when the replica verifies the request it was attached to.
+
+The pre-mint threshold covers one mint and a few request intervals of head start, and is deliberately close to the block margin. Minting before a delegation expires discards the rest of its life, so an active session consumes lifetime at `TTL / (TTL - threshold)`, and every second added here becomes update calls and stable writes on every active session for as long as it lives. At 45 seconds an active session refreshes about every four and a quarter minutes against a floor of five. At two minutes it would refresh every three, which is two thirds again as many calls.
 
 ## Sequence
 
@@ -71,16 +74,34 @@ No public export returns the session key, the session chain, or a handle from wh
 `getIdentity()` resolves to an identity carrying an app delegation minted from the session.
 
 **MINT-2.**
-A delegation whose remaining lifetime is below the re-mint margin is replaced before it is handed to a caller.
+A request arriving when the held delegation has less than the block margin left, or when none is held, waits for a mint.
 
 **MINT-3.**
-At most one mint is in flight. Callers arriving while one is running await that one rather than starting another.
+A request arriving when the held delegation has less than the pre-mint threshold and at least the block margin left is served from the delegation already held, and starts a mint in the background.
 
 **MINT-4.**
-`app_get_delegation` is called with the exact `expiration` that `app_prepare_delegation` returned. A mismatch is a failed mint, not a retry with a different value.
+At most one mint is in flight. Callers arriving while one is running await that one rather than starting another, and a request that has to wait joins a background mint already running rather than starting a second.
 
 **MINT-5.**
+`app_get_delegation` is called with the exact `expiration` that `app_prepare_delegation` returned. A mismatch is a failed mint, not a retry with a different value.
+
+**MINT-6.**
+No mint is started when the session itself has less than the block margin left. A delegation is minted for `min(5 minutes, what remains of the session)`, so a mint against a nearly finished session returns one already too short to satisfy MINT-2, and refreshing on the delegation's remaining life alone would mint without end. Such a session is over and is treated as ERR-1.
+
+**MINT-7.**
+`signIn()` mints before it resolves, so the first request after signing in does not wait. The cost is hidden inside a ceremony the user is already waiting for.
+
+**MINT-8.**
+A page load that restores a stored session starts a mint in the background. `getIdentity()` does not wait for it.
+
+**MINT-9.**
+No timer, interval or scheduled task triggers a mint. Requests are the only trigger, which is what keeps the session's last-refreshed stamp a record of use rather than of an open tab.
+
+**MINT-10.**
 A mint that fails leaves the stored session chain and session key exactly as they were, except where ERR-1 applies.
+
+**MINT-11.**
+The principal a caller sees does not change when a delegation is replaced. `app_prepare_delegation` returns the account's own key as the delegation's root, so successive mints are one hop from the same key.
 
 ## Failure
 
@@ -95,6 +116,12 @@ A mint that fails leaves the stored session chain and session key exactly as the
 
 **ERR-4.**
 No failure path leaves a session chain stored without its key, or a key without its chain.
+
+**ERR-5.**
+A background mint that fails transiently is not surfaced to the application and does not report a sign-out. The delegation already held stays in use, and the next request retries, waiting if MINT-2 applies by then.
+
+**ERR-6.**
+`NoMatchingSession` from a background mint is terminal exactly as in the foreground. It means the session is gone, and which mint discovered that does not change what is true.
 
 ## The cross-subdomain hint
 
@@ -128,6 +155,20 @@ The fallback path behaves as the library does today, including what it stores an
 
 **COMPAT-3.**
 An application cannot select between the two paths. Which one runs is a property of the provider, not a configuration option.
+
+## Reaching the II canister
+
+**AGENT-1.**
+The II canister id is taken from the `targets` of the session chain, which ACQ-3 has already established names that canister and nothing else. It is not configured.
+
+**AGENT-2.**
+Mint calls go to the origin of the configured identity provider, because the II canister is served by the same gateway that serves the II frontend.
+
+**AGENT-3.**
+Where that origin is loopback, the agent fetches the replica's root key. Where it is not, it does not.
+
+**AGENT-4.**
+No host, agent or canister-id option is added. Everything above is derived from configuration the library already has, or from the session itself.
 
 ## Public surface
 
