@@ -39,9 +39,11 @@ The library cannot call II's session methods at all, so the canister work has no
 
 ### Two keys, one of them private to the library
 
-The session key is what the session chain delegates to. It signs calls to the II canister and nothing else, because the chain carries `targets` naming only that canister. The app key is what an app delegation delegates to, and it signs the calls the app actually makes.
+The session key is what the session chain delegates to. It signs calls to the II canister and nothing else, because the chain carries `targets` naming only that canister. It lasts as long as the session.
 
-An app is handed an identity built on the second. The first never leaves `AuthClient`.
+The app key is what an app delegation delegates to, and it signs the calls the app actually makes. It lasts as long as that delegation, which is five minutes, because a key outliving its delegation is worth nothing: the authority is in the delegation. So a mint makes a key and gets a delegation for it in one act, and the pair is replaced as one. Key rotation comes free from that rather than from a policy.
+
+An app is handed an identity built on the second, and never sees either.
 
 ### Acquiring
 
@@ -169,20 +171,24 @@ writes every five minutes for one person's one session.
 They can share instead. A non-extractable key survives a structured clone, which
 is what lets one live in IndexedDB, and the same property lets it cross a
 `BroadcastChannel` to another tab as a handle that signs but cannot be exported.
-So a tab opening asks on the channel, a tab already running answers with the key
-and the delegation it holds, and the new tab adopts both without minting. Nothing
-is persisted, so a delegation still never outlives the tabs that hold it and there
-is nothing stale to reconcile on a load.
+What crosses is the pair, because that is what a mint produces and what expires
+together. A tab opening asks on the channel, a tab already running answers with the
+pair it holds, and the asking tab adopts it without minting. Nothing is persisted,
+so a delegation still never outlives the tabs that hold it and there is nothing
+stale to reconcile on a load.
 
-Asking has to happen under the same lock a mint takes, or the arrangement fails at
-the moment it matters most. A browser restoring several tabs at once would have
-them all ask in the same instant with none of them yet able to answer, so each
-would make a key of its own and the origin would end up with as many keys, and as
-many mints, as it has tabs. Under the lock that start is sequential instead: the
-first tab makes a key, and every tab after it finds someone able to answer. A
-tab's key is then settled for as long as it lives, because adopting one later would
-mean throwing away a working key and the delegation issued to it, possibly with a
-mint in flight, to save a call.
+Sharing a whole pair is also what makes tabs converge without anything electing a
+winner. Two tabs that end up with a pair each, because a browser restored them in
+the same instant with neither able to answer the other, are not stuck that way: the
+next mint produces one pair, its broadcast reaches both, and both adopt it. So
+divergence costs an extra mint or two and lasts at most one delegation's lifetime,
+where sharing a key alone would have left an origin permanently minting once per
+tab.
+
+Replacing a pair cannot disturb a request already on its way. A request is signed
+and its delegation attached in the same act, so what is in flight carries a
+signature and a delegation that match each other, whatever the tab holds by the
+time a replica checks it.
 
 The hard part is not the sharing. It is that the two things one wants pull in
 opposite directions: not minting five times wants a single tab responsible for
