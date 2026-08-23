@@ -8,7 +8,7 @@ An app often runs as several subdomains of one domain, and a user expects one si
 cover all of them. Today each subdomain is a separate origin with its own principal and its
 own sign-in, and signing out of one leaves the others signed in.
 
-The client side of the fix already exists in `@icp-sdk/auth`. What is missing is II's side:
+The client side of the fix is specified in `@icp-sdk/auth` and not yet built there; see [client-app-sessions.md](client-app-sessions.md). What is missing on II's side:
 it cannot answer an authorize request without rendering something, cannot be told which
 session to answer from when an identity has several at one origin, and cannot fail in a way
 a client can tell apart from a real error.
@@ -28,7 +28,7 @@ An app can already opt out of that. It nominates one origin as the **derivation 
 
 The second existing mechanism is a browser cookie scoped to the parent domain, which every subdomain in the set can read.
 
-The client side is built on those two, and is already specified in `@icp-sdk/auth` ([shared-sessions.md](https://github.com/dfinity/icp-js-auth/blob/5aa78d5f64714d6e8e7781e256562035c09018c6/docs/src/content/docs/shared-sessions.md)). It puts three pieces in place:
+The client side is built on those two, and is specified in `@icp-sdk/auth` ([shared-sessions.md](https://github.com/dfinity/icp-js-auth/blob/5aa78d5f64714d6e8e7781e256562035c09018c6/docs/src/content/docs/shared-sessions.md)), whose session handling is designed in [client-app-sessions.md](client-app-sessions.md). It puts three pieces in place:
 
 | Piece                                                                                               | Effect                                                                                   |
 | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
