@@ -12,16 +12,11 @@
 | Session lifetime        | requested as a ceiling, chosen at consent, clamped | 10 minutes to 30 days      |
 | Block margin            | this library                                       | 10 seconds                 |
 | Pre-mint threshold      | this library                                       | 15 seconds                 |
-| Wake-up jitter          | this library                                       | up to 30 seconds earlier   |
-| Claim window            | this library                                       | 100 milliseconds           |
-| Mint result window      | this library                                       | 5 seconds                  |
 | Inherit window          | this library                                       | 200 milliseconds           |
 
 The block margin covers a request's flight time, because the delegation has to still be valid when the replica verifies the request it was attached to.
 
 The pre-mint threshold covers one mint and nothing else, because a refresh is scheduled for the moment it is needed rather than waiting for a request to arrive inside a window. Minting before a delegation expires discards the rest of its life, so an active session consumes lifetime at `TTL / (TTL - threshold)`: at 15 seconds it refreshes about every four and three quarter minutes against a floor of five. A threshold wide enough to catch a passing request would have to be several times larger, and every second of it becomes update calls and stable writes on every active session for as long as it lives.
-
-The wake-up jitter has to exceed a mint, so the first tab to wake finishes and announces before the next one does; 30 seconds gives a mint an order of magnitude of headroom and costs a slightly earlier refresh. The claim window is a message on a same-origin channel, which is why it is milliseconds rather than seconds. The mint result window is a mint plus margin, since it is what a tab waits before deciding the tab that claimed one is not coming back. The inherit window is one round trip on the same channel, short enough that a tab that has to mint has barely been delayed.
 
 ## Sequence
 
@@ -255,19 +250,19 @@ A tab with no key asks on the channel and adopts the key and delegation it is of
 A tab adopts an offered delegation only when its root is the stored account principal and it delegates to the key offered alongside it. A mismatched pair is discarded rather than used, so a mistake surfaces where it was made.
 
 **TAB-6.**
-Each tab schedules its refresh earlier than the pre-mint threshold by a random offset within the wake-up jitter. The delegation's expiry is shared, so an unjittered schedule wakes every tab in the same instant, and the channel cannot suppress what has already begun.
+A mint runs while holding a named lock, where the environment provides one. Tabs that wake in the same moment queue on it rather than each starting a mint, which is what removes the double-mint window rather than narrowing it, and no wake-up needs to be spread out to avoid a collision.
 
 **TAB-7.**
-A tab re-reads what it holds when its timer fires, and does nothing when a delegation minted elsewhere has arrived in the meantime.
+A tab holding the lock re-reads what it has before minting, and does nothing when a delegation minted elsewhere has arrived in the meantime.
 
 **TAB-8.**
-A tab announces a mint before making it and waits out the claim window. Where another tab has announced one, the lower announcement identifier proceeds and the other stands down. This narrows the window in which two tabs both mint from the duration of a mint to the duration of a message.
+Liveness rests on the lock rather than on a timeout. A browser releases a lock when the context holding it goes away, so a tab closed mid-mint lets the next in the queue proceed, and nothing has to decide how long a tab that is not coming back should be waited for.
 
 **TAB-9.**
-A tab that stood down mints after the mint result window if no delegation has arrived, because the tab that announced one may have been closed mid-flight. This is the only place liveness rests on a timeout, and its failure mode is a second mint rather than none.
+Where the environment has no such lock, every tab mints. That is the cost of no coordination and not a failure, and it is why the lock may be relied on for what this costs and never for whether it works.
 
 **TAB-10.**
-A request that finds no usable delegation mints immediately, without announcing or waiting. A caller is waiting on it, and the result reaches the other tabs the way any mint does.
+A request that finds no usable delegation queues on the same lock rather than jumping it. Waiting costs at most one mint, which is what it would have spent minting anyway, and it often ends with another tab's delegation and no mint at all.
 
 **TAB-11.**
 Adopting a delegation, however it arrived, reschedules that tab's refresh from the adopted delegation's expiry, so tabs do not drift onto separate clocks.

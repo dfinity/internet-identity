@@ -186,24 +186,24 @@ chance to notice that the work is already done, or being done, and stand down. I
 every message were lost the tabs would each mint, which is the cost of doing
 nothing at all rather than a failure; and no tab waits on another to act.
 
-Three things make that suppression usually work:
+A named lock is what makes the suppression work, where the browser has one. A tab
+about to mint takes it, and tabs that wake in the same moment queue behind it
+rather than each starting a mint of their own. Whoever holds it looks again before
+acting, because by then the delegation may already have been replaced, in which
+case there is nothing left to do.
 
-- **Tabs do not all wake at once.** The delegation's expiry is shared, so an
-  unjittered schedule has every tab firing in the same instant, and the channel
-  cannot suppress what has already started. Each tab picks a random offset earlier
-  than the moment it would otherwise fire, wide enough that the first to wake has
-  finished and told the others before the next one wakes.
-- **A tab re-reads before it mints.** By the time its own timer fires, a delegation
-  another tab minted may already be in hand, in which case there is nothing to do.
-- **A tab about to mint says so.** Two tabs that wake close together both announce
-  first and one stands down, which narrows the window from the length of a mint to
-  the length of a message. A tab that stood down waits for the result, and mints
-  itself if it does not arrive, because the tab that claimed it may have been closed
-  mid-flight.
+The lock also settles the case a schedule cannot. A tab holding it can be closed
+mid-mint, and the browser releases a lock when the tab holding it goes away, so the
+next tab in the queue simply proceeds. Nothing has to guess how long to wait for a
+tab that is not coming back, which a timeout would have had to.
 
-A request that needs a delegation now does not take part in any of this. It mints
-immediately, because a caller is waiting, and the result reaches the other tabs the
-same way.
+Where the browser has no such lock every tab mints, which is the cost of no
+coordination rather than a failure. That is the rule above again: the lock may be
+relied on for how much this costs and never for whether it works.
+
+A request that needs a delegation now queues on the same lock rather than jumping
+it. Waiting costs at most one mint, which is what it would have spent minting
+anyway, and it often ends with another tab's fresh delegation and no mint at all.
 
 ### Signing out is not the same as finding out
 
