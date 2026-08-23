@@ -239,7 +239,10 @@ No host, agent or canister-id option is added. Everything above is derived from 
 `signIn()`, `getIdentity()`, `signOut()`, `isAuthenticated()` and `subscribe()` keep their current signatures, and no session type, session chain or session expiry is exposed through any of them. The one addition is `disableForegroundRefresh` in MINT-7, which is about when the library refreshes rather than about sessions.
 
 **API-2.**
-`isAuthenticated()` reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints.
+`isAuthenticated()` reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints. It stays synchronous, reading the stored session and nothing else, so a page load answers without a mint, a network call or an asynchronous store.
 
 **API-3.**
+`isAuthenticated()` is optimistic about revocation, and this is a change in kind rather than degree. It answers from what the client stored, so a session revoked at the canister or from another browser still reads as authenticated until something mints and is told otherwise, at which point the stored session is dropped and subscribers are notified. Before sessions the answer could only go stale by expiry, which a client could compute; now it can go stale because someone acted. An application that must not act on a stale answer should make a call and handle its failure, which is the only thing that consults the canister.
+
+**API-4.**
 `getIdentity()` performs no canister call and returns the same identity for the life of the session. It is the identity that refreshes, not `AuthClient` that hands out a fresh one, because an application passes the identity to an agent once and that agent keeps the object: an identity that was a snapshot of one delegation would go on signing with it until it expired, and no later `getIdentity()` call would reach the agent holding it.
