@@ -244,27 +244,32 @@ The channel reaches the tabs of one origin and no further. A sibling subdomain i
 Coordination may only suppress a mint, never be required for one. Every tab schedules its refresh exactly as it would if it were alone, and every message the channel carries is a chance to stand down rather than an instruction to act. With every message lost each tab mints, which is the behaviour of no coordination at all, and no tab is ever waiting on another when none acts.
 
 **TAB-4.**
-A tab with no key asks on the channel and adopts the key and delegation it is offered. Where no answer arrives within the inherit window it generates a key and mints, which is the case when it is the first tab open or the last one closed.
+A tab with no key acquires one while holding the same lock a mint holds. It asks on the channel, adopts the key and delegation it is offered, and generates a key only when no answer arrives within the inherit window.
+
+Holding the lock is what makes tabs converge. Without it, a browser restoring several tabs at once has them all ask in the same moment with none of them yet able to answer, so each generates a key of its own and the origin ends up with as many keys, and as many mints, as it has tabs. Under the lock the same start becomes sequential: the first tab generates, and every tab after it finds someone able to answer.
 
 **TAB-5.**
-A tab adopts an offered delegation only when its root is the stored account principal and it delegates to the key offered alongside it. A mismatched pair is discarded rather than used, so a mistake surfaces where it was made.
+A tab's app key is chosen once, at first use, and does not change afterwards. Adopting later would mean discarding a working key and the delegation issued to it, possibly with a mint in flight, to save a call. Where no lock exists tabs may each hold their own key and never converge, which is the same degradation as TAB-10 and is bounded by the number of tabs.
 
 **TAB-6.**
-A mint runs while holding a named lock, where the environment provides one. Tabs that wake in the same moment queue on it rather than each starting a mint, which is what removes the double-mint window rather than narrowing it, and no wake-up needs to be spread out to avoid a collision.
+A tab adopts an offered delegation only when its root is the stored account principal and it delegates to the key offered alongside it. A mismatched pair is discarded rather than used, so a mistake surfaces where it was made.
 
 **TAB-7.**
-A tab holding the lock re-reads what it has before minting, and does nothing when a delegation minted elsewhere has arrived in the meantime.
+A mint runs while holding a named lock, where the environment provides one. Tabs that wake in the same moment queue on it rather than each starting a mint, which is what removes the double-mint window rather than narrowing it, and no wake-up needs to be spread out to avoid a collision.
 
 **TAB-8.**
-Liveness rests on the lock rather than on a timeout. A browser releases a lock when the context holding it goes away, so a tab closed mid-mint lets the next in the queue proceed, and nothing has to decide how long a tab that is not coming back should be waited for.
+A tab holding the lock re-reads what it has before minting, and does nothing when a delegation minted elsewhere has arrived in the meantime.
 
 **TAB-9.**
-Where the environment has no such lock, every tab mints. That is the cost of no coordination and not a failure, and it is why the lock may be relied on for what this costs and never for whether it works.
+Liveness rests on the lock rather than on a timeout. A browser releases a lock when the context holding it goes away, so a tab closed mid-mint lets the next in the queue proceed, and nothing has to decide how long a tab that is not coming back should be waited for.
 
 **TAB-10.**
-A request that finds no usable delegation queues on the same lock rather than jumping it. Waiting costs at most one mint, which is what it would have spent minting anyway, and it often ends with another tab's delegation and no mint at all.
+Where the environment has no such lock, every tab mints. That is the cost of no coordination and not a failure, and it is why the lock may be relied on for what this costs and never for whether it works.
 
 **TAB-11.**
+A request that finds no usable delegation queues on the same lock rather than jumping it. Waiting costs at most one mint, which is what it would have spent minting anyway, and it often ends with another tab's delegation and no mint at all.
+
+**TAB-12.**
 Adopting a delegation, however it arrived, reschedules that tab's refresh from the adopted delegation's expiry, so tabs do not drift onto separate clocks.
 
 ## Reaching the II canister

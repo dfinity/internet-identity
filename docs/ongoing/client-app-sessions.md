@@ -174,6 +174,16 @@ and the delegation it holds, and the new tab adopts both without minting. Nothin
 is persisted, so a delegation still never outlives the tabs that hold it and there
 is nothing stale to reconcile on a load.
 
+Asking has to happen under the same lock a mint takes, or the arrangement fails at
+the moment it matters most. A browser restoring several tabs at once would have
+them all ask in the same instant with none of them yet able to answer, so each
+would make a key of its own and the origin would end up with as many keys, and as
+many mints, as it has tabs. Under the lock that start is sequential instead: the
+first tab makes a key, and every tab after it finds someone able to answer. A
+tab's key is then settled for as long as it lives, because adopting one later would
+mean throwing away a working key and the delegation issued to it, possibly with a
+mint in flight, to save a call.
+
 The hard part is not the sharing. It is that the two things one wants pull in
 opposite directions: not minting five times wants a single tab responsible for
 refreshing, and not failing to mint at all wants no tab to be load-bearing. A
