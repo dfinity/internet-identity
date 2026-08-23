@@ -50,6 +50,8 @@ An app is handed an identity built on the second. The first never leaves `AuthCl
 
 The identity handed to the app carries a five-minute app delegation, obtained by calling `app_prepare_delegation` and then `app_get_delegation` signed as the session. An agent holds that identity and signs every request with it, possibly for hours, so the identity is what has to notice its delegation ageing: it mints from inside the per-request hook the agent already calls, and one mint is in flight at a time, so several requests arriving together wait on the same round trip.
 
+The identity is one object for the life of the session, and it is the object that refreshes. `getIdentity()` returns it without calling anything. The alternative, having `AuthClient` mint and hand back a fresh identity on each call, fails on how identities are actually used: an application passes one to an agent once, and the agent keeps it. A snapshot of a single delegation would go on signing with that delegation until it expired, and no later call to `AuthClient` would reach the agent still holding the old one.
+
 The principal an app sees is not in the session chain. That chain is rooted at the session's own key, derived from the session seed, while an app delegation is rooted at the account's key. They are different principals, and only the second is what the app's canisters will see. The ceremony computes it and the canister returns it as `account_principal`, but the result the app receives over the transport carries only the chain, so the library learns the account principal from the first mint, where it arrives as `user_key`.
 
 It is therefore recorded alongside the session chain rather than recomputed. A reload can answer for the principal from what it stored, without a mint, and `getPrincipal()` stays synchronous. Every later mint returns the same key, since the account seed does not change, so a mint that returns a different root is a failed mint rather than a new principal.
@@ -63,6 +65,28 @@ Waiting until a delegation has expired means one request every five minutes pays
 So requests are what arm a refresh, and the refresh itself is scheduled for the moment it is needed. A request from an active application schedules one mint for just before its delegation runs out, rather than minting early or waiting for another request to arrive at the right time.
 
 Scheduling it, rather than minting whenever a request happens to arrive with little life left, is what keeps the threshold small. A threshold that has to catch a passing request must be wide enough that one turns up inside it, and everything it discards is paid for: minting before a delegation expires throws away the rest of its life, so an active session consumes lifetime at `TTL / (TTL - threshold)`. Two minutes of threshold turns a five-minute refresh into a three-minute one and adds two thirds again to the update calls and stable writes of every active session, permanently. A scheduled mint only has to cover the mint itself, which is seconds, and an active session then refreshes at nearly the floor the canister sets.
+
+What the application sees is nothing at all. A mint lands between two of its requests, in the gap where the delegation it already holds is still good:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant App as application
+    participant Id as the identity it holds
+    participant IIC as II canister
+
+    App->>Id: request
+    Id-->>App: signed with the delegation held
+    Note over Id: mint scheduled for<br/>shortly before expiry
+    Note over Id: it fires, and the application<br/>has been active
+    Id->>IIC: app_prepare_delegation
+    IIC-->>Id: account key, expiration
+    Id->>IIC: app_get_delegation
+    IIC-->>Id: delegation, five minutes
+    Note over Id: replaced, and the next<br/>mint is scheduled
+    App->>Id: request, minutes later
+    Id-->>App: signed with the new delegation,<br/>having waited for nothing
+```
 
 The schedule needs one check, or it becomes the timer this section rejects. An application that goes idle seconds after its last request would still have a refresh scheduled, and firing it would stamp the session as used. So a scheduled mint asks, at the moment it fires, whether the application has been active recently, and cancels if it has not. One more refresh after the last request, and then the delegation is allowed to lapse.
 

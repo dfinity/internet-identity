@@ -24,6 +24,7 @@ sequenceDiagram
     autonumber
     participant App as application code
     participant AC as AuthClient
+    participant Id as the identity
     participant IIF as II frontend
     participant IIC as II canister
 
@@ -31,14 +32,22 @@ sequenceDiagram
     AC->>IIF: ii_session_delegation(session public key)
     IIF->>IIC: prepare_account_session / get_account_session
     IIF-->>AC: session chain, targets = II canister
-    AC->>AC: store chain and session key, write hint
+    AC->>AC: store chain and session key
+    AC->>Id: hand it the session
+    Id->>IIC: app_prepare_delegation(app public key)
+    IIC-->>Id: account key, expiration
+    Id->>IIC: app_get_delegation(app public key, expiration)
+    IIC-->>Id: delegation, five minutes
+    AC->>AC: store the account principal, write hint
+    AC-->>App: signIn() resolves
+
     App->>AC: getIdentity()
-    AC->>IIC: app_prepare_delegation(app public key)
-    IIC-->>AC: user_key, expiration
-    AC->>IIC: app_get_delegation(app public key, expiration)
-    IIC-->>AC: signed delegation, 5 minutes
-    AC-->>App: identity carrying the app delegation
+    AC-->>App: the same identity, no call
+    App->>Id: request
+    Id-->>App: signed with the delegation it holds
 ```
+
+`getIdentity()` makes no call and returns the same object every time. The mint at sign-in is step 7 onwards, and after that the identity replaces its own delegation on the schedule and the request paths of the section below. An application that calls `getIdentity()` a thousand times mints nothing; one that makes a thousand requests over an hour mints about twelve times.
 
 ## Acquiring a session
 
@@ -72,6 +81,38 @@ The app key is generated per `AuthClient` instance and held in memory only. A re
 No public export returns the session key, the session chain, or a handle from which either can be recovered.
 
 ## Minting an app delegation
+
+Every path that reaches a mint, and every guard on the way:
+
+```mermaid
+flowchart TD
+    R["a request arrives"] --> Q1{"a delegation<br/>is held?"}
+    Q1 -->|"no"| W["wait for a mint"]
+    Q1 -->|"yes"| Q2{"life left in it"}
+    Q2 -->|"below the block margin"| W
+    Q2 -->|"below the threshold"| BG["serve from it,<br/>mint behind the request"]
+    Q2 -->|"above the threshold"| SC["serve from it, schedule<br/>a mint at the threshold"]
+
+    T["a scheduled mint fires"] --> Q3{"active<br/>recently?"}
+    Q3 -->|"no"| X["cancel, let the<br/>delegation lapse"]
+    Q3 -->|"yes"| G
+
+    S1["signIn() completes"] --> G
+    S2["a stored session<br/>is restored"] --> G
+    W --> G
+    BG --> G
+    G{"session life left<br/>below the block margin?"} -->|"yes"| E["ERR-1: the session is over"]
+    G -->|"no"| C["app_prepare_delegation<br/>then app_get_delegation"]
+
+    C -->|"NoMatchingSession"| E
+    C -->|"other failure, foreground"| FF["fail the request,<br/>keep the session"]
+    C -->|"other failure, background"| FB["stay silent,<br/>keep the delegation"]
+    C -->|"delegation returned"| Q4{"its root matches the<br/>stored account principal?"}
+    Q4 -->|"no"| FM["a failed mint,<br/>not adopted"]
+    Q4 -->|"yes"| OK["adopt it, and schedule<br/>the next mint"]
+```
+
+Every arrow into the mint is subject to MINT-6: if one is already running, the arrival joins it rather than starting a second.
 
 **MINT-1.**
 `getIdentity()` resolves to an identity carrying an app delegation minted from the session.
@@ -189,3 +230,6 @@ No host, agent or canister-id option is added. Everything above is derived from 
 
 **API-2.**
 `isAuthenticated()` reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints.
+
+**API-3.**
+`getIdentity()` performs no canister call and returns the same identity for the life of the session. It is the identity that refreshes, not `AuthClient` that hands out a fresh one, because an application passes the identity to an agent once and that agent keeps the object: an identity that was a snapshot of one delegation would go on signing with it until it expired, and no later `getIdentity()` call would reach the agent holding it.
