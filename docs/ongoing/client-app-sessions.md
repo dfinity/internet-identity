@@ -146,9 +146,18 @@ whether to try a silent re-auth.
 
 **One consequence to be plain about: the floor is one mint per active origin, not
 one per domain.** Two siblings open means two mints every five minutes for one
-session. That is not an oversight to be optimised away later. Each origin signs its
-own calls with its own key, so each needs a delegation of its own, and the only
-channel that reaches across siblings is a cookie, which a chain does not fit in.
+session, and that is not an oversight to be optimised away later.
+
+A delegation is issued to a key, and each origin signs its own calls with a key of
+its own, so a delegation minted for `chat` authorises nothing for `hr`. Sharing one
+delegation between them would mean sharing the key it was issued to, and a key is
+the one thing a cookie must never carry: a cookie holds bytes, so sharing a key
+through one means handing out the private material itself, to anything on the domain
+that can read a cookie and to every request that carries it.
+
+This is exactly why a channel can do what a cookie cannot. Tabs of one origin pass
+a key handle, not key material, and the handle signs without being exportable. There
+is no such thing to pass between origins.
 
 ### One delegation for every tab of an origin
 
