@@ -109,6 +109,52 @@ Two stalls are worth removing outright rather than absorbing, and both are hidde
 
 A delegation lasts `min(five minutes, what remains of the session)`, so near the end of a session a mint returns something shorter than the margin it was meant to satisfy. Refreshing on remaining life alone would then mint, find the result already too short, and mint again without end, each iteration an update call. A session with less than the block margin left is over, and the library treats it as over rather than minting against it.
 
+### One delegation for every tab of an origin
+
+Tabs of one origin share their storage, so they share the session. What they do not
+share is the delegation minted from it: the app key lives in memory, so each tab
+mints for a key of its own, and five tabs cost five update calls and five stable
+writes every five minutes for one person's one session.
+
+They can share instead. A non-extractable key survives a structured clone, which
+is what lets one live in IndexedDB, and the same property lets it cross a
+`BroadcastChannel` to another tab as a handle that signs but cannot be exported.
+So a tab opening asks on the channel, a tab already running answers with the key
+and the delegation it holds, and the new tab adopts both without minting. Nothing
+is persisted, so a delegation still never outlives the tabs that hold it and there
+is nothing stale to reconcile on a load.
+
+The hard part is not the sharing. It is that the two things one wants pull in
+opposite directions: not minting five times wants a single tab responsible for
+refreshing, and not failing to mint at all wants no tab to be load-bearing. A
+designated refresher satisfies the first and fails the second the moment that tab
+is closed.
+
+**So coordination may only ever suppress a mint, never be required for one.** Every
+tab schedules its own refresh, as it would alone. What the channel adds is the
+chance to notice that the work is already done, or being done, and stand down. If
+every message were lost the tabs would each mint, which is the cost of doing
+nothing at all rather than a failure; and no tab waits on another to act.
+
+Three things make that suppression usually work:
+
+- **Tabs do not all wake at once.** The delegation's expiry is shared, so an
+  unjittered schedule has every tab firing in the same instant, and the channel
+  cannot suppress what has already started. Each tab picks a random offset earlier
+  than the moment it would otherwise fire, wide enough that the first to wake has
+  finished and told the others before the next one wakes.
+- **A tab re-reads before it mints.** By the time its own timer fires, a delegation
+  another tab minted may already be in hand, in which case there is nothing to do.
+- **A tab about to mint says so.** Two tabs that wake close together both announce
+  first and one stands down, which narrows the window from the length of a mint to
+  the length of a message. A tab that stood down waits for the result, and mints
+  itself if it does not arrive, because the tab that claimed it may have been closed
+  mid-flight.
+
+A request that needs a delegation now does not take part in any of this. It mints
+immediately, because a caller is waiting, and the result reaches the other tabs the
+same way.
+
 ### Where the mint calls go
 
 This is the first thing in the library that calls a canister at all. Everything until now produced an identity and left the network to the application, which is why nothing in it is configured with a host.

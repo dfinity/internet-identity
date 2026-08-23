@@ -12,10 +12,16 @@
 | Session lifetime        | requested as a ceiling, chosen at consent, clamped | 10 minutes to 30 days      |
 | Block margin            | this library                                       | 10 seconds                 |
 | Pre-mint threshold      | this library                                       | 15 seconds                 |
+| Wake-up jitter          | this library                                       | up to 30 seconds earlier   |
+| Claim window            | this library                                       | 100 milliseconds           |
+| Mint result window      | this library                                       | 5 seconds                  |
+| Inherit window          | this library                                       | 200 milliseconds           |
 
 The block margin covers a request's flight time, because the delegation has to still be valid when the replica verifies the request it was attached to.
 
 The pre-mint threshold covers one mint and nothing else, because a refresh is scheduled for the moment it is needed rather than waiting for a request to arrive inside a window. Minting before a delegation expires discards the rest of its life, so an active session consumes lifetime at `TTL / (TTL - threshold)`: at 15 seconds it refreshes about every four and three quarter minutes against a floor of five. A threshold wide enough to catch a passing request would have to be several times larger, and every second of it becomes update calls and stable writes on every active session for as long as it lives.
+
+The wake-up jitter has to exceed a mint, so the first tab to wake finishes and announces before the next one does; 30 seconds gives a mint an order of magnitude of headroom and costs a slightly earlier refresh. The claim window is a message on a same-origin channel, which is why it is milliseconds rather than seconds. The mint result window is a mint plus margin, since it is what a tab waits before deciding the tab that claimed one is not coming back. The inherit window is one round trip on the same channel, short enough that a tab that has to mint has barely been delayed.
 
 ## Sequence
 
@@ -78,7 +84,7 @@ The account key is part of the stored session, not a second thing stored beside 
 The session key is persisted through `IdentityStorage`, so it is the key that survives a reload and it inherits whatever non-extractable backing the configured store provides.
 
 **KEY-2.**
-The app key is generated per `AuthClient` instance and held in memory only. A reload therefore mints against a fresh app key, which costs one round trip and leaves nothing on disk that can sign for the app.
+The app key is held in memory and never persisted. One key serves every tab of an origin, shared as TAB-1 describes, so a delegation minted by any of them is usable by all. It is a non-extractable key rather than one whose private bytes are readable, because a key that crosses a channel to another tab should arrive as something that signs and cannot be copied. When the last tab closes the key is gone, and the next tab to open makes a new one.
 
 **KEY-3.**
 No public export returns the session key, the session chain, or a handle from which either can be recovered.
@@ -221,6 +227,38 @@ Local state is cleared whether or not that call succeeded. A user who pressed si
 
 **END-3.**
 `app_revoke_session` returns nothing and always succeeds, so there is no error to surface and a repeated sign-out needs no special case.
+
+## Sharing one delegation across tabs
+
+**TAB-1.**
+The app key and the app delegation are shared between tabs of an origin over a `BroadcastChannel`, and neither is persisted. A non-extractable key crosses a structured clone as a handle that signs and cannot be exported, so what a tab receives is usable without key material having left the origin.
+
+**TAB-2.**
+Coordination may only suppress a mint, never be required for one. Every tab schedules its refresh exactly as it would if it were alone, and every message the channel carries is a chance to stand down rather than an instruction to act. With every message lost each tab mints, which is the behaviour of no coordination at all, and no tab is ever waiting on another when none acts.
+
+**TAB-3.**
+A tab with no key asks on the channel and adopts the key and delegation it is offered. Where no answer arrives within the inherit window it generates a key and mints, which is the case when it is the first tab open or the last one closed.
+
+**TAB-4.**
+A tab adopts an offered delegation only when its root is the stored account principal and it delegates to the key offered alongside it. A mismatched pair is discarded rather than used, so a mistake surfaces where it was made.
+
+**TAB-5.**
+Each tab schedules its refresh earlier than the pre-mint threshold by a random offset within the wake-up jitter. The delegation's expiry is shared, so an unjittered schedule wakes every tab in the same instant, and the channel cannot suppress what has already begun.
+
+**TAB-6.**
+A tab re-reads what it holds when its timer fires, and does nothing when a delegation minted elsewhere has arrived in the meantime.
+
+**TAB-7.**
+A tab announces a mint before making it and waits out the claim window. Where another tab has announced one, the lower announcement identifier proceeds and the other stands down. This narrows the window in which two tabs both mint from the duration of a mint to the duration of a message.
+
+**TAB-8.**
+A tab that stood down mints after the mint result window if no delegation has arrived, because the tab that announced one may have been closed mid-flight. This is the only place liveness rests on a timeout, and its failure mode is a second mint rather than none.
+
+**TAB-9.**
+A request that finds no usable delegation mints immediately, without announcing or waiting. A caller is waiting on it, and the result reaches the other tabs the way any mint does.
+
+**TAB-10.**
+Adopting a delegation, however it arrived, reschedules that tab's refresh from the adopted delegation's expiry, so tabs do not drift onto separate clocks.
 
 ## Reaching the II canister
 
