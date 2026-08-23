@@ -67,7 +67,7 @@ The session chain is persisted through `DelegationStorage`.
 The app delegation is never persisted, by any path.
 
 **ACQ-6.**
-The account principal is persisted alongside the session chain. It is not derivable from that chain, which is rooted at the session's own key, and the transport result carries only the chain, so it is taken from the `user_key` of the first mint, which MINT-9 makes part of signing in.
+The account principal is persisted alongside the session chain. It is not derivable from that chain, which is rooted at the session's own key, and the transport result carries only the chain, so it is taken from the `user_key` of the first mint, which MINT-11 makes part of signing in.
 
 ## Keys
 
@@ -129,37 +129,53 @@ A scheduled mint cancels unless the delegation it is replacing signed at least o
 
 The question is asked separately about each delegation, which is what bounds the chain: a refresh happens only if the delegation being retired was used, and the delegation it produces has to earn the next one the same way. So an application that makes a request at least once per delegation lifetime refreshes for as long as that holds, and one that goes quiet refreshes exactly once more, because the delegation it was using did serve a request, and then lets the replacement lapse unused. A single request does not buy a chain of refreshes.
 
-The predicate needs no constant of its own and there is nothing to tune. Without it, a refresh would fire for as long as a tab stayed open, stamping the session as used and inflating the signal MINT-11 exists to keep honest.
+The predicate needs no constant of its own and there is nothing to tune. Without it, a refresh would fire for as long as a tab stayed open, stamping the session as used and inflating the signal MINT-13 exists to keep honest.
 
 **MINT-5.**
 A request arriving when the held delegation has less than the pre-mint threshold and at least the block margin left is served from the delegation already held and starts a mint in the background. This is the guarantee behind the schedule, which is best effort: browsers throttle timers in hidden tabs and fire them late after a machine has slept.
 
 **MINT-6.**
-At most one mint is in flight. Callers arriving while one is running await that one rather than starting another, and a request that has to wait joins a background mint already running rather than starting a second.
+A mint starts in the background when the page becomes visible or the window regains focus. The identity decides whether one is due, on the same terms as any other trigger, so a foreground with plenty of life left in the delegation costs nothing: the trigger says the moment is a good one, the identity says whether to act.
+
+The events are `visibilitychange` filtered on a visible state, `pageshow`, and `focus`. `focus` is there because two visible windows side by side do not change visibility when the user moves between them, and `pageshow` because a page restored from the back-forward cache resumes with timers that never ran.
+
+This is what covers a throttled schedule, which is ordinary rather than exotic. A backgrounded tab has its timers throttled and its delegation lapses, so without it the user's first click after returning waits for a mint. Returning to a tab is a second or two of human latency ahead of that click, which is enough to hide one.
 
 **MINT-7.**
-`app_get_delegation` is called with the exact `expiration` that `app_prepare_delegation` returned. A mismatch is a failed mint, not a retry with a different value.
+The identity holds no reference to a DOM. `AuthClient` calls a refresh entry point on it, and the listening lives in a separable piece that is constructed only where those APIs exist, in the way idle detection already is. An environment without a DOM constructs nothing, hooks nothing, and neither warns nor throws.
+
+`CookieDelegationStorage` reads the same events inline, and is not the model to follow: a cookie store is browser-only by definition, so it may assume what it needs. Refresh has to work in Node and anywhere else `AuthClient` runs, so its environment-specific part is isolated rather than assumed.
+
+Where there is no DOM, the schedule of MINT-3 and the request paths of MINT-2 and MINT-5 are the whole mechanism. Nothing is incorrect without this trigger; a request after a long gap simply waits for its mint.
+
+The trigger is on by default and turned off with `disableForegroundRefresh`, following `disableIdle` for a behaviour enabled unless an application opts out. Its listeners are released by `dispose()`.
 
 **MINT-8.**
-No mint is started when the session itself has less than the block margin left. A delegation is minted for `min(5 minutes, what remains of the session)`, so a mint against a nearly finished session returns one already too short to satisfy MINT-2, and refreshing on the delegation's remaining life alone would mint without end. Such a session is over and is treated as ERR-1.
+At most one mint is in flight. Callers arriving while one is running await that one rather than starting another, and a request that has to wait joins a background mint already running rather than starting a second.
 
 **MINT-9.**
-`signIn()` mints before it resolves, so the first request after signing in does not wait. The cost is hidden inside a ceremony the user is already waiting for.
+`app_get_delegation` is called with the exact `expiration` that `app_prepare_delegation` returned. A mismatch is a failed mint, not a retry with a different value.
 
 **MINT-10.**
-A page load that restores a stored session starts a mint in the background. `getIdentity()` does not wait for it.
+No mint is started when the session itself has less than the block margin left. A delegation is minted for `min(5 minutes, what remains of the session)`, so a mint against a nearly finished session returns one already too short to satisfy MINT-2, and refreshing on the delegation's remaining life alone would mint without end. Such a session is over and is treated as ERR-1.
 
 **MINT-11.**
-No recurring timer or interval triggers a mint, and no mint happens for a delegation nothing used. Adopting a delegation arms one refresh, and MINT-4 confirms that delegation was used before the refresh fires, which is what keeps the session's last-refreshed stamp a record of use rather than of an open tab.
+`signIn()` mints before it resolves, so the first request after signing in does not wait. The cost is hidden inside a ceremony the user is already waiting for.
 
 **MINT-12.**
-A mint that fails leaves the stored session chain and session key exactly as they were, except where ERR-1 applies.
+A page load that restores a stored session starts a mint in the background. `getIdentity()` does not wait for it.
 
 **MINT-13.**
-The principal a caller sees does not change when a delegation is replaced. `app_prepare_delegation` roots every delegation at the account's key, so successive mints agree. A mint whose `user_key` does not match the stored account principal is a failed mint, and its delegation is not adopted.
+No recurring timer or interval triggers a mint, and no mint happens for a delegation nothing used. Adopting a delegation arms one refresh, and MINT-4 confirms that delegation was used before the refresh fires, which is what keeps the session's last-refreshed stamp a record of use rather than of an open tab.
 
 **MINT-14.**
-`getPrincipal()` never triggers a mint. It is answered from the account principal persisted by ACQ-6, which is why the background mint of MINT-10 does not have to complete before a restored session can report who is signed in.
+A mint that fails leaves the stored session chain and session key exactly as they were, except where ERR-1 applies.
+
+**MINT-15.**
+The principal a caller sees does not change when a delegation is replaced. `app_prepare_delegation` roots every delegation at the account's key, so successive mints agree. A mint whose `user_key` does not match the stored account principal is a failed mint, and its delegation is not adopted.
+
+**MINT-16.**
+`getPrincipal()` never triggers a mint. It is answered from the account principal persisted by ACQ-6, which is why the background mint of MINT-12 does not have to complete before a restored session can report who is signed in.
 
 ## Failure
 
@@ -220,7 +236,7 @@ No host, agent or canister-id option is added. Everything above is derived from 
 ## Public surface
 
 **API-1.**
-`signIn()`, `getIdentity()`, `signOut()`, `isAuthenticated()` and `subscribe()` keep their current signatures. Sessions add no public type, option or method.
+`signIn()`, `getIdentity()`, `signOut()`, `isAuthenticated()` and `subscribe()` keep their current signatures, and no session type, session chain or session expiry is exposed through any of them. The one addition is `disableForegroundRefresh` in MINT-7, which is about when the library refreshes rather than about sessions.
 
 **API-2.**
 `isAuthenticated()` reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints.
