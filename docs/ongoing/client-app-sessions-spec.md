@@ -82,37 +82,38 @@ No public export returns the session key, the session chain, or a handle from wh
 
 ## Minting an app delegation
 
-Every path that reaches a mint, and every guard on the way:
+A request arriving finds one of three situations:
 
 ```mermaid
-flowchart TD
-    R["a request arrives"] --> Q1{"a delegation<br/>is held?"}
-    Q1 -->|"no"| W["wait for a mint"]
-    Q1 -->|"yes"| Q2{"life left in it"}
-    Q2 -->|"below the block margin"| W
-    Q2 -->|"below the threshold"| BG["serve from it,<br/>mint behind the request"]
-    Q2 -->|"above the threshold"| SC["serve from it, schedule<br/>a mint at the threshold"]
-
-    T["a scheduled mint fires"] --> Q3{"active<br/>recently?"}
-    Q3 -->|"no"| X["cancel, let the<br/>delegation lapse"]
-    Q3 -->|"yes"| G
-
-    S1["signIn() completes"] --> G
-    S2["a stored session<br/>is restored"] --> G
-    W --> G
-    BG --> G
-    G{"session life left<br/>below the block margin?"} -->|"yes"| E["ERR-1: the session is over"]
-    G -->|"no"| C["app_prepare_delegation<br/>then app_get_delegation"]
-
-    C -->|"NoMatchingSession"| E
-    C -->|"other failure, foreground"| FF["fail the request,<br/>keep the session"]
-    C -->|"other failure, background"| FB["stay silent,<br/>keep the delegation"]
-    C -->|"delegation returned"| Q4{"its root matches the<br/>stored account principal?"}
-    Q4 -->|"no"| FM["a failed mint,<br/>not adopted"]
-    Q4 -->|"yes"| OK["adopt it, and schedule<br/>the next mint"]
+flowchart LR
+    R["a request"] --> Q{"life left in<br/>the delegation"}
+    Q -->|"comfortable"| A["serve from it"]
+    Q -->|"under the threshold"| B["serve from it, and<br/>mint behind the request"]
+    Q -->|"under the margin,<br/>or none held"| C["wait for a mint"]
 ```
 
-Every arrow into the mint is subject to MINT-6: if one is already running, the arrival joins it rather than starting a second.
+A scheduled mint asks one question before it runs:
+
+```mermaid
+flowchart LR
+    T["a scheduled mint fires"] --> Q{"active<br/>recently?"}
+    Q -->|"yes"| M["mint"]
+    Q -->|"no"| X["cancel, and let the<br/>delegation lapse"]
+```
+
+Whatever reached it, a mint ends one of five ways:
+
+```mermaid
+flowchart LR
+    M["a mint"] --> P{"outcome"}
+    P -->|"a delegation whose root<br/>is the stored principal"| OK["adopt it, schedule the next"]
+    P -->|"a delegation rooted<br/>anywhere else"| F["discard it"]
+    P -->|"NoMatchingSession"| E["the session is over"]
+    P -->|"any other failure,<br/>serving a request"| FR["fail the request,<br/>keep the session"]
+    P -->|"any other failure,<br/>in the background"| S["stay silent,<br/>keep the delegation"]
+```
+
+Sign-in and a restored session reach a mint directly, without the questions above. No mint starts at all while the session itself has less than the block margin left, and if one is already running an arrival joins it rather than starting a second.
 
 **MINT-1.**
 `getIdentity()` resolves to an identity carrying an app delegation minted from the session.
