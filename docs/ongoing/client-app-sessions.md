@@ -109,6 +109,47 @@ Two stalls are worth removing outright rather than absorbing, and both are hidde
 
 A delegation lasts `min(five minutes, what remains of the session)`, so near the end of a session a mint returns something shorter than the margin it was meant to satisfy. Refreshing on remaining life alone would then mint, find the result already too short, and mint again without end, each iteration an update call. A session with less than the block margin left is over, and the library treats it as over rather than minting against it.
 
+### What is shared, and how far
+
+Three things are shared, and each reaches a different distance. Almost everything
+below follows from that.
+
+```mermaid
+flowchart TB
+    subgraph D["example.com: as far as the hint cookie reaches"]
+        subgraph O1["chat.example.com"]
+            L1[("localStorage:<br/>the session chain")]
+            B1["BroadcastChannel:<br/>the app key and its delegation"]
+        end
+        subgraph O2["hr.example.com"]
+            L2[("localStorage:<br/>the session chain")]
+            B2["BroadcastChannel:<br/>the app key and its delegation"]
+        end
+    end
+    D --> S[("one session record,<br/>at the II canister")]
+```
+
+The session is the widest of the three and the one nothing local can see. Sibling
+subdomains sharing a derivation origin resolve to one application, and a session
+lives at an identity, an application, an account and a browser, so `chat` and `hr`
+are not two sessions that behave alike: they are one session, and either of them
+signing out ends it for both.
+
+Everything the client holds is narrower. A chain is in `localStorage`, which is per
+origin, and the app key and its delegation ride a `BroadcastChannel`, which is also
+per origin. So `chat`'s tabs coordinate with each other and `hr`'s tabs coordinate
+with each other, and the two sets cannot speak at all.
+
+The hint cookie is the only thing that crosses between siblings, and it carries a
+principal and the session's expiry, which is all a sibling needs in order to decide
+whether to try a silent re-auth.
+
+**One consequence to be plain about: the floor is one mint per active origin, not
+one per domain.** Two siblings open means two mints every five minutes for one
+session. That is not an oversight to be optimised away later. Each origin signs its
+own calls with its own key, so each needs a delegation of its own, and the only
+channel that reaches across siblings is a cookie, which a chain does not fit in.
+
 ### One delegation for every tab of an origin
 
 Tabs of one origin share their storage, so they share the session. What they do not
@@ -154,6 +195,56 @@ Three things make that suppression usually work:
 A request that needs a delegation now does not take part in any of this. It mints
 immediately, because a caller is waiting, and the result reaches the other tabs the
 same way.
+
+### Signing out is not the same as finding out
+
+Because one session serves every sibling, a client that discovers its own chain is
+dead must be careful about what it concludes. Signing in again replaces the
+browser's session at that application, so the sibling that did not sign in is left
+holding a chain to a session that no longer exists. It finds out on its next mint.
+
+What it must not do then is remove the shared hint. The hint is the domain's, not
+this origin's, and the sibling that signed in has just written a fresh one. Taking
+it away would tell that sibling, correctly by its own rules, that the session it
+just obtained is gone.
+
+So the two are separate acts. Signing out removes the local session and the shared
+hint, because the user asked for the sign-in to end. Finding out that a chain is
+stale removes the local session only.
+
+That leaves the discovering sibling in exactly the state silent re-auth exists for,
+and it recovers without the user seeing anything:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant chat as chat.example.com
+    participant hint as the hint cookie
+    participant hr as hr.example.com
+    participant IIC as II canister
+
+    chat->>IIC: signs in again
+    Note over IIC: the browser's session at this<br/>application is replaced
+    chat->>hint: writes the new session's expiry
+    hr->>IIC: mints from the chain it holds
+    IIC--xhr: no such session
+    hr->>hr: drops its chain, leaves the hint alone
+    hr->>hint: reads it: a session exists
+    hr->>IIC: asks again, rendering nothing
+    IIC-->>hr: a chain to the new session
+```
+
+The recovery works for a reason worth stating, because it looks like luck
+otherwise. II keeps its own record of a session under the identity, the account and
+the _effective_ origin, which for siblings is the derivation origin they share. So
+the ceremony `chat` ran replaced that one record, and the request `hr` makes finds
+the new one rather than nothing.
+
+Two things follow. A hint can outlive the session it describes, after a revocation
+from settings for instance, so a sibling acting on one has to be able to fall back
+to asking the user; it is a hint and not an authority. And two siblings asking at
+once is safe, because asking without rendering never creates a session: both are
+handed a chain from the same record, and neither replaces anything.
 
 ### Where the mint calls go
 

@@ -192,7 +192,7 @@ The principal a caller sees does not change when a delegation is replaced. `app_
 ## Failure
 
 **ERR-1.**
-`NoMatchingSession` is terminal. The library discards the session chain, the session key and the hint, notifies subscribers, and reports the user as not authenticated.
+`NoMatchingSession` is terminal for the chain in hand. The library discards the session chain and the session key for this origin, notifies subscribers, and reports the user as not authenticated. It does not remove the shared hint: see HINT-4.
 
 **ERR-2.**
 `InternalCanisterError`, a transport failure, and an unreachable boundary node are transient. The library retains the session, propagates the failure to the caller, and does not report a sign-out.
@@ -212,9 +212,18 @@ A background mint that fails transiently is not surfaced to the application and 
 The hint cookie carries the signed-in principal and the **session's** expiry.
 
 **HINT-2.**
-The hint is written when a session is acquired and removed when one is discarded, whether by sign-out or by ERR-1.
+The hint is written when a session is acquired.
 
 **HINT-3.**
+The hint is removed by signing out, and by nothing else. Storage exposes the removal of a local session separately from the removal of the shared hint, because they are different acts: a user ending a sign-in, and an origin finding out that the chain it held is stale.
+
+**HINT-4.**
+Discovering a stale chain removes the local session only. One session serves every sibling of a domain, so a sibling that did not sign in holds a chain to a session a ceremony elsewhere replaced, and removing the hint would tell the sibling that did sign in that the session it just obtained is gone.
+
+**HINT-5.**
+A hint may outlive the session it describes, after a revocation from settings for instance. It is a hint, so a sibling acting on one has to be able to fall back to asking the user, and may not treat it as authority to skip that path.
+
+**HINT-6.**
 Minting does not write the hint. An app delegation's expiry is five minutes away and says nothing about whether a sibling has a session to re-issue from.
 
 ## Signing out
@@ -234,30 +243,33 @@ Local state is cleared whether or not that call succeeded. A user who pressed si
 The app key and the app delegation are shared between tabs of an origin over a `BroadcastChannel`, and neither is persisted. A non-extractable key crosses a structured clone as a handle that signs and cannot be exported, so what a tab receives is usable without key material having left the origin.
 
 **TAB-2.**
-Coordination may only suppress a mint, never be required for one. Every tab schedules its refresh exactly as it would if it were alone, and every message the channel carries is a chance to stand down rather than an instruction to act. With every message lost each tab mints, which is the behaviour of no coordination at all, and no tab is ever waiting on another when none acts.
+The channel reaches the tabs of one origin and no further. A sibling subdomain is a different origin, so the two sets of tabs cannot coordinate, and the floor is one mint per active origin rather than one per domain. Each origin signs its own calls with its own key and so needs a delegation of its own, and the only thing that crosses between siblings is a cookie, which a chain does not fit in.
 
 **TAB-3.**
-A tab with no key asks on the channel and adopts the key and delegation it is offered. Where no answer arrives within the inherit window it generates a key and mints, which is the case when it is the first tab open or the last one closed.
+Coordination may only suppress a mint, never be required for one. Every tab schedules its refresh exactly as it would if it were alone, and every message the channel carries is a chance to stand down rather than an instruction to act. With every message lost each tab mints, which is the behaviour of no coordination at all, and no tab is ever waiting on another when none acts.
 
 **TAB-4.**
-A tab adopts an offered delegation only when its root is the stored account principal and it delegates to the key offered alongside it. A mismatched pair is discarded rather than used, so a mistake surfaces where it was made.
+A tab with no key asks on the channel and adopts the key and delegation it is offered. Where no answer arrives within the inherit window it generates a key and mints, which is the case when it is the first tab open or the last one closed.
 
 **TAB-5.**
-Each tab schedules its refresh earlier than the pre-mint threshold by a random offset within the wake-up jitter. The delegation's expiry is shared, so an unjittered schedule wakes every tab in the same instant, and the channel cannot suppress what has already begun.
+A tab adopts an offered delegation only when its root is the stored account principal and it delegates to the key offered alongside it. A mismatched pair is discarded rather than used, so a mistake surfaces where it was made.
 
 **TAB-6.**
-A tab re-reads what it holds when its timer fires, and does nothing when a delegation minted elsewhere has arrived in the meantime.
+Each tab schedules its refresh earlier than the pre-mint threshold by a random offset within the wake-up jitter. The delegation's expiry is shared, so an unjittered schedule wakes every tab in the same instant, and the channel cannot suppress what has already begun.
 
 **TAB-7.**
-A tab announces a mint before making it and waits out the claim window. Where another tab has announced one, the lower announcement identifier proceeds and the other stands down. This narrows the window in which two tabs both mint from the duration of a mint to the duration of a message.
+A tab re-reads what it holds when its timer fires, and does nothing when a delegation minted elsewhere has arrived in the meantime.
 
 **TAB-8.**
-A tab that stood down mints after the mint result window if no delegation has arrived, because the tab that announced one may have been closed mid-flight. This is the only place liveness rests on a timeout, and its failure mode is a second mint rather than none.
+A tab announces a mint before making it and waits out the claim window. Where another tab has announced one, the lower announcement identifier proceeds and the other stands down. This narrows the window in which two tabs both mint from the duration of a mint to the duration of a message.
 
 **TAB-9.**
-A request that finds no usable delegation mints immediately, without announcing or waiting. A caller is waiting on it, and the result reaches the other tabs the way any mint does.
+A tab that stood down mints after the mint result window if no delegation has arrived, because the tab that announced one may have been closed mid-flight. This is the only place liveness rests on a timeout, and its failure mode is a second mint rather than none.
 
 **TAB-10.**
+A request that finds no usable delegation mints immediately, without announcing or waiting. A caller is waiting on it, and the result reaches the other tabs the way any mint does.
+
+**TAB-11.**
 Adopting a delegation, however it arrived, reschedules that tab's refresh from the adopted delegation's expiry, so tabs do not drift onto separate clocks.
 
 ## Reaching the II canister
