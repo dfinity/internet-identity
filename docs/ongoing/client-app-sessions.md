@@ -115,11 +115,13 @@ Nothing new has to be configured. The session chain names the II canister in its
 
 ### What is stored
 
-The session chain, and not the app delegation. Keeping an artifact that dies in five minutes buys nothing, and it would leave a stale one to reconcile on the next load.
+A session, and not the app delegation. Keeping an artifact that dies in five minutes buys nothing, and it would leave a stale one to reconcile on the next load.
+
+What the client stores is named for that: a session store rather than a delegation store. The distinction is not cosmetic, because a session is no longer a delegation. It is what a delegation is minted _from_, it outlives any one of them, and it carries the account's key alongside the chain, which is what lets a restored session answer for its principal without minting. A store shaped around a bare chain has nowhere to put that.
 
 ### The cross-subdomain hint carries the session's expiry
 
-`CookieDelegationStorage` derives its hint from the delegation it is handed. Handed a five-minute app delegation, the hint would announce to a sibling subdomain that the session expires in five minutes, and the sibling would decide there was nothing worth resuming. The hint takes the session's expiry, because what a sibling is deciding is whether a session exists to re-issue from.
+`CookieSessionStorage` derives its hint from what it is handed. This is why what it is handed is a session rather than a delegation: given a five-minute app delegation, the hint would announce to a sibling subdomain that the session expires in five minutes, and the sibling would decide there was nothing worth resuming. The hint takes the session's expiry, because what a sibling is deciding is whether a session exists to re-issue from.
 
 ### Two kinds of failure, told apart
 

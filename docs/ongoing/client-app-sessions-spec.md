@@ -61,13 +61,13 @@ The request carries a session public key and, where the application configured o
 The returned chain is rejected unless its `targets` name the II canister and nothing else. A chain without that restriction is not a session chain, and treating one as a session would give the library something it could sign arbitrary calls with.
 
 **ACQ-4.**
-The session chain is persisted through `DelegationStorage`.
+The session is persisted through `SessionStorage`, which holds the chain and the account key together as one record.
 
 **ACQ-5.**
 The app delegation is never persisted, by any path.
 
 **ACQ-6.**
-The account principal is persisted alongside the session chain. It is not derivable from that chain, which is rooted at the session's own key, and the transport result carries only the chain, so it is taken from the `user_key` of the first mint, which MINT-11 makes part of signing in.
+The account key is part of the stored session, not a second thing stored beside it. It is not derivable from the chain, which is rooted at the session's own key, and the transport result carries only the chain, so it is taken from the `user_key` of the first mint, which MINT-11 makes part of signing in.
 
 ## Keys
 
@@ -144,7 +144,7 @@ This is what covers a throttled schedule, which is ordinary rather than exotic. 
 **MINT-7.**
 The identity holds no reference to a DOM. `AuthClient` calls a refresh entry point on it, and the listening lives in a separable piece that is constructed only where those APIs exist, in the way idle detection already is. An environment without a DOM constructs nothing, hooks nothing, and neither warns nor throws.
 
-`CookieDelegationStorage` reads the same events inline, and is not the model to follow: a cookie store is browser-only by definition, so it may assume what it needs. Refresh has to work in Node and anywhere else `AuthClient` runs, so its environment-specific part is isolated rather than assumed.
+`CookieSessionStorage` reads the same events inline, and is not the model to follow: a cookie store is browser-only by definition, so it may assume what it needs. Refresh has to work in Node and anywhere else `AuthClient` runs, so its environment-specific part is isolated rather than assumed.
 
 Where there is no DOM, the schedule of MINT-3 and the request paths of MINT-2 and MINT-5 are the whole mechanism. Nothing is incorrect without this trigger; a request after a long gap simply waits for its mint.
 
