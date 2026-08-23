@@ -50,7 +50,9 @@ An app is handed an identity built on the second. The first never leaves `AuthCl
 
 The identity handed to the app carries a five-minute app delegation, obtained by calling `app_prepare_delegation` and then `app_get_delegation` signed as the session. An agent holds that identity and signs every request with it, possibly for hours, so the identity is what has to notice its delegation ageing: it mints from inside the per-request hook the agent already calls, and one mint is in flight at a time, so several requests arriving together wait on the same round trip.
 
-The principal does not move when a delegation is replaced. `app_prepare_delegation` returns the account's own key as the delegation's root, so every app delegation is one hop from the same key, and an app that read the principal once can keep it.
+The principal an app sees is not in the session chain. That chain is rooted at the session's own key, derived from the session seed, while an app delegation is rooted at the account's key. They are different principals, and only the second is what the app's canisters will see. The ceremony computes it and the canister returns it as `account_principal`, but the result the app receives over the transport carries only the chain, so the library learns the account principal from the first mint, where it arrives as `user_key`.
+
+It is therefore recorded alongside the session chain rather than recomputed. A reload can answer for the principal from what it stored, without a mint, and `getPrincipal()` stays synchronous. Every later mint returns the same key, since the account seed does not change, so a mint that returns a different root is a failed mint rather than a new principal.
 
 ### Refreshing ahead of use, never on a clock
 
@@ -58,18 +60,15 @@ Waiting until a delegation has expired means one request every five minutes pays
 
 `app_prepare_delegation` stamps the session's last-refreshed time, and that stamp is what II's settings screen shows the user as "this browser used this app 3 minutes ago", and what the session cap reclaims on. A timer refreshes whether or not anyone is looking at the tab, so the column stops meaning "in use" and starts meaning "has a tab open", which is not the reading the user is being offered. Minting only when a request needs one keeps that signal honest at no cost.
 
-So refresh is driven by requests. A request served while the delegation still has comfortable life left starts a mint in the background and uses the delegation it already has; the replacement is ready before any later request needs it.
+So requests are what arm a refresh, and the refresh itself is scheduled for the moment it is needed. A request from an active application schedules one mint for just before its delegation runs out, rather than minting early or waiting for another request to arrive at the right time.
 
-| Delegation life left when a request arrives | What happens                                            |
-| ------------------------------------------- | ------------------------------------------------------- |
-| More than the pre-mint threshold            | Served immediately, no call                             |
-| Between the block margin and that threshold | Served immediately, and a mint starts in the background |
-| Below the block margin, or nothing held     | The request waits for a mint                            |
-| No request arrives                          | Nothing happens                                         |
+Scheduling it, rather than minting whenever a request happens to arrive with little life left, is what keeps the threshold small. A threshold that has to catch a passing request must be wide enough that one turns up inside it, and everything it discards is paid for: minting before a delegation expires throws away the rest of its life, so an active session consumes lifetime at `TTL / (TTL - threshold)`. Two minutes of threshold turns a five-minute refresh into a three-minute one and adds two thirds again to the update calls and stable writes of every active session, permanently. A scheduled mint only has to cover the mint itself, which is seconds, and an active session then refreshes at nearly the floor the canister sets.
 
-Both thresholds come from what they have to cover rather than from what feels safe, because the cost of getting them wrong is structural. Minting before a delegation expires throws away the rest of its life, so an active session consumes lifetime at `TTL / (TTL - threshold)`: a pre-mint threshold of two minutes turns a five-minute refresh into a three-minute one and adds two thirds again to the update calls and stable writes of every active session, permanently. The threshold therefore covers the mint itself and a few request intervals of head start, and no more. The block margin covers a request's flight time, since the delegation has to still be valid when the replica verifies it.
+The schedule needs one check, or it becomes the timer this section rejects. An application that goes idle seconds after its last request would still have a refresh scheduled, and firing it would stamp the session as used. So a scheduled mint asks, at the moment it fires, whether the application has been active recently, and cancels if it has not. One more refresh after the last request, and then the delegation is allowed to lapse.
 
-The case for a generous threshold is the app that makes a request every couple of minutes and sails past a narrow window, and it loses. Its cost is one stall per idle gap, in an app the user is not interacting with tightly, while a generous threshold is paid continuously by every active session.
+Requests remain the guarantee, because a schedule is best effort: browsers throttle timers in tabs nobody is looking at and fire them late after a machine has slept. A request that finds its delegation inside the threshold starts a mint in the background and is served from what it already has, and one that finds it below the block margin waits. The block margin covers a request's flight time, since the delegation has to still be valid when the replica verifies it.
+
+Minting at the end of sign-in is not only about latency: it is where the account principal comes from, so an application that signs in and reads its principal without making a request gets an answer.
 
 Two stalls are worth removing outright rather than absorbing, and both are hidden inside something the user is already waiting for. `signIn()` mints at the end of the ceremony, so the first call after signing in is instant. A page load that finds a stored session mints in the background while the page starts, without making `getIdentity()` wait for it.
 
