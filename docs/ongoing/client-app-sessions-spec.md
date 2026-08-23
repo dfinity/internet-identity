@@ -186,15 +186,12 @@ The principal a caller sees does not change when a delegation is replaced. `app_
 `InternalCanisterError`, a transport failure, and an unreachable boundary node are transient. The library retains the session, propagates the failure to the caller, and does not report a sign-out.
 
 **ERR-3.**
-`check_session` returning `false` is treated as ERR-1. It exists so the library can reach that conclusion without minting, for instance when deciding on load whether a stored chain is worth keeping.
-
-**ERR-4.**
 No failure path leaves a session chain stored without its key, or a key without its chain.
 
-**ERR-5.**
+**ERR-4.**
 A background mint that fails transiently is not surfaced to the application and does not report a sign-out. The delegation already held stays in use, and the next request retries, waiting if MINT-2 applies by then.
 
-**ERR-6.**
+**ERR-5.**
 `NoMatchingSession` from a background mint is terminal exactly as in the foreground. It means the session is gone, and which mint discovered that does not change what is true.
 
 ## The cross-subdomain hint

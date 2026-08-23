@@ -14,7 +14,7 @@ A delegation is a signed statement that one key may act for an identity, for a s
 
 Signing in today calls `icrc34_delegation`. The user picks a duration at the consent screen, II signs a delegation to the key the library generated, and the library stores both. Every call the app makes for the next few hours or weeks is signed by that key and carries that delegation.
 
-II now offers a different arrangement. `prepare_account_session` records a session and signs a chain to a key, and `app_prepare_delegation` with `app_get_delegation` mint a delegation from that session with a ceiling of five minutes that a caller cannot raise. `app_revoke_session` deletes the session, and `check_session` answers whether one is still there. The session itself lives at the canister, so ending it ends what can be minted from it.
+II now offers a different arrangement. `prepare_account_session` records a session and signs a chain to a key, and `app_prepare_delegation` with `app_get_delegation` mint a delegation from that session with a ceiling of five minutes that a caller cannot raise. `app_revoke_session` deletes the session. The session itself lives at the canister, so ending it ends what can be minted from it.
 
 ## Problem
 
@@ -129,7 +129,7 @@ A mint is a canister call, so it fails for two very different reasons and the li
 
 An `InternalCanisterError`, a network failure, or an unreachable boundary node means the session may well be alive. The library keeps it and lets the caller retry. Signing a user out because their train entered a tunnel is worse than a call that failed.
 
-`check_session` exists for the case where the library wants that answer without minting, such as deciding on page load whether a stored chain is worth keeping.
+The library never asks whether a session is still alive. It tries to use it, and a mint that comes back with `NoMatchingSession` is the answer. That is why a page load starts a mint in the background rather than probing first: the mint it needs anyway is also the check, so there is one mechanism where there could have been two.
 
 ### Ending
 
