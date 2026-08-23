@@ -79,7 +79,7 @@ sequenceDiagram
     App->>Id: request
     Id-->>App: signed with the delegation held
     Note over Id: mint scheduled for<br/>shortly before expiry
-    Note over Id: it fires, and the application<br/>has been active
+    Note over Id: it fires, and this delegation<br/>did serve a request
     Id->>IIC: app_prepare_delegation
     IIC-->>Id: account key, expiration
     Id->>IIC: app_get_delegation
@@ -89,7 +89,9 @@ sequenceDiagram
     Id-->>App: signed with the new delegation,<br/>having waited for nothing
 ```
 
-The schedule needs one check, or it becomes the timer this section rejects. An application that goes idle seconds after its last request would still have a refresh scheduled, and firing it would stamp the session as used. So a scheduled mint asks, at the moment it fires, whether the application has been active recently, and cancels if it has not. One more refresh after the last request, and then the delegation is allowed to lapse.
+The schedule needs one check, or it becomes the timer this section rejects: an application that goes quiet still has a refresh armed, and firing it would stamp the session as used. So a scheduled mint asks whether the delegation it is about to replace ever signed a request, and cancels if it did not.
+
+Signing a request is the only thing that counts as use, because it is the only activity the library can see, and the window is the replaced delegation's own lifetime, because that delegation is what the question is about. Nothing here needs a constant or a window to tune. An application making a request at least once per delegation lifetime refreshes for as long as that lasts; one that stops refreshes once more, because the delegation it was using did serve a request, and then lets the next lapse unused.
 
 Requests remain the guarantee, because a schedule is best effort: browsers throttle timers in tabs nobody is looking at and fire them late after a machine has slept. A request that finds its delegation inside the threshold starts a mint in the background and is served from what it already has, and one that finds it below the block margin waits. The block margin covers a request's flight time, since the delegation has to still be valid when the replica verifies it.
 

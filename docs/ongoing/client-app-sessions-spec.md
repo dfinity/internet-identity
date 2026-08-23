@@ -96,7 +96,7 @@ A scheduled mint asks one question before it runs:
 
 ```mermaid
 flowchart LR
-    T["a scheduled mint fires"] --> Q{"active<br/>recently?"}
+    T["a scheduled mint fires"] --> Q{"was this delegation<br/>ever used?"}
     Q -->|"yes"| M["mint"]
     Q -->|"no"| X["cancel, and let the<br/>delegation lapse"]
 ```
@@ -122,10 +122,12 @@ Sign-in and a restored session reach a mint directly, without the questions abov
 A request arriving when the held delegation has less than the block margin left, or when none is held, waits for a mint.
 
 **MINT-3.**
-While an application is active, one mint is scheduled for the moment the held delegation reaches the pre-mint threshold. It is a single scheduled refresh of a known delegation, not a recurring one.
+Adopting a delegation schedules one mint for the moment that delegation reaches the pre-mint threshold. It is a single scheduled refresh of a known delegation, not a recurring one.
 
 **MINT-4.**
-A scheduled mint checks at the moment it fires whether the application has been active recently, and cancels if it has not. Without that check, a session that went idle seconds after its last request would still be refreshed, stamping it as used and inflating the signal MINT-11 exists to keep honest. An application that stops making requests refreshes at most once more and then lets its delegation lapse.
+A scheduled mint cancels unless the delegation it is replacing signed at least one request. Signing a request is the only thing that counts as use, because it is the only activity the library sees, and the delegation's own lifetime is the window, because it is the delegation being replaced that the question is about.
+
+That predicate needs no constant of its own and there is nothing to tune. An application that makes a request at least once per delegation lifetime refreshes indefinitely, which is correct, because it is in continuous use. One that goes quiet refreshes once more, since the delegation it was using did serve a request, and then lets the next one lapse unused. Without the check it would refresh for as long as the tab stayed open, stamping the session as used and inflating the signal MINT-11 exists to keep honest.
 
 **MINT-5.**
 A request arriving when the held delegation has less than the pre-mint threshold and at least the block margin left is served from the delegation already held and starts a mint in the background. This is the guarantee behind the schedule, which is best effort: browsers throttle timers in hidden tabs and fire them late after a machine has slept.
@@ -146,7 +148,7 @@ No mint is started when the session itself has less than the block margin left. 
 A page load that restores a stored session starts a mint in the background. `getIdentity()` does not wait for it.
 
 **MINT-11.**
-No recurring timer or interval triggers a mint, and no mint happens without recent activity. Activity is what arms a refresh and what MINT-4 confirms before one fires, which is what keeps the session's last-refreshed stamp a record of use rather than of an open tab.
+No recurring timer or interval triggers a mint, and no mint happens for a delegation nothing used. Adopting a delegation arms one refresh, and MINT-4 confirms that delegation was used before the refresh fires, which is what keeps the session's last-refreshed stamp a record of use rather than of an open tab.
 
 **MINT-12.**
 A mint that fails leaves the stored session chain and session key exactly as they were, except where ERR-1 applies.
