@@ -96,7 +96,7 @@ A scheduled mint asks one question before it runs:
 
 ```mermaid
 flowchart LR
-    T["a scheduled mint fires"] --> Q{"was this delegation<br/>ever used?"}
+    T["a scheduled mint fires"] --> Q{"did this delegation<br/>sign a request?"}
     Q -->|"yes"| M["mint"]
     Q -->|"no"| X["cancel, and let the<br/>delegation lapse"]
 ```
@@ -125,9 +125,11 @@ A request arriving when the held delegation has less than the block margin left,
 Adopting a delegation schedules one mint for the moment that delegation reaches the pre-mint threshold. It is a single scheduled refresh of a known delegation, not a recurring one.
 
 **MINT-4.**
-A scheduled mint cancels unless the delegation it is replacing signed at least one request. Signing a request is the only thing that counts as use, because it is the only activity the library sees, and the delegation's own lifetime is the window, because it is the delegation being replaced that the question is about.
+A scheduled mint cancels unless the delegation it is replacing signed at least one request. Signing a request is the only thing that counts as use, because it is the only activity the library sees, and the window is that one delegation's lifetime rather than any longer history.
 
-That predicate needs no constant of its own and there is nothing to tune. An application that makes a request at least once per delegation lifetime refreshes indefinitely, which is correct, because it is in continuous use. One that goes quiet refreshes once more, since the delegation it was using did serve a request, and then lets the next one lapse unused. Without the check it would refresh for as long as the tab stayed open, stamping the session as used and inflating the signal MINT-11 exists to keep honest.
+The question is asked separately about each delegation, which is what bounds the chain: a refresh happens only if the delegation being retired was used, and the delegation it produces has to earn the next one the same way. So an application that makes a request at least once per delegation lifetime refreshes for as long as that holds, and one that goes quiet refreshes exactly once more, because the delegation it was using did serve a request, and then lets the replacement lapse unused. A single request does not buy a chain of refreshes.
+
+The predicate needs no constant of its own and there is nothing to tune. Without it, a refresh would fire for as long as a tab stayed open, stamping the session as used and inflating the signal MINT-11 exists to keep honest.
 
 **MINT-5.**
 A request arriving when the held delegation has less than the pre-mint threshold and at least the block margin left is served from the delegation already held and starts a mint in the background. This is the guarantee behind the schedule, which is best effort: browsers throttle timers in hidden tabs and fire them late after a machine has slept.

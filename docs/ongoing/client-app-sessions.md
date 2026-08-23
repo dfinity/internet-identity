@@ -89,9 +89,11 @@ sequenceDiagram
     Id-->>App: signed with the new delegation,<br/>having waited for nothing
 ```
 
-The schedule needs one check, or it becomes the timer this section rejects: an application that goes quiet still has a refresh armed, and firing it would stamp the session as used. So a scheduled mint asks whether the delegation it is about to replace ever signed a request, and cancels if it did not.
+The schedule needs one check, or it becomes the timer this section rejects: an application that goes quiet still has a refresh armed, and firing it would stamp the session as used. So a scheduled mint asks whether the delegation it is about to replace signed a request, and cancels if it did not.
 
-Signing a request is the only thing that counts as use, because it is the only activity the library can see, and the window is the replaced delegation's own lifetime, because that delegation is what the question is about. Nothing here needs a constant or a window to tune. An application making a request at least once per delegation lifetime refreshes for as long as that lasts; one that stops refreshes once more, because the delegation it was using did serve a request, and then lets the next lapse unused.
+Signing a request is the only thing that counts as use, because it is the only activity the library can see, and the window is that one delegation's lifetime rather than any longer history. Nothing here needs a constant or a window to tune.
+
+Asking it of each delegation separately is what stops one request buying an indefinite chain. A refresh happens only if the delegation being retired was used, and the delegation it produces has to earn the next refresh the same way. An application making a request at least once per delegation lifetime therefore refreshes for as long as that holds, while one that goes quiet refreshes exactly once more and then lets the replacement lapse unused.
 
 Requests remain the guarantee, because a schedule is best effort: browsers throttle timers in tabs nobody is looking at and fire them late after a machine has slept. A request that finds its delegation inside the threshold starts a mint in the background and is served from what it already has, and one that finds it below the block margin waits. The block margin covers a request's flight time, since the delegation has to still be valid when the replica verifies it.
 
