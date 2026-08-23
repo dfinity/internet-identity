@@ -45,7 +45,9 @@ An app is handed an identity built on the second. The first never leaves `AuthCl
 
 ### Acquiring
 
-`signIn()` asks for a session rather than a long-lived delegation, and stores the chain it gets back. Because the chain is restricted to the II canister, a copy of it is worth nothing against the app's own canisters, and it is only useful to whoever can also reach II and mint.
+`signIn()` asks for a session rather than a long-lived delegation, and stores the chain it gets back.
+
+An application can say how long it is willing for that session to last, and `maxTimeToLive` keeps meaning what it meant for a delegation: the longest the thing being granted may live. It is a ceiling rather than a request, since what the user picks at consent wins over it, an organization's cap narrows it further, and the canister clamps the result. What an application cannot ask for is an access level, which is the user's alone. Because the chain is restricted to the II canister, a copy of it is worth nothing against the app's own canisters, and it is only useful to whoever can also reach II and mint.
 
 ### Minting
 

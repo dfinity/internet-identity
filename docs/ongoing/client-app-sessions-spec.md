@@ -6,12 +6,12 @@
 
 ## Constants
 
-| Value                   | Where it comes from                               | Setting                    |
-| ----------------------- | ------------------------------------------------- | -------------------------- |
-| App delegation lifetime | `APP_DELEGATION_TTL_NS`, enforced by the canister | 5 minutes, not requestable |
-| Session lifetime        | chosen at consent, clamped by the canister        | 10 minutes to 30 days      |
-| Block margin            | this library                                      | 10 seconds                 |
-| Pre-mint threshold      | this library                                      | 15 seconds                 |
+| Value                   | Where it comes from                                | Setting                    |
+| ----------------------- | -------------------------------------------------- | -------------------------- |
+| App delegation lifetime | `APP_DELEGATION_TTL_NS`, enforced by the canister  | 5 minutes, not requestable |
+| Session lifetime        | requested as a ceiling, chosen at consent, clamped | 10 minutes to 30 days      |
+| Block margin            | this library                                       | 10 seconds                 |
+| Pre-mint threshold      | this library                                       | 15 seconds                 |
 
 The block margin covers a request's flight time, because the delegation has to still be valid when the replica verifies the request it was attached to.
 
@@ -55,18 +55,21 @@ sequenceDiagram
 `signIn()` requests a session with `ii_session_delegation`. Nothing checks first whether the provider offers it: this library is for Internet Identity, and a provider that cannot answer is a failed sign-in rather than a case to fall back from.
 
 **ACQ-2.**
-The request carries a session public key and, where the application configured one, a derivation origin. It carries no access level and no lifetime, both of which the user decides at consent.
+The request carries a session public key, a `maxTimeToLive` where the application sets one, and a derivation origin where it configured one. It carries no access level, which is the user's alone to decide at consent.
 
 **ACQ-3.**
-The returned chain is rejected unless its `targets` name the II canister and nothing else. A chain without that restriction is not a session chain, and treating one as a session would give the library something it could sign arbitrary calls with.
+`maxTimeToLive` is a ceiling, not a request. What the user picks at consent wins over it, an SSO organization's cap narrows it further, and the canister clamps the result to the session lifetime in the table above. An application asking for less than the minimum therefore gets the minimum, and one asking for more than it is offered gets what it is offered.
 
 **ACQ-4.**
-The session is persisted through `SessionStorage`, which holds the chain and the account key together as one record.
+The returned chain is rejected unless its `targets` name the II canister and nothing else. A chain without that restriction is not a session chain, and treating one as a session would give the library something it could sign arbitrary calls with.
 
 **ACQ-5.**
-The app delegation is never persisted, by any path.
+The session is persisted through `SessionStorage`, which holds the chain and the account key together as one record.
 
 **ACQ-6.**
+The app delegation is never persisted, by any path.
+
+**ACQ-7.**
 The account key is part of the stored session, not a second thing stored beside it. It is not derivable from the chain, which is rooted at the session's own key, and the transport result carries only the chain, so it is taken from the `user_key` of the first mint, which MINT-11 makes part of signing in.
 
 ## Keys
@@ -219,7 +222,7 @@ Local state is cleared whether or not that call succeeded. A user who pressed si
 ## Reaching the II canister
 
 **AGENT-1.**
-The II canister id is taken from the `targets` of the session chain, which ACQ-3 has already established names that canister and nothing else. It is not configured.
+The II canister id is taken from the `targets` of the session chain, which ACQ-4 has already established names that canister and nothing else. It is not configured.
 
 **AGENT-2.**
 Mint calls go to the origin of the configured identity provider, because the II canister is served by the same gateway that serves the II frontend.
