@@ -121,7 +121,7 @@ This one decision is shaped by a design that comes after it, and pretending othe
 
 That last point is the whole decision, and it is a decision about what goes in the session index's value. It can hold the account's principal, which the map here turns into an identity, app and account, or it can hold those three itself and need no map. Everything else follows from which.
 
-Holding the principal is the choice, and the map is closer to a relocation than an addition: the three values live once per account instead of being repeated in the session index for every session of that account, and what each of those entries holds instead is a principal. The map is bounded by the same cap as the rows it indexes, so an entry exists only where a row does and it cannot outgrow 500 per identity.
+Holding the principal is the choice, and not on storage. A session exists per browser per account, so most accounts have one or two, and one map entry per account against two fields saved in one or two session entries is roughly a wash. The reason is that the principal is needed on every mint regardless: the delegation a session mints is for the account's principal, so whatever the session index holds has to yield that principal on the hot path. Holding it outright yields it for free, and the map is consulted only for the identity, app and account, which the mint does not need. An opaque handle would need resolving twice, once for the principal and once for the rest.
 
 #### How it arrived at a map
 
@@ -137,9 +137,9 @@ That last step is also what puts this map on trial, and the trial is worth recor
 
 #### The alternative that is still arguable
 
-Put the identity, app and account in the session index's value, instead of a principal that has to be resolved. It needs no second map, which makes it look cheaper, and the saving does not survive contact: what this map costs is paid again in every session-index entry, so there is nothing left over to set against what it gives up.
+Put the identity, app and account in the session index's value, instead of a principal that has to be resolved. It needs no second map, and on storage alone it is the cheaper option, because sessions per account are few.
 
-It makes every session-index value the larger one. A principal is one field where an identity, an app and an account are three, and a stable map is sized for the largest value it may hold, so every session pays that difference where this map is paid once per account.
+It loses on the hot path. The mint needs the account's principal, which those three values do not contain, so every mint would have to derive it: hash the salt with the account number and the origin, encode the key. That is a derivation on every call where holding the principal is a field read, and it buys back only a map entry per account.
 
 It also fixes something that moves. Naming a default account materialises it, which changes those three values and leaves its principal untouched, so every session-index entry for that account would have to be found and rewritten the moment the user picks a name. Holding the principal puts the same change in one entry of this map and touches the session index not at all.
 
