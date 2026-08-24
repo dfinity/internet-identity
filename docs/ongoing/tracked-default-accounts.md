@@ -113,30 +113,33 @@ That last point is the whole decision. A session can name its account by holding
 
 Naming the principal is the choice, and the map is closer to a relocation than an addition: the three values live once per account instead of being repeated in every session of it, and what a session holds instead is a principal. The map is bounded by the same cap as the rows it indexes, so an entry exists only where a row does and it cannot outgrow 500 per identity.
 
-Four other ways to answer the same question, and why this one:
+#### How it arrived at a map
 
-1. **Let the caller carry the answer.**  
-   Built, narrowed, then removed, which makes it the alternative most likely to be proposed again and the most informative of the four. The app attached a canister-signed bundle to its call as `sender_info`, and II read the account out of it, so nothing had to be resolved.
+The answer went through three shapes. The first two were built.
 
-   The first version put the identity number and the account number in that bundle in cleartext. An app learned both, and two apps holding bundles for the same person would see the same identity number, which is the correlation per-origin derivation exists to prevent. That is the wall alternative 4 hits from the other side.
+It began with the caller carrying it. The app attached a canister-signed bundle to its call as `sender_info` and II read the account straight out of it, so nothing had to be resolved anywhere. That bundle held the identity number and the account number in cleartext, which meant an app learned both, and two apps holding bundles for the same person would see the same identity number. That is the correlation per-origin derivation exists to prevent, and it is the same wall the structured-principal idea below runs into.
 
-   The second carried the account principal instead, and that fixed the leak: the principal is what the app is already calling with, so the bundle told it nothing new. The approach still lost, and not on secrecy. A signed bundle has to be issued per session, given an expiry, attached to every call, verified on arrival and witnessed on the query, and it makes an app's agent responsible for carrying something. Once the map from a session's principal to its session existed, the caller could be recognised from its own signature, and the bundle was machinery around an answer that two lookups already gave.
+So the bundle was narrowed to carry the account principal alone. That fixed the leak completely, because the principal is what the app is already calling with, so the bundle told it nothing it did not have. The approach still did not survive, and not on secrecy. A signed bundle has to be issued per session, given an expiry, attached to every call, verified on arrival and witnessed on the query, and it makes an app's agent responsible for carrying something.
 
-   One consequence is worth recording, because it decides whether this map earns its place. Once the bundle was gone, resolving an account principal had exactly one caller left, and had sessions held the three values instead of a principal it would have had none. The map survives because a session names a principal, which is the same property alternative 2 gives up.
+Then the bundle went altogether. Once II kept a map from a session's own principal to its session, a caller was recognisable from its signature alone, and the bundle became machinery wrapped around an answer that lookups already gave. What remained was turning the account principal that session holds into an identity, app and account, which is the map this approach adds.
 
-2. **Let the session hold the identity, app and account directly.**  
-   The closest alternative, and it looks cheaper because it needs no map at all. The saving does not survive contact: what the map costs is paid again in every session, so there is nothing left over to weigh against the flexibility it gives up.
+That last step is also what puts this map on trial, and the trial is worth recording. With the bundle gone, resolving an account principal had exactly one caller left in production, and if sessions had held the identity, app and account instead of a principal, it would have had none.
 
-   It makes the session the larger record. A principal is one field where an identity, an app and an account are three, and a stable map is sized for the largest value it may hold, so every session pays that difference where the map here is paid once per account.
+#### The alternative that is still arguable
 
-   It also fixes something that moves. Naming a default account materialises it, which changes those three values and leaves its principal untouched, so every session of that account would have to be found and rewritten the moment the user picks a name. Holding the principal puts the same change in one entry and touches no session.
+Let a session hold the identity, app and account directly. It needs no map, which makes it look cheaper, and the saving does not survive contact: what the map costs is paid again in every session, so there is nothing left over to set against what it gives up.
 
-   That is the flexibility being spent. One indirection leaves a single place to update when what an account is called internally changes, which is what makes naming a default cheap here and what keeps moving an account between identities possible later. The encoding this design introduces reserves the shape that move needs, and sessions holding the three values would have to be rewritten by it too.
+It makes the session the larger record. A principal is one field where an identity, an app and an account are three, and a stable map is sized for the largest value it may hold, so every session pays that difference where this map is paid once per account.
 
-3. **Compute it on demand.**  
-   The enumeration described in the problem: a scan of every account against every origin, for a question asked several times a minute, and impossible from outside the canister because the salt is hashed in.
-4. **Make the principal say what it is.**  
-   A structured principal an app could decode would need no lookup anywhere. It also destroys the reason per-origin derivation exists, because anyone who sees a principal on chain could read the identity out of it, and two apps could compare notes. This is the one thing the whole design is built to prevent, so it is not a trade to weigh.
+It also fixes something that moves. Naming a default account materialises it, which changes those three values and leaves its principal untouched, so every session of that account would have to be found and rewritten the moment the user picks a name. Holding the principal puts the same change in one entry and touches no session.
+
+That is the flexibility being spent. One indirection leaves a single place to update when what an account is called internally changes, which is what makes naming a default cheap here and what keeps moving an account between identities possible later. The encoding this design introduces reserves the shape that move needs, and sessions holding the three values would be rewritten by it too.
+
+#### Two that were never on the table
+
+Computing the answer on demand is the enumeration the problem describes: a scan of every account against every origin, for a question asked several times a minute, and impossible from outside the canister because the salt is hashed in.
+
+A structured principal an app could decode would need no lookup anywhere, and would let anyone who sees a principal on chain read the identity out of it, so two apps could compare notes. That is the one thing the whole design exists to prevent, so it is not a trade to weigh.
 
 The map is internal. No method takes a principal and reports anything about it, because that would let anyone look up any principal they observe on chain and learn which identity it belongs to.
 
