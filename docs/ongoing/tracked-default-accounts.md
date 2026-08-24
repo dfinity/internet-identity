@@ -119,13 +119,13 @@ Four other ways to answer the same question, and why this one:
    One consequence is worth recording, because it decides whether this index earns its place at all. With the bundle gone, resolving a principal had a single production caller, and had the session handle named the account by its coordinates instead of by its principal, this index would have had none. It survives because the handle names a principal, which is what keeps a rename to one entry, and that is the same reason alternative 2 loses.
 
 2. **Have the session entry name the coordinates directly.**  
-   The closest alternative, and it looks cheaper because it needs no map. It costs more in three ways.
+   The closest alternative, and it looks cheaper because it needs no map. The saving does not survive contact: the map it removes is paid for again in every session entry, so there is nothing left over to weigh against the flexibility it gives up.
 
    It makes the session entry the larger value. A principal is one field where coordinates are three, and a stable map is sized for the largest value it may hold, so every session pays the difference while the map here is paid once per account.
 
    It fails on renaming. Materialising a default account changes its coordinates and leaves its principal untouched, so every session of that account would have to be found and rewritten the moment the user names it, where naming a principal puts that rename in one entry and touches no session at all. Coordinates are not a stable name for something whose coordinates change.
 
-   And it spends the flexibility. One indirection is what leaves a single place to change when an account moves, which is why materialising a default is cheap today and why moving an account between identities stays possible later. The encoding this design introduces reserves the shape that move needs, and a session naming coordinates would have to be rewritten by it too.
+   And that is what the flexibility is spent on. One indirection leaves a single place to change when an account moves, which is why materialising a default is cheap today and why moving an account between identities stays possible later. The encoding this design introduces reserves the shape that move needs, and a session naming coordinates would have to be rewritten by it too.
 
 3. **Compute it on demand.**  
    The enumeration described in the problem: a scan of every account against every origin, for a question asked several times a minute, and impossible from outside the canister because the salt is hashed in.
