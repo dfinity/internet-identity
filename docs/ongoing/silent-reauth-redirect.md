@@ -77,6 +77,14 @@ Answering silently also must not become a way to get something for free. A page 
 
 Two new authorize-URL parameters and a path through the authorize flow that renders nothing.
 
+### Why a top-level redirect
+
+The conventional way to answer `prompt=none` is a hidden iframe, and it is the reason this design exists in the redirect transport instead. An iframe puts II in a third-party context, where browsers now partition storage per top-level site or block it outright, so an embedded II cannot reach the session it is being asked about. The mechanism fails precisely where it is needed, and fails silently.
+
+A popup avoids the partitioning but needs a user gesture, and the case here is a page load with no click behind it.
+
+A top-level redirect keeps II first-party, so it finds its own session. The cost is that the app's page unloads and its flow re-runs on the return load, which is a real constraint on the calling app rather than a free choice, and one `@icp-sdk/auth` already carries for the interactive redirect flow.
+
 | Item                                    | Change                                                                                                                                                                               |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `prompt`                                | New. `none` answers from a held session or fails. `login` and an absent `prompt` both run the ceremony; `login` exists so a client can say so rather than to select a different path |
@@ -86,7 +94,7 @@ Two new authorize-URL parameters and a path through the authorize flow that rend
 
 A hint selects; it does not grant. It can only pick from the sessions II already holds for the origin being authorized, and it is holding the session that confers anything, so a hint read out of a cookie an app can write is safe. A silent request also cannot create a session: creating one needs an access method, and a redirect carries none.
 
-Almost all of this is the II frontend using methods [revocable-app-sessions.md](revocable-app-sessions.md) already specifies. It needs one addition, `check_session`: a query that confirms the canister still holds the session the frontend's local record names. Without it a session revoked from settings or from another app would still be answered from the local copy, and the app would fail at its first mint with an error it could not tell apart from a real one.
+Almost all of this is the II frontend using methods [revocable-app-sessions.md](revocable-app-sessions.md) already specifies. It needs one addition, `check_session`: a query that confirms the canister still holds the session the frontend's local record names. A query rather than an update because it is only deciding whether to attempt the silent path, and being wrong costs a ceremony the user would otherwise have been spared. Nothing is granted on its answer: the mint that follows is an update, and that is what authoritatively refuses a session that has gone. Without it a session revoked from settings or from another app would still be answered from the local copy, and the app would fail at its first mint with an error it could not tell apart from a real one.
 
 ---
 

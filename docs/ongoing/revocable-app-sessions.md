@@ -66,6 +66,9 @@ The same gap prevents a user from signing one browser out. II keeps no record th
 
 1. **Store a session.**  
    Signing in records a session against the account the user chose, on the per-account row that `tracked-default-accounts.md` introduces: when it was created, when it expires, when it was last used, which browser it came from, and the access level the user consented to.
+
+   On that row rather than in a table of its own, because the row is already the thing a settings screen lists and is already capped and swept. A separate table would need its own bound and its own cleanup, and would let a session outlive the record of the app it belongs to. The cost is that the two share a fate: evicting a row for an app the identity stopped using ends any session on it, which is the behaviour `tracked-default-accounts.md` argues for rather than an accident of layout.
+
 2. **Hand the app a chain, not a credential.**  
    The canister signs the session to a key the II frontend generates and cannot export, and the frontend extends that chain to a key the app supplies. The app's hop is restricted to the II canister, so the chain can be used to ask II for delegations and for nothing else.
 3. **Give the app a way to say which account it means.**  
