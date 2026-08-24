@@ -44,7 +44,11 @@ II does keep one record per app origin it has ever encountered, shared by all id
 
 2. Recording use would make the app list grow without limit. Nothing in this part of storage has ever been deleted. There is no removal path for any of these records, and the per-app counts only ever increase. That is survivable today because only named accounts create records. If every first sign-in at a new app created one, each would stay for the lifetime of the canister.
 
-3. Revocable app sessions cannot be built. The design in `revocable-app-sessions.md` needs the opposite direction of the hash: given the principal an app is calling with, which identity and account does it belong to? A one-way hash cannot answer that, so the answer has to be written down as it is produced. The session refresh path reads it on every call it authorises.
+3. Revocable app sessions cannot be built. The design in `revocable-app-sessions.md` needs the opposite direction of the hash: given the principal an app is calling with, which identity and account does it belong to? The session refresh path asks this on every call it authorises.
+
+   Inside the canister, deriving forwards is cheap, so a guess can be checked: the canister's salt, the account number and the origin hash to a seed, that seed encodes to a key, and the key gives a principal to compare. What the hash denies is a way to narrow the guessing. A caller arrives holding only the principal, and nothing in it points at the account it came from, so answering by computation means enumerating every account the canister holds against every origin it might have been used at until one matches. That is not a lookup with a bad constant factor. It is a scan of the whole canister for a question asked several times a minute across active sessions, and it does not fit in one message.
+
+   Outside the canister the search is not slow, it is impossible, because the salt is secret and no guess can even be checked. That is the reason the answer is recorded rather than offered: a method that turns a principal into the account behind it would hand out precisely what the salt protects, which is the correlation this design refuses everywhere else.
 
 ```mermaid
 flowchart LR
@@ -60,7 +64,7 @@ Two separate concerns run through this, and each is worth doing on its own terms
 
 **Knowing every app an identity has used** is what lets anything be attached to that pairing. A settings screen can only list apps it has records for, and the rule that follows is the one that decides the shape of the rest: data may only be attached to something the user can see and manage. An account the settings screen cannot list is an account that must not own data, so the tracking has to cover every account, including the default ones nobody named.
 
-**Reaching an account from a principal quickly** is a different requirement with a different consumer. Any feature that starts from the principal an app is calling with, and needs to know whose account that is, has to go that way round: revocable sessions do it on every call they authorise, and an in-app profile would do it on every read. A hash only runs forwards, so the answer has to be recorded as it is produced. Recomputing it instead would mean deriving every principal an identity could present and comparing, which is the work the record exists to avoid.
+**Reaching an account from a principal quickly** is a different requirement with a different consumer. Any feature that starts from the principal an app is calling with, and needs to know whose account that is, has to go that way round: revocable sessions do it on every call they authorise, and an in-app profile would do it on every read. A hash only runs forwards, so the answer has to be recorded as it is produced. Computing it on demand would mean the enumeration the Problem describes.
 
 The two are independent in motivation and entangled in delivery. Recording use is what makes the list grow; the cap is what bounds it; deleting an app record is only reachable because the cap lets a count fall; and the index is only affordable once the thing it indexes is bounded. All four read and write the same row, so they share one write path, which keeps the counts and the index consistent without every caller having to remember to update them.
 
@@ -97,7 +101,7 @@ With rows now able to disappear, an app's count of referring accounts can reach 
 
 ### 4. Keep a map from a principal back to the account it belongs to
 
-For every account that has a row, II records which principal it derives to and which identity, app and account that principal means. This is the reverse direction the one-way hash cannot give.
+For every account that has a row, II records which principal it derives to and which identity, app and account that principal means. This is the reverse direction the hash cannot narrow, bought once at write time instead of searched for at read time.
 
 It is bounded by the same cap as the rows it indexes, which is what makes it affordable: an entry exists only where a row does, so the map cannot outgrow 500 per identity. Storing the reverse direction only for named accounts was the cheaper option and does not work, because the callers that need it arrive with a principal and cannot know in advance whether it belongs to a named account or a default one.
 
