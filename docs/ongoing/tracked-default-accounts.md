@@ -106,12 +106,12 @@ For every account that has a row, II records which principal it derives to and w
 This one decision is shaped by a design that comes after it, and pretending otherwise makes it unreadable. Nothing in _this_ design reads the map. It exists for [revocable-app-sessions.md](revocable-app-sessions.md), so the argument below needs three facts from there, none of which this design decides:
 
 - A **session** is a record II keeps when a user signs in to an app, and it is what the user can later end from settings.
-- An app's calls are signed by that session, so a call arrives carrying the session's own principal and nothing else. II keeps a second map, from that principal to the session, to know which one is calling.
-- A session has to say which account it belongs to, because the delegation it mints is for that account's principal.
+- An app's calls are signed by that session, so a call arrives carrying the session's own principal and nothing else. To know which session is calling, II keeps a **session index**: a map whose key is that principal and whose value is the session.
+- The value in that index has to say which account the session belongs to, because the delegation the session mints is for that account's principal.
 
-That last point is the whole decision. A session can name its account by holding the account's principal, which the map here turns into an identity, app and account, or by holding those three directly and needing no map. Everything else follows from which of the two it holds.
+That last point is the whole decision, and it is a decision about what goes in the session index's value. It can hold the account's principal, which the map here turns into an identity, app and account, or it can hold those three itself and need no map. Everything else follows from which.
 
-Naming the principal is the choice, and the map is closer to a relocation than an addition: the three values live once per account instead of being repeated in every session of it, and what a session holds instead is a principal. The map is bounded by the same cap as the rows it indexes, so an entry exists only where a row does and it cannot outgrow 500 per identity.
+Holding the principal is the choice, and the map is closer to a relocation than an addition: the three values live once per account instead of being repeated in the session index for every session of that account, and what each of those entries holds instead is a principal. The map is bounded by the same cap as the rows it indexes, so an entry exists only where a row does and it cannot outgrow 500 per identity.
 
 #### How it arrived at a map
 
@@ -121,19 +121,19 @@ It began with the caller carrying it. The app attached a canister-signed bundle 
 
 So the bundle was narrowed to carry the account principal alone. That fixed the leak completely, because the principal is what the app is already calling with, so the bundle told it nothing it did not have. The approach still did not survive, and not on secrecy. A signed bundle has to be issued per session, given an expiry, attached to every call, verified on arrival and witnessed on the query, and it makes an app's agent responsible for carrying something.
 
-Then the bundle went altogether. Once II kept a map from a session's own principal to its session, a caller was recognisable from its signature alone, and the bundle became machinery wrapped around an answer that lookups already gave. What remained was turning the account principal that session holds into an identity, app and account, which is the map this approach adds.
+Then the bundle went altogether. Once the session index existed, keyed by a session's own principal, a caller was recognisable from its signature alone, and the bundle became machinery wrapped around an answer that lookups already gave. What remained was turning the account principal that session holds into an identity, app and account, which is the map this approach adds.
 
-That last step is also what puts this map on trial, and the trial is worth recording. With the bundle gone, resolving an account principal had exactly one caller left in production, and if sessions had held the identity, app and account instead of a principal, it would have had none.
+That last step is also what puts this map on trial, and the trial is worth recording. With the bundle gone, resolving an account principal had exactly one caller left in production, and if the session index had held the identity, app and account in its value instead of a principal, it would have had none.
 
 #### The alternative that is still arguable
 
-Let a session hold the identity, app and account directly. It needs no map, which makes it look cheaper, and the saving does not survive contact: what the map costs is paid again in every session, so there is nothing left over to set against what it gives up.
+Put the identity, app and account in the session index's value, instead of a principal that has to be resolved. It needs no second map, which makes it look cheaper, and the saving does not survive contact: what this map costs is paid again in every session-index entry, so there is nothing left over to set against what it gives up.
 
-It makes the session the larger record. A principal is one field where an identity, an app and an account are three, and a stable map is sized for the largest value it may hold, so every session pays that difference where this map is paid once per account.
+It makes every session-index value the larger one. A principal is one field where an identity, an app and an account are three, and a stable map is sized for the largest value it may hold, so every session pays that difference where this map is paid once per account.
 
-It also fixes something that moves. Naming a default account materialises it, which changes those three values and leaves its principal untouched, so every session of that account would have to be found and rewritten the moment the user picks a name. Holding the principal puts the same change in one entry and touches no session.
+It also fixes something that moves. Naming a default account materialises it, which changes those three values and leaves its principal untouched, so every session-index entry for that account would have to be found and rewritten the moment the user picks a name. Holding the principal puts the same change in one entry of this map and touches the session index not at all.
 
-That is the flexibility being spent. One indirection leaves a single place to update when what an account is called internally changes, which is what makes naming a default cheap here and what keeps moving an account between identities possible later. The encoding this design introduces reserves the shape that move needs, and sessions holding the three values would be rewritten by it too.
+That is the flexibility being spent. One indirection leaves a single place to update when what an account is called internally changes, which is what makes naming a default cheap here and what keeps moving an account between identities possible later. The encoding this design introduces reserves the shape that move needs, and a session index holding the three values would be rewritten by it too.
 
 #### Two that were never on the table
 
