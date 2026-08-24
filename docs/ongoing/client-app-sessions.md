@@ -63,6 +63,10 @@ An app is handed an identity built on the second, and never sees either. A third
 | Stored            | IndexedDB, non-extractable           | memory only, never persisted             |
 | Leaves the origin | never                                | never; it reaches other tabs as a handle |
 
+One key would be simpler, and there are two ways to try it. Letting the app sign with the session key fails on what that key is for: the session chain names the II canister in its `targets`, so an app signing with it could call II and nothing else, and the app's own canisters would refuse the delegation. It also hands the app the thing that mints, so nothing would expire by itself and revocation would be the only way to stop anything. Letting the app bring a long-lived key of its own and delegating to it once is the arrangement this design replaces, and its problem is the one the Problem section opens with.
+
+Keeping one app key and replacing only its delegation is the closest of the three, and it buys nothing. A key with no live delegation carries no authority, so holding one across mints adds a longer-lived secret for no gain, where making a fresh one each time means rotation costs nothing beyond what the mint already does.
+
 ### Acquiring
 
 `signIn()` asks for a session rather than a long-lived delegation, and stores the chain it gets back.
