@@ -125,7 +125,9 @@ This one decision is shaped by a design that comes after it, and pretending othe
 
 That last point is the whole decision, and it is a decision about what goes in the session index's value. It can hold the account's principal, which the map here turns into an identity, app and account, or it can hold those three itself and need no map. Everything else follows from which.
 
-Holding the principal is the choice, and not on storage. A session exists per browser per account, so most accounts have one or two, and one map entry per account against two fields saved in one or two session entries is roughly a wash. The reason is that the principal is needed on every mint regardless: the delegation a session mints is for the account's principal, so whatever the session index holds has to yield that principal on the hot path. Holding it outright yields it for free, and the map is consulted only for the identity, app and account, which the mint does not need. An opaque handle would need resolving twice, once for the principal and once for the rest. The map is bounded either way, since an entry exists only where a row does, so it is held down by whatever an identity can hold in rows.
+Holding the principal is the choice, and what it buys is that two questions stay apart. The session index answers which session is calling. This map answers which account a principal belongs to. Those are the two concerns this design opens with, they have different consumers, and the only thing joining them is that the first produces a principal the second accepts.
+
+Collapsing them, by putting the identity, app and account in the session index, leaves one lookup that only something already holding a session can use. Every later feature that starts from a principal then has to obtain a session it may not have, or add this map after all, and the two concerns get conflated once per feature instead of separated once here. An entry in the map exists only where a row does, so it is bounded by whatever an identity can hold in rows.
 
 #### How it arrived at a map
 
