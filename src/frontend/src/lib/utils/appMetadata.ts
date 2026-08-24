@@ -45,6 +45,8 @@
  *   never break the sign-in flow.
  */
 
+import { gatewayOriginTwins } from "$lib/utils/urlUtils";
+
 export interface AppMetadata {
   /** Display name of the app. */
   name?: string;
@@ -53,13 +55,6 @@ export interface AppMetadata {
   /** Ready-to-render `<img src>` value (a `blob:` URL for fetched logos). */
   logo?: string;
 }
-
-/** The canister gateway domains that `remapToLegacyDomain` collapses onto
- *  `ic0.app` so a canister derives one principal across all of them. */
-const GATEWAY_TWIN_DOMAINS = ["icp0.io", "icp.net"] as const;
-
-const LEGACY_GATEWAY_ORIGIN_REGEX =
-  /^https:\/\/(?<subdomain>[\w-]+(?:\.raw)?)\.ic0\.app$/;
 
 /**
  * The origins to ask for an app's metadata, in order.
@@ -73,21 +68,14 @@ const LEGACY_GATEWAY_ORIGIN_REGEX =
  * client_domain_canister_mismatch` at `<id>.ic0.app`. Asking only the remapped
  * origin would lose the metadata of every app in that position.
  *
- * So the remap is inverted here and the twins are used as fallbacks. All three
- * resolve to the same canister, so this widens where the document may be
- * served, never whose document is used.
+ * So the remap is inverted here (via {@link gatewayOriginTwins}) and the twins
+ * are used as fallbacks. All three resolve to the same canister, so this
+ * widens where the document may be served, never whose document is used.
  */
-export const appMetadataOrigins = (origin: string): string[] => {
-  const subdomain = origin.match(LEGACY_GATEWAY_ORIGIN_REGEX)?.groups
-    ?.subdomain;
-  if (subdomain === undefined) {
-    return [origin];
-  }
-  return [
-    origin,
-    ...GATEWAY_TWIN_DOMAINS.map((domain) => `https://${subdomain}.${domain}`),
-  ];
-};
+export const appMetadataOrigins = (origin: string): string[] => [
+  origin,
+  ...gatewayOriginTwins(origin),
+];
 
 /** Well-known path (relative to the app's origin) the metadata is served on. */
 export const APP_METADATA_PATH = "/.well-known/ii-app-metadata";
