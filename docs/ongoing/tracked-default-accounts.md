@@ -105,13 +105,18 @@ For every account that has a row, II records which principal it derives to and w
 
 It is bounded by the same cap as the rows it indexes, so an entry exists only where a row does and the map cannot outgrow 500 per identity. That is what makes a second structure affordable at all.
 
-Three other ways to answer the same question, and why this one:
+Four other ways to answer the same question, and why this one:
 
-1. **Put the answer in the session instead, and keep no index.**  
+1. **Let the caller carry the answer.**  
+   This one was built and removed, so it is the alternative most likely to be proposed again. The app attached a canister-signed bundle to its call as `sender_info`, holding the session locator and an expiry, and II read the coordinates out of it. No index anywhere, and the lookup is a signature check.
+
+   It leaked. The bundle held the identity number in cleartext, so an app learned it, and two apps holding bundles for the same person could compare them and see the same number. That is the correlation per-origin derivation exists to prevent, and it is the same wall alternative 4 hits from the other side. The bundle also had to be issued per session, expired, attached to every call, verified and re-issued, where a caller that identifies itself by its own signature needs none of that.
+
+2. **Put the answer in the session instead, and keep no index.**  
    The closest alternative, since a session already has to be found from the caller. Each session could hold the account's coordinates outright, and the refresh path would never need a principal at all. It fails on renaming: materialising a default account changes its coordinates and leaves its principal alone, so every session of that account would have to be rewritten the moment the user names it. Naming the principal instead puts that rename in one index entry and touches no session. Sessions are also many per account, so the coordinates would be stored once per session rather than once per account.
-2. **Compute it on demand.**  
+3. **Compute it on demand.**  
    The enumeration described in the problem: a scan of every account against every origin, for a question asked several times a minute, and impossible from outside the canister because the salt is hashed in.
-3. **Make the principal say what it is.**  
+4. **Make the principal say what it is.**  
    A structured principal an app could decode would need no lookup anywhere. It also destroys the reason per-origin derivation exists, because anyone who sees a principal on chain could read the identity out of it, and two apps could compare notes. This is the one thing the whole design is built to prevent, so it is not a trade to weigh.
 
 The map is internal. No method takes a principal and reports anything about it, because that would let anyone look up any principal they observe on chain and learn which identity it belongs to.
