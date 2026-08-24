@@ -141,13 +141,15 @@ That last step is also what puts this map on trial, and the trial is worth recor
 
 #### The alternative that is still arguable
 
-Put the identity, app and account in the session index's value, instead of a principal that has to be resolved. It needs no second map, and on storage alone it is the cheaper option, because sessions per account are few.
+Put the identity, app and account in the session index's value, instead of a principal that has to be resolved. It needs no second map.
 
-It loses on the hot path. The mint needs the account's principal, which those three values do not contain, so every mint would have to derive it: hash the salt with the account number and the origin, encode the key. That is a derivation on every call where holding the principal is a field read, and it buys back only a map entry per account.
+Cost does not decide this. Those three values in every session-index entry, against a principal in every entry plus one map entry per account, comes out close enough either way that neither side has a margin worth arguing about, and sessions per account are few enough that the multiplier does not rescue either.
+
+What separates them is the question each can answer. With the three values in the session index, the only thing the canister can resolve is which account a _session_ belongs to. With the map it can also resolve which account an account _principal_ belongs to, and that is the more general question, because it can be asked by anything holding a principal rather than only by something holding a session. The refresh path happens to hold both. A per-app profile read, which the two concerns above name as the other reason for all this, starts from the account and has no session in hand at all.
 
 It also fixes something that moves. Naming a default account materialises it, which changes those three values and leaves its principal untouched, so every session-index entry for that account would have to be rewritten the moment the user picks a name. Rarity is no rescue, and the Summary does say naming is rare: the problem is not how often the rewrite runs but that there is nothing to run it with. The session index is keyed by session principal, so finding the entries that belong to one account means either a third index from accounts to sessions or a scan of the whole index. Holding the account principal puts the same change in one entry of this map and needs neither.
 
-That is the flexibility being spent. One indirection leaves a single place to update when what an account is called internally changes, which is what makes naming a default cheap here and what keeps moving an account between identities possible later. The encoding this design introduces reserves the shape that move needs, and a session index holding the three values would be rewritten by it too.
+That is the rest of the flexibility being spent. One indirection leaves a single place to update when what an account is called internally changes, which is what makes naming a default cheap here and what keeps moving an account between identities possible later. The encoding this design introduces reserves the shape that move needs, and a session index holding the three values would be rewritten by it too.
 
 #### Two that were never on the table
 
