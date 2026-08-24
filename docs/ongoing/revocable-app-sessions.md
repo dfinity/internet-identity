@@ -72,9 +72,15 @@ The same gap prevents a user from signing one browser out. II keeps no record th
 2. **Hand the app a chain, not a credential.**  
    The canister signs the session to a key the II frontend generates and cannot export, and the frontend extends that chain to a key the app supplies. The app's hop is restricted to the II canister, so the chain can be used to ask II for delegations and for nothing else.
 3. **Give the app a way to say which account it means.**  
-   The app names nothing. Its calls are signed by the session chain, so the canister recognises the caller as that session and looks up which account that session belongs to. There is nothing for an app to supply, and so nothing for it to get wrong or lie about.
+   The app names nothing. Its calls are signed by the session chain, so the canister recognises the caller as that session and looks up which account that session belongs to.
+
+   The alternative is to let the app say, by passing the account in the request. It would then be naming something it cannot be trusted about, so the canister would have to check the claim against the session anyway, which is the lookup this avoids. It would also put II's internal numbers in an app-facing argument, and keeping them out of an app's reach is why per-origin derivation exists at all.
+
 4. **Mint short delegations on demand.**  
    The app calls `app_prepare_delegation` / `app_get_delegation` with that chain and gets a 5-minute delegation for its account principal. This is a direct canister call: no popup, no iframe, no navigation.
+
+   Asking II on every call would revoke instantly rather than within five minutes, and it is the wrong trade. A delegation is verified by the replica from the signature it carries, so an app's own canisters need no II call and no knowledge that II exists. Authorising per call would put an inter-canister hop to II inside every request an app serves, make II a hard dependency of its availability, and pay that cost forever to shorten a five-minute window. Minting is the same mechanism the platform already uses for delegations, applied on a short cycle, which is why the cost falls on the client and not on the app's callers.
+
 5. **Revoke by deleting the record.**  
    No new delegation can be minted, and the one already out expires within five minutes.
 6. **Group sessions by browser.**  
