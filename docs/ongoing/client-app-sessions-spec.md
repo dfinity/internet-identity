@@ -62,7 +62,7 @@ The request carries a session public key, a `maxTimeToLive` where the applicatio
 `maxTimeToLive` is a ceiling, not a request. What the user picks at consent wins over it, an SSO organization's cap narrows it further, and the canister clamps the result to the session lifetime in the table above. An application asking for less than the minimum therefore gets the minimum, and one asking for more than it is offered gets what it is offered.
 
 **ACQ-4.**
-The returned chain is rejected unless its `targets` name the II canister and nothing else. A chain without that restriction is not a session chain, and treating one as a session would give the library something it could sign arbitrary calls with.
+The returned chain is rejected unless its `targets` name the configured II canister and nothing else, per AGENT-5. A chain without that restriction is not a session chain, and treating one as a session would give the library something it could sign arbitrary calls with. Acquisition mints before it resolves, so the check runs there too.
 
 **ACQ-5.**
 The session is persisted through `SessionStorage`, which holds the chain and the account key together as one record.
@@ -278,21 +278,24 @@ Adopting a delegation, however it arrived, reschedules that tab's refresh from t
 ## Reaching the II canister
 
 **AGENT-1.**
-The II canister id is taken from the `targets` of the session chain, which ACQ-4 has already established names that canister and nothing else. It is not configured.
+The identity provider is configured as two values: the authorize URL a ceremony is rendered at, and the canister id that mints and revokes. They are not the same address, because a custom domain may front the mainnet canister and a local deployment changes both.
 
 **AGENT-2.**
-Mint calls go to the origin of the configured identity provider, because the II canister is served by the same gateway that serves the II frontend.
+Each half has its own default, the mainnet authorize URL and the mainnet II canister id, so an application deploying against mainnet configures neither.
 
 **AGENT-3.**
-Where that origin is loopback, the agent fetches the replica's root key. Where it is not, it does not.
+Options for the agent that makes the mint and revoke calls are passed through to it unchanged, except that the identity is set by the library, last, so no option can replace the session the calls are made as. Where no agent options are given the agent applies its own defaults, which reach mainnet.
 
 **AGENT-4.**
-No host, agent or canister-id option is added. Everything above is derived from configuration the library already has, or from the session itself.
+Nothing about the calls is derived from the authorize URL. Its origin is not used as a host, and whether it is loopback decides nothing.
+
+**AGENT-5.**
+Before the first call, a session chain that names `targets` and does not name the configured canister id is refused, with an error naming both. A chain naming no targets restricts nothing and is accepted. This is a check rather than a source: the canister id comes from AGENT-1.
 
 ## Public surface
 
 **API-1.**
-`signIn()`, `getIdentity()`, `signOut()`, `isAuthenticated()` and `subscribe()` keep their current signatures, and no session type, session chain or session expiry is exposed through any of them. The one addition is `disableForegroundRefresh` in MINT-8, which is about when the library refreshes rather than about sessions.
+`signIn()`, `getIdentity()`, `signOut()`, `isAuthenticated()` and `subscribe()` keep their current signatures, and no session type, session chain or session expiry is exposed through any of them. Three options are added or changed: `disableForegroundRefresh` in MINT-8, which is about when the library refreshes rather than about sessions, and the two in AGENT-1 and AGENT-3. `identityProvider` changing from a URL to an object is a breaking change and the only one in the public surface.
 
 **API-2.**
 `isAuthenticated()` reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints. It stays synchronous, reading the stored session and nothing else, so a page load answers without a mint, a network call or an asynchronous store.

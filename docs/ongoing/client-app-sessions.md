@@ -277,7 +277,11 @@ handed a chain from the same record, and neither replaces anything.
 
 This is the first thing in the library that calls a canister at all. Everything until now produced an identity and left the network to the application, which is why nothing in it is configured with a host.
 
-Nothing new has to be configured. The session chain names the II canister in its `targets`, so the canister id arrives with the session. The II canister is served by the same gateway that serves the II frontend, so the origin of the configured identity provider is the host to call it on, and a loopback origin is a local replica whose root key has to be fetched.
+So Internet Identity is configured as two values rather than one: the URL a ceremony renders at, and the canister that mints. They are not the same address. A custom domain can front the mainnet canister, and a local deployment changes both. Each half defaults to its mainnet value, so an application deploying against mainnet configures neither, and options for the agent making the calls are handed to it as its own.
+
+Deriving any of this from the authorize URL was the alternative, and it reads well until an application needs a deployment of its own: the origin of a URL is not a promise about which canister answers there, and taking the canister id out of the session chain would leave the library reading its own configuration out of a credential.
+
+The chain's `targets` still matter, as a check rather than a source. A session chain names that canister and nothing else, and a chain that names anything else, or nothing at all, is refused before the first call. The unrestricted case is the one worth refusing hardest: the session key signs with that chain, so accepting one would leave the library holding a credential good for any call rather than the two it makes.
 
 ### What is stored
 
