@@ -376,6 +376,10 @@ mod tests {
         assert!(validate_device_public_key(&good));
     }
 
+    // The invariant is a `debug_assert!`, compiled out in release builds (which
+    // is what CI runs tests under), so the panic only happens with debug
+    // assertions on.
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "one aes128gcm record")]
     fn oversized_plaintext_trips_the_invariant() {
