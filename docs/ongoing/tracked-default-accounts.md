@@ -56,7 +56,13 @@ flowchart LR
     E -->|"keeps it bounded"| I
 ```
 
-None of these can ship alone. Recording use is what makes the list grow; the cap is what bounds it; deleting an app record is only reachable because the cap lets a count fall; and the index is only affordable once the thing it indexes is bounded. All four read and write the same row, so they share one write path, which keeps the counts and the index consistent without every caller having to remember to update them.
+Two separate concerns run through this, and each is worth doing on its own terms.
+
+**Knowing every app an identity has used** is what lets anything be attached to that pairing. A settings screen can only list apps it has records for, and the rule that follows is the one that decides the shape of the rest: data may only be attached to something the user can see and manage. An account the settings screen cannot list is an account that must not own data, so the tracking has to cover every account, including the default ones nobody named.
+
+**Reaching an account from a principal quickly** is a different requirement with a different consumer. Any feature that starts from the principal an app is calling with, and needs to know whose account that is, has to go that way round: revocable sessions do it on every call they authorise, and an in-app profile would do it on every read. A hash only runs forwards, so the answer has to be recorded as it is produced. Recomputing it instead would mean deriving every principal an identity could present and comparing, which is the work the record exists to avoid.
+
+The two are independent in motivation and entangled in delivery. Recording use is what makes the list grow; the cap is what bounds it; deleting an app record is only reachable because the cap lets a count fall; and the index is only affordable once the thing it indexes is bounded. All four read and write the same row, so they share one write path, which keeps the counts and the index consistent without every caller having to remember to update them.
 
 ## Out of scope
 
@@ -79,7 +85,9 @@ Today a record only exists where a user named an account. We add one for the def
 
 Each identity gets a limit of 500 of these no-name rows. On reaching it, II deletes the ones used longest ago, down to 450 so that the work is spread across later sign-ins rather than repeated on every one.
 
-Dropping one costs the user nothing. The account was never stored, only computed, so signing in at that app again writes a fresh row and produces the identical principal it had before. The user sees no difference; only the record of having been there is lost.
+Dropping one costs the user almost nothing. The account was never stored, only computed, so signing in at that app again writes a fresh row and produces the identical principal it had before. What is lost is the record of having been there, and with it anything attached to that pairing. That is acceptable for the same reason the cap is: an app an identity stopped using for long enough to fall out of the last 450 is one whose per-app data has stopped mattering. A colour theme for an app the user has abandoned is not worth a permanent row.
+
+Evicting rather than refusing is the choice here. Refusing at 500 would keep the oldest data and stop recording new use, which fails the concern above: the app the user is signing into right now is exactly the one a settings screen must be able to list.
 
 One row is never dropped: one that also holds a named account, since that account cannot be recomputed. A row holding a live session is not spared, and losing one signs that browser out of that app until the next sign-in. Sparing them instead would let an identity sit above its limit for as long as something kept refreshing.
 
@@ -89,7 +97,9 @@ With rows now able to disappear, an app's count of referring accounts can reach 
 
 ### 4. Keep a map from a principal back to the account it belongs to
 
-For every account that has a row, II records which principal it derives to and which identity, app and account that principal means. This is the reverse direction the one-way hash cannot give, and it is what the session refresh path reads.
+For every account that has a row, II records which principal it derives to and which identity, app and account that principal means. This is the reverse direction the one-way hash cannot give.
+
+It is bounded by the same cap as the rows it indexes, which is what makes it affordable: an entry exists only where a row does, so the map cannot outgrow 500 per identity. Storing the reverse direction only for named accounts was the cheaper option and does not work, because the callers that need it arrive with a principal and cannot know in advance whether it belongs to a named account or a default one.
 
 The map is internal. No method takes a principal and reports anything about it, because that would let anyone look up any principal they observe on chain and learn which identity it belongs to.
 
