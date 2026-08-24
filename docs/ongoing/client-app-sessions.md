@@ -71,31 +71,23 @@ An application can say how long it is willing for that session to last, and `max
 
 ### Minting
 
-The identity handed to the app carries a five-minute app delegation, obtained by calling `app_prepare_delegation` and then `app_get_delegation` signed as the session. An agent holds that identity and signs every request with it, possibly for hours, so the identity is what has to notice its delegation ageing: it mints from inside the per-request hook the agent already calls, and one mint is in flight at a time, so several requests arriving together wait on the same round trip.
+The identity an app holds carries a five-minute app delegation, minted by calling `app_prepare_delegation` and then `app_get_delegation` signed as the session. An agent keeps that identity and signs with it for hours, so the identity is what notices its own delegation expiring. It mints from inside the per-request hook the agent already calls, and one mint is in flight at a time.
 
-The identity is one object for the life of the session even though what it signs with is replaced every five minutes, which works because the object reaches the current pair rather than holding one. That is also why an app can hold the identity and never notice a rotation: it never sees the app key, and the principal it does see comes from the account, which does not change.
+One object lasts the whole session even though what it signs with is replaced every five minutes, because the object reaches the current pair instead of holding one. `getIdentity()` returns that same object and calls nothing. Handing back a fresh identity per call would not work, since an application passes one to an agent once and the agent keeps it, so a snapshot would go on signing with a delegation that had expired.
 
-`getIdentity()` returns the same object without calling anything. Having `AuthClient` mint and hand back a fresh identity on each call would fail on how identities are used, because an application passes one to an agent once and the agent keeps it. A snapshot of a single delegation would go on signing with that delegation until it expired, and no later call to `AuthClient` would reach the agent still holding the old one.
-
-The principal an app sees does not appear in the session chain, which is rooted at the session's own key. An app delegation is rooted at the account's key instead. They are different principals, and only the second is what the app's canisters will see. The ceremony computes it and the canister returns it as `account_principal`, but the result the app receives over the transport carries only the chain, so the library learns the account principal from the first mint, where it arrives as `user_key`.
-
-It is therefore recorded alongside the session chain rather than recomputed. A reload can answer for the principal from what it stored, without a mint, and `getPrincipal()` stays synchronous. Every later mint returns the same key, since the account seed does not change, so a mint that returns a different root is a failed mint rather than a new principal.
+The principal an app sees comes from the account, not from the session chain, which is rooted at the session's own key. Only a mint reports it, arriving as `user_key`, so it is stored beside the chain and a reload can answer for it without minting. Every later mint returns the same key, so one that returns a different root is a failed mint and not a new principal.
 
 ### Refreshing ahead of use, never on a clock
 
-Waiting until a delegation has expired means one request every five minutes pays for a mint, which an interactive app shows as a stall. Refreshing on a timer avoids that and is worse for two reasons, one of which has nothing to do with cost.
+Waiting until a delegation has expired makes one request in every five minutes pay for a mint, which an interactive app shows as a stall.
 
 #### Why not a timer
 
-`app_prepare_delegation` stamps the session's last-refreshed time. II's settings screen shows that stamp to the user as "this browser used this app 3 minutes ago", and the session cap reclaims on it. A timer refreshes whether or not anyone is looking at the tab, so the column would come to mean "has a tab open" instead of "in use". Minting only when a request needs one keeps the timestamp accurate at no cost.
+`app_prepare_delegation` stamps the session's last-refreshed time. II's settings screen shows that stamp as "this browser used this app 3 minutes ago", and the session cap reclaims on it. A timer refreshes whether or not anyone is looking, so the column would come to mean "has a tab open". Minting only when a request needs one keeps it accurate at no cost.
 
 #### How a refresh is scheduled
 
-A request from an active application schedules one mint for just before its delegation runs out, rather than minting early or waiting for another request to arrive at the right time.
-
-Scheduling the mint keeps the threshold at 15 seconds. A threshold wide enough to catch a passing request has to be minutes wide, and every second of it is discarded delegation life, because an active session then mints at `TTL / (TTL - threshold)`. A two-minute threshold turns a five-minute refresh into a three-minute one, adding two thirds to the update calls and stable writes of every active session for as long as it lives. A scheduled mint only has to cover the mint itself.
-
-A mint lands between two of an application's requests, in the gap where the delegation it already holds is still good:
+A request schedules one mint for just before its delegation runs out. Scheduling is what keeps the threshold at 15 seconds: a threshold wide enough to catch a passing request would have to be minutes wide, and every second of it is delegation life thrown away. The spec gives the arithmetic.
 
 ```mermaid
 sequenceDiagram
@@ -119,27 +111,21 @@ sequenceDiagram
 
 #### The check that keeps the schedule honest
 
-The schedule needs one check, or it becomes the timer this section rejects. An application that has gone quiet still has a refresh armed, and firing it would record the session as used. So a scheduled mint asks whether the delegation it is about to replace signed a request, and cancels if it did not.
-
-Signing a request is the only thing that counts as use, because it is the only activity the library can see, and the window is that one delegation's lifetime rather than any longer history.
-
-Asking it of each delegation separately is what stops one request buying an indefinite chain. A refresh happens only if the delegation being retired was used, and the delegation it produces has to earn the next refresh the same way. An application making a request at least once per delegation lifetime therefore refreshes for as long as that holds, while one that goes quiet refreshes exactly once more and then lets the replacement lapse unused.
+An application that has gone quiet still has a refresh armed, and firing it would record the session as used. So a scheduled mint asks whether the delegation it is replacing signed a request, and cancels if it did not. Asked of each delegation separately, one request cannot buy an indefinite chain.
 
 #### Coming back to a tab
 
-One trigger is added beyond requests. A tab in the background has its timers throttled, so its delegation lapses while nobody is looking and the user's first click after returning waits for a mint. Returning happens a second or two before that click, long enough to cover a mint, so becoming visible or regaining focus starts one if it is due. The identity still decides whether it is due, so focusing a tab with a healthy delegation costs nothing.
+A backgrounded tab has its timers throttled, so its delegation lapses unnoticed and the first click after returning waits for a mint. Returning happens a second or two before that click, long enough to cover one, so becoming visible or regaining focus mints if one is due.
 
-That trigger is the one part of this that cannot be assumed to exist. `AuthClient` also runs outside a browser, so the identity holds no DOM reference and the listening lives in a separable piece constructed only where those APIs exist, as idle detection already does. It is on by default and can be turned off. Without a DOM the schedule and the request paths are the whole mechanism, and a request after a long gap simply waits for its mint.
+This is the one trigger that cannot be assumed to exist, since `AuthClient` also runs outside a browser. It is on by default, and without it the schedule and the request paths are the whole mechanism.
 
-Requests remain the guarantee, because a schedule is best effort. Browsers throttle timers in tabs nobody is looking at, and fire them late after a machine has slept. A request that finds its delegation inside the threshold starts a mint in the background and is served from what it already has, and one that finds it below the block margin waits. The block margin covers a request's flight time, since the delegation has to still be valid when the replica verifies it.
+#### Requests are the guarantee
+
+A schedule is best effort, because browsers throttle timers in hidden tabs and fire them late after a machine has slept. So requests carry the guarantee, and the block margin exists because a delegation has to still be valid when a replica verifies the request it was attached to.
 
 #### Sign-in and page load
 
-`signIn()` mints at the end of the ceremony, so the first call after signing in is instant. A page load that finds a stored session mints while the page starts, without making `getIdentity()` wait for it.
-
-Minting at the end of sign-in is also where the account principal comes from, so an application that signs in and reads its principal without making a request gets an answer.
-
-The page-load mint arrives through the same trigger as returning to a tab, because a page load is the page becoming visible for the first time. Turning that trigger off therefore turns off the page-load mint too, and with it the only thing that discovers a revoked session before the application makes a request of its own.
+`signIn()` mints at the end of the ceremony, so the first call after signing in is instant, and that mint is where the account principal comes from. A page load mints through the same trigger as returning to a tab, since a load is the page becoming visible for the first time. Turning that trigger off turns off the load mint too, and with it the only thing that finds a revoked session before the application asks for one.
 
 | Trigger                                  | Condition                                                            | Does the caller wait? |
 | ---------------------------------------- | -------------------------------------------------------------------- | --------------------- |
@@ -151,7 +137,7 @@ The page-load mint arrives through the same trigger as returning to a tab, becau
 | `signIn()`                               | at the end of the ceremony                                           | **yes**               |
 | A recurring timer                        | never, and this is the thing the design rejects                      | not applicable        |
 
-A delegation lasts `min(five minutes, what remains of the session)`, so near the end of a session a mint returns something shorter than the margin it was meant to satisfy. Refreshing on remaining life alone would then mint, find the result already too short, and mint again without end, each iteration an update call. A session with less than the block margin left is over, and the library treats it as over rather than minting against it.
+A delegation lasts `min(five minutes, what remains of the session)`, so a session with less than the block margin left is treated as over rather than minted against.
 
 ### What is shared, and how far
 
@@ -198,7 +184,7 @@ Tabs of one origin share their storage, so they share the session. What they do 
 
 #### Passing the pair between tabs
 
-A non-extractable key can be structured-cloned, which is what lets one live in IndexedDB, and the same property lets it cross a `BroadcastChannel` as a handle that signs but cannot be exported. What crosses is the pair, because that is what a mint produces and what expires together.
+A non-extractable key can be structured-cloned, which is what lets one live in IndexedDB and what lets it cross a `BroadcastChannel` as a handle that signs but cannot be exported. The pair crosses together, because that is what a mint produces and what expires at once.
 
 A tab opening asks on the channel and a tab already running answers with the pair it holds. The asking tab waits 200 milliseconds for an answer, which is the only waiting in this design: long enough for a tab that is there to reply, and short enough that a tab starting alone is not delayed by tabs that do not exist. Nothing is persisted, so a delegation never outlives the tabs holding it and there is nothing stale to reconcile on a load.
 
@@ -223,24 +209,17 @@ sequenceDiagram
     Note over T1,T2: either way both hold the same pair
 ```
 
-Sharing the whole pair also makes tabs converge with nothing electing a winner. Two tabs that end up with a pair each, because a browser restored them in the same instant with neither able to answer the other, are not stuck that way: the next mint produces one pair, its broadcast reaches both, and both adopt it. So divergence costs an extra mint or two and lasts at most one delegation's lifetime, where sharing a key alone would have left an origin permanently minting once per tab.
+Sharing the whole pair also makes tabs converge with nothing electing a winner. Two tabs restored in the same instant may each end up with a pair, and they do not stay that way: the next mint produces one pair, its broadcast reaches both, and both adopt it. Divergence costs an extra mint or two and lasts at most one delegation's lifetime.
 
 #### Why no tab may be in charge
 
 Avoiding five mints wants one tab responsible for refreshing; never missing a mint wants no tab to be essential. A designated refresher gives the first and loses the second the moment that tab is closed.
 
-The rules that follow:
-
-1. Coordination may only ever suppress a mint, never be required for one.
-2. Every tab schedules its own refresh, as it would if it were alone.
-3. Losing every message costs mints, never correctness.
-4. The lock may be relied on for how much this costs, never for whether it works.
+So coordination may only suppress a mint, never be required for one. Every tab schedules its own refresh as if it were alone, and losing every message costs mints and never correctness.
 
 #### The lock
 
-A named lock is what makes the suppression work, where the browser has one. A tab about to mint takes it, and tabs that wake in the same moment queue behind it rather than each starting a mint of their own. Whoever holds it looks again before acting, because by then the delegation may already have been replaced, in which case there is nothing left to do.
-
-The lock also settles the case a schedule cannot. A tab holding it can be closed mid-mint, and the browser releases a lock when the tab holding it goes away, so the next tab in the queue simply proceeds. Nothing has to guess how long to wait for a tab that is not coming back, which a timeout would have had to.
+A named lock makes the suppression work where the browser has one. Tabs that wake in the same moment queue on it, and the holder re-reads before acting because the delegation may already have been replaced. A tab can be closed mid-mint and the browser releases its lock, so the next in the queue proceeds and nothing has to guess how long to wait for a tab that is not coming back.
 
 Where the browser has no such lock every tab mints, which is the cost of no coordination and not a failure.
 
@@ -256,7 +235,7 @@ flowchart TD
     M2 -.->|tab closed mid-mint| RL["the browser releases the lock,<br/>the next in the queue proceeds"]
 ```
 
-A request that needs a delegation now queues on the same lock rather than jumping it. Waiting costs at most one mint, which is what it would have spent minting anyway, and it often ends with another tab's fresh delegation and no mint at all.
+A request that needs a delegation now queues on the same lock rather than jumping it. Waiting costs at most the mint it would have spent anyway, and often ends with another tab's delegation instead.
 
 ### Signing out is not the same as finding out
 
