@@ -22,7 +22,7 @@ An Internet Identity is a number, called an identity. When a user signs in to an
 
 II produces that principal by hashing three things together: the identity number, the app's origin, and a secret value held only inside the canister. The result is fully determined by those inputs, so II can compute it whenever it needs to and never has to store it.
 
-We call the account a user gets this way their default account at that app. A user can also create a second account at the same app, with a name they choose, to keep two separate personas there. A named account does have to be stored, because the name has to be kept somewhere and because its principal is derived from an account number rather than from the identity and origin the default uses.
+We call the account a user gets this way their default account at that app. A user can also create a second account at the same app, with a name they choose, to keep two separate personas there. An account created with a name has to be stored, because the name has to be kept somewhere and because its principal is derived from an account number rather than from the identity and origin a default uses. Naming a default is the exception that matters later: it keeps the seed it already had, so it gains an account number without its principal changing.
 
 ```mermaid
 flowchart LR
@@ -83,9 +83,17 @@ Four changes, described here in terms of what is stored rather than in terms of 
 
 Today a record only exists where a user named an account. We add one for the default account as well: the same kind of row, with no name attached, holding when it was last used. It is a few bytes, against a whole account record, and it turns that row into a complete list of the apps an identity has used.
 
+The list could come from somewhere other than the canister. A browser could keep its own, which costs II nothing and answers the wrong question, because the user is asking where _they_ are signed in and a per-browser list cannot see the other devices. An app could declare itself, which makes the list depend on apps choosing to appear in a screen whose purpose is to catch the ones the user does not recognise. And usage could be appended to a log rather than folded into a row, which answers "which apps" by reading the whole log and grows with visits rather than with apps. A row per app is the answer already computed, and it is the only one of the four that a canister can render without trusting anybody.
+
 ### 2. Limit how many of those an identity can hold, and drop the ones it stopped using
 
 Each identity gets a limit of 500 of these no-name rows. On reaching it, II deletes the ones used longest ago, down to 450 so that the work is spread across later sign-ins rather than repeated on every one.
+
+Three other ways to bound it, none of which bounds it:
+
+1. **Leave it unbounded**, which is today's behaviour and survivable only because nothing creates these rows. Once a first sign-in does, the growth is driven by how many origins someone visits, and visiting origins is free.
+2. **Expire by age.** An identity that uses forty apps twice a year loses all of them, and one that visits five thousand origins in a week keeps every row. Age bounds how stale a record is, not how many there are, and storage is the thing under pressure.
+3. **One global cap.** The identity that fills it evicts records belonging to identities that did nothing, so the cost of one user's behaviour lands on another's settings screen. A per-identity cap keeps the consequence where the cause is.
 
 Dropping one costs the user almost nothing. The account was never stored, only computed, so signing in at that app again writes a fresh row and produces the identical principal it had before. What is lost is the record of having been there, and with it anything attached to that pairing. That is acceptable for the same reason the cap is: an app an identity stopped using for long enough to fall out of the last 450 is one whose per-app data has stopped mattering. A colour theme for an app the user has abandoned is not worth a permanent row.
 
@@ -95,7 +103,11 @@ One row is never dropped: one that also holds a named account, since that accoun
 
 ### 3. Delete an app record once no identity refers to it
 
-With rows now able to disappear, an app's count of referring accounts can reach zero, and the record can be removed along with the entry that maps its origin string to its internal number. That number is not handed out again, so a later sign-in at the same origin gets a new one.
+With rows now able to disappear, an app's count of referring accounts can reach zero, and the record can be removed along with the entry that maps its origin string to its internal number.
+
+Keeping app records forever was the alternative, and it means the table holds every origin any identity ever touched, including the ones visited once and the ones visiting on purpose. The count is what makes removal reachable at all: without it, deciding whether an app is unreferenced means reading every identity's rows, where a count is maintained by the same write path that already has the row in hand.
+
+That number is not handed out again, so a later sign-in at the same origin gets a new one. Reissuing it would be cheaper and is the kind of saving that ages badly, because anything later keyed on an application number could still hold entries under the retired one, and the new app would inherit them.
 
 ### 4. Keep a map from a principal back to the account it belongs to
 
@@ -117,9 +129,9 @@ The answer went through three shapes. The first two were built.
 
 It began with the caller carrying it. The app attached a canister-signed bundle to its call as `sender_info` and II read the account straight out of it, so nothing had to be resolved anywhere. That bundle held the identity number and the account number in cleartext, which meant an app learned both, and two apps holding bundles for the same person would see the same identity number. That is the correlation per-origin derivation exists to prevent, and it is the same wall the structured-principal idea below runs into.
 
-So the bundle was narrowed to carry the account principal alone. That fixed the leak completely, because the principal is what the app is already calling with, so the bundle told it nothing it did not have. The approach still did not survive, and not on secrecy. A signed bundle has to be issued per session, given an expiry, attached to every call, verified on arrival and witnessed on the query, and it makes an app's agent responsible for carrying something.
+So the bundle was narrowed to carry the account principal alone. That fixed the leak completely, because the principal is what the app is already calling with, so the bundle told it nothing it did not have. This version worked, and it carried a standing cost while it did: a signed bundle has to be issued, given an expiry, attached to every call and verified on arrival, and it makes an app's client library responsible for sending something. Nothing about that cost was fatal on its own.
 
-Then the bundle went altogether. Once the session index existed, keyed by a session's own principal, a caller was recognisable from its signature alone, and the bundle became machinery wrapped around an answer that lookups already gave. What remained was turning the account principal that session holds into an identity, app and account, which is the map this approach adds.
+What ended it was the session index. Once II keyed a map by a session's own principal, a caller was recognisable from its signature alone, so the bundle was carrying an answer a lookup already had, and its standing cost was being paid for nothing. What remained was turning the account principal that session holds into an identity, app and account, which is the map this approach adds.
 
 That last step is also what puts this map on trial, and the trial is worth recording. With the bundle gone, resolving an account principal had exactly one caller left in production, and if the session index had held the identity, app and account in its value instead of a principal, it would have had none.
 
