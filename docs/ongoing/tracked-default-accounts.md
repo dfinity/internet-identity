@@ -99,13 +99,17 @@ Dropping one costs the user almost nothing. The account was never stored, only c
 
 Evicting rather than refusing is the choice here. Refusing at 500 would keep the oldest data and stop recording new use, which fails the concern above: the app the user is signing into right now is exactly the one a settings screen must be able to list.
 
-One row is never dropped: one that also holds a named account, since that account cannot be recomputed. A row holding a live session is not spared, and losing one signs that browser out of that app until the next sign-in. Sparing them instead would let an identity sit above its limit for as long as something kept refreshing.
+Signing in stamps the row as used, and so does a refresh, so a row an application is actively calling from sits at the top of the order and is never the victim. What eviction reaches is idle rows, and recovery from a wrong guess is one sign-in.
+
+One row is never dropped: one that also holds a named account, since that account cannot be recomputed. A row whose session is merely idle is not spared, and losing one signs that browser out of that app until the next sign-in. Sparing any row with a session attached would instead let an identity sit above its limit for as long as anything kept a stale one alive.
 
 ### 3. Delete an app record once no identity refers to it
 
 With rows now able to disappear, an app's count of referring accounts can reach zero, and the record can be removed along with the entry that maps its origin string to its internal number.
 
-Keeping app records forever was the alternative, and it means the table holds every origin any identity ever touched, including the ones visited once and the ones visiting on purpose. The count is what makes removal reachable at all: without it, deciding whether an app is unreferenced means reading every identity's rows, where a count is maintained by the same write path that already has the row in hand.
+This is the one table no per-identity cap reaches. Approach 2 bounds what an identity holds and says nothing about a table shared by every identity and keyed by origin. Origins are free to create, so without removal that table grows with every distinct origin anybody has ever signed in at, and nothing ever gives a row back. That is the growth this design would otherwise trade for the one it fixes.
+
+Keeping app records forever was the alternative, and it means the table holds every origin any identity ever touched, including the ones visited once and the ones created to be visited once. The count is what makes removal reachable at all: without it, deciding whether an app is unreferenced means reading every identity's rows, where a count is maintained by the same write path that already has the row in hand.
 
 That number is not handed out again, so a later sign-in at the same origin gets a new one. Reissuing it would be cheaper and is the kind of saving that ages badly, because anything later keyed on an application number could still hold entries under the retired one, and the new app would inherit them.
 
@@ -121,7 +125,7 @@ This one decision is shaped by a design that comes after it, and pretending othe
 
 That last point is the whole decision, and it is a decision about what goes in the session index's value. It can hold the account's principal, which the map here turns into an identity, app and account, or it can hold those three itself and need no map. Everything else follows from which.
 
-Holding the principal is the choice, and not on storage. A session exists per browser per account, so most accounts have one or two, and one map entry per account against two fields saved in one or two session entries is roughly a wash. The reason is that the principal is needed on every mint regardless: the delegation a session mints is for the account's principal, so whatever the session index holds has to yield that principal on the hot path. Holding it outright yields it for free, and the map is consulted only for the identity, app and account, which the mint does not need. An opaque handle would need resolving twice, once for the principal and once for the rest.
+Holding the principal is the choice, and not on storage. A session exists per browser per account, so most accounts have one or two, and one map entry per account against two fields saved in one or two session entries is roughly a wash. The reason is that the principal is needed on every mint regardless: the delegation a session mints is for the account's principal, so whatever the session index holds has to yield that principal on the hot path. Holding it outright yields it for free, and the map is consulted only for the identity, app and account, which the mint does not need. An opaque handle would need resolving twice, once for the principal and once for the rest. The map is bounded either way, since an entry exists only where a row does, so it is held down by whatever an identity can hold in rows.
 
 #### How it arrived at a map
 
@@ -141,7 +145,7 @@ Put the identity, app and account in the session index's value, instead of a pri
 
 It loses on the hot path. The mint needs the account's principal, which those three values do not contain, so every mint would have to derive it: hash the salt with the account number and the origin, encode the key. That is a derivation on every call where holding the principal is a field read, and it buys back only a map entry per account.
 
-It also fixes something that moves. Naming a default account materialises it, which changes those three values and leaves its principal untouched, so every session-index entry for that account would have to be found and rewritten the moment the user picks a name. Holding the principal puts the same change in one entry of this map and touches the session index not at all.
+It also fixes something that moves. Naming a default account materialises it, which changes those three values and leaves its principal untouched, so every session-index entry for that account would have to be rewritten the moment the user picks a name. Rarity is no rescue, and the Summary does say naming is rare: the problem is not how often the rewrite runs but that there is nothing to run it with. The session index is keyed by session principal, so finding the entries that belong to one account means either a third index from accounts to sessions or a scan of the whole index. Holding the account principal puts the same change in one entry of this map and needs neither.
 
 That is the flexibility being spent. One indirection leaves a single place to update when what an account is called internally changes, which is what makes naming a default cheap here and what keeps moving an account between identities possible later. The encoding this design introduces reserves the shape that move needs, and a session index holding the three values would be rewritten by it too.
 
