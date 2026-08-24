@@ -39,8 +39,7 @@ The library cannot call II's session methods at all, so the canister work has no
 
 ### The durations this rests on
 
-Four nested lifetimes, and two marks near the end of a delegation. The argument
-below is about why the last three are what they are, so they are stated here once.
+Three nested lifetimes, and two marks near the end of a delegation. The argument below turns on the last three, so all five are stated here once.
 
 | Duration                | Value                          | Set by                                                                                 | What it bounds                                                      |
 | ----------------------- | ------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
@@ -56,7 +55,7 @@ The session key is what the session chain delegates to. It signs calls to the II
 
 The app key is what an app delegation delegates to, and it signs the calls the app actually makes. It lasts as long as that delegation, which is five minutes, because a key outliving its delegation is worth nothing: the authority is in the delegation. So a mint makes a key and gets a delegation for it in one act, and the pair is replaced as one.
 
-An app is handed an identity built on the second, and never sees either.
+An app is handed an identity built on the second, and never sees either. A third value travels with them and is not a secret: the account key is the public key an app delegation is rooted at, returned by the canister as `user_key`, and the principal an app's canisters see is derived from it. It is stored beside the chain precisely because it is public.
 
 |                   | Session key                          | App key                                  |
 | ----------------- | ------------------------------------ | ---------------------------------------- |
@@ -88,9 +87,15 @@ It is therefore recorded alongside the session chain rather than recomputed. A r
 
 Waiting until a delegation has expired means one request every five minutes pays for a mint, which an interactive app shows as a stall. Refreshing on a timer avoids that and is worse for two reasons, one of which has nothing to do with cost.
 
+#### Why not a timer
+
 `app_prepare_delegation` stamps the session's last-refreshed time, and that stamp is what II's settings screen shows the user as "this browser used this app 3 minutes ago", and what the session cap reclaims on. A timer refreshes whether or not anyone is looking at the tab, so the column stops meaning "in use" and starts meaning "has a tab open", which is not the reading the user is being offered. Minting only when a request needs one keeps that signal honest at no cost.
 
-So requests are what arm a refresh, and the refresh itself is scheduled for the moment it is needed. A request from an active application schedules one mint for just before its delegation runs out, rather than minting early or waiting for another request to arrive at the right time.
+So requests are what arm a refresh, and the refresh itself is scheduled for the moment it is needed.
+
+#### How a refresh is scheduled
+
+A request from an active application schedules one mint for just before its delegation runs out, rather than minting early or waiting for another request to arrive at the right time.
 
 Scheduling it, rather than minting whenever a request happens to arrive with little life left, is what keeps the threshold small. A threshold that has to catch a passing request must be wide enough that one turns up inside it, and everything it discards is paid for: minting before a delegation expires throws away the rest of its life, so an active session consumes lifetime at `TTL / (TTL - threshold)`. Two minutes of threshold turns a five-minute refresh into a three-minute one and adds two thirds again to the update calls and stable writes of every active session, permanently. A scheduled mint only has to cover the mint itself, which is seconds, and an active session then refreshes at nearly the floor the canister sets.
 
@@ -116,17 +121,23 @@ sequenceDiagram
     Id-->>App: signed with the new delegation,<br/>having waited for nothing
 ```
 
+#### The check that keeps the schedule honest
+
 The schedule needs one check, or it becomes the timer this section rejects: an application that goes quiet still has a refresh armed, and firing it would stamp the session as used. So a scheduled mint asks whether the delegation it is about to replace signed a request, and cancels if it did not.
 
 Signing a request is the only thing that counts as use, because it is the only activity the library can see, and the window is that one delegation's lifetime rather than any longer history.
 
 Asking it of each delegation separately is what stops one request buying an indefinite chain. A refresh happens only if the delegation being retired was used, and the delegation it produces has to earn the next refresh the same way. An application making a request at least once per delegation lifetime therefore refreshes for as long as that holds, while one that goes quiet refreshes exactly once more and then lets the replacement lapse unused.
 
+#### Coming back to a tab
+
 One trigger is added beyond requests. A tab in the background has its timers throttled, so its delegation lapses while nobody is looking, and the user's first click after coming back waits for a mint. Coming back to a tab happens a second or two before that click, which is room enough to hide one, so becoming visible or regaining focus starts a mint if one is due. The identity still decides whether it is due, so a glance at a tab with a healthy delegation costs nothing.
 
 That trigger is the one part of this that cannot be assumed to exist. `AuthClient` runs outside a browser as well, so the identity holds no reference to a DOM and the listening lives in a separable piece constructed only where those APIs are present, in the way idle detection already is. It is on by default and can be turned off. Where there is no DOM, the schedule and the request paths are the whole mechanism, and nothing is incorrect without it: a request after a long gap waits for its mint.
 
 Requests remain the guarantee, because a schedule is best effort: browsers throttle timers in tabs nobody is looking at and fire them late after a machine has slept. A request that finds its delegation inside the threshold starts a mint in the background and is served from what it already has, and one that finds it below the block margin waits. The block margin covers a request's flight time, since the delegation has to still be valid when the replica verifies it.
+
+#### Sign-in and page load
 
 Two stalls are removed outright rather than absorbed, and both hide inside something the user is already waiting for. `signIn()` mints at the end of the ceremony, so the first call after signing in is instant. A page load that finds a stored session mints while the page starts, without making `getIdentity()` wait for it.
 
@@ -152,44 +163,24 @@ A delegation lasts `min(five minutes, what remains of the session)`, so near the
 
 Three things are shared, and each reaches a different distance.
 
-The session is the widest of the three and the one nothing local can see. A
-derivation origin is the origin an application asks II to derive its principals
-from, so sibling subdomains configured with the same one resolve to a single
-application rather than to several. Siblings sharing it and a session
-lives at an identity, an application, an account and a browser, so `chat` and `hr`
-are not two sessions that behave alike: they are one session, and either of them
-signing out ends it for both.
+The session is the widest of the three and the one nothing local can see. A derivation origin is the origin an application asks II to derive its principals from, so sibling subdomains configured with the same one resolve to a single application rather than to several. A session record is keyed on the identity, that application, the account and the browser. `chat` and `hr` therefore share one record instead of holding two that behave alike, and either of them signing out ends it for both.
 
-Everything the client holds is narrower. A chain is in `localStorage`, which is per
-origin, and the app key and its delegation ride a `BroadcastChannel`, which is also
-per origin. So `chat`'s tabs coordinate with each other and `hr`'s tabs coordinate
-with each other, and the two sets cannot speak at all.
+Everything the client holds is narrower. A chain is in `localStorage`, which is per origin, and the app key and its delegation ride a `BroadcastChannel`, which is also per origin. So `chat`'s tabs coordinate with each other and `hr`'s tabs coordinate with each other, and the two sets cannot speak at all.
 
-The hint cookie is the only thing that crosses between siblings, and it carries a
-principal and the session's expiry, which is all a sibling needs in order to decide
-whether to try a silent re-auth.
+The hint cookie is the only thing that crosses between siblings, and it carries a principal and the session's expiry, which is all a sibling needs in order to decide whether to try a silent re-auth.
 
-The floor is therefore one mint per active origin, not one per domain. Two siblings
-open means two mints every five minutes for one session, which is inherent and not
-a gap to close later.
+The floor is therefore one mint per active origin, not one per domain. Two siblings open means two mints every five minutes for one session, which is inherent and not a gap to close later.
 
-A delegation is issued to a key, and each origin signs its own calls with a key of
-its own, so a delegation minted for `chat` authorises nothing for `hr`. Sharing one
-delegation between them would mean sharing the key it was issued to, and a key is
-the one thing a cookie must never carry: a cookie holds bytes, so sharing a key
-through one means handing out the private material itself, to anything on the domain
-that can read a cookie and to every request that carries it.
+A delegation is issued to a key, and each origin signs its own calls with a key of its own, so a delegation minted for `chat` authorises nothing for `hr`. Sharing one delegation between them would mean sharing the key it was issued to, and a key is the one thing a cookie must never carry: a cookie holds bytes, so sharing a key through one means handing out the private material itself, to anything on the domain that can read a cookie and to every request that carries it.
 
-A channel can therefore do what a cookie cannot. Tabs of one origin pass a key
-handle rather than key material, and the handle signs without being exportable.
-Between origins there is no such thing to pass.
+A channel can therefore do what a cookie cannot. Tabs of one origin pass a key handle rather than key material, and the handle signs without being exportable. Between origins there is no such thing to pass.
 
-| Shared thing                      | Where it lives                            | How far it reaches          | The consequence                                             |
-| --------------------------------- | ----------------------------------------- | --------------------------- | ----------------------------------------------------------- |
-| The session                       | the II canister, one record per browser   | every sibling of the domain | either sibling signing out ends it for both                 |
-| The session chain and session key | `localStorage` and IndexedDB              | one origin                  | each sibling holds its own chain to the same session        |
-| The app key and its delegation    | memory, offered over a `BroadcastChannel` | the tabs of one origin      | the floor is one mint per active origin                     |
-| The hint                          | a cookie scoped to the domain             | every sibling of the domain | a sibling decides whether to acquire silently, with no call |
+| Shared thing                      | Where it lives                                                             | How far it reaches          | The consequence                                             |
+| --------------------------------- | -------------------------------------------------------------------------- | --------------------------- | ----------------------------------------------------------- |
+| The session                       | the II canister, one record per identity, application, account and browser | every sibling of the domain | either sibling signing out ends it for both                 |
+| The session chain and session key | `localStorage` and IndexedDB                                               | one origin                  | each sibling holds its own chain to the same session        |
+| The app key and its delegation    | memory, offered over a `BroadcastChannel`                                  | the tabs of one origin      | the floor is one mint per active origin                     |
+| The hint                          | a cookie scoped to the domain                                              | every sibling of the domain | a sibling decides whether to acquire silently, with no call |
 
 ```mermaid
 flowchart TB
@@ -211,24 +202,13 @@ flowchart TB
 
 ### One delegation for every tab of an origin
 
-Tabs of one origin share their storage, so they share the session. What they do not
-share is the delegation minted from it: the app key lives in memory, so each tab
-mints for a key of its own, and five tabs cost five update calls and five stable
-writes every five minutes for one person's one session.
+Tabs of one origin share their storage, so they share the session. What they do not share is the delegation minted from it: the app key lives in memory, so each tab mints for a key of its own, and five tabs cost five update calls and five stable writes every five minutes for one person's one session.
 
 #### Passing the pair between tabs
 
-They can share instead. A non-extractable key can be structured-cloned, which is
-what lets one live in IndexedDB, and the same property lets it cross a
-`BroadcastChannel` as a handle that signs but cannot be exported. What crosses is
-the pair, because that is what a mint produces and what expires together.
+They can share instead. A non-extractable key can be structured-cloned, which is what lets one live in IndexedDB, and the same property lets it cross a `BroadcastChannel` as a handle that signs but cannot be exported. What crosses is the pair, because that is what a mint produces and what expires together.
 
-A tab opening asks on the channel and a tab already running answers with the pair it
-holds. The asking tab waits 200 milliseconds for an answer, which is the only
-waiting in this design: long enough for a tab that is there to reply, and short
-enough that a tab starting alone is not delayed by tabs that do not exist. Nothing
-is persisted, so a delegation never outlives the tabs holding it and there is
-nothing stale to reconcile on a load.
+A tab opening asks on the channel and a tab already running answers with the pair it holds. The asking tab waits 200 milliseconds for an answer, which is the only waiting in this design: long enough for a tab that is there to reply, and short enough that a tab starting alone is not delayed by tabs that do not exist. Nothing is persisted, so a delegation never outlives the tabs holding it and there is nothing stale to reconcile on a load.
 
 ```mermaid
 sequenceDiagram
@@ -240,28 +220,22 @@ sequenceDiagram
 
     T2->>BC: ask
     BC->>T1: ask
-    T1-->>BC: offer: the key handle and its delegation
-    BC-->>T2: offer
-    Note over T2: adopts the pair and reschedules<br/>from that delegation's expiry
-    Note over T2: or, no answer within 200 ms
-    T2->>II: mints a pair of its own
-    T2->>BC: offers it, unasked
-    Note over T1,T2: both hold the same pair again
+    alt a tab answers within the inherit window
+        T1-->>BC: offer: the key handle and its delegation
+        BC-->>T2: offer
+        Note over T2: adopts the pair and reschedules<br/>from that delegation's expiry
+    else nothing answers in 200 ms
+        T2->>II: mints a pair of its own
+        T2->>BC: offers it, unasked
+    end
+    Note over T1,T2: either way both hold the same pair
 ```
 
-Sharing a whole pair is also what makes tabs converge without anything electing a
-winner. Two tabs that end up with a pair each, because a browser restored them in
-the same instant with neither able to answer the other, are not stuck that way: the
-next mint produces one pair, its broadcast reaches both, and both adopt it. So
-divergence costs an extra mint or two and lasts at most one delegation's lifetime,
-where sharing a key alone would have left an origin permanently minting once per
-tab.
+Sharing a whole pair is also what makes tabs converge without anything electing a winner. Two tabs that end up with a pair each, because a browser restored them in the same instant with neither able to answer the other, are not stuck that way: the next mint produces one pair, its broadcast reaches both, and both adopt it. So divergence costs an extra mint or two and lasts at most one delegation's lifetime, where sharing a key alone would have left an origin permanently minting once per tab.
 
 #### Why no tab may be in charge
 
-The two goals conflict. Avoiding five mints wants one tab responsible for
-refreshing; never missing a mint wants no tab to be essential. A designated
-refresher gives the first and loses the second the moment that tab is closed.
+The two goals conflict. Avoiding five mints wants one tab responsible for refreshing; never missing a mint wants no tab to be essential. A designated refresher gives the first and loses the second the moment that tab is closed.
 
 So the rules are these, in this order:
 
@@ -270,52 +244,35 @@ So the rules are these, in this order:
 3. Losing every message costs mints, never correctness.
 4. The lock may be relied on for how much this costs, never for whether it works.
 
-What the channel adds is the chance to notice the work is already done, or being
-done, and stand down.
+What the channel adds is the chance to notice the work is already done, or being done, and stand down.
 
 #### The lock
 
-A named lock is what makes the suppression work, where the browser has one. A tab
-about to mint takes it, and tabs that wake in the same moment queue behind it
-rather than each starting a mint of their own. Whoever holds it looks again before
-acting, because by then the delegation may already have been replaced, in which
-case there is nothing left to do.
+A named lock is what makes the suppression work, where the browser has one. A tab about to mint takes it, and tabs that wake in the same moment queue behind it rather than each starting a mint of their own. Whoever holds it looks again before acting, because by then the delegation may already have been replaced, in which case there is nothing left to do.
 
-The lock also settles the case a schedule cannot. A tab holding it can be closed
-mid-mint, and the browser releases a lock when the tab holding it goes away, so the
-next tab in the queue simply proceeds. Nothing has to guess how long to wait for a
-tab that is not coming back, which a timeout would have had to.
+The lock also settles the case a schedule cannot. A tab holding it can be closed mid-mint, and the browser releases a lock when the tab holding it goes away, so the next tab in the queue simply proceeds. Nothing has to guess how long to wait for a tab that is not coming back, which a timeout would have had to.
 
-Where the browser has no such lock every tab mints, which is the cost of no
-coordination and not a failure.
+Where the browser has no such lock every tab mints, which is the cost of no coordination and not a failure.
 
 ```mermaid
 flowchart TD
-    N["a tab is about to mint"] --> L{"a named lock<br/>available?"}
+    N["a tab is about to mint"] --> L{"does this browser have<br/>the named-lock API?"}
     L -->|no| M1["mint, and broadcast the pair"]
-    L -->|yes| Q["queue on it"]
+    L -->|yes| Q["queue on the lock"]
     Q --> H["holds it"]
     H --> R{"has a fresh pair arrived<br/>while queueing?"}
-    R -->|yes| S["stand down, adopt it, no mint"]
+    R -->|yes| S["skip the mint and adopt it"]
     R -->|no| M2["mint, and broadcast the pair"]
-    H -.->|tab closed mid-mint| RL["the browser releases the lock,<br/>the next in the queue proceeds"]
+    M2 -.->|tab closed mid-mint| RL["the browser releases the lock,<br/>the next in the queue proceeds"]
 ```
 
-A request that needs a delegation now queues on the same lock rather than jumping
-it. Waiting costs at most one mint, which is what it would have spent minting
-anyway, and it often ends with another tab's fresh delegation and no mint at all.
+A request that needs a delegation now queues on the same lock rather than jumping it. Waiting costs at most one mint, which is what it would have spent minting anyway, and it often ends with another tab's fresh delegation and no mint at all.
 
 ### Signing out is not the same as finding out
 
-Because one session serves every sibling, a client that discovers its own chain is
-dead must be careful about what it concludes. Signing in again replaces the
-browser's session at that application, so the sibling that did not sign in is left
-holding a chain to a session that no longer exists. It finds out on its next mint.
+Because one session serves every sibling, a client that discovers its own chain is dead must be careful about what it concludes. Signing in again replaces the browser's session at that application, so the sibling that did not sign in is left holding a chain to a session that no longer exists. It finds out on its next mint.
 
-What it must not do then is remove the shared hint. The hint is the domain's, not
-this origin's, and the sibling that signed in has just written a fresh one. Taking
-it away would tell that sibling, correctly by its own rules, that the session it
-just obtained is gone.
+What it must not do then is remove the shared hint. The hint is the domain's, not this origin's, and the sibling that signed in has just written a fresh one. Taking it away would tell that sibling, correctly by its own rules, that the session it just obtained is gone.
 
 So the two are separate acts, and they differ in exactly one respect.
 
@@ -328,8 +285,7 @@ So the two are separate acts, and they differ in exactly one respect.
 | The shared hint             | **removed**                  | **left alone**                        |
 | What the user sees          | signed out across the domain | nothing, and a silent re-auth follows |
 
-That leaves the discovering sibling in exactly the state silent re-auth exists for,
-and it recovers without the user seeing anything:
+That leaves the discovering sibling in exactly the state silent re-auth exists for, and it recovers without the user seeing anything:
 
 ```mermaid
 sequenceDiagram
@@ -345,21 +301,14 @@ sequenceDiagram
     hr->>IIC: mints from the chain it holds
     IIC--xhr: no such session
     hr->>hr: drops its chain, leaves the hint alone
-    hr->>hint: reads it: a session exists
+    hint-->>hr: a session exists, for this account
     hr->>IIC: asks again, rendering nothing
     IIC-->>hr: a chain to the new session
 ```
 
-Recovery works because II keys its record of a session on the identity, the account
-and the _effective_ origin, which for siblings is the derivation origin they share.
-The ceremony `chat` ran replaced that one record, so the request `hr` makes finds
-the new one instead of nothing.
+Recovery works because that record is keyed on the application, which for siblings is the derivation origin they share, so `chat`'s ceremony had one record to replace rather than one per origin. The ceremony `chat` ran replaced that one record, so the request `hr` makes finds the new one instead of nothing.
 
-A hint can outlive the session it describes, after a revocation
-from settings for instance, so a sibling acting on one has to be able to fall back
-to asking the user; it is a hint and not an authority. And two siblings asking at
-once is safe, because asking without rendering never creates a session: both are
-handed a chain from the same record, and neither replaces anything.
+A hint can outlive the session it describes, after a revocation from settings for instance, so a sibling acting on one has to be able to fall back to asking the user; it is a hint and not an authority. And two siblings asking at once is safe, because asking without rendering never creates a session: both are handed a chain from the same record, and neither replaces anything.
 
 ### Where the mint calls go
 
