@@ -103,7 +103,9 @@ With rows now able to disappear, an app's count of referring accounts can reach 
 
 For every account that has a row, II records which principal it derives to and which identity, app and account that principal means. This is the reverse direction the hash cannot narrow, bought once at write time instead of searched for at read time.
 
-It is bounded by the same cap as the rows it indexes, so an entry exists only where a row does and the map cannot outgrow 500 per identity. That is what makes a second structure affordable at all.
+It helps to be clear about what is actually being decided. A call arrives carrying nothing but its own principal, so an index from that principal to the session is needed whatever else is true, and `revocable-app-sessions.md` builds one. Whatever that index holds has to identify the account, so the question this approach answers is not whether to index but what the session entry should name the account **by**: the account's own principal, resolved through the map described here, or its identity, app and account outright.
+
+Naming the principal is the choice, and it is close to free. The account's coordinates then live once per account rather than once in every session of it, so what this map adds is one entry per account against what the other arrangement would repeat per session, and a session entry holds a principal in place of coordinates of much the same size. The map is bounded by the same cap as the rows it indexes, so an entry exists only where a row does and it cannot outgrow 500 per identity.
 
 Four other ways to answer the same question, and why this one:
 
@@ -116,8 +118,8 @@ Four other ways to answer the same question, and why this one:
 
    One consequence is worth recording, because it decides whether this index earns its place at all. With the bundle gone, resolving a principal had a single production caller, and had the session handle named the account by its coordinates instead of by its principal, this index would have had none. It survives because the handle names a principal, which is what keeps a rename to one entry, and that is the same reason alternative 2 loses.
 
-2. **Put the answer in the session instead, and keep no index.**  
-   The closest alternative, since a session already has to be found from the caller. Each session could hold the account's coordinates outright, and the refresh path would never need a principal at all. It fails on renaming: materialising a default account changes its coordinates and leaves its principal alone, so every session of that account would have to be rewritten the moment the user names it. Naming the principal instead puts that rename in one index entry and touches no session. Sessions are also many per account, so the coordinates would be stored once per session rather than once per account.
+2. **Have the session entry name the coordinates directly.**  
+   The closest alternative, and the cheaper one on a first count, since it needs no map at all and a session with no siblings costs one entry less. It fails on renaming. Materialising a default account changes its coordinates and leaves its principal untouched, so every session of that account would have to be found and rewritten the moment the user names it, where naming the principal puts that rename in one entry and touches no session at all. Coordinates are not a stable name for a thing whose coordinates change.
 3. **Compute it on demand.**  
    The enumeration described in the problem: a scan of every account against every origin, for a question asked several times a minute, and impossible from outside the canister because the salt is hashed in.
 4. **Make the principal say what it is.**  
