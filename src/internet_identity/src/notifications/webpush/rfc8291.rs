@@ -211,13 +211,13 @@ mod tests {
     //! (HKDF info strings, AEAD nonce, framing bytes, ECDH direction)
     //! drifts, the round-trip fails immediately.
     //!
-    //! The RFC's own §5 test vector (byte-exact `aes128gcm` output for a
-    //! specific pair of keys + salt) is a follow-up we haven't wired up
-    //! yet — it validates *interop with other RFC 8291 implementations*,
-    //! whereas the round-trip only validates our own two halves talk to
-    //! each other. Filed as a `TODO` for the next slice.
+    //! The RFC's own §5 known-answer test (`rfc8291_section5_vector`) then
+    //! decrypts the standard's canonical `aes128gcm` body, pinning our key
+    //! derivation and AEAD to the spec. That is what proves a real browser
+    //! interoperates; the round-trip only proves our two halves agree.
 
     use super::*;
+    use base64::prelude::{Engine, BASE64_URL_SAFE_NO_PAD};
     use rand_chacha::ChaCha20Rng;
     use rand_core::SeedableRng;
 
@@ -287,6 +287,26 @@ mod tests {
         let last = *opened.last().expect("non-empty");
         assert_eq!(last, 0x02, "expected 0x02 last-record marker");
         opened[..opened.len() - 1].to_vec()
+    }
+
+    /// RFC 8291 §5 known-answer test: decrypting the standard's canonical
+    /// `aes128gcm` body with its receiver key recovers the example plaintext.
+    /// Pins our key derivation and AEAD to the spec, so a browser decrypts what
+    /// `encrypt()` produces.
+    #[test]
+    fn rfc8291_section5_vector() {
+        let b64 = |s: &str| BASE64_URL_SAFE_NO_PAD.decode(s).expect("valid base64url");
+        // Reproduced verbatim from RFC 8291 §5.
+        let ua_private = b64("q1dXpw3UpT5VOmu_cf_v6ih07Aems3njxI-JWgLcM94");
+        let auth: [u8; AUTH_SECRET_LEN] = b64("BTBZMqHH6r4Tts7J_aSIgg")
+            .try_into()
+            .expect("16-byte auth secret");
+        let body = b64("DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPTpK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN");
+
+        let device_priv = P256SecretKey::from_slice(&ua_private).expect("valid P-256 scalar");
+        let recovered = decrypt(&body, &device_priv, &auth);
+
+        assert_eq!(recovered, b"When I grow up, I want to be a watermelon");
     }
 
     #[test]
