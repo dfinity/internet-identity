@@ -46,9 +46,7 @@ II does keep one record per app origin it has ever encountered, shared by all id
 
 3. Revocable app sessions cannot be built. The design in `revocable-app-sessions.md` needs the opposite direction of the hash: given the principal an app is calling with, which identity and account does it belong to? The session refresh path asks this on every call it authorises.
 
-   Inside the canister, deriving forwards is cheap, so a guess can be checked: the canister's salt, the account number and the origin hash to a seed, that seed encodes to a key, and the key gives a principal to compare. What the hash denies is a way to narrow the guessing. A caller arrives holding only the principal, and nothing in it points at the account it came from, so answering by computation means enumerating every account the canister holds against every origin it might have been used at until one matches. That is not a lookup with a bad constant factor. It is a scan of the whole canister for a question asked several times a minute across active sessions, and it does not fit in one message.
-
-   Outside the canister the search is not slow, it is impossible, because the salt is secret and no guess can even be checked. That is the reason the answer is recorded rather than offered: a method that turns a principal into the account behind it would hand out precisely what the salt protects, which is the correlation this design refuses everywhere else.
+   The hash runs one way. Deriving a principal from an account is cheap, and a principal carries nothing that points back at the account it came from, so the answer has to be written down as it is produced or searched for at read time. Which of those, and what else was tried, is [approach 4](#4-keep-a-map-from-a-principal-back-to-the-account-it-belongs-to).
 
 ```mermaid
 flowchart LR
@@ -137,11 +135,15 @@ That is the flexibility being spent. One indirection leaves a single place to up
 
 #### Two that were never on the table
 
-Computing the answer on demand is the enumeration the problem describes: a scan of every account against every origin, for a question asked several times a minute, and impossible from outside the canister because the salt is hashed in.
+Computing the answer on demand has a real case for it. It stores nothing, so there is no second structure to keep consistent with the rows, no entry to remove when a row goes, no backfill for the accounts that already exist, and no derived state that can drift from the truth. The canister holds the salt, so checking a single candidate is a hash and a comparison, which is cheap.
+
+It fails on the search, not on the arithmetic. A caller supplies a principal, and nothing in a principal points at the account it came from, so there is no way to narrow the candidates: not to one identity, because which identity is the question, and not to one origin, because the call does not carry one. What remains is every account in the canister paired with every origin it might have been used at. That does not fit in one message, so a question asked several times a minute per active session would be answered across several calls while the caller waits.
+
+The worse property is what it couples. A scan makes the cost of resolving one user's caller grow with the number of accounts every other user has, so signing up unrelated identities slows down an existing one's refresh. An index keeps that cost flat, and flat is the property being bought.
 
 A structured principal an app could decode would need no lookup anywhere, and would let anyone who sees a principal on chain read the identity out of it, so two apps could compare notes. That is the one thing the whole design exists to prevent, so it is not a trade to weigh.
 
-The map is internal. No method takes a principal and reports anything about it, because that would let anyone look up any principal they observe on chain and learn which identity it belongs to.
+The map is internal, and the salt is why that matters. Nobody outside the canister can derive these principals or check a guess at one, so the map holds an answer that is otherwise unobtainable rather than one that is merely inconvenient to compute. No method takes a principal and reports anything about it: offering one would hand out exactly what the salt protects, letting anyone look up any principal they see on chain and learn which identity it belongs to.
 
 ---
 
