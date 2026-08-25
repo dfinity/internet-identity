@@ -32,11 +32,7 @@ export const readDeviceState = async (): Promise<DeviceNotificationState> => {
 };
 
 export type OptInScreen =
-  | "first-time"
-  | "allow-app"
-  | "new-device"
-  | "blocked"
-  | "skip";
+  "first-time" | "allow-app" | "new-device" | "blocked" | "skip";
 
 /** Picks the opt-in screen for `origin` from device state and existing consent. */
 export const resolveOptInScreen = (

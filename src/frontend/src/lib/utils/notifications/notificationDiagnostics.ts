@@ -15,13 +15,7 @@ export type FailureReason =
   | "unsupported";
 
 export type BrowserKind =
-  | "chrome"
-  | "firefox"
-  | "safari"
-  | "edge"
-  | "ios"
-  | "android"
-  | "other";
+  "chrome" | "firefox" | "safari" | "edge" | "ios" | "android" | "other";
 
 export interface NotificationDiagnostics {
   lastFailure?: { reason: FailureReason; message?: string; at: number };
