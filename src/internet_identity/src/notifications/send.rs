@@ -5,7 +5,7 @@
 
 use super::check_enabled;
 use super::consent::has_consent;
-use super::sender::authorized_origin;
+use super::sender::is_authorized_sender;
 use super::webpush::subscription::has_subscribed_device;
 use crate::delegation::get_principal;
 use crate::state::{last_upgrade_timestamp, storage_borrow};
@@ -49,6 +49,10 @@ pub enum NotificationRejection {
 #[derive(CandidType, Deserialize, Clone, Debug)]
 pub struct NotificationSendRequest {
     pub notifications: Option<Vec<Notification>>,
+    /// The origin the sender claims to send for. Accepted only if that origin's
+    /// well-known list also named this canister, so an origin can't authorize a
+    /// canister it doesn't own.
+    pub origin: Option<FrontendHostname>,
 }
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
@@ -101,21 +105,20 @@ pub fn notification_send(request: NotificationSendRequest) -> NotificationSendRe
 
     let notifications = request.notifications.unwrap_or_default();
 
-    // No cached origin for this caller, so reject everything. Best-effort: a
-    // sender becomes known only once II fetches its origin's well-known list at
-    // consent, so a brand-new one is rejected until then.
-    let Some(origin) = authorized_origin(ic_cdk::caller()) else {
-        response.rejected = Some(
-            notifications
-                .into_iter()
-                .map(|n| RejectedNotification {
-                    id: n.id,
-                    reason: NotificationRejection::Invalid,
-                })
-                .collect(),
-        );
+    // The sender declares the origin it sends for; accept only if that origin's
+    // well-known list also named this canister (bound at consent). This two-way
+    // check — caller declares O, O vouches for caller — is what stops an origin
+    // from claiming a canister it doesn't own. Verifying here, before any
+    // `get_principal`, also keeps an oversized/garbage origin from reaching
+    // `check_frontend_length` (which traps): an unbound origin is just rejected.
+    let Some(origin) = request.origin else {
+        response.rejected = Some(reject_all(notifications));
         return response;
     };
+    if !is_authorized_sender(ic_cdk::caller(), &origin) {
+        response.rejected = Some(reject_all(notifications));
+        return response;
+    }
 
     let now = ic_cdk::api::time();
     let mut accepted = 0u32;
@@ -140,6 +143,18 @@ pub fn notification_send(request: NotificationSendRequest) -> NotificationSendRe
     response.accepted = Some(accepted);
     response.rejected = Some(rejected);
     response
+}
+
+/// Rejects a whole batch as `invalid` — used when the sender is not an
+/// authorized sender for the origin it declared (or declared none).
+fn reject_all(notifications: Vec<Notification>) -> Vec<RejectedNotification> {
+    notifications
+        .into_iter()
+        .map(|n| RejectedNotification {
+            id: n.id,
+            reason: NotificationRejection::Invalid,
+        })
+        .collect()
 }
 
 fn accept_one(

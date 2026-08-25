@@ -1,11 +1,12 @@
 //! Fetches a dApp's `/.well-known/ii-notification-senders` to learn which
-//! canisters may send notifications for its origin, and caches `sender ->
-//! origin`. Runs best-effort at consent, so a sender is authorized by the time
-//! it sends. A canister principal doesn't encode its origin, so serving this
-//! file is what proves origin ownership — there is no register endpoint.
+//! canisters may send notifications for its origin, and records a verified
+//! `(canister, origin)` binding for each. Runs best-effort at consent, so a
+//! sender is bound by the time it sends. Serving this file is what proves origin
+//! ownership; the sender must also declare the origin at send time (see
+//! `sender`), so the trust is two-way and there is no register endpoint.
 
 #[cfg(not(test))]
-use super::sender::cache_sender;
+use super::sender::bind_sender;
 use internet_identity_interface::internet_identity::types::{FrontendHostname, Timestamp};
 
 #[cfg(not(test))]
@@ -14,9 +15,9 @@ struct SendersDoc {
     senders: Vec<String>,
 }
 
-/// Fetch the origin's well-known senders and cache each `canister -> origin`.
-/// Best-effort: any failure leaves the cache unchanged, and a send from an
-/// uncached canister is rejected until a later consent refetches.
+/// Fetch the origin's well-known senders and record a `(canister, origin)`
+/// binding for each. Best-effort: any failure leaves the bindings unchanged, and
+/// a send from an unbound canister is rejected until a later consent refetches.
 #[cfg(not(test))]
 pub async fn fetch_and_cache(origin: FrontendHostname, now_ns: Timestamp) {
     let Ok(senders) = fetch_senders(&origin).await else {
@@ -24,7 +25,7 @@ pub async fn fetch_and_cache(origin: FrontendHostname, now_ns: Timestamp) {
     };
     for text in senders {
         if let Ok(sender) = candid::Principal::from_text(&text) {
-            cache_sender(sender, origin.clone(), now_ns);
+            bind_sender(sender, origin.clone(), now_ns);
         }
     }
 }
