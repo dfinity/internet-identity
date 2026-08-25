@@ -1044,6 +1044,12 @@ export interface InternetIdentityInit {
    */
   'dnssec_config' : [] | [[] | [DnssecConfig]],
   /**
+   * Server-side kill switch for the notifications feature. null / `opt false`
+   * (the default) disables every notification endpoint; `opt true` enables
+   * them. Omitting it on upgrade keeps the stored value.
+   */
+  'notifications_enabled' : [] | [boolean],
+  /**
    * Configuration parameters related to the II archive.
    * Note: some parameters changes (like the polling interval) will only take effect after an archive deployment.
    * See ArchiveConfig for details.
