@@ -6,19 +6,16 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { throwTextCanisterError } from "$lib/utils/utils";
-import { generateVapidKeypair, signJwtPool } from "./vapidPool";
-import {
-  relayOriginOf,
-  requestNotificationPermission,
-  subscribeToPush,
-} from "./pushSubscription";
+import { requestNotificationPermission } from "./pushSubscription";
+import { subscribeAndRegisterDevice } from "./subscribeDevice";
 import {
   mintNotificationCredential,
   storeNotificationCredential,
 } from "./pullCredential";
 
 export type EnableNotificationsResult =
-  { status: "enabled" } | { status: "permission-denied" };
+  | { status: "enabled" }
+  | { status: "permission-denied" };
 
 export const enableNotifications = async ({
   identityNumber,
@@ -35,30 +32,44 @@ export const enableNotifications = async ({
     return { status: "permission-denied" };
   }
 
-  const { publicKeyRaw, privateKey } = await generateVapidKeypair();
-  const { endpoint, p256dh, auth } = await subscribeToPush(publicKeyRaw);
-  const issuedAtNs = BigInt(Date.now()) * BigInt(1_000_000);
-  const signatures = await signJwtPool(
-    privateKey,
-    relayOriginOf(endpoint),
-    issuedAtNs,
-  );
+  await subscribeAndRegisterDevice(identityNumber, actor);
+  await grantAndMint({ identityNumber, accountNumber, origin, actor });
 
-  await actor
-    .webpush_subscribe_device(
-      identityNumber,
-      endpoint,
-      p256dh,
-      auth,
-      publicKeyRaw,
-      signatures,
-      issuedAtNs,
-    )
-    .then(throwTextCanisterError);
+  return { status: "enabled" };
+};
+
+/**
+ * Records consent for an app and mints the pull credential, without touching the
+ * subscription. For a browser that is already subscribed and only needs to allow
+ * one more app, so there is no permission prompt and no new endpoint.
+ */
+export const allowApp = ({
+  identityNumber,
+  accountNumber,
+  origin,
+  actor,
+}: {
+  identityNumber: bigint;
+  accountNumber?: bigint;
+  origin: string;
+  actor: ActorSubclass<_SERVICE>;
+}): Promise<void> =>
+  grantAndMint({ identityNumber, accountNumber, origin, actor });
+
+const grantAndMint = async ({
+  identityNumber,
+  accountNumber,
+  origin,
+  actor,
+}: {
+  identityNumber: bigint;
+  accountNumber?: bigint;
+  origin: string;
+  actor: ActorSubclass<_SERVICE>;
+}): Promise<void> => {
   await actor
     .notification_grant_consent(identityNumber, origin)
     .then(throwTextCanisterError);
-
   await storeNotificationCredential(
     await mintNotificationCredential({
       identityNumber,
@@ -67,6 +78,4 @@ export const enableNotifications = async ({
       actor,
     }),
   );
-
-  return { status: "enabled" };
 };
