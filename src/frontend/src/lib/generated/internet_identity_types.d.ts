@@ -1251,6 +1251,7 @@ export type NotificationRejection = { 'invalid' : null } |
  */
 export interface NotificationSendRequest {
   'notifications' : [] | [Array<Notification>],
+  'origin' : [] | [string],
 }
 export interface NotificationSendResponse {
   'retry_after_ms' : [] | [number],

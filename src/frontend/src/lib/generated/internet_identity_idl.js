@@ -667,6 +667,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const NotificationSendRequest = IDL.Record({
     'notifications' : IDL.Opt(IDL.Vec(Notification)),
+    'origin' : IDL.Opt(IDL.Text),
   });
   const NotificationRejection = IDL.Variant({
     'invalid' : IDL.Null,

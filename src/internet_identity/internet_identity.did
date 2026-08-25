@@ -1594,6 +1594,7 @@ type NotificationRejection = variant {
 // can grow without a breaking candid change.
 type NotificationSendRequest = record {
     notifications : opt vec Notification;
+    origin : opt text;               // the origin the sender sends for; accepted only if that origin's well-known also lists this canister
 };
 
 type NotificationSendResponse = record {
