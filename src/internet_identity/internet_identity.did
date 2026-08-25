@@ -334,6 +334,10 @@ type InternetIdentityInit = record {
     // set/clear pattern as `dnssec_config`: null keeps the previously stored
     // value, `opt null` clears it, `opt opt "https://..."` sets it.
     mcp_official_url : opt opt text;
+    // Server-side kill switch for the notifications feature. null / `opt false`
+    // (the default) disables every notification endpoint; `opt true` enables
+    // them. Omitting it on upgrade keeps the stored value.
+    notifications_enabled : opt bool;
 };
 
 // DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
