@@ -19,8 +19,7 @@ import { loadVapidKey, purgeVapidKey } from "./vapidKeyStore";
 export { currentDeviceSubscription };
 
 export type EnableDeviceResult =
-  | { status: "enabled" }
-  | { status: "permission-denied" };
+  { status: "enabled" } | { status: "permission-denied" };
 
 // Windows left in the pool below which the reconcile tops it up. The pool covers
 // 30 days; refreshing with a week-plus of headroom keeps a device that opens II
