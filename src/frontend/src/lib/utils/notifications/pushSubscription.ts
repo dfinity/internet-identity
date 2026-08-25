@@ -56,6 +56,14 @@ export const subscribeToPush = async (
   };
 };
 
+/** This browser's current push subscription, or `undefined` if not subscribed. */
+export const currentDeviceSubscription = async (): Promise<
+  PushSubscription | undefined
+> => {
+  const registration = await navigator.serviceWorker.getRegistration();
+  return (await registration?.pushManager.getSubscription()) ?? undefined;
+};
+
 /** `scheme://host[:port]` of a relay endpoint — the JWT `aud` the pool signs for. */
 export const relayOriginOf = (endpoint: string): string =>
   new URL(endpoint).origin;
