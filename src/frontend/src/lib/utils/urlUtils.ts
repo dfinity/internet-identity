@@ -45,3 +45,44 @@ export const originLabel = (origin: string): string => {
     return origin;
   }
 };
+
+/**
+ * The canister gateway domains a canister is reachable on. `ic0.app` comes
+ * first because it is the one principals are derived against: `remapToLegacyDomain`
+ * collapses the other two onto it so a canister derives one principal
+ * regardless of which domain the user arrived through.
+ */
+const GATEWAY_DOMAINS = ["ic0.app", "icp0.io", "icp.net"] as const;
+
+/** The legacy gateway domain principals are derived against. */
+export const LEGACY_GATEWAY_DOMAIN = GATEWAY_DOMAINS[0];
+
+/**
+ * Matches a canister gateway origin, capturing the canister subdomain (with an
+ * optional `.raw` label) and the gateway domain it was reached through.
+ *
+ * Single source of truth for both directions of the mapping:
+ * `remapToLegacyDomain` uses it to normalize onto {@link LEGACY_GATEWAY_DOMAIN},
+ * and {@link gatewayOriginTwins} to invert that.
+ */
+export const GATEWAY_ORIGIN_REGEX =
+  /^https:\/\/(?<subdomain>[\w-]+(?:\.raw)?)\.(?<domain>ic0\.app|icp0\.io|icp\.net)$/;
+
+/**
+ * The same canister's origins on the gateway domains other than the one
+ * `origin` uses, in {@link GATEWAY_DOMAINS} order. Empty for anything that is
+ * not a canister gateway origin (a custom domain, localhost).
+ *
+ * These all resolve to the same canister, so they are interchangeable for
+ * resources that carry no principal-derivation semantics, and only for those.
+ */
+export const gatewayOriginTwins = (origin: string): string[] => {
+  const groups = origin.match(GATEWAY_ORIGIN_REGEX)?.groups;
+  if (groups === undefined) {
+    return [];
+  }
+  const { subdomain, domain } = groups;
+  return GATEWAY_DOMAINS.filter((candidate) => candidate !== domain).map(
+    (candidate) => `https://${subdomain}.${candidate}`,
+  );
+};

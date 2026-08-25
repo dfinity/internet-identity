@@ -45,6 +45,8 @@
  *   never break the sign-in flow.
  */
 
+import { gatewayOriginTwins } from "$lib/utils/urlUtils";
+
 export interface AppMetadata {
   /** Display name of the app. */
   name?: string;
@@ -53,6 +55,27 @@ export interface AppMetadata {
   /** Ready-to-render `<img src>` value (a `blob:` URL for fetched logos). */
   logo?: string;
 }
+
+/**
+ * The origins to ask for an app's metadata, in order.
+ *
+ * Callers pass the origin the app's identity is derived for, which has already
+ * been remapped onto `ic0.app` when it is a canister gateway origin (see
+ * `remapToLegacyDomain`), because principals must not depend on which gateway
+ * domain the user arrived through. The metadata document carries no such
+ * requirement, and a canister is not necessarily served on all three domains:
+ * a canister reachable at `<id>.icp0.io` can answer `400
+ * client_domain_canister_mismatch` at `<id>.ic0.app`. Asking only the remapped
+ * origin would lose the metadata of every app in that position.
+ *
+ * So the remap is inverted here (via {@link gatewayOriginTwins}) and the twins
+ * are used as fallbacks. All three resolve to the same canister, so this
+ * widens where the document may be served, never whose document is used.
+ */
+export const appMetadataOrigins = (origin: string): string[] => [
+  origin,
+  ...gatewayOriginTwins(origin),
+];
 
 /** Well-known path (relative to the app's origin) the metadata is served on. */
 export const APP_METADATA_PATH = "/.well-known/ii-app-metadata";
@@ -148,18 +171,25 @@ const readBodyCapped = async (
   }
 };
 
+/** Outcome of a capped fetch. On failure the origin's HTTP status is carried
+ *  when there was a response at all, so callers can tell an origin that
+ *  answered (`404`: nothing served here) from one that never did (a network
+ *  error, a CORS rejection, a redirect or a timeout leave `status` unset). */
+type CappedFetch =
+  | { ok: true; response: Response; blob: Blob }
+  | { ok: false; status: number | undefined };
+
 /**
  * Fetch `url` with the hardened options shared by both resources and read the
  * body under `maxBytes` (rejected up front when `Content-Length` declares an
- * oversize response, enforced while streaming otherwise). Returns `undefined`
- * on a non-200 status or when the cap is exceeded; network errors propagate
- * to the caller.
+ * oversize response, enforced while streaming otherwise). Fails on a non-200
+ * status or when the cap is exceeded; network errors propagate to the caller.
  */
 const fetchCapped = async (
   url: URL,
   accept: string,
   maxBytes: number,
-): Promise<{ response: Response; blob: Blob } | undefined> => {
+): Promise<CappedFetch> => {
   // AbortController + setTimeout matches the rest of the FE (e.g.
   // `lib/utils/dnssec/doh.ts`, `lib/utils/ssoDiscovery.ts`); we avoid
   // `AbortSignal.timeout` because the project still supports browsers
@@ -184,15 +214,17 @@ const fetchCapped = async (
     if (response.status !== 200) {
       // Cancel the stream so the download stops now, not at GC time.
       await response.body?.cancel().catch(() => undefined);
-      return undefined;
+      return { ok: false, status: response.status };
     }
     const declaredLength = response.headers.get("content-length");
     if (declaredLength !== null && Number(declaredLength) > maxBytes) {
       await response.body?.cancel().catch(() => undefined);
-      return undefined;
+      return { ok: false, status: response.status };
     }
     const blob = await readBodyCapped(response, maxBytes);
-    return blob === undefined ? undefined : { response, blob };
+    return blob === undefined
+      ? { ok: false, status: response.status }
+      : { ok: true, response, blob };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -401,7 +433,7 @@ const transcodeToObjectUrl = async (
  */
 const fetchLogoObjectUrl = async (url: URL): Promise<string | undefined> => {
   const result = await fetchCapped(url, "image/*", MAX_APP_LOGO_SIZE);
-  if (result === undefined) {
+  if (!result.ok) {
     return undefined;
   }
   const contentType = (result.response.headers.get("content-type") ?? "")
@@ -428,6 +460,13 @@ const fetchLogoObjectUrl = async (url: URL): Promise<string | undefined> => {
  * malformed, fails validation, or carries no usable field — callers should
  * then fall back to other sources (e.g. the hostname).
  *
+ * When that origin is a canister gateway origin it has already been remapped
+ * onto `ic0.app`, and the canister may not be served there; its `icp0.io` and
+ * `icp.net` twins are then tried in turn (see {@link appMetadataOrigins}). An
+ * origin that answers `404`, or answers at all with the document, settles the
+ * question and no twin is tried, so the ordinary case of an app that publishes
+ * nothing still costs a single request.
+ *
  * @param origin Origin the app's identity is derived for: the validated
  *   derivation origin when the authorization request carries one, and the
  *   requesting origin otherwise. That origin is the single source of truth for
@@ -438,16 +477,48 @@ const fetchLogoObjectUrl = async (url: URL): Promise<string | undefined> => {
 export const fetchAppMetadata = async (
   origin: string,
 ): Promise<AppMetadata | undefined> => {
+  for (const candidate of appMetadataOrigins(origin)) {
+    const attempt = await fetchAppMetadataFrom(candidate);
+    if (attempt.served) {
+      return attempt.metadata;
+    }
+  }
+  return undefined;
+};
+
+/** Whether an origin that answered with `status` gave a definitive answer
+ *  about the document, rather than one that says this domain isn't where the
+ *  app is served. `404` is the app's canister saying it has no such file, and
+ *  `200` means the document was received (it may still fail validation, which
+ *  is equally definitive). Anything else — `400
+ *  client_domain_canister_mismatch` from a gateway domain the canister isn't
+ *  served on, a `5xx`, or no response at all — leaves the question open. */
+const isDefinitiveStatus = (status: number | undefined): boolean =>
+  status === 404 || status === 200;
+
+/** The outcome of asking one origin for the document. `served: false` means
+ *  the origin never answered for the app, so a sibling origin may still. */
+type MetadataAttempt =
+  { served: true; metadata: AppMetadata | undefined } | { served: false };
+
+const fetchAppMetadataFrom = async (
+  origin: string,
+): Promise<MetadataAttempt> => {
+  let result: CappedFetch;
   try {
     const url = new URL(APP_METADATA_PATH, origin);
-    const result = await fetchCapped(
-      url,
-      "application/json",
-      MAX_APP_METADATA_SIZE,
-    );
-    if (result === undefined) {
-      return undefined;
-    }
+    result = await fetchCapped(url, "application/json", MAX_APP_METADATA_SIZE);
+  } catch {
+    // No response at all: a network error, a CORS rejection, a redirect or a
+    // timeout. Another of the app's gateway origins may still serve it.
+    return { served: false };
+  }
+  if (!result.ok) {
+    return isDefinitiveStatus(result.status)
+      ? { served: true, metadata: undefined }
+      : { served: false };
+  }
+  try {
     // Fatal decoding: malformed UTF-8 rejects the file (via the catch below)
     // instead of silently turning into U+FFFD on the sign-in screen.
     // The document is at most 8 KiB and has to be parsed, so this one does
@@ -462,7 +533,7 @@ export const fetchAppMetadata = async (
       typeof parsed !== "object" ||
       Array.isArray(parsed)
     ) {
-      return undefined;
+      return { served: true, metadata: undefined };
     }
     const { name, description, logo } = parsed as Record<string, unknown>;
     // Validate every field before bailing out, so a document with more than
@@ -479,7 +550,7 @@ export const fetchAppMetadata = async (
       validDescription === INVALID ||
       logoUrl === INVALID
     ) {
-      return undefined;
+      return { served: true, metadata: undefined };
     }
     const metadata: AppMetadata = {
       name: validName,
@@ -502,12 +573,13 @@ export const fetchAppMetadata = async (
       metadata.description === undefined &&
       metadata.logo === undefined
     ) {
-      return undefined;
+      return { served: true, metadata: undefined };
     }
-    return metadata;
+    return { served: true, metadata };
   } catch {
-    // Missing file, missing CORS headers, redirect, timeout, invalid JSON, …:
-    // the app simply gets the default (hostname-based) presentation.
-    return undefined;
+    // The document was received but could not be decoded or parsed. That is
+    // this origin's answer, so no sibling origin is tried: the app simply gets
+    // the default (hostname-based) presentation.
+    return { served: true, metadata: undefined };
   }
 };
