@@ -14,6 +14,10 @@ export type AuthorizationContext = {
    *  sign-in screen can offer durations up to this value — the app's request is
    *  the ceiling the user picks under. */
   maxTimeToLive?: bigint;
+  /** Whether the app asked to be allowed to notify this user (`iiNotifications`
+   *  on the request). The opt-in screen is only ever offered to an app that
+   *  asked, so `undefined` keeps it hidden. */
+  notificationsRequested?: boolean;
 };
 
 export type Authorized = {
@@ -40,15 +44,19 @@ export const authorizationStore = {
    *  render, so setting the requested duration in the *same* update guarantees
    *  the sign-in screen never renders with the origin known but the requested
    *  duration (the picker's ceiling) still missing. `maxTimeToLive` is
-   *  `undefined` when the app didn't specify one. */
+   *  `undefined` when the app didn't specify one. `notificationsRequested` rides
+   *  along for the same reason: it decides whether the notification opt-in is
+   *  offered, so the sign-in screen must never see the origin without it. */
   setRequestContext: (
     effectiveOrigin: string,
     maxTimeToLive: bigint | undefined,
+    notificationsRequested: boolean | undefined,
   ): void => {
     contextInternal.update((context) => ({
       ...context,
       effectiveOrigin,
       maxTimeToLive,
+      notificationsRequested,
     }));
   },
   /** Called by the UI as soon as the auth method is chosen — lets consumers
@@ -96,6 +104,13 @@ export const authorizationContextStore: Readable<
  *  (reading the throwing store there crashes the page render). */
 export const requestedMaxTimeToLiveStore: Readable<bigint | undefined> =
   derived(contextInternal, (context) => context?.maxTimeToLive);
+
+/** Non-throwing view of whether the app asked to be allowed to notify this
+ *  user. Non-throwing for the same reason as
+ *  {@link requestedMaxTimeToLiveStore}: the sign-in screen reads it during
+ *  renders that happen before the authorization context exists. */
+export const notificationsRequestedStore: Readable<boolean | undefined> =
+  derived(contextInternal, (context) => context?.notificationsRequested);
 
 /** Store that holds the authorization outcome once the user has authorized. */
 export const authorizedStore: Readable<Authorized | undefined> = {
