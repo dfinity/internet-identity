@@ -138,15 +138,15 @@ An anchor that moves its default away and sits at the materialized cap can no lo
 
 Everything below hangs off state derived from the reference list: two anchor counters, one application counter, and the principal index. Today the list is written at six sites, and this design adds two more.
 
-| Site                                                                                     | Effect                                                         |
-| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `storage.rs:1622`, `1643` (`with_account_mut`)                                           | Rewrites the list on every sign-in and rename, adds no entries |
-| `storage.rs:1897` (`create_additional_account`, new list)                                | Two entries                                                    |
-| `storage.rs:1910` (`create_additional_account`, push)                                    | One entry                                                      |
-| `storage.rs:2193` (`create_default_account`, new list)                                   | One entry                                                      |
-| `storage.rs:2222` (`create_default_account`, existing list)                              | Mutates the `None` reference in place                          |
-| New in [tracking default accounts](#tracking-default-accounts) (`set_account_last_used`) | One entry                                                      |
-| New in [Invariant A](#invariant-a) (`set_default_account_for_origin`)                    | One entry                                                      |
+| Site                                                                                  | Effect                                                         |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `storage.rs:1622`, `1643` (`with_account_mut`)                                        | Rewrites the list on every sign-in and rename, adds no entries |
+| `storage.rs:1897` (`create_additional_account`, new list)                             | Two entries                                                    |
+| `storage.rs:1910` (`create_additional_account`, push)                                 | One entry                                                      |
+| `storage.rs:2193` (`create_default_account`, new list)                                | One entry                                                      |
+| `storage.rs:2222` (`create_default_account`, existing list)                           | Mutates the `None` reference in place                          |
+| New in [tracking default accounts](#tracking-default-accounts) (`record_account_use`) | One entry                                                      |
+| New in [Invariant A](#invariant-a) (`set_default_account_for_origin`)                 | One entry                                                      |
 
 Keeping three kinds of derived state correct at eight call sites is a convention, not a guarantee. The anchor indexes already solved this: `write()` (`storage.rs:855-864`) is the single place a `StorableAnchor` is stored, so it holds previous and current side by side and calls each `sync_*` function itself. No caller has to remember.
 
@@ -192,25 +192,25 @@ No new stable structure or storable type for this part. A tracked default is an 
 AccountReference { account_number: None, last_used: Some(t) }
 ```
 
-`create_additional_account` (`storage.rs:1851`) already writes this reference when backfilling a default alongside a new named account, except that it leaves `last_used` unset, which is correct there because creating a named account is not a use of the default. What changes is that a sign-in now writes it eagerly, with the timestamp set.
+`create_additional_account` (`storage.rs:1851`) already writes this reference when backfilling a default alongside a new named account, and leaves `last_used` unset, which is correct there because creating a named account is not a use of the default. What changes is that a sign-in writes the reference eagerly and then stamps it, so the timestamp is set by the same step that sets it for every other account.
 
 ```mermaid
 flowchart TD
-    A[prepare_account_delegation] --> B[set_account_last_used]
-    B --> C{application known?}
-    C -->|no| D["insert application + origin index"]
-    C -->|yes| E{reference list exists?}
-    D --> E
-    E -->|no| F["write_reference_list: [None, last_used = now]"]
-    E -->|yes| G[stamp last_used on the matching reference]
-    F --> H{over cap?}
-    H -->|yes| I[evict LRU tracked defaults to watermark]
-    H -->|no| Z[done]
-    I --> Z
-    G --> Z
+    A[prepare_account_delegation] --> B[record_account_use]
+    B --> C{default account?}
+    C -->|named| S
+    C -->|default| D["insert application + origin index if unknown"]
+    D --> E{reference list exists?}
+    E -->|yes| S
+    E -->|no| F["write_reference_list: [None], last_used unset"]
+    F --> G{over cap?}
+    G -->|yes| H[evict LRU tracked defaults to watermark]
+    G -->|no| S
+    H --> S
+    S[stamp last_used on the matching reference] --> Z[done]
 ```
 
-`set_account_last_used` (`storage.rs:1652`) resolves the application with the non-inserting lookup first, and only falls through to the inserting one on the path that creates a reference. That ordering matters for one case: a named account at an origin with no application record returns `Ok(None)` and creates nothing, because a named account cannot be conjured from an origin alone.
+`record_account_use` runs as two steps: a default with no reference list at the origin is given one by `ensure_account_reference_list`, and then the reference is stamped. Only a default takes the first step, and only that step uses the inserting application lookup. Two cases turn on the split. A named account with no reference records nothing and creates nothing, because a named account cannot be conjured from an origin alone. A default at an origin another identity already registered does get its row, because what decides is whether _this_ identity holds a reference list there, not whether the application is known.
 
 ### Invariant A
 
