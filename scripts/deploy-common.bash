@@ -181,6 +181,11 @@ Common options:
                             value (e.g. opt vec { record { ... } }, or
                             opt vec {} to clear all providers). Omit to leave
                             the current on-chain value untouched.
+  --notifications-enabled <true|false>
+                            Set the backend notifications_enabled init arg
+                            (the server-side kill switch for push
+                            notifications). Omit to leave the current
+                            on-chain value untouched.
   --be-extra-args-file <path>
                             Merge extra InternetIdentityInit fields into the
                             backend install arg, verbatim from a Candid-text
@@ -191,9 +196,10 @@ Common options:
                             rejected; set those via their own path instead:
                             backend_canister_id (from staging selection),
                             backend_origin / related_origins (prompts),
-                            openid_configs (--openid-configs-file), and
+                            openid_configs (--openid-configs-file),
                             dnssec_config / doh_config
-                            (--update-email-recovery-init).
+                            (--update-email-recovery-init), and
+                            notifications_enabled (--notifications-enabled).
                             Encoding is type-checked against the deployed wasm.
   -h, --help                Show this help
 EOF
@@ -230,6 +236,10 @@ parse_common_args() {
     # (e.g. `mcp_server_origin`, `is_production`, `captcha_config`, …). Empty =
     # not passed = the arg carries only the fields the script manages itself.
     BE_EXTRA_ARGS_FILE=""
+    # Backend `notifications_enabled` init arg: "true"/"false" when
+    # --notifications-enabled was passed, "" = not passed = leave the field
+    # `null` (preserve the previously stored value).
+    NOTIFICATIONS_ENABLED_ARG=""
     REMAINING_ARGS=()
 
     while [[ $# -gt 0 ]]; do
@@ -375,6 +385,15 @@ parse_common_args() {
                     return 1
                 fi
                 OPENID_CONFIGS_FILE="$1"
+                shift
+                ;;
+            --notifications-enabled)
+                shift
+                if [ $# -eq 0 ] || { [ "$1" != true ] && [ "$1" != false ]; }; then
+                    echo "Error: --notifications-enabled requires 'true' or 'false'" >&2
+                    return 1
+                fi
+                NOTIFICATIONS_ENABLED_ARG="$1"
                 shift
                 ;;
             --be-extra-args-file)
@@ -796,7 +815,7 @@ EXTRA
         fi
         local managed
         for managed in backend_canister_id backend_origin related_origins \
-                       mcp_official_url \
+                       mcp_official_url notifications_enabled \
                        openid_configs dnssec_config doh_config; do
             # Match the field name only as a record-field key: at a line start
             # (ignoring leading whitespace) and followed by `=`. This avoids
@@ -808,10 +827,18 @@ EXTRA
                 echo "       staging selection (-sa/-sb/-sc/-sd / --staging); backend_origin," >&2
                 echo "       related_origins and mcp_official_url from the prompts; openid_configs from" >&2
                 echo "       --openid-configs-file; dnssec_config / doh_config from" >&2
-                echo "       --update-email-recovery-init." >&2
+                echo "       --update-email-recovery-init; notifications_enabled from" >&2
+                echo "       --notifications-enabled." >&2
                 return 1
             fi
         done
+    fi
+
+    # `notifications_enabled` stays absent (= preserve on-chain value) unless
+    # --notifications-enabled was passed, in which case emit `opt true|false`.
+    local notifications_enabled_arg=""
+    if [ -n "$NOTIFICATIONS_ENABLED_ARG" ]; then
+        notifications_enabled_arg="    notifications_enabled = opt $NOTIFICATIONS_ENABLED_ARG;"
     fi
 
     cat <<EOF
@@ -822,6 +849,7 @@ EXTRA
     related_origins = $BE_RELATED_ORIGINS_ARG;
     mcp_official_url = $BE_MCP_OFFICIAL_URL_ARG;
     openid_configs = $openid_configs_arg;
+$notifications_enabled_arg
 $extra
 $extra_user
   }
