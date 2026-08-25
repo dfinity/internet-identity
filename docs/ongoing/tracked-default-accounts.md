@@ -89,6 +89,8 @@ The list could come from somewhere other than the canister. A browser could keep
 
 Each identity gets a limit of 500 of these no-name rows. On reaching it, II deletes the ones used longest ago, down to 450 so that the work is spread across later sign-ins rather than repeated on every one.
 
+500 is the number an identity is already limited to for accounts it has named, so this adds a second cap rather than a second number. It is a ceiling against abuse and not a capacity plan: what the footprint actually follows is how many identities are active times how many distinct apps each uses, which is nowhere near it. That is also the answer to how much the eviction rule matters in practice. A user it reaches is one who has signed in at five hundred separate apps, and what it costs them is one sign-in at whichever they return to.
+
 Three other ways to bound it, none of which bounds it:
 
 1. **Leave it unbounded**, which is today's behaviour and survivable only because nothing creates these rows. Once a first sign-in does, the growth is driven by how many origins someone visits, and visiting origins is free.
