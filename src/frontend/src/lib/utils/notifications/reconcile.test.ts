@@ -27,7 +27,7 @@ const pending = (id: string): PulledNotification => ({
 const fakeRegistration = (shown: FakeNotification[]) => {
   const showNotification = vi.fn(async () => {});
   const registration = {
-    getNotifications: async () => shown as unknown as Notification[],
+    getNotifications: () => Promise.resolve(shown as unknown as Notification[]),
     showNotification,
   } as unknown as ServiceWorkerRegistration;
   return { registration, showNotification };
