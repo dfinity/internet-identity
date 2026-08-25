@@ -357,7 +357,7 @@ pub async fn prepare_account_delegation(
     let seed = account.calculate_seed();
 
     storage_borrow_mut(|storage| {
-        storage.set_account_last_used(anchor_number, origin.clone(), account_number, time())
+        storage.record_account_use(anchor_number, origin.clone(), account_number, time())
     })
     .map_err(|err| AccountDelegationError::InternalCanisterError(err.to_string()))?;
 
