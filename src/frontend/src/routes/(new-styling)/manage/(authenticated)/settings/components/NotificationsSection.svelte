@@ -1,6 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { BellIcon, GlobeIcon, Trash2Icon } from "@lucide/svelte";
+  import {
+    BellIcon,
+    BellOffIcon,
+    GlobeIcon,
+    Trash2Icon,
+    TriangleAlertIcon,
+  } from "@lucide/svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import { toaster } from "$lib/components/utils/toaster";
@@ -11,10 +17,16 @@
   import {
     currentDeviceSubscription,
     enableDeviceNotifications,
-    disableAllNotifications,
     unsubscribeDevice,
     revokeApp,
   } from "$lib/utils/notifications/deviceNotifications";
+  import {
+    clearFailure,
+    detectBrowser,
+    readDiagnostics,
+    recordFailure,
+  } from "$lib/utils/notifications/notificationDiagnostics";
+  import NotifUnblockSteps from "$lib/components/notifications/NotifUnblockSteps.svelte";
 
   interface Props {
     identityNumber: bigint;
@@ -24,25 +36,36 @@
   const titleId = $props.id();
 
   const pushSupported = typeof navigator !== "undefined" && isPushSupported();
+  const browser = detectBrowser();
+  const isIos = browser === "ios";
 
+  let permission = $state<NotificationPermission>("default");
   let browserSubscribed = $state(false);
   let deviceStatusLoaded = $state(false);
   let busy = $state(false);
+  // A reconcile failure recorded on boot; only surfaced while still subscribed.
+  let lastFailureReason = $state<string>();
 
   // `undefined` while the first read is in flight.
   let origins = $state<string[]>();
   let revoking = $state<string>();
 
-  // Notifications are "on" only when this browser holds a subscription AND at
-  // least one app is allowed: either alone can't deliver anything.
-  const on = $derived(browserSubscribed && (origins?.length ?? 0) > 0);
+  // The toggle owns this browser's subscription. Fully deliverable ("On") also
+  // needs at least one allowed app.
+  const blocked = $derived(pushSupported && permission === "denied");
+  const fullyOn = $derived(browserSubscribed && (origins?.length ?? 0) > 0);
+  const needsAttention = $derived(
+    browserSubscribed &&
+      (lastFailureReason === "subscribe-failed" ||
+        lastFailureReason === "register-failed"),
+  );
 
-  // The switch is driven separately from `on` so a failed toggle can snap it
-  // back: the user's click flips `switchOn`, and `syncSwitch()` (run after every
-  // load and every action) resets it to the true state, reverting on failure.
+  // The switch is driven separately so a failed toggle can snap back: the click
+  // flips `switchOn`, and `syncSwitch()` (after every load and action) resets it
+  // to the true subscription state.
   let switchOn = $state(false);
   const syncSwitch = () => {
-    switchOn = browserSubscribed && (origins?.length ?? 0) > 0;
+    switchOn = browserSubscribed;
   };
 
   const errorDetail = (err: unknown): string =>
@@ -53,6 +76,10 @@
     dapps.find((dapp) => dapp.hasOrigin(origin))?.name ?? origin;
 
   onMount(() => {
+    if (typeof Notification !== "undefined") {
+      permission = Notification.permission;
+    }
+    lastFailureReason = readDiagnostics().lastFailure?.reason;
     if (!pushSupported) {
       deviceStatusLoaded = true;
       return;
@@ -75,8 +102,6 @@
           );
       } catch {
         origins = [];
-      } finally {
-        syncSwitch();
       }
     })();
   });
@@ -97,34 +122,34 @@
           $authenticatedStore.actor,
         );
         if (result.status === "permission-denied") {
-          toaster.error({
-            title:
-              typeof Notification !== "undefined" &&
-              Notification.permission === "denied"
-                ? $t`Notifications are blocked for this site. Allow them in your browser settings, then try again.`
-                : $t`Notification permission was not granted.`,
-            duration: 6000,
-          });
+          recordFailure("permission-denied");
+          // Re-read so a fresh denial flips the section to its blocked state.
+          if (typeof Notification !== "undefined") {
+            permission = Notification.permission;
+          }
+          if (permission !== "denied") {
+            toaster.error({
+              title: $t`Notification permission wasn't granted.`,
+              duration: 6000,
+            });
+          }
           return;
         }
         browserSubscribed = true;
+        lastFailureReason = undefined;
+        clearFailure();
       } else {
-        await disableAllNotifications(
-          identityNumber,
-          $authenticatedStore.actor,
-        );
+        await unsubscribeDevice(identityNumber, $authenticatedStore.actor);
         browserSubscribed = false;
-        origins = [];
       }
     } catch (err) {
+      recordFailure("subscribe-failed", errorDetail(err));
       toaster.error({
         title: $t`Couldn't change notifications on this device. Please try again.`,
         description: errorDetail(err),
         duration: 8000,
       });
     } finally {
-      // Reconcile the switch to the true state — reverts it if the change above
-      // failed or was denied.
       syncSwitch();
       busy = false;
     }
@@ -133,25 +158,17 @@
   const remove = async (origin: string) => {
     revoking = origin;
     const previous = origins ?? [];
-    const next = previous.filter((consented) => consented !== origin);
-    origins = next;
+    origins = previous.filter((consented) => consented !== origin);
     try {
       await revokeApp(identityNumber, $authenticatedStore.actor, origin);
-      // Removing the last allowed app drops the browser subscription too:
-      // nothing is left to deliver to it.
-      if (next.length === 0) {
-        await unsubscribeDevice(identityNumber, $authenticatedStore.actor);
-        browserSubscribed = false;
-      }
     } catch {
       origins = previous;
       toaster.error({
-        title: $t`Couldn't turn off notifications. Please try again.`,
+        title: $t`Couldn't remove this app. Please try again.`,
         duration: 4000,
       });
     } finally {
       revoking = undefined;
-      syncSwitch();
     }
   };
 </script>
@@ -164,7 +181,11 @@
       class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-10 shrink-0 items-center justify-center rounded-lg border"
       aria-hidden="true"
     >
-      <BellIcon class="size-5" />
+      {#if blocked}
+        <BellOffIcon class="size-5" />
+      {:else}
+        <BellIcon class="size-5" />
+      {/if}
     </span>
 
     <div class="flex min-w-0 flex-1 flex-col gap-1">
@@ -174,81 +195,118 @@
         <h3 id={titleId} class="text-text-primary text-base font-semibold">
           {$t`Notifications`}
         </h3>
-        {#if deviceStatusLoaded && on}
+        {#if deviceStatusLoaded && fullyOn}
           <Badge color="success" size="sm" dot>
             {$t`On`}
           </Badge>
         {/if}
       </div>
       <p class="text-text-tertiary text-sm">
-        {$t`dApps you've allowed can send push notifications to this device.`}
+        {#if blocked}
+          {$t`Blocked for this site in your browser.`}
+        {:else}
+          {$t`Apps you've allowed can send push notifications to this device.`}
+        {/if}
       </p>
     </div>
 
-    <div class="flex h-6 shrink-0 items-center">
-      {#if pushSupported}
+    {#if pushSupported && !blocked}
+      <div class="flex h-6 shrink-0 items-center">
         <Toggle
           bind:checked={switchOn}
           onchange={handleToggle}
           disabled={busy || !deviceStatusLoaded}
           aria-labelledby={titleId}
         />
-      {/if}
-    </div>
+      </div>
+    {/if}
   </div>
 
   {#if !pushSupported}
     <div class="border-border-tertiary mt-5 border-t pt-4">
       <p class="text-text-tertiary text-sm">
-        {$t`This browser does not support push notifications.`}
+        {#if isIos}
+          {$t`This browser doesn't support push notifications. On iPhone and iPad, add Internet Identity to your Home Screen and open it from there to enable them.`}
+        {:else}
+          {$t`This browser doesn't support push notifications.`}
+        {/if}
       </p>
     </div>
-  {:else if on}
+  {:else if blocked}
+    <div class="border-border-tertiary mt-5 flex flex-col gap-3 border-t pt-4">
+      <p class="text-text-tertiary text-sm">
+        {$t`Your browser is blocking notifications for this site. Allow them in your browser settings, then reload this page.`}
+      </p>
+      <NotifUnblockSteps {browser} open />
+    </div>
+  {:else}
+    {#if needsAttention}
+      <div
+        class="border-border-tertiary text-text-tertiary bg-bg-primary mt-5 flex items-start gap-2.5 rounded-lg border border-t p-3 text-sm"
+      >
+        <TriangleAlertIcon class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <span
+          >{$t`Notifications may not be arriving on this device. Turn them off and on to reconnect.`}</span
+        >
+      </div>
+    {/if}
     <div class="border-border-tertiary mt-5 border-t pt-4">
       <p
         class="text-text-tertiary mb-3 text-xs font-semibold tracking-wide uppercase"
       >
         {$t`Allowed apps`}
       </p>
-      <ul class="flex flex-col gap-2" aria-labelledby={titleId}>
-        {#each origins ?? [] as origin (origin)}
-          <li
-            class="border-border-secondary flex flex-row items-center gap-3 rounded-lg border px-3 py-3 sm:px-4"
-          >
-            <span
-              class="border-border-secondary bg-bg-secondary text-fg-tertiary flex size-9 shrink-0 items-center justify-center rounded-md border"
-              aria-hidden="true"
+      {#if (origins?.length ?? 0) > 0}
+        <ul class="flex flex-col gap-2" aria-labelledby={titleId}>
+          {#each origins ?? [] as origin (origin)}
+            <li
+              class={[
+                "border-border-secondary flex flex-row items-center gap-3 rounded-lg border px-3 py-3 sm:px-4",
+                !browserSubscribed && "opacity-60",
+              ]}
             >
-              <GlobeIcon class="size-4.5" />
-            </span>
-            <div class="flex min-w-0 flex-1 flex-col">
-              <span class="text-text-primary truncate text-sm font-semibold">
-                {appName(origin)}
-              </span>
               <span
-                class="text-text-tertiary truncate font-mono text-xs"
-                title={origin}
+                class="border-border-secondary bg-bg-secondary text-fg-tertiary flex size-9 shrink-0 items-center justify-center rounded-md border"
+                aria-hidden="true"
               >
-                {origin}
+                <GlobeIcon class="size-4.5" />
               </span>
-            </div>
-            <button
-              class="btn btn-tertiary btn-sm btn-icon shrink-0"
-              onclick={() => remove(origin)}
-              disabled={revoking === origin}
-              aria-label={$t`Remove ${appName(origin)}`}
-            >
-              <Trash2Icon class="size-4.5" />
-            </button>
-          </li>
-        {/each}
-      </ul>
-    </div>
-  {:else}
-    <div class="border-border-tertiary mt-5 border-t pt-4">
-      <p class="text-text-tertiary text-sm">
-        {$t`No apps can send you notifications.`}
-      </p>
+              <div class="flex min-w-0 flex-1 flex-col">
+                <span class="text-text-primary truncate text-sm font-semibold">
+                  {appName(origin)}
+                </span>
+                <span
+                  class="text-text-tertiary truncate font-mono text-xs"
+                  title={origin}
+                >
+                  {origin}
+                </span>
+              </div>
+              <button
+                class="btn btn-tertiary btn-sm btn-icon shrink-0"
+                onclick={() => remove(origin)}
+                disabled={revoking === origin}
+                aria-label={$t`Remove ${appName(origin)}`}
+              >
+                <Trash2Icon class="size-4.5" />
+              </button>
+            </li>
+          {/each}
+        </ul>
+        {#if !browserSubscribed}
+          <p class="text-text-tertiary mt-3 text-sm">
+            {$t`Turn this device on to receive from these apps.`}
+          </p>
+        {/if}
+      {:else if browserSubscribed}
+        <p class="text-text-tertiary text-sm">
+          {$t`No apps yet. Apps you allow when you sign in will show up here.`}
+        </p>
+      {:else}
+        <p class="text-text-tertiary text-sm">
+          {$t`Turn on to let apps you've allowed notify this device.`}
+        </p>
+      {/if}
     </div>
   {/if}
 </section>

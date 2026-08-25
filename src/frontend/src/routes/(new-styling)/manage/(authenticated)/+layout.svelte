@@ -32,6 +32,8 @@
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
+  import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
+  import { reconcileDeviceNotifications } from "$lib/utils/notifications/deviceNotifications";
   import type { LayoutProps } from "./$types";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
@@ -257,6 +259,25 @@
       reauthCleanup?.();
       reauthCleanup = undefined;
     };
+  });
+
+  // Keep this browser's push registration and JWT pool healthy, once per
+  // authenticated session. Best-effort: a failure here must never disrupt the
+  // page, and it only acts on a browser that turned notifications on.
+  let reconciledFor: bigint | undefined;
+  $effect(() => {
+    const authenticated = $authenticationStore;
+    if (authenticated === undefined || !$PUSH_NOTIFICATIONS) {
+      return;
+    }
+    if (reconciledFor === authenticated.identityNumber) {
+      return;
+    }
+    reconciledFor = authenticated.identityNumber;
+    void reconcileDeviceNotifications(
+      authenticated.identityNumber,
+      authenticated.actor,
+    ).catch(() => {});
   });
 </script>
 
