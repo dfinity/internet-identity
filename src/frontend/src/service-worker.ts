@@ -65,6 +65,24 @@ sw.addEventListener("notificationclick", (event) => {
   event.waitUntil(openApp(origin));
 });
 
+sw.addEventListener("pushsubscriptionchange", (event) => {
+  const change = event as ExtendableEvent & {
+    oldSubscription?: PushSubscription | null;
+  };
+  change.waitUntil(handleSubscriptionChange(change.oldSubscription ?? null));
+});
+
+// The browser rotated or expired this device's push subscription. Re-registering
+// it needs the user's II identity, which only an authenticated page holds, so the
+// worker just clears the dead subscription. The next authenticated page load
+// reconciles: it re-subscribes and registers the new endpoint with the canister.
+const handleSubscriptionChange = async (
+  old: PushSubscription | null,
+): Promise<void> => {
+  const stale = old ?? (await sw.registration.pushManager.getSubscription());
+  await stale?.unsubscribe().catch(() => {});
+};
+
 const handlePush = async (payload: unknown): Promise<void> => {
   const origin = originOf(payload);
   const pulled =
