@@ -206,6 +206,9 @@ export const DelegationParamsCodec = z.object({
   publicKey: Base64ToPublicKeyCodec,
   maxTimeToLive: z.optional(StringToBigIntCodec),
   icrc95DerivationOrigin: z.optional(OriginSchema),
+  // Non-standard II extension: the app asks to be allowed to notify this user.
+  // A request for the consent screen, never a grant.
+  iiNotifications: z.optional(z.boolean()),
 });
 
 export type DelegationParams = z.infer<typeof DelegationParamsCodec>;
@@ -273,6 +276,7 @@ export const AuthRequestCodec = z.codec(
     derivationOrigin: z.optional(z.lazy(() => OriginSchema)),
     allowPinAuthentication: z.optional(z.boolean()),
     autoSelectionPrincipal: z.optional(z.string()),
+    iiNotifications: z.optional(z.boolean()),
   }),
   z.object({
     kind: z.literal("authorize-client"),
@@ -283,6 +287,7 @@ export const AuthRequestCodec = z.codec(
     autoSelectionPrincipal: z.optional(
       z.custom<Principal>((arg) => arg instanceof Principal),
     ),
+    iiNotifications: z.optional(z.boolean()),
   }),
   {
     decode: ({
@@ -292,6 +297,7 @@ export const AuthRequestCodec = z.codec(
       derivationOrigin,
       allowPinAuthentication,
       autoSelectionPrincipal,
+      iiNotifications,
     }) => ({
       kind,
       sessionPublicKey:
@@ -306,6 +312,7 @@ export const AuthRequestCodec = z.codec(
         autoSelectionPrincipal !== undefined
           ? Principal.fromText(autoSelectionPrincipal)
           : undefined,
+      iiNotifications,
     }),
     encode: ({
       kind,
@@ -314,6 +321,7 @@ export const AuthRequestCodec = z.codec(
       derivationOrigin,
       allowPinAuthentication,
       autoSelectionPrincipal,
+      iiNotifications,
     }) => ({
       kind,
       sessionPublicKey: z.util.uint8ArrayToBase64(sessionPublicKey),
@@ -321,6 +329,7 @@ export const AuthRequestCodec = z.codec(
       derivationOrigin,
       allowPinAuthentication,
       autoSelectionPrincipal: autoSelectionPrincipal?.toText(),
+      iiNotifications,
     }),
   },
 );

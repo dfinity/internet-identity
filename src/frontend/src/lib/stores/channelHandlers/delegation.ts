@@ -84,6 +84,7 @@ export const handleDelegationRequest =
         authorizationStore.setRequestContext(
           effectiveOrigin,
           params.maxTimeToLive,
+          params.iiNotifications,
         );
 
         let authorized = await waitForStore(authorizedStore);

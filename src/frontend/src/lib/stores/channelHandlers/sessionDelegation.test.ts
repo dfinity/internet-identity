@@ -594,7 +594,11 @@ describe("requests that fall through to a ceremony", () => {
       new Promise((resolve) => setTimeout(resolve, 50)),
     ]);
 
-    expect(setRequestContext).toHaveBeenCalledWith(ORIGIN, undefined);
+    expect(setRequestContext).toHaveBeenCalledWith(
+      ORIGIN,
+      undefined,
+      undefined,
+    );
   });
 
   it("runs the ceremony when silence was not asked for", async () => {

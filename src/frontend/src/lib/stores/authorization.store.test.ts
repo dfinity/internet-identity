@@ -3,6 +3,7 @@ import {
   authorizationContextStore,
   authorizationStore,
   authorizedStore,
+  notificationsRequestedStore,
   requestedMaxTimeToLiveStore,
 } from "./authorization.store";
 
@@ -55,12 +56,46 @@ describe("requestedMaxTimeToLiveStore", () => {
 
   it("exposes the requested duration once the request context is set", () => {
     const maxTimeToLive = BigInt(3600) * BigInt(1_000_000_000);
-    authorizationStore.setRequestContext("https://example.com", maxTimeToLive);
+    authorizationStore.setRequestContext(
+      "https://example.com",
+      maxTimeToLive,
+      undefined,
+    );
     expect(get(requestedMaxTimeToLiveStore)).toBe(maxTimeToLive);
   });
 
   it("is undefined when the app didn't request a duration", () => {
-    authorizationStore.setRequestContext("https://example.com", undefined);
+    authorizationStore.setRequestContext(
+      "https://example.com",
+      undefined,
+      undefined,
+    );
     expect(get(requestedMaxTimeToLiveStore)).toBeUndefined();
+  });
+});
+
+describe("notificationsRequestedStore", () => {
+  // Same non-throwing contract as `requestedMaxTimeToLiveStore`: the sign-in
+  // screen reads it during renders that happen before the request context.
+  it("does not throw before the effective origin is set", () => {
+    expect(() => get(notificationsRequestedStore)).not.toThrow();
+  });
+
+  it("exposes the app's notification request once the context is set", () => {
+    authorizationStore.setRequestContext(
+      "https://example.com",
+      undefined,
+      true,
+    );
+    expect(get(notificationsRequestedStore)).toBe(true);
+  });
+
+  it("is undefined when the app didn't ask", () => {
+    authorizationStore.setRequestContext(
+      "https://example.com",
+      undefined,
+      undefined,
+    );
+    expect(get(notificationsRequestedStore)).toBeUndefined();
   });
 });

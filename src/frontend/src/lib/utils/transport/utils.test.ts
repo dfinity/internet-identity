@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { Delegation, DelegationChain } from "@icp-sdk/core/identity";
 import type { Signature } from "@icp-sdk/core/agent";
-import { DelegationResultSchema, AuthResponseCodec } from "./utils";
+import {
+  AuthRequestCodec,
+  AuthResponseCodec,
+  DelegationParamsCodec,
+  DelegationResultSchema,
+} from "./utils";
 
 const PUBKEY = new Uint8Array(32).fill(2);
 const USER_KEY = new Uint8Array(32).fill(3);
@@ -82,5 +87,53 @@ describe("AuthResponseCodec (legacy authorize-client forwarding)", () => {
       throw new Error("expected success response");
     }
     expect(decoded.delegations[0].delegation.permissions).toBeUndefined();
+  });
+});
+
+describe("iiNotifications (app asking to be allowed to notify)", () => {
+  const B64_PUBKEY = "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=";
+
+  it("parses off ICRC-34 delegation params", () => {
+    const params = DelegationParamsCodec.parse({
+      publicKey: B64_PUBKEY,
+      iiNotifications: true,
+    });
+
+    expect(params.iiNotifications).toBe(true);
+  });
+
+  it("is undefined on ICRC-34 params when the app didn't ask", () => {
+    const params = DelegationParamsCodec.parse({ publicKey: B64_PUBKEY });
+
+    expect(params.iiNotifications).toBeUndefined();
+  });
+
+  it("survives the legacy authorize-client request (the auth client's customValues path)", () => {
+    const request = AuthRequestCodec.parse({
+      kind: "authorize-client",
+      sessionPublicKey: B64_PUBKEY,
+      iiNotifications: true,
+    });
+
+    expect(request.iiNotifications).toBe(true);
+  });
+
+  it("round-trips through the legacy redirect re-encode", () => {
+    const request = AuthRequestCodec.parse({
+      kind: "authorize-client",
+      sessionPublicKey: B64_PUBKEY,
+      iiNotifications: true,
+    });
+
+    expect(AuthRequestCodec.encode(request).iiNotifications).toBe(true);
+  });
+
+  it("rejects a non-boolean rather than coercing it", () => {
+    expect(
+      DelegationParamsCodec.safeParse({
+        publicKey: B64_PUBKEY,
+        iiNotifications: "true",
+      }).success,
+    ).toBe(false);
   });
 });

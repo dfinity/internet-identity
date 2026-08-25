@@ -330,7 +330,11 @@ const createSession = async (
   requestedMaxTimeToIdle: bigint | undefined,
   resumable: boolean,
 ): Promise<{ record: AppSessionRecord }> => {
-  authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
+  authorizationStore.setRequestContext(
+    effectiveOrigin,
+    requestedMaxTimeToLive,
+    undefined,
+  );
   const authorized = await waitForStore(authorizedStore);
   const [accountNumber, { identityNumber, actor, authMethod }] =
     await Promise.all([
