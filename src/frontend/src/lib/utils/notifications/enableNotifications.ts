@@ -14,8 +14,7 @@ import {
 } from "./pullCredential";
 
 export type EnableNotificationsResult =
-  | { status: "enabled" }
-  | { status: "permission-denied" };
+  { status: "enabled" } | { status: "permission-denied" };
 
 export const enableNotifications = async ({
   identityNumber,
