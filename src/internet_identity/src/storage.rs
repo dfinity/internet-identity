@@ -1771,9 +1771,7 @@ impl<M: Memory + Clone> Storage<M> {
 
         self.stable_account_reference_list_memory
             .insert(key, current.into());
-        self.apply_reference_counter_deltas(anchor_number, application_number, application, deltas);
-
-        Ok(())
+        self.apply_reference_counter_deltas(anchor_number, application_number, application, deltas)
     }
 
     fn apply_reference_counter_deltas(
@@ -1782,9 +1780,9 @@ impl<M: Memory + Clone> Storage<M> {
         application_number: ApplicationNumber,
         application: StorableApplication,
         deltas: ReferenceListDeltas,
-    ) {
+    ) -> Result<(), StorageError> {
         if deltas.is_empty() {
-            return;
+            return Ok(());
         }
 
         let anchor_counter = self
@@ -1813,7 +1811,7 @@ impl<M: Memory + Clone> Storage<M> {
                 stored_accounts: global_counter.stored_accounts,
                 stored_account_references: global_references,
             })
-            .expect("failed to update the global account counter");
+            .map_err(|_| StorageError::ErrorUpdatingAccountCounter)?;
 
         let (stored_accounts, stored_account_references) = deltas.apply(
             application.stored_accounts,
@@ -1827,6 +1825,8 @@ impl<M: Memory + Clone> Storage<M> {
                 stored_account_references,
             },
         );
+
+        Ok(())
     }
 
     /// This is for testing purposes only, DO NOT use anywhere else!
@@ -1870,11 +1870,19 @@ impl<M: Memory + Clone> Storage<M> {
 
     // Increments the `stable_account_counter_memory` account counter by one and returns the new number.
     fn allocate_account_number(&mut self) -> Result<AccountNumber, StorageError> {
-        let account_counter = self.stable_account_counter_memory.get();
-        let updated_accounts_counter = account_counter.increment_accounts();
-        let next_account_number = updated_accounts_counter.stored_accounts;
+        let account_counter = self.stable_account_counter_memory.get().clone();
+        // The counter is also the account number, so it must not wrap or saturate:
+        // either would re-issue a number that is already in use, and two accounts at
+        // one origin would derive the same principal.
+        let next_account_number = account_counter
+            .stored_accounts
+            .checked_add(1)
+            .ok_or(StorageError::AccountsCounterOverflow)?;
         self.stable_account_counter_memory
-            .set(updated_accounts_counter)
+            .set(StorableAccountsCounter {
+                stored_accounts: next_account_number,
+                ..account_counter
+            })
             .map_err(|_| StorageError::ErrorUpdatingAccountCounter)?;
         Ok(next_account_number)
     }
@@ -2620,6 +2628,7 @@ pub enum StorageError {
         application_number: ApplicationNumber,
     },
     ErrorUpdatingAccountCounter,
+    AccountsCounterOverflow,
     EmptyAccountReferenceList {
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
@@ -2686,6 +2695,7 @@ impl fmt::Display for StorageError {
                 "Origin not found for application number {application_number}",
             ),
             Self::ErrorUpdatingAccountCounter => write!(f, "Error updating account counter"),
+            Self::AccountsCounterOverflow => write!(f, "No account numbers left to allocate"),
             Self::EmptyAccountReferenceList {
                 anchor_number,
                 application_number,

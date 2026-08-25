@@ -2127,6 +2127,7 @@ fn test_anchor_storage_migration_round_trip() {
 
 mod reference_list_write_path_tests {
     use crate::storage::account::{AccountReference, CreateAccountParams};
+    use crate::storage::storable::accounts_counter::StorableAccountsCounter;
     use crate::storage::StorageError;
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
@@ -2139,6 +2140,29 @@ mod reference_list_write_path_tests {
         let anchor_number = anchor.anchor_number();
         storage.write(anchor).unwrap();
         (storage, anchor_number)
+    }
+
+    #[test]
+    fn allocating_past_the_last_account_number_is_refused() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        // The allocator hands out the incremented count, so there is no number left
+        // after this one. Reachable only here, which is the point: it refuses rather
+        // than re-issuing a number, and it does so without trapping.
+        storage
+            .stable_account_counter_memory
+            .set(StorableAccountsCounter {
+                stored_accounts: u64::MAX,
+                stored_account_references: 0,
+            })
+            .unwrap();
+
+        let result = storage.create_additional_account(CreateAccountParams {
+            anchor_number,
+            name: "named".to_string(),
+            origin: "https://example.com".to_string(),
+        });
+
+        assert!(matches!(result, Err(StorageError::AccountsCounterOverflow)));
     }
 
     #[test]
