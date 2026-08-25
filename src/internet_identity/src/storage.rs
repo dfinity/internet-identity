@@ -1663,105 +1663,89 @@ impl<M: Memory + Clone> Storage<M> {
     where
         F: FnOnce(&mut StorableAccountReference, Option<&mut StorableAccount>) -> T,
     {
-        match maybe_account_number {
-            None => {
-                // We are looking for a synthetic account
-                let Some(((_, application_number), mut account_references)) =
-                    self.find_account_references(anchor_number, application_number)
-                else {
-                    return Ok(None);
-                };
+        // A named account has a stored record to hand to `f`; a default is derived
+        // and has none. A named account with no record was removed, so there is
+        // nothing to update.
+        let mut storable_account = match maybe_account_number {
+            Some(account_number) => match self.stable_account_memory.get(&account_number) {
+                Some(storable_account) => Some(storable_account),
+                None => return Ok(None),
+            },
+            None => None,
+        };
 
-                let mut result = None;
+        let Some(((_, application_number), mut account_references)) =
+            self.find_account_references(anchor_number, application_number)
+        else {
+            return Ok(None);
+        };
 
-                for account_reference in &mut account_references {
-                    if account_reference.account_number == maybe_account_number {
-                        result = Some(f(account_reference, None));
-                        break;
-                    }
-                }
+        let Some(account_reference) = account_references
+            .iter_mut()
+            .find(|account_reference| account_reference.account_number == maybe_account_number)
+        else {
+            // `f` never ran, so nothing was modified and writing the list back would
+            // store the bytes it already holds.
+            return Ok(None);
+        };
+        let result = f(account_reference, storable_account.as_mut());
 
-                self.write_reference_list(
-                    anchor_number,
-                    application_number,
-                    account_references.into_iter().map(Into::into).collect(),
-                )?;
-
-                Ok(result)
-            }
-            Some(account_number) => {
-                // Account should be stored, otherwise, it was removed and we'll return `None`.
-                let Some(mut storable_account) = self.stable_account_memory.get(&account_number)
-                else {
-                    return Ok(None);
-                };
-                let Some(((_, application_number), mut account_references)) =
-                    self.find_account_references(anchor_number, application_number)
-                else {
-                    return Ok(None);
-                };
-
-                let mut result = None;
-
-                for account_reference in &mut account_references {
-                    if account_reference.account_number == maybe_account_number {
-                        result = Some(f(account_reference, Some(&mut storable_account)));
-                        break;
-                    }
-                }
-
-                self.write_reference_list(
-                    anchor_number,
-                    application_number,
-                    account_references.into_iter().map(Into::into).collect(),
-                )?;
-                self.stable_account_memory
-                    .insert(account_number, storable_account);
-
-                Ok(result)
-            }
+        self.write_reference_list(
+            anchor_number,
+            application_number,
+            account_references.into_iter().map(Into::into).collect(),
+        )?;
+        if let (Some(account_number), Some(storable_account)) =
+            (maybe_account_number, storable_account)
+        {
+            self.stable_account_memory
+                .insert(account_number, storable_account);
         }
+
+        Ok(Some(result))
     }
 
-    /// Stamps `last_used`, tracking the default account on first use at an origin.
-    pub fn set_account_last_used(
+    /// Records that an account was used at `origin`.
+    ///
+    /// A default account has no reference stored until it is used, so recording a
+    /// use is also what creates one. A named account's reference is its existence:
+    /// where it is gone the account was removed, and writing one back would undo
+    /// that, so only the default gets the pre-step.
+    pub fn record_account_use(
         &mut self,
         anchor_number: AnchorNumber,
         origin: FrontendHostname,
         account_number: Option<AccountNumber>,
         now: Timestamp,
-    ) -> Result<Option<()>, StorageError> {
-        if let Some(application_number) = self.lookup_application_number_with_origin(&origin) {
-            if self
-                .lookup_account_references(anchor_number, application_number)
-                .is_some()
-            {
-                return self.with_account_mut(
-                    anchor_number,
-                    Some(application_number),
-                    account_number,
-                    |account_reference, _| {
-                        account_reference.last_used = Some(now);
-                    },
-                );
-            }
+    ) -> Result<(), StorageError> {
+        if account_number.is_none() {
+            let application_number = self.lookup_or_insert_application_number_with_origin(&origin);
+            self.ensure_account_reference_list(anchor_number, application_number)?;
         }
+        self.stamp_account_reference(anchor_number, &origin, account_number, now)
+    }
 
-        if account_number.is_some() {
-            return Ok(None);
-        }
-
-        let application_number = self.lookup_or_insert_application_number_with_origin(&origin);
-        self.write_reference_list(
+    /// Stamps `last_used` on the reference for `account_number` at `origin`.
+    ///
+    /// Does nothing when the identity has no such reference stored: nothing is
+    /// recorded against an account it cannot reach.
+    fn stamp_account_reference(
+        &mut self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+        account_number: Option<AccountNumber>,
+        now: Timestamp,
+    ) -> Result<(), StorageError> {
+        let application_number = self.lookup_application_number_with_origin(origin);
+        self.with_account_mut(
             anchor_number,
             application_number,
-            vec![AccountReference {
-                account_number: None,
-                last_used: Some(now),
-            }],
+            account_number,
+            |account_reference, _| {
+                account_reference.last_used = Some(now);
+            },
         )?;
-        self.evict_idle_tracked_defaults(anchor_number, application_number)?;
-        Ok(Some(()))
+        Ok(())
     }
 
     /// Writes the reference-list row an `AnchorApplicationConfig` row implies, leaving
