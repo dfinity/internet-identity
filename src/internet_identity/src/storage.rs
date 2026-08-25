@@ -2317,9 +2317,7 @@ impl<M: Memory + Clone> Storage<M> {
         self.stable_anchor_application_config_memory.remove(&key);
 
         let deltas = ReferenceListDeltas::between(&previous, &[]);
-        self.apply_reference_counter_deltas(anchor_number, application_number, application, deltas);
-
-        Ok(())
+        self.apply_reference_counter_deltas(anchor_number, application_number, application, deltas)
     }
 
     /// Rows whose only reference is a tracked default.
