@@ -32,7 +32,6 @@
   import NotifOptInView from "./views/NotifOptInView.svelte";
   import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
   import { isPushSupported } from "$lib/utils/notifications/pushSubscription";
-  import { enableNotifications } from "$lib/utils/notifications/enableNotifications";
   import { actorForIdentity } from "$lib/stores/session-delegation.store";
   import {
     type AttributeConsent,
@@ -197,6 +196,7 @@
     accountNumber: Promise<bigint | undefined>;
     accessLevel: AccessLevel;
     maxTimeToLive?: bigint;
+    origin: string;
   }>();
 
   const handleAuthorize = (
@@ -223,7 +223,12 @@
       effectiveOrigin !== undefined &&
       notifOptIn === undefined
     ) {
-      notifOptIn = { accountNumber, accessLevel, maxTimeToLive };
+      notifOptIn = {
+        accountNumber,
+        accessLevel,
+        maxTimeToLive,
+        origin: effectiveOrigin,
+      };
       return;
     }
     authorizationStore.authorize(accountNumber, accessLevel, maxTimeToLive);
@@ -240,33 +245,6 @@
       args.accessLevel,
       args.maxTimeToLive,
     );
-  };
-
-  // Opting in never blocks sign-in: a failure toasts and still authorizes.
-  const handleNotifAllow = async () => {
-    const args = notifOptIn;
-    const effectiveOrigin = get(authorizationStore)?.effectiveOrigin;
-    if (
-      args !== undefined &&
-      effectiveOrigin !== undefined &&
-      selectedIdentity !== undefined
-    ) {
-      try {
-        const identityNumber = selectedIdentity.identityNumber;
-        const actor = await actorForIdentity(identityNumber);
-        if (actor !== undefined) {
-          await enableNotifications({
-            identityNumber,
-            accountNumber: await args.accountNumber,
-            origin: effectiveOrigin,
-            actor,
-          });
-        }
-      } catch {
-        toaster.error({ title: $t`Couldn't turn on notifications.` });
-      }
-    }
-    resumeAuthorize();
   };
 
   const handleAttributeConsent = (consent: AttributeConsent) => {
@@ -722,11 +700,17 @@
 {/snippet}
 
 {#snippet notifOptInContent()}
-  <NotifOptInView
-    appName={dapp?.name}
-    onAllow={handleNotifAllow}
-    onSkip={resumeAuthorize}
-  />
+  {#if notifOptIn !== undefined && selectedIdentity !== undefined}
+    {@const identityNumber = selectedIdentity.identityNumber}
+    <NotifOptInView
+      appName={dapp?.name}
+      {identityNumber}
+      origin={notifOptIn.origin}
+      accountNumber={notifOptIn.accountNumber}
+      resolveActor={() => actorForIdentity(identityNumber)}
+      onDone={resumeAuthorize}
+    />
+  {/if}
 {/snippet}
 
 {#snippet continueContent()}
