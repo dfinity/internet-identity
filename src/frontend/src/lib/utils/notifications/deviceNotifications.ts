@@ -1,29 +1,31 @@
-// Device-level push enablement for the settings screen. "Notifications on this
-// device" is a combined state: the browser holds a push subscription AND at
-// least one app is allowed. These helpers keep enable/disable idempotent so the
-// toggle can't fail for the many "already in that state" reasons.
+// Device-level push helpers for the settings screen and the boot-time reconcile.
+// The device toggle owns this browser's push subscription; per-app consent is a
+// separate list. Enable/disable stays idempotent so the toggle can't fail for
+// the many "already in that state" reasons.
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { throwTextCanisterError } from "$lib/utils/utils";
-import { generateVapidKeypair, signJwtPool } from "./vapidPool";
+import { signJwtPool } from "./vapidPool";
 import {
+  currentDeviceSubscription,
+  isPushSupported,
   relayOriginOf,
   requestNotificationPermission,
-  subscribeToPush,
 } from "./pushSubscription";
+import { subscribeAndRegisterDevice } from "./subscribeDevice";
+import { loadVapidKey, purgeVapidKey } from "./vapidKeyStore";
+
+export { currentDeviceSubscription };
 
 export type EnableDeviceResult =
   | { status: "enabled" }
   | { status: "permission-denied" };
 
-/** This browser's current push subscription, or `undefined` if not subscribed. */
-export const currentDeviceSubscription = async (): Promise<
-  PushSubscription | undefined
-> => {
-  const registration = await navigator.serviceWorker.getRegistration();
-  return (await registration?.pushManager.getSubscription()) ?? undefined;
-};
+// Windows left in the pool below which the reconcile tops it up. The pool covers
+// 30 days; refreshing with a week-plus of headroom keeps a device that opens II
+// at least monthly covered without a call on every visit.
+const JWT_POOL_REFRESH_THRESHOLD = 10;
 
 /**
  * Subscribes this browser to push and registers it with the canister. No app
@@ -37,42 +39,25 @@ export const enableDeviceNotifications = async (
   if (!(await requestNotificationPermission())) {
     return { status: "permission-denied" };
   }
-  const { publicKeyRaw, privateKey } = await generateVapidKeypair();
-  const { endpoint, p256dh, auth } = await subscribeToPush(publicKeyRaw);
-  const issuedAtNs = BigInt(Date.now()) * BigInt(1_000_000);
-  const signatures = await signJwtPool(
-    privateKey,
-    relayOriginOf(endpoint),
-    issuedAtNs,
-  );
-  await actor
-    .webpush_subscribe_device(
-      identityNumber,
-      endpoint,
-      p256dh,
-      auth,
-      publicKeyRaw,
-      signatures,
-      issuedAtNs,
-    )
-    .then(throwTextCanisterError);
+  await subscribeAndRegisterDevice(identityNumber, actor);
   return { status: "enabled" };
 };
 
-/** Drops this browser's subscription, canister-side and then locally. No-op if
- * this browser isn't subscribed. */
+/** Drops this browser's subscription and its stored key, canister-side then
+ * locally. Consent for apps is left untouched: it is per identity, and other
+ * devices may still use it. */
 export const unsubscribeDevice = async (
   identityNumber: bigint,
   actor: ActorSubclass<_SERVICE>,
 ): Promise<void> => {
   const subscription = await currentDeviceSubscription();
-  if (subscription === undefined) {
-    return;
+  if (subscription !== undefined) {
+    await actor
+      .webpush_unsubscribe_device(identityNumber, subscription.endpoint)
+      .then(throwTextCanisterError);
+    await subscription.unsubscribe();
   }
-  await actor
-    .webpush_unsubscribe_device(identityNumber, subscription.endpoint)
-    .then(throwTextCanisterError);
-  await subscription.unsubscribe();
+  await purgeVapidKey();
 };
 
 /** Revokes one app's consent and drops the service worker's credential for it.
@@ -92,17 +77,67 @@ export const revokeApp = async (
     .catch(() => {});
 };
 
-/** Turns notifications off entirely: revokes every allowed app, then
- * unsubscribes this browser. */
-export const disableAllNotifications = async (
+/**
+ * Keeps this browser's push registration healthy, run on authenticated boot.
+ * Re-subscribes when the browser rotated or dropped its subscription, so the
+ * canister stops knowing a dead endpoint, and tops up the JWT pool before it
+ * runs out. No-op for a browser that never turned notifications on.
+ */
+export const reconcileDeviceNotifications = async (
   identityNumber: bigint,
   actor: ActorSubclass<_SERVICE>,
 ): Promise<void> => {
-  const origins = await actor
-    .notification_consented_origins(identityNumber)
-    .catch(() => [] as string[]);
-  for (const origin of origins) {
-    await revokeApp(identityNumber, actor, origin);
+  if (!isPushSupported() || Notification.permission !== "granted") {
+    return;
   }
-  await unsubscribeDevice(identityNumber, actor);
+  const subscription = await currentDeviceSubscription();
+  const stored = await loadVapidKey();
+  if (subscription === undefined && stored === undefined) {
+    return;
+  }
+
+  // The canister knows this browser only if the live subscription matches the
+  // key we still hold. Anything else — rotated endpoint, dropped subscription,
+  // lost key — means subscribe and register afresh.
+  if (
+    subscription === undefined ||
+    stored === undefined ||
+    stored.endpoint !== subscription.endpoint
+  ) {
+    if (stored !== undefined) {
+      await actor
+        .webpush_unsubscribe_device(identityNumber, stored.endpoint)
+        .catch(() => {});
+    }
+    await subscribeAndRegisterDevice(identityNumber, actor);
+    return;
+  }
+
+  // Registered: top up the pool before it runs out. A missing status means the
+  // canister dropped the endpoint (e.g. 410-pruned), so re-register instead.
+  const [status] = await actor.webpush_jwt_pool_status(
+    identityNumber,
+    subscription.endpoint,
+  );
+  if (status === undefined) {
+    await subscribeAndRegisterDevice(identityNumber, actor);
+    return;
+  }
+  if (status.remaining >= JWT_POOL_REFRESH_THRESHOLD) {
+    return;
+  }
+  const issuedAtNs = BigInt(Date.now()) * BigInt(1_000_000);
+  const signatures = await signJwtPool(
+    stored.privateKey,
+    relayOriginOf(subscription.endpoint),
+    issuedAtNs,
+  );
+  await actor
+    .webpush_refresh_jwts(
+      identityNumber,
+      subscription.endpoint,
+      signatures,
+      issuedAtNs,
+    )
+    .then(throwTextCanisterError);
 };
