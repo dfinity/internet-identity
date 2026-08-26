@@ -1,5 +1,6 @@
 import { IDL } from "@icp-sdk/core/candid";
 import { Principal } from "@icp-sdk/core/principal";
+import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import { test as base, expect, type Page } from "@playwright/test";
 import { II_URL, toBase64 } from "../utils";
 
@@ -43,6 +44,34 @@ class AuthorizePage {
     return this.#page;
   }
 }
+
+/**
+ * Waits for a sign-in to have produced its result on the test app's page.
+ *
+ * The provider's window closes before the app has anything to show: over the
+ * session protocol the app has still to mint a delegation, and the redirect
+ * transport has still to navigate back. The app hides `#principal` until it has
+ * one, so its appearance is the signal that the rest of the page can be read.
+ *
+ * A sign-in that produced nothing never shows it, and so does a test that drove
+ * the provider directly and has no test app page at all. Both are outcomes the
+ * readers below report rather than fail on, so the wait is bounded and running
+ * out is not an error.
+ */
+const waitForSignInResult = async (
+  testAppPage: Page,
+  authPage: Page | undefined,
+): Promise<void> => {
+  if (authPage !== undefined) {
+    await authPage.waitForEvent("close", { timeout: 15_000 });
+  }
+  if ((await testAppPage.locator("#principal").count()) === 0) {
+    return;
+  }
+  await expect(testAppPage.locator("#principal"))
+    .toBeVisible({ timeout: 15_000 })
+    .catch(() => undefined);
+};
 
 export const test = base.extend<{
   authorizeConfig: Partial<AuthorizeConfig> | undefined;
@@ -113,8 +142,13 @@ export const test = base.extend<{
         .getByRole("textbox", { name: "Identity Provider" })
         .fill(internetIdentityURL + "/authorize" + querySuffix);
       await testAppPage
-        .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
+        .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
         .setChecked(true);
+      // The client refuses a session chain that names any provider but the one it
+      // was configured with, and its default is the mainnet canister.
+      await testAppPage
+        .getByRole("textbox", { name: "II canister id:" })
+        .fill(readCanisterId({ canisterName: "internet_identity" }));
       if (
         "useIcrc3Attributes" in authorizeConfig &&
         authorizeConfig.useIcrc3Attributes === true
@@ -186,18 +220,9 @@ export const test = base.extend<{
       }
     }
   },
-  authorizedPrincipal: async ({ page, authorizeConfig }, use) => {
+  authorizedPrincipal: async ({ page }, use) => {
     const [testAppPage, authPage] = page.context().pages();
-    if (authPage !== undefined) {
-      await authPage.waitForEvent("close", { timeout: 15_000 });
-    }
-    // The redirect flow renders the principal only after navigating back to the
-    // test app, so wait for it before reading (window flow already has it).
-    if (authorizeConfig?.transport === "redirect") {
-      await expect(testAppPage.locator("#principal")).toBeVisible({
-        timeout: 15_000,
-      });
-    }
+    await waitForSignInResult(testAppPage, authPage);
 
     const principal = await testAppPage.locator("#principal").textContent();
     if (principal === null) {
@@ -208,9 +233,7 @@ export const test = base.extend<{
   },
   authorizedAttributes: async ({ page }, use) => {
     const [testAppPage, authPage] = page.context().pages();
-    if (authPage !== undefined) {
-      await authPage.waitForEvent("close", { timeout: 15_000 });
-    }
+    await waitForSignInResult(testAppPage, authPage);
 
     const attributes = await testAppPage
       .locator("#certifiedAttributes")
@@ -228,18 +251,9 @@ export const test = base.extend<{
       ),
     );
   },
-  authorizedIcrc3Attributes: async ({ page, authorizeConfig }, use) => {
+  authorizedIcrc3Attributes: async ({ page }, use) => {
     const [testAppPage, authPage] = page.context().pages();
-    if (authPage !== undefined) {
-      await authPage.waitForEvent("close", { timeout: 15_000 });
-    }
-    // The redirect flow renders results only after navigating back to the test
-    // app, so wait for the return (principal visible) before reading.
-    if (authorizeConfig?.transport === "redirect") {
-      await expect(testAppPage.locator("#principal")).toBeVisible({
-        timeout: 15_000,
-      });
-    }
+    await waitForSignInResult(testAppPage, authPage);
 
     // Tests that bypass the test_app entirely (e.g. the channel-error
     // test that goes straight to the authorize URL) won't have the
@@ -258,18 +272,9 @@ export const test = base.extend<{
 
     await use(JSON.parse(icrc3Attributes));
   },
-  authorizedDelegation: async ({ page, authorizeConfig }, use) => {
+  authorizedDelegation: async ({ page }, use) => {
     const [testAppPage, authPage] = page.context().pages();
-    if (authPage !== undefined) {
-      await authPage.waitForEvent("close", { timeout: 15_000 });
-    }
-    // The redirect flow renders the delegation only after navigating back to
-    // the test app, so wait for the return (principal visible) before reading.
-    if (authorizeConfig?.transport === "redirect") {
-      await expect(testAppPage.locator("#principal")).toBeVisible({
-        timeout: 15_000,
-      });
-    }
+    await waitForSignInResult(testAppPage, authPage);
 
     const delegation = await testAppPage.locator("#delegation").innerText();
     // The test app writes a plain status string here (e.g. "Current identity is
