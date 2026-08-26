@@ -1,7 +1,13 @@
 import { expect } from "@playwright/test";
 import { test } from "../../../fixtures";
 import { TEST_APP_CANONICAL_URL } from "../../../utils";
-import { continueAs, openSettings, signInAsFirstIdentity } from "./helpers";
+import {
+  continueAs,
+  listedBrowsers,
+  openSettings,
+  signInAsFirstIdentity,
+  signOutFirstBrowser,
+} from "./helpers";
 
 /**
  * Access that can be ended is the point of the design, so these are the scenarios
@@ -123,11 +129,8 @@ test.describe("ending a session", () => {
       identities[0].identityNumber,
       signInWithIdentity,
     );
-    const listed = await settings
-      .getByRole("button", { name: "Sign out" })
-      .count();
-    await settings.getByRole("button", { name: "Sign out" }).first().click();
-    await expect(settings.getByText("Signed out")).toBeVisible();
+    const listed = await listedBrowsers(settings).count();
+    await signOutFirstBrowser(settings);
 
     // DEV-18: the entry stays, so signing in again reuses it.
     await testApp.focus();
@@ -142,9 +145,7 @@ test.describe("ending a session", () => {
       identities[0].identityNumber,
       signInWithIdentity,
     );
-    await expect(
-      listedAgain.getByRole("button", { name: "Sign out" }),
-    ).toHaveCount(listed);
+    await expect(listedBrowsers(listedAgain)).toHaveCount(listed);
     await listedAgain.close();
   });
 });
