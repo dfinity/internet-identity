@@ -18,7 +18,7 @@ Internet Identity is an authentication and identity service for the [Internet Co
 Internet Identity is:
 
 - **Simple**: Uses [passkeys][webauthn] (TouchID, FaceID, Windows Hello, security keys) for passwordless registration and authentication. Users can also sign in with their Google, Apple, or Microsoft account via [OpenID Connect](https://openid.net/developers/how-connect-works/).
-- **Flexible**: Integrating Internet Identity is as simple as using the [agent-js](https://github.com/dfinity/agent-js) library or the ICRC authentication standards. No need to interact with the canister smart contract directly.
+- **Flexible**: Integrating Internet Identity is as simple as using the [`@icp-sdk/auth`](https://www.npmjs.com/package/@icp-sdk/auth) and [`@icp-sdk/core`](https://www.npmjs.com/package/@icp-sdk/core) libraries or the ICRC authentication standards. No need to interact with the canister smart contract directly.
 - **Secure**: A unique identity (principal) is derived for each app a user authenticates to, preventing cross-app tracking. Cryptographic material never leaves the user's device.
 
 For more information, see the [Internet Identity documentation](https://docs.internetcomputer.org/guides/authentication/internet-identity) on [internetcomputer.org](https://internetcomputer.org).
