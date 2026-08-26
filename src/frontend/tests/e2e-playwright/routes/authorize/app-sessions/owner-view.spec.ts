@@ -1,10 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../../../fixtures";
-import {
-  openSettings,
-  SESSION_SIGN_IN,
-  signInAsFirstIdentity,
-} from "./helpers";
+import { openSettings, signInAsFirstIdentity } from "./helpers";
 
 /**
  * Ending access is only useful if the owner can see what there is to end, so a
@@ -15,7 +11,7 @@ import {
  * specs cover.
  */
 test.describe("what the owner sees", () => {
-  test.use({ authorizeConfig: SESSION_SIGN_IN });
+  test.use({ authorizeConfig: { protocol: "icrc25" } });
 
   test.describe("the browser appears in the list after signing in", () => {
     test.afterEach(
