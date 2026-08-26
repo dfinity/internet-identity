@@ -21,7 +21,7 @@ Internet Identity is:
 - **Flexible**: Integrating Internet Identity is as simple as using the [`@icp-sdk/auth`](https://www.npmjs.com/package/@icp-sdk/auth) and [`@icp-sdk/core`](https://www.npmjs.com/package/@icp-sdk/core) libraries or the ICRC authentication standards. No need to interact with the canister directly.
 - **Secure**: A unique identity (principal) is derived for each app a user authenticates to, preventing cross-app tracking. Cryptographic material never leaves the user's device.
 
-For more information, see the [Internet Identity documentation](https://docs.internetcomputer.org/guides/authentication/internet-identity) on [docs.internetcomputer.org](https://docs.internetcomputer.org).
+For more information, see the [Internet Identity documentation](https://docs.internetcomputer.org/guides/authentication/internet-identity).
 
 ### Table of Contents
 
@@ -138,7 +138,7 @@ We're here to help. Here are some ways you can reach out for help if you get stu
 ## Links
 
 - [Internet Identity Specification][spec], the official Internet Identity Specification
-- [Internet Identity Documentation](https://docs.internetcomputer.org/guides/authentication/internet-identity) on [docs.internetcomputer.org](https://docs.internetcomputer.org)
+- [Internet Identity Documentation](https://docs.internetcomputer.org/guides/authentication/internet-identity)
 
 [webauthn]: https://webauthn.guide
 [hacking]: ./HACKING.md#running-locally
