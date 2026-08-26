@@ -1,5 +1,5 @@
 import { test } from "../../../fixtures";
-import { continueAs, SESSION_SIGN_IN, signInAsFirstIdentity } from "./helpers";
+import { continueAs, signInAsFirstIdentity } from "./helpers";
 
 /**
  * What a browser keeps between visits, and what it must not. Clearing the site's
@@ -11,7 +11,7 @@ import { continueAs, SESSION_SIGN_IN, signInAsFirstIdentity } from "./helpers";
  * needs the browser closed and reopened, which a test cannot do to itself.
  */
 test.describe("coming back later", () => {
-  test.use({ authorizeConfig: SESSION_SIGN_IN });
+  test.use({ authorizeConfig: { protocol: "icrc25" } });
 
   test.describe("clearing the site's data is a clean start", () => {
     test.afterEach(async ({ signedInApp }) => {
