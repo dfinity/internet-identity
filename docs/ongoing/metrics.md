@@ -56,6 +56,15 @@ Visitor behaviour, funnels, page views, drop-off and anything else measurable fr
 
 The same rule excludes some session questions. Whether a silent re-issue rendered nothing, and whether it had anything to resume from, are decided in the frontend; the canister sees a delegation request like any other.
 
+## Walking through the result
+
+The twenty-two panels this document argues for are laid out as four sub-dashboards in
+[metrics-dashboards/](metrics-dashboards/README.md), one page per question, linked to each other
+the way a Grafana folder would be. Every panel there is a sketch of the finished chart with the
+query under it, so the proposal can be clicked through before any of it is built.
+
+Read that for the shape. Read the entries below for why each panel is the way it is.
+
 ## The dashboard, most useful first
 
 Ordered by how often the panel would change a decision, not by where it sits on the screen today. Each entry says whether it stays, changes, or is new. What gets deleted is listed after them.
@@ -523,20 +532,63 @@ xychart-beta
 The family plotted per structure on a log-2 axis, in pages.
 
 **Verdict.**
-Correct and unreadable. Live there are 25 structures totalling 238,574 pages, 14.6 GiB, of which `identities` alone is 77.6 percent. The unit is pages rather than bytes, the log scale flattens the differences that matter, and the series names are storage internals.
+The data is right and the panel is unusable. Twenty-five series, all flat, on a log-2 axis from 1 to 262,144, labelled by internal structure name, with a legend that takes more vertical space than the plot. Nothing about it survives a glance, and nobody could answer "where is the memory going" from it.
+
+Worse, the list behind it is hand-maintained. `memory_sizes()` enumerates each memory by hand, so a memory added to storage is invisible until somebody remembers to add it here, and four have been missed:
+
+| Never reported                                      | What it holds                                        |
+| --------------------------------------------------- | ---------------------------------------------------- |
+| `lookup_session_with_principal_memory`              | The session index. The session feature's own storage |
+| `stable_account_counter_memory`                     | The global account counter                           |
+| `stable_account_counter_discrepancy_counter_memory` | How often that counter had to be rebuilt             |
+| `next_application_number_memory`                    | The application number allocator                     |
+
+Three of those are single cells and will never matter. The first is an index that grows with every session, so as sessions roll out the memory panel will be blind to the one structure whose growth is new.
+
+One published label is also taken by the wrong memory: `stable_account_counter` reports `stable_anchor_account_counter_memory`, the per-identity map, while the global counter cell of nearly that name is one of the four above.
 
 **Wording.**
-Three problems in one title. "Virtual memory" is the stable-structure abstraction rather than anything virtual, "page sizes" are counts of 64 KiB pages rather than sizes, and the series names are storage internals. What the panel answers is where the stable memory goes, so that is the title, and the unit should be bytes.
+Three problems in the title alone. "Virtual memory" is the stable-structure abstraction rather than anything virtual, "page sizes" are counts of 64 KiB pages rather than sizes, and every series name is an internal identifier. The panel answers where stable memory goes, so that is the title, the unit is bytes, and each series needs a label a reader can act on:
+
+| Memory                                                | Label                                | Live        |
+| ----------------------------------------------------- | ------------------------------------ | ----------- |
+| `identities`                                          | Identities, original layout          | 11,576 MiB  |
+| `stable_identities`                                   | Identities, current layout           | 1,680 MiB   |
+| `mcp_config_memory`                                   | MCP configs                          | 639 MiB     |
+| `lookup_anchor_with_device_credential`                | Index: device credential to identity | 415 MiB     |
+| `lookup_anchor_with_passkey_pubkey_hash_memory`       | Index: passkey to identity           | 217 MiB     |
+| `event_data`                                          | Statistics event log                 | 146 MiB     |
+| `lookup_anchor_with_recovery_phrase_principal_memory` | Index: recovery phrase to identity   | 127 MiB     |
+| `lookup_anchor_with_openid_credential`                | Index: OpenID credential to identity | 67 MiB      |
+| `event_aggregations`                                  | Statistics aggregations              | 20 MiB      |
+| `archive_buffer`                                      | Operations waiting for the archive   | 14 MiB      |
+| `stable_accounts`                                     | Named accounts                       | 3.6 MiB     |
+| `stable_account_reference_list`                       | App records                          | 1.9 MiB     |
+| `stable_applications`                                 | Apps                                 | 1.5 MiB     |
+| `stable_account_counter`                              | Per-identity account counts          | 1.4 MiB     |
+| `stable_anchor_application_config`                    | Per-identity app settings            | 0.8 MiB     |
+| `lookup_application_with_origin`                      | Index: origin to app                 | 0.6 MiB     |
+| the remaining nine, one page each                     | Config, caches, allocators, trackers | under 1 MiB |
+
+The two identity rows are the ones worth naming carefully. There are two identity storages, and 77.6 percent of all stable memory sits in the one labelled `identities`, which is the original layout, against 1,680 MiB in the newer `stable_identities`. A panel that said so would make the state of that migration visible at a glance; today the two are adjacent flat lines with near-identical names.
 
 **Change.**
-No source change. Two panels: a readable ranking titled "Stable memory by structure", in bytes, and the existing log view retitled to say it is a debugging view for spotting a structure that jumps by an order of magnitude. Neither should say "virtual memory page sizes", which names the mechanism rather than the question.
+Source changed: `memory_sizes()` to cover every memory, ideally derived from the memory manager rather than hand-listed, so the next memory added is reported without anybody remembering. Source changed: rename `stable_account_counter` to match what it reports. Two panels replace one, a bytes ranking and the log view kept as an explicitly labelled debugging view.
+
+```mermaid
+xychart-beta
+  title "As rendered: twenty-five flat lines on a log axis"
+  x-axis "structure, in the order the legend lists them" [s1, s2, s3, s4, s5, s6, s7, s8]
+  y-axis "pages, log scale" 1 --> 262144
+  line [185220, 26873, 10229, 6640, 3471, 2340, 2026, 1065]
+```
 
 ```mermaid
 xychart-beta
   title "Stable memory by structure, live values"
-  x-axis "structure" ["identities", "stable_identities", "mcp_config", "device_cred_index", "passkey_index", "event_data", "rest"]
+  x-axis "structure" ["identities, original", "identities, current", "MCP configs", "device index", "passkey index", "event log", "recovery index", "other"]
   y-axis "MiB" 0 --> 12000
-  bar [11576, 1680, 639, 415, 217, 146, 273]
+  bar [11576, 1680, 639, 415, 217, 146, 127, 90]
 ```
 
 ### Days until internet identity becomes full
