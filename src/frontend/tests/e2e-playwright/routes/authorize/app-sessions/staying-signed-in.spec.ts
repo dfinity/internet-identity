@@ -1,5 +1,5 @@
 import { test } from "../../../fixtures";
-import { SESSION_SIGN_IN, signInAsFirstIdentity } from "./helpers";
+import { signInAsFirstIdentity } from "./helpers";
 
 /**
  * An app delegation lasts five minutes and a session lasts hours, so an app left
@@ -12,7 +12,7 @@ import { SESSION_SIGN_IN, signInAsFirstIdentity } from "./helpers";
  * HOLD-6 — and the silent re-issue an app can ask for itself.
  */
 test.describe("staying signed in", () => {
-  test.use({ authorizeConfig: SESSION_SIGN_IN });
+  test.use({ authorizeConfig: { protocol: "icrc25" } });
 
   test.describe("the app keeps working for longer than one app delegation lasts", () => {
     test.afterEach(async ({ signedInApp }) => {
