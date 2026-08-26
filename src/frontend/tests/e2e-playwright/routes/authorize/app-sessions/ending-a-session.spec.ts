@@ -24,10 +24,10 @@ test.describe("ending a session", () => {
   test.describe("signing out leaves nothing behind, across a reload", () => {
     test.afterEach(async ({ signedInApp }) => {
       await signedInApp.signOut();
-      await expect(signedInApp.state).toHaveText("no session");
+      await signedInApp.expectSignedOut();
 
       await signedInApp.reload();
-      await expect(signedInApp.state).toHaveText("no session");
+      await signedInApp.expectSignedOut();
     });
 
     test("picks an identity and continues", signInAsFirstIdentity);
@@ -36,7 +36,7 @@ test.describe("ending a session", () => {
   test.describe("a silent re-issue with nothing to answer from fails one way", () => {
     test.afterEach(async ({ signedInApp }) => {
       await signedInApp.signOut();
-      await expect(signedInApp.state).toHaveText("no session");
+      await signedInApp.expectSignedOut();
 
       await signedInApp.silentReauth();
 
@@ -45,8 +45,7 @@ test.describe("ending a session", () => {
       // transport opens a channel either way, and SIL-1 is about screens, which
       // the redirect transport the silent design targets is what makes
       // checkable.
-      await expect(signedInApp.log).toContainText("error", { timeout: 30_000 });
-      await expect(signedInApp.state).toHaveText("no session");
+      await signedInApp.expectSilentReauthFailed();
     });
 
     test("picks an identity and continues", signInAsFirstIdentity);
@@ -74,9 +73,7 @@ test.describe("ending a session", () => {
         await signedInApp.ageDelegation();
         await signedInApp.replaceDelegation();
 
-        await expect(signedInApp.state).toHaveText("no session", {
-          timeout: 30_000,
-        });
+        await signedInApp.expectSignedOut();
       },
     );
 
@@ -106,10 +103,10 @@ test.describe("ending a session", () => {
 
     await testApp.focus();
     await testApp.signOut();
-    await expect(testApp.state).toHaveText("no session");
+    await testApp.expectSignedOut();
 
     // Another origin is another account and another session.
-    await expect(other.state).toHaveText("signed in");
+    await other.waitUntilSignedIn();
     await other.close();
   });
 
