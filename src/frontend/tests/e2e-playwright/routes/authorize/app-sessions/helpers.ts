@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { II_URL } from "../../../utils";
 
 /**
@@ -52,6 +52,28 @@ export const openSettings = async (
     settings.getByRole("heading", { name: "Signed-in browsers" }),
   ).toBeVisible();
   return settings;
+};
+
+/** One row per browser the identity is signed in from. */
+export const listedBrowsers = (settings: Page): Locator =>
+  settings.getByRole("button", { name: "Sign out" });
+
+/** Fails unless the identity's settings list at least one browser. */
+export const expectBrowserListed = async (settings: Page): Promise<void> => {
+  await expect(listedBrowsers(settings).first()).toBeVisible();
+};
+
+/**
+ * Signs the first listed browser out and waits for settings to say it is done.
+ *
+ * Ending a sign-in is a canister call, so this waits longer than an assertion
+ * about something already on the page would.
+ */
+export const signOutFirstBrowser = async (settings: Page): Promise<void> => {
+  await listedBrowsers(settings).first().click();
+  await expect(settings.getByText("Signed out")).toBeVisible({
+    timeout: 30_000,
+  });
 };
 
 /** The domain whose subdomains share a session in the sibling scenarios. */

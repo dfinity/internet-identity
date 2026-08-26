@@ -285,10 +285,17 @@ export class TestApp {
     await this.page.clock.fastForward(duration);
   }
 
-  /** Forgets everything this origin stored, as clearing site data would. */
+  /**
+   * Forgets everything this origin stored, as clearing site data would.
+   *
+   * Cookies included: a domain announces a session to its subdomains in one,
+   * so a clean start that left them would not be one.
+   */
   async clearSiteData(): Promise<void> {
+    await this.page.context().clearCookies();
     await this.page.evaluate(async () => {
       localStorage.clear();
+      sessionStorage.clear();
       const databases = (await indexedDB.databases?.()) ?? [];
       await Promise.all(
         databases.map(
