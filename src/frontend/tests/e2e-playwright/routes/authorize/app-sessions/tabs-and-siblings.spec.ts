@@ -1,4 +1,3 @@
-import { expect } from "@playwright/test";
 import { test } from "../../../fixtures";
 import {
   TEST_APP_DERIVATION_ORIGIN,
@@ -27,14 +26,13 @@ test.describe("more than one tab, and sibling subdomains", () => {
 
   test.describe("a second tab of the origin is already signed in", () => {
     test.afterEach(async ({ signedInApp, openTestApp, context }) => {
-      await expect(signedInApp.account).not.toHaveText("-");
-      const account = await signedInApp.account.textContent();
+      const account = await signedInApp.accountPrincipal();
 
       const second = openTestApp(await context.newPage());
       await second.visit();
 
-      await expect(second.state).toHaveText("signed in");
-      await expect(second.account).toHaveText(account ?? "");
+      await second.waitUntilSignedIn();
+      await second.expectAccount(account);
       await second.close();
     });
 
@@ -45,11 +43,11 @@ test.describe("more than one tab, and sibling subdomains", () => {
     test.afterEach(async ({ signedInApp, openTestApp, context }) => {
       const second = openTestApp(await context.newPage());
       await second.visit();
-      await expect(second.state).toHaveText("signed in");
+      await second.waitUntilSignedIn();
 
       await signedInApp.signOut();
 
-      await expect(second.state).toHaveText("no session");
+      await second.expectSignedOut();
       await second.close();
     });
 
@@ -60,12 +58,12 @@ test.describe("more than one tab, and sibling subdomains", () => {
     test.afterEach(async ({ signedInApp, openTestApp, context }) => {
       const second = openTestApp(await context.newPage());
       await second.visit();
-      await expect(second.state).toHaveText("signed in");
+      await second.waitUntilSignedIn();
       await second.close();
 
       await signedInApp.replaceDelegation();
-      await expect(signedInApp.state).toHaveText("signed in");
-      await expect(signedInApp.delegation).not.toHaveText("none held");
+      await signedInApp.waitUntilSignedIn();
+      await signedInApp.expectHoldsDelegation();
     });
 
     test("picks an identity and continues", signInAsFirstIdentity);
@@ -96,11 +94,10 @@ test.describe("more than one tab, and sibling subdomains", () => {
     await testApp.signIn(
       continueAs(identities[0].identityNumber, signInWithIdentity),
     );
-    const account = await testApp.account.textContent();
+    const account = await testApp.accountPrincipal();
 
-    // HINT-1: what crosses between siblings names the account and an expiry.
-    await expect(testApp.sharedHint).not.toHaveText("none");
-    await expect(testApp.sharedHint).toContainText("until");
+    // HINT-1: the domain announces the session to its subdomains.
+    await testApp.expectSharesSession();
 
     const other = openTestApp(await context.newPage());
     await other.open({
@@ -109,13 +106,13 @@ test.describe("more than one tab, and sibling subdomains", () => {
       cookieDomain: SHARED_DOMAIN,
     });
     // Never signed in here, but the domain announces that a session exists.
-    await expect(other.sharedHint).not.toHaveText("none");
-    await expect(other.state).toHaveText("no session");
+    await other.expectSharesSession();
+    await other.expectSignedOut();
 
     // SIL-5: it re-issues its own chain from the same session.
     await other.silentReauth();
-    await expect(other.state).toHaveText("signed in", { timeout: 30_000 });
-    await expect(other.account).toHaveText(account ?? "");
+    await other.expectSilentReauthSucceeded();
+    await other.expectAccount(account);
     await other.close();
   });
 
@@ -148,18 +145,18 @@ test.describe("more than one tab, and sibling subdomains", () => {
       cookieDomain: SHARED_DOMAIN,
     });
     await other.silentReauth();
-    await expect(other.state).toHaveText("signed in", { timeout: 30_000 });
+    await other.expectSilentReauthSucceeded();
 
     // HINT-3: signing out retracts what the domain shares, so the sibling has
     // nothing to resume from and asks the user instead.
     await testApp.focus();
     await testApp.signOut();
-    await expect(testApp.state).toHaveText("no session");
+    await testApp.expectSignedOut();
 
     await other.focus();
     await other.reload();
-    await expect(other.sharedHint).toHaveText("none", { timeout: 20_000 });
-    await expect(other.state).toHaveText("no session");
+    await other.expectSharesNothing();
+    await other.expectSignedOut();
     await other.close();
   });
 });
