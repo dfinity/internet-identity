@@ -120,9 +120,14 @@ export class TestApp {
     await expect(this.state).toHaveText(HOLDS_NOTHING, { timeout: ROUND_TRIP });
   }
 
+  /** Fails unless the app is acting as some account. */
+  async expectHoldsAccount(): Promise<void> {
+    await expect(this.account).not.toHaveText(NO_ACCOUNT);
+  }
+
   /** The principal an app's canisters see, once the app has one. */
   async accountPrincipal(): Promise<string> {
-    await expect(this.account).not.toHaveText(NO_ACCOUNT);
+    await this.expectHoldsAccount();
     return this.account.innerText();
   }
 
