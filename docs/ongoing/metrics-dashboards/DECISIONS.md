@@ -119,11 +119,13 @@ The memory panel must report every memory. Four are missing from the list that f
 
 ## Settled questions
 
-**Sessions orphaned by an identity change is a bug to file, not a chart.** Removing a passkey or an OpenID credential does not revoke the sessions it created, so somebody who removes a stolen credential believes they have cut off access and has not. All three designers reached this independently, with the same reasoning: you fix it at any value above zero, so no reading of the chart changes a decision. It becomes one more reason on the endings panel afterwards, as the way to verify the fix.
+**Nothing charts sessions against the access method that created them, because a session is not bound to one.** A session record carries the browser it belongs to and nothing about the passkey or credential that authenticated the ceremony, so "the sessions this passkey created" is not a quantity the canister holds. Somebody whose access method is stolen removes it and signs out the browsers they do not recognise; those are two controls the settings screen already offers, and the second is the one that ends access.
 
 **Per-app panels are bounded and floored.** At most twenty series per family, chosen by that family's own value in the window, and only for apps at or above one hundred; everything else sums into one `other` bucket. Any per-app value that can _decrease_ is additionally rounded down to a multiple of ten, because a scrape-to-scrape delta near the floor would otherwise isolate one person leaving.
 
-This matters more than it looks: `/metrics` is served from a query with no caller check, it is public, and whoever scrapes it archives it permanently. Today's canister-side `take(10)` is doing this privacy work by accident; it should be doing it on purpose. Gating the endpoint is worth a separate ticket — it also runs two full-map scans per scrape, unauthenticated and unthrottled — but the floor is correct either way.
+This matters more than it looks: `/metrics` is served from a query with no caller check, it is public, and whoever scrapes it archives it permanently. Today's canister-side `take(10)` is doing this privacy work by accident; it should be doing it on purpose.
+
+Scrape cost is not the reason. Almost every value on the endpoint is a stored counter read directly; the per-app families read rows that `event_aggregations` maintains as events arrive, and rank them at scrape rather than recomputing them. Two MCP gauges do scan their map per scrape and say so in their own help text, over 85 and 1 entries respectively. The floor is a privacy measure and stands on that alone.
 
 **Four of today's panels die with nothing replacing them.** Bounce Rate, both cumulative-session-length panels, and Registration Rates. Three more die by merging into a panel that answers the same question better.
 
