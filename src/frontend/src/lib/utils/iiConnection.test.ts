@@ -67,6 +67,7 @@ const DEFAULT_INIT: InternetIdentityInit = {
   enable_dnssec_email_recovery: [],
   doh_config: [],
   dnssec_config: [],
+  notifications_enabled: [],
 };
 
 vi.mock("$lib/globals", () => ({
