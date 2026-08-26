@@ -53,12 +53,11 @@ test.describe("app sessions", () => {
   test.use({ authorizeConfig: { protocol: "icrc25" } });
 
   test.describe("FIRST-1: a first sign-in leaves the app holding a session and a delegation", () => {
-    test.afterEach(async ({ testApp }) => {
-      await testApp.waitUntilSignedIn();
-      await expect(testApp.account).not.toHaveText("-");
+    test.afterEach(async ({ signedInApp }) => {
+      await expect(signedInApp.account).not.toHaveText("-");
       // The ceremony mints before it resolves, so a delegation is held straight
       // away rather than only once the tab next comes forward.
-      await expect(testApp.delegation).not.toHaveText("none held");
+      await expect(signedInApp.delegation).not.toHaveText("none held");
     });
 
     test("picks an identity and continues", async ({
@@ -74,18 +73,17 @@ test.describe("app sessions", () => {
   });
 
   test.describe("HOLD-1: the app keeps working for longer than one app delegation lasts", () => {
-    test.afterEach(async ({ testApp }) => {
-      await testApp.waitUntilSignedIn();
-      await expect(testApp.account).not.toHaveText("-");
-      const account = await testApp.account.textContent();
+    test.afterEach(async ({ signedInApp }) => {
+      await expect(signedInApp.account).not.toHaveText("-");
+      const account = await signedInApp.account.textContent();
 
-      await testApp.ageDelegation();
-      await testApp.replaceDelegation();
+      await signedInApp.ageDelegation();
+      await signedInApp.replaceDelegation();
 
-      await expect(testApp.state).toHaveText("signed in");
-      await expect(testApp.delegation).not.toHaveText("none held");
-      await expect(testApp.account).toHaveText(account ?? "");
-      await expect(testApp.replacements).not.toHaveText("0");
+      await expect(signedInApp.state).toHaveText("signed in");
+      await expect(signedInApp.delegation).not.toHaveText("none held");
+      await expect(signedInApp.account).toHaveText(account ?? "");
+      await expect(signedInApp.replacements).not.toHaveText("0");
     });
 
     test("picks an identity and continues", async ({
@@ -101,16 +99,15 @@ test.describe("app sessions", () => {
   });
 
   test.describe("HOLD-2: an app left open and untouched replaces nothing", () => {
-    test.afterEach(async ({ testApp }) => {
-      await testApp.waitUntilSignedIn();
-      await expect(testApp.replacements).toHaveText("0");
+    test.afterEach(async ({ signedInApp }) => {
+      await expect(signedInApp.replacements).toHaveText("0");
 
       // MINT-5 and MINT-14: the scheduled refresh cancels unless the delegation
       // it would replace signed a request, so an idle tab spends nothing.
-      await testApp.ageDelegation();
-      await testApp.page.waitForTimeout(1000);
+      await signedInApp.ageDelegation();
+      await signedInApp.page.waitForTimeout(1000);
 
-      await expect(testApp.replacements).toHaveText("0");
+      await expect(signedInApp.replacements).toHaveText("0");
     });
 
     test("picks an identity and continues", async ({
@@ -126,22 +123,21 @@ test.describe("app sessions", () => {
   });
 
   test.describe("HOLD-3: coming back to a tab replaces the delegation without being asked", () => {
-    test.afterEach(async ({ testApp }) => {
-      await testApp.waitUntilSignedIn();
-      await expect(testApp.replacements).toHaveText("0");
+    test.afterEach(async ({ signedInApp }) => {
+      await expect(signedInApp.replacements).toHaveText("0");
 
       // A delegation earns a replacement only once something used it (MINT-5).
-      await testApp.whoAmI();
+      await signedInApp.whoAmI();
 
       // MINT-7: the tab coming forward is the trigger; nothing is clicked to
       // mint.
-      await testApp.ageDelegation("04:55");
-      await testApp.returnToTab();
+      await signedInApp.ageDelegation("04:55");
+      await signedInApp.returnToTab();
 
-      await expect(testApp.replacements).not.toHaveText("0", {
+      await expect(signedInApp.replacements).not.toHaveText("0", {
         timeout: 30_000,
       });
-      await expect(testApp.state).toHaveText("signed in");
+      await expect(signedInApp.state).toHaveText("signed in");
     });
 
     test("picks an identity and continues", async ({
@@ -157,18 +153,17 @@ test.describe("app sessions", () => {
   });
 
   test.describe("HOLD-4: replacing the delegation renders nothing and keeps the account", () => {
-    test.afterEach(async ({ testApp }) => {
-      await testApp.waitUntilSignedIn();
-      await expect(testApp.account).not.toHaveText("-");
-      const account = await testApp.account.textContent();
-      const windowsBefore = testApp.openWindows;
+    test.afterEach(async ({ signedInApp }) => {
+      await expect(signedInApp.account).not.toHaveText("-");
+      const account = await signedInApp.account.textContent();
+      const windowsBefore = signedInApp.openWindows;
 
-      await testApp.replaceDelegation();
+      await signedInApp.replaceDelegation();
 
       // MINT-16: the account does not move. USE-6: nothing is rendered to do it.
-      await expect(testApp.account).toHaveText(account ?? "");
-      await expect(testApp.delegation).not.toHaveText("none held");
-      expect(testApp.openWindows).toBe(windowsBefore);
+      await expect(signedInApp.account).toHaveText(account ?? "");
+      await expect(signedInApp.delegation).not.toHaveText("none held");
+      expect(signedInApp.openWindows).toBe(windowsBefore);
     });
 
     test("picks an identity and continues", async ({
@@ -184,15 +179,14 @@ test.describe("app sessions", () => {
   });
 
   test.describe("HOLD-6: a reload comes back signed in, asking for nothing", () => {
-    test.afterEach(async ({ testApp }) => {
-      await testApp.waitUntilSignedIn();
-      await expect(testApp.account).not.toHaveText("-");
-      const account = await testApp.account.textContent();
+    test.afterEach(async ({ signedInApp }) => {
+      await expect(signedInApp.account).not.toHaveText("-");
+      const account = await signedInApp.account.textContent();
 
-      await testApp.reload();
+      await signedInApp.reload();
 
-      await expect(testApp.state).toHaveText("signed in");
-      await expect(testApp.account).toHaveText(account ?? "");
+      await expect(signedInApp.state).toHaveText("signed in");
+      await expect(signedInApp.account).toHaveText(account ?? "");
     });
 
     test("picks an identity and continues", async ({
@@ -208,10 +202,9 @@ test.describe("app sessions", () => {
   });
 
   test.describe("SHARE-1: a second tab of the origin is already signed in", () => {
-    test.afterEach(async ({ testApp, openTestApp, context }) => {
-      await testApp.waitUntilSignedIn();
-      await expect(testApp.account).not.toHaveText("-");
-      const account = await testApp.account.textContent();
+    test.afterEach(async ({ signedInApp, openTestApp, context }) => {
+      await expect(signedInApp.account).not.toHaveText("-");
+      const account = await signedInApp.account.textContent();
 
       const second = openTestApp(await context.newPage());
       await second.visit();
@@ -234,14 +227,12 @@ test.describe("app sessions", () => {
   });
 
   test.describe("SHARE-2: signing out in one tab is noticed in the other", () => {
-    test.afterEach(async ({ testApp, openTestApp, context }) => {
-      await testApp.waitUntilSignedIn();
-
+    test.afterEach(async ({ signedInApp, openTestApp, context }) => {
       const second = openTestApp(await context.newPage());
       await second.visit();
       await expect(second.state).toHaveText("signed in");
 
-      await testApp.signOut();
+      await signedInApp.signOut();
 
       await expect(second.state).toHaveText("no session");
       await second.close();
@@ -260,17 +251,15 @@ test.describe("app sessions", () => {
   });
 
   test.describe("SHARE-6: closing a tab does not disturb the others", () => {
-    test.afterEach(async ({ testApp, openTestApp, context }) => {
-      await testApp.waitUntilSignedIn();
-
+    test.afterEach(async ({ signedInApp, openTestApp, context }) => {
       const second = openTestApp(await context.newPage());
       await second.visit();
       await expect(second.state).toHaveText("signed in");
       await second.close();
 
-      await testApp.replaceDelegation();
-      await expect(testApp.state).toHaveText("signed in");
-      await expect(testApp.delegation).not.toHaveText("none held");
+      await signedInApp.replaceDelegation();
+      await expect(signedInApp.state).toHaveText("signed in");
+      await expect(signedInApp.delegation).not.toHaveText("none held");
     });
 
     test("picks an identity and continues", async ({
@@ -286,14 +275,12 @@ test.describe("app sessions", () => {
   });
 
   test.describe("EXIT-6: signing out leaves nothing behind, across a reload", () => {
-    test.afterEach(async ({ testApp }) => {
-      await testApp.waitUntilSignedIn();
+    test.afterEach(async ({ signedInApp }) => {
+      await signedInApp.signOut();
+      await expect(signedInApp.state).toHaveText("no session");
 
-      await testApp.signOut();
-      await expect(testApp.state).toHaveText("no session");
-
-      await testApp.reload();
-      await expect(testApp.state).toHaveText("no session");
+      await signedInApp.reload();
+      await expect(signedInApp.state).toHaveText("no session");
     });
 
     test("picks an identity and continues", async ({
@@ -309,18 +296,17 @@ test.describe("app sessions", () => {
   });
 
   test.describe("a silent re-issue keeps the account and asks nothing", () => {
-    test.afterEach(async ({ testApp }) => {
-      await testApp.waitUntilSignedIn();
-      await expect(testApp.account).not.toHaveText("-");
-      const account = await testApp.account.textContent();
+    test.afterEach(async ({ signedInApp }) => {
+      await expect(signedInApp.account).not.toHaveText("-");
+      const account = await signedInApp.account.textContent();
 
-      await testApp.silentReauth();
+      await signedInApp.silentReauth();
 
-      await expect(testApp.log).toContainText("silent re-auth", {
+      await expect(signedInApp.log).toContainText("silent re-auth", {
         timeout: 30_000,
       });
-      await expect(testApp.state).toHaveText("signed in");
-      await expect(testApp.account).toHaveText(account ?? "");
+      await expect(signedInApp.state).toHaveText("signed in");
+      await expect(signedInApp.account).toHaveText(account ?? "");
     });
 
     test("picks an identity and continues", async ({
@@ -336,20 +322,19 @@ test.describe("app sessions", () => {
   });
 
   test.describe("a silent re-issue with nothing to answer from fails one way", () => {
-    test.afterEach(async ({ testApp }) => {
-      await testApp.waitUntilSignedIn();
-      await testApp.signOut();
-      await expect(testApp.state).toHaveText("no session");
+    test.afterEach(async ({ signedInApp }) => {
+      await signedInApp.signOut();
+      await expect(signedInApp.state).toHaveText("no session");
 
-      await testApp.silentReauth();
+      await signedInApp.silentReauth();
 
       // FAIL-1 and SIL-2: one outcome, reported without asking the user
       // anything, and nothing created. Windows are not counted: the window
       // transport opens a channel either way, and SIL-1 is about screens, which
       // the redirect transport the silent design targets is what makes
       // checkable.
-      await expect(testApp.log).toContainText("error", { timeout: 30_000 });
-      await expect(testApp.state).toHaveText("no session");
+      await expect(signedInApp.log).toContainText("error", { timeout: 30_000 });
+      await expect(signedInApp.state).toHaveText("no session");
     });
 
     test("picks an identity and continues", async ({
@@ -365,13 +350,11 @@ test.describe("app sessions", () => {
   });
 
   test.describe("STAY-2: clearing the site's data is a clean start", () => {
-    test.afterEach(async ({ testApp }) => {
-      await testApp.waitUntilSignedIn();
+    test.afterEach(async ({ signedInApp }) => {
+      await signedInApp.clearSiteData();
+      await signedInApp.reload();
 
-      await testApp.clearSiteData();
-      await testApp.reload();
-
-      await expect(testApp.state).toHaveText("no session");
+      await expect(signedInApp.state).toHaveText("no session");
     });
 
     test("picks an identity and continues", async ({
@@ -390,7 +373,11 @@ test.describe("app sessions", () => {
     test.describe("SHOW-2: the browser appears in the list after signing in", () => {
       test.afterEach(
         async ({ testApp, context, identities, signInWithIdentity }) => {
+          // Stated here rather than taken from `signedInApp`, which this hook
+          // has nothing else to read: the row exists only once the sign-in has
+          // reached the canister.
           await testApp.waitUntilSignedIn();
+
           const settings = await openSettings(
             context,
             identities[0].identityNumber,
@@ -417,9 +404,7 @@ test.describe("app sessions", () => {
 
     test.describe("EXIT-3: signing the browser out from settings ends the app's access", () => {
       test.afterEach(
-        async ({ testApp, context, identities, signInWithIdentity }) => {
-          await testApp.waitUntilSignedIn();
-
+        async ({ signedInApp, context, identities, signInWithIdentity }) => {
           const settings = await openSettings(
             context,
             identities[0].identityNumber,
@@ -435,11 +420,11 @@ test.describe("app sessions", () => {
           // END-5 allows the app to keep working until the delegation it holds
           // expires, so nothing shows until one is due. It is the mint that then
           // discovers the session is gone.
-          await testApp.focus();
-          await testApp.ageDelegation();
-          await testApp.replaceDelegation();
+          await signedInApp.focus();
+          await signedInApp.ageDelegation();
+          await signedInApp.replaceDelegation();
 
-          await expect(testApp.state).toHaveText("no session", {
+          await expect(signedInApp.state).toHaveText("no session", {
             timeout: 30_000,
           });
         },

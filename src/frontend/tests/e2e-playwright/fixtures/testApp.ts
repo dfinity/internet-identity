@@ -112,12 +112,7 @@ export class TestApp {
     await this.page.close();
   }
 
-  /**
-   * Waits until the app holds a session.
-   *
-   * `afterEach` runs before the sign-in fixture's own teardown, so the
-   * provider's window may still be closing and the app may still be minting.
-   */
+  /** Waits until the app holds a session. */
   async waitUntilSignedIn(): Promise<void> {
     await expect(this.state).toHaveText("signed in", { timeout: 20_000 });
   }
@@ -240,11 +235,29 @@ export class TestApp {
 
 export const test = base.extend<{
   testApp: TestApp;
+  /**
+   * The app once it holds a session, for a hook that reads what a sign-in left
+   * behind.
+   *
+   * `afterEach` runs before the sign-in fixture's own teardown, so the
+   * provider's window may still be closing and the app may still be minting.
+   * Waiting here rather than in each hook keeps that out of the scenarios, the
+   * way `authorizedPrincipal` does for the specs that read a principal.
+   *
+   * Only a hook should ask for this. A test body that asks for it waits for a
+   * sign-in that has not been started yet.
+   */
+  signedInApp: TestApp;
   /** The same app in another tab, window or browser. */
   openTestApp: (page: Page) => TestApp;
 }>({
   testApp: async ({ page }, use) => {
     await use(new TestApp(page));
+  },
+  signedInApp: async ({ page }, use) => {
+    const app = new TestApp(page);
+    await app.waitUntilSignedIn();
+    await use(app);
   },
   // eslint-disable-next-line no-empty-pattern
   openTestApp: async ({}, use) => {
