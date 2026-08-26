@@ -141,9 +141,6 @@ export const test = base.extend<{
       await testAppPage
         .getByRole("textbox", { name: "Identity Provider" })
         .fill(internetIdentityURL + "/authorize" + querySuffix);
-      await testAppPage
-        .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
-        .setChecked(true);
       // The client refuses a session chain that names any provider but the one it
       // was configured with, and its default is the mainnet canister.
       await testAppPage
@@ -179,6 +176,13 @@ export const test = base.extend<{
         .getByRole("textbox", { name: "Identity Provider" })
         .fill(internetIdentityURL + "#authorize");
     }
+
+    // Stated for both protocols rather than only for the session one. The app's
+    // sign-in button defaults to ICRC-25 and sessions, so a legacy flow that
+    // leaves this alone runs the session path under a legacy config.
+    await testAppPage
+      .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
+      .setChecked(protocol === "icrc25");
 
     await expect(testAppPage.locator("#principal")).toBeHidden();
 
