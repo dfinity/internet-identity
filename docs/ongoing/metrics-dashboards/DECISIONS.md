@@ -117,6 +117,34 @@ Involuntary endings get their own panel rather than a bar beside voluntary ones.
 
 The memory panel must report every memory. Four are missing from the list that feeds it, including the session index — the one structure whose growth is entirely new — and one series is published against the wrong structure.
 
+## How these are reported
+
+A dashboard viewer chooses the time range. The canister should therefore publish
+quantities Prometheus can re-window, and bake in a window only where re-windowing is
+mathematically impossible. Today's endpoint does neither consistently: the two per-app
+families carry a `window="24h"` or `window="30d"` label, and not one of the 53 families is
+a histogram, so nothing can be re-bucketed or quantiled at query time.
+
+**A count of events is a counter, with no window label.** One counter, and
+`increase(x[$__range])` answers every window anyone asks for. This is why the two per-app
+panels collapse to one: the 24-hour and 30-day pair exist only because the canister computed
+both windows itself, and the time picker replaces them. The `window` label goes with them.
+
+**A distribution is a histogram, with `le` buckets.** Session age at use, the gap between
+returns, the granted term: each is a property of an event, not a window over events, so a
+counter cannot carry it. Published as `_bucket`/`_sum`/`_count`, quantiles work at query
+time and the cumulative reading of `le` is standard rather than something a panel has to
+define for itself. Bucket edges are fixed at publication and choosing them is a real
+decision, but that is inherent to histograms and is not a window in the sense above.
+
+**A count of unique things is the exception, and the window has to be the canister's.**
+Uniqueness does not add up: seven daily unique-identity counts cannot be combined into a
+weekly one, because Prometheus has no way to know how many identities appear in more than
+one day. Nothing at query time can recover it, so the canister must decide the window before
+it counts, and daily and monthly are two separate families rather than one re-windowable
+series. This is why active identities and active sessions keep their fixed windows while
+everything else loses them — the constraint is arithmetic, not habit.
+
 ## Settled questions
 
 **Nothing charts sessions against the access method that created them, because a session is not bound to one.** A session record carries the browser it belongs to and nothing about the passkey or credential that authenticated the ceremony, so "the sessions this passkey created" is not a quantity the canister holds. Somebody whose access method is stolen removes it and signs out the browsers they do not recognise; those are two controls the settings screen already offers, and the second is the one that ends access.
