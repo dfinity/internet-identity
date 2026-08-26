@@ -15,7 +15,7 @@ test.describe("signing in", () => {
 
   test.describe("a first sign-in leaves the app holding a session and a delegation", () => {
     test.afterEach(async ({ signedInApp }) => {
-      await signedInApp.accountPrincipal();
+      await signedInApp.expectHoldsAccount();
       // The ceremony mints before it resolves, so a delegation is held straight
       // away rather than only once the tab next comes forward.
       await signedInApp.expectHoldsDelegation();
