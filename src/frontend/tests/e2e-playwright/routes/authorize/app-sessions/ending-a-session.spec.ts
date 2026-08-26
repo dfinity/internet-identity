@@ -1,12 +1,7 @@
 import { expect } from "@playwright/test";
 import { test } from "../../../fixtures";
 import { TEST_APP_CANONICAL_URL } from "../../../utils";
-import {
-  continueAs,
-  openSettings,
-  SESSION_SIGN_IN,
-  signInAsFirstIdentity,
-} from "./helpers";
+import { continueAs, openSettings, signInAsFirstIdentity } from "./helpers";
 
 /**
  * Access that can be ended is the point of the design, so these are the scenarios
@@ -19,7 +14,7 @@ import {
  * and the silent re-issue that has nothing left to answer from.
  */
 test.describe("ending a session", () => {
-  test.use({ authorizeConfig: SESSION_SIGN_IN });
+  test.use({ authorizeConfig: { protocol: "icrc25" } });
 
   test.describe("signing out leaves nothing behind, across a reload", () => {
     test.afterEach(async ({ signedInApp }) => {
