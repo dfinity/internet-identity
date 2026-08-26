@@ -2,19 +2,13 @@
 
 [Dashboards](README.md) · [Health](health.md) · [Usage](usage.md) · [Staying signed in](staying-signed-in.md) · **Access methods** · [Storage and capacity](storage.md)
 
-Which methods people authenticate with, and how that mix moves. Reasoning for each panel is in [metrics.md](../metrics.md).
+Which methods people authenticate with, and how that mix moves.
 
-This is a concern on its own, not a breakdown of anything. Nothing on [Adoption and usage](usage.md) is labelled by access method: a count of sign-ins is a count of sign-ins whoever signed in with what, and it should not move when the mix here changes. The two panels below are the whole of what the endpoint says about the mix, and the whole of where it is read.
+This is a concern on its own, not a breakdown of anything. Nothing on [Usage](usage.md) is labelled by access method: a count of sign-ins is a count of sign-ins whoever made them with whatever, and it should not move when the mix here changes.
 
 ## Daily active authentication methods
 
-`internet_identity_daily_active_authn_methods` with `legendFormat: {{type}} {{issuer}}`
-
-The metric carries `type` and `issuer`, and OpenID appears once per issuer, so today's `{{type}}` legend renders five distinct series all called `openid`. One legend field is the whole fix.
-
-Three of the remaining names are internal: `webauthn_auth` is a passkey used to sign in, `webauthn_recovery` one used to recover, `browser_storage_key` a key held in the browser rather than in a passkey or an OpenID credential.
-
-Live, and the reason this panel matters: OpenID together is 1,485 against 2,272 for passkeys.
+The mix, day by day. Live it is the reason this page exists: OpenID together is 1,485 against 2,272 for passkeys.
 
 ```mermaid
 xychart-beta
@@ -24,11 +18,39 @@ xychart-beta
   bar [2272, 1412, 52, 21, 30]
 ```
 
+<details>
+<summary><b>Today:</b> Daily Active Authentication Methods — five series all called <code>openid</code></summary>
+
+Plots `internet_identity_daily_active_authn_methods{type, issuer}` with `legendFormat: {{type}}`. The family carries `type` **and** `issuer`, and OpenID appears once per issuer, so five distinct series render under the same name and cannot be told apart.
+
+```mermaid
+xychart-beta
+  title "As rendered: five series indistinguishable in the legend"
+  x-axis "series as labelled" ["openid", "openid", "openid", "webauthn_auth", "recovery_phrase"]
+  y-axis "identities" 0 --> 2500
+  bar [1412, 52, 21, 2272, 30]
+```
+
+Three of the series names are also internal. `webauthn_auth` is a passkey used to sign in and `webauthn_recovery` one used to recover; `browser_storage_key` is a key held in the browser rather than in a passkey or an OpenID credential; `other` is anything the enum does not name.
+
+</details>
+
+<details>
+<summary><b>Sources and formula</b></summary>
+
+No source change. One legend field is the whole fix, plus renaming the series to passkey, recovery passkey and browser-stored key.
+
+```promql
+internet_identity_daily_active_authn_methods
+```
+
+with `legendFormat: {{type}} {{issuer}}`.
+
+</details>
+
 ## Monthly active authentication methods
 
-`internet_identity_monthly_active_authn_methods` with `legendFormat: {{type}} {{issuer}}`
-
-The same metric over a month, and the same one-field fix. The monthly window is where a shift in the mix shows up as a trend rather than as a weekday, which is what makes it worth its own panel.
+The same mix over a month, which is where a shift shows up as a trend rather than as a weekday.
 
 ```mermaid
 xychart-beta
@@ -37,3 +59,23 @@ xychart-beta
   y-axis "% of active methods" 0 --> 60
   line [21, 26, 31, 35, 38, 40]
 ```
+
+<details>
+<summary><b>Today:</b> Monthly Active Authentication Methods — the same legend bug</summary>
+
+Identical construction to the daily panel and identically illegible: `legendFormat: {{type}}` on a metric labelled by type and issuer.
+
+</details>
+
+<details>
+<summary><b>Sources and formula</b></summary>
+
+No source change; the same one-field fix.
+
+```promql
+internet_identity_monthly_active_authn_methods
+```
+
+with `legendFormat: {{type}} {{issuer}}`.
+
+</details>
