@@ -1,10 +1,12 @@
-# Adoption and usage
+# Usage
 
-[Dashboards](README.md) · [Health](health.md) · **Adoption and usage** · [Apps](apps.md) · [Storage and capacity](storage.md)
+[Dashboards](README.md) · [Health](health.md) · **Usage** · [Staying signed in](staying-signed-in.md) · [Access methods](access.md) · [Storage and capacity](storage.md)
 
-Is it being used, by how many people, and for how long. The page to open before a planning conversation. Reasoning for each panel is in [metrics.md](../metrics.md).
+How much it is used, by how many people, on which apps, and how far the session rollout has got. The page to open before a planning conversation.
 
-## Sign-ins per hour · replaces Logins per Hour
+Everything here is a volume. Whether people come back is a different question and has [its own page](staying-signed-in.md). Nothing here is labelled by how anyone authenticated either — that is [Access methods](access.md), and a usage number should not move when the mix does. Reasoning for each panel is in [metrics.md](../metrics.md).
+
+## Sign-ins per hour
 
 `sum by (flow) (rate(internet_identity_sign_ins_total[5m])) * 3600`
 
@@ -28,7 +30,7 @@ xychart-beta
   line [270, 270, 215, 175, 130, 120, 60, 40]
 ```
 
-## Share of sign-ins that created a session · new
+## Share of sign-ins that created a session
 
 `sum(rate(internet_identity_sign_ins_total{flow="session"}[1d])) / sum(rate(internet_identity_sign_ins_total[1d]))`
 
@@ -42,53 +44,55 @@ xychart-beta
   line [2, 9, 21, 38, 52, 63, 71, 76]
 ```
 
-## How long sign-ins last · new · replaces two panels
+## Sign-ins per app
 
-`histogram_quantile(0.5, sum by (le) (rate(internet_identity_session_age_seconds_bucket[7d])))`
+`topk(10, sum by (dapp) (increase(internet_identity_sign_ins_total[24h])))`
 
-Observed when a sign-in ends, because that is the last moment anything knows how old it was. Replaces both cumulative-session-length panels, which sum the lifetimes delegations were _requested for_ and render them in years.
+Which apps carry the traffic. A ranking rather than a time series, because a ranking is what people read off it, and one panel replaces the 24-hour and 30-day pair: once sign-ins come from a counter, Prometheus computes any window and the dashboard's time picker chooses it.
 
-Sign-ins that ran the full 30 days all land in the top bucket, so quantiles above that share are meaningless. Sign-ins nobody returns to are removed late, so they are under-represented.
-
-```mermaid
-xychart-beta
-  title "How long sign-ins lasted, last 30 days"
-  x-axis "lifetime" ["0-5m", "5m-1h", "1-6h", "6-24h", "1-3d", "3-7d", "7-14d", "14-30d", "full 30d"]
-  y-axis "sign-ins ended" 0 --> 30000
-  bar [1800, 4200, 7600, 12000, 19000, 24000, 15000, 8000, 9500]
-```
-
-## How sign-ins ended · new
-
-`sum by (reason) (increase(internet_identity_sessions_ended_total[30d])) / scalar(sum(increase(internet_identity_sessions_ended_total[30d])))`
-
-A deliberate sign-out is somebody leaving; running the full term is somebody who stopped coming back. This is also the only measure of whether the settings screen is used: if almost nothing ends by a revocation from settings, the design's central promise is going unexercised.
+Today's panels are fed only by `prepare_account_delegation`, so a migrating app's line falls to zero while its usage is flat. They also filter on `ii_origin`, which scopes them to identities holding a passkey registered on one domain: 190 of 3,627. The replacement carries `dapp` and the flow, and nothing about how anyone authenticated.
 
 ```mermaid
 xychart-beta
-  title "How sign-ins ended, last 30 days"
-  x-axis "ended by" ["signed out in app", "revoked in settings", "signed out of II", "ran full term", "dropped at a cap"]
-  y-axis "% of sign-ins ended" 0 --> 60
-  bar [46, 7, 3, 42, 2]
+  title "Sign-ins per app, last 24 hours, both flows"
+  x-axis "app" ["app-a", "app-b", "app-c", "app-d", "app-e", "app-f"]
+  y-axis "sign-ins" 0 --> 600
+  bar [510, 240, 180, 120, 90, 60]
 ```
 
-## Daily and monthly active identities · fix
+## Identities per app
 
-`internet_identity_daily_active_anchors` with `..._by_domain`, plus the monthly pair
+`topk(10, internet_identity_identities_per_app)`
+
+Identities that have ever signed in to each app: reach rather than current traffic. Already stored as a count on each application record, so publishing it is a read and a sort.
+
+Useful beside the panel above, since an app with many identities and little traffic is one people signed up for and left.
+
+```mermaid
+xychart-beta
+  title "Identities that have signed in, ten largest apps"
+  x-axis "app" ["app-a", "app-b", "app-c", "app-d", "app-e", "app-f"]
+  y-axis "identities" 0 --> 60000
+  bar [51000, 33000, 21000, 14000, 9000, 6500]
+```
+
+## Daily and monthly active identities
+
+`internet_identity_daily_active_anchors` and `internet_identity_monthly_active_anchors`
 
 Identities that took an authenticated action in the window. Live: 3,627 daily, 38,079 monthly.
 
-The fix is publishing the remainder. The per-domain parts sum to 2,137 against a total of 3,627, because a domain is recorded only when the authenticating device carries one and OpenID credentials do not. The 1,490 difference matches the 1,485 daily active OpenID identities.
+The fix is removing the by-domain series plotted beside the total. They sum to 2,137 against 3,627, because a domain is recorded only from the authenticating passkey and OpenID credentials carry none — so they count passkeys by the domain they were registered on, not people by the domain they use. How somebody authenticated belongs on [Access methods](access.md); which domain a browser visited is measurable from the browser and belongs in Plausible.
 
 ```mermaid
 xychart-beta
-  title "Daily active identities by domain, with the remainder published"
-  x-axis "domain" ["id.ai", "no domain", "identity.ic0.app", "both", "internetcomputer.org"]
-  y-axis "identities" 0 --> 4000
-  bar [1893, 1490, 190, 34, 20]
+  title "Daily and monthly active identities, live values"
+  x-axis "window" ["daily", "monthly"]
+  y-axis "identities" 0 --> 40000
+  bar [3627, 38079]
 ```
 
-## Identities and registrations · keep
+## Identities and registrations
 
 `internet_identity_user_count`, and `increase(internet_identity_user_count[1d])`
 
@@ -102,16 +106,18 @@ xychart-beta
   line [840, 700, 610, 640, 900, 1180, 1120]
 ```
 
-## Traffic per signed-in user · new
+## Identity changes per hour
 
-`sum(rate(internet_identity_app_delegation_requests_total{outcome="served"}[1d])) * 86400 / internet_identity_daily_active_sessions`
+`rate(internet_identity_anchor_operations_counter[5m]) * 3600`
 
-Delegation requests per active sign-in per day. At a five-minute credential this is really a measure of how long apps stay open, and it is the figure to put beside any proposal to change those five minutes. Requests are a proxy for cost, not cost.
+Mutation volume: adding a passkey, renaming a device, linking an OpenID credential. Live: 7,453 since the last upgrade.
+
+The metric is a gauge that resets on upgrade, so `rate()` over it drops whatever accumulated before each deploy. Moving the counter into persistent state is the fix, and it is the same groundwork every new counter on this dashboard needs.
 
 ```mermaid
 xychart-beta
-  title "Delegation requests per active sign-in per day"
-  x-axis "day" [mon, tue, wed, thu, fri, sat, sun]
-  y-axis "requests per sign-in" 0 --> 40
-  line [27, 28, 29, 28, 28, 23, 24]
+  title "Identity changes per hour"
+  x-axis "hour" [h1, h2, h3, h4, h5, h6, h7, h8]
+  y-axis "operations per hour" 0 --> 400
+  line [210, 240, 225, 260, 310, 280, 245, 220]
 ```

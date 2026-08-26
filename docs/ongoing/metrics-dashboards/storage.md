@@ -1,10 +1,10 @@
 # Storage and capacity
 
-[Dashboards](README.md) · [Health](health.md) · [Adoption and usage](usage.md) · [Apps](apps.md) · **Storage and capacity**
+[Dashboards](README.md) · [Health](health.md) · [Usage](usage.md) · [Staying signed in](staying-signed-in.md) · [Access methods](access.md) · **Storage and capacity**
 
 Where the memory goes and when anything runs out. Opened rarely, and worth being right when it is. Reasoning for each panel is in [metrics.md](../metrics.md).
 
-## Stable memory by structure · replaces the log-scale panel
+## Stable memory by structure
 
 `internet_identity_virtual_memory_size_pages * 65536`, ranked, in bytes, with readable labels
 
@@ -24,7 +24,7 @@ The list behind the metric is hand-maintained, and four memories are missing fro
 
 The log-scale view is worth keeping as a second, explicitly labelled debugging panel: it is the right shape for spotting a structure that jumps by an order of magnitude, and the wrong shape for everything else.
 
-## Stable memory against its ceiling · fix
+## Stable memory against its ceiling
 
 `internet_identity_stable_memory_pages * 65536 / (256 * 1024^3) * 100`
 
@@ -38,7 +38,7 @@ xychart-beta
   bar [2.9, 5.8]
 ```
 
-## Identity numbers remaining · fix · two panels
+## Identity numbers remaining
 
 `(internet_identity_max_user_number - internet_identity_min_user_number - internet_identity_user_count + 1) / (deriv(internet_identity_user_count[1w]) * 86400)`
 
@@ -54,7 +54,7 @@ xychart-beta
   line [5600, 5480, 5310, 5020, 4760, 4510, 4310, 4112]
 ```
 
-## Operations archived · keep · plus a rate
+## Operations archived
 
 `ii_archive_entries_count{source="log"}`, and its rate
 
@@ -68,13 +68,13 @@ xychart-beta
   line [180, 210, 195, 240, 300, 260, 220, 205]
 ```
 
-## Archive stable memory · check
+## Archive stable memory
 
 `ii_archive_stable_memory_pages * 65536 / (500 * 1024^3) * 100`
 
 Same construction as the II panel, and the same open question: whether the archive canister has a managed cap below the subnet's 500 GiB. If it does, this needs the same correction. If it does not, the divergence from the II panel should be commented so nobody harmonises them wrongly later.
 
-## Stored records · keep
+## Stored records
 
 `internet_identity_total_accounts_count`, `internet_identity_total_account_references_count`, `internet_identity_total_application_count`
 

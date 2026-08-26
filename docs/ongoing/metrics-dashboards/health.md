@@ -1,10 +1,10 @@
 # Health
 
-[Dashboards](README.md) · **Health** · [Adoption and usage](usage.md) · [Apps](apps.md) · [Storage and capacity](storage.md)
+[Dashboards](README.md) · **Health** · [Usage](usage.md) · [Staying signed in](staying-signed-in.md) · [Access methods](access.md) · [Storage and capacity](storage.md)
 
 Is anything broken right now. This is the page to open when something is reported, and the only page carrying alerts. Reasoning for each panel is in [metrics.md](../metrics.md).
 
-## Delegation requests refused · new · alerts
+## Delegation requests refused
 
 `sum(rate(internet_identity_app_delegation_requests_total{outcome!="served"}[5m])) / sum(rate(internet_identity_app_delegation_requests_total[5m]))`
 
@@ -18,7 +18,7 @@ xychart-beta
   line [0.4, 0.4, 0.5, 6.2, 3.1, 0.6, 0.4, 0.4]
 ```
 
-## Archive pull staleness · keep · alerts
+## Archive pull staleness
 
 `time() - ii_archive_last_successful_fetch_timestamp_seconds`
 
@@ -32,7 +32,7 @@ xychart-beta
   line [12, 8, 14, 11, 9, 13, 12.7, 10]
 ```
 
-## Operations waiting for the archive · fix
+## Operations waiting for the archive
 
 `internet_identity_buffered_archive_entries` against `internet_identity_archive_config_entries_buffer_limit`
 
@@ -46,7 +46,7 @@ xychart-beta
   line [0, 1, 0, 0, 2, 1, 0, 1]
 ```
 
-## Registrations consumed against the throttle · fix
+## Registrations consumed against the throttle
 
 `internet_identity_register_rate_limit_max_tokens - internet_identity_register_rate_limit_current_tokens`
 
@@ -60,7 +60,7 @@ xychart-beta
   line [1, 1, 2, 1, 1, 2, 1, 1]
 ```
 
-## Live delegation signatures · keep
+## Live delegation signatures
 
 `avg_over_time(internet_identity_signature_count[$__interval])`
 
@@ -76,7 +76,7 @@ xychart-beta
   line [15, 22, 18, 12, 20, 25, 19, 16]
 ```
 
-## Stored counts rebuilt after drifting · keep
+## Stored counts rebuilt after drifting
 
 `increase(internet_identity_account_counter_discrepancy_count[1d])`
 
@@ -90,4 +90,20 @@ xychart-beta
   x-axis "week" [w1, w2, w3, w4, w5, w6, w7, w8]
   y-axis "rebuilds" 0 --> 10
   line [0, 0, 0, 0, 3, 0, 0, 0]
+```
+
+## Delegation minting load
+
+`sum(rate(internet_identity_app_delegation_requests_total{outcome="served"}[5m]))`
+
+Requests per second the canister is minting credentials for. A capacity number, and it belongs here rather than beside anything about people.
+
+It is deliberately not divided by active sign-ins. That ratio moves when an app changes how often it polls, when the credential lifetime changes, and when somebody leaves a tab open over lunch — none of which is a fact about the product. As a raw rate against a known ceiling it answers the one question it can answer honestly: how close the canister is to the load it can serve.
+
+```mermaid
+xychart-beta
+  title "Delegation requests per second"
+  x-axis "hour" [h1, h2, h3, h4, h5, h6, h7, h8]
+  y-axis "requests per second" 0 --> 200
+  line [42, 55, 71, 96, 124, 141, 118, 87]
 ```

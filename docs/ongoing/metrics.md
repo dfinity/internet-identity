@@ -2,7 +2,7 @@
 
 **Relates to:** `revocable-app-sessions.md` and `tracked-default-accounts.md`, whose behaviour the new charts here measure. This document covers the whole `/metrics` endpoint and the dashboard reading it, not only the session work.
 
-Read from the `internet-identity` Grafana dashboard JSON and checked against the production endpoint on 2026-08-26. Twenty-three panels, 53 metric families.
+Read from the `internet-identity` Grafana dashboard JSON and checked against the production endpoint on 2026-08-26. Twenty-four panels, 53 metric families.
 
 ## How to read an entry
 
@@ -33,7 +33,7 @@ A family named `_counter` is still a gauge, and several are documented as counti
 
 Nothing can expose a distribution. Any question of the form "how long" or "what is the ninetieth percentile" is currently unanswerable, whatever the data.
 
-The two per-app families are filtered to one value of a label that does not mean what it says. `ii_origin` is read from the authenticating passkey's registration origin:
+The two per-app families are filtered to one value of a label that does not mean what it says, and that has no business being on them. `ii_origin` is read from the authenticating passkey's registration origin:
 
 ```rust
 let maybe_domain = match &authorization_key {
@@ -44,7 +44,9 @@ let maybe_domain = match &authorization_key {
 
 So a passkey created on `ic0.app` is labelled `ic0.app` for life whichever domain its owner uses, and anything that is not a passkey, OpenID above all, has no origin and falls into a bucket the endpoint never publishes. Live, of 3,627 daily active identities, 190 are attributed to `identity.ic0.app`, 1,893 to `id.ai`, and 1,490 to no domain at all, which matches the 1,485 daily active OpenID identities to within five.
 
-Deciding what `ii_origin` should mean comes before adding any per-app metric, because the answer applies to those too.
+How somebody authenticated is a separate question from how much an app is used, and a usage number should not move when the answer changes. So `ii_origin` comes off the per-app families rather than getting a better definition, and the new counters carry `dapp` and nothing else. The same reasoning removes the by-domain series from the active-identity panels: a count of people is a count of people, whatever they signed in with.
+
+Which methods people authenticate with is its own concern, with its own panels, and is not a breakdown of anything else.
 
 Separately, five panels use Grafana's deprecated Angular `graph` type: Internet Identities, Registrations the last 24h, Logins per Hour, Identity Changes per Hour, Signature map size. The warning triangle on exactly those five is that deprecation, not an alert.
 
@@ -58,18 +60,51 @@ The same rule excludes some session questions. Whether a silent re-issue rendere
 
 ## Walking through the result
 
-The twenty-two panels this document argues for are laid out as four sub-dashboards in
-[metrics-dashboards/](metrics-dashboards/README.md), one page per question, linked to each other
-the way a Grafana folder would be. Every panel there is a sketch of the finished chart with the
-query under it, so the proposal can be clicked through before any of it is built.
+The dashboard this document argues for is laid out as five sub-dashboards in
+[metrics-dashboards/](metrics-dashboards/README.md), one page per question, linked to each other the
+way a Grafana folder would be. Every panel there is a sketch of the finished chart with the query
+under it, so it can be clicked through before any of it is built. That is the end state rather than
+a plan for reaching it; what each piece costs is in the tables at the end of this document.
 
 Read that for the shape. Read the entries below for why each panel is the way it is.
+
+## What the canister can observe about a session
+
+Three facts from the session implementation decide which questions are answerable, and getting them
+wrong produces panels that look reasonable and are drawn from a biased sample. They are checked
+against the code on `feat/session-devices-settings`, not against the design documents.
+
+**A sign-in always creates a session.** `prepare_account_session` calls `create_session`
+unconditionally; there is no path that finds and reuses an existing one. So one ceremony is one new
+session, a person signing in from three browsers creates three, and there is no such thing as a
+returning sign-in to count. What the ceremony does distinguish is the browser: it computes
+`known_device` and records a `RegisterSessionDevice` operation only when the browser is new to the
+identity.
+
+**Every use carries its own history.** `stamp_session_refresh` holds the session's `created_at`, its
+previous `last_refreshed` and the current time before it overwrites anything, so the age of the
+relationship and the gap since its last use are both free at that point. `last_refreshed` is `None`
+until the first use, which makes "was this session ever used" an observable transition rather than an
+inference.
+
+**An ending is mostly invisible.** Expiry writes nothing — the storage comment on the cap states that
+"a session can expire with no write anywhere, so the count drifts upwards". Only two things remove an
+expired session, and neither is a sweep: `reclaim_sessions` runs once an identity holds 500 sessions,
+which is almost nobody, and `stamp_session_refresh` drops dead sessions from the row it was already
+rewriting, which only ever reaches apps somebody still uses.
+
+The consequence is that anything observed at removal is drawn from relationships that are still
+alive, and the abandoned ones — the population most worth knowing about — are the ones missing. So
+the panels below measure creation and use, which are complete, and the only counter observed at
+removal counts deliberate endings and says so in its title.
 
 ## The dashboard, most useful first
 
 Ordered by how often the panel would change a decision, not by where it sits on the screen today. Each entry says whether it stays, changes, or is new. What gets deleted is listed after them.
 
-The dashboard has 23 panels. This ordering keeps 6 as they are, fixes 7 in place, replaces 3, opens 1 question, adds 4, and deletes 5. That is 23 in and 24 out, so the dashboard barely grows while five panels that mislead or show nothing go away.
+The dashboard has 24 panels, counted from its JSON: 17 `timeseries`, 5 deprecated `graph`, 2 `stat`. Every one of them falls into exactly one bucket below — 6 kept as they are, 9 fixed in place, 4 replaced by 3, 1 pending a check, and 4 deleted.
+
+The panels this document proposes adding are counted separately, because the interesting question is not whether the dashboard grows. It is which questions it can answer, and [the walk-through](metrics-dashboards/README.md) is where that is easiest to see.
 
 ### Is anything failing
 
@@ -267,28 +302,30 @@ xychart-beta
 Both families plotted together, the total legended "All domains".
 
 **Verdict.**
-The parts cannot sum to the whole and nothing on the panel says why. Live: 190 on `identity.ic0.app`, 1,893 on `id.ai`, 20 on `internetcomputer.org`, 34 on both, totalling 2,137 against a total of 3,627. The 1,490 difference is identities whose authentication carried no domain, which is what OpenID credentials do, and daily active OpenID identities total 1,485.
+The total is right and is the number to read. The by-domain series beside it are not a breakdown of it: they cannot sum to it, and they are not measuring what the legend says. Live they give 190 on `identity.ic0.app`, 1,893 on `id.ai`, 20 on `internetcomputer.org` and 34 on both, totalling 2,137 against 3,627, because a domain is recorded only from the authenticating passkey and OpenID credentials carry none. The 1,490 missing identities match the 1,485 daily active OpenID ones.
+
+Publishing the remainder would make the bars add up without making them mean anything: they would still count passkeys by the domain they were registered on years ago, not people by the domain they use. The question the series looks like it answers, which domain people are actually on, is answered from the browser, so it belongs in Plausible under the rule above.
 
 **Wording.**
-Two terms need it. The metric family says `anchors` where the panel says identities, and identities is the right word, so the panel is already ahead of the metric name. And the `both_ii_domains` series means an identity that was active on more than one II domain during the window, not a domain of that name.
+The metric family says `anchors` where the panel says identities. Identities is the right word, so the panel is already ahead of the metric name.
 
 **Change.**
-Source changed: publish the remainder as its own series, `domain="none"`, so the parts add up and the OpenID share is visible where a reader looks for it.
+Sources removed: `daily_active_anchors_by_domain` and its monthly twin, from this panel and from the endpoint. What is left is one line per window, which is the whole of what the panel was for.
 
 ```mermaid
 xychart-beta
-  title "Daily active identities by domain, live values"
-  x-axis "domain" ["id.ai", "identity.ic0.app", "both", "internetcomputer.org"]
+  title "As rendered: a total beside parts that cannot sum to it"
+  x-axis "series" ["all domains", "id.ai", "identity.ic0.app", "both", "internetcomputer.org"]
   y-axis "identities" 0 --> 4000
-  bar [1893, 190, 34, 20]
+  bar [3627, 1893, 190, 34, 20]
 ```
 
 ```mermaid
 xychart-beta
-  title "The same panel with the remainder published"
-  x-axis "domain" ["id.ai", "no domain", "identity.ic0.app", "both", "internetcomputer.org"]
-  y-axis "identities" 0 --> 4000
-  bar [1893, 1490, 190, 34, 20]
+  title "Daily and monthly active identities, live values"
+  x-axis "window" ["daily", "monthly"]
+  y-axis "identities" 0 --> 40000
+  bar [3627, 38079]
 ```
 
 ### Internet Identities
@@ -342,30 +379,160 @@ xychart-beta
   line [840, 700, 610, 640, 900, 1180, 1120]
 ```
 
-### How long people stay signed in
+### Do people come back
 
-**New panel.** Replaces two panels that claimed to measure this and did not.
+**New panel.** The retention curve, and the most valuable thing sessions make measurable.
 
 **Sources added.**
-`internet_identity_session_age_seconds`, a histogram with nine bucket edges, observed at removal as `min(now, valid_till) - created_at`.
+`internet_identity_session_uses_total{age}`, a counter incremented in `stamp_session_refresh` and labelled by how old the session was at that moment. The age is `now - created_at`, both already in hand.
 
 **Formula.**
 
 ```promql
-histogram_quantile(0.5, sum by (le) (rate(internet_identity_session_age_seconds_bucket[7d])))
+sum(rate(internet_identity_session_uses_total{age="7d+"}[7d]))
+  / sum(rate(internet_identity_sign_ins_total[7d]))
 ```
 
 **Why.**
-The only way to learn a sign-in's length: the moment it ends is the last moment anything knows how old it was. It replaces the cumulative-session-length panels, which measure requested lifetime instead. Nine edges rather than five, because `histogram_quantile` interpolates inside a bucket and wide buckets return invented numbers.
+A use is a return, and until sessions existed there was nothing to return to. Only the canister can measure it, because a relationship spanning apps is invisible from inside any one of them.
 
-Two limits belong on the panel. Sign-ins that ran the full 30 days all land in the top finite bucket, so quantiles above that share are meaningless. And a sign-in nobody returns to is removed only when another write rewrites its record, so abandoned ones are under-represented.
+It is a rate ratio rather than a cohort: returns happening now against sign-ins happening now. That reads correctly while sign-in volume is roughly stable and flatters retention while volume falls, which belongs on the panel. The alternative, following real cohorts, would need the sessions to finish first, and finishing is what the canister cannot see.
+
+Keep `dapp` off this counter. Age buckets multiplied by apps is a cardinality problem for a number that is read in aggregate.
 
 ```mermaid
 xychart-beta
-  title "How long sign-ins actually lasted, last 30 days"
-  x-axis "lifetime" ["0-5m", "5m-1h", "1-6h", "6-24h", "1-3d", "3-7d", "7-14d", "14-30d", "full 30d"]
-  y-axis "sign-ins ended" 0 --> 30000
-  bar [1800, 4200, 7600, 12000, 19000, 24000, 15000, 8000, 9500]
+  title "Share of sign-ins still in use after"
+  x-axis "age of the session when used" ["1d", "3d", "7d", "14d", "30d"]
+  y-axis "% still in use" 0 --> 100
+  line [72, 54, 41, 29, 18]
+```
+
+### Sign-ins that were never used
+
+**New panel.** The failure staying signed in exists to remove, currently invisible.
+
+**Sources added.**
+`internet_identity_session_first_uses_total`, incremented where `last_refreshed` goes from `None` to `Some`.
+
+**Formula.**
+
+```promql
+1 - sum(rate(internet_identity_session_first_uses_total[7d]))
+  / sum(rate(internet_identity_sign_ins_total[7d]))
+```
+
+**Why.**
+Somebody who signs in and never comes back got nothing from the session they were given. The transition is already in the record — `last_refreshed` is `None` until first use — so this costs one increment on a branch the code already takes, and needs nothing observed at removal.
+
+```mermaid
+xychart-beta
+  title "Sign-ins never used again, by week"
+  x-axis "week" [w1, w2, w3, w4, w5, w6, w7, w8]
+  y-axis "% of sign-ins" 0 --> 50
+  line [34, 33, 31, 30, 28, 27, 26, 24]
+```
+
+### How long between visits
+
+**New panel.** How often people come back, rather than whether they do.
+
+**Sources added.**
+`internet_identity_session_gap_seconds`, a histogram observed in `stamp_session_refresh` as `now - last_refreshed` for a session that has been used before.
+
+**Formula.**
+
+```promql
+histogram_quantile(0.5, sum by (le) (rate(internet_identity_session_gap_seconds_bucket[7d])))
+```
+
+**Why.**
+The previous stamp is in memory when the new one is written, so the gap is a subtraction on a path already running. Sessions used for the first time contribute nothing here and are counted by the panel above instead.
+
+This is the honest form of a number this document previously proposed as delegation requests per active sign-in per day. That ratio moved when an app changed its polling or somebody left a tab open; this one moves when people change how often they show up.
+
+```mermaid
+xychart-beta
+  title "Time between one visit and the next"
+  x-axis "gap" ["under 1h", "1-6h", "6-24h", "1-3d", "3-7d", "7-30d"]
+  y-axis "visits" 0 --> 40000
+  bar [31000, 18000, 27000, 22000, 9000, 3000]
+```
+
+### How much of the term gets used
+
+**New panel.** The number to bring to any argument about the thirty-day term.
+
+**Sources.**
+`internet_identity_session_uses_total{age}` again, read as a profile rather than as a ratio.
+
+**Formula.**
+
+```promql
+sum by (age) (rate(internet_identity_session_uses_total[30d]))
+```
+
+**Why.**
+Where in a session's life the use actually happens. If almost nothing lands past the first week, the term is far longer than the behaviour it serves.
+
+It replaces a lifetime histogram observed at removal, which this document proposed before the removal paths were checked. That histogram would have been drawn from sessions somebody came back to, because an abandoned session is never removed at all, and so it would have reported longer lives the more people abandoned.
+
+```mermaid
+xychart-beta
+  title "When in its life a session gets used"
+  x-axis "session age at use" ["0-1d", "1-3d", "3-7d", "7-14d", "14-30d"]
+  y-axis "% of all uses" 0 --> 50
+  bar [44, 22, 16, 11, 7]
+```
+
+### Deliberate endings
+
+**New panel.** Whether the revocation the design promises is ever exercised.
+
+**Sources added.**
+`internet_identity_sessions_revoked_total{reason}`, incremented at each of the four call sites that delete a session on purpose: `app_revoke_session`, `revoke_account_session`, `revoke_device_sessions`, and the internal call that drops a browser when the registry passes twenty. The last two share a storage function, so the label is set by the caller that knows which happened.
+
+**Formula.**
+
+```promql
+sum by (reason) (increase(internet_identity_sessions_revoked_total[30d]))
+```
+
+**Why.**
+If the two settings paths stay near zero, the design's central promise is going unexercised, and nothing else on the dashboard would say so.
+
+Expiry is deliberately not a slice of it. It writes nothing, so a bar for it would show whatever the opportunistic cleanup in `stamp_session_refresh` happened to catch, which is worse than showing nothing. The title says deliberate for that reason.
+
+```mermaid
+xychart-beta
+  title "Deliberate endings, last 30 days"
+  x-axis "reason" ["app signed out", "one revoked in settings", "browser revoked in settings", "browser dropped at the cap"]
+  y-axis "sessions" 0 --> 40000
+  bar [34000, 5200, 2600, 900]
+```
+
+### New and known browsers
+
+**New panel.** The closest honest thing to new against returning.
+
+**Sources changed.**
+A `browser` label on `internet_identity_sign_ins_total`, set from the `known_device` value `prepare_account_session` already computes.
+
+**Formula.**
+
+```promql
+sum by (browser) (rate(internet_identity_sign_ins_total[1d])) * 86400
+```
+
+**Why.**
+Since a sign-in never reuses a session, a repeat ceremony does not mean a returning user; it means the previous session ended, or the person is signing in to something else. The browser is the part that carries history, and the ceremony already branches on it to decide whether to record a `RegisterSessionDevice` operation.
+
+```mermaid
+xychart-beta
+  title "Sign-ins from a browser the identity had not used before"
+  x-axis "week" [w1, w2, w3, w4, w5, w6, w7, w8]
+  y-axis "% of sign-ins" 0 --> 60
+  line [51, 47, 44, 40, 37, 34, 32, 30]
 ```
 
 ### Top 10 dapps by number of sign-ins, 24h and 30d
@@ -379,13 +546,13 @@ xychart-beta
 `internet_identity_prepare_delegation_count{ii_origin="ic0.app", window="24h"}`, and the same with `window="30d"`.
 
 **Verdict.**
-The canister keeps its own rolling totals per app and returns the ten heaviest, so each plotted point is the canister's window as it stood then. Three problems. The 30-day panel is the wrong chart type, because a 30-day rolling total barely moves across a 7-day view. The `ii_origin` filter is deliberate and documented, but now scopes the panel to a minority of traffic. And the family is fed only by `prepare_account_delegation`: `prepare_account_session` calls no bookkeeping at all, so a migrating app's line falls to zero while its usage is flat.
+The canister keeps its own rolling totals per app and returns the ten heaviest, so each plotted point is the canister's window as it stood then. Three problems. The 30-day panel is the wrong chart type, because a 30-day rolling total barely moves across a 7-day view. The `ii_origin` filter scopes the panel to whichever identities hold a passkey registered on one domain, live 190 of 3,627, which is not a fact about app traffic at all. And the family is fed only by `prepare_account_delegation`: `prepare_account_session` calls no bookkeeping at all, so a migrating app's line falls to zero while its usage is flat.
 
 **Wording.**
 The `dapp` label holds the app's origin, which the legend renders as a full URL and a canister id for most entries. That is unavoidable for canister-hosted apps, but "app" is the word for the axis and the title rather than "dapp". A sign-in here is one identity being granted access to one app, which is worth stating because the number is much larger than a count of people.
 
 **Change.**
-Source added: `internet_identity_sign_ins_total{flow, dapp}`. Source removed from these panels: `prepare_delegation_count`. Two panels become one bar ranking, with Prometheus doing the windowing:
+Source added: `internet_identity_sign_ins_total{flow, dapp}`, labelled by app and flow and by nothing about the access method behind it. Source removed from these panels: `prepare_delegation_count`. Two panels become one bar ranking, with Prometheus doing the windowing:
 
 ```promql
 topk(10, sum by (dapp) (increase(internet_identity_sign_ins_total[24h])))
@@ -407,34 +574,37 @@ xychart-beta
   bar [510, 240, 180, 120, 90, 60]
 ```
 
-### What one signed-in user costs
+### Delegation minting load
 
 **New panel.** The running cost of the design, in the unit that scales.
 
 **Sources added.**
-`internet_identity_app_delegation_requests_total` from above, and `internet_identity_daily_active_sessions`, a gauge from the existing activity machinery reading the stored `last_refreshed`.
+`internet_identity_app_delegation_requests_total{outcome}` from above.
 
 **Formula.**
 
 ```promql
-sum(rate(internet_identity_app_delegation_requests_total{outcome="served"}[1d])) * 86400
-  / internet_identity_daily_active_sessions
+sum(rate(internet_identity_app_delegation_requests_total{outcome="served"}[5m]))
 ```
 
 **Why.**
-Requests per active sign-in per day. At a five-minute credential this is really a measure of how long apps stay open, and it is the figure to put beside any proposal to change those five minutes. Requests are a proxy for cost rather than cost; the cycles version is deferred below.
+A raw rate against a known ceiling, and a capacity number rather than a product one, which is why it sits on the health page and not beside anything about people.
+
+It is deliberately not divided by active sign-ins. That ratio moves when an app changes how often it polls, when the credential lifetime changes, and when somebody leaves a tab open, none of which is a fact about the product, and it invites being read as engagement. Requests remain a proxy for cost rather than cost; the cycles version is deferred below.
 
 ```mermaid
 xychart-beta
-  title "Delegation requests per active sign-in per day"
-  x-axis "day" [mon, tue, wed, thu, fri, sat, sun]
-  y-axis "requests per sign-in" 0 --> 40
-  line [27, 28, 29, 28, 28, 23, 24]
+  title "Delegation requests per second"
+  x-axis "hour" [h1, h2, h3, h4, h5, h6, h7, h8]
+  y-axis "requests per second" 0 --> 200
+  line [42, 55, 71, 96, 124, 141, 118, 87]
 ```
 
 ### Daily and Monthly Active Authentication Methods
 
 **Fix in place.** How people authenticate, which drives most product decisions here.
+
+This is its own question and not a dimension of any other panel. Nothing about usage, per app or overall, is labelled by access method; the mix lives here and changes here.
 
 **Sources.**
 `internet_identity_daily_active_authn_methods{type, issuer}`, and the monthly equivalent.
@@ -767,7 +937,7 @@ xychart-beta
   bar [34, 17, 4.25, 2.13, 1.06, 0.53]
 ```
 
-Two panels, replaced by the one lifetime histogram above. Until that lands, retitle these "sign-ins weighted by requested lifetime" so nobody reads them as a duration; the present title has already been read that way.
+Two panels, and nothing replaces them directly, because the duration they appear to promise is not observable: a session that is never returned to is never removed, so anything measured at removal omits exactly the cases worth seeing. [How much of the term gets used](#how-much-of-the-term-gets-used) and [How long between visits](#how-long-between-visits) answer what these were reached for, from use rather than from removal. Until they land, retitle these "sign-ins weighted by requested lifetime" so nobody reads them as a duration; the present title has already been read that way.
 
 ### Registration Rates / Captcha Threshold Rate
 
@@ -785,26 +955,29 @@ Two panels, replaced by the one lifetime histogram above. Until that lands, reti
 
 Everything the entries above depend on, in one place. Cost is what it takes the canister to produce the number, which decides the order.
 
-| Source                                                 | Action | Type      | Cost                                            |
-| ------------------------------------------------------ | ------ | --------- | ----------------------------------------------- |
-| `internet_identity_sign_ins_total{flow,dapp}`          | add    | counter   | one increment on two existing writes            |
-| `internet_identity_app_delegation_requests_total`      | add    | counter   | one increment with a label on one update        |
-| `internet_identity_sessions_ended_total{reason}`       | add    | counter   | one increment per removal path                  |
-| `internet_identity_session_age_seconds`                | add    | histogram | one observation per removal path                |
-| `internet_identity_browsers_evicted_total`             | add    | counter   | one increment where the list trims at 20        |
-| `internet_identity_session_reclaim_passes_total`       | add    | counter   | one increment in the reclaiming pass            |
-| `internet_identity_daily_active_sessions`              | add    | gauge     | existing activity machinery, `last_refreshed`   |
-| `internet_identity_identities_per_app{dapp}`           | add    | gauge     | read and sort a count already stored            |
-| `internet_identity_session_max_lifetime_seconds`       | add    | gauge     | constant                                        |
-| `internet_identity_app_delegation_lifetime_seconds`    | add    | gauge     | constant                                        |
-| `internet_identity_sessions_per_identity_limit`        | add    | gauge     | constant                                        |
-| `internet_identity_browsers_per_identity_limit`        | add    | gauge     | constant                                        |
-| `internet_identity_anchor_operations_counter`          | change | counter   | move to persistent state so it survives upgrade |
-| `internet_identity_daily_active_anchors_by_domain`     | change | gauge     | publish the unattributed remainder as a series  |
-| `internet_identity_registrations_per_second`           | change | gauge     | emit unconditionally, or drop the panel         |
-| `internet_identity_prepare_delegation_count`           | remove | gauge     | superseded by `sign_ins_total`                  |
-| `internet_identity_prepare_delegation_session_seconds` | remove | gauge     | superseded by `session_age_seconds`             |
-| `internet_identity_delegation_counter`                 | remove | gauge     | superseded by `sign_ins_total`                  |
+| Source                                                 | Action | Type      | Cost                                             |
+| ------------------------------------------------------ | ------ | --------- | ------------------------------------------------ |
+| `internet_identity_sign_ins_total{flow,dapp,browser}`  | add    | counter   | one increment on two existing writes             |
+| `internet_identity_app_delegation_requests_total`      | add    | counter   | one increment with a label on one update         |
+| `internet_identity_sessions_revoked_total{reason}`     | add    | counter   | one increment at each of four revoke call sites  |
+| `internet_identity_session_uses_total{age}`            | add    | counter   | one increment where refresh already writes       |
+| `internet_identity_session_first_uses_total`           | add    | counter   | one increment on the `None` to `Some` transition |
+| `internet_identity_session_gap_seconds`                | add    | histogram | one subtraction where refresh already writes     |
+| `internet_identity_browsers_evicted_total`             | add    | counter   | one increment where the list trims at 20         |
+| `internet_identity_session_reclaim_passes_total`       | add    | counter   | one increment in the reclaiming pass             |
+| `internet_identity_daily_active_sessions`              | add    | gauge     | existing activity machinery, `last_refreshed`    |
+| `internet_identity_live_sessions`                      | add    | gauge     | needs a pass over the session rows               |
+| `internet_identity_identities_per_app{dapp}`           | add    | gauge     | read and sort a count already stored             |
+| `internet_identity_session_max_lifetime_seconds`       | add    | gauge     | constant                                         |
+| `internet_identity_app_delegation_lifetime_seconds`    | add    | gauge     | constant                                         |
+| `internet_identity_sessions_per_identity_limit`        | add    | gauge     | constant                                         |
+| `internet_identity_browsers_per_identity_limit`        | add    | gauge     | constant                                         |
+| `internet_identity_anchor_operations_counter`          | change | counter   | move to persistent state so it survives upgrade  |
+| `internet_identity_daily_active_anchors_by_domain`     | remove | gauge     | an access-method label on a count of people      |
+| `internet_identity_registrations_per_second`           | change | gauge     | emit unconditionally, or drop the panel          |
+| `internet_identity_prepare_delegation_count`           | remove | gauge     | superseded by `sign_ins_total`                   |
+| `internet_identity_prepare_delegation_session_seconds` | remove | gauge     | measures requested lifetime, not time signed in  |
+| `internet_identity_delegation_counter`                 | remove | gauge     | superseded by `sign_ins_total`                   |
 
 Every added counter needs encoding as a counter and keeping in persistent state, which takes appended optional fields. Nothing on the endpoint does this today, so it is the one piece of groundwork the whole list rests on.
 
@@ -841,9 +1014,9 @@ Dashboard-only edits first, because none needs a release.
 
 Then the canister, in the order the source table implies.
 
-11. Decide what `ii_origin` means, before anything per-app is added.
+11. Drop `ii_origin` from the per-app families and the by-domain series from the active-identity ones.
 12. Encode counters as counters in persistent state, and publish the four constants.
 13. `sign_ins_total` on both paths. This is the one that stops three panels going quiet.
 14. `app_delegation_requests_total`, the only alertable metric and the denominator for cost per user.
-15. `sessions_ended_total`, `session_age_seconds`, `browsers_evicted_total`, `session_reclaim_passes_total`.
+15. `session_uses_total`, `session_first_uses_total` and `session_gap_seconds`, all on the refresh path; then `sessions_revoked_total`, `browsers_evicted_total` and `session_reclaim_passes_total`.
 16. `daily_active_sessions`, then `identities_per_app`.
