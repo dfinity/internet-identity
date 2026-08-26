@@ -755,7 +755,7 @@
     "oneLiner": "A portal for provisioning Cloud Engines: a sovereign serverless cloud platform with tamperproof execution, safe upgrades, and horizontal auto-scaling.",
     "website": "https://opencloud.org",
     "authOrigins": ["https://opencloud.org"],
-    "logo": "open_cloud_logo.svg"
+    "logo": "open_cloud_logo.png"
   },
   {
     "name": "CITADEL",
