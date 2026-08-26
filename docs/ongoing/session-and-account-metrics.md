@@ -4,7 +4,7 @@
 
 The session flow feeds no metrics at all. `prepare_account_session` calls no bookkeeping, so a sign-in that creates a session increments nothing and emits no event. Two existing dashboard panels therefore degrade as apps adopt sessions, and nothing reports on the feature itself.
 
-Figures below are from the production endpoint on 2026-08-26.
+Figures below are from the production endpoint on 2026-08-26. A panel-by-panel review of the existing dashboard, including which panels are wrong today, is in [metrics-dashboard-review.md](metrics-dashboard-review.md).
 
 ## What the existing dashboard will get wrong
 
