@@ -54,8 +54,5 @@ export const openSettings = async (
   return settings;
 };
 
-/** The app signs in over ICRC-25, which is what creates a session. */
-export const SESSION_SIGN_IN = { protocol: "icrc25" } as const;
-
 /** The domain whose subdomains share a session in the sibling scenarios. */
 export const SHARED_DOMAIN = "nice-name.com";
