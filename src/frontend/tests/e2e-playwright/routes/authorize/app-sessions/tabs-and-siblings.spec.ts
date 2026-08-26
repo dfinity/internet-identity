@@ -4,12 +4,7 @@ import {
   TEST_APP_SIBLING_A_URL,
   TEST_APP_SIBLING_B_URL,
 } from "../../../utils";
-import {
-  continueAs,
-  SESSION_SIGN_IN,
-  SHARED_DOMAIN,
-  signInAsFirstIdentity,
-} from "./helpers";
+import { continueAs, SHARED_DOMAIN, signInAsFirstIdentity } from "./helpers";
 
 /**
  * One sign-in serves every tab of an origin, and every subdomain of a domain
@@ -22,7 +17,7 @@ import {
  * and SHARE-6.
  */
 test.describe("more than one tab, and sibling subdomains", () => {
-  test.use({ authorizeConfig: SESSION_SIGN_IN });
+  test.use({ authorizeConfig: { protocol: "icrc25" } });
 
   test.describe("a second tab of the origin is already signed in", () => {
     test.afterEach(async ({ signedInApp, openTestApp, context }) => {
