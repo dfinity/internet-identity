@@ -112,6 +112,16 @@ export class TestApp {
     await this.page.close();
   }
 
+  /**
+   * Waits until the app holds a session.
+   *
+   * `afterEach` runs before the sign-in fixture's own teardown, so the
+   * provider's window may still be closing and the app may still be minting.
+   */
+  async waitUntilSignedIn(): Promise<void> {
+    await expect(this.state).toHaveText("signed in", { timeout: 20_000 });
+  }
+
   /** Arrives at the app without filling anything in, as a second tab does. */
   async visit(url: string = TEST_APP_URL): Promise<void> {
     await this.page.goto(url);
