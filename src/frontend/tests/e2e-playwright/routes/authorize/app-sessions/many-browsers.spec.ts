@@ -51,7 +51,7 @@ test.describe("using many apps and browsers", () => {
     await oldest.focus();
     await oldest.ageDelegation();
     await oldest.replaceDelegation();
-    await expect(oldest.state).toHaveText("no session", { timeout: 30_000 });
+    await oldest.expectSignedOut();
 
     for (const { fresh } of browsers) await fresh.close();
   });
