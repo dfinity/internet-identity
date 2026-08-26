@@ -1,4 +1,3 @@
-import { expect } from "@playwright/test";
 import { test } from "../../../fixtures";
 import { continueAs, SESSION_SIGN_IN, signInAsFirstIdentity } from "./helpers";
 
@@ -19,7 +18,7 @@ test.describe("coming back later", () => {
       await signedInApp.clearSiteData();
       await signedInApp.reload();
 
-      await expect(signedInApp.state).toHaveText("no session");
+      await signedInApp.expectSignedOut();
     });
 
     test("picks an identity and continues", signInAsFirstIdentity);
@@ -34,14 +33,14 @@ test.describe("coming back later", () => {
     await testApp.abandonSignIn(async (authPage) => {
       await signInWithIdentity(authPage, identities[0].identityNumber);
     });
-    await expect(testApp.state).toHaveText("no session");
+    await testApp.expectSignedOut();
 
     // DEV-13: the browser persisted its key before the call, so a second attempt
     // is recognised as the same browser rather than blocked by the first.
     await testApp.signIn(
       continueAs(identities[0].identityNumber, signInWithIdentity),
     );
-    await expect(testApp.state).toHaveText("signed in");
+    await testApp.waitUntilSignedIn();
   });
 
   test.describe("with two identities", () => {
@@ -60,17 +59,16 @@ test.describe("coming back later", () => {
       await testApp.signIn(
         continueAs(identities[0].identityNumber, signInWithIdentity),
       );
-      await expect(testApp.account).not.toHaveText("-");
-      const first = await testApp.account.textContent();
+      const first = await testApp.accountPrincipal();
 
       await testApp.signOut();
-      await expect(testApp.state).toHaveText("no session");
+      await testApp.expectSignedOut();
 
       await testApp.signIn(
         continueAs(identities[1].identityNumber, signInWithIdentity),
       );
 
-      await expect(testApp.account).not.toHaveText(first ?? "");
+      await testApp.expectAccountOtherThan(first);
     });
   });
 });
