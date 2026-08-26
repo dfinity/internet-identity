@@ -17,10 +17,15 @@ import { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
+const iiCanisterId = readCanisterId({ canisterName: "internet_identity" });
 export const II_URL = "https://id.ai";
 export const LEGACY_II_URL = "https://identity.ic0.app";
 export const ALT_LEGACY_II_URL = "https://identity.internetcomputer.org";
 export const TEST_APP_URL = "https://nice-name.com";
+/** Siblings of one domain, sharing `TEST_APP_DERIVATION_ORIGIN`. */
+export const TEST_APP_SIBLING_A_URL = "https://a.nice-name.com";
+export const TEST_APP_SIBLING_B_URL = "https://b.nice-name.com";
+export const TEST_APP_DERIVATION_ORIGIN = "https://auth.nice-name.com";
 export const NOT_TEST_APP_URL = "https://very-nice-name.com";
 export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
 
@@ -70,6 +75,19 @@ export const authorize = (
  * @param authenticate The method that will be called within authorize page
  * @returns Authenticated principal
  */
+/**
+ * Selects the raw postMessage protocol, which creates no session.
+ *
+ * The test app defaults to the session path, so a test that drives it directly
+ * has to say which protocol it means rather than inherit whichever the app
+ * happens to prefer.
+ */
+export const useLegacyProtocol = async (page: Page): Promise<void> => {
+  await page
+    .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
+    .setChecked(false);
+};
+
 export const authorizeWithUrl = async (
   page: Page,
   appUrl: string,
@@ -81,10 +99,18 @@ export const authorizeWithUrl = async (
   // Open demo app and assert that user isn't authenticated yet
   await page.goto(appUrl);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(iiURL);
+  // Set either way rather than relying on the test app's default, which selects
+  // the session path and would otherwise decide this for every caller.
+  await page
+    .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
+    .setChecked(useIcrc25 === true);
   if (useIcrc25 === true) {
+    // The session the client is handed is restricted to one identity provider,
+    // and the client refuses a chain that names any other. Its default is the
+    // mainnet canister, so a local sign-in needs this filled in.
     await page
-      .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
-      .setChecked(true);
+      .getByRole("textbox", { name: "II canister id:" })
+      .fill(iiCanisterId);
 
     // If also requesting attributes, fill them in the textarea
     if (attributes !== undefined) {
@@ -106,6 +132,11 @@ export const authorizeWithUrl = async (
   // Wait for II window to close.
   // During the identity upgrade flow there is a delay of 5s
   await authPage.waitForEvent("close", { timeout: 15_000 });
+
+  // The window closing is not the app being finished: over the session protocol
+  // it has still to mint a delegation, and it keeps `#principal` hidden until it
+  // has one.
+  await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
 
   // Assert that the user is authenticated (valid principal)
   const principal = (await page.locator("#principal").textContent()) ?? "";
