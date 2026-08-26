@@ -1,6 +1,7 @@
-import { expect } from "@playwright/test";
+import { expect, type BrowserContext } from "@playwright/test";
 import { test } from "../../../fixtures";
-import { continueAs, openSettings } from "./helpers";
+import type { TestApp } from "../../../fixtures/testApp";
+import { continueAs, listedBrowsers, openSettings } from "./helpers";
 
 /**
  * An identity keeps a bounded list of the browsers it is signed in from, so
@@ -23,36 +24,41 @@ test.describe("using many apps and browsers", () => {
     // A context is a separate browser as far as the identity is concerned, so the
     // 20-entry cap is reachable without 20 machines.
     const CAP = 20;
-    const browsers = [];
-    for (let index = 0; index < CAP + 2; index++) {
-      const fresh = await browser.newContext({ ignoreHTTPSErrors: true });
-      const app = openTestApp(await fresh.newPage());
-      await app.open();
-      await app.signIn(
-        continueAs(identities[0].identityNumber, signInWithIdentity),
-      );
-      browsers.push({ fresh, app });
-    }
-
-    // DEV-14: reaching the limit drops the least recently used rather than
-    // refusing, so the newest sign-in worked and the list is capped.
-    const settings = await openSettings(
-      browsers[browsers.length - 1].fresh,
+    const authenticate = continueAs(
       identities[0].identityNumber,
       signInWithIdentity,
     );
-    const listed = await settings
-      .getByRole("button", { name: "Sign out" })
-      .count();
-    expect(listed).toBeLessThanOrEqual(CAP);
+    const browsers: { context: BrowserContext; app: TestApp }[] = [];
 
-    // DEV-15: dropping an entry ends that browser's sessions.
-    const oldest = browsers[0].app;
-    await oldest.focus();
-    await oldest.ageDelegation();
-    await oldest.replaceDelegation();
-    await oldest.expectSignedOut();
+    // Closed in `finally`, so a sign-in that throws part way through does not
+    // leave contexts open for the tests that follow.
+    try {
+      for (let index = 0; index < CAP + 2; index++) {
+        const context = await browser.newContext({ ignoreHTTPSErrors: true });
+        const app = openTestApp(await context.newPage());
+        await app.open();
+        await app.signIn(authenticate);
+        browsers.push({ context, app });
+      }
 
-    for (const { fresh } of browsers) await fresh.close();
+      // DEV-14: reaching the limit drops the least recently used rather than
+      // refusing, so the newest sign-in worked and the list is capped.
+      const settings = await openSettings(
+        browsers[browsers.length - 1].context,
+        identities[0].identityNumber,
+        signInWithIdentity,
+      );
+      expect(await listedBrowsers(settings).count()).toBeLessThanOrEqual(CAP);
+      await settings.close();
+
+      // DEV-15: dropping an entry ends that browser's sessions.
+      const oldest = browsers[0].app;
+      await oldest.focus();
+      await oldest.ageDelegation();
+      await oldest.replaceDelegation();
+      await oldest.expectSignedOut();
+    } finally {
+      await Promise.allSettled(browsers.map(({ context }) => context.close()));
+    }
   });
 });
