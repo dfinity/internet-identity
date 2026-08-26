@@ -17,6 +17,19 @@ import { II_URL, TEST_APP_URL } from "../utils";
 
 const II_CANISTER_ID = readCanisterId({ canisterName: "internet_identity" });
 
+/** What the panel prints, so no scenario has to quote it. */
+const HOLDS_SESSION = "signed in";
+const HOLDS_NOTHING = "no session";
+const NO_ACCOUNT = "-";
+const NO_DELEGATION = "none held";
+const NOTHING_SHARED = "none";
+
+/**
+ * How long a scenario waits on something the app has to reach a canister for: a
+ * mint, a re-issue, or discovering that its session has been revoked.
+ */
+const ROUND_TRIP = 30_000;
+
 export interface TestAppOptions {
   /** Defaults to `TEST_APP_URL`. */
   url?: string;
@@ -40,36 +53,26 @@ export class TestApp {
     this.page = page;
   }
 
-  /** What the panel reports. */
-  get state(): Locator {
+  private get state(): Locator {
     return this.page.locator("#sessionState");
   }
-  /** The principal an app's canisters see. */
-  get account(): Locator {
+  private get account(): Locator {
     return this.page.locator("#sessionAccountPrincipal");
   }
-  /** The key II resolves the session from. */
-  get sessionKey(): Locator {
+  private get sessionKey(): Locator {
     return this.page.locator("#sessionSessionPrincipal");
   }
-  get sessionExpiry(): Locator {
-    return this.page.locator("#sessionExpiry");
-  }
-  get delegation(): Locator {
+  private get delegation(): Locator {
     return this.page.locator("#delegationExpiry");
   }
-  get replacements(): Locator {
+  private get replacements(): Locator {
     return this.page.locator("#delegationChanges");
   }
-  /** What the siblings of a domain share. */
-  get sharedHint(): Locator {
+  private get sharedHint(): Locator {
     return this.page.locator("#sessionHint");
   }
-  get log(): Locator {
+  private get log(): Locator {
     return this.page.locator("#sessionLog");
-  }
-  get principal(): Locator {
-    return this.page.locator("#principal");
   }
 
   /** Opens the app and states which provider and protocol to use. */
@@ -102,11 +105,6 @@ export class TestApp {
     }
   }
 
-  /** How many windows the browser holding this app has open. */
-  get openWindows(): number {
-    return this.page.context().pages().length;
-  }
-
   /** Closes this tab. */
   async close(): Promise<void> {
     await this.page.close();
@@ -114,7 +112,96 @@ export class TestApp {
 
   /** Waits until the app holds a session. */
   async waitUntilSignedIn(): Promise<void> {
-    await expect(this.state).toHaveText("signed in", { timeout: 20_000 });
+    await expect(this.state).toHaveText(HOLDS_SESSION, { timeout: ROUND_TRIP });
+  }
+
+  /** Fails unless the app is holding nothing it could act with. */
+  async expectSignedOut(): Promise<void> {
+    await expect(this.state).toHaveText(HOLDS_NOTHING, { timeout: ROUND_TRIP });
+  }
+
+  /** The principal an app's canisters see, once the app has one. */
+  async accountPrincipal(): Promise<string> {
+    await expect(this.account).not.toHaveText(NO_ACCOUNT);
+    return this.account.innerText();
+  }
+
+  async expectAccount(principal: string): Promise<void> {
+    await expect(this.account).toHaveText(principal);
+  }
+
+  async expectAccountOtherThan(principal: string): Promise<void> {
+    await expect(this.account).not.toHaveText(principal);
+    await expect(this.account).not.toHaveText(NO_ACCOUNT);
+  }
+
+  /** The key II resolves the session from, once the app has one. */
+  async sessionKeyPrincipal(): Promise<string> {
+    await expect(this.sessionKey).not.toHaveText(NO_ACCOUNT);
+    return this.sessionKey.innerText();
+  }
+
+  async expectSessionKeyOtherThan(principal: string): Promise<void> {
+    await expect(this.sessionKey).not.toHaveText(principal);
+  }
+
+  /** Fails unless the app has a delegation it could sign a request with. */
+  async expectHoldsDelegation(): Promise<void> {
+    await expect(this.delegation).not.toHaveText(NO_DELEGATION);
+  }
+
+  async expectNoDelegationReplacements(): Promise<void> {
+    await expect(this.replacements).toHaveText("0");
+  }
+
+  async expectDelegationReplaced(): Promise<void> {
+    await expect(this.replacements).not.toHaveText("0", {
+      timeout: ROUND_TRIP,
+    });
+  }
+
+  /** Fails unless the domain is announcing a session to its subdomains. */
+  async expectSharesSession(): Promise<void> {
+    await expect(this.sharedHint).not.toHaveText(NOTHING_SHARED);
+    // What crosses between siblings names the account and an expiry.
+    await expect(this.sharedHint).toContainText("until");
+  }
+
+  async expectSharesNothing(): Promise<void> {
+    await expect(this.sharedHint).toHaveText(NOTHING_SHARED, {
+      timeout: ROUND_TRIP,
+    });
+  }
+
+  async expectSilentReauthSucceeded(): Promise<void> {
+    await expect(this.log).toContainText("silent re-auth", {
+      timeout: ROUND_TRIP,
+    });
+    await this.waitUntilSignedIn();
+  }
+
+  async expectSilentReauthFailed(): Promise<void> {
+    await expect(this.log).toContainText("error", { timeout: ROUND_TRIP });
+    await this.expectSignedOut();
+  }
+
+  /**
+   * Runs something and fails if the browser opened a window while it ran.
+   *
+   * Counting the windows afterwards would miss one that opened and closed
+   * again, which is the thing a scenario about rendering nothing cares about.
+   */
+  async expectNothingOpens(action: () => Promise<void>): Promise<void> {
+    const opened: Page[] = [];
+    const record = (page: Page): number => opened.push(page);
+    const context = this.page.context();
+    context.on("page", record);
+    try {
+      await action();
+    } finally {
+      context.off("page", record);
+    }
+    expect(opened).toHaveLength(0);
   }
 
   /** Arrives at the app without filling anything in, as a second tab does. */
@@ -144,7 +231,7 @@ export class TestApp {
     const authPage = await authPagePromise;
     await authenticate(authPage);
     await authPage.waitForEvent("close", { timeout: 15_000 });
-    await expect(this.state).toHaveText("signed in", { timeout: 20_000 });
+    await this.waitUntilSignedIn();
   }
 
   /** Signs in and abandons the ceremony part way through. */

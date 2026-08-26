@@ -69,13 +69,6 @@ export const authorize = (
 };
 
 /**
- * Authorize with a custom app URL
- * @param page The page that will load the test app
- * @param appUrl The URL of the app to authorize with
- * @param authenticate The method that will be called within authorize page
- * @returns Authenticated principal
- */
-/**
  * Selects the raw postMessage protocol, which creates no session.
  *
  * The test app defaults to the session path, so a test that drives it directly
@@ -88,6 +81,13 @@ export const useLegacyProtocol = async (page: Page): Promise<void> => {
     .setChecked(false);
 };
 
+/**
+ * Authorize with a custom app URL
+ * @param page The page that will load the test app
+ * @param appUrl The URL of the app to authorize with
+ * @param authenticate The method that will be called within authorize page
+ * @returns Authenticated principal
+ */
 export const authorizeWithUrl = async (
   page: Page,
   appUrl: string,

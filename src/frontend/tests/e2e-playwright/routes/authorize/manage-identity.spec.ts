@@ -1,6 +1,11 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { authorize, II_URL, TEST_APP_URL, useLegacyProtocol } from "../../utils";
+import {
+  authorize,
+  II_URL,
+  TEST_APP_URL,
+  useLegacyProtocol,
+} from "../../utils";
 
 test.describe("Manage your Internet Identity from authorize popover", () => {
   test("postMessage handoff — manage tab lands on /manage without sign-in dialog", async ({
@@ -11,7 +16,7 @@ test.describe("Manage your Internet Identity from authorize popover", () => {
   }) => {
     // Establish a last-used identity by completing an authorize flow first.
     await page.goto(TEST_APP_URL);
-  await useLegacyProtocol(page);
+    await useLegacyProtocol(page);
     await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
 
     await authorize(page, async (authPage) => {

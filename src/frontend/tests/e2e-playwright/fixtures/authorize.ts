@@ -225,7 +225,10 @@ export const test = base.extend<{
     await waitForSignInResult(testAppPage, authPage);
 
     const principal = await testAppPage.locator("#principal").textContent();
-    if (principal === null) {
+    // Empty is the same answer as absent: the wait above is bounded, so a
+    // sign-in that produced nothing leaves the element there and blank, and
+    // `Principal.fromText("")` would report that as a bad checksum.
+    if (principal === null || principal === "") {
       return use(undefined);
     }
 
@@ -322,7 +325,7 @@ export const test = base.extend<{
 
     const [testAppPage] = page.context().pages();
     await testAppPage
-      .getByRole("textbox", { name: "II canister id (signer)" })
+      .getByRole("textbox", { name: "II canister id:" })
       .fill(iiBackendCanisterId.toText());
     const humanReadableLocator = testAppPage.locator(
       "#canisterEchoedAttributes",

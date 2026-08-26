@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { addVirtualAuthenticator, II_URL, TEST_APP_URL, useLegacyProtocol } from "../../utils";
+import {
+  addVirtualAuthenticator,
+  II_URL,
+  TEST_APP_URL,
+  useLegacyProtocol,
+} from "../../utils";
 
 test("Delegation maxTimeToLive: 1 min", async ({ page }) => {
   // Open demo app and configure II URL
