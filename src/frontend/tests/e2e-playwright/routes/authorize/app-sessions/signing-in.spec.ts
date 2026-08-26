@@ -1,4 +1,3 @@
-import { expect } from "@playwright/test";
 import { test } from "../../../fixtures";
 import { TEST_APP_CANONICAL_URL } from "../../../utils";
 import { continueAs, SESSION_SIGN_IN, signInAsFirstIdentity } from "./helpers";
@@ -16,10 +15,10 @@ test.describe("signing in", () => {
 
   test.describe("a first sign-in leaves the app holding a session and a delegation", () => {
     test.afterEach(async ({ signedInApp }) => {
-      await expect(signedInApp.account).not.toHaveText("-");
+      await signedInApp.accountPrincipal();
       // The ceremony mints before it resolves, so a delegation is held straight
       // away rather than only once the tab next comes forward.
-      await expect(signedInApp.delegation).not.toHaveText("none held");
+      await signedInApp.expectHoldsDelegation();
     });
 
     test("picks an identity and continues", signInAsFirstIdentity);
@@ -36,11 +35,11 @@ test.describe("signing in", () => {
     );
     await testApp.open();
     await testApp.signIn(authenticate);
-    const before = await testApp.sessionKey.textContent();
+    const before = await testApp.sessionKeyPrincipal();
 
     await testApp.signIn(authenticate);
 
-    await expect(testApp.sessionKey).not.toHaveText(before ?? "");
+    await testApp.expectSessionKeyOtherThan(before);
   });
 
   test("one identity is a different account at each app", async ({
@@ -57,7 +56,7 @@ test.describe("signing in", () => {
 
     await testApp.open();
     await testApp.signIn(authenticate);
-    const here = await testApp.account.textContent();
+    const here = await testApp.accountPrincipal();
 
     // The same app on another origin. `NOT_TEST_APP_URL` is not the app at all:
     // every unknown host resolves to the II dev server.
@@ -65,7 +64,7 @@ test.describe("signing in", () => {
     await elsewhere.open({ url: TEST_APP_CANONICAL_URL });
     await elsewhere.signIn(authenticate);
 
-    await expect(elsewhere.account).not.toHaveText(here ?? "");
+    await elsewhere.expectAccountOtherThan(here);
     await elsewhere.close();
   });
 });
