@@ -1,6 +1,6 @@
 import { test } from "../../../fixtures";
 import { TEST_APP_CANONICAL_URL } from "../../../utils";
-import { continueAs, SESSION_SIGN_IN, signInAsFirstIdentity } from "./helpers";
+import { continueAs, signInAsFirstIdentity } from "./helpers";
 
 /**
  * What a sign-in leaves behind: an account the app acts as, a delegation to act
@@ -11,7 +11,7 @@ import { continueAs, SESSION_SIGN_IN, signInAsFirstIdentity } from "./helpers";
  * per-app account, which the designs promise and no scenario there names.
  */
 test.describe("signing in", () => {
-  test.use({ authorizeConfig: SESSION_SIGN_IN });
+  test.use({ authorizeConfig: { protocol: "icrc25" } });
 
   test.describe("a first sign-in leaves the app holding a session and a delegation", () => {
     test.afterEach(async ({ signedInApp }) => {
