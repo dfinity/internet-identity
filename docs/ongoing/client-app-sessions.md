@@ -54,13 +54,13 @@ The app key is what an app delegation delegates to, and it signs the calls the a
 
 An app is handed an identity built on the second, and never sees either. A third value travels with them and is not a secret. The account key is the public key an app delegation is rooted at, returned by the canister as `user_key`, and the principal an app's canisters see is derived from it. It is stored beside the chain precisely because it is public.
 
-|                   | Session key                          | App key                                           |
-| ----------------- | ------------------------------------ | ------------------------------------------------- |
-| Delegated to by   | the session chain, from the ceremony | an app delegation, from a mint                    |
-| Signs             | calls to the II canister only        | every call the application makes                  |
-| Lives for         | the session                          | its delegation, so five minutes                   |
-| Stored            | IndexedDB, non-extractable           | IndexedDB, refused past its expiry or its session |
-| Leaves the origin | never                                | never; other tabs read it as a handle             |
+|                   | Session key                          | App key                               |
+| ----------------- | ------------------------------------ | ------------------------------------- |
+| Delegated to by   | the session chain, from the ceremony | an app delegation, from a mint        |
+| Signs             | calls to the II canister only        | every call the application makes      |
+| Lives for         | the session                          | its delegation, so five minutes       |
+| Stored            | its key store, non-extractable       | its key store, non-extractable        |
+| Leaves the origin | never                                | never; other tabs read it as a handle |
 
 One key would be simpler, and there are two ways to try it. Letting the app sign with the session key fails on what that key is for: the session chain names the II canister in its `targets`, so an app signing with it could call II and nothing else, and the app's own canisters would refuse the delegation. It also hands the app the thing that mints, so nothing would expire by itself and revocation would be the only way to stop anything. Letting the app bring a long-lived key of its own and delegating to it once is the arrangement this design replaces, and its problem is the one the Problem section opens with.
 
@@ -191,7 +191,11 @@ Tabs of one origin share their storage, so they share the session. What they do 
 
 #### Where the pair is kept
 
-A non-extractable key can be structured-cloned, which is what lets one live in IndexedDB as a handle that signs but cannot be exported. So the pair is written there, in the store that already holds the session key, and sharing is a read rather than a conversation: a tab that needs a delegation looks at what is there before minting one.
+Read that table twice and the storage falls out of it. Both columns are the same shape — a key that signs, and a chain saying what it may sign for — so each is held the same way: a key store, asynchronous because a non-extractable key needs one, and a chain store, synchronous because a chain is not a secret. Two stores per credential, the same two interfaces supplied twice.
+
+A non-extractable key can be structured-cloned, which is what lets one live in IndexedDB as a handle that signs but cannot be exported. So the app pair is written the way the session's already is, and sharing becomes a read rather than a conversation: a tab that needs a delegation looks at what is there before minting one.
+
+The four slots are set independently, which is the point rather than a side effect. An application unwilling to have delegations on disk supplies memory-backed stores for the app half and leaves the session persisted — it still shares between its live tabs, with nothing written down. Neither half is dangerous alone either: a chain whose key is gone signs nothing, a key whose chain is gone authorises nothing, and a pair that does not match is refused. So a half-persisted configuration costs a mint and never more.
 
 Nothing waits on another tab to answer. That matters most where no tab can: a backgrounded tab is frozen and may be discarded outright, so a tab that asked would wait out its window and mint anyway. Reading a store works whether the other tabs are running, frozen, or gone, which is the case sharing is worth having in.
 
