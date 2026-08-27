@@ -195,7 +195,11 @@ No mint is started when the session itself has less than the block margin left. 
 `signIn()` mints before it resolves, so the first request after signing in does not wait. The cost is hidden inside a ceremony the user is already waiting for.
 
 **MINT-13.**
-A page load that restores a stored session goes through the trigger of MINT-7, since a load is the page becoming visible for the first time, and that trigger mints only when one is due. A load that reads a usable pair from the store is therefore not due and MUST NOT mint. It still follows the trigger's conditions: no DOM, or `disableForegroundRefresh`, and the load mints nothing and the first request pays for it. `getIdentity()` does not wait for either outcome.
+A page load that restores a stored session goes through the trigger of MINT-7, since a load is the page becoming visible for the first time, and that trigger mints only when one is due. Both halves of that matter on a load.
+
+A load that reads a usable pair is not due, and MUST NOT mint. A load that finds no pair, or one inside the pre-mint threshold, is due and MUST mint in the background — before anything asks for an identity, and whether or not the application goes on to use one. Waiting for the first request to discover it would put the cost in front of a user action, which is what the trigger exists to avoid.
+
+It still follows the trigger's conditions: with no DOM, or under `disableForegroundRefresh`, the load mints nothing and the first request pays for it. `getIdentity()` does not wait for any of these outcomes.
 
 A load consequently stops being where a session revoked elsewhere is discovered, since a stored pair reads the same either way. TAB-6 catches a session replaced in this browser; one revoked from another device is found at the next mint, which is within one delegation lifetime — the bound [revocable-app-sessions-spec.md](revocable-app-sessions-spec.md) sets in END-5, and the same bound that applies to a delegation minted a moment before the revocation.
 
