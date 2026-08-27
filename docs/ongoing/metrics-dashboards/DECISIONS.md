@@ -37,16 +37,18 @@ The index gate cannot be watched today: the backfill's progress lives in a `thre
 
 ## Health
 
-| Panel                                                 | What it answers                                                    |
-| ----------------------------------------------------- | ------------------------------------------------------------------ |
-| Apps being refused a delegation                       | Are people being signed out against their will · **alerts**        |
-| Sign-ins failing                                      | Can people get in at all · **alerts**                              |
-| Sign-ins per hour against this hour last week         | The catch-all: everything upstream fails as absence · **alerts**   |
-| Delegation mints per second                           | Load, undivided — a capacity number, not an engagement one         |
-| Seconds since the archive last pulled                 | Is the archive alive · **alerts**                                  |
-| Operations waiting for the archive, against its limit | Is it falling behind, with the limit drawn                         |
-| Live delegation signatures held                       | Canary; its band must be re-derived once 5-minute mints land       |
-| Running since                                         | Explains every counter reset; drives deploy annotations everywhere |
+| Panel                                                 | What it answers                                                       |
+| ----------------------------------------------------- | --------------------------------------------------------------------- |
+| Apps being refused a delegation                       | Are people being signed out against their will · **alerts**           |
+| Sign-ins failing                                      | Can people get in at all, by outcome on the same counter · **alerts** |
+| Sign-ins per hour against this hour last week         | The catch-all: everything upstream fails as absence · **alerts**      |
+| Delegation mints per second                           | Load, undivided — a capacity number, not an engagement one            |
+| Seconds since the archive last pulled                 | Is the archive alive · **alerts**                                     |
+| Operations waiting for the archive, against its limit | Is it falling behind, with the limit drawn                            |
+| Live delegation signatures held                       | Canary; its band must be re-derived once 5-minute mints land          |
+| Time since each OpenID issuer's keys last refreshed   | Is Google, Microsoft or Apple key fetching broken · **alerts**        |
+| OpenID verifications by issuer and outcome            | Which issuer is failing, and whether it is a missing key              |
+| Running since                                         | Explains every counter reset; drives deploy annotations everywhere    |
 
 Abuse band, all resting at zero:
 
@@ -58,6 +60,8 @@ Abuse band, all resting at zero:
 | Mints per session against the expected 12/hour | Is anything minting far above what a browser needs  |
 | Identities pressed against the caps            | Is anyone at the session or browser cap             |
 | Counts rebuilt, and DNS answers disagreeing    | Two invariants that should never move               |
+
+The two OpenID panels cover the largest unmonitored dependency in the system. Roughly 1,485 of 3,627 daily active identities authenticate through Google, Microsoft or Apple; their signing keys are refetched on a fifteen-minute timer; and a failing fetch is reported only to the canister log. The comment on that line already describes the consequence — a provider rotating its key while fetches fail "shows up only as `Certificate not found for {kid}` on every sign-in, with no hint of the cause". Splitting that case out as its own verification outcome turns an unattributable sign-in failure into a named alert, and the freshness threshold derives from the refresh interval the way archive staleness derives from the polling interval.
 
 The week-over-week comparison on sign-ins is the design, not decoration: the rate has hard daily and weekly seasonality, so a static threshold either never fires or fires every Sunday.
 
@@ -159,6 +163,10 @@ Scrape cost is not the reason. Almost every value on the endpoint is a stored co
 
 **No sweep.** REC-8 states that nothing may require a periodic sweep across identities, which rules out the obvious way to make expiry observable. Everything above is therefore built from creation, use, and the paths that already rewrite a row.
 
+That constraint is also not unusual. Okta documents the same limitation in the same words — a session expiry does not appear in its logs unless the user signed out or the session was revoked — so building from creation and use is the mainstream answer rather than a concession.
+
+**Refreshes do not count as activity.** Only the ceremony records identity activity; the mint path authenticates by session chain and never reaches that code. So the active-identity numbers will not inflate as sessions roll out, which is the trap a service counting token refreshes as activity walks into.
+
 ## What is deliberately not here
 
 Anything measurable from the browser belongs to Plausible: bounce rate, funnels, page views, drop-off, and which II domain somebody actually visited. Two definitions of one number drift apart, and the drifted one is always the one on the dashboard.
@@ -167,4 +175,6 @@ Silent re-auth outcomes are the one genuinely desirable rollout number that is n
 
 Session lifetime observed at removal, because expiry writes nothing and nothing sweeps — any such histogram is drawn from sessions somebody came back to, and would report longer lives the more people abandoned.
 
-Latency from inside the canister, which is not merely expensive but impossible: block time is constant for a whole message execution, so a duration measured there is identically zero. Instructions are what the canister can honestly report; latency has to come from the boundary-node log.
+Latency from inside the canister, which is not merely expensive but impossible: block time is constant for a whole message execution, so a duration measured there is identically zero. Instructions are what the canister can honestly report.
+
+Latency itself is not out of reach, though, and this document previously implied it was. The boundary-node access log is already a data source on the same Grafana — it is what the deleted bounce-rate panel read — and it carries per-method rows. Availability and latency percentiles for the sign-in and session methods belong there, measured at the edge, which is where every comparable service measures them. Deleting the one panel that touched that source without repurposing it was the wrong instinct.
