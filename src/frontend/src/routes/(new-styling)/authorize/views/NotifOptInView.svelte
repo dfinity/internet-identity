@@ -59,7 +59,6 @@
   let variant = $state<Variant>("loading");
   let busy = $state(false);
   let browser = $state<BrowserKind>("other");
-  let failureDetail = $state<string>();
   let actor: ActorSubclass<_SERVICE> | undefined;
   // A retry from the failed screen subscribes for a fresh/new device, or only
   // records consent when the browser is already subscribed.
@@ -120,7 +119,6 @@
     } catch (err) {
       const message = messageOf(err);
       recordFailure(classify(message), message);
-      failureDetail = message;
       variant = "failed";
     } finally {
       busy = false;
@@ -145,7 +143,6 @@
     } catch (err) {
       const message = messageOf(err);
       recordFailure("register-failed", message);
-      failureDetail = message;
       variant = "failed";
     } finally {
       busy = false;
@@ -243,13 +240,6 @@
             or set it up later in Settings.
           </Trans>
         </p>
-        {#if failureDetail !== undefined}
-          <p
-            class="text-text-tertiary bg-bg-secondary mt-3 rounded-lg px-3 py-2 font-mono text-xs break-words"
-          >
-            {failureDetail}
-          </p>
-        {/if}
       {/if}
     </div>
 
