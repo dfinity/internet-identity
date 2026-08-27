@@ -722,6 +722,12 @@ export const idlFactory = ({ IDL }) => {
     'deliverable_channels' : IDL.Opt(IDL.Vec(NotificationChannel)),
     'consented' : IDL.Opt(IDL.Bool),
   });
+  const NotificationConsentedApp = IDL.Record({
+    'muted' : IDL.Bool,
+    'origin' : IDL.Text,
+    'granted_at_ns' : Timestamp,
+    'last_sent_ns' : IDL.Opt(Timestamp),
+  });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
@@ -1367,6 +1373,11 @@ export const idlFactory = ({ IDL }) => {
         [NotificationConsentStatus],
         ['query'],
       ),
+    'notification_consented_apps' : IDL.Func(
+        [UserNumber],
+        [IDL.Vec(NotificationConsentedApp)],
+        ['query'],
+      ),
     'notification_consented_origins' : IDL.Func(
         [UserNumber],
         [IDL.Vec(IDL.Text)],
@@ -1379,6 +1390,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'notification_revoke_consent' : IDL.Func(
         [UserNumber, IDL.Text],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'notification_set_app_muted' : IDL.Func(
+        [UserNumber, IDL.Text, IDL.Bool],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
