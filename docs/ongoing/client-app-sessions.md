@@ -6,7 +6,7 @@
 
 An app that signs in through `@icp-sdk/auth` receives a delegation valid for as long as the user agreed to, up to 30 days, and nothing can withdraw it before it expires. Internet Identity's side of the fix is designed and built: a session the user can see and end, with short-lived delegations minted from it. No client uses those methods, so no app can reach the feature.
 
-This holds the session inside `AuthClient`. An app calls `signIn()` and gets an identity, as it does today. Behind that identity is a session, and the delegations it signs calls with last five minutes. The library replaces them ahead of use and never stores one, so a delegation exists only in the tab holding it and only for as long as it is good for. `signOut()` ends the session at the canister instead of only clearing local storage. Sessions do not appear in the public API at all, so an app never handles a session chain and nothing it can call returns one. Upgrading is not free, though: the stored record changes shape, nothing migrates it, and everyone signed in through an earlier version signs in again once.
+This holds the session inside `AuthClient`. An app calls `signIn()` and gets an identity, as it does today. Behind that identity is a session, and the delegations it signs calls with last five minutes. The library replaces them ahead of use, and a delegation is kept only where every tab of the origin can read it and only for as long as it is good for: one past its five minutes, or from a session that is no longer the stored one, is refused and deleted rather than returned. `signOut()` ends the session at the canister instead of only clearing local storage. Sessions do not appear in the public API at all, so an app never handles a session chain and nothing it can call returns one. Upgrading is not free, though: the stored record changes shape, nothing migrates it, and everyone signed in through an earlier version signs in again once.
 
 ## Context
 
@@ -45,7 +45,6 @@ Three nested lifetimes, and two marks near the end of a delegation.
 | App delegation lifetime | `min(5 minutes, session left)` | II, and not requestable                                                                | how long one delegation signs an app's calls                        |
 | Pre-mint threshold      | 15 seconds before expiry       | this library                                                                           | when a refresh is scheduled, and when a request mints behind itself |
 | Block margin            | 10 seconds before expiry       | this library                                                                           | below this a request waits for a mint                               |
-| Inherit window          | 200 milliseconds               | this library                                                                           | how long a starting tab waits for another tab's pair                |
 
 ### Two keys, one of them private to the library
 
@@ -55,13 +54,13 @@ The app key is what an app delegation delegates to, and it signs the calls the a
 
 An app is handed an identity built on the second, and never sees either. A third value travels with them and is not a secret. The account key is the public key an app delegation is rooted at, returned by the canister as `user_key`, and the principal an app's canisters see is derived from it. It is stored beside the chain precisely because it is public.
 
-|                   | Session key                          | App key                                  |
-| ----------------- | ------------------------------------ | ---------------------------------------- |
-| Delegated to by   | the session chain, from the ceremony | an app delegation, from a mint           |
-| Signs             | calls to the II canister only        | every call the application makes         |
-| Lives for         | the session                          | its delegation, so five minutes          |
-| Stored            | IndexedDB, non-extractable           | memory only, never persisted             |
-| Leaves the origin | never                                | never; it reaches other tabs as a handle |
+|                   | Session key                          | App key                                           |
+| ----------------- | ------------------------------------ | ------------------------------------------------- |
+| Delegated to by   | the session chain, from the ceremony | an app delegation, from a mint                    |
+| Signs             | calls to the II canister only        | every call the application makes                  |
+| Lives for         | the session                          | its delegation, so five minutes                   |
+| Stored            | IndexedDB, non-extractable           | IndexedDB, refused past its expiry or its session |
+| Leaves the origin | never                                | never; other tabs read it as a handle             |
 
 One key would be simpler, and there are two ways to try it. Letting the app sign with the session key fails on what that key is for: the session chain names the II canister in its `targets`, so an app signing with it could call II and nothing else, and the app's own canisters would refuse the delegation. It also hands the app the thing that mints, so nothing would expire by itself and revocation would be the only way to stop anything. Letting the app bring a long-lived key of its own and delegating to it once is the arrangement this design replaces, and its problem is the one the Problem section opens with.
 
@@ -147,7 +146,7 @@ A delegation lasts `min(five minutes, what remains of the session)`, so a sessio
 
 The session is the widest of the three and the one nothing local can see. A derivation origin is the origin an application asks II to derive its principals from, so sibling subdomains configured with the same one resolve to a single application rather than to several. A session record is keyed on the identity, that application, the account and the browser. `chat` and `hr` therefore share one record instead of holding two that behave alike, and either of them signing out ends it for both.
 
-Everything the client holds is narrower. A chain is in `localStorage`, which is per origin, and the app key and its delegation ride a `BroadcastChannel`, which is also per origin. So `chat`'s tabs coordinate with each other and `hr`'s tabs coordinate with each other, and the two sets cannot speak at all.
+Everything the client holds is narrower. A chain is in `localStorage` and the app key and its delegation are in IndexedDB, both of which are per origin. So `chat`'s tabs share with each other and `hr`'s tabs share with each other, and neither set can read the other's.
 
 The hint cookie is the only thing that crosses between siblings, and it carries a principal and the session's expiry, which is all a sibling needs in order to decide whether to try a silent re-auth.
 
@@ -161,7 +160,7 @@ Tabs of one origin pass a key handle instead, which signs without being exportab
 | --------------------------------- | -------------------------------------------------------------------------- | --------------------------- | ----------------------------------------------------------- |
 | The session                       | the II canister, one record per identity, application, account and browser | every sibling of the domain | either sibling signing out ends it for both                 |
 | The session chain and session key | `localStorage` and IndexedDB                                               | one origin                  | each sibling holds its own chain to the same session        |
-| The app key and its delegation    | memory, offered over a `BroadcastChannel`                                  | the tabs of one origin      | the floor is one mint per active origin                     |
+| The app key and its delegation    | IndexedDB, refused past its expiry or its session                          | the tabs of one origin      | the floor is one mint per active origin                     |
 | The hint                          | a cookie scoped to the domain                                              | every sibling of the domain | a sibling decides whether to acquire silently, with no call |
 
 ```mermaid
@@ -170,11 +169,11 @@ flowchart TB
         H[("cookie: the account's principal<br/>and the session's expiry")]
         subgraph O1["chat.example.com"]
             L1[("session chain, account key,<br/>session key")]
-            B1["app key and its delegation,<br/>in memory, shared across tabs"]
+            B1[("app key and its delegation,<br/>read by every tab")]
         end
         subgraph O2["hr.example.com"]
             L2[("session chain, account key,<br/>session key")]
-            B2["app key and its delegation,<br/>in memory, shared across tabs"]
+            B2[("app key and its delegation,<br/>read by every tab")]
         end
     end
     L1 -->|mints from| S
@@ -186,34 +185,40 @@ flowchart TB
 
 Tabs of one origin share their storage, so they share the session. What they do not share is the delegation minted from it: the app key lives in memory, so each tab mints for a key of its own, and five tabs cost five update calls and five stable writes every five minutes for one person's one session.
 
-#### Passing the pair between tabs
+#### Where the pair is kept
 
-A non-extractable key can be structured-cloned, which is what lets one live in IndexedDB and what lets it cross a `BroadcastChannel` as a handle that signs but cannot be exported. The pair crosses together, because that is what a mint produces and what expires at once.
+A non-extractable key can be structured-cloned, which is what lets one live in IndexedDB as a handle that signs but cannot be exported. So the pair is written there, in the store that already holds the session key, and sharing is a read rather than a conversation: a tab that needs a delegation looks at what is there before minting one.
 
-A tab opening asks on the channel and a tab already running answers with the pair it holds. The asking tab waits 200 milliseconds for an answer, which is the only waiting in this design: long enough for a tab that is there to reply, and short enough that a tab starting alone is not delayed by tabs that do not exist. Nothing is persisted, so a delegation never outlives the tabs holding it and there is nothing stale to reconcile on a load.
+Nothing waits on another tab to answer. That matters most where no tab can: a backgrounded tab is frozen and may be discarded outright, so a tab that asked would wait out its window and mint anyway. Reading a store works whether the other tabs are running, frozen, or gone, which is the case sharing is worth having in.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant T2 as a tab starting
-    participant BC as BroadcastChannel<br/>(this origin only)
-    participant T1 as a tab already running
+    participant T as a tab needing a delegation
+    participant S as the origin's store
     participant II as II canister
 
-    T2->>BC: ask
-    BC->>T1: ask
-    alt a tab answers within the inherit window
-        T1-->>BC: offer: the key handle and its delegation
-        BC-->>T2: offer
-        Note over T2: adopts the pair and reschedules<br/>from that delegation's expiry
-    else nothing answers in 200 ms
-        T2->>II: mints a pair of its own
-        T2->>BC: offers it, unasked
+    T->>S: read the stored pair
+    alt one is there, unexpired, and from this session
+        S-->>T: the key handle and its delegation
+        Note over T: adopts it and reschedules<br/>from that delegation's expiry
+    else nothing usable
+        T->>II: mints a pair
+        T->>S: writes it
     end
-    Note over T1,T2: either way both hold the same pair
 ```
 
-Sharing the whole pair also makes tabs converge with nothing electing a winner. Two tabs restored in the same instant may each end up with a pair, and they do not stay that way: the next mint produces one pair, its broadcast reaches both, and both adopt it. Divergence costs an extra mint or two and lasts at most one delegation's lifetime.
+#### What makes a stored delegation safe to keep
+
+A delegation is the thing revocation cannot reach, so putting one on disk has to answer what stops it outliving the sign-in it belongs to. Not an event: there is no dependable signal for a browser closing, and a guarantee that rests on one is a guarantee that lapses exactly when the browser is killed rather than closed.
+
+Two checks on every read carry it instead.
+
+The first is expiry. A stored delegation past its expiry is refused and deleted rather than returned. That bounds it at five minutes with nothing having to fire.
+
+The second is the session it came from. The pair is stored beside the session that minted it, and a pair whose session is not the one stored now is refused and deleted. After a sign-out there is no session, so the first read removes it; after a sign-in replaced the session, the same read replaces the pair.
+
+What this does not add is reach. The session key is already in this store, so anything able to read the pair could already mint a fresh one from the live session. What the checks add is that a pair cannot outlive the session behind it — and what remains, honestly, is an artifact on disk for as long as five minutes. That is a bound, not an erasure, and a threat that reads the disk directly rather than through this library is not one it addresses.
 
 #### Why no tab may be in charge
 
@@ -230,12 +235,12 @@ Where the browser has no such lock every tab mints, which is the cost of no coor
 ```mermaid
 flowchart TD
     N["a tab is about to mint"] --> L{"does this browser have<br/>the named-lock API?"}
-    L -->|no| M1["mint, and broadcast the pair"]
+    L -->|no| M1["mint, and write the pair"]
     L -->|yes| Q["queue on the lock"]
     Q --> H["holds it"]
-    H --> R{"has a fresh pair arrived<br/>while queueing?"}
+    H --> R{"is there a usable pair<br/>in the store?"}
     R -->|yes| S["skip the mint and adopt it"]
-    R -->|no| M2["mint, and broadcast the pair"]
+    R -->|no| M2["mint, and write the pair"]
     M2 -.->|tab closed mid-mint| RL["the browser releases the lock,<br/>the next in the queue proceeds"]
 ```
 
