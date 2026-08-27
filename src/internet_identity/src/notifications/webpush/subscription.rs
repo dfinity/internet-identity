@@ -11,6 +11,7 @@ use crate::storage::storable::notifications::webpush::endpoint_hash::StorableEnd
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
+use minicbor::bytes::ByteVec;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn add_subscription(
@@ -51,7 +52,7 @@ pub(super) fn add_subscription(
         created_at_ns: now_ns,
         vapid_public_key,
         jwt_pool: Some(StorableWebPushJwtPool {
-            signatures: jwt_signatures,
+            signatures: jwt_signatures.into_iter().map(ByteVec::from).collect(),
             issued_at_ns: jwt_issued_at_ns,
         }),
     };

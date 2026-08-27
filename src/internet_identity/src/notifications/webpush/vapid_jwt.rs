@@ -34,7 +34,7 @@ pub fn assemble(
     let aud = serde_json::to_string(relay_origin).ok()?;
     let payload = format!(r#"{{"aud":{aud},"exp":{exp_secs},"sub":"{VAPID_SUBJECT}"}}"#);
     let payload_b64 = BASE64_URL_SAFE_NO_PAD.encode(payload);
-    let signature_b64 = BASE64_URL_SAFE_NO_PAD.encode(signature);
+    let signature_b64 = BASE64_URL_SAFE_NO_PAD.encode(signature.as_slice());
     Some(format!("{HEADER_B64}.{payload_b64}.{signature_b64}"))
 }
 
@@ -44,7 +44,9 @@ mod tests {
 
     fn pool(count: usize, issued_at_ns: Timestamp) -> StorableWebPushJwtPool {
         StorableWebPushJwtPool {
-            signatures: (0..count).map(|i| vec![i as u8; 64]).collect(),
+            signatures: (0..count)
+                .map(|i| minicbor::bytes::ByteVec::from(vec![i as u8; 64]))
+                .collect(),
             issued_at_ns,
         }
     }

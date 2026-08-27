@@ -10,6 +10,7 @@ use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::storable::notifications::webpush::endpoint_hash::StorableEndpointSha256;
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
+use minicbor::bytes::ByteVec;
 
 /// What a device still has signed, so the frontend knows when to top up.
 #[derive(candid::CandidType, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,7 +39,7 @@ fn replace_jwt_pool(
             return Err("no subscription for that endpoint".to_string());
         };
         subscription.jwt_pool = Some(StorableWebPushJwtPool {
-            signatures,
+            signatures: signatures.into_iter().map(ByteVec::from).collect(),
             issued_at_ns,
         });
         storage
