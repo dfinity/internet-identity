@@ -10,7 +10,7 @@ use std::borrow::Cow;
 #[derive(Encode, Decode, Clone, Debug, PartialEq)]
 #[cbor(map)]
 pub struct StorableWebPushSeal {
-    #[n(0)]
+    #[cbor(n(0), with = "minicbor::bytes")]
     pub blob: Vec<u8>,
     #[n(1)]
     pub created_at_ns: Timestamp,
@@ -59,8 +59,11 @@ mod tests {
         // delimiter and the GCM tag.
         let escaped_origin = "https://".len() + (255 - "https://".len()) * 6;
         let plaintext = r#"{"o":""#.len() + escaped_origin + r#""}"#.len();
+        // High-entropy bytes (a real seal is aes128gcm ciphertext): as a CBOR
+        // int-array these would ~double and blow the bound; as a byte string
+        // they don't. Guards against dropping the `minicbor::bytes` annotation.
         let seal = StorableWebPushSeal {
-            blob: vec![0u8; 86 + plaintext + 1 + 16],
+            blob: vec![0xABu8; 86 + plaintext + 1 + 16],
             created_at_ns: u64::MAX,
         };
         assert!(seal.to_bytes().len() <= max_size as usize);

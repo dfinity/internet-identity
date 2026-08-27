@@ -20,15 +20,15 @@ pub struct StorableWebPushSubscription {
     #[n(1)]
     pub endpoint: String,
     /// Device public key: uncompressed SEC1 P-256 (65 bytes).
-    #[n(2)]
+    #[cbor(n(2), with = "minicbor::bytes")]
     pub p256dh: Vec<u8>,
     /// Auth secret from `subscription.getKey("auth")` (16 bytes).
-    #[n(3)]
+    #[cbor(n(3), with = "minicbor::bytes")]
     pub auth: Vec<u8>,
     /// The `applicationServerKey` the browser minted this subscription with
     /// (uncompressed SEC1 P-256, 65 bytes). Sent as the relay's `k=`; the relay
     /// rejects a push whose `k` doesn't match.
-    #[n(5)]
+    #[cbor(n(5), with = "minicbor::bytes")]
     pub vapid_public_key: Vec<u8>,
     /// Written per (re-)subscribe; the eviction tie-breaker at the cap.
     #[n(4)]
@@ -62,6 +62,7 @@ impl Storable for StorableWebPushSubscription {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use minicbor::bytes::ByteVec;
 
     fn sample(jwt_pool: Option<StorableWebPushJwtPool>) -> StorableWebPushSubscription {
         StorableWebPushSubscription {
@@ -80,7 +81,7 @@ mod tests {
         for pool in [
             None,
             Some(StorableWebPushJwtPool {
-                signatures: vec![vec![7u8; 64], vec![8u8; 64]],
+                signatures: vec![ByteVec::from(vec![7u8; 64]), ByteVec::from(vec![8u8; 64])],
                 issued_at_ns: 42,
             }),
         ] {
@@ -102,12 +103,15 @@ mod tests {
         let subscription = StorableWebPushSubscription {
             anchor: u64::MAX,
             endpoint: "x".repeat(1024),
-            p256dh: vec![0u8; 65],
-            auth: vec![0u8; 16],
+            // High-entropy bytes (values >= 24): under a CBOR int-array these
+            // would take ~2 bytes each and blow the bound; as byte strings they
+            // don't. Guards against dropping the `minicbor::bytes` annotation.
+            p256dh: vec![0xABu8; 65],
+            auth: vec![0xABu8; 16],
             created_at_ns: u64::MAX,
-            vapid_public_key: vec![0u8; 65],
+            vapid_public_key: vec![0xABu8; 65],
             jwt_pool: Some(StorableWebPushJwtPool {
-                signatures: vec![vec![0u8; 64]; 30],
+                signatures: vec![ByteVec::from(vec![0xABu8; 64]); 30],
                 issued_at_ns: u64::MAX,
             }),
         };
