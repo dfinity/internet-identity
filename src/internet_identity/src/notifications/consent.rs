@@ -211,6 +211,10 @@ pub struct NotificationConsentedApp {
     pub account_number: Option<u64>,
 }
 
+/// Don't rewrite `last_sent_ns` more than once an hour per app: the send path
+/// is throughput-critical, and the page only shows it coarsely.
+const SENT_THROTTLE_NS: u64 = 60 * 60 * 1_000_000_000;
+
 /// Every consented app for the caller's anchor, with metadata.
 pub fn consented_apps(anchor_number: AnchorNumber) -> Vec<NotificationConsentedApp> {
     if !feature_enabled() || !authorize_query(anchor_number) {
@@ -252,6 +256,43 @@ pub fn set_app_muted(
         storage.notifications_consent_memory.insert(key, consent);
         Ok(())
     })
+}
+
+/// Whether `origin` is both consented and not muted — the send path's gate.
+pub(crate) fn is_deliverable(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
+    if validate_origin(&origin).is_err() {
+        return false;
+    }
+    let origin_hash = StorableOriginSha256::from_origin(&origin);
+    storage_borrow(|storage| {
+        storage
+            .notifications_consent_memory
+            .get(&(anchor_number, origin_hash))
+            .is_some_and(|c| c.muted != Some(true))
+    })
+}
+
+/// Records a send to `origin` for the page's "last sent" line. Throttled (see
+/// [`SENT_THROTTLE_NS`]) so a send flood doesn't turn into a write flood.
+pub(crate) fn record_sent(
+    anchor_number: AnchorNumber,
+    origin: &FrontendHostname,
+    now_ns: Timestamp,
+) {
+    let origin_hash = StorableOriginSha256::from_origin(origin);
+    storage_borrow_mut(|storage| {
+        let key = (anchor_number, origin_hash);
+        let Some(mut consent) = storage.notifications_consent_memory.get(&key) else {
+            return;
+        };
+        let fresh = consent
+            .last_sent_ns
+            .is_none_or(|last| now_ns.saturating_sub(last) >= SENT_THROTTLE_NS);
+        if fresh {
+            consent.last_sent_ns = Some(now_ns);
+            storage.notifications_consent_memory.insert(key, consent);
+        }
+    });
 }
 
 #[cfg(test)]
@@ -351,5 +392,62 @@ mod tests {
         setup();
         let recipient = Principal::from_slice(&[3u8; 10]);
         assert!(set_consent(1, "http://app.example".to_string(), recipient, None, 0).is_err());
+    }
+
+    #[test]
+    fn muting_stops_delivery_but_keeps_consent() {
+        setup();
+        let anchor = 1;
+        let origin = "https://app.example".to_string();
+        let recipient = Principal::from_slice(&[3u8; 10]);
+        set_consent(anchor, origin.clone(), recipient, 1_000).unwrap();
+        assert!(is_deliverable(anchor, origin.clone()));
+
+        // Mute at the storage layer (what `set_app_muted` does, minus authz).
+        let hash = StorableOriginSha256::from_origin(&origin);
+        storage_borrow_mut(|s| {
+            let mut c = s
+                .notifications_consent_memory
+                .get(&(anchor, hash.clone()))
+                .unwrap();
+            c.muted = Some(true);
+            s.notifications_consent_memory
+                .insert((anchor, hash.clone()), c);
+        });
+
+        assert!(
+            !is_deliverable(anchor, origin.clone()),
+            "muted app must not deliver"
+        );
+        assert!(has_consent(anchor, origin), "muting keeps consent");
+    }
+
+    #[test]
+    fn record_sent_is_throttled() {
+        setup();
+        let anchor = 1;
+        let origin = "https://app.example".to_string();
+        let recipient = Principal::from_slice(&[3u8; 10]);
+        set_consent(anchor, origin.clone(), recipient, 1_000).unwrap();
+        let hash = StorableOriginSha256::from_origin(&origin);
+        let last = |h: StorableOriginSha256| {
+            storage_borrow(|s| {
+                s.notifications_consent_memory
+                    .get(&(anchor, h))
+                    .unwrap()
+                    .last_sent_ns
+            })
+        };
+
+        record_sent(anchor, &origin, 10_000);
+        assert_eq!(last(hash.clone()), Some(10_000));
+
+        // Within the throttle window: no rewrite.
+        record_sent(anchor, &origin, 10_001);
+        assert_eq!(last(hash.clone()), Some(10_000));
+
+        // Past the window: updates.
+        record_sent(anchor, &origin, 10_000 + SENT_THROTTLE_NS);
+        assert_eq!(last(hash), Some(10_000 + SENT_THROTTLE_NS));
     }
 }

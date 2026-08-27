@@ -4,7 +4,7 @@
 //! separate PR; here the buffer just fills.
 
 use super::check_enabled;
-use super::consent::has_consent;
+use super::consent::{is_deliverable, record_sent};
 use super::sender::is_authorized_sender;
 use super::webpush::subscription::has_subscribed_device;
 use crate::delegation::get_principal;
@@ -183,7 +183,7 @@ fn accept_one(
     if get_principal(anchor_number, origin.clone()) != notification.recipient {
         return Err(NotificationRejection::NoConsent);
     }
-    if !has_consent(anchor_number, origin.clone()) {
+    if !is_deliverable(anchor_number, origin.clone()) {
         return Err(NotificationRejection::NoConsent);
     }
     // No subscribed device means the ping has nowhere to land, so reject rather
@@ -193,6 +193,7 @@ fn accept_one(
         return Err(NotificationRejection::NotSubscribed);
     }
 
+    record_sent(anchor_number, origin, now_ns);
     Ok(BufferedNotification {
         anchor_number,
         origin: origin.clone(),
