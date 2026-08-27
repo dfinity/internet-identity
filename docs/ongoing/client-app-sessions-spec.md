@@ -290,10 +290,12 @@ Storing a pair grants no reach the session key beside it did not already grant: 
 Coordination may only suppress a mint, never be required for one. Every tab schedules its refresh as it would if it were alone, and a tab that cannot read or write the store mints for itself.
 
 **TAB-10.**
-A mint runs while holding a named lock, where the environment provides one. Tabs waking in the same moment queue on it, closing the double-mint window.
+A mint runs while holding a named lock, where the environment provides one. Tabs waking in the same moment queue on it, closing the window in which two mints overlap.
 
 **TAB-11.**
-A tab holding the lock re-reads the store before minting, and adopts what it finds instead of minting when that pair is usable. This is where tabs converge, so two tabs restored in the same instant do not both mint.
+A tab holding the lock MUST read the store before minting, and MUST adopt what it finds instead of minting when that pair is usable.
+
+The lock alone does not reduce what the canister is asked for: tabs that queue on it and then each mint make the same number of calls, one after another instead of at once. TAB-11 is what turns serialising into suppressing, and is therefore what the floor in TAB-2 rests on.
 
 **TAB-12.**
 Liveness rests on the lock rather than on a timeout. A browser releases a lock when the context holding it goes away, so a tab closed mid-mint lets the next in the queue proceed, and nothing has to decide how long a tab that is not coming back should be waited for.
