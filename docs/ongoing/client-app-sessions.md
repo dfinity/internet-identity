@@ -128,7 +128,11 @@ A schedule is best effort, because browsers throttle timers in hidden tabs and f
 
 #### Sign-in and page load
 
-`signIn()` mints at the end of the ceremony, so the first call after signing in is instant, and that mint is where the account principal comes from. A page load mints through the same trigger as returning to a tab, since a load is the page becoming visible for the first time. Turning that trigger off turns off the load mint too, and with it the only thing that finds a revoked session before the application asks for one.
+`signIn()` mints at the end of the ceremony, so the first call after signing in is instant, and that mint is where the account principal comes from.
+
+A page load goes through the same trigger as returning to a tab, since a load is the page becoming visible for the first time — but that trigger mints only if one is due, and since the pair is now read from the store a load usually finds one that is not. So the common page load costs nothing at the canister, where before it cost a mint every time because nothing survived the previous page. A load that finds the store empty or its pair spent still mints there and then, ahead of anything asking, so the saving never lands as a wait in front of the first click.
+
+That gives up something worth naming. The load mint used to be what found a session revoked elsewhere before the application asked for anything; now the store looks the same whether the session is alive or was revoked from another device, and the discovery moves to the next mint. Both are inside the bound revocation already promises, because a delegation already minted keeps working for its own lifetime either way — the load simply stops being a special place where that is noticed early.
 
 | Trigger                                  | Condition                                                            | Does the caller wait? |
 | ---------------------------------------- | -------------------------------------------------------------------- | --------------------- |
