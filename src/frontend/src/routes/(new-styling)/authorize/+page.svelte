@@ -43,6 +43,7 @@
   import {
     authorizationContextStore,
     authorizationStore,
+    notificationsRequestedStore,
     requestedMaxTimeToLiveStore,
   } from "$lib/stores/authorization.store";
   import {
@@ -218,6 +219,7 @@
     const effectiveOrigin = get(authorizationStore)?.effectiveOrigin;
     if (
       $PUSH_NOTIFICATIONS &&
+      $notificationsRequestedStore === true &&
       isPushSupported() &&
       selectedIdentity !== undefined &&
       effectiveOrigin !== undefined &&
