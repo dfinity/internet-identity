@@ -54,13 +54,13 @@ The app key is what an app delegation delegates to, and it signs the calls the a
 
 An app is handed an identity built on the second, and never sees either. A third value travels with them and is not a secret. The account key is the public key an app delegation is rooted at, returned by the canister as `user_key`, and the principal an app's canisters see is derived from it. It is stored beside the chain precisely because it is public.
 
-|                   | Session key                          | App key                               |
-| ----------------- | ------------------------------------ | ------------------------------------- |
-| Delegated to by   | the session chain, from the ceremony | an app delegation, from a mint        |
-| Signs             | calls to the II canister only        | every call the application makes      |
-| Lives for         | the session                          | its delegation, so five minutes       |
-| Stored            | its key store, non-extractable       | its key store, non-extractable        |
-| Leaves the origin | never                                | never; other tabs read it as a handle |
+|                   | Session key                            | App key                                |
+| ----------------- | -------------------------------------- | -------------------------------------- |
+| Delegated to by   | the session chain, from the ceremony   | an app delegation, from a mint         |
+| Signs             | calls to the II canister only          | every call the application makes       |
+| Lives for         | the session                            | its delegation, so five minutes        |
+| Stored            | its `IdentityStorage`, non-extractable | its `IdentityStorage`, non-extractable |
+| Leaves the origin | never                                  | never; other tabs read it as a handle  |
 
 One key would be simpler, and there are two ways to try it. Letting the app sign with the session key fails on what that key is for: the session chain names the II canister in its `targets`, so an app signing with it could call II and nothing else, and the app's own canisters would refuse the delegation. It also hands the app the thing that mints, so nothing would expire by itself and revocation would be the only way to stop anything. Letting the app bring a long-lived key of its own and delegating to it once is the arrangement this design replaces, and its problem is the one the Problem section opens with.
 
@@ -191,7 +191,11 @@ Tabs of one origin share their storage, so they share the session. What they do 
 
 #### Where the pair is kept
 
-Read that table twice and the storage falls out of it. Both columns are the same shape — a key that signs, and a chain saying what it may sign for — so each is held the same way: a key store, asynchronous because a non-extractable key needs one, and a chain store, synchronous because a chain is not a secret. Two stores per credential, the same two interfaces supplied twice.
+Read that table twice and the storage falls out of it. Both columns are the same shape — an identity that signs, and a delegation saying what it may sign for — so each is held the same way: an `IdentityStorage`, asynchronous because a non-extractable key needs one, and a `DelegationStorage`, synchronous because a delegation is not a secret. Two per credential, the same two interfaces supplied twice.
+
+An application supplies those two and the library composes them, as a `SessionStore` and an `AppStore`. The split is about who can get it wrong. A leaf knows a medium and an encoding, which is what an application might reasonably want to replace; the composite knows the slot each half is written under, when a stored pair must be refused, and whether a lock is worth taking — none of which an application should have to reimplement, and any of which a hand-written store could quietly omit.
+
+Slot names belonging to the composite is the part worth stating outright. In the arrangement this replaces, four implementations each chose their own default and three of them collided — two on the slot a previous version wrote a differently-shaped value to, one on the same key in the same database. One composite handing out `session-identity`, `session-delegation`, `app-identity` and `app-delegation` cannot collide with itself. It also means one leaf can serve more than one slot, so both identities can share a single IndexedDB connection.
 
 A non-extractable key can be structured-cloned, which is what lets one live in IndexedDB as a handle that signs but cannot be exported. So the app pair is written the way the session's already is, and sharing becomes a read rather than a conversation: a tab that needs a delegation looks at what is there before minting one.
 
