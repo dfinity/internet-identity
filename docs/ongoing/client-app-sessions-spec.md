@@ -74,7 +74,7 @@ The request carries a session public key, a `maxTimeToLive` where the applicatio
 The returned chain is rejected unless its `targets` name the configured II canister and nothing else, per AGENT-5. A chain without that restriction is not a session chain, and treating one as a session would give the library something it could sign arbitrary calls with. Acquisition mints before it resolves, so the check runs there too.
 
 **ACQ-5.**
-The session is persisted through its chain store, which holds the chain and the account key together as one record.
+The session is persisted through its `DelegationStorage`, which holds the chain and the account key together as one record.
 
 **ACQ-6.**
 The app delegation is persisted only through the shared pair TAB-1 describes, and only under the conditions TAB-5 and TAB-6 impose on reading one back. No other path stores it.
@@ -84,33 +84,50 @@ The account key is part of the stored session, not a second thing stored beside 
 
 ## Keys
 
-Five things are held, in two credentials of the same shape. A credential is a key and the chain that authorises it, so each has a key store and a chain store, and the extra value each chain carries rides in its own record.
+Five things are held, in two credentials of the same shape. A credential is an identity and the delegation that authorises it, so each has an `IdentityStorage` and a `DelegationStorage`, and the extra value each delegation carries rides in its own record.
 
-| Thing          | Where                         | Lifetime       | Requirement    |
-| -------------- | ----------------------------- | -------------- | -------------- |
-| Session key    | `session.key`                 | the session    | KEY-1, KEY-4   |
-| Session chain  | `session.chain`               | the session    | ACQ-5, KEY-4   |
-| Account key    | `session.chain`, same record  | the session    | ACQ-7, MINT-17 |
-| App key        | `app.key`                     | one delegation | KEY-2, TAB-1   |
-| App delegation | `app.chain`, with its session | one delegation | ACQ-6, TAB-1   |
+| Thing          | Slot                 | Held in                                              | Lifetime       | Requirement    |
+| -------------- | -------------------- | ---------------------------------------------------- | -------------- | -------------- |
+| Session key    | `session-identity`   | `SessionStore.identity`                              | the session    | KEY-1, KEY-4   |
+| Session chain  | `session-delegation` | `SessionStore.delegation`                            | the session    | ACQ-5, KEY-4   |
+| Account key    | `session-delegation` | same record as the chain                             | the session    | ACQ-7, MINT-17 |
+| App key        | `app-identity`       | `AppStore.identity`                                  | one delegation | KEY-2, TAB-1   |
+| App delegation | `app-delegation`     | `AppStore.delegation`, with the session it came from | one delegation | ACQ-6, TAB-1   |
 
 **STORE-1.**
-Storage is two interfaces, not four. A key store holds a `SignIdentity` and is asynchronous, because a non-extractable key needs a store that can hold one. A chain store holds a `DelegationChain` and one value beside it, and is synchronous. Each is supplied twice, once for the session and once for the app.
+Two credentials are held, and each is an identity and the delegation authorising it. So storage is two interfaces — `IdentityStorage` for a `SignIdentity`, asynchronous because a non-extractable key needs a store that can hold one, and `DelegationStorage` for a `DelegationChain` and the one value beside it, synchronous because a chain is not a secret — and each is supplied twice.
 
 **STORE-2.**
-Only the session's chain store is read synchronously by anything, and that is what forces the split rather than the types: `isAuthenticated()` answers from it without a call, per API-2. Nothing reads the app delegation synchronously — it is read once when a page loads and served from memory after that — so the app pair could have been one asynchronous store, and is two for consistency rather than necessity.
+An application supplies the two leaves; the library composes them. `SessionStore` and `AppStore` each take an `IdentityStorage` and a `DelegationStorage` and are classes, not interfaces, because the invariants below live in them and an application MUST NOT be able to supply a composite that omits one.
+
+| Owned by the composite                             | Owned by the leaf                     |
+| -------------------------------------------------- | ------------------------------------- |
+| the slot each half is written under                | the medium, and the encoding for it   |
+| the expiry and session refusals of TAB-5 and TAB-6 | the key algorithm, through `create()` |
+| the lock, and whether one is taken at all          | whether another tab can read it       |
 
 **STORE-3.**
-Only the session's chain store needs `subscribe()`. Cross-tab reconcile watches the session, not the app delegation, whose convergence is the read inside the lock in TAB-11.
+Slot names belong to the composite and not to the leaf, so a leaf takes the slot per call rather than defaulting one. Four implementations each choosing a default is what produced three colliding slots in the version this replaces, and one composite naming `session-identity`, `session-delegation`, `app-identity` and `app-delegation` cannot collide with itself.
+
+It follows that one leaf instance may serve several slots, so a single IndexedDB connection can hold both identities and an application writing a custom backend writes one adapter rather than one per slot.
 
 **STORE-4.**
-The four slots are supplied independently, so a caller chooses what survives a reload for each half of each credential. An app that will not have delegations on disk supplies memory-backed stores for `app` and leaves `session` persisted; the library ships an implementation for that rather than leaving it to be written per application.
+Only the session's `DelegationStorage` is read synchronously by anything, and that is what forces the split rather than the types: `isAuthenticated()` answers from it without a call, per API-2. Nothing reads the app delegation synchronously — it is read once on a page load and served from memory after that — so the app pair could have been one asynchronous store, and is two for consistency rather than necessity.
 
 **STORE-5.**
-A half without its other half carries no authority: a chain whose key is gone signs nothing, and a key whose chain is gone carries no authority at all. So a slot configured to persist while its partner does not degrades to minting rather than to anything unsafe, and a torn read pairing one credential's key with another's chain is refused by TAB-7, which requires a pair to delegate to the key stored beside it.
+Only the session's `DelegationStorage` needs `subscribe()`. Cross-tab reconcile watches the session, not the app delegation, whose convergence is the read inside the lock in TAB-11.
+
+**STORE-6.**
+The four slots are supplied independently, so an application chooses what survives a reload for each half of each credential. One unwilling to have delegations on disk supplies memory-backed leaves to `AppStore` and leaves `SessionStore` persisted, and still shares between its live tabs; the library ships those leaves rather than leaving them to be written per application.
+
+**STORE-7.**
+A half without its other half carries no authority: a delegation whose identity is gone signs nothing, and an identity whose delegation is gone authorises nothing. So a slot configured to persist while its partner does not degrades to minting rather than to anything unsafe, and a torn read pairing one credential's identity with another's delegation is refused by TAB-7, which requires a pair to delegate to the identity stored beside it.
+
+**STORE-8.**
+`AppStore` owns the lock, and `SessionStore` has none: a session is written once per ceremony, so there is no repeated work to suppress. `AppStore` takes the lock only when both its leaves report that another tab can read them, because a pair no other tab can see is one every tab must mint for itself, and locking would then serialise without suppressing anything — the distinction TAB-11 turns on.
 
 **KEY-1.**
-The session key is persisted through its key store, so it is the key that survives a reload and it inherits whatever non-extractable backing the configured store provides.
+The session key is persisted through its `IdentityStorage`, so it is the key that survives a reload and it inherits whatever non-extractable backing the configured leaf provides.
 
 **KEY-2.**
 The app key is generated by the mint that gets a delegation for it, and stored only as half of the pair in TAB-1. A key and its delegation are one thing with one lifetime: five minutes, after which both are replaced, because a key that outlives its delegation carries no authority — which is also why the pair is stored and refused as one thing rather than two.
