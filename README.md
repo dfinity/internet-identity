@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-    <a href="https://id.ai">https://id.ai</a> • <a href="https://internetcomputer.org/docs/current/references/ii-spec">Specification</a><br/><br/><a href="https://forum.dfinity.org/c/internet-identity/32">Forum</a> • <a href="https://github.com/dfinity/internet-identity/issues/new">Report an Issue</a> • <a href="https://discord.internetcomputer.org">Discord</a>
+    <a href="https://id.ai">https://id.ai</a> • <a href="https://docs.internetcomputer.org/references/internet-identity-spec">Specification</a><br/><br/><a href="https://forum.dfinity.org/c/internet-identity/32">Forum</a> • <a href="https://github.com/dfinity/internet-identity/issues/new">Report an Issue</a> • <a href="https://discord.internetcomputer.org">Discord</a>
 </p>
 
 ---
@@ -18,10 +18,10 @@ Internet Identity is an authentication and identity service for the [Internet Co
 Internet Identity is:
 
 - **Simple**: Uses [passkeys][webauthn] (TouchID, FaceID, Windows Hello, security keys) for passwordless registration and authentication. Users can also sign in with their Google, Apple, or Microsoft account via [OpenID Connect](https://openid.net/developers/how-connect-works/).
-- **Flexible**: Integrating Internet Identity is as simple as using the [agent-js](https://github.com/dfinity/agent-js) library or the ICRC authentication standards. No need to interact with the canister smart contract directly.
+- **Flexible**: Integrating Internet Identity is as simple as using the [`@icp-sdk/auth`](https://www.npmjs.com/package/@icp-sdk/auth) and [`@icp-sdk/core`](https://www.npmjs.com/package/@icp-sdk/core) libraries or the ICRC authentication standards. No need to interact with the canister directly.
 - **Secure**: A unique identity (principal) is derived for each app a user authenticates to, preventing cross-app tracking. Cryptographic material never leaves the user's device.
 
-For more information, see the [Internet Identity documentation](https://internetcomputer.org/docs/current/developer-docs/integrations/internet-identity/) on [internetcomputer.org](https://internetcomputer.org).
+For more information, see the [Internet Identity documentation](https://docs.internetcomputer.org/guides/authentication/internet-identity).
 
 ### Table of Contents
 
@@ -69,7 +69,7 @@ If you are running into build issues on Apple Silicon (specifically, if rollup i
 
 ### Architecture Overview
 
-Internet Identity is an authentication service for the [Internet Computer][ic]. All programs on the Internet Computer are Wasm modules, or canisters (canister smart contracts).
+Internet Identity is an authentication service for the [Internet Computer][ic]. All programs on the Internet Computer are Wasm modules, called canisters.
 
 ![Architecture](./ii-architecture.png) <!-- this is an excalidraw.com image, source is ii-architecture.excalidraw -->
 
@@ -99,7 +99,7 @@ We recommend using the [`docker-build`](./scripts/docker-build) script. It extra
 
 ### Integration with Internet Identity
 
-Client applications authenticate their users by opening the Internet Identity frontend and exchanging window messages with it to obtain a signed delegation. That exchange is described step by step, with a sequence diagram and the exact message payloads, in the [Client Authentication Protocol section](https://internetcomputer.org/docs/current/references/ii-spec#client-authentication-protocol) of the [Internet Identity Specification][spec] — also maintained in this repository at [`docs/ii-spec.mdx`](./docs/ii-spec.mdx). The [`@icp-sdk/auth`](https://www.npmjs.com/package/@icp-sdk/auth) package implements that exchange, so most applications do not need to handle the messages themselves.
+Client applications authenticate their users by opening the Internet Identity frontend and exchanging window messages with it to obtain a signed delegation. That exchange is described step by step, with a sequence diagram and the exact message payloads, in the [Client Authentication Protocol section](https://docs.internetcomputer.org/references/internet-identity-spec#client-authentication-protocol) of the [Internet Identity Specification][spec] — also maintained in this repository at [`docs/ii-spec.mdx`](./docs/ii-spec.mdx). The [`@icp-sdk/auth`](https://www.npmjs.com/package/@icp-sdk/auth) package implements that exchange, so most applications do not need to handle the messages themselves.
 
 ## Key Features
 
@@ -138,13 +138,13 @@ We're here to help. Here are some ways you can reach out for help if you get stu
 ## Links
 
 - [Internet Identity Specification][spec], the official Internet Identity Specification
-- [Internet Identity Documentation](https://internetcomputer.org/docs/current/developer-docs/integrations/internet-identity/) on [internetcomputer.org](https://internetcomputer.org)
+- [Internet Identity Documentation](https://docs.internetcomputer.org/guides/authentication/internet-identity)
 
 [webauthn]: https://webauthn.guide
 [hacking]: ./HACKING.md#running-locally
 [ic]: https://internetcomputer.org
-[spec]: https://internetcomputer.org/docs/current/references/ii-spec
+[spec]: https://docs.internetcomputer.org/references/internet-identity-spec
 [releases]: https://github.com/dfinity/internet-identity/releases
 [docker]: https://docker.io
 [links]: #links
-[candid]: https://internetcomputer.org/docs/current/developer-docs/build/languages/candid/candid-concepts/
+[candid]: https://docs.internetcomputer.org/guides/canister-calls/candid/
