@@ -228,7 +228,9 @@ So coordination may only suppress a mint, never be required for one. Every tab s
 
 #### The lock
 
-A named lock makes the suppression work where the browser has one. Tabs that wake in the same moment queue on it, and the holder re-reads before acting because the delegation may already have been replaced. A tab can be closed mid-mint and the browser releases its lock, so the next in the queue proceeds and nothing has to guess how long to wait for a tab that is not coming back.
+A named lock makes the suppression work where the browser has one, and it takes two parts to get the saving. The lock stops tabs minting at the same time; the read inside it stops them minting at all. Without that read, five tabs waking together queue politely and then make five calls one after another, which costs the canister exactly what five at once would have. So the tab holding the lock reads the store first and mints only if what it finds is unusable, and the four behind it find the pair the first one wrote.
+
+Queueing is ordered, so the tab that mints is whichever reached the front, and nothing elects it. A tab can be closed mid-mint and the browser releases its lock, so the next in the queue proceeds and nothing has to guess how long to wait for a tab that is not coming back.
 
 Where the browser has no such lock every tab mints, which is the cost of no coordination and not a failure.
 
