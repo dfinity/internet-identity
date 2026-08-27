@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    BellIcon,
     AtSignIcon,
     BriefcaseMedicalIcon,
     ChevronDownIcon,
@@ -370,6 +371,17 @@
             <span class="sm:max-md:hidden">{$t`Recovery`}</span>
           </NavItem>
         </li>
+        {#if $PUSH_NOTIFICATIONS}
+          <li class="contents">
+            <NavItem
+              href="/manage/notifications"
+              current={page.url.pathname === "/manage/notifications"}
+            >
+              <BellIcon class="size-5 sm:max-md:mx-auto" />
+              <span class="sm:max-md:hidden">{$t`Notifications`}</span>
+            </NavItem>
+          </li>
+        {/if}
         <li class="contents">
           <NavItem
             href="/manage/settings"
