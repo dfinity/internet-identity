@@ -44,6 +44,8 @@ fn set_consent(
             StorableNotificationConsent {
                 origin,
                 granted_at_ns: now_ns,
+                last_sent_ns: None,
+                muted: None,
             },
         );
         storage
@@ -131,6 +133,57 @@ pub fn consented_origins(anchor_number: AnchorNumber) -> Vec<FrontendHostname> {
         return Vec::new();
     }
     storage_borrow(|storage| storage.notifications_consented_origins(anchor_number))
+}
+
+/// One consented app with its metadata, for the Settings notifications page.
+#[derive(candid::CandidType, serde::Deserialize, Clone, Debug)]
+pub struct NotificationConsentedApp {
+    pub origin: FrontendHostname,
+    pub granted_at_ns: Timestamp,
+    pub last_sent_ns: Option<Timestamp>,
+    pub muted: bool,
+}
+
+/// Every consented app for the caller's anchor, with metadata.
+pub fn consented_apps(anchor_number: AnchorNumber) -> Vec<NotificationConsentedApp> {
+    if !feature_enabled() || !authorize_query(anchor_number) {
+        return Vec::new();
+    }
+    storage_borrow(|storage| {
+        storage
+            .notifications_consented_apps(anchor_number)
+            .into_iter()
+            .map(|c| NotificationConsentedApp {
+                origin: c.origin,
+                granted_at_ns: c.granted_at_ns,
+                last_sent_ns: c.last_sent_ns,
+                muted: c.muted.unwrap_or(false),
+            })
+            .collect()
+    })
+}
+
+/// Mutes or unmutes an already-consented app. Muting keeps the consent row (and
+/// its seals) but the send path skips it; unmuting resumes delivery. Errors if
+/// the app isn't consented.
+pub fn set_app_muted(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    muted: bool,
+) -> Result<(), String> {
+    check_enabled()?;
+    authorize_update(anchor_number)?;
+    validate_origin(&origin)?;
+    let origin_hash = StorableOriginSha256::from_origin(&origin);
+    storage_borrow_mut(|storage| {
+        let key = (anchor_number, origin_hash);
+        let Some(mut consent) = storage.notifications_consent_memory.get(&key) else {
+            return Err("no consent for that origin".to_string());
+        };
+        consent.muted = Some(muted);
+        storage.notifications_consent_memory.insert(key, consent);
+        Ok(())
+    })
 }
 
 #[cfg(test)]

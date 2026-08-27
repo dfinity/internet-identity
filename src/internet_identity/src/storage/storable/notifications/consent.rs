@@ -14,6 +14,14 @@ pub struct StorableNotificationConsent {
     pub origin: FrontendHostname,
     #[n(1)]
     pub granted_at_ns: Timestamp,
+    /// Last time a send to this app was accepted (ns). `None` = never sent.
+    /// Updated throttled on the send path, so it's coarse, not exact.
+    #[n(2)]
+    pub last_sent_ns: Option<Timestamp>,
+    /// The user muted this app without revoking it: consent stays, but the
+    /// send path skips it. `None`/`Some(false)` = not muted.
+    #[n(3)]
+    pub muted: Option<bool>,
 }
 
 impl Storable for StorableNotificationConsent {
@@ -27,9 +35,10 @@ impl Storable for StorableNotificationConsent {
         minicbor::decode(&bytes).expect("failed to decode StorableNotificationConsent")
     }
 
-    // origin (≤ MAX_ORIGIN_LEN = 255) + a timestamp, CBOR-encoded; ~270 bytes.
+    // origin (≤ MAX_ORIGIN_LEN = 255) + a timestamp, an optional timestamp and
+    // an optional bool, CBOR-encoded.
     const BOUND: Bound = Bound::Bounded {
-        max_size: 384,
+        max_size: 448,
         is_fixed_size: false,
     };
 }
@@ -43,6 +52,8 @@ mod tests {
         let consent = StorableNotificationConsent {
             origin: "https://example.com".to_string(),
             granted_at_ns: 1_234_567_890,
+            last_sent_ns: Some(1_234_999_999),
+            muted: Some(true),
         };
 
         let decoded = StorableNotificationConsent::from_bytes(consent.to_bytes());

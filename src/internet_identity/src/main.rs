@@ -400,6 +400,22 @@ fn notification_consented_origins(anchor_number: AnchorNumber) -> Vec<FrontendHo
 }
 
 #[query]
+fn notification_consented_apps(
+    anchor_number: AnchorNumber,
+) -> Vec<notifications::consent::NotificationConsentedApp> {
+    notifications::consent::consented_apps(anchor_number)
+}
+
+#[update]
+fn notification_set_app_muted(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    muted: bool,
+) -> Result<(), String> {
+    notifications::consent::set_app_muted(anchor_number, origin, muted)
+}
+
+#[query]
 fn lookup_device_key(credential_id: CredentialId) -> Option<DeviceKeyWithAnchor> {
     anchor_management::lookup_device_key_with_credential_id(&credential_id)
 }

@@ -1223,6 +1223,15 @@ export interface NotificationConsentStatus {
   'deliverable_channels' : [] | [Array<NotificationChannel>],
   'consented' : [] | [boolean],
 }
+/**
+ * One consented app with its metadata, for the Settings notifications page.
+ */
+export interface NotificationConsentedApp {
+  'muted' : boolean,
+  'origin' : string,
+  'granted_at_ns' : Timestamp,
+  'last_sent_ns' : [] | [Timestamp],
+}
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
@@ -2280,6 +2289,14 @@ export interface _SERVICE {
     NotificationConsentStatus
   >,
   /**
+   * Report the consented apps for an anchor with metadata (grant time, last
+   * send, mute state) for the Settings notifications page.
+   */
+  'notification_consented_apps' : ActorMethod<
+    [UserNumber],
+    Array<NotificationConsentedApp>
+  >,
+  /**
    * Report the full list of consented apps for a given anchor
    */
   'notification_consented_origins' : ActorMethod<[UserNumber], Array<string>>,
@@ -2293,6 +2310,14 @@ export interface _SERVICE {
   >,
   'notification_revoke_consent' : ActorMethod<
     [UserNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * Mute or unmute an already-consented app (keeps consent, skips the send path).
+   */
+  'notification_set_app_muted' : ActorMethod<
+    [UserNumber, string, boolean],
     { 'Ok' : null } |
       { 'Err' : string }
   >,

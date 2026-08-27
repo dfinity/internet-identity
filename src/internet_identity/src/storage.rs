@@ -1586,6 +1586,19 @@ impl<M: Memory + Clone> Storage<M> {
             .collect()
     }
 
+    /// Every consent row for `anchor_number` (origin plus its metadata).
+    pub fn notifications_consented_apps(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> Vec<StorableNotificationConsent> {
+        let start = (anchor_number, StorableOriginSha256::MIN);
+        let end = (anchor_number, StorableOriginSha256::MAX);
+        self.notifications_consent_memory
+            .range(start..=end)
+            .map(|(_, consent)| consent)
+            .collect()
+    }
+
     /// Only used in tests.
     // TODO: mark this code as test-only or adjust the tests to avoid using this functions.
     #[allow(dead_code)]

@@ -1580,6 +1580,14 @@ type NotificationConsentStatus = record {
     deliverable_channels : opt vec NotificationChannel;  // channels set up right now; empty means consented but unreachable
 };
 
+// One consented app with its metadata, for the Settings notifications page.
+type NotificationConsentedApp = record {
+    origin : text;
+    granted_at_ns : Timestamp;
+    last_sent_ns : opt Timestamp;  // coarse; absent = never sent
+    muted : bool;                  // consented but skipped by the send path
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2037,6 +2045,11 @@ service : (opt InternetIdentityInit) -> {
     notification_consent_status : (anchor_number : UserNumber, origin : text) -> (NotificationConsentStatus) query;
     // Report the full list of consented apps for a given anchor
     notification_consented_origins : (anchor_number : UserNumber) -> (vec text) query;
+    // Report the consented apps for an anchor with metadata (grant time, last
+    // send, mute state) for the Settings notifications page.
+    notification_consented_apps : (anchor_number : UserNumber) -> (vec NotificationConsentedApp) query;
+    // Mute or unmute an already-consented app (keeps consent, skips the send path).
+    notification_set_app_muted : (anchor_number : UserNumber, origin : text, muted : bool) -> (variant { Ok; Err : text });
 
     // Register the device push subscription and a pool of JWTs so that we don't have to store a VAPID key-pair in the canister.
     webpush_subscribe_device : (anchor_number : UserNumber, endpoint : text, p256dh : blob, auth : blob, vapid_public_key : blob, jwt_signatures : vec blob, jwt_issued_at_ns : nat64) -> (variant { Ok; Err : text });
