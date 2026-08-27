@@ -151,7 +151,7 @@ flowchart LR
 No mint starts at all while the session itself has less than the block margin left, and if one is already running an arrival joins it rather than starting a second.
 
 **MINT-1.**
-`getIdentity()` resolves to an identity that obtains an app delegation when one is needed. It does not promise to be holding one: signing in leaves it with the delegation minted during the ceremony, while a session restored on a page load starts with none and mints on its first request.
+`getIdentity()` resolves to an identity that obtains an app delegation when one is needed. It does not promise to be holding one: signing in leaves it with the delegation minted during the ceremony, a session restored on a page load starts with whatever usable pair the store holds, and where there is none it mints on its first request.
 
 **MINT-2.**
 Before a delegation is held, the identity still answers for its principal, since that comes from the stored account key and not from a delegation. Its delegation chain reports the account key and no delegations, which is how "no authority yet" is represented.
@@ -195,7 +195,9 @@ No mint is started when the session itself has less than the block margin left. 
 `signIn()` mints before it resolves, so the first request after signing in does not wait. The cost is hidden inside a ceremony the user is already waiting for.
 
 **MINT-13.**
-A page load that restores a stored session mints in the background through the trigger of MINT-7, since a load is the page becoming visible for the first time. It follows that trigger's conditions: no DOM, or `disableForegroundRefresh`, and the load mints nothing and the first request pays for it. `getIdentity()` does not wait for it.
+A page load that restores a stored session goes through the trigger of MINT-7, since a load is the page becoming visible for the first time, and that trigger mints only when one is due. A load that reads a usable pair from the store is therefore not due and MUST NOT mint. It still follows the trigger's conditions: no DOM, or `disableForegroundRefresh`, and the load mints nothing and the first request pays for it. `getIdentity()` does not wait for either outcome.
+
+A load consequently stops being where a session revoked elsewhere is discovered, since a stored pair reads the same either way. TAB-6 catches a session replaced in this browser; one revoked from another device is found at the next mint, which is within one delegation lifetime — the bound [revocable-app-sessions-spec.md](revocable-app-sessions-spec.md) sets in END-5, and the same bound that applies to a delegation minted a moment before the revocation.
 
 **MINT-14.**
 No recurring timer or interval triggers a mint, and no mint happens for a delegation nothing used. Adopting a delegation arms one refresh, and MINT-5 confirms that delegation was used before the refresh fires, which is what keeps the session's last-refreshed stamp a record of use rather than of an open tab.
