@@ -612,6 +612,77 @@ test("should drop logos responding with a redirect", async () => {
   expect(await fetchAppMetadata(ORIGIN)).toEqual({ name: "Example App" });
 });
 
+test("should accept policy urls on any origin, unlike the logo", async () => {
+  const fetchMock = setupFetchMock(
+    Response.json({
+      name: "Example App",
+      privacyPolicyUrl: "https://legal.example.org/privacy",
+      termsOfServiceUrl: "https://legal.example.org/terms",
+    }),
+  );
+
+  // The documents are linked, never fetched, so they may live on whichever
+  // origin the app publishes them from — and nothing is requested for them.
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({
+    name: "Example App",
+    privacyPolicyUrl: "https://legal.example.org/privacy",
+    termsOfServiceUrl: "https://legal.example.org/terms",
+  });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test("should resolve relative policy urls against the app origin", async () => {
+  setupFetchMock(
+    Response.json({ privacyPolicyUrl: "/privacy", termsOfServiceUrl: "terms" }),
+  );
+
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({
+    privacyPolicyUrl: `${ORIGIN}/privacy`,
+    termsOfServiceUrl: `${ORIGIN}/terms`,
+  });
+});
+
+test("should keep a document carrying nothing but a policy url", async () => {
+  setupFetchMock(Response.json({ privacyPolicyUrl: "/privacy" }));
+
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({
+    privacyPolicyUrl: `${ORIGIN}/privacy`,
+  });
+});
+
+test("should reject the whole document when a policy url is unusable", async () => {
+  for (const url of [
+    "http://legal.example.org/privacy", // plain http on another origin
+    "http://app.example.com/privacy", // and on the app's own origin
+    "javascript:alert(1)",
+    "data:text/html,<h1>privacy</h1>",
+    "mailto:privacy@example.com",
+    // Userinfo: reads as one host, resolves to another.
+    "https://trusted.example@evil.example/privacy",
+    "https://user:pass@evil.example/privacy",
+    "https://", // unparseable
+    "", // nothing at all, and nothing but whitespace
+    "   ",
+    "\t\n",
+  ]) {
+    setupFetchMock(
+      Response.json({ name: "Example App", privacyPolicyUrl: url }),
+    );
+
+    expect(await fetchAppMetadata(ORIGIN), url).toBeUndefined();
+  }
+});
+
+test("should ignore whitespace around a policy url", async () => {
+  setupFetchMock(
+    Response.json({ privacyPolicyUrl: "  https://example.org/privacy\n" }),
+  );
+
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({
+    privacyPolicyUrl: "https://example.org/privacy",
+  });
+});
+
 test("should ignore unknown fields", async () => {
   setupFetchMock(
     Response.json({ name: "Example App", futureField: { nested: true } }),

@@ -373,6 +373,7 @@
 {:else if phase.kind === "authorize" && mcpServer !== undefined && $lastUsedIdentitiesStore.selected !== undefined}
   <McpAuthorizeView
     mcpServerHost={mcpServer.host}
+    mcpServerOrigin={mcpServer.origin}
     requestedTtlSeconds={params.kind === "valid" ? params.ttlSeconds : 3600}
     onAuthorize={handleAuthorize}
   />
