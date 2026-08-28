@@ -165,12 +165,12 @@ Tabs of one origin pass a key handle instead, which signs without being exportab
 | The session            | the II canister, one record per identity, application, account and browser | every sibling of the domain | either sibling signing out ends it for both                 |
 | The session credential | the origin's credential store                                              | one origin                  | each sibling holds its own chain to the same session        |
 | The app credential     | the same store, refused past the delegation's expiry                       | the tabs of one origin      | the floor is one mint per active origin                     |
-| The published status   | a cookie scoped to the domain                                              | every sibling of the domain | a sibling decides whether to acquire silently, with no call |
+| The state              | a cookie scoped to the domain                                              | every sibling of the domain | a sibling decides whether to acquire silently, with no call |
 
 ```mermaid
 flowchart TB
-    subgraph D["example.com: as far as the status reaches"]
-        H[("the status: the account's principal<br/>and the session's expiry")]
+    subgraph D["example.com: as far as the state reaches"]
+        H[("the state: the account's principal<br/>and the session's expiry")]
         subgraph O1["chat.example.com"]
             L1[("the session credential")]
             B1[("the app credential,<br/>read by every tab")]
@@ -296,7 +296,7 @@ The two acts differ in one respect.
 | Discovered by               | `signOut()`                  | a mint returning `NoMatchingSession`  |
 | The session at the canister | revoked                      | already gone                          |
 | Local chain and session key | removed                      | removed                               |
-| The published status        | **removed**                  | **left alone**                        |
+| The state                   | **removed**                  | **left alone**                        |
 | What the user sees          | signed out across the domain | nothing, and a silent re-auth follows |
 
 The sibling recovers without the user seeing anything:
@@ -305,7 +305,7 @@ The sibling recovers without the user seeing anything:
 sequenceDiagram
     autonumber
     participant chat as chat.example.com
-    participant st as the status
+    participant st as the state
     participant hr as hr.example.com
     participant IIC as II canister
 
@@ -314,7 +314,7 @@ sequenceDiagram
     chat->>st: publishes the new session's expiry
     hr->>IIC: mints from the chain it holds
     IIC--xhr: no such session
-    hr->>hr: drops its credential, leaves the status alone
+    hr->>hr: drops its credential, leaves the state alone
     st-->>hr: a session exists, for this account
     hr->>IIC: asks again, rendering nothing
     IIC-->>hr: a chain to the new session
@@ -322,7 +322,7 @@ sequenceDiagram
 
 Recovery works because that record is keyed on the application, which for siblings is the derivation origin they share, so `chat`'s ceremony had one record to replace rather than one per origin. The ceremony `chat` ran replaced that one record, so the request `hr` makes finds the new one instead of nothing.
 
-The published status can outlive the session it describes, after a revocation from settings for instance, so a sibling acting on it has to be able to fall back to asking the user; it is a claim and not an authority. And two siblings asking at once is safe, because asking without rendering never creates a session: both are handed a chain from the same record, and neither replaces anything.
+The state can outlive the session it describes, after a revocation from settings for instance, so a sibling acting on it has to be able to fall back to asking the user; it is a claim and not an authority. And two siblings asking at once is safe, because asking without rendering never creates a session: both are handed a chain from the same record, and neither replaces anything.
 
 ### Where the mint calls go
 
@@ -353,7 +353,7 @@ When an app delegation lapses the whole credential goes, key and chain together,
 
 ### What a sibling reads
 
-The published status is one record: the account's principal, and when the session expires. It belongs to neither credential — the principal is the root of an app delegation, the expiry comes from the session chain — so it is supplied to `AuthClient` beside the credential store rather than inside it. The library derives it; the store keeps two fields and knows nothing about chains.
+The state is one record: the account's principal, and when the session expires. It belongs to neither credential — the principal is the root of an app delegation, the expiry comes from the session chain — so it is supplied to `AuthClient` beside the credential store rather than inside it. The library derives it; the store keeps two fields and knows nothing about chains.
 
 Where that record is kept decides how far it reaches. A cookie reaches every sibling of the domain, which is the point of publishing at all. `localStorage` reaches only this origin, which is still worth doing when the credentials themselves are held in memory: a tab loading with nothing can say who is signed in without waiting on a peer or on a mint. Both are read synchronously, which is what makes either usable — a page load answers before it has awaited anything.
 
