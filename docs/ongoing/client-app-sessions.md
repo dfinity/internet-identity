@@ -54,13 +54,13 @@ The app key is what an app delegation delegates to, and it signs the calls the a
 
 An app is handed an identity built on the second, and never sees either. A third value travels with them and is not a secret. The account key is the public key an app delegation is rooted at, returned by the canister as `user_key`, and the principal an app's canisters see is derived from it. Nothing stores it separately, because every app delegation is rooted at it and the delegation is kept.
 
-|                   | Session key                            | App key                                |
-| ----------------- | -------------------------------------- | -------------------------------------- |
-| Delegated to by   | the session chain, from the ceremony   | an app delegation, from a mint         |
-| Signs             | calls to the II canister only          | every call the application makes       |
-| Lives for         | the session                            | its delegation, so five minutes        |
-| Stored            | its `IdentityStorage`, non-extractable | its `IdentityStorage`, non-extractable |
-| Leaves the origin | never                                  | never; other tabs read it as a handle  |
+|                   | Session key                          | App key                               |
+| ----------------- | ------------------------------------ | ------------------------------------- |
+| Delegated to by   | the session chain, from the ceremony | an app delegation, from a mint        |
+| Signs             | calls to the II canister only        | every call the application makes      |
+| Lives for         | the session                          | its delegation, so five minutes       |
+| Stored            | the `session` credential             | the `app` credential                  |
+| Leaves the origin | never                                | never; other tabs read it as a handle |
 
 One key would be simpler, and there are two ways to try it. Letting the app sign with the session key fails on what that key is for: the session chain names the II canister in its `targets`, so an app signing with it could call II and nothing else, and the app's own canisters would refuse the delegation. It also hands the app the thing that mints, so nothing would expire by itself and revocation would be the only way to stop anything. Letting the app bring a long-lived key of its own and delegating to it once is the arrangement this design replaces, and its problem is the one the Problem section opens with.
 
@@ -130,7 +130,7 @@ A schedule is best effort, because browsers throttle timers in hidden tabs and f
 
 `signIn()` mints at the end of the ceremony, so the first call after signing in is instant, and that mint is where the account principal comes from.
 
-A page load goes through the same trigger as returning to a tab, since a load is the page becoming visible for the first time — but that trigger mints only if one is due, and since the pair is now read from the store a load usually finds one that is not. So the common page load costs nothing at the canister, where before it cost a mint every time because nothing survived the previous page. A load that finds the store empty or its pair spent still mints there and then, ahead of anything asking, so the saving never lands as a wait in front of the first click.
+A page load goes through the same trigger as returning to a tab, since a load is the page becoming visible for the first time — but that trigger mints only if one is due, and since the credential is now read from the store a load usually finds one that is not. So the common page load costs nothing at the canister, where before it cost a mint every time because nothing survived the previous page. A load that finds the store empty or its credential spent still mints there and then, ahead of anything asking, so the saving never lands as a wait in front of the first click.
 
 That gives up something worth naming. The load mint used to be what found a session revoked elsewhere before the application asked for anything; now the store looks the same whether the session is alive or was revoked from another device, and the discovery moves to the next mint. Both are inside the bound revocation already promises, because a delegation already minted keeps working for its own lifetime either way — the load simply stops being a special place where that is noticed early.
 
@@ -150,9 +150,9 @@ A delegation lasts `min(five minutes, what remains of the session)`, so a sessio
 
 The session is the widest of the three and the one nothing local can see. A derivation origin is the origin an application asks II to derive its principals from, so sibling subdomains configured with the same one resolve to a single application rather than to several. A session record is keyed on the identity, that application, the account and the browser. `chat` and `hr` therefore share one record instead of holding two that behave alike, and either of them signing out ends it for both.
 
-Everything the client holds is narrower. Both chains are in `localStorage` and both keys in IndexedDB, and each of those is per origin. So `chat`'s tabs share with each other and `hr`'s tabs share with each other, and neither set can read the other's.
+Everything the client holds is narrower. Both credentials are in one store, IndexedDB by default, which is per origin. So `chat`'s tabs share with each other and `hr`'s tabs share with each other, and neither set can read the other's.
 
-One published record is the only thing that crosses between siblings, and it carries the account's principal and the session's expiry — all a sibling needs in order to decide whether to try a silent re-auth.
+One published record is the only thing that crosses between siblings. It carries the account's principal and the session's expiry — all a sibling needs in order to decide whether to try a silent re-auth, and all this origin needs to answer the two questions that cannot wait.
 
 The floor is therefore one mint per active origin, not one per domain. Two siblings open means two mints every five minutes for one session, which is inherent and not a gap to close later.
 
@@ -160,24 +160,24 @@ A delegation is issued to a key and each origin signs with its own, so a delegat
 
 Tabs of one origin pass a key handle instead, which signs without being exportable. Between origins there is nothing of the kind to pass.
 
-| Shared thing                      | Where it lives                                                             | How far it reaches          | The consequence                                             |
-| --------------------------------- | -------------------------------------------------------------------------- | --------------------------- | ----------------------------------------------------------- |
-| The session                       | the II canister, one record per identity, application, account and browser | every sibling of the domain | either sibling signing out ends it for both                 |
-| The session chain and session key | `localStorage` and IndexedDB                                               | one origin                  | each sibling holds its own chain to the same session        |
-| The app key and its delegation    | the origin's storage, refused past the delegation's expiry                 | the tabs of one origin      | the floor is one mint per active origin                     |
-| The hint                          | a cookie scoped to the domain                                              | every sibling of the domain | a sibling decides whether to acquire silently, with no call |
+| Shared thing           | Where it lives                                                             | How far it reaches          | The consequence                                             |
+| ---------------------- | -------------------------------------------------------------------------- | --------------------------- | ----------------------------------------------------------- |
+| The session            | the II canister, one record per identity, application, account and browser | every sibling of the domain | either sibling signing out ends it for both                 |
+| The session credential | the origin's credential store                                              | one origin                  | each sibling holds its own chain to the same session        |
+| The app credential     | the same store, refused past the delegation's expiry                       | the tabs of one origin      | the floor is one mint per active origin                     |
+| The published status   | a cookie scoped to the domain                                              | every sibling of the domain | a sibling decides whether to acquire silently, with no call |
 
 ```mermaid
 flowchart TB
-    subgraph D["example.com: as far as the hint reaches"]
-        H[("the hint: the account's principal<br/>and the session's expiry")]
+    subgraph D["example.com: as far as the status reaches"]
+        H[("the status: the account's principal<br/>and the session's expiry")]
         subgraph O1["chat.example.com"]
-            L1[("session chain,<br/>session key")]
-            B1[("app key and its delegation,<br/>read by every tab")]
+            L1[("the session credential")]
+            B1[("the app credential,<br/>read by every tab")]
         end
         subgraph O2["hr.example.com"]
-            L2[("session chain,<br/>session key")]
-            B2[("app key and its delegation,<br/>read by every tab")]
+            L2[("the session credential")]
+            B2[("the app credential,<br/>read by every tab")]
         end
     end
     L1 -->|mints from| S
@@ -189,19 +189,23 @@ flowchart TB
 
 Tabs of one origin share their storage, so they share the session. The delegation minted from it is the part that has to be made to follow, because a key held only in the tab that made it means each tab mints for a key of its own, and five tabs cost five update calls and five stable writes every five minutes for one person's one session.
 
-#### Where the pair is kept
+#### Where a credential is kept
 
-Read that table twice and the storage falls out of it. Both columns are the same shape — an identity that signs, and a delegation saying what it may sign for — so each is held the same way: an `IdentityStorage`, asynchronous because a non-extractable key needs one, and a `DelegationStorage`, synchronous because a delegation is not a secret. Two per credential, the same two interfaces supplied twice.
+Read that table twice and the storage falls out of it. Both columns are the same shape — an identity that signs, and a delegation saying what it may sign for — and that pairing is what a credential is. So one record holds both, under a slot, and there is one interface for storing credentials rather than one per half.
 
-An application supplies four of these, in two pairs, and nothing composes them. The split is about who can get it wrong. A leaf knows a medium and an encoding, which is what an application might reasonably want to replace; the slot each half is written under, when a stored pair must be refused, and whether a lock is taken belong to the library, so there is no object an application could hand over that quietly omits one.
+Keeping them together is worth more than the flexibility it costs. Held apart, the two halves can disagree — a chain whose key is gone, a key paired with a chain issued to a different one — and every reader then has to decide what a mismatch means. One record cannot be torn, and the half that would be dangerous, a chain with no key to sign for it, cannot be written down at all.
 
-Slots being the library's to hand out is the part worth stating outright. In the arrangement this replaces, four implementations each chose their own default and three of them collided — two on the slot a previous version wrote a differently-shaped value to, one on the same key in the same database. One assigner naming `session-identity`, `session-delegation`, `app-identity` and `app-delegation` cannot collide with itself. It also means one leaf can serve more than one slot, so both identities can share a single IndexedDB connection.
+Two facts about a store are the library's business, and only the store knows them: whether another tab of this origin reads what it writes, and whether what it writes survives the page being torn down. Everything else about coordination follows from those two. A store that no other tab can read has nothing to share and no reason to be locked. A store that does not survive a teardown cannot carry a key across a full-page redirect, which is the one flow that leaves and comes back.
 
-An application running two clients under one domain separates them with a namespace, which prefixes all four at once rather than leaving three to be changed and the fourth forgotten. Those names travel further than the origin, though, since a slot also names the cookie a sibling subdomain reads: set a namespace on one sibling and not on the other and the sharing below stops, with nothing to report it.
+Slots being the library's to hand out is the part worth stating outright. In the arrangement this replaces, four implementations each chose their own default and three of them collided — two on the slot a previous version wrote a differently-shaped value to, one on the same key in the same database. One assigner naming `session`, `app` and `session-pending` cannot collide with itself, and one store serves all three, so a single IndexedDB connection holds everything.
 
-A non-extractable key can be structured-cloned, which is what lets one live in IndexedDB as a handle that signs but cannot be exported. So the app pair is written the way the session's already is, and sharing becomes a read rather than a conversation: a tab that needs a delegation looks at what is there before minting one.
+The third slot is where a ceremony keeps its key. Signing in has to generate a key before it asks for a delegation, since the delegation is issued to that key, and in the full-page flow the browser then leaves and comes back. Giving that key its own slot rather than the session's means a sign-in abandoned halfway, or overtaken by another, cannot take a working session with it: the return leg promotes the key into the `session` slot once it has a chain to pair it with, and until then nothing else is touched.
 
-The four leaves are set independently, which is the point rather than a side effect. An application unwilling to have delegations on disk supplies memory-backed ones for the app half and leaves the session persisted — it still shares between its live tabs, with nothing written down. Neither half is dangerous alone either: a chain whose key is gone signs nothing, a key whose chain is gone authorises nothing, and a pair that does not match is refused. So a half-persisted configuration costs a mint and never more.
+An application running two clients under one domain separates them with a namespace, which prefixes every slot at once rather than leaving some to be changed and one forgotten. Those names travel further than the origin, since the namespace also names what a sibling subdomain reads: set one on a sibling and not on the other and the sharing below stops, with nothing to report it.
+
+A non-extractable key can be structured-cloned, which is what lets one live in IndexedDB as a handle that signs but cannot be exported. So the app credential is written the way the session's is, and sharing becomes a read rather than a conversation: a tab that needs a delegation looks at what is there before minting one.
+
+There is no choice of store per credential, and that is deliberate rather than an omission. Keeping the app credential in memory while the session is persisted protects nothing, because the session key on disk mints a fresh delegation whenever anything asks — so it reads as a decision about what is at rest while changing nothing about it. Not persisting means something only when it is all of it, and then it means what people expect: close the browser and nothing is left.
 
 Nothing waits on another tab to answer. That matters most where no tab can: a backgrounded tab is frozen and may be discarded outright, so a tab that asked would wait out its window and mint anyway. Reading a store works whether the other tabs are running, frozen, or gone, which is the case sharing is worth having in.
 
@@ -212,15 +216,25 @@ sequenceDiagram
     participant S as the origin's store
     participant II as II canister
 
-    T->>S: read the stored pair
+    T->>S: read the stored credential
     alt one is there, unexpired, and from this session
         S-->>T: the key handle and its delegation
         Note over T: adopts it and reschedules<br/>from that delegation's expiry
     else nothing usable
-        T->>II: mints a pair
+        T->>II: mints a credential
         T->>S: writes it
     end
 ```
+
+#### The synchronous answer comes from somewhere else
+
+An application asks two questions that cannot wait: whether the user is signed in, and who they are. A page renders on the answers, so awaiting is not open to it.
+
+Those two answers are one small record — the account's principal and the session's expiry — and neither is a secret. So they are published separately from the credentials, and the credentials themselves are read asynchronously. Keeping a chain somewhere synchronous because it happens not to be secret would answer the same questions, and would put the constraint on the wrong thing: what has to be immediate is those two answers, not the credential they summarise.
+
+Publishing also decides how far the answer reaches. In a cookie it reaches every sibling of the domain, which is the point of publishing at all. In `localStorage` it reaches this origin, which still matters when the credentials are held in memory: a tab that loads with nothing can say who is signed in without waiting on a peer or on a mint.
+
+The client reads its credentials once while it is being constructed and answers from that copy afterwards, so a synchronous answer is as of the last read rather than as of this instant. What keeps that honest is that every change is announced as soon as it is readable, and a tab that missed the announcement re-reads when it becomes visible — which is when the user is about to act on the answer.
 
 #### What makes a stored delegation safe to keep
 
@@ -228,11 +242,11 @@ A delegation is the thing revocation cannot reach, so putting one on disk has to
 
 Two checks on every read carry it instead.
 
-The first is expiry. A stored pair past its delegation's expiry is refused, and the key is deleted then. That bounds the half that signs at five minutes with nothing having to fire. The chain stays until a mint replaces it, for the reason the section on what is stored gives: it signs nothing without its key, and it is where the account principal comes from.
+The first is expiry. A stored credential past its delegation's expiry is refused, and the key is deleted then. That bounds the half that signs at five minutes with nothing having to fire. The chain stays until a mint replaces it, for the reason the section on what is stored gives: it signs nothing without its key, and it is where the account principal comes from.
 
-The second is the session it belongs to. Both halves are deleted whenever the session is written or removed, so a sign-out leaves nothing to be found and a sign-in that replaced the session replaces the pair rather than letting one linger that is rooted at an account this session no longer belongs to.
+The second is the session it belongs to. The app credential is deleted whenever the session is written or removed, so a sign-out leaves nothing to be found and a sign-in that replaced the session replaces it rather than letting one linger that is rooted at an account this session no longer belongs to.
 
-What this does not add is reach. The session key is already in this store, so anything able to read the pair could already mint a fresh one from the live session. What the checks add is that nothing usable outlives the delegation and nothing at all outlives the session — and what remains, honestly, is a key on disk for as long as five minutes and, after that, a spent chain naming an account. That is a bound, not an erasure, and a threat that reads the disk directly rather than through this library is not one it addresses.
+What this does not add is reach. The session key is already in this store, so anything able to read the app credential could already mint a fresh one from the live session. What the checks add is that nothing usable outlives the delegation and nothing at all outlives the session — and what remains, honestly, is a key on disk for as long as five minutes and, after that, a spent chain naming an account. That is a bound, not an erasure, and a threat that reads the disk directly rather than through this library is not one it addresses.
 
 #### Why no tab may be in charge
 
@@ -242,9 +256,9 @@ So coordination may only suppress a mint, never be required for one. Every tab s
 
 #### The lock
 
-A named lock makes the suppression work where the browser has one, and it takes two parts to get the saving. The lock stops tabs minting at the same time; the read inside it stops them minting at all. Without that read, five tabs waking together queue politely and then make five calls one after another, which costs the canister exactly what five at once would have. So the tab holding the lock reads the store first and mints only if what it finds is unusable, and the four behind it find the pair the first one wrote.
+A named lock makes the suppression work where the browser has one, and it takes two parts to get the saving. The lock stops tabs minting at the same time; the read inside it stops them minting at all. Without that read, five tabs waking together queue politely and then make five calls one after another, which costs the canister exactly what five at once would have. So the tab holding the lock reads the store first and mints only if what it finds is unusable, and the four behind it find the credential the first one wrote.
 
-The lock is the library's rather than a store's, and a store answers one question about itself instead: whether another tab reads what it writes. Only the store knows that, since it is a property of the medium, and it is all the library needs in order to decide. It takes the lock when both halves of the app pair say yes — both, because sharing needs both. A tab that finds a chain whose key it cannot reach is holding half a pair, refuses it and mints anyway, so locking on one shared half would serialise mints it could never prevent.
+The lock is the library's rather than a store's. A store says only whether another tab reads what it writes, which is the one thing about coordination a medium decides and the library cannot infer, and the lock is taken when the answer is yes. Where it is no there is nothing another tab could adopt, so serialising would spread the mints without preventing any of them.
 
 Queueing is ordered, so the tab that mints is whichever reached the front, and nothing elects it. A tab can be closed mid-mint and the browser releases its lock, so the next in the queue proceeds and nothing has to guess how long to wait for a tab that is not coming back.
 
@@ -253,12 +267,12 @@ Where the browser has no such lock every tab mints, which is the cost of no coor
 ```mermaid
 flowchart TD
     N["a tab is about to mint"] --> L{"does this browser have<br/>the named-lock API?"}
-    L -->|no| M1["mint, and write the pair"]
+    L -->|no| M1["mint, and write it"]
     L -->|yes| Q["queue on the lock"]
     Q --> H["holds it"]
-    H --> R{"is there a usable pair<br/>in the store?"}
+    H --> R{"is there a usable credential<br/>in the store?"}
     R -->|yes| S["skip the mint and adopt it"]
-    R -->|no| M2["mint, and write the pair"]
+    R -->|no| M2["mint, and write it"]
     M2 -.->|tab closed mid-mint| RL["the browser releases the lock,<br/>the next in the queue proceeds"]
 ```
 
@@ -280,7 +294,7 @@ The two acts differ in one respect.
 | Discovered by               | `signOut()`                  | a mint returning `NoMatchingSession`  |
 | The session at the canister | revoked                      | already gone                          |
 | Local chain and session key | removed                      | removed                               |
-| The shared hint             | **removed**                  | **left alone**                        |
+| The published status        | **removed**                  | **left alone**                        |
 | What the user sees          | signed out across the domain | nothing, and a silent re-auth follows |
 
 The sibling recovers without the user seeing anything:
@@ -289,24 +303,24 @@ The sibling recovers without the user seeing anything:
 sequenceDiagram
     autonumber
     participant chat as chat.example.com
-    participant hint as the hint
+    participant st as the status
     participant hr as hr.example.com
     participant IIC as II canister
 
     chat->>IIC: signs in again
     Note over IIC: the browser's session at this<br/>application is replaced
-    chat->>hint: writes the new session's expiry
+    chat->>st: publishes the new session's expiry
     hr->>IIC: mints from the chain it holds
     IIC--xhr: no such session
-    hr->>hr: drops its chain, leaves the hint alone
-    hint-->>hr: a session exists, for this account
+    hr->>hr: drops its credential, leaves the status alone
+    st-->>hr: a session exists, for this account
     hr->>IIC: asks again, rendering nothing
     IIC-->>hr: a chain to the new session
 ```
 
 Recovery works because that record is keyed on the application, which for siblings is the derivation origin they share, so `chat`'s ceremony had one record to replace rather than one per origin. The ceremony `chat` ran replaced that one record, so the request `hr` makes finds the new one instead of nothing.
 
-A hint can outlive the session it describes, after a revocation from settings for instance, so a sibling acting on one has to be able to fall back to asking the user; it is a hint and not an authority. And two siblings asking at once is safe, because asking without rendering never creates a session: both are handed a chain from the same record, and neither replaces anything.
+The published status can outlive the session it describes, after a revocation from settings for instance, so a sibling acting on it has to be able to fall back to asking the user; it is a claim and not an authority. And two siblings asking at once is safe, because asking without rendering never creates a session: both are handed a chain from the same record, and neither replaces anything.
 
 ### Where the mint calls go
 
@@ -325,23 +339,23 @@ The chain's `targets` are a check and not a source. A session chain names that c
 
 Both credentials are stored, and what separates them is what is left after one stops being usable.
 
-When an app delegation lapses, the key it was issued to is deleted, because the key is the half that signs. The chain is kept until a mint replaces it: it authorises nothing once its key is gone, and it is the only record of which account is signed in, since every delegation is rooted at the account's key and nothing else holds one. That is what lets a page loading an hour later say who the user is before it mints. An application that supplies memory-backed leaves for the app half gives that up along with the sharing, and reports a principal only once its first mint lands.
+When an app delegation lapses, the key it was issued to is deleted, because the key is the half that signs. The chain is kept until a mint replaces it: it authorises nothing once its key is gone, and it is the only record of which account is signed in, since every delegation is rooted at the account's key and nothing else holds one. That is what lets a page loading an hour later say who the user is before it mints. A store that does not survive a reload holds none of this on a cold load, which is what the published status answers for instead.
 
-| What           | Where                      | Survives a reload | Removed by                           |
-| -------------- | -------------------------- | ----------------- | ------------------------------------ |
-| Session chain  | `localStorage`, per origin | yes               | signing out, and finding out         |
-| Session key    | IndexedDB, non-extractable | yes               | signing out, and finding out         |
-| App key        | IndexedDB, non-extractable | yes               | its expiry, replacement, signing out |
-| App delegation | `localStorage`, per origin | yes               | replacement, and signing out         |
-| The hint       | a cookie or `localStorage` | yes               | signing out only                     |
+| What                 | Where                             | Survives a reload | Removed by                           |
+| -------------------- | --------------------------------- | ----------------- | ------------------------------------ |
+| Session credential   | the credential store, one record  | yes               | signing out, and finding out         |
+| App key              | the same record as its delegation | yes               | its expiry, replacement, signing out |
+| App delegation       | that record, kept past its expiry | yes               | replacement, and signing out         |
+| A ceremony's key     | its own slot, until promoted      | yes               | promotion, or the next ceremony      |
+| The published status | a cookie or `localStorage`        | yes               | signing out only                     |
 
 ### What a sibling reads
 
-A hint is one record: the account's principal, and when the session expires. It belongs to neither credential — the principal is the root of an app delegation, the expiry comes from the session chain — so it is supplied to `AuthClient` beside the two pairs rather than inside either. The library derives it; the store keeps two fields and knows nothing about chains.
+The published status is one record: the account's principal, and when the session expires. It belongs to neither credential — the principal is the root of an app delegation, the expiry comes from the session chain — so it is supplied to `AuthClient` beside the credential store rather than inside it. The library derives it; the store keeps two fields and knows nothing about chains.
 
 Where that record is kept decides how far it reaches. A cookie reaches every sibling of the domain, which is the point of publishing at all. `localStorage` reaches only this origin, which is still worth doing when the credentials themselves are held in memory: a tab loading with nothing can say who is signed in without waiting on a peer or on a mint. Both are read synchronously, which is what makes either usable — a page load answers before it has awaited anything.
 
-What a hint cannot do is authorise. It carries no chain and no key, so a sibling acting on one asks the identity provider to re-issue rather than treating it as proof.
+What it cannot do is authorise. It carries no chain and no key, so a sibling acting on it asks the identity provider to re-issue rather than treating it as proof.
 
 ### Two kinds of failure, told apart
 
