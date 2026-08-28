@@ -337,13 +337,15 @@ In order to allow Internet Identity to read the path `/.well-known/ii-alternativ
 
 ## App metadata
 
-Internet Identity displays the name and logo of the client application on its authorization screens (e.g. "Continue to _App_"). Any application can provide this metadata itself (permissionlessly, without being included in any curated list) by serving a JSON document at the path `/.well-known/ii-app-metadata` (on the origin identified below):
+Internet Identity displays the name and logo of the client application on its authorization screens (e.g. "Continue to _App_"), and links to the application's privacy policy and terms of service on the MCP connect screen. Any application can provide this metadata itself (permissionlessly, without being included in any curated list) by serving a JSON document at the path `/.well-known/ii-app-metadata` (on the origin identified below):
 
 ```json
 {
   "name": "Example App",
   "description": "A short tagline shown on the sign-in screen",
-  "logo": "/logo.png"
+  "logo": "/logo.png",
+  "privacyPolicyUrl": "/privacy",
+  "termsOfServiceUrl": "https://legal.example.com/terms"
 }
 ```
 
@@ -366,11 +368,12 @@ Requirements:
 - `logo` must be a URL (relative URLs are resolved against the origin that served the document) pointing to a raster image _on that same origin_: the gateway domain that answered, when the document came from a fallback one. It must be served with one of the content types `image/png`, `image/jpeg`, `image/webp`, `image/gif` or `image/avif`, must not exceed 1 MiB, and must decode to an image of at most 4096 pixels per axis. Internet Identity downloads the logo (it is never hotlinked), so both the metadata document and the logo asset must be readable cross-origin (see the CORS note below).
 - The logo is not rendered as served: Internet Identity decodes it, draws it once into a canvas scaled to at most 512 pixels on its longest side, and renders that re-encoding from a `blob:` URL. What is displayed is therefore an image Internet Identity produced itself: still (an animated image is flattened to its first frame), bounded in size, and held in the browser's blob store rather than in the page's DOM or its JavaScript heap. `image/svg+xml` is not accepted, because a vector image cannot be put through that step across the browsers Internet Identity supports; applications with a vector logo serve a rasterized copy of it here.
 - Unlike the fields of the document, a logo that cannot be fetched, decoded, or does not meet the asset requirements above costs the application only its logo: fetching a second resource can fail transiently, and the name and description are still used.
+- `privacyPolicyUrl` and `termsOfServiceUrl` must be URLs (relative URLs are resolved against the origin that served the document) served over `https`, on **any** origin. Unlike the logo, Internet Identity never fetches these documents; it renders a link the user opens themselves. So the same-origin requirement does not apply, and they may live on a separate domain from the application, as policies commonly do. Pinning the scheme is what still matters: it is what rules out `javascript:`, `data:` and anything else a link must never carry. A plain-`http` URL is accepted only on the origin that served the document, so an application served over `http` in local development does not have to publish `https` links. Each link is shown only when the application publishes it.
 - The metadata document must not exceed 8 KiB, must be answered with a `200` HTTP status code and must not redirect (Internet Identity _will not_ follow redirects for either the document or the logo).
 
 ### JSON Schema {#app-metadata-schema}
 
-The schema below expresses the requirements above, with one exception it cannot state: that bidirectional isolates must be balanced. Whitespace normalization happens after validation and is not part of it either. Validating in CI is the easiest way to catch a mistake before it costs the application its metadata.
+The schema below expresses the requirements above, with two exceptions it cannot state: that bidirectional isolates must be balanced, and that a policy URL must be `https` unless it is on the document's own origin. Whitespace normalization happens after validation and is not part of it either. Validating in CI is the easiest way to catch a mistake before it costs the application its metadata.
 
 ```json
 {
@@ -399,6 +402,18 @@ The schema below expresses the requirements above, with one exception it cannot 
       "description": "URL of the raster application logo, on the same origin as this document",
       "type": "string",
       "minLength": 1
+    },
+    "privacyPolicyUrl": {
+      "description": "URL of the application's privacy policy, on any origin",
+      "type": "string",
+      "minLength": 1,
+      "format": "uri-reference"
+    },
+    "termsOfServiceUrl": {
+      "description": "URL of the application's terms of service, on any origin",
+      "type": "string",
+      "minLength": 1,
+      "format": "uri-reference"
     }
   }
 }

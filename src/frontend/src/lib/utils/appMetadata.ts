@@ -2,14 +2,17 @@
  * Permissionless app metadata.
  *
  * Apps that integrate Internet Identity sign-in can provide their own display
- * name, description and logo for the authorize flow by serving a JSON file at
- * `/.well-known/ii-app-metadata` on their origin:
+ * name, description and logo for the authorize flow, and links to their privacy
+ * policy and terms of service for the MCP connect screen, by serving a JSON
+ * file at `/.well-known/ii-app-metadata` on their origin:
  *
  * ```json
  * {
  *   "name": "Example App",
  *   "description": "A short tagline shown on the sign-in screen",
- *   "logo": "/logo.png"
+ *   "logo": "/logo.png",
+ *   "privacyPolicyUrl": "/privacy",
+ *   "termsOfServiceUrl": "/terms"
  * }
  * ```
  *
@@ -40,6 +43,11 @@
  *   app's file is never hotlinked, nothing about it has to be trusted to be an
  *   image, and no attacker-controlled payload ends up in the DOM or the JS
  *   heap (which a `data:` URL would put in both).
+ * - The policy URLs are only ever linked to, never fetched, so they may point
+ *   at any origin — a policy commonly lives on a separate domain from the app
+ *   itself. They must be `https` (or on the app's own origin, so an app served
+ *   over plain `http` in local development still works), which is what rules
+ *   out `javascript:`, `data:` and the other schemes a link must never carry.
  * - Every failure mode (missing file, CORS, timeout, invalid JSON, …) yields
  *   `undefined` rather than an error: metadata is a display nicety and must
  *   never break the sign-in flow.
@@ -54,6 +62,10 @@ export interface AppMetadata {
   description?: string;
   /** Ready-to-render `<img src>` value (a `blob:` URL for fetched logos). */
   logo?: string;
+  /** Absolute URL of the app's privacy policy, for the user to open. */
+  privacyPolicyUrl?: string;
+  /** Absolute URL of the app's terms of service, for the user to open. */
+  termsOfServiceUrl?: string;
 }
 
 /**
@@ -373,6 +385,48 @@ const validateLogoUrl = (value: unknown, origin: string): Validated<URL> => {
 };
 
 /**
+ * Validate a `privacyPolicyUrl`/`termsOfServiceUrl` field: it must resolve
+ * (relative to the app origin) to an `https` URL, on any origin.
+ *
+ * Unlike the logo, II never fetches these documents — it renders a link the
+ * user opens in a new tab — so the same-origin rule that keeps the sign-in
+ * private from third parties does not apply, and requiring it would only lock
+ * out the many apps whose policies live on a separate domain. Pinning the
+ * scheme is what still matters: it rules out `javascript:`, `data:` and
+ * anything else a link must never carry. A plain-`http` URL is accepted on the
+ * document's own origin alone, so an app served over `http` in local
+ * development is not forced to publish `https` links.
+ */
+const validatePolicyUrl = (
+  value: unknown,
+  field: string,
+  origin: string,
+): Validated<string> => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string" || value.length === 0) {
+    return reject(field, "must be a non-empty string");
+  }
+  let url: URL;
+  try {
+    url = new URL(value, origin);
+  } catch {
+    return reject(field, "must be a valid URL");
+  }
+  if (
+    url.protocol !== "https:" &&
+    !(url.protocol === "http:" && url.origin === new URL(origin).origin)
+  ) {
+    return reject(
+      field,
+      "must be an https URL, or a URL on the same origin as the document",
+    );
+  }
+  return url.href;
+};
+
+/**
  * Re-encode the downloaded bytes as an image II has produced itself, and hand
  * back a `blob:` URL for it.
  *
@@ -535,7 +589,8 @@ const fetchAppMetadataFrom = async (
     ) {
       return { served: true, metadata: undefined };
     }
-    const { name, description, logo } = parsed as Record<string, unknown>;
+    const { name, description, logo, privacyPolicyUrl, termsOfServiceUrl } =
+      parsed as Record<string, unknown>;
     // Validate every field before bailing out, so a document with more than
     // one problem reports all of them in one go.
     const validName = validateTextField(name, "name", MAX_APP_NAME_LENGTH);
@@ -545,16 +600,30 @@ const fetchAppMetadataFrom = async (
       MAX_APP_DESCRIPTION_LENGTH,
     );
     const logoUrl = validateLogoUrl(logo, origin);
+    const validPrivacyPolicyUrl = validatePolicyUrl(
+      privacyPolicyUrl,
+      "privacyPolicyUrl",
+      origin,
+    );
+    const validTermsOfServiceUrl = validatePolicyUrl(
+      termsOfServiceUrl,
+      "termsOfServiceUrl",
+      origin,
+    );
     if (
       validName === INVALID ||
       validDescription === INVALID ||
-      logoUrl === INVALID
+      logoUrl === INVALID ||
+      validPrivacyPolicyUrl === INVALID ||
+      validTermsOfServiceUrl === INVALID
     ) {
       return { served: true, metadata: undefined };
     }
     const metadata: AppMetadata = {
       name: validName,
       description: validDescription,
+      privacyPolicyUrl: validPrivacyPolicyUrl,
+      termsOfServiceUrl: validTermsOfServiceUrl,
     };
     if (logoUrl !== undefined) {
       // The asset is a second network resource, so unlike the fields of the
@@ -571,7 +640,9 @@ const fetchAppMetadataFrom = async (
     if (
       metadata.name === undefined &&
       metadata.description === undefined &&
-      metadata.logo === undefined
+      metadata.logo === undefined &&
+      metadata.privacyPolicyUrl === undefined &&
+      metadata.termsOfServiceUrl === undefined
     ) {
       return { served: true, metadata: undefined };
     }

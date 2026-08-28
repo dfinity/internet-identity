@@ -612,6 +612,76 @@ test("should drop logos responding with a redirect", async () => {
   expect(await fetchAppMetadata(ORIGIN)).toEqual({ name: "Example App" });
 });
 
+test("should accept policy urls on any origin, unlike the logo", async () => {
+  const fetchMock = setupFetchMock(
+    Response.json({
+      name: "Example App",
+      privacyPolicyUrl: "https://legal.example.org/privacy",
+      termsOfServiceUrl: "https://legal.example.org/terms",
+    }),
+  );
+
+  // The documents are linked, never fetched, so they may live on whichever
+  // origin the app publishes them from — and nothing is requested for them.
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({
+    name: "Example App",
+    privacyPolicyUrl: "https://legal.example.org/privacy",
+    termsOfServiceUrl: "https://legal.example.org/terms",
+  });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test("should resolve relative policy urls against the app origin", async () => {
+  setupFetchMock(
+    Response.json({ privacyPolicyUrl: "/privacy", termsOfServiceUrl: "terms" }),
+  );
+
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({
+    privacyPolicyUrl: `${ORIGIN}/privacy`,
+    termsOfServiceUrl: `${ORIGIN}/terms`,
+  });
+});
+
+test("should keep a document carrying nothing but a policy url", async () => {
+  setupFetchMock(Response.json({ privacyPolicyUrl: "/privacy" }));
+
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({
+    privacyPolicyUrl: `${ORIGIN}/privacy`,
+  });
+});
+
+test("should reject the whole document when a policy url is not https", async () => {
+  for (const url of [
+    "http://legal.example.org/privacy", // plain http on another origin
+    "javascript:alert(1)",
+    "data:text/html,<h1>privacy</h1>",
+    "mailto:privacy@example.com",
+    "https://", // unparseable
+    "",
+  ]) {
+    setupFetchMock(
+      Response.json({ name: "Example App", privacyPolicyUrl: url }),
+    );
+
+    expect(await fetchAppMetadata(ORIGIN), url).toBeUndefined();
+  }
+});
+
+test("should accept http policy urls on the app's own origin (local development)", async () => {
+  setupFetchMock(
+    Response.json({ privacyPolicyUrl: "/privacy" }),
+    Response.json({ privacyPolicyUrl: "http://localhost:5173/privacy" }),
+  );
+
+  const relative = await fetchAppMetadata("http://localhost:5173");
+  const absolute = await fetchAppMetadata("http://localhost:5173");
+
+  expect(relative).toEqual({
+    privacyPolicyUrl: "http://localhost:5173/privacy",
+  });
+  expect(absolute).toEqual(relative);
+});
+
 test("should ignore unknown fields", async () => {
   setupFetchMock(
     Response.json({ name: "Example App", futureField: { nested: true } }),

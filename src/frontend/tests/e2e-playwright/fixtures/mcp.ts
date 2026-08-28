@@ -15,6 +15,7 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { toBase64URL } from "../../../src/lib/utils/utils";
 import { AUTH_CALLBACKS_PATH } from "../../../src/lib/utils/authCallbacks";
+import { APP_METADATA_PATH } from "../../../src/lib/utils/appMetadata";
 import { holdToConfirm, II_URL } from "../utils";
 import { DEFAULT_HOST } from "./identity";
 
@@ -126,6 +127,17 @@ export type McpFixture = {
    * the delegation (i.e. before "Allow access").
    */
   installInterceptor: (page: Page) => Promise<void>;
+  /**
+   * Publishes `document` at this origin's `/.well-known/ii-app-metadata`, the
+   * permissionless document an app — here the MCP server — serves to provide
+   * its own display metadata and legal links. Call before navigating to
+   * `/mcp`; an origin that publishes nothing answers 404 (the connect
+   * interceptor's fallthrough), which is what the other tests exercise.
+   */
+  serveAppMetadata: (
+    page: Page,
+    document: Record<string, unknown>,
+  ) => Promise<void>;
   /** Builds the `/mcp` authorize URL with the request params in the fragment. */
   buildAuthorizeUrl: (opts: {
     app: string;
@@ -351,6 +363,22 @@ export const test = base.extend<{ mcp: McpFixture }>({
       });
     };
 
+    const serveAppMetadata = async (
+      page: Page,
+      document: Record<string, unknown>,
+    ): Promise<void> => {
+      // Read cross-origin by the II frontend, so it carries CORS headers and
+      // the application/json content type, like the allow-list above.
+      // Registered after the connect interceptor so this narrower route wins.
+      await page.route(`${MCP_SERVER_ORIGIN}${APP_METADATA_PATH}`, (route) =>
+        route.fulfill({
+          status: 200,
+          headers: { ...CORS_HEADERS, "content-type": "application/json" },
+          body: JSON.stringify(document),
+        }),
+      );
+    };
+
     const trustServer = async (page: Page): Promise<void> => {
       // The trusted server is the identity's synced (on-chain) config, set via
       // Settings — so seed it the way a user would. Mock this origin's RFC 9728
@@ -427,6 +455,7 @@ export const test = base.extend<{ mcp: McpFixture }>({
       enableFinishRedirect,
       trustServer,
       installInterceptor,
+      serveAppMetadata,
       buildAuthorizeUrl,
     });
   },

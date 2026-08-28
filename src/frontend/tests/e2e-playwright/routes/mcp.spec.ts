@@ -102,15 +102,12 @@ test("The connect screen names the acting identity and keeps the consent in view
   await expect(identityRow).toContainText("Test User");
 
   const allowAccess = page.getByRole("button", { name: "Allow access" });
-  const revokeNote = page.getByRole("link", { name: "settings" });
   await expect(identityRow).toBeInViewport();
   await expect(allowAccess).toBeInViewport();
-  await expect(revokeNote).toBeInViewport();
 
   await page.mouse.wheel(0, 2000);
   await expect(identityRow).toBeInViewport();
   await expect(allowAccess).toBeInViewport();
-  await expect(revokeNote).toBeInViewport();
 
   // The screen carries the identity and its control, so it has no header.
   await expect(
@@ -124,6 +121,62 @@ test("The connect screen names the acting identity and keeps the consent in view
   await expect(
     page.getByRole("button", { name: "Add identity" }),
   ).toBeVisible();
+});
+
+test("The connect screen links the legal documents the server publishes", async ({
+  page,
+  mcp,
+}) => {
+  await mcp.serveAppMetadata(page, {
+    name: "ICP MCP",
+    privacyPolicyUrl: "/privacy",
+    termsOfServiceUrl: "https://legal.example.com/terms",
+  });
+  await addVirtualAuthenticator(page);
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await signUp(page);
+
+  const privacyPolicy = page.getByRole("link", { name: "Privacy Policy" });
+  const termsOfService = page.getByRole("link", { name: "Terms of Service" });
+  // The name comes from the document too, so it says whose documents these
+  // are; the verified host stays in the heading above.
+  await expect(page.getByText("Review ICP MCP's")).toBeVisible();
+  await expect(privacyPolicy).toHaveAttribute(
+    "href",
+    `${mcp.mcpOrigin}/privacy`,
+  );
+  await expect(termsOfService).toHaveAttribute(
+    "href",
+    "https://legal.example.com/terms",
+  );
+  // Both open in a new tab, so the connect request in this one isn't lost.
+  await expect(privacyPolicy).toHaveAttribute("target", "_blank");
+  await expect(termsOfService).toHaveAttribute("target", "_blank");
+
+  // The fine print is pinned above the CTA, so it stays with it when the panel
+  // scrolls.
+  await page.mouse.wheel(0, 2000);
+  await expect(privacyPolicy).toBeInViewport();
+  await expect(
+    page.getByRole("button", { name: "Allow access" }),
+  ).toBeInViewport();
+});
+
+test("A server publishing no legal documents shows no fine print", async ({
+  page,
+  mcp,
+}) => {
+  await addVirtualAuthenticator(page);
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await signUp(page);
+
+  await expect(
+    page.getByRole("button", { name: "Allow access" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Privacy Policy" })).toBeHidden();
+  await expect(
+    page.getByRole("link", { name: "Terms of Service" }),
+  ).toBeHidden();
 });
 
 test("Signing up to an untrusted server prompts to add it in settings", async ({
