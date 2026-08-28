@@ -5,6 +5,7 @@ import {
   del as idbDel,
 } from "idb-keyval";
 import { get } from "svelte/store";
+import { z } from "zod";
 import { Actor, ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
@@ -24,6 +25,17 @@ const SESSION_DELEGATION_STORE = createStore("ii-session-delegations", "keys");
 // + browser clock skew). Cleaner UX to fast-fail to a ceremony than to
 // surface an InvalidDelegation error mid-call.
 const EXPIRY_MARGIN_MS = 5 * 60 * 1000;
+
+const SessionDelegationRecordSchema: z.ZodType<SessionDelegationRecord> =
+  z.object({
+    identityNumber: z.bigint(),
+    keyPair: z.object({
+      privateKey: z.instanceof(CryptoKey),
+      publicKey: z.instanceof(CryptoKey),
+    }),
+    chainJson: z.string(),
+    expiresAtMillis: z.number(),
+  });
 
 export const mintSession = async ({
   identityNumber,
@@ -60,9 +72,9 @@ export const actorForIdentity = async (
     return authenticated.actor;
   }
 
-  let record: SessionDelegationRecord | undefined;
+  let storedRecord: unknown;
   try {
-    record = await idbGet<SessionDelegationRecord>(
+    storedRecord = await idbGet(
       identityNumber.toString(),
       SESSION_DELEGATION_STORE,
     );
@@ -70,9 +82,16 @@ export const actorForIdentity = async (
     return undefined;
   }
 
-  if (record === undefined) {
+  if (storedRecord === undefined) {
     return undefined;
   }
+
+  const parsedRecord = SessionDelegationRecordSchema.safeParse(storedRecord);
+  if (!parsedRecord.success) {
+    void purgeSession(identityNumber);
+    return undefined;
+  }
+  const record = parsedRecord.data;
 
   if (record.expiresAtMillis - EXPIRY_MARGIN_MS <= Date.now()) {
     void purgeSession(identityNumber);
