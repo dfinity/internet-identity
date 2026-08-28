@@ -226,15 +226,17 @@ sequenceDiagram
     end
 ```
 
-#### The synchronous answer comes from somewhere else
+#### The state is not the credentials
 
-An application asks two questions that cannot wait: whether the user is signed in, and who they are. A page renders on the answers, so awaiting is not open to it.
+Two questions cannot wait: whether the user is signed in, and who they are. A page renders on the answers, and awaiting is not open to it — which is why `isAuthenticated()` has always been synchronous.
 
-Those two answers are one small record — the account's principal and the session's expiry — and neither is a secret. So they are published separately from the credentials, and the credentials themselves are read asynchronously. Keeping a chain somewhere synchronous because it happens not to be secret would answer the same questions, and would put the constraint on the wrong thing: what has to be immediate is those two answers, not the credential they summarise.
+So the state is kept as its own small record, the account's principal and when the session expires, and the credentials are the material that acts on it rather than the record of it. Neither field is a secret, so the record can live somewhere a page reads without opening anything, while the keys and chains stay where a non-extractable key can be held and are read only when something signs.
 
-Publishing also decides how far the answer reaches. In a cookie it reaches every sibling of the domain, which is the point of publishing at all. In `localStorage` it reaches this origin, which still matters when the credentials are held in memory: a tab that loads with nothing can say who is signed in without waiting on a peer or on a mint.
+State leads. If the record says nobody is signed in, then nobody is, whatever is sitting in the credential store — and the credentials are what get discarded. Nothing runs the other way: material that is missing, spent or unusable is a reason to acquire more, never a reason to change who is signed in.
 
-The client reads its credentials once while it is being constructed and answers from that copy afterwards, so a synchronous answer is as of the last read rather than as of this instant. What keeps that honest is that every change is announced as soon as it is readable, and a tab that missed the announcement re-reads when it becomes visible — which is when the user is about to act on the answer.
+That single rule does the work of several. A sign-out in another tab, an identity switch, a sign-out on a sibling subdomain, and a session that simply ended are all one thing: the record changed, so this client's material is stale. It is also why the record is written last when signing in, once there is material behind it, and removed first when signing out.
+
+Where the record is kept decides how far the state reaches. In a cookie it reaches every sibling of the domain, which is what lets one sign-out end them all. In `localStorage` it reaches this origin's tabs, which is the default and enough for an app that stands alone. Both are read synchronously, and both raise an event when they change, which is the only notification this design needs — nothing has to be told that a delegation was replaced, because a tab that wants one takes the lock and reads.
 
 #### What makes a stored delegation safe to keep
 
@@ -242,11 +244,11 @@ A delegation is the thing revocation cannot reach, so putting one on disk has to
 
 Two checks on every read carry it instead.
 
-The first is expiry. A stored credential past its delegation's expiry is refused, and the key is deleted then. That bounds the half that signs at five minutes with nothing having to fire. The chain stays until a mint replaces it, for the reason the section on what is stored gives: it signs nothing without its key, and it is where the account principal comes from.
+The first is expiry. A stored credential past its delegation's expiry is refused and removed, both halves at once. That bounds it at five minutes with nothing having to fire.
 
 The second is the session it belongs to. The app credential is deleted whenever the session is written or removed, so a sign-out leaves nothing to be found and a sign-in that replaced the session replaces it rather than letting one linger that is rooted at an account this session no longer belongs to.
 
-What this does not add is reach. The session key is already in this store, so anything able to read the app credential could already mint a fresh one from the live session. What the checks add is that nothing usable outlives the delegation and nothing at all outlives the session — and what remains, honestly, is a key on disk for as long as five minutes and, after that, a spent chain naming an account. That is a bound, not an erasure, and a threat that reads the disk directly rather than through this library is not one it addresses.
+What this does not add is reach. The session key is already in this store, so anything able to read the app credential could already mint a fresh one from the live session. What the checks add is that nothing outlives the delegation it was minted with and nothing at all outlives the session — and what remains, honestly, is a credential on disk for as long as five minutes. That is a bound, not an erasure, and a threat that reads the disk directly rather than through this library is not one it addresses.
 
 #### Why no tab may be in charge
 
@@ -339,15 +341,15 @@ The chain's `targets` are a check and not a source. A session chain names that c
 
 Both credentials are stored, and what separates them is what is left after one stops being usable.
 
-When an app delegation lapses, the key it was issued to is deleted, because the key is the half that signs. The chain is kept until a mint replaces it: it authorises nothing once its key is gone, and it is the only record of which account is signed in, since every delegation is rooted at the account's key and nothing else holds one. That is what lets a page loading an hour later say who the user is before it mints. A store that does not survive a reload holds none of this on a cold load, which is what the published status answers for instead.
+When an app delegation lapses the whole credential goes, key and chain together, because neither is any use once the delegation behind it has run out and neither is needed to remember who is signed in. That is the state's job, and it is why a page loading an hour later can say who the user is before it mints anything.
 
-| What                 | Where                             | Survives a reload | Removed by                           |
-| -------------------- | --------------------------------- | ----------------- | ------------------------------------ |
-| Session credential   | the credential store, one record  | yes               | signing out, and finding out         |
-| App key              | the same record as its delegation | yes               | its expiry, replacement, signing out |
-| App delegation       | that record, kept past its expiry | yes               | replacement, and signing out         |
-| A ceremony's key     | its own slot, until promoted      | yes               | promotion, or the next ceremony      |
-| The published status | a cookie or `localStorage`        | yes               | signing out only                     |
+| What               | Where                             | Survives a reload | Removed by                           |
+| ------------------ | --------------------------------- | ----------------- | ------------------------------------ |
+| Session credential | the credential store, one record  | yes               | signing out, and finding out         |
+| App key            | the same record as its delegation | yes               | its expiry, replacement, signing out |
+| App delegation     | the same record as its key        | yes               | its expiry, replacement, signing out |
+| A ceremony's key   | its own slot, until promoted      | yes               | promotion, or the next ceremony      |
+| The state          | a cookie or `localStorage`        | yes               | signing out only                     |
 
 ### What a sibling reads
 

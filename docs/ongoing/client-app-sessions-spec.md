@@ -80,7 +80,7 @@ The session credential is persisted under the `session` slot: the chain and the 
 The app delegation is persisted only as part of the `app` credential TAB-1 describes, and only under the conditions TAB-5 and TAB-6 impose on reading one back. No other path stores it.
 
 **ACQ-7.**
-The account principal is not a stored field. It is the root of the app delegation, arriving as the `user_key` of a mint, which is why TAB-5 keeps a spent chain rather than deleting it and why the session record carries nothing beyond its own chain. It is not derivable from the session chain, which is rooted at the session's own key, and the transport result carries only that chain. Before the first mint there is none, which MINT-12 puts out of reach by minting inside the ceremony.
+The account principal arrives as the `user_key` of a mint and is recorded in the status, per STATUS-3, which is where everything afterwards reads it. It is not derivable from the session chain, which is rooted at the session's own key, and the transport result carries only that chain. Before the first mint there is none, which MINT-12 puts out of reach by minting inside the ceremony.
 
 **ACQ-8.**
 A key has to exist before the ceremony starts, since its public half is what the delegation is asked to be issued to, so it cannot be generated on the return leg of a redirect. It is written to the `session-pending` slot and never to `session`, so a ceremony that is cancelled or never returns cannot disturb a live session. On return it is promoted: the `session` slot is written with that identity and the chain together, and the pending slot is removed.
@@ -98,24 +98,24 @@ Four things are held, in two credentials of the same shape, and one more while a
 | Session key      | `session`         | the session                                          | KEY-1, KEY-4 |
 | Session chain    | `session`         | the session                                          | ACQ-5, KEY-4 |
 | App key          | `app`             | one delegation                                       | KEY-2, TAB-5 |
-| App delegation   | `app`             | one delegation, kept past it as the account's record | TAB-5        |
+| App delegation   | `app`             | one delegation                                       | TAB-5        |
 | A ceremony's key | `session-pending` | until it is promoted or another ceremony replaces it | ACQ-8        |
 
 **STORE-1.**
-Storage is two interfaces. `CredentialStorage` is asynchronous and holds a credential per slot; `StatusStorage` is synchronous and holds one record. What separates them is not what they hold but who may read it and when it has to answer:
+Storage is two interfaces, and what separates them is what they are for. `StatusStorage` holds the state — who is signed in here and until when — and is read synchronously, because that is what a page decides its rendering on. `CredentialStorage` holds the material that acts on that state, and is asynchronous, because using it means making a call and a non-extractable key needs a store that can hold one.
 
-|            | Holds a secret | Must answer synchronously | Crosses the origin |
-| ---------- | -------------- | ------------------------- | ------------------ |
-| credential | yes            | no                        | never              |
-| status     | no             | yes                       | yes                |
+|            | What it holds       | Read synchronously | Crosses the origin |
+| ---------- | ------------------- | ------------------ | ------------------ |
+| status     | the state of record | yes                | yes                |
+| credential | the material        | no                 | never              |
 
-Each axis is used once, which is why there are two of these and not three or one.
+The state leads. Where the two disagree, the status decides and the credentials are what get discarded — see STATUS-6.
 
 **STORE-2.**
 A credential is one record, written and read as one act. `chain` is optional and legal only in the pending slot of ACQ-8; a record without a chain under any other slot is refused. So the dangerous half is not expressible: there is no way to store a chain without the identity it was issued to, and no way for two stores to disagree about which key a chain belongs to.
 
 **STORE-3.**
-An application supplies one `CredentialStorage`, and a `StatusStorage` where STATUS-7 needs one. Nothing composes them, and there is deliberately no per-credential choice of store. A persisted session with a memory-backed app credential protects nothing — TAB-8 holds that anything able to read the session key can mint a fresh delegation whenever it likes — so it reads as a security choice while being none. Not persisting means something only when it is all of it.
+An application supplies one `CredentialStorage` and one `StatusStorage`. Nothing composes them, and there is deliberately no per-credential choice of store. A persisted session with a memory-backed app credential protects nothing — TAB-8 holds that anything able to read the session key can mint a fresh delegation whenever it likes — so it reads as a security choice while being none. Not persisting means something only when it is all of it.
 
 **STORE-4.**
 Slots are assigned by `AuthClient` and never defaulted by a store, so a store takes the slot as an argument to every call. Implementations choosing their own defaults is what produced three colliding slots in the version this replaces, two of them on the same key in the same database; one assigner cannot collide with itself.
@@ -147,31 +147,27 @@ The lock is `navigator.locks`, named for the `app` slot, and it belongs to `Auth
 `set` writes what it is given and takes no lock. That the `app` slot is written in one place, inside the lock of STORE-8, is a rule about that call site and not a property of the interface: an application implements these interfaces and never calls them.
 
 **STORE-10.**
-A change is readable before it is announced. Whatever the source, the notification fires after the value it describes can be read, at both layers — a store writes what arrived and then fires its own subscribers, and `AuthClient` re-reads and then fires the application's. Reversed at either layer, a listener calling `isAuthenticated()` sees the value the notification was telling it about.
+A credential store has no notification of its own and needs none. Nothing has to be told that a mint happened: a tab wanting a delegation takes the lock and reads, which is the whole protocol, and every change that alters the _state_ is announced by the status store instead. A store whose medium another tab cannot read still runs a channel to populate its own copy, because a peer cannot reach into it, but that is its private business and appears nowhere on the interface. Where a message has not arrived the tab mints, which TAB-9 permits.
 
 **STORE-11.**
-IndexedDB raises no cross-tab change event, so a durable store cannot report a change by itself. `AuthClient` owns a `BroadcastChannel` for this, carrying slot names and nothing else. It is the only writer, so this covers every change the library makes: signing in, signing out, a mint, the drop of ERR-1.
-
-A store whose medium another tab cannot read has to move values rather than announce them, and that message is already its notification, so such a store owns its own channel and implements `subscribe`; `AuthClient` then uses it and broadcasts nothing. Exactly one channel is live per client either way, because two carrying the same logical change have no ordering between them and a bare "changed" overtaking its own value leaves a peer re-reading and finding nothing.
+Credentials are read when they are used and never cached for a synchronous answer. The synchronous questions are answered by the status, so there is no copy to keep fresh, nothing to invalidate, and no window in which a tab holds a stale one. The two places that read are a mint, inside the lock, and the identity when it signs; both are already asynchronous.
 
 **STORE-12.**
-`AuthClient` reads both credentials once while it is being constructed and answers every synchronous question from that copy, re-reading on a notification and when the page becomes visible. The visibility and focus events of MINT-7 are what recover a tab that was frozen or discarded and missed a message, and they fire when the user is about to act, so the staleness that remains belongs to a hidden tab nobody is looking at.
-
-**STORE-13.**
 The library ships a store per medium, so an application chooses rather than writes one:
 
-| Store                           | Backed by                   | Keys generated by `create()`   |
-| ------------------------------- | --------------------------- | ------------------------------ |
-| `IdbCredentialStorage`          | IndexedDB                   | ECDSA, non-extractable         |
-| `LocalCredentialStorage`        | `localStorage`              | Ed25519, private bytes as JSON |
-| `MemoryCredentialStorage`       | a `Map` on the instance     | ECDSA, non-extractable         |
-| `SharedMemoryCredentialStorage` | that `Map`, plus a channel  | ECDSA, non-extractable         |
-| `CookieStatusStorage`           | a cookie scoped to a domain | —                              |
-| `LocalStatusStorage`            | `localStorage`              | —                              |
+| Store                           | Backed by                   | Keys generated by `create()`   |             |
+| ------------------------------- | --------------------------- | ------------------------------ | ----------- |
+| `IdbCredentialStorage`          | IndexedDB                   | ECDSA, non-extractable         | **default** |
+| `LocalCredentialStorage`        | `localStorage`              | Ed25519, private bytes as JSON |             |
+| `MemoryCredentialStorage`       | a `Map` on the instance     | ECDSA, non-extractable         |             |
+| `SharedMemoryCredentialStorage` | that `Map`, plus a channel  | ECDSA, non-extractable         |             |
+| `MemoryStatusStorage`           | a field on the instance     | —                              |             |
+| `LocalStatusStorage`            | `localStorage`              | —                              | **default** |
+| `CookieStatusStorage`           | a cookie scoped to a domain | —                              |             |
 
 Only a store that has to serialise needs a key whose private bytes are readable, which is why `LocalCredentialStorage` generates a different type from the others.
 
-**STORE-14.**
+**STORE-13.**
 The memory-backed stores hold a `Map` keyed by slot, on the instance and never on the module. Two clients on one page must not see each other's slots — which is what the namespace of STORE-4 is for, and a module-level map would defeat it — and state must not carry between tests sharing a process. Nothing about the map is weak: it is keyed by a string, so there is no object to key on and nothing collectable while a slot still names it.
 
 A memory-backed store returns the record it was given rather than a copy. That is the difference from every other store, each of which round-trips through an encoding and hands back something new, and it is what lets one hold a non-extractable key at all. Nothing in the library mutates a `SignIdentity` or a `DelegationChain` it read.
@@ -295,9 +291,7 @@ A mint that fails leaves the stored session credential exactly as it was, except
 The principal a caller sees does not change when a delegation is replaced. `app_prepare_delegation` roots every delegation at the account's key, so successive mints agree. A mint whose `user_key` does not match the principal already established is a failed mint, and its delegation is not adopted.
 
 **MINT-17.**
-`getPrincipal()` never triggers a mint, and two places can answer it. The order is the app credential's chain root first, per ACQ-7, then the status record. The credential is the fresher of the two during a sign-in, since a mint returns `user_key` before the status write lands; the status is the only answer available on a cold load with a non-durable store. Both are read from what STORE-12 hydrated, so a restored session reports who is signed in without waiting for the background mint of MINT-13.
-
-STATUS-6 runs ahead of either, so a credential that survives is consistent with the status rather than being weighed against it.
+`getPrincipal()` never triggers a mint and is answered from the status, synchronously. The account principal is part of the state rather than something derived from whatever material happens to be held, so a page load reports who is signed in without opening a store and without waiting for the background mint of MINT-13.
 
 ## Failure
 
@@ -322,35 +316,39 @@ A minted delegation carrying a `permissions` field is refused with an error nami
 ## The published status
 
 **STATUS-1.**
-The status is one record — the account's principal and the session's expiry — held by its own store and supplied to `AuthClient` beside the credential store. Those two facts are the only ones anything reads without holding a credential, and neither belongs to one credential: the principal is the app delegation's root and the expiry comes from the session chain.
+The status is the state of the sign-in: the account's principal, and when the session expires. It is one record, held by its own store and supplied to `AuthClient` beside the credential store, and it is what decides whether this origin is signed in and as whom. The credentials are the material that acts on that state rather than the record of it.
 
-It is not a credential and has no identity half, so `StatusStorage` stands alone rather than pairing with anything, and it declares neither `shared` nor `durable`: the lock of STORE-8 governs what mints, and a status mints nothing.
+It has no identity half and declares neither `shared` nor `durable`, since the lock of STORE-8 governs what mints and a status mints nothing.
 
 **STATUS-2.**
-`AuthClient` derives the record and a store keeps it, so a status store holds two fields and knows nothing about chains. Where it keeps them decides how far they reach:
+It is read synchronously, which is what lets `isAuthenticated()` and `getPrincipal()` answer on a page load without awaiting anything — see API-2 and MINT-17. Where it is kept decides how far the state reaches and how a change in it is noticed:
 
-| Store                 | Reaches                     | Change observed through          |
-| --------------------- | --------------------------- | -------------------------------- |
-| `CookieStatusStorage` | every sibling of the domain | `cookieStore`, visibility, focus |
-| `LocalStatusStorage`  | this origin                 | `storage`                        |
+| Store                 | Reaches                     | Change observed through          |             |
+| --------------------- | --------------------------- | -------------------------------- | ----------- |
+| `LocalStatusStorage`  | this origin                 | `storage`                        | **default** |
+| `CookieStatusStorage` | every sibling of the domain | `cookieStore`, visibility, focus |             |
 
 **STATUS-3.**
-The status is written whenever either fact changes: acquiring a session sets the expiry, and a mint sets the principal. Signing in does both before it resolves, per MINT-12, so nothing publishes half a record. A record whose expiry has already passed is removed rather than written.
+The status changes only when the state does: acquiring a session sets the expiry, and the first mint sets the principal. Signing in does both before it resolves, per MINT-12, so nothing publishes half a record; later mints replace material without changing the state and leave it alone.
+
+It is written last when signing in, once there is material behind it, and removed first when signing out, because it is the record of what is true. A record whose expiry has already passed is removed rather than written.
 
 **STATUS-4.**
-Signing out removes the status. Discovering that a chain is stale removes the local session only: one session serves every sibling of a domain, so a sibling that did not sign in holds a chain to a session a ceremony elsewhere replaced, and retracting the shared record would tell the sibling that did sign in that the session it just obtained is gone. Storage exposes the two removals separately because they are different acts — a user ending a sign-in, and an origin finding out that what it held is stale.
+Signing out removes the status. Discovering that a chain is stale does not: one session serves every sibling of a domain, so a sibling that did not sign in holds a chain to a session a ceremony elsewhere replaced, and retracting the state would tell the sibling that did sign in that the session it just obtained is gone. The origin that found out drops its own material, keeps the state, and acquires again silently — which is the same path a sibling with a status and no credentials takes.
 
 **STATUS-5.**
-A status may outlive the session it describes, so a sibling acting on one has to be able to fall back to asking the user and may not treat it as authority to skip that path. The case with no recovery is a memory-backed configuration whose last tab closed without signing out: nothing dependable fires on a close, so the record stands, `getPrincipal()` answers from it, and the first call fails. That is API-3's optimism reached by a new route rather than a new kind of wrongness.
+A status may outlive the session it describes, so anything acting on one has to be able to fall back to asking the user and may not treat it as authority against the canister. The case with no recovery is a memory-backed configuration whose last tab closed without signing out: nothing dependable fires on a close, so the record stands, `getPrincipal()` answers from it, and the first call fails. That is API-3's optimism reached by a new route rather than a new kind of wrongness.
 
 **STATUS-6.**
-A stored session is dropped when the status is missing or names another account, which is how a sign-out or an identity switch on a sibling reaches this origin. The comparison is against the account principal because that is the same value on every origin; a session's own principal is rooted at the session key and differs per origin, so comparing against it would have each origin discard a session that was perfectly good.
+Where the status and the credentials disagree, the status decides. Credentials are discarded when the status is missing, when it names another account, or when it has expired — a sign-out, an identity switch, or a session that ended, whether it happened in this tab, another tab, or a sibling subdomain. Nothing goes the other way: material that is present, absent or unusable never changes the state.
+
+The comparison is against the account principal, which is the same value on every origin. A session's own principal is rooted at the session key and differs per origin, so it could not serve.
 
 **STATUS-7.**
-A status store is required wherever a synchronous answer cannot come from a credential. With a durable credential store the records answer both questions themselves, so one is needed only to reach a sibling. With a non-durable store nothing is held on a cold load, so without a status the client cannot say who is signed in and `isAuthenticated()` would answer false and then flip, which API-2 does not allow.
+A status store is not optional. It holds the state, so a client without one could not say whether it was signed in without opening an asynchronous store, and a configuration whose credentials do not survive a reload would have nothing at all to say on a cold load. `MemoryStatusStorage` exists for the environments the other two do not reach — tests, and anywhere without a DOM — and is per instance rather than per origin, so a client there is alone in the same way a memory credential store is.
 
 **STATUS-8.**
-`subscribe` on a status store is not optional in the way STORE-11's is. A sibling subdomain is another origin and no `BroadcastChannel` crosses origins, so a sibling's sign-out is visible only through the medium itself — which is also why the cookie store watches `cookieStore`, `visibilitychange` and `focus` rather than expecting an event.
+The status store is the only notification path in the design, and it has one in every medium it uses: `storage` for `localStorage`, and the cookie hooks above for the other, since `document.cookie` raises no event and no `BroadcastChannel` crosses origins. A change is readable before it is announced — the record is written, then subscribers fire — because a listener that asks `isAuthenticated()` on being told must not see the answer the notification was about to change.
 
 ## Signing out
 
@@ -383,18 +381,16 @@ Sharing is a read, not an exchange. A tab MUST NOT depend on another tab answeri
 A tab that needs a delegation reads the stored credential first, and mints only when there is none it may use.
 
 **TAB-5.**
-A stored app credential MUST be refused on read once its delegation has expired, and the key MUST be deleted then. This is what bounds the thing that signs at one delegation lifetime without depending on an event, and there is no dependable signal for a browser closing to depend on instead.
-
-The chain is kept until a mint replaces it or TAB-6 removes it. A chain whose key is gone signs nothing, and it is the only record of the account, which ACQ-7 and MINT-17 answer `getPrincipal()` from. Deleting it would mean a page loading ten minutes after the last one could not say who was signed in without minting first. How long a record is worth keeping is not how long it is usable, and only the second of those bounds the key.
+A stored app credential MUST be refused and removed on read once its delegation has expired. Both halves go: the key is the thing that signs, and the chain is not needed to remember who is signed in, because STATUS-1 holds that. This is what bounds a stored credential at one delegation lifetime without depending on an event, and there is no dependable signal for a browser closing to depend on instead.
 
 **TAB-6.**
-The `app` slot MUST be removed when the `session` slot is written or removed. A sign-out leaves nothing behind to be found, and a sign-in that replaced the session replaces the app credential rather than letting one stand that is rooted at an account the session no longer belongs to. This is the one removal that reaches the chain TAB-5 keeps.
+The `app` slot MUST be removed when the `session` slot is written or removed. A sign-out leaves nothing behind to be found, and a sign-in that replaced the session replaces the app credential rather than letting one stand that is rooted at an account the session no longer belongs to.
 
 **TAB-7.**
 A stored app credential is adopted only when its delegation is rooted at the account principal the status or an earlier delegation established. A mismatched record is refused rather than used, wherever it came from. It cannot be adopted with the wrong key, because STORE-2 stores the two halves as one.
 
 **TAB-8.**
-Storing the app credential grants no reach the session key did not already grant: anything able to read one could mint from the live session. What TAB-5 and TAB-6 add is that nothing usable outlives the delegation and nothing at all outlives the session. What remains is a key on disk for at most one delegation lifetime and, after that, a spent chain naming an account — a bound and not an erasure, and not a defence against reading the store directly.
+Storing the app credential grants no reach the session key did not already grant: anything able to read one could mint from the live session. What TAB-5 and TAB-6 add is that nothing outlives the delegation it was minted with, and nothing at all outlives the session. What remains is a credential on disk for at most one delegation lifetime — a bound and not an erasure, and not a defence against reading the store directly.
 
 **TAB-9.**
 Coordination may only suppress a mint, never be required for one. Every tab schedules its refresh as it would if it were alone, and a tab that cannot read or write the store mints for itself.
@@ -458,7 +454,7 @@ Before the first call, a session chain is refused unless its `targets` name the 
 `keyType` goes with them, the key type now belonging to a store's `create()`, and `AuthClientStorage`, `IdbStorage`, `LocalStorage` and the `KEY_STORAGE_*` constants stop being exported. `subscribe()` and `dispose()` are additions rather than existing signatures.
 
 **API-2.**
-`isAuthenticated()` reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints. It stays synchronous and makes no call, answering from what STORE-12 hydrated rather than from the store itself — which is what lets a credential store be asynchronous. The answer is therefore as of the last read: fresh against another tab, because STORE-10 announces a change only once it is readable, and stale only in a tab that missed a notification and has not become visible since. Where a status store is configured, STATUS-6 applies to what it reads.
+`isAuthenticated()` reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints. It stays synchronous and makes no call, because it reads the status rather than the credentials — which is what lets a credential store be asynchronous without the answer becoming one.
 
 **API-3.**
 `isAuthenticated()` is optimistic about revocation, and this is a change in kind. It answers from what the client stored, so a session revoked at the canister or from another browser still reads as authenticated until something mints and is told otherwise, at which point the stored session is dropped and subscribers are notified. Before sessions the answer could only go stale by expiry, which a client could compute; now it can go stale because someone acted. An application that must not act on a stale answer should make a call and handle its failure, which is the only thing that consults the canister.
