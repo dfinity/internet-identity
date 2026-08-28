@@ -113,6 +113,8 @@ Only the session's `DelegationStorage` is read synchronously by anything, and th
 **STORE-6.**
 Only the session's `DelegationStorage` needs `subscribe()`. Cross-tab reconcile watches the session, not the app delegation, whose convergence is the read inside the lock in TAB-11.
 
+It stays on the delegation interface rather than moving to the hint, because a hint leaf is optional and a single-origin configuration has none, while a sign-out still has to reach the other tabs. Where both are configured they report the same event twice, so `AuthClient` fires a subscriber once per change and not once per source.
+
 **STORE-7.**
 The four leaves are supplied independently, so an application chooses what survives a reload for each half of each credential. One unwilling to have delegations on disk supplies memory-backed leaves for the app pair and leaves the session pair persisted, and still shares between its live tabs; the library ships those leaves rather than leaving them to be written per application.
 
