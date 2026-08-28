@@ -395,6 +395,13 @@ const validateLogoUrl = (value: unknown, origin: string): Validated<URL> => {
  * anything else a link must never carry, and `http`, which II's production CSP
  * (`connect-src 'self' https:`) means it would never have read this document
  * over in the first place.
+ *
+ * Userinfo is refused as well. It grants an app no destination it couldn't
+ * write plainly — any https origin is allowed by design — but it is the one way
+ * a value could read as one host while resolving to another
+ * (`https://trusted.example@evil.example/privacy`), and the link text the user
+ * sees is II's own generic "Privacy Policy", so the URL itself is all a
+ * careful user has to go on.
  */
 const validatePolicyUrl = (
   value: unknown,
@@ -404,17 +411,27 @@ const validatePolicyUrl = (
   if (value === undefined) {
     return undefined;
   }
-  if (typeof value !== "string" || value.length === 0) {
-    return reject(field, "must be a non-empty string");
+  if (typeof value !== "string") {
+    return reject(field, "must be a string");
+  }
+  // The URL parser ignores surrounding whitespace, so a value with nothing else
+  // in it would resolve to the origin's root rather than being refused. Same
+  // rule as the text fields: a value that reads as absent is absent.
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return reject(field, "must contain at least one non-whitespace character");
   }
   let url: URL;
   try {
-    url = new URL(value, origin);
+    url = new URL(trimmed, origin);
   } catch {
     return reject(field, "must be a valid URL");
   }
   if (url.protocol !== "https:") {
     return reject(field, "must be an https URL");
+  }
+  if (url.username !== "" || url.password !== "") {
+    return reject(field, "must not carry a username or password");
   }
   return url.href;
 };
