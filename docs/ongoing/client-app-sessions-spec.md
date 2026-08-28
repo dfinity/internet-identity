@@ -13,15 +13,15 @@
 | Block margin            | 10 seconds                 | this library                                       |
 | Pre-mint threshold      | 15 seconds                 | this library                                       |
 
-The rest of the document uses these names and restates no value. Five more are fixed strings:
+The rest of the document uses these names and restates no value. Four more are fixed strings:
 
-| Name                   | Value                                                                                                                                | Used by |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------- |
-| Session channel        | `ic-session-sync`                                                                                                                    | TAB-1   |
-| Mint lock              | `ic-session-mint`                                                                                                                    | TAB-7   |
-| Default authorize URL  | `https://id.ai/authorize`                                                                                                            | AGENT-2 |
-| Default II canister id | `rdmx6-jaaaa-aaaaa-aaadq-cai`                                                                                                        | AGENT-2 |
-| Hint cookie            | `ic-delegation`, `Path=/`, `Domain=<the configured domain>`, `SameSite=Lax`, `Max-Age` to the session's expiry, `Secure` on `https:` | HINT-1  |
+| Name                   | Value                                                                                                                       | Used by  |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Slots                  | `session-identity`, `session-delegation`, `app-identity`, `app-delegation`, each prefixed by the namespace where one is set | STORE-3  |
+| Mint lock              | the `app-identity` slot                                                                                                     | STORE-10 |
+| Default authorize URL  | `https://id.ai/authorize`                                                                                                   | AGENT-2  |
+| Default II canister id | `rdmx6-jaaaa-aaaaa-aaadq-cai`                                                                                               | AGENT-2  |
+| Hint cookies           | one per delegation slot and named for it, `Path=/`, `Domain=<the configured domain>`, `SameSite=Lax`, `Secure` on `https:`  | HINT-1   |
 
 The block margin covers a request's flight time.
 
@@ -48,7 +48,7 @@ sequenceDiagram
     IIC-->>Id: account key, expiration
     Id->>IIC: app_get_delegation(app public key, expiration)
     IIC-->>Id: delegation, five minutes
-    AC->>AC: store the account principal, write hint
+    AC->>AC: write the hint cookies
     AC-->>App: signIn() resolves
 
     App->>AC: getIdentity()
@@ -74,57 +74,90 @@ The request carries a session public key, a `maxTimeToLive` where the applicatio
 The returned chain is rejected unless its `targets` name the configured II canister and nothing else, per AGENT-5. A chain without that restriction is not a session chain, and treating one as a session would give the library something it could sign arbitrary calls with. Acquisition mints before it resolves, so the check runs there too.
 
 **ACQ-5.**
-The session is persisted through its `DelegationStorage`, which holds the chain and the account key together as one record.
+The session chain is persisted through its `DelegationStorage`, which holds the chain and nothing beside it.
 
 **ACQ-6.**
 The app delegation is persisted only through the shared pair TAB-1 describes, and only under the conditions TAB-5 and TAB-6 impose on reading one back. No other path stores it.
 
 **ACQ-7.**
-The account key is part of the stored session, not a second thing stored beside it. It is not derivable from the chain, which is rooted at the session's own key, and the transport result carries only the chain, so it is taken from the `user_key` of the first mint, which MINT-12 makes part of signing in.
+The account principal is not a stored field. It is the root of the app delegation, arriving as the `user_key` of a mint, which is why TAB-5 keeps a spent chain rather than deleting it and why the session record carries nothing beyond its own chain. It is not derivable from the session chain, which is rooted at the session's own key, and the transport result carries only that chain. Before the first mint there is none, which MINT-12 puts out of reach by minting inside the ceremony.
 
 ## Keys
 
-Five things are held, in two credentials of the same shape. A credential is an identity and the delegation that authorises it, so each has an `IdentityStorage` and a `DelegationStorage`, and the extra value each delegation carries rides in its own record.
+Four things are held, in two credentials of the same shape. A credential is an identity and the delegation that authorises it, so each has an `IdentityStorage` and a `DelegationStorage`, and nothing rides beside either.
 
-| Thing          | Slot                 | Held in                                              | Lifetime       | Requirement    |
-| -------------- | -------------------- | ---------------------------------------------------- | -------------- | -------------- |
-| Session key    | `session-identity`   | `SessionStore.identity`                              | the session    | KEY-1, KEY-4   |
-| Session chain  | `session-delegation` | `SessionStore.delegation`                            | the session    | ACQ-5, KEY-4   |
-| Account key    | `session-delegation` | same record as the chain                             | the session    | ACQ-7, MINT-17 |
-| App key        | `app-identity`       | `AppStore.identity`                                  | one delegation | KEY-2, TAB-1   |
-| App delegation | `app-delegation`     | `AppStore.delegation`, with the session it came from | one delegation | ACQ-6, TAB-1   |
+| Thing          | Slot                 | Held in                           | Lifetime                                             | Requirement  |
+| -------------- | -------------------- | --------------------------------- | ---------------------------------------------------- | ------------ |
+| Session key    | `session-identity`   | the session's `IdentityStorage`   | the session                                          | KEY-1, KEY-4 |
+| Session chain  | `session-delegation` | the session's `DelegationStorage` | the session                                          | ACQ-5, KEY-4 |
+| App key        | `app-identity`       | the app's `IdentityStorage`       | one delegation                                       | KEY-2, TAB-1 |
+| App delegation | `app-delegation`     | the app's `DelegationStorage`     | one delegation, kept past it as the account's record | ACQ-6, TAB-5 |
 
 **STORE-1.**
-Two credentials are held, and each is an identity and the delegation authorising it. So storage is two interfaces — `IdentityStorage` for a `SignIdentity`, asynchronous because a non-extractable key needs a store that can hold one, and `DelegationStorage` for a `DelegationChain` and the one value beside it, synchronous because a chain is not a secret — and each is supplied twice.
+Two credentials are held, and each is an identity and the delegation authorising it. So storage is two interfaces — `IdentityStorage` for a `SignIdentity`, asynchronous because a non-extractable key needs a store that can hold one, and `DelegationStorage` for a `DelegationChain`, synchronous because a chain is not a secret — and each is supplied twice.
 
 **STORE-2.**
-An application supplies the two leaves; the library composes them. `SessionStore` and `AppStore` each take an `IdentityStorage` and a `DelegationStorage` and are classes, not interfaces, because the invariants below live in them and an application MUST NOT be able to supply a composite that omits one.
-
-| Owned by the composite                             | Owned by the leaf                     |
-| -------------------------------------------------- | ------------------------------------- |
-| the slot each half is written under                | the medium, and the encoding for it   |
-| the expiry and session refusals of TAB-5 and TAB-6 | the key algorithm, through `create()` |
-| the lock, and whether one is taken at all          | whether another tab can read it       |
+An application supplies four leaves, as two pairs: a `session` pair and an `app` pair, each an `IdentityStorage` and a `DelegationStorage`. Nothing composes them. What a composite would have owned — the slot each half is written under, the refusals of TAB-5 and TAB-6, and whether a lock is taken — belongs to `AuthClient` and to the identity it hands out, because a leaf is the part an application may reasonably want to replace and the sequence around it is not. An application cannot supply a store that skips a refusal, since there is no such object to supply.
 
 **STORE-3.**
-Slot names belong to the composite and not to the leaf, so a leaf takes the slot per call rather than defaulting one. Four implementations each choosing a default is what produced three colliding slots in the version this replaces, and one composite naming `session-identity`, `session-delegation`, `app-identity` and `app-delegation` cannot collide with itself.
+Slots are assigned by `AuthClient` and never defaulted by a leaf, so a leaf takes the slot as an argument to every call. Four implementations each choosing their own default is what produced three colliding slots in the version this replaces, two of them on the same key in the same database; one assigner cannot collide with itself.
 
-It follows that one leaf instance may serve several slots, so a single IndexedDB connection can hold both identities and an application writing a custom backend writes one adapter rather than one per slot.
+One optional `namespace` prefixes all four and is the only way to change them, so an application running two clients under one domain separates them with one string and cannot set three slots and miss the fourth. It follows that one leaf instance may serve several slots, so a single IndexedDB connection can hold both identities and an application writing a custom backend writes one adapter rather than one per slot.
 
 **STORE-4.**
-Only the session's `DelegationStorage` is read synchronously by anything, and that is what forces the split rather than the types: `isAuthenticated()` answers from it without a call, per API-2. Nothing reads the app delegation synchronously — it is read once on a page load and served from memory after that — so the app pair could have been one asynchronous store, and is two for consistency rather than necessity.
+A slot names three things: the key the value is stored under, the cookie a `CookieStorage` publishes it to, and the lock of STORE-10. Slot names are therefore a cross-origin contract, because a sibling subdomain reads a cookie by name. A `namespace` set on one sibling and not on another stops the sharing HINT-1 describes and reports nothing, since a cookie that is absent reads exactly like a sibling that is signed out.
 
 **STORE-5.**
-Only the session's `DelegationStorage` needs `subscribe()`. Cross-tab reconcile watches the session, not the app delegation, whose convergence is the read inside the lock in TAB-11.
+Only the session's `DelegationStorage` is read synchronously by anything, and that is what forces the split rather than the types: `isAuthenticated()` answers from it without a call, per API-2. Nothing reads the app delegation synchronously — it is read once on a page load and served from memory after that — so the app pair could have been asynchronous, and is not for consistency rather than necessity.
 
 **STORE-6.**
-The four slots are supplied independently, so an application chooses what survives a reload for each half of each credential. One unwilling to have delegations on disk supplies memory-backed leaves to `AppStore` and leaves `SessionStore` persisted, and still shares between its live tabs; the library ships those leaves rather than leaving them to be written per application.
+Only the session's `DelegationStorage` needs `subscribe()`. Cross-tab reconcile watches the session, not the app delegation, whose convergence is the read inside the lock in TAB-11.
 
 **STORE-7.**
-A half without its other half carries no authority: a delegation whose identity is gone signs nothing, and an identity whose delegation is gone authorises nothing. So a slot configured to persist while its partner does not degrades to minting rather than to anything unsafe, and a torn read pairing one credential's identity with another's delegation is refused by TAB-7, which requires a pair to delegate to the identity stored beside it.
+The four leaves are supplied independently, so an application chooses what survives a reload for each half of each credential. One unwilling to have delegations on disk supplies memory-backed leaves for the app pair and leaves the session pair persisted, and still shares between its live tabs; the library ships those leaves rather than leaving them to be written per application.
 
 **STORE-8.**
-`AppStore` owns the lock, and `SessionStore` has none: a session is written once per ceremony, so there is no repeated work to suppress. `AppStore` takes the lock only when both its leaves report that another tab can read them, because a pair no other tab can see is one every tab must mint for itself, and locking would then serialise without suppressing anything — the distinction TAB-11 turns on.
+A half without its other half carries no authority: a delegation whose identity is gone signs nothing, and an identity whose delegation is gone authorises nothing. So a slot configured to persist while its partner does not degrades to minting rather than to anything unsafe, and a torn read pairing one credential's identity with another's delegation is refused by TAB-7, which requires a pair to delegate to the identity stored beside it.
+
+**STORE-9.**
+Every leaf declares `shared`: whether another tab of this origin reads what it writes. Only the leaf knows that, because it is a property of the medium, and it is the one thing about coordination an application supplying a store has to answer.
+
+It is a required field rather than an optional one. Optional would need a default, and the safe default is the counter-intuitive one: an undeclared store would have to be treated as shared, because a shared store that failed to say so costs a mint in every tab, while a solitary one wrongly assumed shared only makes tabs queue. Requiring one word removes the question.
+
+**STORE-10.**
+The lock is `navigator.locks`, named for the `app-identity` slot, and it belongs to `AuthClient` rather than to a store. Locking is the library coordinating with itself, so an application writing a custom leaf answers STORE-9 and needs to know nothing about the Web Locks API.
+
+A mint takes the lock only when **both** halves of the app pair are shared. Sharing needs both: a tab reading a chain whose key it cannot reach holds a torn pair, which TAB-7 refuses, so it mints regardless. Locking on one shared half would therefore suppress nothing and serialise the mints that were going to happen anyway.
+
+**STORE-11.**
+`set` writes what it is given and takes no lock. It has to, because the session key is written on the outbound load of the redirect flow and the session chain only on return, per ERR-3. That the app slots are written in one place, inside the lock of STORE-10, is a rule about those two call sites and not a property of the interface: an application implements these interfaces and never calls them.
+
+**STORE-12.**
+A `DelegationStorage` MAY implement `getHint(slot)`, returning the principal and expiration it knows for a slot without holding a chain. Only a store that publishes beyond this origin implements it. Every other store derives both from the chain it holds, so the method would be pure restatement: the account is the app chain's root, the session's expiry is the earliest expiration in the session chain, and `isAuthenticated()` reads the session itself.
+
+What a hint means depends on its slot, so what a store returns is a `DelegationHint` and not a `SessionHint`. HINT-3 says how one becomes the other.
+
+**STORE-13.**
+The library ships a leaf per medium, so an application chooses one rather than writing one. A leaf's medium decides both of the things only it can answer: whether another tab reads it, and what kind of key it can hold.
+
+| Leaf                      | Backed by                   | `shared`   | `create()`                     |
+| ------------------------- | --------------------------- | ---------- | ------------------------------ |
+| `IdbIdentityStorage`      | IndexedDB                   | `true`     | ECDSA, non-extractable         |
+| `LocalIdentityStorage`    | `localStorage`              | `true`     | Ed25519, private bytes as JSON |
+| `MemoryIdentityStorage`   | a `Map` on the instance     | `false`    | ECDSA, non-extractable         |
+| `LocalDelegationStorage`  | `localStorage`              | `true`     | —                              |
+| `MemoryDelegationStorage` | a `Map` on the instance     | `false`    | —                              |
+| `CookieStorage`           | decorates a delegation leaf | its leaf's | —                              |
+
+Only a leaf that has to serialise needs a key whose private bytes are readable, which is why `LocalIdentityStorage` generates a different type from the other two. A memory leaf has no encoding step, so it generates the non-extractable key.
+
+**STORE-14.**
+The memory leaves hold a `Map` keyed by slot, on the instance and never on the module. Two clients on one page must not see each other's slots — which is what the namespace of STORE-3 is for, and a module-level map would defeat it — and state must not carry between tests sharing a process. Nothing about the map is weak: it is keyed by a string, so there is no object to key on and nothing that could be collected while a slot still names it.
+
+A memory leaf returns the object it was given rather than a copy. That is the difference from every other leaf, which round-trips through an encoding and hands back something new, and it is what lets a memory identity leaf hold a non-extractable key at all. Nothing in the library mutates a `SignIdentity` or a `DelegationChain` it read.
+
+**STORE-15.**
+An app pair backed by memory starts a page load holding nothing, so `isAuthenticated()` answers from the session while `getPrincipal()` has no delegation to take a root from until the eager mint of MINT-13 lands. The two disagreeing for the length of one mint is the cost of choosing not to persist, and it is the only configuration where they can.
 
 **KEY-1.**
 The session key is persisted through its `IdentityStorage`, so it is the key that survives a reload and it inherits whatever non-extractable backing the configured leaf provides.
@@ -186,7 +219,7 @@ No mint starts at all while the session itself has less than the block margin le
 `getIdentity()` resolves to an identity that obtains an app delegation when one is needed. It does not promise to be holding one: signing in leaves it with the delegation minted during the ceremony, a session restored on a page load starts with whatever usable pair the store holds, and where there is none it mints on its first request.
 
 **MINT-2.**
-Before a delegation is held, the identity still answers for its principal, since that comes from the stored account key and not from a delegation. Its delegation chain reports the account key and no delegations, which is how "no authority yet" is represented.
+Before a delegation is held, the identity still answers for its principal, since that comes from the root of the stored app delegation, which TAB-5 keeps after the delegation itself has lapsed. Its delegation chain reports that key and no delegations, which is how "no authority yet" is represented.
 
 **MINT-3.**
 A request arriving when the held delegation has less than the block margin left, or when none is held, waits for a mint.
@@ -242,15 +275,15 @@ No recurring timer or interval triggers a mint, and no mint happens for a delega
 A mint that fails leaves the stored session chain and session key exactly as they were, except where ERR-1 applies.
 
 **MINT-16.**
-The principal a caller sees does not change when a delegation is replaced. `app_prepare_delegation` roots every delegation at the account's key, so successive mints agree. A mint whose `user_key` does not match the stored account principal is a failed mint, and its delegation is not adopted.
+The principal a caller sees does not change when a delegation is replaced. `app_prepare_delegation` roots every delegation at the account's key, so successive mints agree. A mint whose `user_key` does not match the root of the delegation already stored is a failed mint, and its delegation is not adopted.
 
 **MINT-17.**
-`getPrincipal()` never triggers a mint. It is answered from the account principal persisted by ACQ-5, which is why the background mint of MINT-13 does not have to complete before a restored session can report who is signed in.
+`getPrincipal()` never triggers a mint. It is answered from the root of the stored app delegation, per ACQ-7, which is why the background mint of MINT-13 does not have to complete before a restored session can report who is signed in, and why TAB-5 keeps a chain the moment it stops being usable.
 
 ## Failure
 
 **ERR-1.**
-`NoMatchingSession` is terminal for the chain in hand. The library discards the session chain and the session key for this origin, notifies subscribers, and reports the user as not authenticated. It does not remove the shared hint: see HINT-4.
+`NoMatchingSession` is terminal for the chain in hand. The library discards the session chain and the session key for this origin, notifies subscribers, and reports the user as not authenticated. It does not remove the shared cookies: see HINT-5.
 
 **ERR-2.**
 `InternalCanisterError`, a transport failure, and an unreachable boundary node are transient. The library retains the session, propagates the failure to the caller, and does not report a sign-out.
@@ -270,22 +303,27 @@ A minted delegation carrying a `permissions` field is refused with an error nami
 ## The cross-subdomain hint
 
 **HINT-1.**
-The hint cookie carries the signed-in principal and the **session's** expiry.
+A `CookieStorage` decorates a `DelegationStorage` and publishes, to a cookie named for the slot, the principal the stored chain is rooted at and that chain's expiration. There is one cookie per delegation slot.
 
 **HINT-2.**
-The hint is written when a session is acquired.
+Both fields are published in both cookies, and only one of each is read. The session chain is rooted at the session's own key, so its principal differs on every origin and means nothing to a sibling; an app delegation's expiry is five minutes away and says nothing about whether a session exists. Publishing them anyway buys one cookie format, one parser, and a decorator with no per-slot behaviour, which is worth more than the two unread fields.
+
+The `app-delegation` cookie's `Max-Age` follows the **session's** expiry rather than its own chain's. Otherwise it would be absent for most of a session's life — five minutes after the last mint — and a sibling loading then would know a session existed without knowing whose, leaving a sibling's silent request no principal to name. The reader refuses a lapsed expiration in any case, so publishing past it costs nothing — the separation TAB-5 makes in the store, made here in the cookie.
 
 **HINT-3.**
-The hint is removed by signing out. One other path removes it: writing a session whose derived hint is already expired removes the cookie instead of writing a stale one. Storage exposes the removal of a local session separately from the removal of the shared hint, because they are different acts: a user ending a sign-in, and an origin finding out that the chain it held is stale.
+`AuthClient` assembles a `SessionHint` from the two, taking each half from the cookie that means it: the principal from the `app-delegation` cookie, the expiration from the `session-delegation` cookie. Either half missing means there is nothing to act on — no expiration, no session announced; no principal, no account to name — so the result is nothing rather than half a hint. The two types are structurally identical and MUST NOT be aliased, because the whole operation is taking one field from each of two `DelegationHint`s and an alias would let them be swapped silently.
 
 **HINT-4.**
-Discovering a stale chain removes the local session only. One session serves every sibling of a domain, so a sibling that did not sign in holds a chain to a session a ceremony elsewhere replaced, and removing the hint would tell the sibling that did sign in that the session it just obtained is gone.
+A cookie is written whenever the slot it decorates is written, and removed when that slot is removed. Writing a chain whose derived expiration has already passed removes the cookie instead of publishing a stale one.
 
 **HINT-5.**
-A hint may outlive the session it describes. It is a hint, so a sibling acting on one has to be able to fall back to asking the user, and may not treat it as authority to skip that path.
+Signing out removes both cookies. Discovering that a chain is stale removes the local session only: one session serves every sibling of a domain, so a sibling that did not sign in holds a chain to a session a ceremony elsewhere replaced, and retracting the shared cookies would tell the sibling that did sign in that the session it just obtained is gone. Storage exposes the two removals separately because they are different acts — a user ending a sign-in, and an origin finding out that what it held is stale.
 
 **HINT-6.**
-Minting does not write the hint. An app delegation's expiry is five minutes away and says nothing about whether a sibling has a session to re-issue from.
+A hint may outlive the session it describes. It is a hint, so a sibling acting on one has to be able to fall back to asking the user, and may not treat it as authority to skip that path.
+
+**HINT-7.**
+A stored session is dropped when the `app-delegation` cookie is missing or names another account, which is how a sign-out or an identity switch on a sibling reaches this origin. The comparison is against that cookie and not the `session-delegation` one: the account principal is the same value on every origin, while a session principal is written by whichever sibling wrote last, so comparing against it would have each origin discard its own good session.
 
 ## Signing out
 
@@ -297,6 +335,11 @@ Local state is cleared whether or not that call succeeded.
 
 **END-3.**
 `signOut()` surfaces no error from the revoke call, and a repeated sign-out needs no special case.
+
+**END-4.**
+`signOut()` steals the lock of STORE-10 rather than queueing on it, so it is never made to wait for another tab's mint. Stealing releases the lock at once and aborts the signal held by whoever had it; a mint in flight MUST check that signal after its calls return and before it writes, and MUST discard its result when the signal has fired. Waiting for the lock would let a sign-out hang on a canister call, and re-reading the session before each write would narrow the window rather than close it.
+
+The call itself is not cancelled, since the agent takes no signal: it completes, is discarded, and costs one wasted mint and one refresh stamp on a session that is being revoked in the same moment.
 
 ## Sharing one delegation across tabs
 
@@ -313,22 +356,24 @@ Sharing is a read, not an exchange. A tab MUST NOT depend on another tab answeri
 A tab that needs a delegation reads the stored pair first, and mints only when there is none it may use.
 
 **TAB-5.**
-A stored pair MUST be refused and deleted on read when its delegation has expired. This is what bounds a stored delegation at one delegation lifetime without depending on an event, and there is no dependable signal for a browser closing to depend on instead.
+A stored pair MUST be refused on read when its delegation has expired, and the key MUST be deleted then. This is what bounds the thing that signs at one delegation lifetime without depending on an event, and there is no dependable signal for a browser closing to depend on instead.
+
+The chain is kept until a mint replaces it or TAB-6 removes it. A chain whose key is gone signs nothing, and it is the only record of the account, which ACQ-7 and MINT-17 answer `getPrincipal()` from. Deleting it would mean a page loading ten minutes after the last one could not say who was signed in without minting first. How long a value is worth keeping is not how long it is usable, and only the second of those bounds the key.
 
 **TAB-6.**
-A stored pair MUST be refused and deleted on read when the session it was minted from is not the session stored now. A sign-out leaves no session, so the first read after one removes the pair; a sign-in that replaced the session likewise replaces the pair rather than inheriting it.
+Both halves MUST be deleted when the session is written or removed. A sign-out leaves nothing behind to be found, and a sign-in that replaced the session replaces the pair rather than letting one root at an account the session no longer belongs to. This is the one removal that reaches the chain TAB-5 keeps.
 
 **TAB-7.**
 A pair is adopted only when its delegation is rooted at the stored account principal and delegates to the key stored alongside it. A mismatched pair is refused rather than used, wherever it came from.
 
 **TAB-8.**
-Storing a pair grants no reach the session key beside it did not already grant: anything able to read one could mint from the live session. What TAB-5 and TAB-6 add is that a pair cannot outlive the session behind it. What remains is an artifact on disk for at most one delegation lifetime, which is a bound and not an erasure, and is not a defence against reading the store directly.
+Storing a pair grants no reach the session key beside it did not already grant: anything able to read one could mint from the live session. What TAB-5 and TAB-6 add is that nothing usable outlives the delegation and nothing at all outlives the session. What remains is a key on disk for at most one delegation lifetime and, after that, a spent chain naming an account — a bound and not an erasure, and not a defence against reading the store directly.
 
 **TAB-9.**
 Coordination may only suppress a mint, never be required for one. Every tab schedules its refresh as it would if it were alone, and a tab that cannot read or write the store mints for itself.
 
 **TAB-10.**
-A mint runs while holding a named lock, where the environment provides one. Tabs waking in the same moment queue on it, closing the window in which two mints overlap.
+A mint runs while holding the lock of STORE-10, where the environment provides one. Tabs waking in the same moment queue on it, closing the window in which two mints overlap.
 
 **TAB-11.**
 A tab holding the lock MUST read the store before minting, and MUST adopt what it finds instead of minting when that pair is usable.
@@ -341,6 +386,8 @@ Liveness rests on the lock rather than on a timeout. A browser releases a lock w
 **TAB-13.**
 Where the environment has no such lock, every tab mints. The lock may be relied on for what this costs, never for whether it works.
 
+So does a configuration whose app pair is shared on one half only. The tab that reads the shared half cannot reach its partner, TAB-7 refuses the torn pair, and it mints for itself — which is why STORE-10 does not take a lock there.
+
 **TAB-14.**
 A request that finds no usable delegation queues on the same lock rather than jumping it.
 
@@ -348,7 +395,9 @@ A request that finds no usable delegation queues on the same lock rather than ju
 Adopting a delegation, however it arrived, reschedules that tab's refresh from the adopted delegation's expiry, so tabs do not drift onto separate clocks.
 
 **TAB-16.**
-`signOut()` deletes the stored pair along with the session and its key. TAB-6 makes a pair the sign-out failed to delete unusable on the next read, so the deletion is what keeps the store tidy and TAB-6 is what makes it safe.
+`signOut()` deletes the stored pair along with the session and its key, and steals the lock to stop a mint already running from writing one back. Stealing releases the lock immediately and aborts the signal handed to whoever holds it; that tab completes the call it cannot cancel, sees the abort, and discards the result rather than storing it. See END-4.
+
+TAB-6 makes a pair that survived a failed sign-out unusable, so the deletion is what keeps the store tidy and TAB-6 is what makes it safe.
 
 ## Reaching the II canister
 
@@ -375,13 +424,15 @@ Before the first call, a session chain is refused unless its `targets` name the 
 | Option                     | Change                                                                            | Requirement      |
 | -------------------------- | --------------------------------------------------------------------------------- | ---------------- |
 | `identityProvider`         | **breaking**: a URL becomes an object carrying an authorize URL and a canister id | AGENT-1, AGENT-2 |
+| `session` and `app`        | **breaking**: `storage` becomes two pairs of leaves                               | STORE-2          |
+| `namespace`                | new; prefixes all four slots, and the only way to change them                     | STORE-3          |
 | `agentOptions`             | new; passed to the agent that makes the calls                                     | AGENT-3          |
 | `disableForegroundRefresh` | new; about when the library refreshes rather than about sessions                  | MINT-8           |
 
-`identityProvider` is not the only breaking change in the surface this design touches. `storage` becomes `identityStorage` and `sessionStorage`, `keyType` is removed with the key type now belonging to the store, and `AuthClientStorage`, `IdbStorage`, `LocalStorage` and the `KEY_STORAGE_*` constants stop being exported. `subscribe()` and `dispose()` are additions rather than existing signatures.
+`keyType` goes with them, the key type now belonging to a leaf's `create()`, and `AuthClientStorage`, `IdbStorage`, `LocalStorage` and the `KEY_STORAGE_*` constants stop being exported. `subscribe()` and `dispose()` are additions rather than existing signatures.
 
 **API-2.**
-`isAuthenticated()` reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints. It stays synchronous and makes no call, so a page load answers without a mint or an asynchronous store. It reads only the stored session with the default store; `CookieSessionStorage` also reads the hint cookie, and drops its local copy when the cookie is missing or names another account, which is how a sign-out on a sibling reaches this origin.
+`isAuthenticated()` reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints. It stays synchronous and makes no call, so a page load answers without a mint or an asynchronous store. It reads only the stored session with the default leaves; a `CookieStorage` also reads the cookies, per HINT-7.
 
 **API-3.**
 `isAuthenticated()` is optimistic about revocation, and this is a change in kind. It answers from what the client stored, so a session revoked at the canister or from another browser still reads as authenticated until something mints and is told otherwise, at which point the stored session is dropped and subscribers are notified. Before sessions the answer could only go stale by expiry, which a client could compute; now it can go stale because someone acted. An application that must not act on a stale answer should make a call and handle its failure, which is the only thing that consults the canister.
