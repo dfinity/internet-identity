@@ -45,9 +45,8 @@
  *   heap (which a `data:` URL would put in both).
  * - The policy URLs are only ever linked to, never fetched, so they may point
  *   at any origin — a policy commonly lives on a separate domain from the app
- *   itself. They must be `https` (or on the app's own origin, so an app served
- *   over plain `http` in local development still works), which is what rules
- *   out `javascript:`, `data:` and the other schemes a link must never carry.
+ *   itself. They must be `https`, which is what rules out `javascript:`,
+ *   `data:` and the other schemes a link must never carry.
  * - Every failure mode (missing file, CORS, timeout, invalid JSON, …) yields
  *   `undefined` rather than an error: metadata is a display nicety and must
  *   never break the sign-in flow.
@@ -393,9 +392,9 @@ const validateLogoUrl = (value: unknown, origin: string): Validated<URL> => {
  * private from third parties does not apply, and requiring it would only lock
  * out the many apps whose policies live on a separate domain. Pinning the
  * scheme is what still matters: it rules out `javascript:`, `data:` and
- * anything else a link must never carry. A plain-`http` URL is accepted on the
- * document's own origin alone, so an app served over `http` in local
- * development is not forced to publish `https` links.
+ * anything else a link must never carry, and `http`, which II's production CSP
+ * (`connect-src 'self' https:`) means it would never have read this document
+ * over in the first place.
  */
 const validatePolicyUrl = (
   value: unknown,
@@ -414,14 +413,8 @@ const validatePolicyUrl = (
   } catch {
     return reject(field, "must be a valid URL");
   }
-  if (
-    url.protocol !== "https:" &&
-    !(url.protocol === "http:" && url.origin === new URL(origin).origin)
-  ) {
-    return reject(
-      field,
-      "must be an https URL, or a URL on the same origin as the document",
-    );
+  if (url.protocol !== "https:") {
+    return reject(field, "must be an https URL");
   }
   return url.href;
 };

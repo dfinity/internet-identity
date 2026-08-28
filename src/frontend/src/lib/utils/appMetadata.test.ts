@@ -653,6 +653,7 @@ test("should keep a document carrying nothing but a policy url", async () => {
 test("should reject the whole document when a policy url is not https", async () => {
   for (const url of [
     "http://legal.example.org/privacy", // plain http on another origin
+    "http://app.example.com/privacy", // and on the app's own origin
     "javascript:alert(1)",
     "data:text/html,<h1>privacy</h1>",
     "mailto:privacy@example.com",
@@ -665,21 +666,6 @@ test("should reject the whole document when a policy url is not https", async ()
 
     expect(await fetchAppMetadata(ORIGIN), url).toBeUndefined();
   }
-});
-
-test("should accept http policy urls on the app's own origin (local development)", async () => {
-  setupFetchMock(
-    Response.json({ privacyPolicyUrl: "/privacy" }),
-    Response.json({ privacyPolicyUrl: "http://localhost:5173/privacy" }),
-  );
-
-  const relative = await fetchAppMetadata("http://localhost:5173");
-  const absolute = await fetchAppMetadata("http://localhost:5173");
-
-  expect(relative).toEqual({
-    privacyPolicyUrl: "http://localhost:5173/privacy",
-  });
-  expect(absolute).toEqual(relative);
 });
 
 test("should ignore unknown fields", async () => {
