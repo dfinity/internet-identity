@@ -15,13 +15,13 @@
 
 The rest of the document uses these names and restates no value. Four more are fixed strings:
 
-| Name                   | Value                                                                                                                       | Used by  |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------- |
-| Slots                  | `session-identity`, `session-delegation`, `app-identity`, `app-delegation`, each prefixed by the namespace where one is set | STORE-3  |
-| Mint lock              | the `app-identity` slot                                                                                                     | STORE-10 |
-| Default authorize URL  | `https://id.ai/authorize`                                                                                                   | AGENT-2  |
-| Default II canister id | `rdmx6-jaaaa-aaaaa-aaadq-cai`                                                                                               | AGENT-2  |
-| Hint cookies           | one per delegation slot and named for it, `Path=/`, `Domain=<the configured domain>`, `SameSite=Lax`, `Secure` on `https:`  | HINT-1   |
+| Name                   | Value                                                                                                                                         | Used by  |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Slots                  | `session-identity`, `session-delegation`, `app-identity`, `app-delegation`, each prefixed by the namespace where one is set                   | STORE-3  |
+| Mint lock              | the `app-identity` slot                                                                                                                       | STORE-10 |
+| Default authorize URL  | `https://id.ai/authorize`                                                                                                                     | AGENT-2  |
+| Default II canister id | `rdmx6-jaaaa-aaaaa-aaadq-cai`                                                                                                                 | AGENT-2  |
+| Hint cookie            | named from the namespace, `Path=/`, `Domain=<the configured domain>`, `SameSite=Lax`, `Max-Age` to the session's expiry, `Secure` on `https:` | HINT-2   |
 
 The block margin covers a request's flight time.
 
@@ -48,7 +48,7 @@ sequenceDiagram
     IIC-->>Id: account key, expiration
     Id->>IIC: app_get_delegation(app public key, expiration)
     IIC-->>Id: delegation, five minutes
-    AC->>AC: write the hint cookies
+    AC->>AC: write the hint
     AC-->>App: signIn() resolves
 
     App->>AC: getIdentity()
@@ -105,7 +105,7 @@ Slots are assigned by `AuthClient` and never defaulted by a leaf, so a leaf take
 One optional `namespace` prefixes all four and is the only way to change them, so an application running two clients under one domain separates them with one string and cannot set three slots and miss the fourth. It follows that one leaf instance may serve several slots, so a single IndexedDB connection can hold both identities and an application writing a custom backend writes one adapter rather than one per slot.
 
 **STORE-4.**
-A slot names three things: the key the value is stored under, the cookie a `CookieStorage` publishes it to, and the lock of STORE-10. Slot names are therefore a cross-origin contract, because a sibling subdomain reads a cookie by name. A `namespace` set on one sibling and not on another stops the sharing HINT-1 describes and reports nothing, since a cookie that is absent reads exactly like a sibling that is signed out.
+A slot names two things: the key its value is stored under, and the lock of STORE-10. The hint takes its name from the same namespace, which makes that namespace a cross-origin contract, since a sibling subdomain reads the hint cookie by name. One set on a sibling and not on its neighbour stops the sharing of HINT-1 and reports nothing, because an absent cookie reads exactly like a sibling that is signed out.
 
 **STORE-5.**
 Only the session's `DelegationStorage` is read synchronously by anything, and that is what forces the split rather than the types: `isAuthenticated()` answers from it without a call, per API-2. Nothing reads the app delegation synchronously — it is read once on a page load and served from memory after that — so the app pair could have been asynchronous, and is not for consistency rather than necessity.
@@ -133,21 +133,18 @@ A mint takes the lock only when **both** halves of the app pair are shared. Shar
 `set` writes what it is given and takes no lock. It has to, because the session key is written on the outbound load of the redirect flow and the session chain only on return, per ERR-3. That the app slots are written in one place, inside the lock of STORE-10, is a rule about those two call sites and not a property of the interface: an application implements these interfaces and never calls them.
 
 **STORE-12.**
-A `DelegationStorage` MAY implement `getHint(slot)`, returning the principal and expiration it knows for a slot without holding a chain. Only a store that publishes beyond this origin implements it. Every other store derives both from the chain it holds, so the method would be pure restatement: the account is the app chain's root, the session's expiry is the earliest expiration in the session chain, and `isAuthenticated()` reads the session itself.
-
-What a hint means depends on its slot, so what a store returns is a `DelegationHint` and not a `SessionHint`. HINT-3 says how one becomes the other.
+Neither credential interface carries the hint. A store holding a chain derives both facts from it, so a method for them would be restatement, and a store holding no chain is not a credential store at all. The hint is its own leaf, per HINT-1.
 
 **STORE-13.**
 The library ships a leaf per medium, so an application chooses one rather than writing one. A leaf's medium decides both of the things only it can answer: whether another tab reads it, and what kind of key it can hold.
 
-| Leaf                      | Backed by                   | `shared`   | `create()`                     |
-| ------------------------- | --------------------------- | ---------- | ------------------------------ |
-| `IdbIdentityStorage`      | IndexedDB                   | `true`     | ECDSA, non-extractable         |
-| `LocalIdentityStorage`    | `localStorage`              | `true`     | Ed25519, private bytes as JSON |
-| `MemoryIdentityStorage`   | a `Map` on the instance     | `false`    | ECDSA, non-extractable         |
-| `LocalDelegationStorage`  | `localStorage`              | `true`     | —                              |
-| `MemoryDelegationStorage` | a `Map` on the instance     | `false`    | —                              |
-| `CookieStorage`           | decorates a delegation leaf | its leaf's | —                              |
+| Leaf                      | Backed by               | `shared` | `create()`                     |
+| ------------------------- | ----------------------- | -------- | ------------------------------ |
+| `IdbIdentityStorage`      | IndexedDB               | `true`   | ECDSA, non-extractable         |
+| `LocalIdentityStorage`    | `localStorage`          | `true`   | Ed25519, private bytes as JSON |
+| `MemoryIdentityStorage`   | a `Map` on the instance | `false`  | ECDSA, non-extractable         |
+| `LocalDelegationStorage`  | `localStorage`          | `true`   | —                              |
+| `MemoryDelegationStorage` | a `Map` on the instance | `false`  | —                              |
 
 Only a leaf that has to serialise needs a key whose private bytes are readable, which is why `LocalIdentityStorage` generates a different type from the other two. A memory leaf has no encoding step, so it generates the non-extractable key.
 
@@ -283,7 +280,7 @@ The principal a caller sees does not change when a delegation is replaced. `app_
 ## Failure
 
 **ERR-1.**
-`NoMatchingSession` is terminal for the chain in hand. The library discards the session chain and the session key for this origin, notifies subscribers, and reports the user as not authenticated. It does not remove the shared cookies: see HINT-5.
+`NoMatchingSession` is terminal for the chain in hand. The library discards the session chain and the session key for this origin, notifies subscribers, and reports the user as not authenticated. It does not remove the shared hint: see HINT-4.
 
 **ERR-2.**
 `InternalCanisterError`, a transport failure, and an unreachable boundary node are transient. The library retains the session, propagates the failure to the caller, and does not report a sign-out.
@@ -303,27 +300,32 @@ A minted delegation carrying a `permissions` field is refused with an error nami
 ## The cross-subdomain hint
 
 **HINT-1.**
-A `CookieStorage` decorates a `DelegationStorage` and publishes, to a cookie named for the slot, the principal the stored chain is rooted at and that chain's expiration. There is one cookie per delegation slot.
+A hint is one record — the account's principal and the session's expiry — held by its own leaf and supplied to `AuthClient` beside the two credential pairs rather than inside either. Those are the only two facts anything reads, and neither belongs to one credential: the principal is the app delegation's root and the expiry comes from the session chain.
+
+A hint is not a credential and has no identity half, so `HintStorage` stands alone rather than pairing with anything. It needs no `shared` either, because the lock of STORE-10 governs what mints and a hint mints nothing.
 
 **HINT-2.**
-Both fields are published in both cookies, and only one of each is read. The session chain is rooted at the session's own key, so its principal differs on every origin and means nothing to a sibling; an app delegation's expiry is five minutes away and says nothing about whether a session exists. Publishing them anyway buys one cookie format, one parser, and a decorator with no per-slot behaviour, which is worth more than the two unread fields.
+`AuthClient` derives the record and a leaf keeps it, so a hint store holds two fields and knows nothing about chains. That is what lets two implementations serve every configuration:
 
-The `app-delegation` cookie's `Max-Age` follows the **session's** expiry rather than its own chain's. Otherwise it would be absent for most of a session's life — five minutes after the last mint — and a sibling loading then would know a session existed without knowing whose, leaving a sibling's silent request no principal to name. The reader refuses a lapsed expiration in any case, so publishing past it costs nothing — the separation TAB-5 makes in the store, made here in the cookie.
+| Leaf                | Reaches                     | Read synchronously | Change observed through          |
+| ------------------- | --------------------------- | ------------------ | -------------------------------- |
+| `CookieHintStorage` | every sibling of the domain | yes                | `cookieStore`, visibility, focus |
+| `LocalHintStorage`  | this origin                 | yes                | `storage`                        |
 
 **HINT-3.**
-`AuthClient` assembles a `SessionHint` from the two, taking each half from the cookie that means it: the principal from the `app-delegation` cookie, the expiration from the `session-delegation` cookie. Either half missing means there is nothing to act on — no expiration, no session announced; no principal, no account to name — so the result is nothing rather than half a hint. The two types are structurally identical and MUST NOT be aliased, because the whole operation is taking one field from each of two `DelegationHint`s and an alias would let them be swapped silently.
+The hint is written whenever either fact changes: acquiring a session sets the expiry and a mint sets the principal. Signing in does both before it resolves, per MINT-12, so nothing publishes half a record. A record whose expiry has already passed is removed rather than written.
 
 **HINT-4.**
-A cookie is written whenever the slot it decorates is written, and removed when that slot is removed. Writing a chain whose derived expiration has already passed removes the cookie instead of publishing a stale one.
+Signing out removes the hint. Discovering that a chain is stale removes the local session only: one session serves every sibling of a domain, so a sibling that did not sign in holds a chain to a session a ceremony elsewhere replaced, and retracting the shared record would tell the sibling that did sign in that the session it just obtained is gone. Storage exposes the two removals separately because they are different acts — a user ending a sign-in, and an origin finding out that what it held is stale.
 
 **HINT-5.**
-Signing out removes both cookies. Discovering that a chain is stale removes the local session only: one session serves every sibling of a domain, so a sibling that did not sign in holds a chain to a session a ceremony elsewhere replaced, and retracting the shared cookies would tell the sibling that did sign in that the session it just obtained is gone. Storage exposes the two removals separately because they are different acts — a user ending a sign-in, and an origin finding out that what it held is stale.
-
-**HINT-6.**
 A hint may outlive the session it describes. It is a hint, so a sibling acting on one has to be able to fall back to asking the user, and may not treat it as authority to skip that path.
 
+**HINT-6.**
+A stored session is dropped when the hint is missing or names another account, which is how a sign-out or an identity switch on a sibling reaches this origin. The comparison is against the account principal because that is the same value on every origin; a session's own principal is rooted at the session key and differs per origin, so it could not serve.
+
 **HINT-7.**
-A stored session is dropped when the `app-delegation` cookie is missing or names another account, which is how a sign-out or an identity switch on a sibling reaches this origin. The comparison is against that cookie and not the `session-delegation` one: the account principal is the same value on every origin, while a session principal is written by whichever sibling wrote last, so comparing against it would have each origin discard its own good session.
+A hint leaf is required wherever a synchronous answer cannot come from a credential. Durable delegation leaves answer both questions from the chains they hold, so a hint is needed only to reach a sibling. A memory-backed app pair has no principal until a mint lands, per STORE-15. A memory-backed session pair is the one case where omitting it is wrong rather than merely lossy: `isAuthenticated()` would answer false on a cold load and flip when a peer replied, which API-2 does not allow.
 
 ## Signing out
 
@@ -425,14 +427,15 @@ Before the first call, a session chain is refused unless its `targets` name the 
 | -------------------------- | --------------------------------------------------------------------------------- | ---------------- |
 | `identityProvider`         | **breaking**: a URL becomes an object carrying an authorize URL and a canister id | AGENT-1, AGENT-2 |
 | `session` and `app`        | **breaking**: `storage` becomes two pairs of leaves                               | STORE-2          |
-| `namespace`                | new; prefixes all four slots, and the only way to change them                     | STORE-3          |
+| `namespace`                | new; prefixes the four slots and the hint, and the only way to change them        | STORE-3          |
+| `hint`                     | new; the published record, supplied beside the two pairs                          | HINT-1           |
 | `agentOptions`             | new; passed to the agent that makes the calls                                     | AGENT-3          |
 | `disableForegroundRefresh` | new; about when the library refreshes rather than about sessions                  | MINT-8           |
 
 `keyType` goes with them, the key type now belonging to a leaf's `create()`, and `AuthClientStorage`, `IdbStorage`, `LocalStorage` and the `KEY_STORAGE_*` constants stop being exported. `subscribe()` and `dispose()` are additions rather than existing signatures.
 
 **API-2.**
-`isAuthenticated()` reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints. It stays synchronous and makes no call, so a page load answers without a mint or an asynchronous store. It reads only the stored session with the default leaves; a `CookieStorage` also reads the cookies, per HINT-7.
+`isAuthenticated()` reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints. It stays synchronous and makes no call, so a page load answers without a mint or an asynchronous store. It reads only the stored session with the default leaves; where a hint leaf is configured it reads that too, per HINT-6.
 
 **API-3.**
 `isAuthenticated()` is optimistic about revocation, and this is a change in kind. It answers from what the client stored, so a session revoked at the canister or from another browser still reads as authenticated until something mints and is told otherwise, at which point the stored session is dropped and subscribers are notified. Before sessions the answer could only go stale by expiry, which a client could compute; now it can go stale because someone acted. An application that must not act on a stale answer should make a call and handle its failure, which is the only thing that consults the canister.

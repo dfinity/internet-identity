@@ -152,7 +152,7 @@ The session is the widest of the three and the one nothing local can see. A deri
 
 Everything the client holds is narrower. Both chains are in `localStorage` and both keys in IndexedDB, and each of those is per origin. So `chat`'s tabs share with each other and `hr`'s tabs share with each other, and neither set can read the other's.
 
-Two cookies are the only things that cross between siblings. Between them they carry the account's principal and the session's expiry, which is all a sibling needs in order to decide whether to try a silent re-auth.
+One published record is the only thing that crosses between siblings, and it carries the account's principal and the session's expiry — all a sibling needs in order to decide whether to try a silent re-auth.
 
 The floor is therefore one mint per active origin, not one per domain. Two siblings open means two mints every five minutes for one session, which is inherent and not a gap to close later.
 
@@ -165,12 +165,12 @@ Tabs of one origin pass a key handle instead, which signs without being exportab
 | The session                       | the II canister, one record per identity, application, account and browser | every sibling of the domain | either sibling signing out ends it for both                 |
 | The session chain and session key | `localStorage` and IndexedDB                                               | one origin                  | each sibling holds its own chain to the same session        |
 | The app key and its delegation    | the origin's storage, refused past the delegation's expiry                 | the tabs of one origin      | the floor is one mint per active origin                     |
-| The hints                         | two cookies scoped to the domain                                           | every sibling of the domain | a sibling decides whether to acquire silently, with no call |
+| The hint                          | a cookie scoped to the domain                                              | every sibling of the domain | a sibling decides whether to acquire silently, with no call |
 
 ```mermaid
 flowchart TB
-    subgraph D["example.com: as far as the cookies reach"]
-        H[("two cookies: the account's<br/>principal, the session's expiry")]
+    subgraph D["example.com: as far as the hint reaches"]
+        H[("the hint: the account's principal<br/>and the session's expiry")]
         subgraph O1["chat.example.com"]
             L1[("session chain,<br/>session key")]
             B1[("app key and its delegation,<br/>read by every tab")]
@@ -270,7 +270,7 @@ Signing out is the exception that does not queue. A mint already inside the lock
 
 Because one session serves every sibling, a client that discovers its own chain is dead must be careful about what it concludes. Signing in again replaces the browser's session at that application, so the sibling that did not sign in is left holding a chain to a session that no longer exists. It finds out on its next mint.
 
-What it must not do then is retract what it publishes to its siblings. Those cookies are the domain's, not this origin's, and the sibling that signed in has just written them afresh. Taking it away would tell that sibling, correctly by its own rules, that the session it just obtained is gone.
+What it must not do then is retract what it publishes to its siblings. That record is the domain's, not this origin's, and the sibling that signed in has just written it afresh. Taking it away would tell that sibling, correctly by its own rules, that the session it just obtained is gone.
 
 The two acts differ in one respect.
 
@@ -280,7 +280,7 @@ The two acts differ in one respect.
 | Discovered by               | `signOut()`                  | a mint returning `NoMatchingSession`  |
 | The session at the canister | revoked                      | already gone                          |
 | Local chain and session key | removed                      | removed                               |
-| The shared cookies          | **removed**                  | **left alone**                        |
+| The shared hint             | **removed**                  | **left alone**                        |
 | What the user sees          | signed out across the domain | nothing, and a silent re-auth follows |
 
 The sibling recovers without the user seeing anything:
@@ -289,7 +289,7 @@ The sibling recovers without the user seeing anything:
 sequenceDiagram
     autonumber
     participant chat as chat.example.com
-    participant hint as the cookies
+    participant hint as the hint
     participant hr as hr.example.com
     participant IIC as II canister
 
@@ -298,7 +298,7 @@ sequenceDiagram
     chat->>hint: writes the new session's expiry
     hr->>IIC: mints from the chain it holds
     IIC--xhr: no such session
-    hr->>hr: drops its chain, leaves the cookies alone
+    hr->>hr: drops its chain, leaves the hint alone
     hint-->>hr: a session exists, for this account
     hr->>IIC: asks again, rendering nothing
     IIC-->>hr: a chain to the new session
@@ -327,21 +327,21 @@ Both credentials are stored, and what separates them is what is left after one s
 
 When an app delegation lapses, the key it was issued to is deleted, because the key is the half that signs. The chain is kept until a mint replaces it: it authorises nothing once its key is gone, and it is the only record of which account is signed in, since every delegation is rooted at the account's key and nothing else holds one. That is what lets a page loading an hour later say who the user is before it mints. An application that supplies memory-backed leaves for the app half gives that up along with the sharing, and reports a principal only once its first mint lands.
 
-| What           | Where                        | Survives a reload | Removed by                           |
-| -------------- | ---------------------------- | ----------------- | ------------------------------------ |
-| Session chain  | `localStorage`, per origin   | yes               | signing out, and finding out         |
-| Session key    | IndexedDB, non-extractable   | yes               | signing out, and finding out         |
-| App key        | IndexedDB, non-extractable   | yes               | its expiry, replacement, signing out |
-| App delegation | `localStorage`, per origin   | yes               | replacement, and signing out         |
-| The two hints  | cookies scoped to the domain | yes               | signing out only                     |
+| What           | Where                      | Survives a reload | Removed by                           |
+| -------------- | -------------------------- | ----------------- | ------------------------------------ |
+| Session chain  | `localStorage`, per origin | yes               | signing out, and finding out         |
+| Session key    | IndexedDB, non-extractable | yes               | signing out, and finding out         |
+| App key        | IndexedDB, non-extractable | yes               | its expiry, replacement, signing out |
+| App delegation | `localStorage`, per origin | yes               | replacement, and signing out         |
+| The hint       | a cookie or `localStorage` | yes               | signing out only                     |
 
 ### What a sibling reads
 
-A `CookieStorage` wraps a delegation leaf and publishes, to a cookie named for its slot, the principal that chain is rooted at and when it expires. There are two, and a sibling takes one field from each: the account from the app delegation's cookie, the session's expiry from the session's.
+A hint is one record: the account's principal, and when the session expires. It belongs to neither credential — the principal is the root of an app delegation, the expiry comes from the session chain — so it is supplied to `AuthClient` beside the two pairs rather than inside either. The library derives it; the store keeps two fields and knows nothing about chains.
 
-Neither cookie answers on its own. A session chain is rooted at the session's own key, which differs on every origin and identifies nobody; an app delegation expires five minutes from now and says nothing about whether a session exists to re-issue from. Both cookies carry both fields regardless, because one format and one parser are worth more than the two values nobody reads.
+Where that record is kept decides how far it reaches. A cookie reaches every sibling of the domain, which is the point of publishing at all. `localStorage` reaches only this origin, which is still worth doing when the credentials themselves are held in memory: a tab loading with nothing can say who is signed in without waiting on a peer or on a mint. Both are read synchronously, which is what makes either usable — a page load answers before it has awaited anything.
 
-The app delegation's cookie is written to last as long as the session rather than as long as its chain. Left to its own expiry it would be absent for most of a session's life, and a sibling loading then would know a session existed without knowing whose. How long something is worth publishing is not how long it is usable, and a sibling checks the expiry it reads in any case.
+What a hint cannot do is authorise. It carries no chain and no key, so a sibling acting on one asks the identity provider to re-issue rather than treating it as proof.
 
 ### Two kinds of failure, told apart
 
