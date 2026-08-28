@@ -60,7 +60,7 @@ export const actorForIdentity = async (
     return authenticated.actor;
   }
 
-  let record: SessionDelegationRecord | undefined;
+  let record: SessionDelegationRecord | null | undefined;
   try {
     record = await idbGet<SessionDelegationRecord>(
       identityNumber.toString(),
@@ -71,6 +71,11 @@ export const actorForIdentity = async (
   }
 
   if (record === undefined) {
+    return undefined;
+  }
+
+  if (record === null) {
+    void purgeSession(identityNumber);
     return undefined;
   }
 

@@ -135,6 +135,19 @@ describe("actorForIdentity — IDB resolution", () => {
     expect(result).toBeUndefined();
   });
 
+  it("returns undefined and purges when the stored record is null", async () => {
+    await idbSet(IDENTITY_NUMBER.toString(), null, TEST_STORE);
+
+    const { actorForIdentity } =
+      await import("$lib/stores/session-delegation.store");
+    const result = await actorForIdentity(IDENTITY_NUMBER);
+    expect(result).toBeUndefined();
+
+    await vi.runAllTimersAsync();
+    const remaining = await idbGet(IDENTITY_NUMBER.toString(), TEST_STORE);
+    expect(remaining).toBeUndefined();
+  });
+
   it("returns an actor when a valid unexpired record exists in IDB", async () => {
     const keyPair = await makeKeyPair();
     const chainJson = await makeChainJson();
