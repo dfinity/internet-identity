@@ -131,8 +131,8 @@ export type McpFixture = {
    * Publishes `document` at this origin's `/.well-known/ii-app-metadata`, the
    * permissionless document an app — here the MCP server — serves to provide
    * its own display metadata and legal links. Call before navigating to
-   * `/mcp`; an origin that publishes nothing answers 404 (the connect
-   * interceptor's fallthrough), which is what the other tests exercise.
+   * `/mcp`. Without it the origin publishes nothing: the fixture answers the
+   * path 404, which is what every other test exercises.
    */
   serveAppMetadata: (
     page: Page,
@@ -204,8 +204,16 @@ const connectPageHtml = (redeemPath: string): string => `<!doctype html>
 </script>`;
 
 export const test = base.extend<{ mcp: McpFixture }>({
-  // eslint-disable-next-line no-empty-pattern -- playwright fixtures require the destructure
-  mcp: async ({}, use) => {
+  mcp: async ({ page }, use) => {
+    // The connect screen asks the server's origin for its app-metadata
+    // document as soon as it mounts, so every test that reaches `/mcp` makes
+    // that request, including the ones that never install the server stand-in.
+    // Answer it 404 here (an origin that publishes nothing) so no test reaches
+    // the real mcp.id.ai over the network. `serveAppMetadata` and the connect
+    // interceptor register later in the test body and take precedence.
+    await page.route(`${MCP_SERVER_ORIGIN}${APP_METADATA_PATH}`, (route) =>
+      route.fulfill({ status: 404, headers: CORS_HEADERS }),
+    );
     // The server's two per-session keys: X (registration key, public part rides
     // the link) and S (the long-lived session key it wants bound).
     const registrationIdentity = Ed25519KeyIdentity.generate();
@@ -369,7 +377,7 @@ export const test = base.extend<{ mcp: McpFixture }>({
     ): Promise<void> => {
       // Read cross-origin by the II frontend, so it carries CORS headers and
       // the application/json content type, like the allow-list above.
-      // Registered after the connect interceptor so this narrower route wins.
+      // Registered after the fixture's 404 default, so this answer wins.
       await page.route(`${MCP_SERVER_ORIGIN}${APP_METADATA_PATH}`, (route) =>
         route.fulfill({
           status: 200,
