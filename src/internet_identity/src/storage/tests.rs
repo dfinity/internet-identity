@@ -4161,6 +4161,7 @@ mod session_creation_tests {
                 created_at: 1_000,
                 valid_till: 1_000_000,
                 // Device 0 is the stalest live one; device 1 has already expired.
+                max_idle: None,
                 last_refreshed: Some(500_000 + device_id as u64),
                 device_id,
                 read_only: false,
@@ -4266,6 +4267,7 @@ mod session_creation_tests {
                         SessionRecord {
                             created_at: 1,
                             valid_till: 2,
+                            max_idle: None,
                             last_refreshed: None,
                             device_id,
                             read_only: false,
@@ -4274,6 +4276,7 @@ mod session_creation_tests {
                         SessionRecord {
                             created_at: 1_000,
                             valid_till: 100_000_000,
+                            max_idle: None,
                             last_refreshed: Some(500_000),
                             device_id,
                             read_only: false,
@@ -4355,6 +4358,7 @@ mod session_creation_tests {
         let mut sessions = vec![SessionRecord {
             created_at: 1_000,
             valid_till: 100_000_000,
+            max_idle: None,
             last_refreshed: Some(400_000),
             device_id: 1,
             read_only: false,
@@ -4363,6 +4367,7 @@ mod session_creation_tests {
             (2..=MAX_SESSIONS_PER_ANCHOR).map(|device_id| SessionRecord {
                 created_at: 500_000,
                 valid_till: 100_000_000,
+                max_idle: None,
                 last_refreshed: None,
                 device_id,
                 read_only: false,
@@ -4458,6 +4463,7 @@ mod session_creation_tests {
                         // Already expired at `now`, so it is not reused, but it is still
                         // present when the seed for the new record is derived.
                         valid_till: 1_000,
+                        max_idle: None,
                         last_refreshed: None,
                         device_id: 1,
                         read_only: false,
