@@ -5242,9 +5242,10 @@ mod session_revocation_tests {
                 origin: origin.to_string(),
                 account_number: None,
                 device_id,
-                valid_till: u64::MAX,
+                valid_till_ns: u64::MAX,
+                max_idle_ns: None,
                 read_only: false,
-                now,
+                now_ns: now,
             })
             .unwrap();
     }

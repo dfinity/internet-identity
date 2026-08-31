@@ -1959,7 +1959,7 @@ impl<M: Memory + Clone> Storage<M> {
         let dropped: Vec<SessionRecord> = reference
             .sessions
             .iter()
-            .filter(|session| session.created_at == created_at)
+            .filter(|session| session.created_at_ns == created_at)
             .cloned()
             .collect();
         if dropped.is_empty() {
@@ -1967,7 +1967,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
         reference
             .sessions
-            .retain(|session| session.created_at != created_at);
+            .retain(|session| session.created_at_ns != created_at);
 
         self.write_reference_list(anchor_number, application_number, references)?;
         self.unindex_sessions(anchor_number, application_number, account_number, &dropped);
