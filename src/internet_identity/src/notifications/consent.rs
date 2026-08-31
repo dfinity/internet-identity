@@ -140,6 +140,11 @@ pub async fn grant_consent(
     authorize_update(anchor_number)?;
     let now_ns = ic_cdk::api::time();
     let recipient = recipient_principal(anchor_number, &origin, account_number)?;
+    // Bind the origin's senders first: if its well-known can't be fetched and
+    // parsed (unreachable, served on a different gateway, or lists no senders),
+    // the app could never actually send, so refuse the grant rather than record
+    // a consent that silently can't deliver.
+    fetch_and_cache(origin.clone(), now_ns).await?;
     set_consent(
         anchor_number,
         origin.clone(),
@@ -148,7 +153,6 @@ pub async fn grant_consent(
         now_ns,
     )?;
     seal_devices_for_origin(anchor_number, &origin, now_ns).await;
-    fetch_and_cache(origin, now_ns).await;
     Ok(())
 }
 
