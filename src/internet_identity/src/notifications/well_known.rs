@@ -16,22 +16,29 @@ struct SendersDoc {
 }
 
 /// Fetch the origin's well-known senders and record a `(canister, origin)`
-/// binding for each. Best-effort: any failure leaves the bindings unchanged, and
-/// a send from an unbound canister is rejected until a later consent refetches.
+/// binding for each. Errors if the list can't be fetched or parsed, or names no
+/// valid sender, so a consent grant that depends on it fails rather than
+/// recording a consent no sender can deliver against.
 #[cfg(not(test))]
-pub async fn fetch_and_cache(origin: FrontendHostname, now_ns: Timestamp) {
-    let Ok(senders) = fetch_senders(&origin).await else {
-        return;
-    };
+pub async fn fetch_and_cache(origin: FrontendHostname, now_ns: Timestamp) -> Result<(), String> {
+    let senders = fetch_senders(&origin).await?;
+    let mut bound = 0;
     for text in senders {
         if let Ok(sender) = candid::Principal::from_text(&text) {
             bind_sender(sender, origin.clone(), now_ns);
+            bound += 1;
         }
     }
+    if bound == 0 {
+        return Err("origin lists no valid notification senders".to_string());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
-pub async fn fetch_and_cache(_origin: FrontendHostname, _now_ns: Timestamp) {}
+pub async fn fetch_and_cache(_origin: FrontendHostname, _now_ns: Timestamp) -> Result<(), String> {
+    Ok(())
+}
 
 #[cfg(not(test))]
 async fn fetch_senders(origin: &str) -> Result<Vec<String>, String> {
