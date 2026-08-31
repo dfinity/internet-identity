@@ -323,9 +323,11 @@ A mint that fails leaves the stored session credential exactly as it was, except
 The principal a caller sees does not change when a delegation is replaced. `app_prepare_delegation` roots every delegation at the account's key, so successive mints agree. A mint whose `user_key` does not match the principal already established is a failed mint, and its delegation is not adopted.
 
 **MINT-17.**
-`getPrincipal()` never triggers a mint and is answered from the state, synchronously, returning `undefined` where no record exists. The account principal is part of the state rather than something derived from whatever material happens to be held, so a page load reports who is signed in without opening a store and without waiting for either mint of MINT-13.
+`getPrincipal()` never triggers a mint and is answered from the state, synchronously. The account principal is part of the state rather than something derived from whatever material happens to be held, so a page load reports who is signed in without opening a store and without waiting for either mint of MINT-13.
 
-It answers for an expired record too, because such a record still names the account it belonged to and that is what lets an application word "your session ended, sign back in" for a person rather than for nobody. Telling a live record from a spent one is API-2's job, not this one's.
+It answers exactly where `isAuthenticated()` answers `true`, and `undefined` everywhere else — so the two can never disagree. A principal returned here means calls made as it will be accepted, which is what makes `if (getPrincipal())` mean what it looks like it means; an expired record therefore answers `undefined` even though it still names an account, and so does a record naming an account this origin holds nothing for. Returning one in either case would hand an application permission it does not have, which is the same hazard as API-5's anonymous identity in a different shape.
+
+Nothing is lost by the narrowness: API-2 carries the account principal in the `expired` and `signed-in-elsewhere` cases, with the status beside it, so an application saying whose session ended reads it there and cannot mistake it for permission to act.
 
 ## Failure
 
