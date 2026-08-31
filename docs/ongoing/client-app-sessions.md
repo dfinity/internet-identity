@@ -39,12 +39,13 @@ The library cannot call II's session methods at all, so the canister work has no
 
 Three nested lifetimes, and two marks near the end of a delegation.
 
-| Duration                | Value                          | Set by                                                                                 | What it bounds                                                      |
-| ----------------------- | ------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Session lifetime        | 10 minutes to 30 days          | the app requests a ceiling, the user chooses at consent, an SSO cap narrows, II clamps | how long anything can be minted at all                              |
-| App delegation lifetime | `min(5 minutes, session left)` | II, and not requestable                                                                | how long one delegation signs an app's calls                        |
-| Pre-mint threshold      | 15 seconds before expiry       | this library                                                                           | when a refresh is scheduled, and when a request mints behind itself |
-| Block margin            | 10 seconds before expiry       | this library                                                                           | below this a request waits for a mint                               |
+| Duration                | Value                               | Set by                                                                                 | What it bounds                                                      |
+| ----------------------- | ----------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Session lifetime        | 10 minutes to 30 days               | the app requests a ceiling, the user chooses at consent, an SSO cap narrows, II clamps | how long anything can be minted at all                              |
+| Requested ceiling       | 8 hours where the app asks for none | this library                                                                           | what the ceiling above is, for an app that sets nothing             |
+| App delegation lifetime | `min(5 minutes, session left)`      | II, and not requestable                                                                | how long one delegation signs an app's calls                        |
+| Pre-mint threshold      | 15 seconds before expiry            | this library                                                                           | when a refresh is scheduled, and when a request mints behind itself |
+| Block margin            | 10 seconds before expiry            | this library                                                                           | below this a request waits for a mint                               |
 
 ### Two keys, one of them private to the library
 
@@ -70,7 +71,9 @@ Keeping one app key and replacing only its delegation is the closest of the thre
 
 `signIn()` asks for a session rather than a long-lived delegation, and stores the chain it gets back.
 
-An application can say how long it is willing for that session to last, and `maxTimeToLive` keeps meaning what it meant for a delegation, which is the longest the thing being granted may live. It is a ceiling rather than a request, since what the user picks at consent wins over it, an organization's cap narrows it further, and the canister clamps the result. What an application cannot ask for is an access level, which is the user's alone. Because the chain is restricted to the II canister, a copy of it is worth nothing against the app's own canisters, and it is only useful to whoever can also reach II and mint.
+An application can say how long it is willing for that session to last, and `maxTimeToLive` keeps meaning what it meant for a delegation, which is the longest the thing being granted may live. It is a ceiling rather than a request, since what the user picks at consent wins over it, an organization's cap narrows it further, and the canister clamps the result.
+
+An application that says nothing gets 8 hours, which is the value this option already defaulted to when it capped a delegation. Keeping it is a decision rather than an oversight: a session is a longer-lived thing than the delegation this replaces, and starting it at the same length the library already asked for means nobody's sign-in silently grows to thirty days on upgrade. The number is expected to rise once sessions have run in production, as a release of its own. What an application cannot ask for is an access level, which is the user's alone. Because the chain is restricted to the II canister, a copy of it is worth nothing against the app's own canisters, and it is only useful to whoever can also reach II and mint.
 
 ### Minting
 

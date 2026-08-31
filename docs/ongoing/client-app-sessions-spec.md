@@ -6,12 +6,13 @@
 
 ## Constants
 
-| Constant                | Value                      | Set by                                             |
-| ----------------------- | -------------------------- | -------------------------------------------------- |
-| App delegation lifetime | 5 minutes, not requestable | `APP_DELEGATION_TTL_NS`, enforced by the canister  |
-| Session lifetime        | 10 minutes to 30 days      | requested as a ceiling, chosen at consent, clamped |
-| Block margin            | 10 seconds                 | this library                                       |
-| Pre-mint threshold      | 15 seconds                 | this library                                       |
+| Constant                   | Value                      | Set by                                             |
+| -------------------------- | -------------------------- | -------------------------------------------------- |
+| App delegation lifetime    | 5 minutes, not requestable | `APP_DELEGATION_TTL_NS`, enforced by the canister  |
+| Session lifetime           | 10 minutes to 30 days      | requested as a ceiling, chosen at consent, clamped |
+| Requested ceiling, default | 8 hours                    | this library, where an application asks for none   |
+| Block margin               | 10 seconds                 | this library                                       |
+| Pre-mint threshold         | 15 seconds                 | this library                                       |
 
 The rest of the document uses these names and restates no value. Four more are fixed strings:
 
@@ -69,10 +70,14 @@ Both pending slots are written before anything shared is, and both are settled a
 `signIn()` requests a session with `ii_session_delegation`. Nothing checks first whether the provider offers it: this library is for Internet Identity, and a provider that cannot answer is a failed sign-in rather than a case to fall back from.
 
 **ACQ-2.**
-The request carries a session public key, a `maxTimeToLive` where the application sets one, and a derivation origin where it configured one. It carries no access level, which is the user's alone to decide at consent.
+The request carries a session public key, a `maxTimeToLive`, and a derivation origin where the application configured one. It carries no access level, which is the user's alone to decide at consent.
+
+A ceiling is always sent, so the canister's own default is not reached from here. That is deliberate for this release: see ACQ-3.
 
 **ACQ-3.**
-`maxTimeToLive` is sent as the requested ceiling where an application set one. What is granted is decided by the canister, within the session lifetime above. An application asking for less than the minimum therefore gets the minimum, and one asking for more than it is offered gets what it is offered.
+`maxTimeToLive` is sent as the requested ceiling, and where the application sets none the library sends 8 hours. What is granted is decided by the canister, within the session lifetime above. An application asking for less than the minimum therefore gets the minimum, and one asking for more than it is offered gets what it is offered.
+
+The 8 hours is inherited: it was this option's default when the option capped a delegation, and it is kept while sessions are new. So an application that asks for nothing gets an 8-hour session rather than the 30 days the canister would default to, and the number is expected to rise in a later release once sessions have run in production. Two things follow, and neither is an accident. The client's default is the binding one until then, and raising it is a change to this line and nothing else — the option's meaning, its units and its clamp are all unchanged.
 
 **ACQ-4.**
 The returned chain is rejected unless its `targets` name the configured II canister and nothing else, per AGENT-5. A chain without that restriction is not a session chain, and treating one as a session would give the library something it could sign arbitrary calls with. Acquisition mints before it resolves, so the check runs there too.
