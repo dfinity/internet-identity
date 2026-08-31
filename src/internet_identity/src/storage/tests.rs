@@ -4025,10 +4025,10 @@ mod session_creation_tests {
             origin: ORIGIN.to_string(),
             account_number: None,
             device_id,
-            valid_till: now + 10_000,
-            max_idle: None,
+            valid_till_ns: now + 10_000,
+            max_idle_ns: None,
             read_only: false,
-            now,
+            now_ns: now,
         }
     }
 
@@ -4059,13 +4059,13 @@ mod session_creation_tests {
 
         let session = storage
             .create_session(CreateSessionParams {
-                max_idle: Some(asked),
-                valid_till: DAY_NS,
+                max_idle_ns: Some(asked),
+                valid_till_ns: DAY_NS,
                 ..params(anchor_number, 1, 0)
             })
             .unwrap();
 
-        assert_eq!(session.max_idle, Some(asked));
+        assert_eq!(session.max_idle_ns, Some(asked));
     }
 
     #[test]
@@ -4074,15 +4074,15 @@ mod session_creation_tests {
 
         let session = storage
             .create_session(CreateSessionParams {
-                max_idle: Some(MINUTE_NS),
-                valid_till: DAY_NS,
+                max_idle_ns: Some(MINUTE_NS),
+                valid_till_ns: DAY_NS,
                 ..params(anchor_number, 1, 0)
             })
             .unwrap();
 
         // An app delegation lasts five minutes, so a bound under that would end a
         // session between two mints of one that is plainly in use.
-        assert_eq!(session.max_idle, Some(MIN_SESSION_IDLE_NS));
+        assert_eq!(session.max_idle_ns, Some(MIN_SESSION_IDLE_NS));
     }
 
     #[test]
@@ -4091,15 +4091,15 @@ mod session_creation_tests {
 
         let session = storage
             .create_session(CreateSessionParams {
-                max_idle: Some(400 * DAY_NS),
-                valid_till: DAY_NS,
+                max_idle_ns: Some(400 * DAY_NS),
+                valid_till_ns: DAY_NS,
                 ..params(anchor_number, 1, 0)
             })
             .unwrap();
 
         // A bound it could never reach says something about the session that is not
         // true, so it is stored as the life the session actually got.
-        assert_eq!(session.max_idle, Some(DAY_NS));
+        assert_eq!(session.max_idle_ns, Some(DAY_NS));
     }
 
     #[test]
@@ -4110,7 +4110,7 @@ mod session_creation_tests {
             .create_session(params(anchor_number, 1, 1_000))
             .unwrap();
 
-        assert_eq!(session.max_idle, None);
+        assert_eq!(session.max_idle_ns, None);
         assert!(!session.is_idle(1_000 + 400 * DAY_NS));
     }
 
@@ -4122,9 +4122,9 @@ mod session_creation_tests {
             .create_session(params(anchor_number, 1, 1_000))
             .unwrap();
 
-        assert_eq!(session.created_at, 1_000);
-        assert_eq!(session.valid_till, 11_000);
-        assert_eq!(session.last_refreshed, None);
+        assert_eq!(session.created_at_ns, 1_000);
+        assert_eq!(session.valid_till_ns, 11_000);
+        assert_eq!(session.last_refreshed_ns, None);
         assert_eq!(session.device_id, 1);
         assert_eq!(sessions_of(&storage, anchor_number), vec![session]);
     }
@@ -4142,7 +4142,7 @@ mod session_creation_tests {
             .create_session(params(anchor_number, 1, 5_000))
             .unwrap();
 
-        assert_ne!(again.created_at, first.created_at);
+        assert_ne!(again.created_at_ns, first.created_at_ns);
         assert_eq!(sessions_of(&storage, anchor_number).len(), 1);
     }
 
@@ -4185,7 +4185,7 @@ mod session_creation_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         for device_id in 0..12u32 {
             let mut p = params(anchor_number, device_id, 1_000);
-            p.valid_till = 1_000_000;
+            p.valid_till_ns = 1_000_000;
             storage.create_session(p).unwrap();
         }
 
@@ -4276,12 +4276,12 @@ mod session_creation_tests {
                     account_number: None,
                     last_used: Some(1),
                     sessions: vec![SessionRecord {
-                        created_at: 1_000,
+                        created_at_ns: 1_000,
                         // Already expired at `now`, so it is not reused, but it is still
                         // present when the seed for the new record is derived.
-                        valid_till: 1_000,
-                        max_idle: None,
-                        last_refreshed: None,
+                        valid_till_ns: 1_000,
+                        max_idle_ns: None,
+                        last_refreshed_ns: None,
                         device_id: 1,
                         read_only: false,
                     }],
@@ -4294,7 +4294,7 @@ mod session_creation_tests {
         let created = storage
             .create_session(params(anchor_number, 1, 1_000))
             .unwrap();
-        assert_eq!(created.created_at, 1_000);
+        assert_eq!(created.created_at_ns, 1_000);
     }
 
     /// Creating twice from one browser at one account replaces, so there is never a second
@@ -4307,10 +4307,10 @@ mod session_creation_tests {
             origin: ORIGIN.to_string(),
             account_number: None,
             device_id: 1,
-            valid_till: u64::MAX,
-            max_idle: None,
+            valid_till_ns: u64::MAX,
+            max_idle_ns: None,
             read_only,
-            now: 1_000,
+            now_ns: 1_000,
         };
 
         let first = storage.create_session(params(false)).unwrap();
@@ -4429,13 +4429,13 @@ mod session_consent_change_tests {
                 origin: ORIGIN.to_string(),
                 account_number: None,
                 device_id: 1,
-                valid_till: u64::MAX,
-                max_idle: None,
+                valid_till_ns: u64::MAX,
+                max_idle_ns: None,
                 read_only,
-                now,
+                now_ns: now,
             })
             .unwrap()
-            .created_at
+            .created_at_ns
     }
 
     fn sessions(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> Vec<bool> {
@@ -4496,10 +4496,10 @@ mod session_consent_change_tests {
                 origin: ORIGIN.to_string(),
                 account_number: None,
                 device_id: 2,
-                valid_till: u64::MAX,
-                max_idle: None,
+                valid_till_ns: u64::MAX,
+                max_idle_ns: None,
                 read_only: false,
-                now: 1_000,
+                now_ns: 1_000,
             })
             .unwrap();
         create(&mut storage, anchor_number, false, 1_000);

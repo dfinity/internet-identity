@@ -1847,7 +1847,7 @@ impl<M: Memory + Clone> Storage<M> {
         let seed = calculate_session_seed_with_salt(
             &salt,
             &account.calculate_seed_with_salt(&salt),
-            session.created_at,
+            session.created_at_ns,
             session.device_id,
         );
         Some(canister_sig_principal(canister_id(), seed.to_vec()))
@@ -1950,18 +1950,19 @@ impl<M: Memory + Clone> Storage<M> {
             origin,
             account_number,
             device_id,
-            valid_till,
-            max_idle,
+            valid_till_ns,
+            max_idle_ns,
             read_only,
-            now,
+            now_ns,
         } = params;
 
         // Clamped here rather than at the caller, so every path that creates a session
         // gets the same range whatever it asked for. The ceiling is the life this
         // session was actually granted: a bound longer than that could never be reached,
         // and storing one would say something about the session that is not true.
-        let max_idle = max_idle
-            .map(|requested| requested.clamp(MIN_SESSION_IDLE_NS, valid_till.saturating_sub(now)));
+        let max_idle_ns = max_idle_ns.map(|requested| {
+            requested.clamp(MIN_SESSION_IDLE_NS, valid_till_ns.saturating_sub(now_ns))
+        });
 
         // The row this session lands in has to exist first, but an existing one must not be
         // written here: the single write at the end of this function carries `last_used`.
@@ -1985,7 +1986,7 @@ impl<M: Memory + Clone> Storage<M> {
                 self.write_reference_list(
                     anchor_number,
                     application_number,
-                    vec![AccountReference::new(None, Some(now))],
+                    vec![AccountReference::new(None, Some(now_ns))],
                 )?;
                 self.evict_idle_tracked_defaults(anchor_number, application_number)?;
                 application_number
@@ -2009,7 +2010,7 @@ impl<M: Memory + Clone> Storage<M> {
                 anchor_number,
                 name: String::new(),
             })?;
-        reference.last_used = Some(now);
+        reference.last_used = Some(now_ns);
 
         // A ceremony replaces whatever this browser held here, rather than reusing it: the
         // copy of an old session's chain stops working at the user's next sign-in instead of
@@ -2024,10 +2025,10 @@ impl<M: Memory + Clone> Storage<M> {
         });
 
         let session = SessionRecord {
-            created_at: now,
-            valid_till,
-            max_idle,
-            last_refreshed: None,
+            created_at_ns: now_ns,
+            valid_till_ns,
+            max_idle_ns,
+            last_refreshed_ns: None,
             device_id,
             read_only,
         };
@@ -2039,7 +2040,7 @@ impl<M: Memory + Clone> Storage<M> {
         for reference in references.iter_mut() {
             let account_number = reference.account_number;
             reference.sessions.retain(|session| {
-                if session.is_expired(now) {
+                if session.is_expired(now_ns) {
                     dropped.push((account_number, session.clone()));
                     return false;
                 }
@@ -2065,7 +2066,7 @@ impl<M: Memory + Clone> Storage<M> {
                 StorableSessionHandle {
                     account_principal: account_principal.as_slice().to_vec(),
                     device_id,
-                    created_at: session.created_at,
+                    created_at: session.created_at_ns,
                 },
             );
         }
@@ -3236,12 +3237,10 @@ pub struct CreateSessionParams {
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
     pub device_id: SessionDeviceId,
-    pub valid_till: Timestamp,
-    /// How long the session may go unused, as the application asked for it. Clamped
-    /// on the way in; `None` asks for no bound beyond `valid_till`.
-    pub max_idle: Option<u64>,
+    pub valid_till_ns: Timestamp,
+    pub max_idle_ns: Option<u64>,
     pub read_only: bool,
-    pub now: Timestamp,
+    pub now_ns: Timestamp,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
