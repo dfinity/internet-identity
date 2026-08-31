@@ -42,8 +42,9 @@ export interface AppAccountRecord {
 const APP_SESSION_STORE = createStore("ii-app-sessions", "sessions");
 const APP_ACCOUNT_STORE = createStore("ii-app-accounts", "accounts");
 
-// Treat the last 5 minutes as already expired, so a session is never served that
-// expires between the check here and validation on the IC.
+// A session with less than an app delegation's life left cannot back even one, so
+// serving it would answer a silent request with a sign-in that dies unexplained a
+// moment later. The canister's own APP_DELEGATION_TTL_NS is the same five minutes.
 const EXPIRY_MARGIN_MS = 5 * 60 * 1000;
 
 interface SessionKey {
