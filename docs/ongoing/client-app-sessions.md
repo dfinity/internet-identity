@@ -304,6 +304,14 @@ flowchart TD
 
 A request that needs a delegation now queues on the same lock rather than jumping it. Waiting costs at most the mint it would have spent anyway, and often ends with another tab's delegation instead.
 
+##### Why not a channel
+
+Tabs messaging each other was built first, and dropped. A `BroadcastChannel` carried an ask and an offer: a tab starting up asked, whoever had a credential answered with the key pair — which survives a structured clone as a handle that signs and cannot be exported — and the chain as JSON beside it.
+
+It works, and it costs more than it buys. Asking only pays off when somebody answers, so a tab has to decide how long to wait before minting anyway, and the answer is a timeout: too short and the saving disappears, too long and every cold start is slower for the sake of a mint. Sharing through the store has no such number in it, because reading is immediate and the lock is what the tabs wait on rather than each other. The channel also has to be told about every event that could invalidate what it offered, whereas a store is read at the moment of use and cannot be stale.
+
+What is left of the idea is one boolean. A store that says `shared` is one whose medium another tab can read, and a channel-backed store — a `Map` plus a channel behind the same interface — is a coherent way to build one for an environment with no durable medium. That is the entry the storage table marks as unbuilt: the mechanism moved behind the interface, so the library no longer owns a channel and an application that wants one supplies a store.
+
 Signing out is the exception that does not queue. A mint already inside the lock would otherwise finish and write its pair after the sign-out had cleared everything, leaving a credential behind for a session that no longer exists. So signing out takes the lock away: the holder's lock is released immediately and the signal it was given is aborted, and that tab finishes the call it cannot cancel, sees the abort, and drops the result rather than storing it. What it costs is one wasted mint, and a refresh stamp on a session being revoked in the same moment.
 
 ### Signing out is not the same as finding out
