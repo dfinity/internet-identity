@@ -129,7 +129,6 @@ SessionRecord {
     created_at: Timestamp,
     valid_till: Timestamp,
     max_idle: Duration,                 // how long it may outlive its use
-    resumable: bool,                    // may a silent re-auth resolve to it
     last_refreshed: Option<Timestamp>,  // None until the first refresh
     device_id: SessionDeviceId,
     read_only: bool,                    // from the consent that created it
@@ -138,7 +137,9 @@ SessionRecord {
 
 Nothing else. Every field except `last_refreshed` is fixed for the session's life, which is also why `last_refreshed` is the only one absent from the seed ([session identity](#session-identity)).
 
-`max_idle` and `resumable` are the two things an application asks for that outlive the ceremony. Both are covered below: [a session that outlives its use](#a-session-that-outlives-its-use) and [resumability](#resumability).
+`max_idle` is the one thing this record did not previously carry that an application asks for: see [a session that outlives its use](#a-session-that-outlives-its-use).
+
+Whether a sign-in can be resumed without a ceremony is deliberately not here. The frontend holds the keypairs a silent re-auth needs, so the candidates are the records **it** keeps — a session it has forgotten is simply not among them, and there is nothing for the canister to store or check. [silent-reauth-redirect-spec.md](silent-reauth-redirect-spec.md) covers it.
 
 `read_only` is here rather than being a per-call argument because it describes what the session authorizes, so it has to be part of what a user sees and revokes. Same as MCP's grant.
 
@@ -168,20 +169,6 @@ The range is 10 minutes to the session's own granted length, and an application 
 What the canister sees is mints, so "idle" here means no app delegation has been asked for. That is a narrower thing than a user being away, and it is the client's job to keep the two aligned: [client-app-sessions.md](client-app-sessions.md) has a browser mint on real user activity, so a present user with a quiet application still refreshes. Without that half, an application whose user is reading rather than clicking would be ended while they watched.
 
 It replaces a timeout the client used to enforce alone. A timer in a page cannot be relied on — clearing storage or running where it does not fire simply skips it — and it saw one document, so a backgrounded tab signed out a user working in the tab beside it. Here it is enforced, and because a session belongs to a browser rather than a document it covers every tab of that browser at once.
-
-### Resumability
-
-`resumable` says whether a silent re-auth may resolve to this session. It is asked for at the ceremony and fixed for the session's life.
-
-An application that keeps nothing locally has, until now, still had its sign-in kept here — so "nothing reaches disk" was true of that application's origin and false of the sign-in, and a `prompt=none` would hand the whole thing back. `resumable: false` is how an application says it means it.
-
-What it does **not** do is remove the record. The session still exists, still mints for the browser holding its chain, and is still bounded by `valid_till` and `max_idle`. What changes is that nothing can find it again: a silent re-auth passes it over as though it were not there.
-
-Two consequences worth stating.
-
-A silent re-auth that does resolve inherits the resumability of the session it resolved from, rather than taking it from the request. Otherwise a domain whose siblings each acquire their own would have to ask for it on every one of them, and forgetting it on a single origin would end resumption one hop later, for reasons nobody could see.
-
-And what Internet Identity's frontend keeps is split in two: the account mapping — principal to anchor, account and origin — separately from the session key and its delegation. `resumable: false` drops the second and keeps the first, so a `hint` still resolves after the session has gone. The application gets an interactive sign-in aimed at the right account rather than an account picker, which is the difference between _this sign-in may return_ and _we still know who you were_.
 
 ### Finding a session from a call
 
@@ -1104,20 +1091,19 @@ created, how an app uses it, how it ends, and how browsers are tracked.
 | NEW-6 | The canister MUST sign the session to a key the II frontend holds and cannot export, and the frontend MUST extend the chain to the key the app supplies.                                                                                                      |
 | NEW-7 | The app's hop MUST be restricted to the II canister.                                                                                                                                                                                                          |
 | NEW-8 | The request MUST NOT name an account number, and no app-facing method MAY accept one.                                                                                                                                                                         |
-| NEW-9 | A request MAY carry an idle bound and a resumability flag. Both MUST be stored on the record and fixed for its life, and the idle bound MUST be clamped to the range above.                                                                                   |
+| NEW-9 | A request MAY carry an idle bound. It MUST be stored on the record, fixed for its life, and clamped to the range above.                                                                                                                                       |
 
 ### Using a session
 
-| #     | Requirement                                                                                                                                                                                                                       |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| USE-1 | An app MUST NOT name an account, in an argument or an attachment. The canister MUST identify the session from `caller()` alone, and the account from that session.                                                                |
-| USE-2 | Nothing an app receives or attaches may carry the identity number, the application number or the account number.                                                                                                                  |
-| USE-3 | The canister MUST resolve `caller()` through the session index, and MUST treat the absence of an entry as no usable session.                                                                                                      |
-| USE-4 | A minted delegation MUST expire after five minutes, or with the session if that is sooner. The ceiling MUST be derived by the canister, not taken from the request.                                                               |
-| USE-5 | Every refresh MUST stamp the session, the account reference, and the browser.                                                                                                                                                     |
-| USE-6 | Refresh MUST NOT require a browser, navigation, popup or iframe.                                                                                                                                                                  |
-| USE-7 | Resolving a session MUST treat one whose last refresh is older than its idle bound as no usable session, on the same terms as one past `valid_till`. A session never refreshed is measured from its creation.                     |
-| USE-8 | A silent re-auth MUST pass over a session that is not resumable, and MUST NOT report its existence by any other route. A session it does resolve MUST inherit that session's resumability rather than taking it from the request. |
+| #     | Requirement                                                                                                                                                                                                   |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| USE-1 | An app MUST NOT name an account, in an argument or an attachment. The canister MUST identify the session from `caller()` alone, and the account from that session.                                            |
+| USE-2 | Nothing an app receives or attaches may carry the identity number, the application number or the account number.                                                                                              |
+| USE-3 | The canister MUST resolve `caller()` through the session index, and MUST treat the absence of an entry as no usable session.                                                                                  |
+| USE-4 | A minted delegation MUST expire after five minutes, or with the session if that is sooner. The ceiling MUST be derived by the canister, not taken from the request.                                           |
+| USE-5 | Every refresh MUST stamp the session, the account reference, and the browser.                                                                                                                                 |
+| USE-6 | Refresh MUST NOT require a browser, navigation, popup or iframe.                                                                                                                                              |
+| USE-7 | Resolving a session MUST treat one whose last refresh is older than its idle bound as no usable session, on the same terms as one past `valid_till`. A session never refreshed is measured from its creation. |
 
 ### Ending a session
 
