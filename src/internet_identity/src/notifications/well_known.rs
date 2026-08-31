@@ -78,14 +78,17 @@ async fn fetch_senders(origin: &str) -> Result<Vec<String>, String> {
     Ok(doc.senders)
 }
 
-// Nodes can receive the sender list in any order, so sort it for a deterministic
-// response every node agrees on. Traps on a bad status/body — a transform can't
-// return an error.
+// The response must come back byte-identical on every node or the replicated
+// outcall never reaches consensus, so this rebuilds it from scratch — fixed
+// status, no headers (a gateway's `Date` and request ids differ per node), and
+// the sender list sorted, since nodes can receive it in any order. Traps on a
+// bad status/body: a transform can't return an error.
 #[cfg(not(test))]
 #[allow(clippy::needless_pass_by_value)]
 fn transform_senders(
     response: ic_cdk::api::management_canister::http_request::HttpResponse,
 ) -> ic_cdk::api::management_canister::http_request::HttpResponse {
+    use candid::Nat;
     use ic_cdk::api::management_canister::http_request::HttpResponse;
     use ic_cdk::trap;
 
@@ -98,5 +101,9 @@ fn transform_senders(
     doc.senders.sort();
     let body =
         serde_json::to_vec(&doc).unwrap_or_else(|_| trap("well-known senders: invalid JSON"));
-    HttpResponse { body, ..response }
+    HttpResponse {
+        status: Nat::from(HTTP_STATUS_OK),
+        headers: vec![],
+        body,
+    }
 }
