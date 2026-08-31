@@ -16,6 +16,7 @@ import { authenticationStore } from "$lib/stores/authentication.store";
 import {
   appSessionsForOrigin,
   discardAppSession,
+  rememberAppAccount,
   storeAppSession,
   type AppSessionRecord,
 } from "$lib/stores/app-session.store";
@@ -224,7 +225,7 @@ export const handleSessionDelegationRequest =
           params.icrc95DerivationOrigin ?? channel.origin,
         );
 
-        const { prompt, hint } = get(authorizationPromptStore);
+        const { prompt, hint, resumable } = get(authorizationPromptStore);
         // Silence is something an app asks for. Anything else, an absent `prompt` included,
         // runs the ceremony, so a held session is never handed over without the user
         // seeing a screen they did not request.
@@ -232,10 +233,7 @@ export const handleSessionDelegationRequest =
           prompt === "none" ? await appSessionsForOrigin(effectiveOrigin) : [];
         const chosen = chooseSilentSession({ held, hint });
 
-        let usable =
-          "record" in chosen
-            ? held.find((entry) => entry.record === chosen.record)
-            : undefined;
+        let usable = "session" in chosen ? chosen.session : undefined;
         if (usable && !(await sessionIsLive(usable.record))) {
           await discardAppSession({
             identityNumber: usable.identityNumber,
@@ -268,6 +266,7 @@ export const handleSessionDelegationRequest =
         const created = await createSession(
           effectiveOrigin,
           params.maxTimeToLive,
+          resumable === true,
         );
         const chain = await extendToApp(
           created.record,
@@ -294,6 +293,7 @@ export const handleSessionDelegationRequest =
 const createSession = async (
   effectiveOrigin: string,
   requestedMaxTimeToLive: bigint | undefined,
+  resumable: boolean,
 ): Promise<{ record: AppSessionRecord }> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
   const authorized = await waitForStore(authorizedStore);
@@ -379,8 +379,14 @@ const createSession = async (
     expiresAtMillis: Number(prepared.expiration / BigInt(1_000_000)),
     createdAtNanos: prepared.created_at,
     accessLevel: authorized.accessLevel,
-    accountPrincipal: prepared.account_principal.toText(),
   };
-  await storeAppSession(key, record);
+  // The mapping is not a credential and is kept either way, so a later hint still names
+  // an account this browser has seen. The session is what an app has to ask to have kept.
+  await rememberAppAccount(key, {
+    accountPrincipal: prepared.account_principal.toText(),
+  });
+  if (resumable) {
+    await storeAppSession(key, record);
+  }
   return { record };
 };
