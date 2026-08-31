@@ -148,6 +148,8 @@ A credential store declares two facts about its medium, and only it can:
 | `MemoryCredentialStorage`       | false    | false     |
 | `SharedMemoryCredentialStorage` | true     | false     |
 
+`SharedMemoryCredentialStorage` is specified and not built. It is the one entry here with no shipping implementation, kept because it is what the `shared`/`durable` split is for and because the two axes are otherwise indistinguishable from one; an application wanting it supplies its own.
+
 `shared` is whether another tab of this origin reads what it writes; `durable` is whether it survives this document being torn down. The axes are independent — shared without durable is the channel-backed store, and durable without shared is a `sessionStorage`-backed one nothing ships but which is coherent. Both are required rather than optional: the safe default for either would be the counter-intuitive one, since a store that stays silent about being shared costs a mint in every tab.
 
 **STORE-8.**

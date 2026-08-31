@@ -409,9 +409,17 @@ A mint returning `NoMatchingSession` is how the library finds out, which is why 
 
 ## Implementation stages
 
-1. **Mint app delegations from a session chain.**
-   The refreshing identity, its failure classification, and the shared in-flight mint. Nothing produces a session chain yet, so this changes no behaviour and is safe to release on its own.
-2. **Acquire a session at sign-in, and publish the session's expiry to a sibling.**
-   This is the stage that turns the feature on, and the two parts belong together: what a sibling reads becomes wrong the moment a five-minute delegation is all that is published.
-3. **Revoke at sign-out.**
-   Harmless before stage 2 and only meaningful after it.
+The order below is what the stack in [dfinity/icp-js-auth](https://github.com/dfinity/icp-js-auth) is built in, each stage releasable on its own. It starts at the bottom of the design rather than the top: storage is what everything else is expressed in, so the stages that only rearrange it come before the ones that change what the library does.
+
+| Stage                                                     | Turns anything on?                            |
+| --------------------------------------------------------- | --------------------------------------------- |
+| The state as a record with a store of its own             | no — replaces a hardcoded `localStorage` key  |
+| A key and its delegation as one credential, under slots   | no                                            |
+| An identity that replaces its own delegation as it ages   | no — nothing produces a session chain yet     |
+| Minting against the II canister                           | no — nothing calls it yet                     |
+| Acquiring a session at sign-in, and revoking at sign-out  | **yes**                                       |
+| Minting when a tab comes back                             | no — changes when a mint happens, not whether |
+| The state in a cookie, shared across siblings             | **yes**                                       |
+| Acquiring without a ceremony, for a sibling that has none | **yes**                                       |
+
+Two things about the shape. Revoking rides with acquiring rather than following it, because it is a revoke call, a lock steal and an ordering rule read together with the sign-in it undoes, and there is nothing to revoke before that stage. And the cookie comes after minting on foreground rather than before, because it is the cookie that makes the second silent-acquisition path reachable: an origin with the state and no credentials only exists once the state can cross an origin.
