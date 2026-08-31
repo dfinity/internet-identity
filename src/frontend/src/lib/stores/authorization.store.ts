@@ -36,6 +36,7 @@ const authorizedInternal = writable<Authorized | undefined>();
 export type AuthorizationPromptContext = {
   prompt?: "none" | "login";
   hint?: string;
+  resumable?: boolean;
 };
 
 /** Kept out of `AuthorizationContext`, whose presence is what makes the sign-in UI

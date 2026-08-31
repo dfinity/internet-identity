@@ -3,6 +3,7 @@ import { z } from "zod";
 
 export const PROMPT_PARAM = "prompt";
 export const HINT_PARAM = "hint";
+export const RESUMABLE_PARAM = "resumable";
 
 /** Survives the round trip an interactive flow may take through an IdP. */
 const STORAGE_KEY = "ii-authorize-prompt";
@@ -12,6 +13,10 @@ export type AuthorizationPrompt = "none" | "login";
 export interface PromptContext {
   prompt?: AuthorizationPrompt;
   hint?: string;
+  /** Whether this sign-in may be kept here to be resumed later. An app that does not
+   *  ask is not kept, so a later silent request finds nothing — which is the answer
+   *  for every app that never thought about it. */
+  resumable?: boolean;
 }
 
 const isPrincipal = (value: string): boolean => {
@@ -33,12 +38,18 @@ const PromptContextSchema = z.object({
     .transform((value) => Principal.fromText(value).toText())
     .optional()
     .catch(undefined),
+  resumable: z
+    .literal("true")
+    .transform(() => true)
+    .optional()
+    .catch(undefined),
 });
 
 export const readPromptParams = (url: URL): PromptContext => {
   const parsed = PromptContextSchema.safeParse({
     prompt: url.searchParams.get(PROMPT_PARAM) ?? undefined,
     hint: url.searchParams.get(HINT_PARAM) ?? undefined,
+    resumable: url.searchParams.get(RESUMABLE_PARAM) ?? undefined,
   });
   return parsed.success ? parsed.data : {};
 };
@@ -61,7 +72,11 @@ export const resolvePromptParams = (
   }
 
   const context = readPromptParams(url);
-  if (context.prompt === undefined && context.hint === undefined) {
+  if (
+    context.prompt === undefined &&
+    context.hint === undefined &&
+    context.resumable === undefined
+  ) {
     sessionStorage.removeItem(STORAGE_KEY);
   } else {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(context));
@@ -72,13 +87,10 @@ export const resolvePromptParams = (
 /** Keeps the address bar free of values the flow has already consumed. */
 export const stripPromptParams = (): void => {
   const url = new URL(window.location.href);
-  if (
-    !url.searchParams.has(PROMPT_PARAM) &&
-    !url.searchParams.has(HINT_PARAM)
-  ) {
+  const params = [PROMPT_PARAM, HINT_PARAM, RESUMABLE_PARAM];
+  if (!params.some((param) => url.searchParams.has(param))) {
     return;
   }
-  url.searchParams.delete(PROMPT_PARAM);
-  url.searchParams.delete(HINT_PARAM);
+  params.forEach((param) => url.searchParams.delete(param));
   window.history.replaceState(null, "", url.toString());
 };

@@ -225,7 +225,7 @@ export const handleSessionDelegationRequest =
           params.icrc95DerivationOrigin ?? channel.origin,
         );
 
-        const { prompt, hint } = get(authorizationPromptStore);
+        const { prompt, hint, resumable } = get(authorizationPromptStore);
         // Silence is something an app asks for. Anything else, an absent `prompt` included,
         // runs the ceremony, so a held session is never handed over without the user
         // seeing a screen they did not request.
@@ -266,6 +266,7 @@ export const handleSessionDelegationRequest =
         const created = await createSession(
           effectiveOrigin,
           params.maxTimeToLive,
+          resumable === true,
         );
         const chain = await extendToApp(
           created.record,
@@ -292,6 +293,7 @@ export const handleSessionDelegationRequest =
 const createSession = async (
   effectiveOrigin: string,
   requestedMaxTimeToLive: bigint | undefined,
+  resumable: boolean,
 ): Promise<{ record: AppSessionRecord }> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
   const authorized = await waitForStore(authorizedStore);
@@ -378,9 +380,13 @@ const createSession = async (
     createdAtNanos: prepared.created_at,
     accessLevel: authorized.accessLevel,
   };
+  // The mapping is not a credential and is kept either way, so a later hint still names
+  // an account this browser has seen. The session is what an app has to ask to have kept.
   await rememberAppAccount(key, {
     accountPrincipal: prepared.account_principal.toText(),
   });
-  await storeAppSession(key, record);
+  if (resumable) {
+    await storeAppSession(key, record);
+  }
   return { record };
 };
