@@ -81,7 +81,9 @@ The identity an app holds carries a five-minute app delegation, minted by callin
 
 One object lasts the whole session even though what it signs with is replaced every five minutes, because the object reaches the current pair instead of holding one. `getIdentity()` returns that same object every time. Handing back a fresh identity per call would not work, since an application passes one to an agent once and the agent keeps it, so a snapshot would go on signing with a delegation that had expired.
 
-It is free on every call but one. A page load that restores a session and finds no delegation worth using has to mint before it can answer, and `getIdentity()` waits for it. That is not a lapse in an otherwise cheap method: an account key cannot be worked back out of the state, which carries the account's principal and so a hash of that key rather than the key, so a mint is the only place one can come from. Resolving without it would hand the application an identity that cannot sign, and the failure would land on its first request instead — after a page had already been drawn around `isAuthenticated()` answering yes. A wait is the better of the two, and it is one wait, on one load.
+It is free on every call but one. A page load that restores a session and finds no delegation worth using has to mint before it can answer, and `getIdentity()` waits for it. That is not a lapse in an otherwise cheap method: an account key cannot be worked back out of the state, which carries the account's principal and so a hash of that key rather than the key, so a stored credential and a mint are the only two places one can come from. Resolving without it would hand the application an identity that cannot sign, and the failure would land on its first request instead — after a page had already been drawn around a signed-in answer. A wait is the better of the two, and it is one wait, on one load.
+
+The identity resolves that itself, through the same lock and the same read a rotation uses. Resolving it in the client instead gave the app credential a second writer that took no lock, which could overwrite what a peer tab had minted a moment earlier and would not see the credential that peer had left to be adopted. And a page that must not wait at all does not have to: `getPrincipal()` answers who is signed in from the state, synchronously, which is what a render needs and what an identity is not.
 
 The principal an app sees comes from the account, not from the session chain, which is rooted at the session's own key. Only a mint reports it, arriving as `user_key`, and it is the root of the delegation that mint returns — so keeping that delegation is what lets a reload answer for the principal without minting. Every later mint returns the same key, so one that returns a different root is a failed mint and not a new principal.
 
@@ -235,7 +237,7 @@ sequenceDiagram
 
 #### The state is not the credentials
 
-Two questions cannot wait: whether the user is signed in, and who they are. A page renders on the answers, and awaiting is not open to it — which is why `isAuthenticated()` has always been synchronous.
+Two questions cannot wait: whether the user is signed in, and who they are. A page renders on the answers, and awaiting is not open to it — which is why `isAuthenticated()` has always been synchronous, and why `getPrincipal()` is too. Both read the record and nothing else.
 
 So the state is kept as its own small record, the account's principal and when the session expires, and the credentials are the material that acts on it rather than the record of it. Neither field is a secret, so the record can live somewhere a page reads without opening anything, while the keys and chains stay where a non-extractable key can be held and are read only when something signs.
 
@@ -263,7 +265,9 @@ The alternative is an application reading the record and deciding for itself, an
 
 `expired` is kept rather than folded into `signed-out` because an application can do something better with it: it still knows who the user was, so it can say _your session ended, sign back in_ instead of showing a bare signed-out screen. That is also why the record is not deleted the moment it lapses.
 
-`isAuthenticated()` stays, and is this narrowed to the first case. It answers the question it always answered, and an application that wants the other three asks for them.
+`isAuthenticated()` stays, and is this narrowed to the first case. It answers the question it always answered, and an application that wants the other three asks for them. `getPrincipal()` is the other half of what a render needs, and it answers from the same record — including for a record that has expired, since that still names whose session ended.
+
+There is deliberately no `subscribe()` on the client. A change of state is announced by the store holding it, which is also the only thing that knows how a change arrives in the medium it was given; a second listener list in front of that one would forward what it was told and add nothing.
 
 `getIdentity()` refuses in that second case rather than handing back an anonymous identity. Anonymous is the worst of the available answers there: calls go out unauthenticated while the record says somebody is signed in, and they fail at the canister rather than anywhere a caller was looking. So it throws instead, and the error names a recoverable condition — a sibling signed in, this origin has nothing yet, and asking the identity provider is what comes next.
 
