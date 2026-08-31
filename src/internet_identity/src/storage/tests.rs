@@ -3770,11 +3770,15 @@ mod session_record_tests {
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
 
+    /// A bound so far out that only `valid_till_ns` can end these records, which is
+    /// what the tests about the absolute bound want.
+    const NEVER_IDLE: u64 = u64::MAX;
+
     fn session(created_at_ns: u64, valid_till_ns: u64) -> SessionRecord {
         SessionRecord {
             created_at_ns,
             valid_till_ns,
-            max_idle_ns: None,
+            max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: None,
             device_id: 1,
             read_only: false,
@@ -3806,43 +3810,40 @@ mod session_record_tests {
     }
 
     #[test]
-    fn a_session_with_no_idle_bound_is_never_idle() {
+    fn a_bound_further_out_than_the_session_never_bites() {
         let record = session(0, DAY_NS);
 
-        // What a request that asked for nothing gets. The absolute lifetime is the
-        // only thing bounding it, which is how every session behaved before.
-        assert!(!record.is_idle(DAY_NS * 365));
         assert!(!record.is_over(0));
+        // Past its own lifetime, so over on the other bound — which is the point:
+        // one question, answered by whichever bound is reached first.
+        assert!(record.is_over(DAY_NS));
     }
 
     #[test]
     fn a_session_is_idle_once_nothing_has_minted_for_its_bound() {
         let record = SessionRecord {
-            max_idle_ns: Some(30 * MINUTE_NS),
+            max_idle_ns: 30 * MINUTE_NS,
             last_refreshed_ns: Some(10 * MINUTE_NS),
             ..session(0, DAY_NS)
         };
 
-        assert!(!record.is_idle(39 * MINUTE_NS));
-        assert!(record.is_idle(40 * MINUTE_NS));
-        // Still inside its absolute lifetime, and over anyway. That is the point:
-        // the two bounds answer different questions and either one ends it.
-        assert!(!record.is_expired(40 * MINUTE_NS));
+        assert!(!record.is_over(39 * MINUTE_NS));
+        // Still inside its absolute lifetime, and over anyway: either bound ends it.
         assert!(record.is_over(40 * MINUTE_NS));
     }
 
     #[test]
     fn a_session_that_never_minted_is_measured_from_its_creation() {
         let record = SessionRecord {
-            max_idle_ns: Some(30 * MINUTE_NS),
+            max_idle_ns: 30 * MINUTE_NS,
             last_refreshed_ns: None,
             ..session(5 * MINUTE_NS, DAY_NS)
         };
 
         // Otherwise a session abandoned straight after sign-in would sit unbounded
         // until its lifetime ran out, which is the case the bound exists for.
-        assert!(!record.is_idle(34 * MINUTE_NS));
-        assert!(record.is_idle(35 * MINUTE_NS));
+        assert!(!record.is_over(34 * MINUTE_NS));
+        assert!(record.is_over(35 * MINUTE_NS));
     }
 
     #[test]
@@ -3937,11 +3938,29 @@ mod session_record_tests {
     }
 
     #[test]
+    fn a_session_over_by_idleness_reclaims_like_a_dead_one() {
+        let now = 100 * DAY_NS;
+        let idle = SessionRecord {
+            max_idle_ns: DAY_NS,
+            last_refreshed_ns: Some(now - 10 * DAY_NS),
+            ..session(now - 20 * DAY_NS, now + DAY_NS)
+        };
+        let live = SessionRecord {
+            last_refreshed_ns: Some(now - 1),
+            ..session(now - 20 * DAY_NS, now + DAY_NS)
+        };
+
+        // Both are inside their lifetime, so ranking on that alone would have them
+        // compete for a slot. One of them is finished.
+        assert!(idle.reclaim_order(now) < live.reclaim_order(now));
+    }
+
+    #[test]
     fn reclaim_order_ranks_dead_sessions_first() {
         let now = 1_000;
         let expired = session(1, 500);
         let live = SessionRecord {
-            max_idle_ns: None,
+            max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(900),
             ..session(400, 10_000)
         };
@@ -3955,7 +3974,7 @@ mod session_record_tests {
     fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
         let now = 100 * DAY_NS;
         let held = SessionRecord {
-            max_idle_ns: None,
+            max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - DAY_NS),
             ..session(now - 20 * DAY_NS, now + DAY_NS)
         };
@@ -3978,13 +3997,13 @@ mod session_record_tests {
         let now = 100 * DAY_NS;
         // Signed in three months ago, still being opened every few days.
         let weekly = SessionRecord {
-            max_idle_ns: None,
+            max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - 3 * DAY_NS),
             ..session(now - 90 * DAY_NS, now + DAY_NS)
         };
         // Signed in yesterday, used for five minutes, never opened again.
         let one_sitting = SessionRecord {
-            max_idle_ns: None,
+            max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - DAY_NS + 5 * MINUTE_NS),
             ..session(now - DAY_NS, now + DAY_NS)
         };
