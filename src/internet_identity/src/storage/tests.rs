@@ -3774,6 +3774,7 @@ mod session_record_tests {
         SessionRecord {
             created_at,
             valid_till,
+            max_idle: None,
             last_refreshed: None,
             device_id: 1,
             read_only: false,
@@ -3802,6 +3803,63 @@ mod session_record_tests {
             AccountReference::from(StorableAccountReference::from_bytes(stored.to_bytes()));
 
         assert_eq!(decoded, reference);
+    }
+
+    #[test]
+    fn a_session_with_no_idle_bound_is_never_idle() {
+        let record = session(0, DAY_NS);
+
+        // What a request that asked for nothing gets. The absolute lifetime is the
+        // only thing bounding it, which is how every session behaved before.
+        assert!(!record.is_idle(DAY_NS * 365));
+        assert!(!record.is_over(0));
+    }
+
+    #[test]
+    fn a_session_is_idle_once_nothing_has_minted_for_its_bound() {
+        let record = SessionRecord {
+            max_idle: Some(30 * MINUTE_NS),
+            last_refreshed: Some(10 * MINUTE_NS),
+            ..session(0, DAY_NS)
+        };
+
+        assert!(!record.is_idle(39 * MINUTE_NS));
+        assert!(record.is_idle(40 * MINUTE_NS));
+        // Still inside its absolute lifetime, and over anyway. That is the point:
+        // the two bounds answer different questions and either one ends it.
+        assert!(!record.is_expired(40 * MINUTE_NS));
+        assert!(record.is_over(40 * MINUTE_NS));
+    }
+
+    #[test]
+    fn a_session_that_never_minted_is_measured_from_its_creation() {
+        let record = SessionRecord {
+            max_idle: Some(30 * MINUTE_NS),
+            last_refreshed: None,
+            ..session(5 * MINUTE_NS, DAY_NS)
+        };
+
+        // Otherwise a session abandoned straight after sign-in would sit unbounded
+        // until its lifetime ran out, which is the case the bound exists for.
+        assert!(!record.is_idle(34 * MINUTE_NS));
+        assert!(record.is_idle(35 * MINUTE_NS));
+    }
+
+    #[test]
+    fn a_session_written_before_the_idle_bound_existed_decodes_without_one() {
+        let reference = AccountReference {
+            account_number: Some(3),
+            last_used: Some(9),
+            sessions: vec![session(1, 100)],
+        };
+
+        let decoded = AccountReference::from(StorableAccountReference::from_bytes(
+            StorableAccountReference::from(reference).to_bytes(),
+        ));
+
+        // The field is a new key in a CBOR map, so a record written without it reads
+        // as no bound rather than failing to decode.
+        assert_eq!(decoded.sessions[0].max_idle, None);
     }
 
     #[test]
@@ -3900,6 +3958,7 @@ mod session_record_tests {
         let now = 1_000;
         let expired = session(1, 500);
         let live = SessionRecord {
+            max_idle: None,
             last_refreshed: Some(900),
             ..session(400, 10_000)
         };
@@ -3910,15 +3969,39 @@ mod session_record_tests {
     }
 
     #[test]
+    fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
+        let now = 100 * DAY_NS;
+        let held = SessionRecord {
+            max_idle: None,
+            last_refreshed: Some(now - DAY_NS),
+            ..session(now - 20 * DAY_NS, now + DAY_NS)
+        };
+        // Created after the session it would have to outrank, which under a plain recency
+        // order would protect it.
+        let flood: Vec<SessionRecord> = (0..500)
+            .map(|index| SessionRecord {
+                device_id: index,
+                ..session(now - 1, now + DAY_NS)
+            })
+            .collect();
+
+        assert!(flood
+            .iter()
+            .all(|session| session.reclaim_order(now) < held.reclaim_order(now)));
+    }
+
+    #[test]
     fn an_app_in_weekly_use_outranks_one_opened_once_yesterday() {
         let now = 100 * DAY_NS;
         // Signed in three months ago, still being opened every few days.
         let weekly = SessionRecord {
+            max_idle: None,
             last_refreshed: Some(now - 3 * DAY_NS),
             ..session(now - 90 * DAY_NS, now + DAY_NS)
         };
         // Signed in yesterday, used for five minutes, never opened again.
         let one_sitting = SessionRecord {
+            max_idle: None,
             last_refreshed: Some(now - DAY_NS + 5 * MINUTE_NS),
             ..session(now - DAY_NS, now + DAY_NS)
         };
