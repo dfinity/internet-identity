@@ -1,13 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { chooseSilentSession } from "./silentReauth";
-import type { AppSessionRecord } from "$lib/stores/app-session.store";
 
 const PRINCIPAL_A = "2vxsx-fae";
 const PRINCIPAL_B = "aaaaa-aa";
 
-const held = (accountPrincipal: string) => ({
-  record: { accountPrincipal } as AppSessionRecord,
-});
+const held = (accountPrincipal: string) => ({ accountPrincipal });
 
 describe("chooseSilentSession", () => {
   it("denies when this browser holds nothing for the origin", () => {
@@ -17,8 +14,8 @@ describe("chooseSilentSession", () => {
   });
 
   it("uses the only session held when no hint is given", () => {
-    expect(chooseSilentSession({ held: [held(PRINCIPAL_A)] })).toMatchObject({
-      record: { accountPrincipal: PRINCIPAL_A },
+    expect(chooseSilentSession({ held: [held(PRINCIPAL_A)] })).toEqual({
+      session: held(PRINCIPAL_A),
     });
   });
 
@@ -36,7 +33,7 @@ describe("chooseSilentSession", () => {
         held: [held(PRINCIPAL_A), held(PRINCIPAL_B)],
         hint: PRINCIPAL_B,
       }),
-    ).toMatchObject({ record: { accountPrincipal: PRINCIPAL_B } });
+    ).toEqual({ session: held(PRINCIPAL_B) });
   });
 
   it("denies a hint this browser holds no session for", () => {
