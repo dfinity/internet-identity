@@ -163,6 +163,8 @@ The lock is `navigator.locks`, named for the `app` slot, and it belongs to `Auth
 **STORE-9.**
 `set` writes what it is given and takes no lock. That the `app` slot is written in one place, inside the lock of STORE-8, is a rule about that call site and not a property of the interface: an application implements these interfaces and never calls them.
 
+One place means one routine, reached by both the first acquisition and every rotation: read the slot under the lock, and mint only where what it finds cannot be used. A second reader-and-writer outside the lock — a page load resolving its own account key, say — reintroduces exactly what the lock prevents, because it can overwrite a credential a peer minted a moment earlier and will not see the credential that peer left for it. The ceremony's promotion of ACQ-9 is the one other writer, and it writes a slot no rotation is reading yet.
+
 **STORE-10.**
 A credential store has no notification of its own and needs none. Nothing has to be told that a mint happened: a tab wanting a delegation takes the lock and reads, which is the whole protocol, and every change that alters the _state_ is announced by the state store instead. A store whose medium another tab cannot read still runs a channel to populate its own copy, because a peer cannot reach into it, but that is its private business and appears nowhere on the interface. Where a message has not arrived the tab mints, which TAB-9 permits.
 
@@ -235,7 +237,7 @@ stateDiagram-v2
     SessionOnly --> Over: NoMatchingSession, or the<br/>session is within the block margin
     Held --> Over: NoMatchingSession
     Used --> Over: NoMatchingSession
-    Over --> [*]: chain and key dropped,<br/>subscribers notified
+    Over --> [*]: chain and key dropped,<br/>the state store announces it
 ```
 
 A mint ends one of five ways.
@@ -303,7 +305,7 @@ A page load that restores a stored session goes through the trigger of MINT-7, s
 
 A load makes at most two mints, and they are different acts with different rules.
 
-The first belongs to the restore, and is awaited. Where the store holds no usable app credential the restore MUST mint before `getIdentity()` resolves, because an account key comes only from a stored credential or a mint, per MINT-1. This mint is unconditional: it does not consult `disableForegroundRefresh` and does not require a DOM, since neither has anything to say about whether an identity can be built. `getIdentity()` therefore does make canister calls on such a load, and waits for them.
+The first belongs to the restore, and is awaited. Where the store holds no usable app credential the restore MUST mint before `getIdentity()` resolves, because an account key comes only from a stored credential or a mint, per MINT-1. It is unconditional in one sense and not in another: it consults neither `disableForegroundRefresh` nor the presence of a DOM, since neither has anything to say about whether an identity can be built — but it goes through the lock and the read of STORE-9 like every other mint, so a load beside a tab that is already minting adopts what that tab writes rather than making its own calls.
 
 The second belongs to the trigger of MINT-7, and is not awaited. A load that reads a credential inside the pre-mint threshold is due for a replacement, and MUST mint it in the background — before anything asks for an identity, and whether or not the application goes on to use one, because waiting for the first request would put the cost in front of a user action. This one does follow the trigger's conditions: with no DOM, or under `disableForegroundRefresh`, it does not happen and the first request pays for it. `getIdentity()` does not wait for it.
 
@@ -321,12 +323,14 @@ A mint that fails leaves the stored session credential exactly as it was, except
 The principal a caller sees does not change when a delegation is replaced. `app_prepare_delegation` roots every delegation at the account's key, so successive mints agree. A mint whose `user_key` does not match the principal already established is a failed mint, and its delegation is not adopted.
 
 **MINT-17.**
-`getPrincipal()` never triggers a mint and is answered from the state, synchronously. The account principal is part of the state rather than something derived from whatever material happens to be held, so a page load reports who is signed in without opening a store and without waiting for the background mint of MINT-13.
+`getPrincipal()` never triggers a mint and is answered from the state, synchronously, returning `undefined` where no record exists. The account principal is part of the state rather than something derived from whatever material happens to be held, so a page load reports who is signed in without opening a store and without waiting for either mint of MINT-13.
+
+It answers for an expired record too, because such a record still names the account it belonged to and that is what lets an application word "your session ended, sign back in" for a person rather than for nobody. Telling a live record from a spent one is API-2's job, not this one's.
 
 ## Failure
 
 **ERR-1.**
-`NoMatchingSession` is terminal for the chain in hand. The library discards the session chain and the session key for this origin, notifies subscribers, and reports the user as not authenticated. It does not remove the state: see STATE-4.
+`NoMatchingSession` is terminal for the chain in hand. The library discards the session chain and the session key for this origin and reports the user as not authenticated. Anyone listening hears it from the state store, per STATE-8, and only where the state actually changed — which on this path it does not. It does not remove the state: see STATE-4.
 
 **ERR-2.**
 `InternalCanisterError`, a transport failure, and an unreachable boundary node are transient. The library retains the session, propagates the failure to the caller, and does not report a sign-out.
@@ -486,7 +490,7 @@ Before the first call, a session chain is refused unless its `targets` name the 
 ## Public surface
 
 **API-1.**
-`signIn()`, `getIdentity()`, `signOut()`, `isAuthenticated()` and `subscribe()` keep their current signatures, and no session type, session chain or session expiry is exposed through any of them. Three options change:
+`signIn()`, `getIdentity()`, `signOut()` and `isAuthenticated()` keep their current signatures, and no session type, session chain or session expiry is exposed through any of them. Three options change:
 
 | Option                     | Change                                                                            | Requirement      |
 | -------------------------- | --------------------------------------------------------------------------------- | ---------------- |
@@ -497,7 +501,9 @@ Before the first call, a session chain is refused unless its `targets` name the 
 | `agentOptions`             | new; passed to the agent that makes the calls                                     | AGENT-3          |
 | `disableForegroundRefresh` | new; about when the library refreshes rather than about sessions                  | MINT-8           |
 
-`keyType` goes with them, the key type now belonging to a store's `create()`, and `AuthClientStorage`, `IdbStorage`, `LocalStorage` and the `KEY_STORAGE_*` constants stop being exported. `getStatus()`, `subscribe()` and `dispose()` are additions rather than existing signatures, and `SessionNotHeldError` is a new failure `getIdentity()` can raise where it previously could not — see API-5.
+`keyType` goes with them, the key type now belonging to a store's `create()`, and `AuthClientStorage`, `IdbStorage`, `LocalStorage` and the `KEY_STORAGE_*` constants stop being exported. `getStatus()`, `getPrincipal()` and `dispose()` are additions rather than existing signatures, and `SessionNotHeldError` is a new failure `getIdentity()` can raise where it previously could not — see API-5.
+
+`AuthClient` has no `subscribe()`, and gains none here. A change of state is announced by the store that holds it, per STATE-8, and an application that wants to re-render on one subscribes there — which is also the only place that knows how a change arrives in the medium it chose. Repeating the subscription on the client would put a second listener list in front of the one that already works, and the client has nothing to add to what it would forward.
 
 **API-2.**
 `getStatus()` is the one place that knows what the state's combinations mean, and returns a discriminated union rather than fields for an application to recombine:
@@ -518,7 +524,7 @@ Recombining `held` and the expiry at each call site is what this replaces, and i
 `isAuthenticated()` is `getStatus()` narrowed to its first case, and reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints. It stays synchronous and makes no call, because it reads the state rather than the credentials — which is what lets a credential store be asynchronous without the answer becoming one.
 
 **API-4.**
-`isAuthenticated()` is optimistic about revocation, and this is a change in kind. It answers from what the client stored, so a session revoked at the canister or from another browser still reads as authenticated until something mints and is told otherwise, at which point the stored session is dropped and subscribers are notified. Before sessions the answer could only go stale by expiry, which a client could compute; now it can go stale because someone acted. An application that must not act on a stale answer should make a call and handle its failure, which is the only thing that consults the canister.
+`isAuthenticated()` is optimistic about revocation, and this is a change in kind. It answers from what the client stored, so a session revoked at the canister or from another browser still reads as authenticated until something mints and is told otherwise, at which point the stored session is dropped. Nothing announces that by itself: this origin's claim goes and the record stays, per STATE-4, so an application that must notice reads `getStatus()` again rather than waiting to be told. Before sessions the answer could only go stale by expiry, which a client could compute; now it can go stale because someone acted. An application that must not act on a stale answer should make a call and handle its failure, which is the only thing that consults the canister.
 
 **API-5.**
 `getIdentity()` MUST throw `SessionNotHeldError` rather than return an anonymous identity when the state names an account this origin holds no credential for — the `signed-in-elsewhere` case of API-2. Anonymous is the dangerous answer there: calls would go out unauthenticated while the record says someone is signed in, and an application checking `isAuthenticated()` first would not have been warned. The error is where a silent re-auth belongs, so it names a recoverable condition rather than a failure.
@@ -526,4 +532,6 @@ Recombining `held` and the expiry at each call site is what this replaces, and i
 **API-6.**
 `getIdentity()` returns the same identity for the life of the session, including across the credential being replaced. The identity reaches whatever credential is current rather than holding one, so a rotation changes nothing an application can observe.
 
-It is not free on every call. The first call after a load that restored a session with no usable app credential waits for the mint of MINT-13, which is two canister calls. Every later call, and every call on a load that had a credential to adopt, returns without one. Resolving early instead — handing back an identity that cannot yet sign — would move the failure to the application's first request, where nothing explains it, and an application that renders on `isAuthenticated()` would already have drawn a signed-in page around it.
+It is not free on every call. The first call after a load that restored a session with no usable app credential waits for the mint of MINT-13, which is two canister calls; every later call, and every call on a load that had a credential to adopt, returns without one.
+
+That is a cost and not a change in shape: this method has always been asynchronous, so a caller already awaits it. Resolving early instead — handing back an identity that cannot yet sign — would move the failure to the application's first request, where nothing explains it, and an application that renders on `isAuthenticated()` would already have drawn a signed-in page around it. A page that must not wait at all reads MINT-17 instead, which answers who is signed in without opening a store.
