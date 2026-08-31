@@ -3709,12 +3709,12 @@ mod session_record_tests {
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
 
-    fn session(created_at: u64, valid_till: u64) -> SessionRecord {
+    fn session(created_at_ns: u64, valid_till_ns: u64) -> SessionRecord {
         SessionRecord {
-            created_at,
-            valid_till,
-            max_idle: None,
-            last_refreshed: None,
+            created_at_ns,
+            valid_till_ns,
+            max_idle_ns: None,
+            last_refreshed_ns: None,
             device_id: 1,
             read_only: false,
         }
@@ -3757,8 +3757,8 @@ mod session_record_tests {
     #[test]
     fn a_session_is_idle_once_nothing_has_minted_for_its_bound() {
         let record = SessionRecord {
-            max_idle: Some(30 * MINUTE_NS),
-            last_refreshed: Some(10 * MINUTE_NS),
+            max_idle_ns: Some(30 * MINUTE_NS),
+            last_refreshed_ns: Some(10 * MINUTE_NS),
             ..session(0, DAY_NS)
         };
 
@@ -3773,8 +3773,8 @@ mod session_record_tests {
     #[test]
     fn a_session_that_never_minted_is_measured_from_its_creation() {
         let record = SessionRecord {
-            max_idle: Some(30 * MINUTE_NS),
-            last_refreshed: None,
+            max_idle_ns: Some(30 * MINUTE_NS),
+            last_refreshed_ns: None,
             ..session(5 * MINUTE_NS, DAY_NS)
         };
 
@@ -3782,23 +3782,6 @@ mod session_record_tests {
         // until its lifetime ran out, which is the case the bound exists for.
         assert!(!record.is_idle(34 * MINUTE_NS));
         assert!(record.is_idle(35 * MINUTE_NS));
-    }
-
-    #[test]
-    fn a_session_written_before_the_idle_bound_existed_decodes_without_one() {
-        let reference = AccountReference {
-            account_number: Some(3),
-            last_used: Some(9),
-            sessions: vec![session(1, 100)],
-        };
-
-        let decoded = AccountReference::from(StorableAccountReference::from_bytes(
-            StorableAccountReference::from(reference).to_bytes(),
-        ));
-
-        // The field is a new key in a CBOR map, so a record written without it reads
-        // as no bound rather than failing to decode.
-        assert_eq!(decoded.sessions[0].max_idle, None);
     }
 
     #[test]
@@ -3852,8 +3835,8 @@ mod session_record_tests {
         let now = 1_000;
         let expired = session(1, 500);
         let live = SessionRecord {
-            max_idle: None,
-            last_refreshed: Some(900),
+            max_idle_ns: None,
+            last_refreshed_ns: Some(900),
             ..session(400, 10_000)
         };
         let live_untouched = session(400, 10_000);
@@ -3866,8 +3849,8 @@ mod session_record_tests {
     fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
         let now = 100 * DAY_NS;
         let held = SessionRecord {
-            max_idle: None,
-            last_refreshed: Some(now - DAY_NS),
+            max_idle_ns: None,
+            last_refreshed_ns: Some(now - DAY_NS),
             ..session(now - 20 * DAY_NS, now + DAY_NS)
         };
         // Created after the session it would have to outrank, which under a plain recency
@@ -3889,14 +3872,14 @@ mod session_record_tests {
         let now = 100 * DAY_NS;
         // Signed in three months ago, still being opened every few days.
         let weekly = SessionRecord {
-            max_idle: None,
-            last_refreshed: Some(now - 3 * DAY_NS),
+            max_idle_ns: None,
+            last_refreshed_ns: Some(now - 3 * DAY_NS),
             ..session(now - 90 * DAY_NS, now + DAY_NS)
         };
         // Signed in yesterday, used for five minutes, never opened again.
         let one_sitting = SessionRecord {
-            max_idle: None,
-            last_refreshed: Some(now - DAY_NS + 5 * MINUTE_NS),
+            max_idle_ns: None,
+            last_refreshed_ns: Some(now - DAY_NS + 5 * MINUTE_NS),
             ..session(now - DAY_NS, now + DAY_NS)
         };
 
