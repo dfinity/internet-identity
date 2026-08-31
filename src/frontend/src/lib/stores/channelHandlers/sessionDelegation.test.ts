@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
+import type { Writable } from "svelte/store";
 
 const CANISTER_ID_TEXT = "rwlgt-iiaaa-aaaaa-aaaaa-cai";
 const ORIGIN = "https://app.example.com";
@@ -124,12 +125,14 @@ const runCeremony = async (resumable?: boolean) => {
   };
   const { authenticationStore } =
     await import("$lib/stores/authentication.store");
-  authenticationStore.set({
+  // Both stores are mocked as plain writables above; only their real types are in
+  // scope here, and neither is writable or shaped like what the handler reads.
+  (authenticationStore as unknown as Writable<unknown>).set({
     identityNumber,
     actor,
-    authMethod: { passkey: {} },
+    authMethod: { passkey: { credentialId: new Uint8Array() } },
   });
-  authorizedStore.set({
+  (authorizedStore as unknown as Writable<unknown>).set({
     accountNumberPromise: Promise.resolve(undefined),
     accessLevel: "full-access",
   });
