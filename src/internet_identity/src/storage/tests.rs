@@ -3770,11 +3770,15 @@ mod session_record_tests {
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
 
+    /// A bound so far out that only `valid_till_ns` can end these records, which is
+    /// what the tests about the absolute bound want.
+    const NEVER_IDLE: u64 = u64::MAX;
+
     fn session(created_at_ns: u64, valid_till_ns: u64) -> SessionRecord {
         SessionRecord {
             created_at_ns,
             valid_till_ns,
-            max_idle_ns: None,
+            max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: None,
             device_id: 1,
             read_only: false,
@@ -3806,43 +3810,40 @@ mod session_record_tests {
     }
 
     #[test]
-    fn a_session_with_no_idle_bound_is_never_idle() {
+    fn a_bound_further_out_than_the_session_never_bites() {
         let record = session(0, DAY_NS);
 
-        // What a request that asked for nothing gets. The absolute lifetime is the
-        // only thing bounding it, which is how every session behaved before.
-        assert!(!record.is_idle(DAY_NS * 365));
         assert!(!record.is_over(0));
+        // Past its own lifetime, so over on the other bound — which is the point:
+        // one question, answered by whichever bound is reached first.
+        assert!(record.is_over(DAY_NS));
     }
 
     #[test]
     fn a_session_is_idle_once_nothing_has_minted_for_its_bound() {
         let record = SessionRecord {
-            max_idle_ns: Some(30 * MINUTE_NS),
+            max_idle_ns: 30 * MINUTE_NS,
             last_refreshed_ns: Some(10 * MINUTE_NS),
             ..session(0, DAY_NS)
         };
 
-        assert!(!record.is_idle(39 * MINUTE_NS));
-        assert!(record.is_idle(40 * MINUTE_NS));
-        // Still inside its absolute lifetime, and over anyway. That is the point:
-        // the two bounds answer different questions and either one ends it.
-        assert!(!record.is_expired(40 * MINUTE_NS));
+        assert!(!record.is_over(39 * MINUTE_NS));
+        // Still inside its absolute lifetime, and over anyway: either bound ends it.
         assert!(record.is_over(40 * MINUTE_NS));
     }
 
     #[test]
     fn a_session_that_never_minted_is_measured_from_its_creation() {
         let record = SessionRecord {
-            max_idle_ns: Some(30 * MINUTE_NS),
+            max_idle_ns: 30 * MINUTE_NS,
             last_refreshed_ns: None,
             ..session(5 * MINUTE_NS, DAY_NS)
         };
 
         // Otherwise a session abandoned straight after sign-in would sit unbounded
         // until its lifetime ran out, which is the case the bound exists for.
-        assert!(!record.is_idle(34 * MINUTE_NS));
-        assert!(record.is_idle(35 * MINUTE_NS));
+        assert!(!record.is_over(34 * MINUTE_NS));
+        assert!(record.is_over(35 * MINUTE_NS));
     }
 
     #[test]
@@ -3937,11 +3938,29 @@ mod session_record_tests {
     }
 
     #[test]
+    fn a_session_over_by_idleness_reclaims_like_a_dead_one() {
+        let now = 100 * DAY_NS;
+        let idle = SessionRecord {
+            max_idle_ns: DAY_NS,
+            last_refreshed_ns: Some(now - 10 * DAY_NS),
+            ..session(now - 20 * DAY_NS, now + DAY_NS)
+        };
+        let live = SessionRecord {
+            last_refreshed_ns: Some(now - 1),
+            ..session(now - 20 * DAY_NS, now + DAY_NS)
+        };
+
+        // Both are inside their lifetime, so ranking on that alone would have them
+        // compete for a slot. One of them is finished.
+        assert!(idle.reclaim_order(now) < live.reclaim_order(now));
+    }
+
+    #[test]
     fn reclaim_order_ranks_dead_sessions_first() {
         let now = 1_000;
         let expired = session(1, 500);
         let live = SessionRecord {
-            max_idle_ns: None,
+            max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(900),
             ..session(400, 10_000)
         };
@@ -3955,7 +3974,7 @@ mod session_record_tests {
     fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
         let now = 100 * DAY_NS;
         let held = SessionRecord {
-            max_idle_ns: None,
+            max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - DAY_NS),
             ..session(now - 20 * DAY_NS, now + DAY_NS)
         };
@@ -3978,13 +3997,13 @@ mod session_record_tests {
         let now = 100 * DAY_NS;
         // Signed in three months ago, still being opened every few days.
         let weekly = SessionRecord {
-            max_idle_ns: None,
+            max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - 3 * DAY_NS),
             ..session(now - 90 * DAY_NS, now + DAY_NS)
         };
         // Signed in yesterday, used for five minutes, never opened again.
         let one_sitting = SessionRecord {
-            max_idle_ns: None,
+            max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - DAY_NS + 5 * MINUTE_NS),
             ..session(now - DAY_NS, now + DAY_NS)
         };
@@ -3999,7 +4018,8 @@ mod session_record_tests {
 mod session_creation_tests {
     use crate::delegation::calculate_session_seed_with_salt;
     use crate::storage::account::{
-        AccountReference, CreateAccountParams, SessionRecord, MIN_SESSION_IDLE_NS,
+        AccountReference, CreateAccountParams, SessionRecord, DEFAULT_SESSION_IDLE_NS,
+        MIN_SESSION_IDLE_NS,
     };
     use crate::storage::{
         CreateSessionParams, MAX_SESSIONS_PER_ANCHOR, SESSIONS_WATERMARK_PER_ANCHOR,
@@ -4067,7 +4087,7 @@ mod session_creation_tests {
             })
             .unwrap();
 
-        assert_eq!(session.max_idle_ns, Some(asked));
+        assert_eq!(session.max_idle_ns, asked);
     }
 
     #[test]
@@ -4084,7 +4104,7 @@ mod session_creation_tests {
 
         // An app delegation lasts five minutes, so a bound under that would end a
         // session between two mints of one that is plainly in use.
-        assert_eq!(session.max_idle_ns, Some(MIN_SESSION_IDLE_NS));
+        assert_eq!(session.max_idle_ns, MIN_SESSION_IDLE_NS);
     }
 
     #[test]
@@ -4101,19 +4121,41 @@ mod session_creation_tests {
 
         // A bound it could never reach says something about the session that is not
         // true, so it is stored as the life the session actually got.
-        assert_eq!(session.max_idle_ns, Some(DAY_NS));
+        assert_eq!(session.max_idle_ns, DAY_NS);
     }
 
     #[test]
-    fn asking_for_no_idle_bound_stores_none() {
+    fn asking_for_no_idle_bound_gets_the_default() {
         let (mut storage, anchor_number) = storage_with_anchor();
 
         let session = storage
-            .create_session(params(anchor_number, 1, 1_000))
+            .create_session(CreateSessionParams {
+                valid_till_ns: 30 * DAY_NS,
+                ..params(anchor_number, 1, 0)
+            })
             .unwrap();
 
-        assert_eq!(session.max_idle_ns, None);
-        assert!(!session.is_idle(1_000 + 400 * DAY_NS));
+        // Every session gets a bound now. A week of nobody touching the application
+        // ends the sign-in, well inside the thirty days it could otherwise live.
+        assert_eq!(session.max_idle_ns, DEFAULT_SESSION_IDLE_NS);
+        assert!(!session.is_over(6 * DAY_NS));
+        assert!(session.is_over(7 * DAY_NS));
+    }
+
+    #[test]
+    fn a_session_shorter_than_the_idle_floor_is_bounded_by_its_own_life() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        // Under the floor the range inverts, and clamping in one call would trap.
+        let session = storage
+            .create_session(CreateSessionParams {
+                valid_till_ns: MINUTE_NS,
+                max_idle_ns: Some(30 * MINUTE_NS),
+                ..params(anchor_number, 1, 0)
+            })
+            .unwrap();
+
+        assert_eq!(session.max_idle_ns, MINUTE_NS);
     }
 
     #[test]
@@ -4511,7 +4553,7 @@ mod session_creation_tests {
                         // Already expired at `now`, so it is not reused, but it is still
                         // present when the seed for the new record is derived.
                         valid_till_ns: 1_000,
-                        max_idle_ns: None,
+                        max_idle_ns: u64::MAX,
                         last_refreshed_ns: None,
                         device_id: 1,
                         read_only: false,
