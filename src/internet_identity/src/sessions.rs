@@ -424,7 +424,7 @@ pub fn app_revoke_session() {
             locator.anchor_number,
             locator.application_number,
             locator.account_number,
-            session.created_at,
+            session.created_at_ns,
             session.device_id,
         )
     })

@@ -5141,9 +5141,10 @@ mod session_removal_tests {
                     origin: ORIGIN.to_string(),
                     account_number: None,
                     device_id: *device_id,
-                    valid_till: u64::MAX,
+                    valid_till_ns: u64::MAX,
+                    max_idle_ns: None,
                     read_only: false,
-                    now: 1_000,
+                    now_ns: 1_000,
                 })
                 .unwrap();
         }

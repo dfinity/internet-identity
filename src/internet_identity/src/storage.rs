@@ -1950,7 +1950,8 @@ impl<M: Memory + Clone> Storage<M> {
                     .any(|reference| {
                         reference.account_number == account_number
                             && reference.sessions.iter().any(|session| {
-                                session.device_id == device_id && session.created_at == created_at
+                                session.device_id == device_id
+                                    && session.created_at_ns == created_at
                             })
                     })
             })
