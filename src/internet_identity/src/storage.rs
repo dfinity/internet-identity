@@ -2079,7 +2079,7 @@ impl<M: Memory + Clone> Storage<M> {
         for reference in references.iter_mut() {
             let account_number = reference.account_number;
             reference.sessions.retain(|session| {
-                if session.is_expired(now) {
+                if session.is_over(now) {
                     expired.push((account_number, session.clone()));
                     return false;
                 }
