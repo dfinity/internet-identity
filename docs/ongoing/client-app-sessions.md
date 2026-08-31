@@ -234,11 +234,33 @@ Two questions cannot wait: whether the user is signed in, and who they are. A pa
 
 So the state is kept as its own small record, the account's principal and when the session expires, and the credentials are the material that acts on it rather than the record of it. Neither field is a secret, so the record can live somewhere a page reads without opening anything, while the keys and chains stay where a non-extractable key can be held and are read only when something signs.
 
+A read reports one more thing, which the record cannot hold: whether this origin holds a credential for the account named. Once the record crosses to a sibling subdomain every origin reads the same bytes, so that fact belongs to whoever is asking rather than to what is written, and a store that published it would be answering for somebody else. It is worked out on each read, and where the record reaches no further than this origin the answer is always yes.
+
 State leads. If the record says nobody is signed in, then nobody is, whatever is sitting in the credential store — and the credentials are what get discarded. Nothing runs the other way: material that is missing, spent or unusable is a reason to acquire more, never a reason to change who is signed in.
 
 That single rule does the work of several. A sign-out in another tab, an identity switch, a sign-out on a sibling subdomain, and a session that simply ended are all one thing: the record changed, so this client's material is stale. It is also why the record is written last when signing in, once there is material behind it, and removed first when signing out.
 
 Where the record is kept decides how far the state reaches. In a cookie it reaches every sibling of the domain, which is what lets one sign-out end them all. In `localStorage` it reaches this origin's tabs, which is the default and enough for an app that stands alone. Both are read synchronously, and both raise an event when they change, which is the only notification this design needs — nothing has to be told that a delegation was replaced, because a tab that wants one takes the lock and reads.
+
+#### Four states, named once
+
+Once the record can say _someone is signed in on this domain, but not here_, an application has four cases and not two, and a boolean cannot carry them. So there is one function that knows what the combinations mean:
+
+```ts
+type SessionStatus =
+  | { status: "signed-in"; principal: Principal }
+  | { status: "signed-in-elsewhere"; principal: Principal }
+  | { status: "expired"; principal: Principal }
+  | { status: "signed-out" };
+```
+
+The alternative is an application reading the record and deciding for itself, and it is not neutral: the two facts are a principal and an expiry, and the interesting cases come from combining them with what this origin holds. Combined at every call site, they get combined differently at some of them, and the difference that gets lost is between _signed in here_ and _signed in on this domain_ — which is the difference between rendering the app and asking the identity provider for a chain.
+
+`expired` is kept rather than folded into `signed-out` because an application can do something better with it: it still knows who the user was, so it can say _your session ended, sign back in_ instead of showing a bare signed-out screen. That is also why the record is not deleted the moment it lapses.
+
+`isAuthenticated()` stays, and is this narrowed to the first case. It answers the question it always answered, and an application that wants the other three asks for them.
+
+`getIdentity()` refuses in that second case rather than handing back an anonymous identity. Anonymous is the worst of the available answers there: calls go out unauthenticated while the record says somebody is signed in, and they fail at the canister rather than anywhere a caller was looking. So it throws instead, and the error names a recoverable condition — a sibling signed in, this origin has nothing yet, and asking the identity provider is what comes next.
 
 #### What makes a stored delegation safe to keep
 

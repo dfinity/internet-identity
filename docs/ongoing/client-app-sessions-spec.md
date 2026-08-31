@@ -328,10 +328,12 @@ A minted delegation carrying a `permissions` field is refused with an error nami
 **STATE-1.**
 The state is the record of the sign-in: the account's principal, and when the session expires. It is one record, held by its own store and supplied to `AuthClient` beside the credential store, and it is what decides whether this origin is signed in and as whom. The credentials are the material that acts on that state rather than the record of it.
 
+A read reports a third field, `held`, which is whether _this origin_ holds a credential for the account named. It is derived on read and never written or published, because it is not a property of the record: every sibling reads the same bytes, so a store that published it would be answering for an origin that is not the one asking. A store reaching no further than this origin reports it true unconditionally, having nowhere else for the record to have come from.
+
 It has no identity half and declares neither `shared` nor `durable`, since the lock of STORE-8 governs what mints and a state record mints nothing.
 
 **STATE-2.**
-It is read synchronously, which is what lets `isAuthenticated()` and `getPrincipal()` answer on a page load without awaiting anything — see API-2 and MINT-17. Where it is kept decides how far the state reaches and how a change in it is noticed:
+It is read synchronously, which is what lets `isAuthenticated()` and `getPrincipal()` answer on a page load without awaiting anything — see API-3 and MINT-17. Where it is kept decides how far the state reaches and how a change in it is noticed:
 
 | Store                | Reaches                     | Change observed through          |             |
 | -------------------- | --------------------------- | -------------------------------- | ----------- |
@@ -356,7 +358,7 @@ There are exactly two teardowns, distinguished by what they do to the state and 
 A page load is the second route to finding out, not a third act. Credentials rooted at an account the state no longer names MUST be discarded and MUST NOT be removed along with the state: the record naming another account was written by a sibling's ceremony, and a load that retracts it signs that sibling out.
 
 **STATE-5.**
-A state record may outlive the session it describes, so anything acting on one has to be able to fall back to asking the user and may not treat it as authority against the canister. The case with no recovery is a memory-backed configuration whose last tab closed without signing out: nothing dependable fires on a close, so the record stands, `getPrincipal()` answers from it, and the first call fails. That is API-3's optimism reached by a new route rather than a new kind of wrongness.
+A state record may outlive the session it describes, so anything acting on one has to be able to fall back to asking the user and may not treat it as authority against the canister. The case with no recovery is a memory-backed configuration whose last tab closed without signing out: nothing dependable fires on a close, so the record stands, `getPrincipal()` answers from it, and the first call fails. That is API-4's optimism reached by a new route rather than a new kind of wrongness.
 
 **STATE-6.**
 Where the state and the credentials disagree, the state decides. Credentials are discarded when the record is missing, when it names another account, or when it has expired — a sign-out, an identity switch, or a session that ended, whether it happened in this tab, another tab, or a sibling subdomain. Nothing goes the other way: material that is present, absent or unusable never changes the state.
@@ -475,13 +477,31 @@ Before the first call, a session chain is refused unless its `targets` name the 
 | `agentOptions`             | new; passed to the agent that makes the calls                                     | AGENT-3          |
 | `disableForegroundRefresh` | new; about when the library refreshes rather than about sessions                  | MINT-8           |
 
-`keyType` goes with them, the key type now belonging to a store's `create()`, and `AuthClientStorage`, `IdbStorage`, `LocalStorage` and the `KEY_STORAGE_*` constants stop being exported. `subscribe()` and `dispose()` are additions rather than existing signatures.
+`keyType` goes with them, the key type now belonging to a store's `create()`, and `AuthClientStorage`, `IdbStorage`, `LocalStorage` and the `KEY_STORAGE_*` constants stop being exported. `getStatus()`, `subscribe()` and `dispose()` are additions rather than existing signatures, and `SessionNotHeldError` is a new failure `getIdentity()` can raise where it previously could not — see API-5.
 
 **API-2.**
-`isAuthenticated()` reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints. It stays synchronous and makes no call, because it reads the state rather than the credentials — which is what lets a credential store be asynchronous without the answer becoming one.
+`getStatus()` is the one place that knows what the state's combinations mean, and returns a discriminated union rather than fields for an application to recombine:
+
+```ts
+type SessionStatus =
+  | { status: "signed-in"; principal: Principal }
+  | { status: "signed-in-elsewhere"; principal: Principal }
+  | { status: "expired"; principal: Principal }
+  | { status: "signed-out" };
+```
+
+The cases are tested in that order and the order is part of the contract: expiry is asked before `held`, so a record that has lapsed reports `expired` whatever this origin holds. `signed-in-elsewhere` is the case an application cannot reach by reading the record itself, and it is not an error — a sibling subdomain signed in, and a silent re-auth is what follows. `expired` is kept deliberately rather than collapsing to `signed-out`, because it is what lets an application say _your session ended, sign back in_ instead of showing a bare signed-out screen.
+
+Recombining `held` and the expiry at each call site is what this replaces, and it is where the difference between "signed in here" and "signed in on this domain" gets lost.
 
 **API-3.**
-`isAuthenticated()` is optimistic about revocation, and this is a change in kind. It answers from what the client stored, so a session revoked at the canister or from another browser still reads as authenticated until something mints and is told otherwise, at which point the stored session is dropped and subscribers are notified. Before sessions the answer could only go stale by expiry, which a client could compute; now it can go stale because someone acted. An application that must not act on a stale answer should make a call and handle its failure, which is the only thing that consults the canister.
+`isAuthenticated()` is `getStatus()` narrowed to its first case, and reports whether a session is held and unexpired, not whether an app delegation is currently valid. A held session with a lapsed delegation is authenticated, because the next call mints. It stays synchronous and makes no call, because it reads the state rather than the credentials — which is what lets a credential store be asynchronous without the answer becoming one.
 
 **API-4.**
+`isAuthenticated()` is optimistic about revocation, and this is a change in kind. It answers from what the client stored, so a session revoked at the canister or from another browser still reads as authenticated until something mints and is told otherwise, at which point the stored session is dropped and subscribers are notified. Before sessions the answer could only go stale by expiry, which a client could compute; now it can go stale because someone acted. An application that must not act on a stale answer should make a call and handle its failure, which is the only thing that consults the canister.
+
+**API-5.**
+`getIdentity()` MUST throw `SessionNotHeldError` rather than return an anonymous identity when the state names an account this origin holds no credential for — the `signed-in-elsewhere` case of API-2. Anonymous is the dangerous answer there: calls would go out unauthenticated while the record says someone is signed in, and an application checking `isAuthenticated()` first would not have been warned. The error is where a silent re-auth belongs, so it names a recoverable condition rather than a failure.
+
+**API-6.**
 `getIdentity()` performs no canister call and returns the same identity for the life of the session, including across the credential being replaced. The identity reaches whatever credential is current rather than holding one, so a rotation changes nothing an application can observe.
