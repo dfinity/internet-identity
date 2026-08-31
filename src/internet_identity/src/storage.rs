@@ -110,7 +110,9 @@ use crate::openid::OpenIdCredentialKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
-use crate::storage::account::{AccountReference, SessionRecord, MIN_SESSION_IDLE_NS};
+use crate::storage::account::{
+    AccountReference, SessionRecord, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
+};
 use crate::storage::anchor::Anchor;
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
@@ -2099,13 +2101,19 @@ impl<M: Memory + Clone> Storage<M> {
             now_ns,
         } = params;
 
-        // Clamped here rather than at the caller, so every path that creates a session
-        // gets the same range whatever it asked for. The ceiling is the life this
-        // session was actually granted: a bound longer than that could never be reached,
-        // and storing one would say something about the session that is not true.
-        let max_idle_ns = max_idle_ns.map(|requested| {
-            requested.clamp(MIN_SESSION_IDLE_NS, valid_till_ns.saturating_sub(now_ns))
-        });
+        // Defaulted and clamped here rather than at the caller, so every path that
+        // creates a session gets the same answer whatever it asked for. The ceiling is
+        // the life this session was actually granted: a bound longer than that could
+        // never be reached, and storing one would say something untrue about it.
+        //
+        // Raised then lowered rather than clamped in one call: `clamp` panics when its
+        // floor exceeds its ceiling, which a session granted less than the floor would
+        // do, and a trap is a poor answer to a short session.
+        let granted = valid_till_ns.saturating_sub(now_ns);
+        let max_idle_ns = max_idle_ns
+            .unwrap_or(DEFAULT_SESSION_IDLE_NS)
+            .max(MIN_SESSION_IDLE_NS)
+            .min(granted);
 
         // The row this session lands in has to exist first, but an existing one must not be
         // written here: the single write at the end of this function carries `last_used`.
@@ -2189,7 +2197,7 @@ impl<M: Memory + Clone> Storage<M> {
         for reference in references.iter_mut() {
             let account_number = reference.account_number;
             reference.sessions.retain(|session| {
-                if session.is_expired(now_ns) {
+                if session.is_over(now_ns) {
                     dropped.push((account_number, session.clone()));
                     return false;
                 }
