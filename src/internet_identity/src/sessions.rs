@@ -319,7 +319,7 @@ pub fn app_prepare_delegation(
 
     let expiration = u64::min(
         now.saturating_add(APP_DELEGATION_TTL_NS),
-        session.valid_till,
+        session.valid_till_ns,
     );
     let seed = account_seed(&account)?;
     let access = DelegationAccess::from_read_only(session.read_only);
@@ -348,7 +348,7 @@ pub fn app_get_delegation(
     let (account, session) = authorize_session(now)?;
 
     if request.expiration > now.saturating_add(APP_DELEGATION_TTL_NS)
-        || request.expiration > session.valid_till
+        || request.expiration > session.valid_till_ns
     {
         return Err(AppSessionError::NoMatchingSession);
     }
@@ -408,7 +408,7 @@ fn authorize_session(now: Timestamp) -> Result<(Account, SessionRecord), AppSess
     let session = sessions
         .into_iter()
         .find(|session| {
-            session.device_id == handle.device_id && session.created_at == handle.created_at
+            session.device_id == handle.device_id && session.created_at_ns == handle.created_at
         })
         .ok_or(AppSessionError::NoMatchingSession)?;
     if session.is_expired(now) {
