@@ -69,26 +69,29 @@ impl AccountReference {
     }
 }
 
+/// The shortest idle bound a session may be given.
+///
+/// An app delegation lasts five minutes and an active application replaces it a
+/// little before it expires, so a bound anywhere near that would end sessions
+/// plainly in use. Ten minutes is already the floor on a session's own length,
+/// so this shares that range rather than introducing a second one.
+pub const MIN_SESSION_IDLE_NS: u64 = 10 * crate::MINUTE_NS;
+
 /// A revocable session at one account. Only `last_refreshed` is mutable, which is why
 /// it is the one field absent from the seed.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct SessionRecord {
-    pub created_at: Timestamp,
-    pub valid_till: Timestamp,
-    /// How long this session may go unused before it is over, in nanoseconds.
-    ///
-    /// `None` is no bound beyond `valid_till`, which is what a request that asks
-    /// for nothing gets. A session is otherwise finished once nothing has minted
-    /// from it for this long, whatever life `valid_till` has left.
-    pub max_idle: Option<u64>,
-    pub last_refreshed: Option<Timestamp>,
+    pub created_at_ns: Timestamp,
+    pub valid_till_ns: Timestamp,
+    pub max_idle_ns: Option<u64>,
+    pub last_refreshed_ns: Option<Timestamp>,
     pub device_id: SessionDeviceId,
     pub read_only: bool,
 }
 
 impl SessionRecord {
     pub fn is_expired(&self, now: Timestamp) -> bool {
-        self.valid_till <= now
+        self.valid_till_ns <= now
     }
 
     /// Whether this session has gone unused for longer than it was allowed to.
@@ -97,11 +100,11 @@ impl SessionRecord {
     /// so a session abandoned immediately after sign-in is bounded like any other.
     /// A session with no bound is never idle.
     pub fn is_idle(&self, now: Timestamp) -> bool {
-        let Some(max_idle) = self.max_idle else {
+        let Some(max_idle_ns) = self.max_idle_ns else {
             return false;
         };
-        let last_used = self.last_refreshed.unwrap_or(self.created_at);
-        now.saturating_sub(last_used) >= max_idle
+        let last_used = self.last_refreshed_ns.unwrap_or(self.created_at_ns);
+        now.saturating_sub(last_used) >= max_idle_ns
     }
 
     /// Whether this session can still be minted from, on either bound.
@@ -115,8 +118,8 @@ impl SessionRecord {
     /// How long this session stayed in service: the span from its creation to the last time
     /// its app asked for a delegation. Bounded by the session's own lifetime.
     pub fn demonstrated_use(&self) -> u64 {
-        self.last_refreshed
-            .map_or(0, |refreshed| refreshed.saturating_sub(self.created_at))
+        self.last_refreshed_ns
+            .map_or(0, |refreshed| refreshed.saturating_sub(self.created_at_ns))
     }
 
     /// What the caps reclaim on, ascending: dead sessions first, then live ones by how
@@ -126,7 +129,7 @@ impl SessionRecord {
     /// abandoned, which recency alone gets backwards — the abandoned one was touched more
     /// recently. `device_id` only makes the order total.
     pub fn reclaim_order(&self, now: Timestamp) -> (bool, Timestamp, SessionDeviceId) {
-        let last_used = self.last_refreshed.unwrap_or(self.created_at);
+        let last_used = self.last_refreshed_ns.unwrap_or(self.created_at_ns);
         (
             !self.is_expired(now),
             last_used.saturating_add(self.demonstrated_use()),
