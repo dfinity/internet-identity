@@ -16,6 +16,7 @@ import { authenticationStore } from "$lib/stores/authentication.store";
 import {
   appSessionsForOrigin,
   discardAppSession,
+  rememberAppAccount,
   storeAppSession,
   type AppSessionRecord,
 } from "$lib/stores/app-session.store";
@@ -232,10 +233,7 @@ export const handleSessionDelegationRequest =
           prompt === "none" ? await appSessionsForOrigin(effectiveOrigin) : [];
         const chosen = chooseSilentSession({ held, hint });
 
-        let usable =
-          "record" in chosen
-            ? held.find((entry) => entry.record === chosen.record)
-            : undefined;
+        let usable = "session" in chosen ? chosen.session : undefined;
         if (usable && !(await sessionIsLive(usable.record))) {
           await discardAppSession({
             identityNumber: usable.identityNumber,
@@ -379,8 +377,10 @@ const createSession = async (
     expiresAtMillis: Number(prepared.expiration / BigInt(1_000_000)),
     createdAtNanos: prepared.created_at,
     accessLevel: authorized.accessLevel,
-    accountPrincipal: prepared.account_principal.toText(),
   };
+  await rememberAppAccount(key, {
+    accountPrincipal: prepared.account_principal.toText(),
+  });
   await storeAppSession(key, record);
   return { record };
 };

@@ -51,6 +51,7 @@ vi.mock("$lib/stores/authorization.store", async () => {
 import { handleSessionDelegationRequest } from "./sessionDelegation";
 import {
   appSessionsForOrigin,
+  rememberAppAccount,
   purgeAppSessions,
   storeAppSession,
 } from "$lib/stores/app-session.store";
@@ -82,6 +83,10 @@ const storedSession = async (identityNumber: bigint) => {
     key.getPublicKey(),
     new Date(Date.now() + 60 * 60 * 1000),
   );
+  await rememberAppAccount(
+    { identityNumber, origin: ORIGIN },
+    { accountPrincipal: "2vxsx-fae" },
+  );
   await storeAppSession(
     { identityNumber, origin: ORIGIN },
     {
@@ -90,7 +95,6 @@ const storedSession = async (identityNumber: bigint) => {
       expiresAtMillis: Date.now() + 60 * 60 * 1000,
       createdAtNanos: BigInt(1_000),
       accessLevel: "full-access" as const,
-      accountPrincipal: "2vxsx-fae",
     },
   );
 };
