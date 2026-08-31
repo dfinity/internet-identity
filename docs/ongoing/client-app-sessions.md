@@ -265,7 +265,9 @@ The alternative is an application reading the record and deciding for itself, an
 
 `expired` is kept rather than folded into `signed-out` because an application can do something better with it: it still knows who the user was, so it can say _your session ended, sign back in_ instead of showing a bare signed-out screen. That is also why the record is not deleted the moment it lapses.
 
-`isAuthenticated()` stays, and is this narrowed to the first case. It answers the question it always answered, and an application that wants the other three asks for them. `getPrincipal()` is the other half of what a render needs, and it answers from the same record — including for a record that has expired, since that still names whose session ended.
+`isAuthenticated()` stays, and is this narrowed to the first case. It answers the question it always answered, and an application that wants the other three asks for them. `getPrincipal()` is the other half of what a render needs and is narrowed to the same case: it answers who this origin can act as, and `undefined` wherever it cannot, so the two can never disagree.
+
+That is deliberately not "who does the record name". A principal handed back means calls made as it will be accepted, and `if (getPrincipal())` is the check an application will write — so answering for an expired record, or for one naming an account this origin holds nothing for, would give it permission it does not have. Those are the cases the four-way answer above is for, and it carries the account in each of them, with the status beside it.
 
 There is deliberately no `subscribe()` on the client. A change of state is announced by the store holding it, which is also the only thing that knows how a change arrives in the medium it was given; a second listener list in front of that one would forward what it was told and add nothing.
 
