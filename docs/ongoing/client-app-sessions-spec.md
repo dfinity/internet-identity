@@ -253,7 +253,9 @@ flowchart LR
 No mint starts at all while the session itself has less than the block margin left, and if one is already running an arrival joins it rather than starting a second.
 
 **MINT-1.**
-`getIdentity()` resolves to an identity that obtains an app delegation when one is needed. It does not promise to be holding one: signing in leaves it with the delegation minted during the ceremony, a session restored on a page load starts with whatever usable credential the store holds, and where there is none it mints on its first request.
+`getIdentity()` resolves to an identity that obtains an app delegation when one is needed, and it resolves only once it can sign. Signing in leaves it with the delegation minted during the ceremony; a session restored on a page load starts with whatever usable credential the store holds; and where there is none, the restore mints before `getIdentity()` resolves rather than leaving the first request to discover it.
+
+The wait is the point. An account key cannot be derived from the state — the record carries the account's principal, which is a hash of that key and not the key — so the only places one can come from are a stored app credential and a mint. A load with neither has nothing to build an identity around, and resolving anyway would hand an application something whose first call fails for a reason it cannot see. See MINT-13 for the two mints a load can make, only one of which is awaited.
 
 **MINT-2.**
 Before a delegation is held, the identity still answers for its principal, per MINT-17. Its delegation chain reports that key and no delegations, which is how "no authority yet" is represented.
@@ -299,9 +301,13 @@ No mint is started when the session itself has less than the block margin left. 
 **MINT-13.**
 A page load that restores a stored session goes through the trigger of MINT-7, since a load is the page becoming visible for the first time, and that trigger mints only when one is due. Both halves of that matter on a load.
 
-A load that reads a usable credential is not due, and MUST NOT mint. A load that finds none, or one inside the pre-mint threshold, is due and MUST mint in the background — before anything asks for an identity, and whether or not the application goes on to use one. Waiting for the first request to discover it would put the cost in front of a user action, which is what the trigger exists to avoid.
+A load makes at most two mints, and they are different acts with different rules.
 
-It still follows the trigger's conditions: with no DOM, or under `disableForegroundRefresh`, the load mints nothing and the first request pays for it. `getIdentity()` does not wait for any of these outcomes.
+The first belongs to the restore, and is awaited. Where the store holds no usable app credential the restore MUST mint before `getIdentity()` resolves, because an account key comes only from a stored credential or a mint, per MINT-1. This mint is unconditional: it does not consult `disableForegroundRefresh` and does not require a DOM, since neither has anything to say about whether an identity can be built. `getIdentity()` therefore does make canister calls on such a load, and waits for them.
+
+The second belongs to the trigger of MINT-7, and is not awaited. A load that reads a credential inside the pre-mint threshold is due for a replacement, and MUST mint it in the background — before anything asks for an identity, and whether or not the application goes on to use one, because waiting for the first request would put the cost in front of a user action. This one does follow the trigger's conditions: with no DOM, or under `disableForegroundRefresh`, it does not happen and the first request pays for it. `getIdentity()` does not wait for it.
+
+A load that reads a usable credential outside the threshold makes neither, and MUST NOT mint.
 
 A load with a non-durable store is therefore always due. A load consequently stops being where a session revoked elsewhere is discovered, since a stored credential reads the same either way. TAB-6 catches a session replaced in this browser; one revoked from another device is found at the next mint, which is within one delegation lifetime — the bound [revocable-app-sessions-spec.md](revocable-app-sessions-spec.md) sets in END-5, and the same bound that applies to a delegation minted a moment before the revocation.
 
@@ -518,4 +524,6 @@ Recombining `held` and the expiry at each call site is what this replaces, and i
 `getIdentity()` MUST throw `SessionNotHeldError` rather than return an anonymous identity when the state names an account this origin holds no credential for — the `signed-in-elsewhere` case of API-2. Anonymous is the dangerous answer there: calls would go out unauthenticated while the record says someone is signed in, and an application checking `isAuthenticated()` first would not have been warned. The error is where a silent re-auth belongs, so it names a recoverable condition rather than a failure.
 
 **API-6.**
-`getIdentity()` performs no canister call and returns the same identity for the life of the session, including across the credential being replaced. The identity reaches whatever credential is current rather than holding one, so a rotation changes nothing an application can observe.
+`getIdentity()` returns the same identity for the life of the session, including across the credential being replaced. The identity reaches whatever credential is current rather than holding one, so a rotation changes nothing an application can observe.
+
+It is not free on every call. The first call after a load that restored a session with no usable app credential waits for the mint of MINT-13, which is two canister calls. Every later call, and every call on a load that had a credential to adopt, returns without one. Resolving early instead — handing back an identity that cannot yet sign — would move the failure to the application's first request, where nothing explains it, and an application that renders on `isAuthenticated()` would already have drawn a signed-in page around it.
