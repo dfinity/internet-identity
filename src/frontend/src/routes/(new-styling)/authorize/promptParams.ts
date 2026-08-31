@@ -38,8 +38,10 @@ const PromptContextSchema = z.object({
     .transform((value) => Principal.fromText(value).toText())
     .optional()
     .catch(undefined),
+  // Arrives from the URL as the string it was written as, and from session storage as
+  // the boolean it was stored as, so the schema has to read both.
   resumable: z
-    .literal("true")
+    .union([z.literal("true"), z.literal(true)])
     .transform(() => true)
     .optional()
     .catch(undefined),
