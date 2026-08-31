@@ -126,24 +126,24 @@ A session is an entry in a list on the account reference introduced by [tracked-
 
 ```rust
 SessionRecord {
-    created_at: Timestamp,
-    valid_till: Timestamp,
-    max_idle: Duration,                 // how long it may outlive its use
-    last_refreshed: Option<Timestamp>,  // None until the first refresh
+    created_at_ns: Timestamp,
+    valid_till_ns: Timestamp,
+    max_idle_ns: u64,                      // how long it may outlive its use
+    last_refreshed_ns: Option<Timestamp>,  // None until the first refresh
     device_id: SessionDeviceId,
     read_only: bool,                    // from the consent that created it
 }
 ```
 
-Nothing else. Every field except `last_refreshed` is fixed for the session's life, which is also why `last_refreshed` is the only one absent from the seed ([session identity](#session-identity)).
+Nothing else. Every field except `last_refreshed_ns` is fixed for the session's life, which is also why `last_refreshed_ns` is the only one absent from the seed ([session identity](#session-identity)).
 
-`max_idle` is the one thing this record did not previously carry that an application asks for: see [a session that outlives its use](#a-session-that-outlives-its-use).
+`max_idle_ns` is the one thing this record did not previously carry that an application asks for: see [a session that outlives its use](#a-session-that-outlives-its-use).
 
 Whether a sign-in can be resumed without a ceremony is deliberately not here. The frontend holds the keypairs a silent re-auth needs, so the candidates are the records **it** keeps — a session it has forgotten is simply not among them, and there is nothing for the canister to store or check. [silent-reauth-redirect-spec.md](silent-reauth-redirect-spec.md) covers it.
 
 `read_only` is here rather than being a per-call argument because it describes what the session authorizes, so it has to be part of what a user sees and revokes. Same as MCP's grant.
 
-`last_refreshed` exists for the user rather than for the canister. "This browser used this app 3 minutes ago" against "5 weeks ago" is what makes a session list worth reading, and it is the signal that lets someone spot a session they do not recognise _still being used_ rather than merely still existing. [what refresh writes](#what-refresh-writes) covers what it costs.
+`last_refreshed_ns` exists for the user rather than for the canister. "This browser used this app 3 minutes ago" against "5 weeks ago" is what makes a session list worth reading, and it is the signal that lets someone spot a session they do not recognise _still being used_ rather than merely still existing. [what refresh writes](#what-refresh-writes) covers what it costs.
 
 Consequences of putting sessions on the reference rather than in their own map:
 
@@ -158,13 +158,13 @@ Consequences of putting sessions on the reference rather than in their own map:
 
 ### A session that outlives its use
 
-`valid_till` bounds a session absolutely. It says nothing about whether anybody is still there, so a browser abandoned an hour after signing in holds a usable session for the rest of thirty days.
+`valid_till_ns` bounds a session absolutely. It says nothing about whether anybody is still there, so a browser abandoned an hour after signing in holds a usable session for the rest of thirty days.
 
-`max_idle` bounds it relatively: a session from which nothing has been minted for that long is over, whatever `valid_till` says. Resolving one checks both.
+`max_idle_ns` bounds it relatively: a session from which nothing has been minted for that long is over, whatever `valid_till_ns` says. Resolving one checks both.
 
-The signal costs nothing, because it is already written. `last_refreshed` advances on every refresh and already drives eviction ordering under both caps, and [what refresh writes](#write-it-every-time) establishes that the write happens anyway. Expiry is a comparison at resolve time — no sweep, no new field to maintain, and the pruning of [expired records](#expired-records-are-pruned-on-writes-that-were-happening-anyway) collects them on writes that were happening regardless.
+The signal costs nothing, because it is already written. `last_refreshed_ns` advances on every refresh and already drives eviction ordering under both caps, and [what refresh writes](#write-it-every-time) establishes that the write happens anyway. Expiry is a comparison at resolve time — no sweep, no new field to maintain, and the pruning of [expired records](#expired-records-are-pruned-on-writes-that-were-happening-anyway) collects them on writes that were happening regardless.
 
-The range is 10 minutes to the session's own granted length, and an application that asks for nothing gets the session's length, which constrains nothing. The floor is not arbitrary: an app delegation lasts five minutes and an active application replaces it a little before it expires, so a bound near that would end sessions plainly in use. Ten minutes is already the floor on session length, so this shares a range rather than introducing a second.
+The range is 10 minutes to the session's own granted length, and an application that asks for nothing gets seven days. A default of the session's own length would have made the bound opt-in, which is the wrong way round: the reason to have it is the abandoned browser, and an abandoned browser is precisely the one whose application never asked. Seven days sits well inside the thirty a session may otherwise live, so the ordinary end of an unattended sign-in is idleness rather than expiry. The floor is not arbitrary: an app delegation lasts five minutes and an active application replaces it a little before it expires, so a bound near that would end sessions plainly in use. Ten minutes is already the floor on session length, so this shares a range rather than introducing a second.
 
 What the canister sees is mints, so "idle" here means no app delegation has been asked for. That is a narrower thing than a user being away, and it is the client's job to keep the two aligned: [client-app-sessions.md](client-app-sessions.md) has a browser mint on real user activity, so a present user with a quiet application still refreshes. Without that half, an application whose user is reading rather than clicking would be ended while they watched.
 
@@ -236,7 +236,7 @@ live, it takes the smallest of
 last_used + (last_used − created_at)
 ```
 
-where `last_used` is `last_refreshed`, or `created_at` for a session whose app never asked for
+where `last_used` is `last_refreshed_ns`, or `created_at_ns` for a session whose app never asked for
 a delegation at all. Read it as: how recently the session was used, extended by how long it
 stayed in service.
 
@@ -350,10 +350,10 @@ The construction needs no allocator: no counter cell, nothing to retire. Uniquen
 identities and apps is inherited from the account seed, which already distinguishes them.
 Unguessability comes from the salt, which is hashed into the account seed and again here.
 
-`created_at` and `device_id` are inputs, so a session's attribution cannot be rewritten in
+`created_at_ns` and `device_id` are inputs, so a session's attribution cannot be rewritten in
 storage without invalidating the session.
 
-Only the record's **immutable** fields feed the seed, which is why `last_refreshed` is not
+Only the record's **immutable** fields feed the seed, which is why `last_refreshed_ns` is not
 one: a mutable input would change the session's principal every time it was stamped.
 `read_only` is immutable and could be an input, but deliberately is not. It is a property of
 the authority rather than of the identity, and binding it would mean a consent change had
@@ -401,7 +401,7 @@ flowchart LR
 - To give the app access, the frontend **extends the chain** to a public key the app supplies. No private key is shared and and the frontend's key stays non-extractable.
 - `caller()` derives from the chain's root, the canister-signature key over `session_seed`, so it is the session principal at any chain depth. The canister-side lookup is depth-agnostic.
 - The app's hop carries `targets: [ii_canister_id]`. II has never set `targets`, though `delegation_signature_msg_with_permissions` already accepts them. This is a guardrail rather than a defence: see [what an attacker gets](#what-an-attacker-gets).
-- **Both hops expire with the session**, at `valid_till`. A shorter expiry on the app's hop would make the app return to the II frontend, and therefore navigate, every time its hop lapsed, which is the cadence this design exists to remove. It would also buy nothing, since a thief holding the hop can refresh for as long as it lasts either way, and revocation is the actual control ([what an attacker gets](#what-an-attacker-gets)).
+- **Both hops expire with the session**, at `valid_till_ns`. A shorter expiry on the app's hop would make the app return to the II frontend, and therefore navigate, every time its hop lapsed, which is the cadence this design exists to remove. It would also buy nothing, since a thief holding the hop can refresh for as long as it lasts either way, and revocation is the actual control ([what an attacker gets](#what-an-attacker-gets)).
 
 ### The JSON-RPC method
 
@@ -496,14 +496,14 @@ get_account_session : (GetAccountSessionRequest)
 also caps how long its own sign-ins stay valid, and a session must not outlive that, so the
 frontend sends that ceiling for an SSO identity even when the user picked no duration —
 matching what the existing delegation path already does. Every ceremony
-creates, so it always applies: the replacement's `valid_till` is measured from the ceremony
+creates, so it always applies: the replacement's `valid_till_ns` is measured from the ceremony
 that made it, and no session is ever renewed in place.
 
 A `device_name` over 128 bytes is refused as `InternalCanisterError`, and deliberately not
 given a variant of its own: the II frontend generates the name, so an over-long one is a
 broken client rather than something a user can hit.
 
-The `expiration` a `get` carries has to equal the session's `valid_till` exactly. The pair
+The `expiration` a `get` carries has to equal the session's `valid_till_ns` exactly. The pair
 is one ceremony split across an update and a query, so the query witnesses what the update
 prepared rather than searching for something close to it.
 
@@ -630,7 +630,7 @@ because which of them it is depends on whether a prune has happened to run.
 
 1. Look `caller()` up in the [session handle index](#finding-a-session-from-a-call). No entry is a caller with no session.
 2. Resolve the handle's account principal to `(anchor, application, account)` through the principal index, read that reference row, and take the record `device_id` names.
-3. Check that record's `valid_till`.
+3. Check that record's `valid_till_ns`.
 
 Three reads and no hashing. The handle's key is the derived session principal, so a hit is itself the proof that the caller is that session — there is nothing to compare and nothing to trust, because the caller cannot present a key it does not hold and no argument travels with the call.
 
@@ -644,7 +644,7 @@ Which of them a caller hit depends on whether a prune has happened to run, so di
 
 ### What refresh writes
 
-Refresh stamps `last_refreshed`. Naively that is a stable write on every call, and since `with_account_mut` rewrites the entire `(anchor, app)` reference-list blob, it rewrites the whole row rather than one field.
+Refresh stamps `last_refreshed_ns`. Naively that is a stable write on every call, and since `with_account_mut` rewrites the entire `(anchor, app)` reference-list blob, it rewrites the whole row rather than one field.
 
 #### Write it every time
 
@@ -666,11 +666,11 @@ The same write stamps the browser's last-used time, so [the registry](#registry)
 
 The two timestamps are different fields for different jobs and both are needed:
 
-| Field            | Lives on              | Drives                                                                               |
-| ---------------- | --------------------- | ------------------------------------------------------------------------------------ |
-| `last_used`      | the account reference | [account eviction](tracked-default-accounts-spec.md#bounding-growth)                 |
-| `last_refreshed` | the session record    | [the session cap](#the-session-cap)'s reclaim order and the user-facing session list |
-| `last_used`      | the device record     | [the registry](#registry) cap's eviction order and the settings device list          |
+| Field               | Lives on              | Drives                                                                               |
+| ------------------- | --------------------- | ------------------------------------------------------------------------------------ |
+| `last_used`         | the account reference | [account eviction](tracked-default-accounts-spec.md#bounding-growth)                 |
+| `last_refreshed_ns` | the session record    | [the session cap](#the-session-cap)'s reclaim order and the user-facing session list |
+| `last_used`         | the device record     | [the registry](#registry) cap's eviction order and the settings device list          |
 
 ## Revocation
 
@@ -805,7 +805,7 @@ with `{ id, key, pending, name, created_at, last_used }` per entry, **capped at 
 
 Rather than failing, for the same reason [the session cap](#the-session-cap) gives for sessions: the user is signing in on a new browser and the only thing that could refuse them is internal bookkeeping.
 
-Ordering on use rather than on `created_at` is load-bearing, not a nicety. Clearing browser storage loses the browser's key ([the accepted limitations](#three-accepted-limitations)), so every wipe enrols a fresh record and the wiping browser always holds the newest `created_at`. Under enrolment order it is therefore never its own victim: twenty wipes evict twenty genuinely-used browsers instead. Since eviction also ends the dropped browser's sessions, that signs the user out on devices they never touched. Ordering on `last_used` makes each wipe's throwaway records evict each other.
+Ordering on use rather than on `created_at_ns` is load-bearing, not a nicety. Clearing browser storage loses the browser's key ([the accepted limitations](#three-accepted-limitations)), so every wipe enrols a fresh record and the wiping browser always holds the newest `created_at_ns`. Under enrolment order it is therefore never its own victim: twenty wipes evict twenty genuinely-used browsers instead. Since eviction also ends the dropped browser's sessions, that signs the user out on devices they never touched. Ordering on `last_used` makes each wipe's throwaway records evict each other.
 
 `last_used` advances on a sign-in from that browser and on every session refresh it drives ([what refresh writes](#what-refresh-writes)). Sign-in alone would be too coarse a signal: a browser holding an app open for weeks without a fresh ceremony would read as idle and lose the cap to one that signed in once and went dark.
 
@@ -1036,7 +1036,7 @@ Every value the implementation fixes, in one place.
 | Session lifetime, default | 30 days                      | Used when a request names none                                                                       |
 | Session lifetime, maximum | 30 days                      | A longer request is clamped down to this, not refused                                                |
 | Session lifetime, minimum | 10 minutes                   | A shorter request is clamped up to this                                                              |
-| Idle bound, default       | the session's granted length | Used when a request names none, so it constrains nothing                                             |
+| Idle bound, default       | 7 days                       | Used when a request names none, and clamped down for a session granted less than that                |
 | Idle bound, maximum       | the session's granted length | A longer request is clamped down to this                                                             |
 | Idle bound, minimum       | 10 minutes                   | A shorter request is clamped up to this. It has to stay clear of the mint interval                   |
 | Sessions per identity     | 500                          | Stored, not live. Reaching it reclaims to a watermark of 450, dead sessions first                    |
@@ -1091,19 +1091,19 @@ created, how an app uses it, how it ends, and how browsers are tracked.
 | NEW-6 | The canister MUST sign the session to a key the II frontend holds and cannot export, and the frontend MUST extend the chain to the key the app supplies.                                                                                                      |
 | NEW-7 | The app's hop MUST be restricted to the II canister.                                                                                                                                                                                                          |
 | NEW-8 | The request MUST NOT name an account number, and no app-facing method MAY accept one.                                                                                                                                                                         |
-| NEW-9 | A request MAY carry an idle bound. It MUST be stored on the record, fixed for its life, and clamped to the range above.                                                                                                                                       |
+| NEW-9 | A request MAY carry an idle bound. Every record MUST carry one, the default where a request names none, fixed for its life and clamped to the range above.                                                                                                    |
 
 ### Using a session
 
-| #     | Requirement                                                                                                                                                                                                   |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| USE-1 | An app MUST NOT name an account, in an argument or an attachment. The canister MUST identify the session from `caller()` alone, and the account from that session.                                            |
-| USE-2 | Nothing an app receives or attaches may carry the identity number, the application number or the account number.                                                                                              |
-| USE-3 | The canister MUST resolve `caller()` through the session index, and MUST treat the absence of an entry as no usable session.                                                                                  |
-| USE-4 | A minted delegation MUST expire after five minutes, or with the session if that is sooner. The ceiling MUST be derived by the canister, not taken from the request.                                           |
-| USE-5 | Every refresh MUST stamp the session, the account reference, and the browser.                                                                                                                                 |
-| USE-6 | Refresh MUST NOT require a browser, navigation, popup or iframe.                                                                                                                                              |
-| USE-7 | Resolving a session MUST treat one whose last refresh is older than its idle bound as no usable session, on the same terms as one past `valid_till`. A session never refreshed is measured from its creation. |
+| #     | Requirement                                                                                                                                                                                                      |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| USE-1 | An app MUST NOT name an account, in an argument or an attachment. The canister MUST identify the session from `caller()` alone, and the account from that session.                                               |
+| USE-2 | Nothing an app receives or attaches may carry the identity number, the application number or the account number.                                                                                                 |
+| USE-3 | The canister MUST resolve `caller()` through the session index, and MUST treat the absence of an entry as no usable session.                                                                                     |
+| USE-4 | A minted delegation MUST expire after five minutes, or with the session if that is sooner. The ceiling MUST be derived by the canister, not taken from the request.                                              |
+| USE-5 | Every refresh MUST stamp the session, the account reference, and the browser.                                                                                                                                    |
+| USE-6 | Refresh MUST NOT require a browser, navigation, popup or iframe.                                                                                                                                                 |
+| USE-7 | Resolving a session MUST treat one whose last refresh is older than its idle bound as no usable session, on the same terms as one past `valid_till_ns`. A session never refreshed is measured from its creation. |
 
 ### Ending a session
 
