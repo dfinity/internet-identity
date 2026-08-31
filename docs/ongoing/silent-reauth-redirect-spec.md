@@ -12,7 +12,7 @@ sequenceDiagram
     participant App as sibling app
     participant IIF as II frontend
     participant IIC as II canister
-    App->>App: no local session, cookie has a hint
+    App->>App: no credentials held, the state names an account
     App->>IIF: redirect to /authorize?prompt=none&hint=<principal><br/>plus the URL transport's own callbackUrl
     Note over IIF: validate callbackUrl against ii-auth-callbacks<br/>and the derivation origin, as today
     Note over IIF: match the hint against the sessions held for this origin
@@ -67,7 +67,9 @@ Silently re-issuing to a sibling is inside consent already given: the user signe
 
 ## `hint` rules
 
-`hint` is a principal: the one an app resolves to for the account behind a session. That is `Principal.selfAuthenticating(user_key)`, where `user_key` is what `app_prepare_delegation` hands the app, and it is the same value `prepare_account_session` returns as `account_principal`. That is how it reaches the cookie a sibling reads it from.
+`hint` is a principal: the one an app resolves to for the account behind a session. That is `Principal.selfAuthenticating(user_key)`, where `user_key` is what `app_prepare_delegation` hands the app, and it is the same value `prepare_account_session` returns as `account_principal`. That is how it reaches the state record a sibling reads it from.
+
+The name belongs to this parameter and not to what the client stores. A sibling reads its state — the record of who is signed in on the domain and until when — and sends the principal from it as a `hint`; the record is not itself a hint, and calling it one made the two look like one thing when only the parameter is a suggestion II is free to refuse.
 
 It exists because one origin can hold more than one session: the user has signed in there under more than one identity, or under more than one account of one identity. Without a hint II would have to guess, and guessing wrong signs the user in as the wrong persona.
 
