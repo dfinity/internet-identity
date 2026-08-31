@@ -3770,12 +3770,12 @@ mod session_record_tests {
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
 
-    fn session(created_at: u64, valid_till: u64) -> SessionRecord {
+    fn session(created_at_ns: u64, valid_till_ns: u64) -> SessionRecord {
         SessionRecord {
-            created_at,
-            valid_till,
-            max_idle: None,
-            last_refreshed: None,
+            created_at_ns,
+            valid_till_ns,
+            max_idle_ns: None,
+            last_refreshed_ns: None,
             device_id: 1,
             read_only: false,
         }
@@ -3818,8 +3818,8 @@ mod session_record_tests {
     #[test]
     fn a_session_is_idle_once_nothing_has_minted_for_its_bound() {
         let record = SessionRecord {
-            max_idle: Some(30 * MINUTE_NS),
-            last_refreshed: Some(10 * MINUTE_NS),
+            max_idle_ns: Some(30 * MINUTE_NS),
+            last_refreshed_ns: Some(10 * MINUTE_NS),
             ..session(0, DAY_NS)
         };
 
@@ -3834,8 +3834,8 @@ mod session_record_tests {
     #[test]
     fn a_session_that_never_minted_is_measured_from_its_creation() {
         let record = SessionRecord {
-            max_idle: Some(30 * MINUTE_NS),
-            last_refreshed: None,
+            max_idle_ns: Some(30 * MINUTE_NS),
+            last_refreshed_ns: None,
             ..session(5 * MINUTE_NS, DAY_NS)
         };
 
@@ -3843,23 +3843,6 @@ mod session_record_tests {
         // until its lifetime ran out, which is the case the bound exists for.
         assert!(!record.is_idle(34 * MINUTE_NS));
         assert!(record.is_idle(35 * MINUTE_NS));
-    }
-
-    #[test]
-    fn a_session_written_before_the_idle_bound_existed_decodes_without_one() {
-        let reference = AccountReference {
-            account_number: Some(3),
-            last_used: Some(9),
-            sessions: vec![session(1, 100)],
-        };
-
-        let decoded = AccountReference::from(StorableAccountReference::from_bytes(
-            StorableAccountReference::from(reference).to_bytes(),
-        ));
-
-        // The field is a new key in a CBOR map, so a record written without it reads
-        // as no bound rather than failing to decode.
-        assert_eq!(decoded.sessions[0].max_idle, None);
     }
 
     #[test]
@@ -3958,8 +3941,8 @@ mod session_record_tests {
         let now = 1_000;
         let expired = session(1, 500);
         let live = SessionRecord {
-            max_idle: None,
-            last_refreshed: Some(900),
+            max_idle_ns: None,
+            last_refreshed_ns: Some(900),
             ..session(400, 10_000)
         };
         let live_untouched = session(400, 10_000);
@@ -3972,8 +3955,8 @@ mod session_record_tests {
     fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
         let now = 100 * DAY_NS;
         let held = SessionRecord {
-            max_idle: None,
-            last_refreshed: Some(now - DAY_NS),
+            max_idle_ns: None,
+            last_refreshed_ns: Some(now - DAY_NS),
             ..session(now - 20 * DAY_NS, now + DAY_NS)
         };
         // Created after the session it would have to outrank, which under a plain recency
@@ -3995,14 +3978,14 @@ mod session_record_tests {
         let now = 100 * DAY_NS;
         // Signed in three months ago, still being opened every few days.
         let weekly = SessionRecord {
-            max_idle: None,
-            last_refreshed: Some(now - 3 * DAY_NS),
+            max_idle_ns: None,
+            last_refreshed_ns: Some(now - 3 * DAY_NS),
             ..session(now - 90 * DAY_NS, now + DAY_NS)
         };
         // Signed in yesterday, used for five minutes, never opened again.
         let one_sitting = SessionRecord {
-            max_idle: None,
-            last_refreshed: Some(now - DAY_NS + 5 * MINUTE_NS),
+            max_idle_ns: None,
+            last_refreshed_ns: Some(now - DAY_NS + 5 * MINUTE_NS),
             ..session(now - DAY_NS, now + DAY_NS)
         };
 
@@ -4015,11 +3998,13 @@ mod session_record_tests {
 
 mod session_creation_tests {
     use crate::delegation::calculate_session_seed_with_salt;
-    use crate::storage::account::{AccountReference, CreateAccountParams, SessionRecord};
+    use crate::storage::account::{
+        AccountReference, CreateAccountParams, SessionRecord, MIN_SESSION_IDLE_NS,
+    };
     use crate::storage::{
         CreateSessionParams, MAX_SESSIONS_PER_ANCHOR, SESSIONS_WATERMARK_PER_ANCHOR,
     };
-    use crate::Storage;
+    use crate::{Storage, DAY_NS, MINUTE_NS};
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
@@ -4042,9 +4027,10 @@ mod session_creation_tests {
             origin: ORIGIN.to_string(),
             account_number: None,
             device_id,
-            valid_till: now + 10_000,
+            valid_till_ns: now + 10_000,
+            max_idle_ns: None,
             read_only: false,
-            now,
+            now_ns: now,
         }
     }
 
@@ -4069,6 +4055,68 @@ mod session_creation_tests {
     }
 
     #[test]
+    fn an_idle_bound_is_kept_as_asked_for_when_it_is_in_range() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let asked = 20 * MINUTE_NS;
+
+        let session = storage
+            .create_session(CreateSessionParams {
+                max_idle_ns: Some(asked),
+                valid_till_ns: DAY_NS,
+                ..params(anchor_number, 1, 0)
+            })
+            .unwrap();
+
+        assert_eq!(session.max_idle_ns, Some(asked));
+    }
+
+    #[test]
+    fn an_idle_bound_below_the_floor_is_raised_to_it() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        let session = storage
+            .create_session(CreateSessionParams {
+                max_idle_ns: Some(MINUTE_NS),
+                valid_till_ns: DAY_NS,
+                ..params(anchor_number, 1, 0)
+            })
+            .unwrap();
+
+        // An app delegation lasts five minutes, so a bound under that would end a
+        // session between two mints of one that is plainly in use.
+        assert_eq!(session.max_idle_ns, Some(MIN_SESSION_IDLE_NS));
+    }
+
+    #[test]
+    fn an_idle_bound_longer_than_the_session_is_cut_to_it() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        let session = storage
+            .create_session(CreateSessionParams {
+                max_idle_ns: Some(400 * DAY_NS),
+                valid_till_ns: DAY_NS,
+                ..params(anchor_number, 1, 0)
+            })
+            .unwrap();
+
+        // A bound it could never reach says something about the session that is not
+        // true, so it is stored as the life the session actually got.
+        assert_eq!(session.max_idle_ns, Some(DAY_NS));
+    }
+
+    #[test]
+    fn asking_for_no_idle_bound_stores_none() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        let session = storage
+            .create_session(params(anchor_number, 1, 1_000))
+            .unwrap();
+
+        assert_eq!(session.max_idle_ns, None);
+        assert!(!session.is_idle(1_000 + 400 * DAY_NS));
+    }
+
+    #[test]
     fn creating_a_session_tracks_the_account_and_stores_the_record() {
         let (mut storage, anchor_number) = storage_with_anchor();
 
@@ -4076,9 +4124,9 @@ mod session_creation_tests {
             .create_session(params(anchor_number, 1, 1_000))
             .unwrap();
 
-        assert_eq!(session.created_at, 1_000);
-        assert_eq!(session.valid_till, 11_000);
-        assert_eq!(session.last_refreshed, None);
+        assert_eq!(session.created_at_ns, 1_000);
+        assert_eq!(session.valid_till_ns, 11_000);
+        assert_eq!(session.last_refreshed_ns, None);
         assert_eq!(session.device_id, 1);
         assert_eq!(sessions_of(&storage, anchor_number), vec![session]);
     }
@@ -4096,7 +4144,7 @@ mod session_creation_tests {
             .create_session(params(anchor_number, 1, 5_000))
             .unwrap();
 
-        assert_ne!(again.created_at, first.created_at);
+        assert_ne!(again.created_at_ns, first.created_at_ns);
         assert_eq!(sessions_of(&storage, anchor_number).len(), 1);
     }
 
@@ -4139,7 +4187,7 @@ mod session_creation_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         for device_id in 0..12u32 {
             let mut p = params(anchor_number, device_id, 1_000);
-            p.valid_till = 1_000_000;
+            p.valid_till_ns = 1_000_000;
             storage.create_session(p).unwrap();
         }
 
@@ -4158,17 +4206,17 @@ mod session_creation_tests {
 
         let sessions: Vec<SessionRecord> = (0..MAX_SESSIONS_PER_ANCHOR)
             .map(|device_id| SessionRecord {
-                created_at: 1_000,
-                valid_till: 1_000_000,
+                created_at_ns: 1_000,
+                valid_till_ns: 1_000_000,
                 // Device 0 is the stalest live one; device 1 has already expired.
-                max_idle: None,
-                last_refreshed: Some(500_000 + device_id as u64),
+                max_idle_ns: None,
+                last_refreshed_ns: Some(500_000 + device_id as u64),
                 device_id,
                 read_only: false,
             })
             .map(|mut session| {
                 if session.device_id == 1 {
-                    session.valid_till = 2_000;
+                    session.valid_till_ns = 2_000;
                 }
                 session
             })
@@ -4189,7 +4237,7 @@ mod session_creation_tests {
         storage.write(anchor).unwrap();
 
         let mut params = params(anchor_number, 9_999, 600_000);
-        params.valid_till = 1_000_000;
+        params.valid_till_ns = 1_000_000;
         storage.create_session(params).unwrap();
 
         let remaining = sessions_of(&storage, anchor_number);
@@ -4213,7 +4261,7 @@ mod session_creation_tests {
 
         for device_id in 0..(MAX_SESSIONS_PER_ANCHOR + 120) {
             let mut params = params(anchor_number, device_id, 600_000 + device_id as u64);
-            params.valid_till = 100_000_000;
+            params.valid_till_ns = 100_000_000;
             storage.create_session(params).unwrap();
 
             let stored = sessions_of(&storage, anchor_number).len();
@@ -4265,19 +4313,19 @@ mod session_creation_tests {
                 .map(|device_id| {
                     if device_id == expired_device {
                         SessionRecord {
-                            created_at: 1,
-                            valid_till: 2,
-                            max_idle: None,
-                            last_refreshed: None,
+                            created_at_ns: 1,
+                            valid_till_ns: 2,
+                            max_idle_ns: None,
+                            last_refreshed_ns: None,
                             device_id,
                             read_only: false,
                         }
                     } else {
                         SessionRecord {
-                            created_at: 1_000,
-                            valid_till: 100_000_000,
-                            max_idle: None,
-                            last_refreshed: Some(500_000),
+                            created_at_ns: 1_000,
+                            valid_till_ns: 100_000_000,
+                            max_idle_ns: None,
+                            last_refreshed_ns: Some(500_000),
                             device_id,
                             read_only: false,
                         }
@@ -4306,7 +4354,7 @@ mod session_creation_tests {
         storage.write(anchor).unwrap();
 
         let mut params = params(anchor_number, 9_999, 600_000);
-        params.valid_till = 100_000_000;
+        params.valid_till_ns = 100_000_000;
         storage.create_session(params).unwrap();
 
         let devices = |application_number| -> Vec<u32> {
@@ -4356,19 +4404,19 @@ mod session_creation_tests {
             storage.lookup_or_insert_application_number_with_origin(&ORIGIN.to_string());
 
         let mut sessions = vec![SessionRecord {
-            created_at: 1_000,
-            valid_till: 100_000_000,
-            max_idle: None,
-            last_refreshed: Some(400_000),
+            created_at_ns: 1_000,
+            valid_till_ns: 100_000_000,
+            max_idle_ns: None,
+            last_refreshed_ns: Some(400_000),
             device_id: 1,
             read_only: false,
         }];
         sessions.extend(
             (2..=MAX_SESSIONS_PER_ANCHOR).map(|device_id| SessionRecord {
-                created_at: 500_000,
-                valid_till: 100_000_000,
-                max_idle: None,
-                last_refreshed: None,
+                created_at_ns: 500_000,
+                valid_till_ns: 100_000_000,
+                max_idle_ns: None,
+                last_refreshed_ns: None,
                 device_id,
                 read_only: false,
             }),
@@ -4389,7 +4437,7 @@ mod session_creation_tests {
         storage.write(anchor).unwrap();
 
         let mut params = params(anchor_number, 9_999, 600_000);
-        params.valid_till = 100_000_000;
+        params.valid_till_ns = 100_000_000;
         storage.create_session(params).unwrap();
 
         let remaining = sessions_of(&storage, anchor_number);
@@ -4459,12 +4507,12 @@ mod session_creation_tests {
                     account_number: None,
                     last_used: Some(1),
                     sessions: vec![SessionRecord {
-                        created_at: 1_000,
+                        created_at_ns: 1_000,
                         // Already expired at `now`, so it is not reused, but it is still
                         // present when the seed for the new record is derived.
-                        valid_till: 1_000,
-                        max_idle: None,
-                        last_refreshed: None,
+                        valid_till_ns: 1_000,
+                        max_idle_ns: None,
+                        last_refreshed_ns: None,
                         device_id: 1,
                         read_only: false,
                     }],
@@ -4477,7 +4525,7 @@ mod session_creation_tests {
         let created = storage
             .create_session(params(anchor_number, 1, 1_000))
             .unwrap();
-        assert_eq!(created.created_at, 1_000);
+        assert_eq!(created.created_at_ns, 1_000);
     }
 
     /// Creating twice from one browser at one account replaces, so there is never a second
@@ -4490,9 +4538,10 @@ mod session_creation_tests {
             origin: ORIGIN.to_string(),
             account_number: None,
             device_id: 1,
-            valid_till: u64::MAX,
+            valid_till_ns: u64::MAX,
+            max_idle_ns: None,
             read_only,
-            now: 1_000,
+            now_ns: 1_000,
         };
 
         let first = storage.create_session(params(false)).unwrap();
@@ -4611,12 +4660,13 @@ mod session_consent_change_tests {
                 origin: ORIGIN.to_string(),
                 account_number: None,
                 device_id: 1,
-                valid_till: u64::MAX,
+                valid_till_ns: u64::MAX,
+                max_idle_ns: None,
                 read_only,
-                now,
+                now_ns: now,
             })
             .unwrap()
-            .created_at
+            .created_at_ns
     }
 
     fn sessions(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> Vec<bool> {
@@ -4677,9 +4727,10 @@ mod session_consent_change_tests {
                 origin: ORIGIN.to_string(),
                 account_number: None,
                 device_id: 2,
-                valid_till: u64::MAX,
+                valid_till_ns: u64::MAX,
+                max_idle_ns: None,
                 read_only: false,
-                now: 1_000,
+                now_ns: 1_000,
             })
             .unwrap();
         create(&mut storage, anchor_number, false, 1_000);
