@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
+import { Principal } from "@icp-sdk/core/principal";
 
 const CANISTER_ID_TEXT = "rwlgt-iiaaa-aaaaa-aaaaa-cai";
 const ORIGIN = "https://app.example.com";
@@ -35,6 +36,27 @@ vi.mock("@icp-sdk/core/agent", async () => {
     },
   };
 });
+vi.mock("$lib/stores/authentication.store", async () => {
+  const { writable } = await import("svelte/store");
+  return { authenticationStore: writable<unknown>(undefined) };
+});
+vi.mock("$lib/stores/browser-key.store", () => ({
+  withBrowserProof: (
+    _identityNumber: bigint,
+    _sessionKey: Uint8Array,
+    signIn: (proof: unknown) => Promise<unknown>,
+  ) =>
+    signIn({
+      publicKey: new Uint8Array(),
+      nextPublicKey: new Uint8Array(),
+      signature: new Uint8Array(),
+      nextSignature: new Uint8Array(),
+      accept: () => Promise.resolve(),
+    }),
+}));
+vi.mock("$lib/stores/channelHandlers/describeBrowser", () => ({
+  describeBrowser: () => Promise.resolve("a browser"),
+}));
 
 const setRequestContext = vi.fn();
 vi.mock("$lib/stores/authorization.store", async () => {
@@ -43,18 +65,87 @@ vi.mock("$lib/stores/authorization.store", async () => {
     authorizationStore: {
       setRequestContext: (...args: unknown[]) => setRequestContext(...args),
     },
-    authorizedStore: { subscribe: () => () => {} },
+    authorizedStore: writable<unknown>(undefined),
     authorizationPromptStore: writable<{ prompt?: string; hint?: string }>({}),
   };
 });
 
 import { handleSessionDelegationRequest } from "./sessionDelegation";
 import {
+  appAccountsForOrigin,
   appSessionsForOrigin,
+  rememberAppAccount,
   purgeAppSessions,
   storeAppSession,
 } from "$lib/stores/app-session.store";
 import { INTERACTION_REQUIRED_ERROR_CODE } from "$lib/utils/transport/utils";
+
+/** Drives one ceremony to the point where the session it created is either kept or
+ *  discarded, which is the whole of what `resumable` decides. */
+const runCeremony = async (resumable?: boolean) => {
+  const { authorizationPromptStore, authorizedStore } =
+    await import("$lib/stores/authorization.store");
+  authorizationPromptStore.set(resumable === undefined ? {} : { resumable });
+
+  const identityNumber = BigInt(10_000);
+  const sessionKey = await ECDSAKeyIdentity.generate({ extractable: true });
+  const expiration = BigInt(Date.now() + 60 * 60 * 1000) * BigInt(1_000_000);
+  const chain = await DelegationChain.create(
+    sessionKey,
+    sessionKey.getPublicKey(),
+    new Date(Number(expiration / BigInt(1_000_000))),
+  );
+  const signed = chain.delegations[0];
+
+  const actor = {
+    prepare_account_session: () =>
+      Promise.resolve({
+        Ok: {
+          user_key: new Uint8Array(chain.publicKey),
+          expiration,
+          created_at: BigInt(1_000),
+          account_principal: Principal.fromText("2vxsx-fae"),
+          device_id: BigInt(1),
+        },
+      }),
+    get_account_session: () =>
+      Promise.resolve({
+        Ok: {
+          signed_delegation: {
+            delegation: {
+              pubkey: new Uint8Array(signed.delegation.pubkey),
+              expiration: signed.delegation.expiration,
+              targets: [],
+            },
+            signature: new Uint8Array(signed.signature),
+          },
+        },
+      }),
+  };
+  const { authenticationStore } =
+    await import("$lib/stores/authentication.store");
+  authenticationStore.set({
+    identityNumber,
+    actor,
+    authMethod: { passkey: {} },
+  });
+  authorizedStore.set({
+    accountNumberPromise: Promise.resolve(undefined),
+    accessLevel: "full-access",
+  });
+
+  const { channel, sent } = channelWith();
+  await handleSessionDelegationRequest(
+    channel,
+    vi.fn(),
+  )({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "ii_session_delegation",
+    params: { sessionPublicKey: await appKey() },
+  });
+  return { sent };
+};
 
 const channelWith = () => {
   const sent: unknown[] = [];
@@ -82,6 +173,10 @@ const storedSession = async (identityNumber: bigint) => {
     key.getPublicKey(),
     new Date(Date.now() + 60 * 60 * 1000),
   );
+  await rememberAppAccount(
+    { identityNumber, origin: ORIGIN },
+    { accountPrincipal: "2vxsx-fae" },
+  );
   await storeAppSession(
     { identityNumber, origin: ORIGIN },
     {
@@ -90,7 +185,6 @@ const storedSession = async (identityNumber: bigint) => {
       expiresAtMillis: Date.now() + 60 * 60 * 1000,
       createdAtNanos: BigInt(1_000),
       accessLevel: "full-access" as const,
-      accountPrincipal: "2vxsx-fae",
     },
   );
 };
@@ -429,5 +523,36 @@ describe("requests that fall through to a ceremony", () => {
     // local state, because silence is something an app has to ask for.
     expect(setRequestContext).toHaveBeenCalled();
     expect(sent).toEqual([]);
+  });
+});
+
+describe("keeping a session for later", () => {
+  beforeEach(async () => {
+    await purgeAppSessions(BigInt(10_000));
+    await purgeAppSessions(BigInt(10_001));
+  });
+
+  it("keeps a session the app asked to be resumable", async () => {
+    const { sent } = await runCeremony(true);
+
+    expect(sent).toHaveLength(1);
+    await expect(appSessionsForOrigin(ORIGIN)).resolves.toHaveLength(1);
+  });
+
+  it("answers without keeping a session the app did not ask to be resumable", async () => {
+    const { sent } = await runCeremony();
+
+    // The app is served either way: what `resumable` decides is only whether this
+    // browser can answer the next request without another ceremony.
+    expect(sent).toHaveLength(1);
+    await expect(appSessionsForOrigin(ORIGIN)).resolves.toEqual([]);
+  });
+
+  it("remembers the account even when the session is not kept", async () => {
+    await runCeremony();
+
+    await expect(appAccountsForOrigin(ORIGIN)).resolves.toMatchObject([
+      { record: { accountPrincipal: "2vxsx-fae" } },
+    ]);
   });
 });
