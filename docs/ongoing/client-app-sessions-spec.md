@@ -148,11 +148,9 @@ A credential store declares two facts about its medium, and only it can:
 | `MemoryCredentialStorage`       | false    | false     |
 | `SharedMemoryCredentialStorage` | true     | false     |
 
-`SharedMemoryCredentialStorage` is specified and not built. It is the one entry here with no shipping implementation, kept because it is what the `shared`/`durable` split is for and because the two axes are otherwise indistinguishable from one; an application wanting it supplies its own.
+`SharedMemoryCredentialStorage` is what makes the two axes distinguishable rather than one: it is the only shipping store that is shared and not durable, and the redirect rule of ACQ-8 is the only rule that tells them apart. An earlier version of this design had the library own the channel directly — see _Why not a channel_ — and it lives behind the interface instead, which is the point of `shared` being a fact a medium reports rather than something the library arranges.
 
-An earlier version of this design had the library own a `BroadcastChannel` directly, and it was built and then removed — see _Why not a channel_. The store is where that mechanism belongs if anyone wants it, which is the whole point of `shared` being a fact a medium reports rather than something the library arranges.
-
-`shared` is whether another tab of this origin reads what it writes; `durable` is whether it survives this document being torn down. The axes are independent — shared without durable is the channel-backed store, and durable without shared is a `sessionStorage`-backed one nothing ships but which is coherent. Both are required rather than optional: the safe default for either would be the counter-intuitive one, since a store that stays silent about being shared costs a mint in every tab.
+`shared` is whether another tab of this origin reads what it writes; `durable` is whether it survives this document being torn down. The axes are independent — shared without durable is the channel-backed store of STORE-14, and durable without shared is a `sessionStorage`-backed one nothing ships but which is coherent. Both are required rather than optional: the safe default for either would be the counter-intuitive one, since a store that stays silent about being shared costs a mint in every tab.
 
 **STORE-8.**
 The lock is `navigator.locks`, named for the `app` slot, and it belongs to `AuthClient` rather than to a store. Locking is the library coordinating with itself, so an application writing a custom store answers STORE-7 and needs to know nothing about the Web Locks API. A mint takes the lock when the store is `shared`; where it is not, there is nothing to suppress and TAB-13 applies.
@@ -185,6 +183,13 @@ Only a store that has to serialise needs a key whose private bytes are readable,
 The memory-backed stores hold a `Map` keyed by slot, on the instance and never on the module. Two clients on one page must not see each other's slots — which is what the namespace of STORE-4 is for, and a module-level map would defeat it — and state must not carry between tests sharing a process. Nothing about the map is weak: it is keyed by a string, so there is no object to key on and nothing collectable while a slot still names it.
 
 A memory-backed store returns the record it was given rather than a copy. That is the difference from every other store, each of which round-trips through an encoding and hands back something new, and it is what lets one hold a non-extractable key at all. Nothing in the library mutates a `SignIdentity` or a `DelegationChain` it read.
+
+**STORE-14.**
+A store shared through a channel rather than a shared medium holds nothing when it starts, while its peers hold everything. It MUST reach them without a deadline, because a deadline is either too short to save the mint or long enough to be paid by a tab that had no peer at all.
+
+Each instance holds a lock under a name only it uses, taken and confirmed held before it looks, so presence is a fact that can be enumerated and its own name filtered out by name rather than by ordering. A starting instance names the peers holding one, asks, and waits for whichever comes first: an answer, or the grant of every named peer's lock — which arrives when the browser releases it, and so says the peer is gone rather than slow. An instance with no peer waits not at all, there being no lock to be granted.
+
+An answer is sent even when the answering instance holds nothing, because the asker is waiting on an answer and "nothing" is one. Records from an answer fill gaps and MUST NOT replace what the asker has written since: the answer describes a moment already past. Where the environment has no Web Locks every instance starts alone, which costs mints and never correctness, per TAB-9.
 
 **KEY-1.**
 The session key is stored in the `session` slot, so it is the key that survives a reload and it inherits whatever non-extractable backing the configured store provides.
