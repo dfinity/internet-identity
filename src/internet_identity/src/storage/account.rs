@@ -75,36 +75,29 @@ impl AccountReference {
 pub struct SessionRecord {
     pub created_at_ns: Timestamp,
     pub valid_till_ns: Timestamp,
-    pub max_idle_ns: Option<u64>,
+    pub max_idle_ns: u64,
     pub last_refreshed_ns: Option<Timestamp>,
     pub device_id: SessionDeviceId,
     pub read_only: bool,
 }
 
 impl SessionRecord {
-    pub fn is_expired(&self, now: Timestamp) -> bool {
-        self.valid_till_ns <= now
-    }
-
-    /// Whether this session has gone unused for longer than it was allowed to.
+    /// Whether this session is finished, on either bound.
     ///
-    /// Measured from the last mint, or from creation where nothing has minted yet,
-    /// so a session abandoned immediately after sign-in is bounded like any other.
-    /// A session with no bound is never idle.
-    pub fn is_idle(&self, now: Timestamp) -> bool {
-        let Some(max_idle_ns) = self.max_idle_ns else {
-            return false;
-        };
-        let last_used = self.last_refreshed_ns.unwrap_or(self.created_at_ns);
-        now.saturating_sub(last_used) >= max_idle_ns
-    }
-
-    /// Whether this session can still be minted from, on either bound.
+    /// One question rather than two, because a caller has no use for the halves
+    /// apart: a session past its lifetime and one nobody has used for longer than
+    /// it was allowed are equally over. Asking separately is how a caller ends up
+    /// checking one and forgetting the other.
     ///
-    /// The two are one question at the point of use, and asking them separately is
-    /// how a caller ends up checking one and forgetting the other.
+    /// Idleness is measured from the last mint, or from creation where nothing has
+    /// minted yet, so a session abandoned immediately after sign-in is bounded like
+    /// any other.
     pub fn is_over(&self, now: Timestamp) -> bool {
-        self.is_expired(now) || self.is_idle(now)
+        if self.valid_till_ns <= now {
+            return true;
+        }
+        let last_used = self.last_refreshed_ns.unwrap_or(self.created_at_ns);
+        now.saturating_sub(last_used) >= self.max_idle_ns
     }
 
     /// How long this session stayed in service: the span from its creation to the last time
@@ -123,7 +116,7 @@ impl SessionRecord {
     pub fn reclaim_order(&self, now: Timestamp) -> (bool, Timestamp, SessionDeviceId) {
         let last_used = self.last_refreshed_ns.unwrap_or(self.created_at_ns);
         (
-            !self.is_expired(now),
+            !self.is_over(now),
             last_used.saturating_add(self.demonstrated_use()),
             self.device_id,
         )
