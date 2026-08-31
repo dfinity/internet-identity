@@ -128,6 +128,7 @@ A session is an entry in a list on the account reference introduced by [tracked-
 SessionRecord {
     created_at: Timestamp,
     valid_till: Timestamp,
+    max_idle: Duration,                 // how long it may outlive its use
     last_refreshed: Option<Timestamp>,  // None until the first refresh
     device_id: SessionDeviceId,
     read_only: bool,                    // from the consent that created it
@@ -135,6 +136,10 @@ SessionRecord {
 ```
 
 Nothing else. Every field except `last_refreshed` is fixed for the session's life, which is also why `last_refreshed` is the only one absent from the seed ([session identity](#session-identity)).
+
+`max_idle` is the one thing this record did not previously carry that an application asks for: see [a session that outlives its use](#a-session-that-outlives-its-use).
+
+Whether a sign-in can be resumed without a ceremony is deliberately not here. The frontend holds the keypairs a silent re-auth needs, so the candidates are the records **it** keeps — a session it has forgotten is simply not among them, and there is nothing for the canister to store or check. [silent-reauth-redirect-spec.md](silent-reauth-redirect-spec.md) covers it.
 
 `read_only` is here rather than being a per-call argument because it describes what the session authorizes, so it has to be part of what a user sees and revokes. Same as MCP's grant.
 
@@ -150,6 +155,20 @@ Consequences of putting sessions on the reference rather than in their own map:
 - The reference list is keyed `(anchor, application)`, so one identity's rows are a contiguous
   range. That range is what every identity-scoped operation uses: counting, pruning, and
   finding the sessions of one browser ([the session cap](#the-session-cap)).
+
+### A session that outlives its use
+
+`valid_till` bounds a session absolutely. It says nothing about whether anybody is still there, so a browser abandoned an hour after signing in holds a usable session for the rest of thirty days.
+
+`max_idle` bounds it relatively: a session from which nothing has been minted for that long is over, whatever `valid_till` says. Resolving one checks both.
+
+The signal costs nothing, because it is already written. `last_refreshed` advances on every refresh and already drives eviction ordering under both caps, and [what refresh writes](#write-it-every-time) establishes that the write happens anyway. Expiry is a comparison at resolve time — no sweep, no new field to maintain, and the pruning of [expired records](#expired-records-are-pruned-on-writes-that-were-happening-anyway) collects them on writes that were happening regardless.
+
+The range is 10 minutes to the session's own granted length, and an application that asks for nothing gets the session's length, which constrains nothing. The floor is not arbitrary: an app delegation lasts five minutes and an active application replaces it a little before it expires, so a bound near that would end sessions plainly in use. Ten minutes is already the floor on session length, so this shares a range rather than introducing a second.
+
+What the canister sees is mints, so "idle" here means no app delegation has been asked for. That is a narrower thing than a user being away, and it is the client's job to keep the two aligned: [client-app-sessions.md](client-app-sessions.md) has a browser mint on real user activity, so a present user with a quiet application still refreshes. Without that half, an application whose user is reading rather than clicking would be ended while they watched.
+
+It replaces a timeout the client used to enforce alone. A timer in a page cannot be relied on — clearing storage or running where it does not fire simply skips it — and it saw one document, so a backgrounded tab signed out a user working in the tab beside it. Here it is enforced, and because a session belongs to a browser rather than a document it covers every tab of that browser at once.
 
 ### Finding a session from a call
 
@@ -971,7 +990,7 @@ Note the stable writes from [what refresh writes](#what-refresh-writes) scale wi
 
 #### The table is a ceiling, not a steady state
 
-Nobody uses an app 24 hours a day. A session refreshes only while its app is open and doing something, so real load is far lower and spread out, driven either on demand when a call finds an expired delegation or by a timer in the client. A stored session that nobody is using costs nothing, since refresh is the only thing that generates load and an idle client does not refresh.
+Nobody uses an app 24 hours a day. A session refreshes only while its app is open and doing something, so real load is far lower and spread out, driven either on demand when a call finds an expired delegation or by the client refreshing ahead of use. A stored session that nobody is using costs nothing, since refresh is the only thing that generates load and an idle client does not refresh.
 
 Signing several delegations ahead in one update looks like an escape and is not: revocation latency equals the maximum lifetime of any already-issued delegation, so pre-signing is the same thing as a longer TTL. Without the relying party checking with II per call, T is the only dial.
 
@@ -1011,15 +1030,18 @@ Also out of scope: whether to fold MCP's grant into this mechanism. The value sh
 
 Every value the implementation fixes, in one place.
 
-| Constant                  | Value      | What it bounds                                                                                       |
-| ------------------------- | ---------- | ---------------------------------------------------------------------------------------------------- |
-| App-delegation lifetime   | 5 minutes  | How long a minted delegation lasts, and therefore how long revocation takes to bite. Not requestable |
-| Session lifetime, default | 30 days    | Used when a request names none                                                                       |
-| Session lifetime, maximum | 30 days    | A longer request is clamped down to this, not refused                                                |
-| Session lifetime, minimum | 10 minutes | A shorter request is clamped up to this                                                              |
-| Sessions per identity     | 500        | Stored, not live. Reaching it reclaims to a watermark of 450, dead sessions first                    |
-| Browsers per identity     | 20         | Reaching it drops the least recently used, and ends that browser's sessions                          |
-| Browser name              | 128 bytes  | Longer is refused                                                                                    |
+| Constant                  | Value                        | What it bounds                                                                                       |
+| ------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
+| App-delegation lifetime   | 5 minutes                    | How long a minted delegation lasts, and therefore how long revocation takes to bite. Not requestable |
+| Session lifetime, default | 30 days                      | Used when a request names none                                                                       |
+| Session lifetime, maximum | 30 days                      | A longer request is clamped down to this, not refused                                                |
+| Session lifetime, minimum | 10 minutes                   | A shorter request is clamped up to this                                                              |
+| Idle bound, default       | the session's granted length | Used when a request names none, so it constrains nothing                                             |
+| Idle bound, maximum       | the session's granted length | A longer request is clamped down to this                                                             |
+| Idle bound, minimum       | 10 minutes                   | A shorter request is clamped up to this. It has to stay clear of the mint interval                   |
+| Sessions per identity     | 500                          | Stored, not live. Reaching it reclaims to a watermark of 450, dead sessions first                    |
+| Browsers per identity     | 20                           | Reaching it drops the least recently used, and ends that browser's sessions                          |
+| Browser name              | 128 bytes                    | Longer is refused                                                                                    |
 
 Two orderings an implementer would otherwise have to invent. The session cap takes dead
 sessions before live ones, and orders the live on `last_used + (last_used − created_at)`,
@@ -1069,17 +1091,19 @@ created, how an app uses it, how it ends, and how browsers are tracked.
 | NEW-6 | The canister MUST sign the session to a key the II frontend holds and cannot export, and the frontend MUST extend the chain to the key the app supplies.                                                                                                      |
 | NEW-7 | The app's hop MUST be restricted to the II canister.                                                                                                                                                                                                          |
 | NEW-8 | The request MUST NOT name an account number, and no app-facing method MAY accept one.                                                                                                                                                                         |
+| NEW-9 | A request MAY carry an idle bound. It MUST be stored on the record, fixed for its life, and clamped to the range above.                                                                                                                                       |
 
 ### Using a session
 
-| #     | Requirement                                                                                                                                                         |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| USE-1 | An app MUST NOT name an account, in an argument or an attachment. The canister MUST identify the session from `caller()` alone, and the account from that session.  |
-| USE-2 | Nothing an app receives or attaches may carry the identity number, the application number or the account number.                                                    |
-| USE-3 | The canister MUST resolve `caller()` through the session index, and MUST treat the absence of an entry as no usable session.                                        |
-| USE-4 | A minted delegation MUST expire after five minutes, or with the session if that is sooner. The ceiling MUST be derived by the canister, not taken from the request. |
-| USE-5 | Every refresh MUST stamp the session, the account reference, and the browser.                                                                                       |
-| USE-6 | Refresh MUST NOT require a browser, navigation, popup or iframe.                                                                                                    |
+| #     | Requirement                                                                                                                                                                                                   |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| USE-1 | An app MUST NOT name an account, in an argument or an attachment. The canister MUST identify the session from `caller()` alone, and the account from that session.                                            |
+| USE-2 | Nothing an app receives or attaches may carry the identity number, the application number or the account number.                                                                                              |
+| USE-3 | The canister MUST resolve `caller()` through the session index, and MUST treat the absence of an entry as no usable session.                                                                                  |
+| USE-4 | A minted delegation MUST expire after five minutes, or with the session if that is sooner. The ceiling MUST be derived by the canister, not taken from the request.                                           |
+| USE-5 | Every refresh MUST stamp the session, the account reference, and the browser.                                                                                                                                 |
+| USE-6 | Refresh MUST NOT require a browser, navigation, popup or iframe.                                                                                                                                              |
+| USE-7 | Resolving a session MUST treat one whose last refresh is older than its idle bound as no usable session, on the same terms as one past `valid_till`. A session never refreshed is measured from its creation. |
 
 ### Ending a session
 

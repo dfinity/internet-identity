@@ -43,6 +43,7 @@ Three nested lifetimes, and two marks near the end of a delegation.
 | ----------------------- | ----------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | Session lifetime        | 10 minutes to 30 days               | the app requests a ceiling, the user chooses at consent, an SSO cap narrows, II clamps | how long anything can be minted at all                              |
 | Requested ceiling       | 8 hours where the app asks for none | this library                                                                           | what the ceiling above is, for an app that sets nothing             |
+| Idle bound              | 10 minutes to the session's length  | the app requests it, II clamps and enforces                                            | how long a session outlives its use, before II ends it              |
 | App delegation lifetime | `min(5 minutes, session left)`      | II, and not requestable                                                                | how long one delegation signs an app's calls                        |
 | Pre-mint threshold      | 15 seconds before expiry            | this library                                                                           | when a refresh is scheduled, and when a request mints behind itself |
 | Block margin            | 10 seconds before expiry            | this library                                                                           | below this a request waits for a mint                               |
@@ -123,6 +124,16 @@ sequenceDiagram
 
 An application that has gone quiet still has a refresh armed, and firing it would record the session as used. So a scheduled mint asks whether the delegation it is replacing signed a request, and cancels if it did not. Asked of each delegation separately, one request cannot buy an indefinite chain.
 
+#### A session that outlives its use
+
+A session lasts until its ceiling whether or not anybody is there. That is the wrong default on a shared machine, and it is why the library has always shipped an idle timeout that signs the user out after ten quiet minutes.
+
+Enforcing that in the browser was never sound. It is a timer in a page: clear storage, or run somewhere the timer does not fire, and it does not happen. It also only ever saw one document, so a tab left in the background signed out a user who was working in the tab beside it.
+
+So the bound moves to where it can be enforced. An application asks for one, the canister keeps it with the session, and a session nothing has minted from within it ends. Nothing has to fire in a browser, which is the argument this design already makes for not depending on an unload event — and because it is kept per browser rather than per document, every tab and every device is covered without a shared stamp or a protocol between tabs.
+
+What the canister sees is mints, so a client has to make its own presence visible. That is the next two sections, and it is not a new mechanism: this design already mints when a tab comes back, on the bet that a request is about to follow.
+
 #### Coming back to a tab
 
 A backgrounded tab has its timers throttled, so its delegation lapses unnoticed and the first click after returning waits for a mint. Returning happens a second or two before that click, long enough to cover one, so becoming visible or regaining focus mints if one is due.
@@ -152,6 +163,14 @@ That gives up something worth naming. The load mint used to be what found a sess
 | A recurring timer                        | never, and this is the thing the design rejects                      | not applicable        |
 
 A delegation lasts `min(five minutes, what remains of the session)`, so a session with less than the block margin left is treated as over rather than minted against.
+
+#### Activity is the same bet as coming back
+
+A user moving a mouse is very likely about to do something that needs a delegation, so activity joins foregrounding as a trigger — presses, keys, pointer movement, the wheel. They are the events the retired idle timer already listened to, put to a better use.
+
+Nothing throttles it, because the pre-mint threshold already does. Activity asks the identity to refresh, and the identity mints only when what it holds is inside the threshold, so a hand resting on a mouse costs at most one mint per refresh interval. That is exactly what an application making requests costs. An application nobody is using costs nothing, which is what the idle bound is for.
+
+The rule that an unused delegation lapses is untouched: it governs the refresh that fires on a clock, the case where nothing at all has happened, and every trigger here already overrode it.
 
 ### What is shared, and how far
 
@@ -272,6 +291,24 @@ That is deliberately not "who does the record name". A principal handed back mea
 There is deliberately no `subscribe()` on the client. A change of state is announced by the store holding it, which is also the only thing that knows how a change arrives in the medium it was given; a second listener list in front of that one would forward what it was told and add nothing.
 
 `getIdentity()` refuses in that second case rather than handing back an anonymous identity. Anonymous is the worst of the available answers there: calls go out unauthenticated while the record says somebody is signed in, and they fail at the canister rather than anywhere a caller was looking. So it throws instead, and the error names a recoverable condition — a sibling signed in, this origin has nothing yet, and asking the identity provider is what comes next.
+
+#### What a store choosing memory does not buy
+
+An application can put every credential in memory, and people reach for that expecting a sign-in that ends with the tab. It does not. The session lives at the identity provider whichever store is chosen, so what memory buys is nothing on this origin's disk — and a silent re-issue would hand the whole thing back a moment later.
+
+That is worth saying plainly because the opposite reads so well. Choosing a store decides where a copy lives; it never decides how long the sign-in lasts. The two things that decide that are signing out, which revokes, and the bounds above.
+
+Which leaves a real question the design has to answer: may the provider bring a sign-in back without a ceremony at all?
+
+#### Resumable, and who says so
+
+The answer is already implied by the record's reach, and an application should not have to say it twice. A record no other origin can read is only ever read by the origin that wrote it, so that origin always holds what the record names — and there is never anybody in the position a silent re-issue exists to rescue. Only a record that crosses to a sibling creates that position, and only the cookie store does that.
+
+So the store declares it and the client forwards it. The cookie store says yes; the other two say nothing and get no. An application that picked memory gets a sign-in the provider will not resurrect, without having read this section.
+
+It stays overridable, because a store cannot know everything the application is doing: two origins that share a record some other way opt in by hand, and a domain that shares one across siblings but wants each of them to sign in properly turns it off.
+
+It is deliberately not called `shared`. A credential store already uses that word for reaching the other tabs of one origin, and one word covering two ranges is how a reader ends up assuming the wrong one.
 
 #### What makes a stored delegation safe to keep
 
@@ -444,3 +481,12 @@ The order below is what the stack in [dfinity/icp-js-auth](https://github.com/df
 | Acquiring without a ceremony, for a sibling that has none | **yes**                                       |
 
 Two things about the shape. Revoking rides with acquiring rather than following it, because it is a revoke call, a lock steal and an ordering rule read together with the sign-in it undoes, and there is nothing to revoke before that stage. And the cookie comes after minting on foreground rather than before, because it is the cookie that makes the second silent-acquisition path reachable: an origin with the state and no credentials only exists once the state can cross an origin.
+
+**Not built yet.** Everything above ships; the sections on a session outliving its use, on activity as a trigger, and on resumability do not. They are decided rather than delivered, and they land as one further stage:
+
+| Stage                                            | Turns anything on?                                            |
+| ------------------------------------------------ | ------------------------------------------------------------- |
+| An idle bound the canister keeps and enforces    | **yes**, and it retires the client's own idle timeout         |
+| Activity as a trigger, and resumability declared | no — changes when a mint happens, and what the provider keeps |
+
+The order within it matters in one direction only: activity has to drive minting before a bound on minting can be enforced, or a present user with a quiet application is signed out. Both halves are on the canister's side as much as this library's, so the stage depends on [revocable-app-sessions.md](revocable-app-sessions.md) shipping the session's idle bound and [silent-reauth-redirect.md](silent-reauth-redirect.md) shipping the resumability flag.
