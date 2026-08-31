@@ -12,6 +12,7 @@ import {
 } from "$lib/stores/authorization.store";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import {
+  rememberAppAccount,
   storeAppSession,
   type AppSessionRecord,
 } from "$lib/stores/app-session.store";
@@ -275,8 +276,10 @@ const createSession = async (
     expiresAtMillis: Number(prepared.expiration / BigInt(1_000_000)),
     createdAtNanos: prepared.created_at,
     accessLevel: authorized.accessLevel,
-    accountPrincipal: prepared.account_principal.toText(),
   };
+  await rememberAppAccount(key, {
+    accountPrincipal: prepared.account_principal.toText(),
+  });
   await storeAppSession(key, record);
   return { record };
 };
