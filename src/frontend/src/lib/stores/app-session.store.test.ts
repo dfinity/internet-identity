@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 import {
+  appAccountsForOrigin,
   appSessionsForOrigin,
   discardAppSession,
   purgeAppSessions,
+  rememberAppAccount,
   storeAppSession,
   type AppSessionRecord,
 } from "./app-session.store";
@@ -16,7 +18,6 @@ const record = (expiresAtMillis: number): AppSessionRecord => ({
   expiresAtMillis,
   createdAtNanos: BigInt(1_000),
   accessLevel: "full-access" as const,
-  accountPrincipal: "2vxsx-fae",
 });
 
 const anHourFromNow = () => Date.now() + 60 * 60 * 1000;
@@ -35,9 +36,42 @@ describe("app session store", () => {
     await expect(appSessionsForOrigin(ORIGIN)).resolves.toMatchObject([
       {
         identityNumber: key.identityNumber,
+        record: { chainJson: "{}" },
+      },
+    ]);
+  });
+
+  it("carries the account principal of a listed session", async () => {
+    const key = { identityNumber: BigInt(10_000), origin: ORIGIN };
+    await rememberAppAccount(key, { accountPrincipal: "2vxsx-fae" });
+    await storeAppSession(key, record(anHourFromNow()));
+
+    await expect(appSessionsForOrigin(ORIGIN)).resolves.toMatchObject([
+      { accountPrincipal: "2vxsx-fae" },
+    ]);
+  });
+
+  it("remembers which account a principal names without a session", async () => {
+    const key = { identityNumber: BigInt(10_000), origin: ORIGIN };
+    await rememberAppAccount(key, { accountPrincipal: "2vxsx-fae" });
+
+    await expect(appSessionsForOrigin(ORIGIN)).resolves.toEqual([]);
+    await expect(appAccountsForOrigin(ORIGIN)).resolves.toMatchObject([
+      {
+        identityNumber: key.identityNumber,
         record: { accountPrincipal: "2vxsx-fae" },
       },
     ]);
+  });
+
+  it("keeps the account mapping when the session is discarded", async () => {
+    const key = { identityNumber: BigInt(10_000), origin: ORIGIN };
+    await rememberAppAccount(key, { accountPrincipal: "2vxsx-fae" });
+    await storeAppSession(key, record(anHourFromNow()));
+
+    await discardAppSession(key);
+
+    await expect(appAccountsForOrigin(ORIGIN)).resolves.toHaveLength(1);
   });
 
   it("keeps accounts of one identity apart", async () => {
@@ -133,5 +167,22 @@ describe("app session store", () => {
     await expect(
       appSessionsForOrigin("https://other.example.com"),
     ).resolves.toEqual([]);
+  });
+
+  it("purges the account mappings of one identity too", async () => {
+    await rememberAppAccount(
+      { identityNumber: BigInt(10_000), origin: ORIGIN },
+      { accountPrincipal: "2vxsx-fae" },
+    );
+    await rememberAppAccount(
+      { identityNumber: BigInt(10_001), origin: ORIGIN },
+      { accountPrincipal: "2vxsx-fae" },
+    );
+
+    await purgeAppSessions(BigInt(10_000));
+
+    await expect(appAccountsForOrigin(ORIGIN)).resolves.toMatchObject([
+      { identityNumber: BigInt(10_001) },
+    ]);
   });
 });
