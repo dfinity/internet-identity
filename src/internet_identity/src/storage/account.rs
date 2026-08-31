@@ -75,6 +75,12 @@ impl AccountReference {
 pub struct SessionRecord {
     pub created_at: Timestamp,
     pub valid_till: Timestamp,
+    /// How long this session may go unused before it is over, in nanoseconds.
+    ///
+    /// `None` is no bound beyond `valid_till`, which is what a request that asks
+    /// for nothing gets. A session is otherwise finished once nothing has minted
+    /// from it for this long, whatever life `valid_till` has left.
+    pub max_idle: Option<u64>,
     pub last_refreshed: Option<Timestamp>,
     pub device_id: SessionDeviceId,
     pub read_only: bool,
@@ -83,6 +89,27 @@ pub struct SessionRecord {
 impl SessionRecord {
     pub fn is_expired(&self, now: Timestamp) -> bool {
         self.valid_till <= now
+    }
+
+    /// Whether this session has gone unused for longer than it was allowed to.
+    ///
+    /// Measured from the last mint, or from creation where nothing has minted yet,
+    /// so a session abandoned immediately after sign-in is bounded like any other.
+    /// A session with no bound is never idle.
+    pub fn is_idle(&self, now: Timestamp) -> bool {
+        let Some(max_idle) = self.max_idle else {
+            return false;
+        };
+        let last_used = self.last_refreshed.unwrap_or(self.created_at);
+        now.saturating_sub(last_used) >= max_idle
+    }
+
+    /// Whether this session can still be minted from, on either bound.
+    ///
+    /// The two are one question at the point of use, and asking them separately is
+    /// how a caller ends up checking one and forgetting the other.
+    pub fn is_over(&self, now: Timestamp) -> bool {
+        self.is_expired(now) || self.is_idle(now)
     }
 
     /// How long this session stayed in service: the span from its creation to the last time
