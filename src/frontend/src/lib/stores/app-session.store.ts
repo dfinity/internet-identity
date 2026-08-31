@@ -116,13 +116,27 @@ export const discardAppSession = async (key: SessionKey): Promise<void> => {
   }
 };
 
-/** Every session this identity holds, for the sibling lookup and for sign-out. */
+/** Every session this identity holds, for the sibling lookup and for sign-out.
+ *
+ *  Each carries the principal its account is known by, which lives in the other store
+ *  and is joined back on here: a hint names a principal, and what it selects between is
+ *  sessions. */
 export const appSessionsForOrigin = async (
   origin: string,
 ): Promise<
-  { identityNumber: bigint; accountNumber?: bigint; record: AppSessionRecord }[]
+  {
+    identityNumber: bigint;
+    accountNumber?: bigint;
+    accountPrincipal?: string;
+    record: AppSessionRecord;
+  }[]
 > => {
   const now = Date.now();
+  const accounts = new Map(
+    (await readAll<AppAccountRecord>(APP_ACCOUNT_STORE)).map(
+      ([key, record]) => [key, record.accountPrincipal],
+    ),
+  );
   return (await readAll<AppSessionRecord>(APP_SESSION_STORE)).flatMap(
     ([key, record]) => {
       const parsed = parseKey(key);
@@ -136,6 +150,7 @@ export const appSessionsForOrigin = async (
         {
           identityNumber: parsed.identityNumber,
           accountNumber: parsed.accountNumber,
+          accountPrincipal: accounts.get(key),
           record: normalize(record),
         },
       ];
