@@ -411,7 +411,7 @@ fn authorize_session(now: Timestamp) -> Result<(Account, SessionRecord), AppSess
             session.device_id == handle.device_id && session.created_at_ns == handle.created_at
         })
         .ok_or(AppSessionError::NoMatchingSession)?;
-    if session.is_expired(now) {
+    if session.is_over(now) {
         return Err(AppSessionError::NoMatchingSession);
     }
     Ok((account, session))
