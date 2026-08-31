@@ -346,6 +346,15 @@ It is written last when signing in, once there is material behind it, and remove
 **STATE-4.**
 Signing out removes the state. Discovering that a chain is stale does not: one session serves every sibling of a domain, so a sibling that did not sign in holds a chain to a session a ceremony elsewhere replaced, and retracting the state would tell the sibling that did sign in that the session it just obtained is gone. The origin that found out drops its own material, keeps the state, and acquires again silently — which is the same path a sibling that has the state and no credentials takes.
 
+There are exactly two teardowns, distinguished by what they do to the state and by nothing else, and every site MUST name one rather than choosing per case:
+
+| Act         | Entered by                                                                       | The state              | The credentials |
+| ----------- | -------------------------------------------------------------------------------- | ---------------------- | --------------- |
+| Signing out | `signOut()`                                                                      | removed                | every slot      |
+| Finding out | a mint refused; a page load whose credentials name an account the state does not | discarded, per STATE-9 | every slot      |
+
+A page load is the second route to finding out, not a third act. Credentials rooted at an account the state no longer names MUST be discarded and MUST NOT be removed along with the state: the record naming another account was written by a sibling's ceremony, and a load that retracts it signs that sibling out.
+
 **STATE-5.**
 A state record may outlive the session it describes, so anything acting on one has to be able to fall back to asking the user and may not treat it as authority against the canister. The case with no recovery is a memory-backed configuration whose last tab closed without signing out: nothing dependable fires on a close, so the record stands, `getPrincipal()` answers from it, and the first call fails. That is API-3's optimism reached by a new route rather than a new kind of wrongness.
 
@@ -359,6 +368,9 @@ A state store is not optional. It holds the state, so a client without one could
 
 **STATE-8.**
 The state store is the only notification path in the design, and it has one in every medium it uses: `storage` for `localStorage`, and the cookie hooks above for the other, since `document.cookie` raises no event and no `BroadcastChannel` crosses origins. A change is readable before it is announced — the record is written, then subscribers fire — because a listener that asks `isAuthenticated()` on being told must not see the answer the notification was about to change.
+
+**STATE-9.**
+Discarding drops what this origin holds without retracting what the store publishes beyond it. In a store that reaches no further than this origin there is nothing to distinguish, so discarding is removing; the two differ only where the record crosses to a sibling, and a store MUST say which it is by whether it implements the discard half at all.
 
 ## Signing out
 
@@ -427,6 +439,8 @@ Adopting a delegation, however it arrived, reschedules that tab's refresh from t
 
 **TAB-16.**
 `signOut()` removes both slots and steals the lock, so a mint already running cannot write a credential back over a cleared store. Stealing releases the lock immediately and aborts the signal handed to whoever holds it; that tab completes the call it cannot cancel, sees the abort, and discards the result rather than storing it. See END-4.
+
+Both removals MUST be attempted whatever either does, and the first failure reported once neither is left behind. Chaining them means a session slot that fails to clear leaves the app credential in place, and a credential that survives can still be adopted on the next load. The state is retracted before either, per STATE-3, so a teardown that fails partway never leaves the record saying this origin is signed in.
 
 TAB-6 makes an app credential that survived a failed sign-out unusable, so the removal is what keeps the store tidy and TAB-6 is what makes it safe.
 

@@ -292,14 +292,18 @@ What it must not do then is retract what it publishes to its siblings. That reco
 
 The two acts differ in one respect.
 
-|                             | Signing out                  | Finding out the chain is stale        |
-| --------------------------- | ---------------------------- | ------------------------------------- |
-| What happened               | the user ended the sign-in   | a sibling signed in and replaced it   |
-| Discovered by               | `signOut()`                  | a mint returning `NoMatchingSession`  |
-| The session at the canister | revoked                      | already gone                          |
-| Local chain and session key | removed                      | removed                               |
-| The state                   | **removed**                  | **left alone**                        |
-| What the user sees          | signed out across the domain | nothing, and a silent re-auth follows |
+|                             | Signing out                  | Finding out the chain is stale                                                      |
+| --------------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
+| What happened               | the user ended the sign-in   | a sibling signed in and replaced it                                                 |
+| Discovered by               | `signOut()`                  | a mint refused, or a page load whose credentials name an account the state does not |
+| The session at the canister | revoked                      | already gone                                                                        |
+| Local credentials           | removed, both slots          | removed, both slots                                                                 |
+| The state                   | **removed**                  | **left alone**                                                                      |
+| What the user sees          | signed out across the domain | nothing, and a silent re-auth follows                                               |
+
+Two acts and no third, so the code says which one it is asking rather than passing a flag: one retracts the state and then the credentials, the other discards this origin's claim and then the credentials. Both clear every slot, because a sign-in ended halfway is worse than one ended slowly — an app delegation left behind was minted under a session that is gone and would be adopted on the next load. Neither removal is allowed to be skipped because the other failed, for the same reason.
+
+The second discovery route is the one that is easy to get wrong. A page load that finds credentials the state does not back looks like ordinary tidying up, and tidying up is exactly what must not happen: the record naming another account was written by a sibling's ceremony a moment ago, so a load that cleans up thoroughly signs out the tab that did nothing wrong. It is the same act as a refused mint, reached earlier.
 
 The sibling recovers without the user seeing anything:
 
