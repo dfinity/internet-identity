@@ -200,22 +200,17 @@
     origin: string;
   }>();
 
-  const handleAuthorize = (
+  // Offer notifications before authorizing when the app asked for them and this
+  // browser can receive, stashing the authorization so the opt-in can resume it.
+  // Returns true when the opt-in took over, so the caller stops before
+  // authorizing. Every authorize path funnels through here — the continue
+  // screen, upgrade-success, and the 1-click OpenID/SSO resume — so a returning
+  // 1-click user still gets the chance to allow a requesting app.
+  const maybeOfferOptIn = (
     accountNumber: Promise<bigint | undefined>,
     accessLevel: AccessLevel,
     maxTimeToLive?: bigint,
-  ) => {
-    authorizationStore.authorize(accountNumber, accessLevel, maxTimeToLive);
-  };
-
-  // ContinueView's authorize: offer notifications first when eligible, otherwise
-  // authorize straight away. Only this path opts in — the 1-click and
-  // upgrade-success flows authorize directly.
-  const handleContinueAuthorize = (
-    accountNumber: Promise<bigint | undefined>,
-    accessLevel: AccessLevel,
-    maxTimeToLive?: bigint,
-  ) => {
+  ): boolean => {
     const effectiveOrigin = get(authorizationStore)?.effectiveOrigin;
     if (
       $PUSH_NOTIFICATIONS &&
@@ -231,6 +226,17 @@
         maxTimeToLive,
         origin: effectiveOrigin,
       };
+      return true;
+    }
+    return false;
+  };
+
+  const handleAuthorize = (
+    accountNumber: Promise<bigint | undefined>,
+    accessLevel: AccessLevel,
+    maxTimeToLive?: bigint,
+  ) => {
+    if (maybeOfferOptIn(accountNumber, accessLevel, maxTimeToLive)) {
       return;
     }
     authorizationStore.authorize(accountNumber, accessLevel, maxTimeToLive);
@@ -515,7 +521,13 @@
         throw e;
       }
     }
-    // 1-click OpenID flow: no access-level toggle, always full access.
+    // 1-click OpenID/SSO flow: no access-level toggle, always full access.
+    if (maybeOfferOptIn(Promise.resolve(undefined), "full-access")) {
+      // Stop the resume animation so the opt-in screen shows; the stashed
+      // authorization resumes once the user chooses.
+      openIdResumeProcessing = false;
+      return;
+    }
     authorizationStore.authorize(Promise.resolve(undefined), "full-access");
     directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToApp);
   };
@@ -720,7 +732,7 @@
     effectiveOrigin={$authorizationContextStore.effectiveOrigin}
     displayOrigin={$establishedChannelStore.origin}
     requestedMaxTimeToLive={$requestedMaxTimeToLiveStore}
-    onAuthorize={handleContinueAuthorize}
+    onAuthorize={handleAuthorize}
   />
 {/snippet}
 
