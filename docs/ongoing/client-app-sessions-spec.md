@@ -70,7 +70,7 @@ Both pending slots are written before anything shared is, and both are settled a
 `signIn()` requests a session with `ii_session_delegation`. Nothing checks first whether the provider offers it: this library is for Internet Identity, and a provider that cannot answer is a failed sign-in rather than a case to fall back from.
 
 **ACQ-2.**
-The request carries a session public key, a `maxTimeToLive`, and a derivation origin where the application configured one. It carries no access level, which is the user's alone to decide at consent.
+The request carries a session public key, a `maxTimeToLive`, a `maxTimeToIdle` where the application sets one, and a derivation origin where it configured one. It carries no access level, which is the user's alone to decide at consent.
 
 A ceiling is always sent, so the canister's own default is not reached from here. That is deliberate for this release: see ACQ-3.
 
@@ -80,28 +80,35 @@ A ceiling is always sent, so the canister's own default is not reached from here
 The 8 hours is inherited: it was this option's default when the option capped a delegation, and it is kept while sessions are new. So an application that asks for nothing gets an 8-hour session rather than the 30 days the canister would default to, and the number is expected to rise in a later release once sessions have run in production. Two things follow, and neither is an accident. The client's default is the binding one until then, and raising it is a change to this line and nothing else — the option's meaning, its units and its clamp are all unchanged.
 
 **ACQ-4.**
-The returned chain is rejected unless its `targets` name the configured II canister and nothing else, per AGENT-5. A chain without that restriction is not a session chain, and treating one as a session would give the library something it could sign arbitrary calls with. Acquisition mints before it resolves, so the check runs there too.
+`maxTimeToIdle` bounds how long a session outlives its use: the canister ends one from which nothing has been minted for that span. It is requested as a ceiling in the same way `maxTimeToLive` is, in the same units, and clamped to the same range — 10 minutes to the granted session length. Where an application sets none, the granted session length is used, so it constrains nothing.
+
+The floor has to keep clear of the mint interval. An active application mints roughly every four and three quarter minutes, per the arithmetic in the constants above, so a bound anywhere near that would end sessions that are plainly in use. Ten minutes is already the session-length minimum, so this shares its range rather than introducing a second one.
+
+It is independent of resumability. A session Internet Identity will not resume still ends when nothing mints from it, and one it will resume still does: how long a session outlives use and whether it can be brought back are different questions, and neither implies the other.
 
 **ACQ-5.**
-The session credential is persisted under the `session` slot: the chain and the key it was issued to, as one record and nothing beside them.
+The returned chain is rejected unless its `targets` name the configured II canister and nothing else, per AGENT-5. A chain without that restriction is not a session chain, and treating one as a session would give the library something it could sign arbitrary calls with. Acquisition mints before it resolves, so the check runs there too.
 
 **ACQ-6.**
-The app delegation is persisted only as part of the `app` credential TAB-1 describes, and only under the conditions TAB-5 and TAB-6 impose on reading one back. No other path stores it.
+The session credential is persisted under the `session` slot: the chain and the key it was issued to, as one record and nothing beside them.
 
 **ACQ-7.**
-The account principal arrives as the `user_key` of a mint and is recorded in the state, per STATE-3, which is where everything afterwards reads it. It is not derivable from the session chain, which is rooted at the session's own key, and the transport result carries only that chain. Before the first mint there is none, which MINT-12 puts out of reach by minting inside the ceremony.
+The app delegation is persisted only as part of the `app` credential TAB-1 describes, and only under the conditions TAB-5 and TAB-6 impose on reading one back. No other path stores it.
 
 **ACQ-8.**
+The account principal arrives as the `user_key` of a mint and is recorded in the state, per STATE-3, which is where everything afterwards reads it. It is not derivable from the session chain, which is rooted at the session's own key, and the transport result carries only that chain. Before the first mint there is none, which MINT-12 puts out of reach by minting inside the ceremony.
+
+**ACQ-9.**
 A key has to exist before the ceremony starts, since its public half is what the delegation is asked to be issued to, so it cannot be generated on the return leg of a redirect. It is written to the `session-pending` slot and never to `session`, so a ceremony that is cancelled or never returns cannot disturb a live session. On return it is promoted: the `session` slot is written with that identity and the chain together, and the pending slot is removed.
 
 The pending key's **public** key is journaled through the redirect's `memoize`, which is what that journal already carries — non-secret and serialisable. On return, a mismatch means another ceremony in this browser superseded this one, and is reported as that rather than surfacing later as a chain that does not match its key. A superseded ceremony MUST read the `session` slot before starting another: the ceremony that superseded it promoted a credential there, so in the ordinary case there is a session to use and nothing to retry. Only where the slot is empty does it begin again. Without that read, two tabs acquiring at once cost the loser a second round trip to the identity provider to arrive where one read would have put it. Naming the slot per ceremony instead would let both finish, and would leak a bare key handle per abandoned ceremony with no way to find it again, the interface having no enumeration.
 
 `signIn()` with `transport: 'redirect'` is refused outright where the store is neither `durable` nor `shared`: the key cannot survive the navigation and nothing can answer for it, so refusing before navigating beats returning to a flow that cannot finish. Where the store is `shared` but not `durable` a peer answers, which is genuine rather than luck, so the return leg reports that the key did not survive instead of the configuration being rejected.
 
-**ACQ-9.**
+**ACQ-10.**
 The mint a ceremony performs, per MINT-12, writes to `app-pending` and is promoted to `app` only once the session and the state are stored. So the slot every tab of the origin acts with is never emptied by a sign-in: a ceremony that fails costs the other tabs nothing, and an abandoned redirect leaves a spent five-minute record behind rather than having wiped the live one.
 
-This makes both halves of a ceremony symmetric with ACQ-8 — each writes to a slot of its own and promotes on success — which is the same rule stated once rather than a sign-in that is careful about one credential and destructive with the other. Promotion is not atomic across the two slots, and does not need to be: a promotion that stops halfway leaves records that STATE-6 discards on the next read, because the state is written last.
+This makes both halves of a ceremony symmetric with ACQ-9 — each writes to a slot of its own and promotes on success — which is the same rule stated once rather than a sign-in that is careful about one credential and destructive with the other. Promotion is not atomic across the two slots, and does not need to be: a promotion that stops halfway leaves records that STATE-6 discards on the next read, because the state is written last.
 
 ## Keys
 
@@ -110,11 +117,11 @@ Four things are held, in two credentials of the same shape, and each half of a c
 | Thing                   | Slot              | Lifetime                                             | Requirement  |
 | ----------------------- | ----------------- | ---------------------------------------------------- | ------------ |
 | Session key             | `session`         | the session                                          | KEY-1, KEY-4 |
-| Session chain           | `session`         | the session                                          | ACQ-5, KEY-4 |
+| Session chain           | `session`         | the session                                          | ACQ-6, KEY-4 |
 | App key                 | `app`             | one delegation                                       | KEY-2, TAB-5 |
 | App delegation          | `app`             | one delegation                                       | TAB-5        |
-| A ceremony's key        | `session-pending` | until it is promoted or another ceremony replaces it | ACQ-8        |
-| A ceremony's first mint | `app-pending`     | until it is promoted or the ceremony is abandoned    | ACQ-9        |
+| A ceremony's key        | `session-pending` | until it is promoted or another ceremony replaces it | ACQ-9        |
+| A ceremony's first mint | `app-pending`     | until it is promoted or the ceremony is abandoned    | ACQ-10       |
 
 **STORE-1.**
 Storage is two interfaces, and what separates them is what they are for. `StateStorage` holds the state — who is signed in here and until when — and is read synchronously, because that is what a page decides its rendering on. `CredentialStorage` holds the material that acts on that state, and is asynchronous, because using it means making a call and a non-extractable key needs a store that can hold one.
@@ -127,10 +134,10 @@ Storage is two interfaces, and what separates them is what they are for. `StateS
 The state leads. Where the two disagree, the state decides and the credentials are what get discarded — see STATE-6.
 
 **STORE-2.**
-A credential is one record, written and read as one act. `chain` is optional and legal only in the pending slot of ACQ-8; a record without a chain under any other slot is refused. So the dangerous half is not expressible: there is no way to store a chain without the identity it was issued to, and no way for two stores to disagree about which key a chain belongs to.
+A credential is one record, written and read as one act. `chain` is optional and legal only in the pending slot of ACQ-9; a record without a chain under any other slot is refused. So the dangerous half is not expressible: there is no way to store a chain without the identity it was issued to, and no way for two stores to disagree about which key a chain belongs to.
 
 **STORE-3.**
-An application supplies one `CredentialStorage` and one `StateStorage`. Nothing composes them, and there is deliberately no per-credential choice of store. A persisted session with a memory-backed app credential protects nothing — TAB-8 holds that anything able to read the session key can mint a fresh delegation whenever it likes — so it reads as a security choice while being none. Not persisting means something only when it is all of it.
+An application supplies one `CredentialStorage` and one `StateStorage`. Nothing composes them, and there is deliberately no per-credential choice of store. A persisted session with a memory-backed app credential protects nothing — TAB-8 holds that anything able to read the session key can mint a fresh delegation whenever it likes — so it reads as a security choice while being none. Not persisting locally means less than it looks like, and this is worth being plain about: the sign-in persists at the identity provider whichever stores an application picks, so a memory-backed configuration keeps nothing on this origin's disk and does not make the sign-in ephemeral. What ends a sign-in is `signOut()`, which revokes, or the bounds of ACQ-3 and ACQ-4. Choosing a store changes where a copy lives and never how long the sign-in lasts.
 
 **STORE-4.**
 Slots are assigned by `AuthClient` and never defaulted by a store, so a store takes the slot as an argument to every call. Implementations choosing their own defaults is what produced three colliding slots in the version this replaces, two of them on the same key in the same database; one assigner cannot collide with itself.
@@ -153,7 +160,7 @@ A credential store declares two facts about its medium, and only it can:
 | `MemoryCredentialStorage`       | false    | false     |
 | `SharedMemoryCredentialStorage` | true     | false     |
 
-`SharedMemoryCredentialStorage` is what makes the two axes distinguishable rather than one: it is the only shipping store that is shared and not durable, and the redirect rule of ACQ-8 is the only rule that tells them apart. An earlier version of this design had the library own the channel directly — see _Why not a channel_ — and it lives behind the interface instead, which is the point of `shared` being a fact a medium reports rather than something the library arranges.
+`SharedMemoryCredentialStorage` is what makes the two axes distinguishable rather than one: it is the only shipping store that is shared and not durable, and the redirect rule of ACQ-9 is the only rule that tells them apart. An earlier version of this design had the library own the channel directly — see _Why not a channel_ — and it lives behind the interface instead, which is the point of `shared` being a fact a medium reports rather than something the library arranges.
 
 `shared` is whether another tab of this origin reads what it writes; `durable` is whether it survives this document being torn down. The axes are independent — shared without durable is the channel-backed store of STORE-14, and durable without shared is a `sessionStorage`-backed one nothing ships but which is coherent. Both are required rather than optional: the safe default for either would be the counter-intuitive one, since a store that stays silent about being shared costs a mint in every tab.
 
@@ -163,7 +170,7 @@ The lock is `navigator.locks`, named for the `app` slot, and it belongs to `Auth
 **STORE-9.**
 `set` writes what it is given and takes no lock. That the `app` slot is written in one place, inside the lock of STORE-8, is a rule about that call site and not a property of the interface: an application implements these interfaces and never calls them.
 
-One place means one routine, reached by both the first acquisition and every rotation: read the slot under the lock, and mint only where what it finds cannot be used. A second reader-and-writer outside the lock — a page load resolving its own account key, say — reintroduces exactly what the lock prevents, because it can overwrite a credential a peer minted a moment earlier and will not see the credential that peer left for it. The ceremony's promotion of ACQ-9 is the one other writer, and it writes a slot no rotation is reading yet.
+One place means one routine, reached by both the first acquisition and every rotation: read the slot under the lock, and mint only where what it finds cannot be used. A second reader-and-writer outside the lock — a page load resolving its own account key, say — reintroduces exactly what the lock prevents, because it can overwrite a credential a peer minted a moment earlier and will not see the credential that peer left for it. The ceremony's promotion of ACQ-10 is the one other writer, and it writes a slot no rotation is reading yet.
 
 **STORE-10.**
 A credential store has no notification of its own and needs none. Nothing has to be told that a mint happened: a tab wanting a delegation takes the lock and reads, which is the whole protocol, and every change that alters the _state_ is announced by the state store instead. A store whose medium another tab cannot read still runs a channel to populate its own copy, because a peer cannot reach into it, but that is its private business and appears nowhere on the interface. Where a message has not arrived the tab mints, which TAB-9 permits.
@@ -279,6 +286,10 @@ A mint starts in the background when the page becomes visible or the window rega
 
 The events are `visibilitychange` filtered on a visible state, `pageshow`, and `focus`. `focus` is there because two visible windows side by side do not change visibility when the user moves between them, and `pageshow` because a page restored from the back-forward cache resumes with timers that never ran.
 
+Ordinary user activity is the same trigger with a shorter fuse, and joins them: `pointerdown`, `keydown`, and the pointer and wheel movement that says a hand is on the input. A user moving a mouse is very likely about to do something that needs a delegation, which is the same bet foregrounding makes.
+
+Nothing throttles this, because the pre-mint threshold already does. Activity calls the same entry point foregrounding calls, and the identity mints only where the held delegation is inside the threshold — so continuous movement costs at most one mint per refresh interval, which is exactly what an application making requests costs. MINT-5 is unaffected: it governs the clock-driven refresh, which is the case where nothing has happened at all, and every trigger here already overrides it.
+
 Returning to a tab is a second or two of human latency ahead of that click, which is enough to hide one.
 
 **MINT-8.**
@@ -338,7 +349,7 @@ Nothing is lost by the narrowness: API-2 carries the account principal in the `e
 `InternalCanisterError`, a transport failure, and an unreachable boundary node are transient. The library retains the session, propagates the failure to the caller, and does not report a sign-out.
 
 **ERR-3.**
-A chain cannot be stored without the key it was issued to, because STORE-2 makes the two one record. The half that is legal — a key with no chain — carries no authority and lives only in the pending slot of ACQ-8, so a ceremony in progress has somewhere to keep its key that no failure path has to work around.
+A chain cannot be stored without the key it was issued to, because STORE-2 makes the two one record. The half that is legal — a key with no chain — carries no authority and lives only in the pending slot of ACQ-9, so a ceremony in progress has somewhere to keep its key that no failure path has to work around.
 
 **ERR-4.**
 A background mint that fails transiently is not surfaced to the application and does not report a sign-out. The delegation already held stays in use, and the next request retries, waiting if MINT-3 applies by then.
@@ -398,7 +409,18 @@ A state store is not optional. It holds the state, so a client without one could
 The state store is the only notification path in the design, and it has one in every medium it uses: `storage` for `localStorage`, and the cookie hooks above for the other, since `document.cookie` raises no event and no `BroadcastChannel` crosses origins. A change is readable before it is announced — the record is written, then subscribers fire — because a listener that asks `isAuthenticated()` on being told must not see the answer the notification was about to change.
 
 **STATE-9.**
-Discarding drops what this origin holds without retracting what the store publishes beyond it. In a store that reaches no further than this origin there is nothing to distinguish, so discarding is removing; the two differ only where the record crosses to a sibling, and a store MUST say which it is by whether it implements the discard half at all.
+Discarding drops what this origin holds without retracting what the store publishes beyond it. In a store that reaches no further than this origin there is nothing to distinguish, so discarding is removing; the two differ only where the record crosses to a sibling.
+
+Every store MUST implement it. It was optional so that omitting it could signal an origin-local store, and that signal cannot work: the client calls it on every discard, so a store that left it out would make finding out a silent no-op and leave a record standing that this origin can no longer act on. Required instead, and a store reaching one origin answers with `remove` in one line. Defaulting it would be worse than either — falling back to `remove` is right for an origin-local store and wrong for a shared one, so the forgetful case would fail in the destructive direction.
+
+**STATE-10.**
+A state store declares whether a sign-in recorded in it can be recovered without a ceremony, and that declaration is the default for what the client tells the identity provider. It is the one fact about a state store's medium the client cannot work out for itself and has to forward, because the canister cannot see which store an application chose.
+
+True only where the record reaches beyond this origin, and that is not a coincidence: a record no other origin reads can only be read by the origin that wrote it, so `held` is never false, so there is never an origin that knows a sign-in exists and holds nothing for it — which is the only situation a silent re-issue answers. The cookie store declares it; the other two do not.
+
+A default and not an authority, because an application can be doing something its store cannot know about. A cross-origin arrangement that is not sibling subdomains opts in explicitly, and one that shares a record across siblings but wants each of them to sign in properly turns it off. See API-1.
+
+Deliberately not called `shared`: a credential store already uses that word for reaching the other tabs of one origin, and reusing it here for reaching another origin would give one word two ranges.
 
 ## Signing out
 
@@ -492,7 +514,7 @@ Before the first call, a session chain is refused unless its `targets` name the 
 ## Public surface
 
 **API-1.**
-`signIn()`, `getIdentity()`, `signOut()` and `isAuthenticated()` keep their current signatures, and no session type, session chain or session expiry is exposed through any of them. Three options change:
+`signIn()`, `getIdentity()`, `signOut()` and `isAuthenticated()` keep their current signatures, and no session type, session chain or session expiry is exposed through any of them. The options change as follows:
 
 | Option                     | Change                                                                            | Requirement      |
 | -------------------------- | --------------------------------------------------------------------------------- | ---------------- |
@@ -502,8 +524,11 @@ Before the first call, a session chain is refused unless its `targets` name the 
 | `namespace`                | new; prefixes every slot and the state, and the only way to change them           | STORE-4          |
 | `agentOptions`             | new; passed to the agent that makes the calls                                     | AGENT-3          |
 | `disableForegroundRefresh` | new; about when the library refreshes rather than about sessions                  | MINT-8           |
+| `resumable`                | new; whether the provider may resume this sign-in, defaulted from the state store | STATE-10         |
+| `maxTimeToIdle`            | new, on `signIn()`; how long a session may outlive its use                        | ACQ-4            |
+| `idleOptions`              | **breaking**: reduced to whether idleness applies and for how long                | API-7            |
 
-`keyType` goes with them, the key type now belonging to a store's `create()`, and `AuthClientStorage`, `IdbStorage`, `LocalStorage` and the `KEY_STORAGE_*` constants stop being exported. `getStatus()`, `getPrincipal()` and `dispose()` are additions rather than existing signatures, and `SessionNotHeldError` is a new failure `getIdentity()` can raise where it previously could not — see API-5.
+`keyType` goes with them, the key type now belonging to a store's `create()`, and `AuthClientStorage`, `IdbStorage`, `LocalStorage`, `IdleManager` and the `KEY_STORAGE_*` constants stop being exported. `getStatus()`, `getPrincipal()` and `dispose()` are additions rather than existing signatures, and `SessionNotHeldError` is a new failure `getIdentity()` can raise where it previously could not — see API-5.
 
 `AuthClient` has no `subscribe()`, and gains none here. A change of state is announced by the store that holds it, per STATE-8, and an application that wants to re-render on one subscribes there — which is also the only place that knows how a change arrives in the medium it chose. Repeating the subscription on the client would put a second listener list in front of the one that already works, and the client has nothing to add to what it would forward.
 
@@ -537,3 +562,12 @@ Recombining `held` and the expiry at each call site is what this replaces, and i
 It is not free on every call. The first call after a load that restored a session with no usable app credential waits for the mint of MINT-13, which is two canister calls; every later call, and every call on a load that had a credential to adopt, returns without one.
 
 That is a cost and not a change in shape: this method has always been asynchronous, so a caller already awaits it. Resolving early instead — handing back an identity that cannot yet sign — would move the failure to the application's first request, where nothing explains it, and an application that renders on `isAuthenticated()` would already have drawn a signed-in page around it. A page that must not wait at all reads MINT-17 instead, which answers who is signed in without opening a store.
+
+**API-7.**
+Idle detection stops being the client's to enforce. `IdleManager` is retired along with its timer, its DOM listeners as a timeout source, and the sign-out-and-reload it registered by default. What an application asks for is a duration, `maxTimeToIdle` of ACQ-4, and the canister ends a session nothing has minted from within it.
+
+The client-side timeout was advisory and could not be otherwise: clearing storage, or running where a timer does not fire, made it not happen. The canister's is enforced, and it is per browser rather than per document, so it covers every tab and every device without a shared stamp or a presence protocol.
+
+`idleOptions` keeps only what is still the client's business — whether idleness applies at all, and for how long. The callbacks go: an application learns that a session ended through the state store's `subscribe()` of STATE-8. There is no warning before the window closes and no hook for one, because no listener could be honest about it — this client cannot know whether another tab, or another device, is about to mint and move the deadline. An application that wants to warn computes an estimate from the duration it asked for and its own last mint, and treats it as an estimate.
+
+What survives of the old mechanism is its DOM listeners, which become the activity trigger of MINT-7.
