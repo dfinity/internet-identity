@@ -85,19 +85,23 @@ Where a scenario needs a delegation to age, the point is the boundary and not th
 3. **SHARE-3. A sibling subdomain is already signed in.**  
    Sign in on one subdomain of a shared domain, then visit a sibling that has never been signed in to.  
    The sibling must reach a working state as the same account, showing no II screen.  
-   Covers SIL-1, SIL-3, SIL-5, HINT-2.
+   Covers SIL-1, SIL-3, SIL-5, STATE-2, API-2.
 4. **SHARE-4. A sibling asks properly when there is nothing left to resume from.**  
    Sign in on one subdomain, wait for the session to expire, then visit a sibling.  
    It must ask the user to sign in, rather than failing in a way the user cannot act on.  
-   Covers HINT-5, FAIL-1, SIL-4.
+   Covers STATE-5, API-2, FAIL-1, SIL-4.
 5. **SHARE-5. Signing out on one subdomain signs the siblings out.**  
    Sign in on one subdomain, use a sibling, then sign out on the first and use the sibling again.  
    The sibling must stop acting as that account and must ask for a sign-in.  
-   Covers HINT-3, END-3.
+   Covers STATE-4, END-3.
 6. **SHARE-6. Closing a tab does not disturb the others.**  
    With several tabs of the app open and in use, close some, then use one of those left.  
    It must keep working without a pause.  
    Covers TAB-9, TAB-3.
+7. **SHARE-7. A sibling switching identity does not sign the first one out.**  
+   Sign in on one subdomain, sign in on a sibling as a different identity, then reload the first.  
+   The first must reach a working state as the identity the sibling chose, and the sibling must still be signed in when it is used next — the reload must not have taken the sign-in away from it.  
+   Covers STATE-4, STATE-6, STATE-9.
 
 ## Ending a session
 
@@ -209,4 +213,4 @@ Every scenario cites the requirements it exercises, so the specs can be walked i
 | The browser proof's cryptography and its key rotation                            | A signature either verifies or it does not; the canister's tests               |
 | Canister-internal ordering, indexes and number allocation                        | Not reachable from a browser at all                                            |
 
-What is left is the set whose whole point is what a user experiences, and those are the ones to keep honest: END-5 on how long access outlives revocation, LIMIT-7 on an evicted account being unchanged, MINT-16 on the account never appearing to change under a working app, HINT-5 on an expired session still leading somewhere, and FAIL-1 on a user being offered a sign-in rather than a dead end.
+What is left is the set whose whole point is what a user experiences, and those are the ones to keep honest: END-5 on how long access outlives revocation, LIMIT-7 on an evicted account being unchanged, MINT-16 on the account never appearing to change under a working app, STATE-5 on an expired session still leading somewhere, and FAIL-1 on a user being offered a sign-in rather than a dead end.
