@@ -110,7 +110,7 @@ use crate::openid::OpenIdCredentialKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
-use crate::storage::account::{AccountReference, SessionRecord};
+use crate::storage::account::{AccountReference, SessionRecord, MIN_SESSION_IDLE_NS};
 use crate::storage::anchor::Anchor;
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
@@ -1951,9 +1951,17 @@ impl<M: Memory + Clone> Storage<M> {
             account_number,
             device_id,
             valid_till,
+            max_idle,
             read_only,
             now,
         } = params;
+
+        // Clamped here rather than at the caller, so every path that creates a session
+        // gets the same range whatever it asked for. The ceiling is the life this
+        // session was actually granted: a bound longer than that could never be reached,
+        // and storing one would say something about the session that is not true.
+        let max_idle = max_idle
+            .map(|requested| requested.clamp(MIN_SESSION_IDLE_NS, valid_till.saturating_sub(now)));
 
         // The row this session lands in has to exist first, but an existing one must not be
         // written here: the single write at the end of this function carries `last_used`.
@@ -2018,7 +2026,7 @@ impl<M: Memory + Clone> Storage<M> {
         let session = SessionRecord {
             created_at: now,
             valid_till,
-            max_idle: None,
+            max_idle,
             last_refreshed: None,
             device_id,
             read_only,
@@ -3229,6 +3237,9 @@ pub struct CreateSessionParams {
     pub account_number: Option<AccountNumber>,
     pub device_id: SessionDeviceId,
     pub valid_till: Timestamp,
+    /// How long the session may go unused, as the application asked for it. Clamped
+    /// on the way in; `None` asks for no bound beyond `valid_till`.
+    pub max_idle: Option<u64>,
     pub read_only: bool,
     pub now: Timestamp,
 }

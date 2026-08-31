@@ -4015,9 +4015,11 @@ mod session_record_tests {
 
 mod session_creation_tests {
     use crate::delegation::calculate_session_seed_with_salt;
-    use crate::storage::account::{AccountReference, CreateAccountParams, SessionRecord};
+    use crate::storage::account::{
+        AccountReference, CreateAccountParams, SessionRecord, MIN_SESSION_IDLE_NS,
+    };
     use crate::storage::CreateSessionParams;
-    use crate::Storage;
+    use crate::{Storage, DAY_NS, MINUTE_NS};
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
@@ -4041,6 +4043,7 @@ mod session_creation_tests {
             account_number: None,
             device_id,
             valid_till: now + 10_000,
+            max_idle: None,
             read_only: false,
             now,
         }
@@ -4064,6 +4067,68 @@ mod session_creation_tests {
             .find(|reference| reference.account_number.is_none())
             .unwrap()
             .sessions
+    }
+
+    #[test]
+    fn an_idle_bound_is_kept_as_asked_for_when_it_is_in_range() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let asked = 20 * MINUTE_NS;
+
+        let session = storage
+            .create_session(CreateSessionParams {
+                max_idle: Some(asked),
+                valid_till: DAY_NS,
+                ..params(anchor_number, 1, 0)
+            })
+            .unwrap();
+
+        assert_eq!(session.max_idle, Some(asked));
+    }
+
+    #[test]
+    fn an_idle_bound_below_the_floor_is_raised_to_it() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        let session = storage
+            .create_session(CreateSessionParams {
+                max_idle: Some(MINUTE_NS),
+                valid_till: DAY_NS,
+                ..params(anchor_number, 1, 0)
+            })
+            .unwrap();
+
+        // An app delegation lasts five minutes, so a bound under that would end a
+        // session between two mints of one that is plainly in use.
+        assert_eq!(session.max_idle, Some(MIN_SESSION_IDLE_NS));
+    }
+
+    #[test]
+    fn an_idle_bound_longer_than_the_session_is_cut_to_it() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        let session = storage
+            .create_session(CreateSessionParams {
+                max_idle: Some(400 * DAY_NS),
+                valid_till: DAY_NS,
+                ..params(anchor_number, 1, 0)
+            })
+            .unwrap();
+
+        // A bound it could never reach says something about the session that is not
+        // true, so it is stored as the life the session actually got.
+        assert_eq!(session.max_idle, Some(DAY_NS));
+    }
+
+    #[test]
+    fn asking_for_no_idle_bound_stores_none() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        let session = storage
+            .create_session(params(anchor_number, 1, 1_000))
+            .unwrap();
+
+        assert_eq!(session.max_idle, None);
+        assert!(!session.is_idle(1_000 + 400 * DAY_NS));
     }
 
     #[test]
@@ -4260,6 +4325,7 @@ mod session_creation_tests {
             account_number: None,
             device_id: 1,
             valid_till: u64::MAX,
+            max_idle: None,
             read_only,
             now: 1_000,
         };
@@ -4381,6 +4447,7 @@ mod session_consent_change_tests {
                 account_number: None,
                 device_id: 1,
                 valid_till: u64::MAX,
+                max_idle: None,
                 read_only,
                 now,
             })
@@ -4447,6 +4514,7 @@ mod session_consent_change_tests {
                 account_number: None,
                 device_id: 2,
                 valid_till: u64::MAX,
+                max_idle: None,
                 read_only: false,
                 now: 1_000,
             })

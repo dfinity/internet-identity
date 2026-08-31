@@ -69,6 +69,14 @@ impl AccountReference {
     }
 }
 
+/// The shortest idle bound a session may be given.
+///
+/// An app delegation lasts five minutes and an active application replaces it a
+/// little before it expires, so a bound anywhere near that would end sessions
+/// plainly in use. Ten minutes is already the floor on a session's own length,
+/// so this shares that range rather than introducing a second one.
+pub const MIN_SESSION_IDLE_NS: u64 = 10 * crate::MINUTE_NS;
+
 /// A revocable session at one account. Only `last_refreshed` is mutable, which is why
 /// it is the one field absent from the seed.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
