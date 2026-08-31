@@ -15,7 +15,7 @@ pub struct StorableSessionRecord {
     #[n(1)]
     pub valid_till_ns: StorableTimestamp,
     #[n(2)]
-    pub max_idle_ns: Option<StorableDuration>,
+    pub max_idle_ns: StorableDuration,
     #[n(3)]
     pub last_refreshed_ns: Option<StorableTimestamp>,
     #[n(4)]
