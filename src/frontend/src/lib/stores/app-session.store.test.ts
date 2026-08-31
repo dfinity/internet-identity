@@ -41,6 +41,16 @@ describe("app session store", () => {
     ]);
   });
 
+  it("carries the account principal of a listed session", async () => {
+    const key = { identityNumber: BigInt(10_000), origin: ORIGIN };
+    await rememberAppAccount(key, { accountPrincipal: "2vxsx-fae" });
+    await storeAppSession(key, record(anHourFromNow()));
+
+    await expect(appSessionsForOrigin(ORIGIN)).resolves.toMatchObject([
+      { accountPrincipal: "2vxsx-fae" },
+    ]);
+  });
+
   it("remembers which account a principal names without a session", async () => {
     const key = { identityNumber: BigInt(10_000), origin: ORIGIN };
     await rememberAppAccount(key, { accountPrincipal: "2vxsx-fae" });
