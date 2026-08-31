@@ -1,5 +1,6 @@
 import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
-import { originOf, type McpConfig } from "$lib/utils/mcpConfig";
+import type { McpConfig } from "$lib/utils/mcpConfig";
+import { isLoopbackUrl, trustsOrigin } from "$lib/utils/mcpServer";
 import { matchDeclaredCallback } from "$lib/utils/authCallbacks";
 import type { BackendCanisterConfig } from "$lib/globals";
 import type { Authenticated } from "$lib/stores/authentication.store";
@@ -36,10 +37,11 @@ interface McpAuthorizeInput {
    *  query can't redirect delivery to an attacker's origin. */
   serverOrigin: string;
   /** The exact callback the (attacker-craftable) connect link requested. Once
-   *  `serverOrigin` is trust-confirmed, it is matched against the allow-list
-   *  the server declares at a fixed well-known path on its origin (see
-   *  `matchDeclaredCallback`) — the link only ever selects among the declared
-   *  entries. This is where II delivers the registration delegation (a
+   *  `serverOrigin` is trust-confirmed, a *remote* server's callback is matched
+   *  against the allow-list it declares at a fixed well-known path on its
+   *  origin (see `matchDeclaredCallback`), so the link only ever selects among
+   *  the declared entries; a *local* server's is taken as-is, for the reasons
+   *  at the call site. This is where II delivers the registration delegation (a
    *  top-level navigation carrying it in the fragment). */
   requestedCallback: string;
   /** Opaque value the server issued for this connect, delivered back alongside
@@ -89,11 +91,11 @@ interface McpAuthorizeInput {
  * declared callback.
  *
  * Delivery is gated here, on values that can't be forged by a single node: the
- * connect link's origin must equal the origin of `prepare`'s `trusted_url`
+ * connect link's origin must be the server `prepare`'s `trusted_url` names
  * (certified, since `prepare` is an update call — so a forged `mcp_get_config`
- * query can't redirect delivery to an attacker's origin), and only then is the
- * link's callback matched against the allow-list the server declares on that
- * origin. A trust mismatch throws {@link McpUntrustedServerError} before the
+ * query can't redirect delivery to an attacker's origin), and only then, for a
+ * remote server, is the link's callback matched against the allow-list that
+ * server declares. A trust mismatch throws {@link McpUntrustedServerError} before the
  * chain is fetched or assembled, so the minted registration stays inert and
  * expires undelivered. Resolves with the delivery URL the caller should
  * navigate the tab to; the server's callback finishes the flow on its side
@@ -160,15 +162,33 @@ export const mcpAuthorize = async ({
   // link's origin is that trusted origin; on a mismatch we throw before
   // fetching `get` or assembling the chain, so the registration `prepare` just
   // minted is never turned into a redeemable artifact and simply expires.
-  if (originOf(trusted_url) !== serverOrigin) {
+  if (!trustsOrigin(trusted_url, serverOrigin)) {
     throw new McpUntrustedServerError();
   }
 
-  // Trust confirmed: only now contact the server for its declared-callback
-  // allow-list, and require the link's callback to exact-match a declared
-  // entry (so a crafted link can't point II at an arbitrary path on the trusted
-  // origin). Failure here fails the connect closed, before delivery.
-  const callback = await matchDeclaredCallback(serverOrigin, requestedCallback);
+  // Trust confirmed. For a remote server, contact it for its declared-callback
+  // allow-list and require the link's callback to exact-match a declared entry
+  // (so a crafted link can't point II at an arbitrary path on the trusted
+  // origin). Failure there fails the connect closed, before delivery.
+  //
+  // A local server is exempt, because the check cannot be made: browsers block
+  // this https document from fetching a loopback URL, so the request never
+  // reaches the local server and every local connect would fail closed. The
+  // allow-list defends against a *path* on a shared origin that leaks what is
+  // delivered to it — a public host can carry pages many parties wrote, so the
+  // origin alone doesn't say who receives the delegation. A local server is one
+  // program the user chose to run, and any port on this computer is trusted
+  // anyway (the stored URL carries none), so pinning the path would be defeated
+  // by naming a different port. What stands in its place is the deliberate
+  // Settings opt-in, the notice before the first local sign-in on a machine,
+  // and the consent screen on every connect.
+  //
+  // Decided on the *certified* `trusted_url`, never on the link: the two are
+  // equal by the gate above, but reading it from the certified value keeps this
+  // branch impossible to steer from the fragment.
+  const callback = isLoopbackUrl(trusted_url)
+    ? requestedCallback
+    : await matchDeclaredCallback(serverOrigin, requestedCallback);
 
   // `get` recovers the seed from `user_key` (the value `prepare` returned), so
   // it needs neither the consent params nor a deterministic re-derivation.
@@ -221,8 +241,8 @@ export const mcpAuthorize = async ({
  *
  * Takes the canister config rather than a bare URL so the official connector
  * can only come from the deployment, never from an arbitrary string at a call
- * site. Matching is by origin, the same boundary the delegation uses (II
- * derives a per-origin principal; the path can't scope it).
+ * site. Matching goes through {@link trustsOrigin} — by exact origin for a
+ * remote server, by loopback host for a local one.
  */
 export const isOriginTrusted = (
   config: McpConfig | undefined,
@@ -233,5 +253,5 @@ export const isOriginTrusted = (
     config !== undefined && config.enabled
       ? (config.url ?? mcp_official_url[0])
       : undefined;
-  return url !== undefined && originOf(url) === origin;
+  return url !== undefined && trustsOrigin(url, origin);
 };

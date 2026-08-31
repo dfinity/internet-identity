@@ -100,6 +100,10 @@ const browserKeyOf = (actor: ReturnType<typeof makeActor>): Uint8Array =>
 const authorize = (
   actor: ReturnType<typeof makeActor>,
   accessLevel: "read-only" | "full-access",
+  server: { origin: string; callback: string } = {
+    origin: MCP_ORIGIN,
+    callback: CALLBACK,
+  },
 ) =>
   mcpAuthorize({
     authenticated: {
@@ -108,11 +112,29 @@ const authorize = (
     } as unknown as Authenticated,
     ttlSeconds: TTL_SECONDS,
     accessLevel,
-    serverOrigin: MCP_ORIGIN,
-    requestedCallback: CALLBACK,
+    serverOrigin: server.origin,
+    requestedCallback: server.callback,
     state: STATE,
     registrationKey: REGISTRATION_KEY,
   });
+
+/** A local server: the port-less stored trusted URL, and the ported loopback
+ *  callback the program is actually listening on for this sign-in. */
+const LOCAL_TRUSTED_URL = "http://127.0.0.1";
+const LOCAL_ORIGIN = "http://127.0.0.1:52341";
+const LOCAL_CALLBACK = `${LOCAL_ORIGIN}/callback`;
+
+/** `prepare` answering with a local server as the identity's trusted one. */
+const withLocalTrustedUrl = (actor: ReturnType<typeof makeActor>) => {
+  actor.prepare_mcp_registration_delegation.mockResolvedValue({
+    Ok: {
+      user_key: USER_KEY,
+      expiration: actor.expiration,
+      trusted_url: LOCAL_TRUSTED_URL,
+    },
+  });
+  return actor;
+};
 
 beforeEach(() => {
   // The connect's only network call of its own is the trusted server's
@@ -255,6 +277,94 @@ describe("mcpAuthorize trust gate (certified trusted_url)", () => {
 
     const url = await authorize(actor, "read-only");
     expect(url.startsWith(`${CALLBACK}#`)).toBe(true);
+  });
+});
+
+describe("mcpAuthorize local server (loopback)", () => {
+  it("delivers without fetching an allow-list", async () => {
+    // Browsers block this https document from fetching a loopback URL, so the
+    // allow-list can't be read and a local connect must not depend on it.
+    const actor = withLocalTrustedUrl(makeActor());
+
+    const url = await authorize(actor, "read-only", {
+      origin: LOCAL_ORIGIN,
+      callback: LOCAL_CALLBACK,
+    });
+
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(url.startsWith(`${LOCAL_CALLBACK}#`)).toBe(true);
+  });
+
+  it("accepts any port, since the local server binds a fresh one per sign-in", async () => {
+    const actor = withLocalTrustedUrl(makeActor());
+
+    const url = await authorize(actor, "read-only", {
+      origin: "http://127.0.0.1:9",
+      callback: "http://127.0.0.1:9/callback",
+    });
+
+    expect(url.startsWith("http://127.0.0.1:9/callback#")).toBe(true);
+  });
+
+  it("still refuses an origin that is not loopback at all", async () => {
+    // The port is free; the host is not. A local trusted entry must never
+    // authorize delivery to a remote origin.
+    const actor = withLocalTrustedUrl(makeActor());
+
+    await expect(
+      authorize(actor, "read-only", {
+        origin: "https://evil.example",
+        callback: "https://evil.example/callback",
+      }),
+    ).rejects.toBeInstanceOf(McpUntrustedServerError);
+    expect(actor.get_mcp_registration_delegation).not.toHaveBeenCalled();
+  });
+
+  it("refuses loopback lookalikes", async () => {
+    for (const origin of [
+      "http://localhost:52341",
+      "http://[::1]:52341",
+      "https://127.0.0.1:52341",
+      "http://127.0.0.1.nip.io:52341",
+    ]) {
+      const actor = withLocalTrustedUrl(makeActor());
+      await expect(
+        authorize(actor, "read-only", {
+          origin,
+          callback: `${origin}/callback`,
+        }),
+      ).rejects.toBeInstanceOf(McpUntrustedServerError);
+    }
+  });
+
+  it("does not let a remote trusted server authorize a loopback callback", async () => {
+    // The mirror of the above: a crafted link naming a local callback must not
+    // ride an identity whose trusted server is remote.
+    const actor = makeActor();
+
+    await expect(
+      authorize(actor, "read-only", {
+        origin: LOCAL_ORIGIN,
+        callback: LOCAL_CALLBACK,
+      }),
+    ).rejects.toBeInstanceOf(McpUntrustedServerError);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(actor.get_mcp_registration_delegation).not.toHaveBeenCalled();
+  });
+
+  it("keeps enforcing the allow-list for a remote server", async () => {
+    // The loopback exemption must not leak into the remote path.
+    const actor = makeActor();
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ callbacks: [`${MCP_ORIGIN}/other`] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await expect(authorize(actor, "read-only")).rejects.toThrow(
+      /does not declare this callback/,
+    );
   });
 });
 
@@ -453,6 +563,41 @@ describe("isOriginTrusted", () => {
     expect(
       isOriginTrusted(trust("not a url"), "https://mcp.id.ai", NO_OFFICIAL),
     ).toBe(false);
+  });
+});
+
+describe("isOriginTrusted — local server", () => {
+  const OFFICIAL = {
+    mcp_official_url: [] as [] | [string],
+  } as Pick<BackendCanisterConfig, "mcp_official_url">;
+  const local = (enabled: boolean): McpConfig => ({
+    enabled,
+    url: "http://127.0.0.1",
+  });
+
+  it("trusts any loopback port", () => {
+    expect(
+      isOriginTrusted(local(true), "http://127.0.0.1:52341", OFFICIAL),
+    ).toBe(true);
+    expect(isOriginTrusted(local(true), "http://127.0.0.1:1", OFFICIAL)).toBe(
+      true,
+    );
+  });
+
+  it("still requires the feature enabled", () => {
+    expect(
+      isOriginTrusted(local(false), "http://127.0.0.1:52341", OFFICIAL),
+    ).toBe(false);
+  });
+
+  it("trusts nothing off loopback", () => {
+    for (const origin of [
+      "https://mcp.id.ai",
+      "http://localhost:52341",
+      "https://127.0.0.1:52341",
+    ]) {
+      expect(isOriginTrusted(local(true), origin, OFFICIAL)).toBe(false);
+    }
   });
 });
 
