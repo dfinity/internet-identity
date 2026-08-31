@@ -17,7 +17,7 @@ The rest of the document uses these names and restates no value. Four more are f
 
 | Name                   | Value                                                                                                                                         | Used by |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Slots                  | `session`, `app`, `session-pending`, each prefixed by the namespace where one is set                                                          | STORE-4 |
+| Slots                  | `session`, `app`, `session-pending`, `app-pending`, each prefixed by the namespace where one is set                                           | STORE-4 |
 | Mint lock              | the `app` slot                                                                                                                                | STORE-8 |
 | Default authorize URL  | `https://id.ai/authorize`                                                                                                                     | AGENT-2 |
 | Default II canister id | `rdmx6-jaaaa-aaaaa-aaadq-cai`                                                                                                                 | AGENT-2 |
@@ -39,16 +39,18 @@ sequenceDiagram
     participant IIC as II canister
 
     App->>AC: signIn()
+    AC->>AC: session key to `session-pending`
     AC->>IIF: ii_session_delegation(session public key)
     IIF->>IIC: prepare_account_session / get_account_session
     IIF-->>AC: session chain, targets = II canister
-    AC->>AC: promote the pending credential
+    AC->>IIC: app_prepare_delegation(app public key)
+    IIC-->>AC: account key, expiration
+    AC->>IIC: app_get_delegation(app public key, expiration)
+    IIC-->>AC: delegation, five minutes
+    AC->>AC: that credential to `app-pending`
+    AC->>AC: write `session` and the state
+    AC->>AC: promote `app-pending`, then drop `session-pending`
     AC->>Id: hand it the session
-    Id->>IIC: app_prepare_delegation(app public key)
-    IIC-->>Id: account key, expiration
-    Id->>IIC: app_get_delegation(app public key, expiration)
-    IIC-->>Id: delegation, five minutes
-    AC->>AC: write the state
     AC-->>App: signIn() resolves
 
     App->>AC: getIdentity()
@@ -57,7 +59,9 @@ sequenceDiagram
     Id-->>App: signed with the delegation it holds
 ```
 
-`getIdentity()` makes no call and returns the same object every time. The mint at sign-in is step 7 onwards, and after that the identity replaces its own delegation on the schedule and the request paths of the section below.
+`getIdentity()` makes no call and returns the same object every time. The mint at sign-in is steps 6 to 9, and after that the identity replaces its own delegation on the schedule and the request paths of the section below.
+
+Both pending slots are written before anything shared is, and both are settled after the state is: the account key a mint reports is what the state records, so the mint has to happen before the record can be written, and nothing may be promoted until it has been. That is the order steps 10 to 12 are in, and reversing any pair of them publishes a credential for a sign-in nothing has recorded yet.
 
 ## Acquiring a session
 
@@ -89,17 +93,23 @@ The pending key's **public** key is journaled through the redirect's `memoize`, 
 
 `signIn()` with `transport: 'redirect'` is refused outright where the store is neither `durable` nor `shared`: the key cannot survive the navigation and nothing can answer for it, so refusing before navigating beats returning to a flow that cannot finish. Where the store is `shared` but not `durable` a peer answers, which is genuine rather than luck, so the return leg reports that the key did not survive instead of the configuration being rejected.
 
+**ACQ-9.**
+The mint a ceremony performs, per MINT-12, writes to `app-pending` and is promoted to `app` only once the session and the state are stored. So the slot every tab of the origin acts with is never emptied by a sign-in: a ceremony that fails costs the other tabs nothing, and an abandoned redirect leaves a spent five-minute record behind rather than having wiped the live one.
+
+This makes both halves of a ceremony symmetric with ACQ-8 — each writes to a slot of its own and promotes on success — which is the same rule stated once rather than a sign-in that is careful about one credential and destructive with the other. Promotion is not atomic across the two slots, and does not need to be: a promotion that stops halfway leaves records that STATE-6 discards on the next read, because the state is written last.
+
 ## Keys
 
-Four things are held, in two credentials of the same shape, and one more while a ceremony is in flight. A credential is an identity and the delegation that authorises it, kept as one record under one slot.
+Four things are held, in two credentials of the same shape, and each half of a ceremony writes to a slot of its own while it is in flight. A credential is an identity and the delegation that authorises it, kept as one record under one slot.
 
-| Thing            | Slot              | Lifetime                                             | Requirement  |
-| ---------------- | ----------------- | ---------------------------------------------------- | ------------ |
-| Session key      | `session`         | the session                                          | KEY-1, KEY-4 |
-| Session chain    | `session`         | the session                                          | ACQ-5, KEY-4 |
-| App key          | `app`             | one delegation                                       | KEY-2, TAB-5 |
-| App delegation   | `app`             | one delegation                                       | TAB-5        |
-| A ceremony's key | `session-pending` | until it is promoted or another ceremony replaces it | ACQ-8        |
+| Thing                   | Slot              | Lifetime                                             | Requirement  |
+| ----------------------- | ----------------- | ---------------------------------------------------- | ------------ |
+| Session key             | `session`         | the session                                          | KEY-1, KEY-4 |
+| Session chain           | `session`         | the session                                          | ACQ-5, KEY-4 |
+| App key                 | `app`             | one delegation                                       | KEY-2, TAB-5 |
+| App delegation          | `app`             | one delegation                                       | TAB-5        |
+| A ceremony's key        | `session-pending` | until it is promoted or another ceremony replaces it | ACQ-8        |
+| A ceremony's first mint | `app-pending`     | until it is promoted or the ceremony is abandoned    | ACQ-9        |
 
 **STORE-1.**
 Storage is two interfaces, and what separates them is what they are for. `StateStorage` holds the state — who is signed in here and until when — and is read synchronously, because that is what a page decides its rendering on. `CredentialStorage` holds the material that acts on that state, and is asynchronous, because using it means making a call and a non-extractable key needs a store that can hold one.
