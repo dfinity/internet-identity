@@ -405,7 +405,9 @@ fn authorize_session(
     now: Timestamp,
 ) -> Result<(StorableAccountLocator, Account, SessionRecord), AppSessionError> {
     let matched = match_session()?;
-    if matched.2.is_expired(now) {
+    // Either bound: a session past its lifetime and one nobody has used for longer
+    // than it was allowed are equally gone, and a refresh is the thing that finds out.
+    if matched.2.is_over(now) {
         return Err(AppSessionError::NoMatchingSession);
     }
     Ok(matched)
@@ -463,7 +465,6 @@ fn match_session() -> Result<(StorableAccountLocator, Account, SessionRecord), A
             session.device_id == handle.device_id && session.created_at_ns == handle.created_at
         })
         .ok_or(AppSessionError::NoMatchingSession)?;
-
     Ok((locator, account, session))
 }
 
