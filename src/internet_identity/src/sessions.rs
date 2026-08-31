@@ -156,9 +156,10 @@ pub async fn prepare_account_session(
             origin: origin.clone(),
             account_number,
             device_id,
-            valid_till,
+            valid_till_ns: valid_till,
+            max_idle_ns: None,
             read_only,
-            now,
+            now_ns: now,
         })
     })
     .expect("failed to create a session for an account that was just read");
@@ -170,14 +171,20 @@ pub async fn prepare_account_session(
         .expect("failed to derive the principal of an account that was just read");
 
     state::signature_map_mut(|sigs| {
-        add_delegation_signature(sigs, session_key, seed.as_ref(), session.valid_till, None);
+        add_delegation_signature(
+            sigs,
+            session_key,
+            seed.as_ref(),
+            session.valid_till_ns,
+            None,
+        );
     });
     update_root_hash();
 
     Ok(PrepareAccountSessionResponse {
         user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
-        expiration: session.valid_till,
-        created_at: session.created_at,
+        expiration: session.valid_till_ns,
+        created_at: session.created_at_ns,
         device_id,
         account_principal,
     })
@@ -204,7 +211,7 @@ pub fn get_account_session(
 
     sessions
         .into_iter()
-        .filter(|session| session.valid_till == expiration)
+        .filter(|session| session.valid_till_ns == expiration)
         .find_map(|session| {
             let (seed, _) =
                 session_identity(identity_number, &origin, account_number, &session).ok()?;
@@ -269,7 +276,7 @@ fn session_identity(
     let seed = calculate_session_seed_with_salt(
         &salt,
         &account.calculate_seed_with_salt(&salt),
-        session.created_at,
+        session.created_at_ns,
         session.device_id,
     );
     Ok((seed, application_number))
