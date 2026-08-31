@@ -77,6 +77,14 @@ impl AccountReference {
 /// so this shares that range rather than introducing a second one.
 pub const MIN_SESSION_IDLE_NS: u64 = 10 * crate::MINUTE_NS;
 
+/// What a session gets when its ceremony asks for no bound of its own.
+///
+/// Seven days of nobody touching an application ends the sign-in, well inside the
+/// thirty days a session may otherwise live. It is the length of an absence rather
+/// than of a session: coming back inside a week keeps you signed in indefinitely,
+/// and a machine walked away from stops being signed in within one.
+pub const DEFAULT_SESSION_IDLE_NS: u64 = 7 * crate::DAY_NS;
+
 /// A revocable session at one account. Only `last_refreshed` is mutable, which is why
 /// it is the one field absent from the seed.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]

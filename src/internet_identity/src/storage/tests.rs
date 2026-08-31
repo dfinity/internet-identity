@@ -4018,7 +4018,8 @@ mod session_record_tests {
 mod session_creation_tests {
     use crate::delegation::calculate_session_seed_with_salt;
     use crate::storage::account::{
-        AccountReference, CreateAccountParams, SessionRecord, MIN_SESSION_IDLE_NS,
+        AccountReference, CreateAccountParams, SessionRecord, DEFAULT_SESSION_IDLE_NS,
+        MIN_SESSION_IDLE_NS,
     };
     use crate::storage::CreateSessionParams;
     use crate::{Storage, DAY_NS, MINUTE_NS};
@@ -4084,7 +4085,7 @@ mod session_creation_tests {
             })
             .unwrap();
 
-        assert_eq!(session.max_idle_ns, Some(asked));
+        assert_eq!(session.max_idle_ns, asked);
     }
 
     #[test]
@@ -4101,7 +4102,7 @@ mod session_creation_tests {
 
         // An app delegation lasts five minutes, so a bound under that would end a
         // session between two mints of one that is plainly in use.
-        assert_eq!(session.max_idle_ns, Some(MIN_SESSION_IDLE_NS));
+        assert_eq!(session.max_idle_ns, MIN_SESSION_IDLE_NS);
     }
 
     #[test]
@@ -4118,19 +4119,41 @@ mod session_creation_tests {
 
         // A bound it could never reach says something about the session that is not
         // true, so it is stored as the life the session actually got.
-        assert_eq!(session.max_idle_ns, Some(DAY_NS));
+        assert_eq!(session.max_idle_ns, DAY_NS);
     }
 
     #[test]
-    fn asking_for_no_idle_bound_stores_none() {
+    fn asking_for_no_idle_bound_gets_the_default() {
         let (mut storage, anchor_number) = storage_with_anchor();
 
         let session = storage
-            .create_session(params(anchor_number, 1, 1_000))
+            .create_session(CreateSessionParams {
+                valid_till_ns: 30 * DAY_NS,
+                ..params(anchor_number, 1, 0)
+            })
             .unwrap();
 
-        assert_eq!(session.max_idle_ns, None);
-        assert!(!session.is_idle(1_000 + 400 * DAY_NS));
+        // Every session gets a bound now. A week of nobody touching the application
+        // ends the sign-in, well inside the thirty days it could otherwise live.
+        assert_eq!(session.max_idle_ns, DEFAULT_SESSION_IDLE_NS);
+        assert!(!session.is_over(6 * DAY_NS));
+        assert!(session.is_over(7 * DAY_NS));
+    }
+
+    #[test]
+    fn a_session_shorter_than_the_idle_floor_is_bounded_by_its_own_life() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        // Under the floor the range inverts, and clamping in one call would trap.
+        let session = storage
+            .create_session(CreateSessionParams {
+                valid_till_ns: MINUTE_NS,
+                max_idle_ns: Some(30 * MINUTE_NS),
+                ..params(anchor_number, 1, 0)
+            })
+            .unwrap();
+
+        assert_eq!(session.max_idle_ns, MINUTE_NS);
     }
 
     #[test]
@@ -4299,7 +4322,7 @@ mod session_creation_tests {
                         // Already expired at `now`, so it is not reused, but it is still
                         // present when the seed for the new record is derived.
                         valid_till_ns: 1_000,
-                        max_idle_ns: None,
+                        max_idle_ns: u64::MAX,
                         last_refreshed_ns: None,
                         device_id: 1,
                         read_only: false,
