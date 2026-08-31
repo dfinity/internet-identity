@@ -4846,9 +4846,10 @@ mod session_refresh_stamp_tests {
                 origin: ORIGIN.to_string(),
                 account_number: None,
                 device_id: 1,
-                valid_till: u64::MAX,
+                valid_till_ns: u64::MAX,
+                max_idle_ns: None,
                 read_only: false,
-                now: 1_000,
+                now_ns: 1_000,
             })
             .unwrap();
         let application_number = storage
@@ -4858,7 +4859,7 @@ mod session_refresh_stamp_tests {
             storage,
             anchor_number,
             application_number,
-            session.created_at,
+            session.created_at_ns,
         )
     }
 
@@ -4896,7 +4897,7 @@ mod session_refresh_stamp_tests {
 
         assert!(stamped);
         assert_eq!(
-            session_of(&storage, anchor_number).last_refreshed,
+            session_of(&storage, anchor_number).last_refreshed_ns,
             Some(2_000)
         );
         assert_eq!(reference(&storage, anchor_number).last_used, Some(2_000));
@@ -4911,7 +4912,7 @@ mod session_refresh_stamp_tests {
                 .stamp_session_refresh(anchor_number, application_number, None, created_at, 1, now)
                 .unwrap());
             assert_eq!(
-                session_of(&storage, anchor_number).last_refreshed,
+                session_of(&storage, anchor_number).last_refreshed_ns,
                 Some(now)
             );
         }
@@ -4929,9 +4930,10 @@ mod session_refresh_stamp_tests {
                 origin: ORIGIN.to_string(),
                 account_number: None,
                 device_id: 9,
-                valid_till: 1_500,
+                valid_till_ns: 1_500,
+                max_idle_ns: None,
                 read_only: false,
-                now: 1_000,
+                now_ns: 1_000,
             })
             .unwrap();
         let dead_principal = storage
@@ -4985,9 +4987,10 @@ mod session_refresh_stamp_tests {
                 origin: ORIGIN.to_string(),
                 account_number: None,
                 device_id: 2,
-                valid_till: u64::MAX,
+                valid_till_ns: u64::MAX,
+                max_idle_ns: None,
                 read_only: false,
-                now: 1_000,
+                now_ns: 1_000,
             })
             .unwrap();
         let now = 2_000;
@@ -5000,8 +5003,8 @@ mod session_refresh_stamp_tests {
         assert_eq!(sessions.len(), 2);
         let stamped = sessions.iter().find(|s| s.device_id == 1).unwrap();
         let untouched = sessions.iter().find(|s| s.device_id == 2).unwrap();
-        assert_eq!(stamped.last_refreshed, Some(now));
-        assert_eq!(untouched.last_refreshed, None);
+        assert_eq!(stamped.last_refreshed_ns, Some(now));
+        assert_eq!(untouched.last_refreshed_ns, None);
     }
 
     fn storage_with_registered_device() -> (
@@ -5030,9 +5033,10 @@ mod session_refresh_stamp_tests {
                 origin: ORIGIN.to_string(),
                 account_number: None,
                 device_id,
-                valid_till: u64::MAX,
+                valid_till_ns: u64::MAX,
+                max_idle_ns: None,
                 read_only: false,
-                now: 1_000,
+                now_ns: 1_000,
             })
             .unwrap();
         let application_number = storage
@@ -5042,7 +5046,7 @@ mod session_refresh_stamp_tests {
             storage,
             anchor_number,
             application_number,
-            session.created_at,
+            session.created_at_ns,
             device_id,
         )
     }
@@ -5108,7 +5112,7 @@ mod session_refresh_stamp_tests {
 
         assert!(stamped);
         assert_eq!(
-            session_of(&storage, anchor_number).last_refreshed,
+            session_of(&storage, anchor_number).last_refreshed_ns,
             Some(9_000)
         );
     }

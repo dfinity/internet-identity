@@ -2062,12 +2062,12 @@ impl<M: Memory + Clone> Storage<M> {
         let Some(session) = reference
             .sessions
             .iter_mut()
-            .find(|session| session.created_at == created_at && session.device_id == device_id)
+            .find(|session| session.created_at_ns == created_at && session.device_id == device_id)
         else {
             return Ok(false);
         };
 
-        session.last_refreshed = Some(now);
+        session.last_refreshed_ns = Some(now);
         reference.last_used = Some(now);
 
         // This row is being rewritten anyway, so its dead sessions go now. It costs one

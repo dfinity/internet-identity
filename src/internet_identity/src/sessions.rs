@@ -323,7 +323,7 @@ pub fn app_prepare_delegation(
             locator.anchor_number,
             locator.application_number,
             locator.account_number,
-            session.created_at,
+            session.created_at_ns,
             session.device_id,
             now,
         )
