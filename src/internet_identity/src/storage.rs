@@ -2175,6 +2175,7 @@ impl<M: Memory + Clone> Storage<M> {
         let session = SessionRecord {
             created_at: now,
             valid_till,
+            max_idle: None,
             last_refreshed: None,
             device_id,
             read_only,
