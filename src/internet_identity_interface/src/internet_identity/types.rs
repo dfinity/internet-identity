@@ -767,12 +767,13 @@ pub struct PrepareAccountSessionRequest {
     pub device_name: String,
     /// The browser's own public key, DER-encoded, as the registry currently holds it. A
     /// key this anchor has not seen registers a browser under it.
-    pub device_key: PublicKey,
+    pub current_device_key: PublicKey,
     /// What the browser rotates to once this sign-in succeeds.
     pub next_device_key: PublicKey,
-    /// Signature over `session_key` and `next_device_key`, verified with `device_key`.
-    /// A second signature by `next_device_key` proves the browser holds it.
-    pub device_key_signature: ByteBuf,
+    /// Signature over `session_key` and `next_device_key`, verified with
+    /// `current_device_key`. A second signature by `next_device_key` proves the browser
+    /// holds the key it is announcing.
+    pub current_device_key_signature: ByteBuf,
     pub next_device_key_signature: ByteBuf,
     /// The consented access level, fixed for the session's life.
     pub permissions: Option<Permissions>,
