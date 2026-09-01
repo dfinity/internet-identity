@@ -723,8 +723,14 @@ impl<M: Memory + Clone> Storage<M> {
         storage
     }
 
-    /// Existing application numbers are dense from zero, so the row count is the
-    /// first free number.
+    /// Seeds the allocator from whichever is higher: the stored counter, or the row
+    /// count.
+    ///
+    /// The row count is a floor rather than the answer. It is exact only for data
+    /// written before this counter existed, where numbering was dense from zero.
+    /// Retiring an application removes its row without reissuing its number, so from
+    /// then on the count undershoots and only the stored counter is right — taking the
+    /// maximum is what keeps allocation monotonic across both.
     fn seed_application_number_allocator(&mut self) {
         let seeded = ApplicationNumber::max(
             *self.next_application_number_memory.get(),
@@ -2391,13 +2397,30 @@ impl<M: Memory + Clone> Storage<M> {
             .stable_application_memory
             .get(&application_number)
             .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
+        // Every reference goes, so every principal it derived goes with it — resolved
+        // before the first removal so a missing salt refuses with the row intact.
+        let salt = *self.salt().ok_or(StorageError::SaltNotSet)?;
+        let origin = application.origin.clone();
+        let dropped: usize = previous
+            .iter()
+            .map(|reference| reference.sessions.len())
+            .sum();
 
-        self.sync_account_principal_index(anchor_number, application_number, &previous, &[])?;
+        // Both of these can refuse, so both run before anything is removed.
+        let deltas = ReferenceListDeltas::between(&previous, &[]);
+        self.apply_reference_counter_deltas(
+            anchor_number,
+            application_number,
+            application,
+            deltas,
+        )?;
+        if dropped > 0 {
+            self.change_session_count(anchor_number, dropped, 0)?;
+        }
 
         // The row's sessions go with it, so their index entries have to go too. A browser
         // keeps its id, and evicting a row leaves the account's principal untouched, so an
         // entry left behind here would be waiting for the next sign-in at this origin.
-        let mut dropped = 0usize;
         for reference in &previous {
             self.unindex_sessions(
                 anchor_number,
@@ -2405,17 +2428,18 @@ impl<M: Memory + Clone> Storage<M> {
                 reference.account_number,
                 &reference.sessions,
             );
-            dropped += reference.sessions.len();
         }
-        if dropped > 0 {
-            self.change_session_count(anchor_number, dropped, 0)?;
-        }
-
+        self.sync_account_principal_index(
+            anchor_number,
+            application_number,
+            &origin,
+            &salt,
+            &previous,
+            &[],
+        );
         self.stable_account_reference_list_memory.remove(&key);
         self.stable_anchor_application_config_memory.remove(&key);
-
-        let deltas = ReferenceListDeltas::between(&previous, &[]);
-        self.apply_reference_counter_deltas(anchor_number, application_number, application, deltas)
+        Ok(())
     }
 
     /// Rows whose only reference is a tracked default.
@@ -2536,11 +2560,45 @@ impl<M: Memory + Clone> Storage<M> {
 
         let deltas = ReferenceListDeltas::between(&previous, &current);
 
-        self.sync_account_principal_index(anchor_number, application_number, &previous, &current)?;
+        // A derived principal is a function of the anchor, the origin and the account
+        // number, so a write that leaves every account number in place — a `last_used`
+        // stamp, which is every sign-in — cannot have changed one. Skipping the sync
+        // there keeps the hottest write in the system off a per-account hash.
+        let accounts_changed = previous.len() != current.len()
+            || previous
+                .iter()
+                .zip(&current)
+                .any(|(previous, current)| previous.account_number != current.account_number);
+        // Resolved before anything is written, so a missing salt refuses here rather
+        // than half-way through.
+        let salt = if accounts_changed {
+            Some(*self.salt().ok_or(StorageError::SaltNotSet)?)
+        } else {
+            None
+        };
+        let origin = application.origin.clone();
 
+        // Counters before the list: returning an error after the list is written would
+        // commit one without the other. Past this line nothing can fail.
+        self.apply_reference_counter_deltas(
+            anchor_number,
+            application_number,
+            application,
+            deltas,
+        )?;
+        if let Some(salt) = salt {
+            self.sync_account_principal_index(
+                anchor_number,
+                application_number,
+                &origin,
+                &salt,
+                &previous,
+                &current,
+            );
+        }
         self.stable_account_reference_list_memory
             .insert(key, current.into());
-        self.apply_reference_counter_deltas(anchor_number, application_number, application, deltas)
+        Ok(())
     }
 
     /// Indexes one batch of existing reference-list rows. Entries are only inserted,
@@ -2559,6 +2617,8 @@ impl<M: Memory + Clone> Storage<M> {
             outcome.is_done = true;
             return outcome;
         }
+        // Not done, so the caller comes back. A canister whose salt is unset has not
+        // finished starting up rather than finished backfilling.
         let Some(salt) = self.salt().copied() else {
             return outcome;
         };
@@ -2587,6 +2647,7 @@ impl<M: Memory + Clone> Storage<M> {
                 .get(&application_number)
                 .map(|application| application.origin)
             else {
+                outcome.skipped += 1;
                 continue;
             };
 
@@ -2614,24 +2675,21 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Keeps the principal index in step with one reference-list write, diffing values
     /// rather than keys.
+    /// Takes the salt and origin its caller already resolved, so everything that could
+    /// refuse has refused before this writes anything.
     fn sync_account_principal_index(
         &mut self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
+        origin: &FrontendHostname,
+        salt: &[u8; 32],
         previous: &[AccountReference],
         current: &[AccountReference],
-    ) -> Result<(), StorageError> {
-        let salt = *self.salt().ok_or(StorageError::SaltNotSet)?;
-        let origin = self
-            .stable_application_memory
-            .get(&application_number)
-            .map(|application| application.origin)
-            .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
-
+    ) {
         let previous_entries =
-            self.account_principals(anchor_number, application_number, &origin, &salt, previous);
+            self.account_principals(anchor_number, application_number, origin, salt, previous);
         let current_entries =
-            self.account_principals(anchor_number, application_number, &origin, &salt, current);
+            self.account_principals(anchor_number, application_number, origin, salt, current);
 
         for (principal, locator) in &previous_entries {
             if current_entries.contains_key(principal) {
@@ -2653,8 +2711,6 @@ impl<M: Memory + Clone> Storage<M> {
             self.lookup_account_with_principal_memory
                 .insert(principal, locator);
         }
-
-        Ok(())
     }
 
     /// The principals a set of references derives to. A reference whose account row is
@@ -2711,27 +2767,30 @@ impl<M: Memory + Clone> Storage<M> {
             return Ok(());
         }
 
+        // Every counter is computed before any of them is written, so an out-of-bounds
+        // delta refuses with all three still holding their old values.
         let anchor_counter = self
             .stable_anchor_account_counter_memory
             .get(&anchor_number)
             .unwrap_or_default();
-        let (stored_accounts, stored_account_references) = deltas.apply(
+        let (anchor_accounts, anchor_references) = deltas.apply(
             anchor_counter.stored_accounts,
             anchor_counter.stored_account_references,
-        );
-        self.stable_anchor_account_counter_memory.insert(
-            anchor_number,
-            StorableAccountsCounter {
-                stored_accounts,
-                stored_account_references,
-            },
-        );
+        )?;
 
         let global_counter = self.stable_account_counter_memory.get().clone();
         let (_, global_references) = deltas.apply(
             global_counter.stored_accounts,
             global_counter.stored_account_references,
-        );
+        )?;
+
+        let (application_accounts, application_references) = deltas.apply(
+            application.stored_accounts,
+            application.stored_account_references,
+        )?;
+
+        // The only write here that reports a failure, so it goes before the two that
+        // cannot: past this line nothing can return an error and leave a partial update.
         self.stable_account_counter_memory
             .set(StorableAccountsCounter {
                 stored_accounts: global_counter.stored_accounts,
@@ -2739,19 +2798,25 @@ impl<M: Memory + Clone> Storage<M> {
             })
             .map_err(|_| StorageError::ErrorUpdatingAccountCounter)?;
 
-        let (stored_accounts, stored_account_references) = deltas.apply(
-            application.stored_accounts,
-            application.stored_account_references,
+        self.stable_anchor_account_counter_memory.insert(
+            anchor_number,
+            StorableAccountsCounter {
+                stored_accounts: anchor_accounts,
+                stored_account_references: anchor_references,
+            },
         );
-        if stored_account_references == 0 {
+        // A zero here now means what it says. The delta refuses rather than clamping, so
+        // the row is only retired when no anchor references it, not when a counter that
+        // had already drifted was pulled below zero.
+        if application_references == 0 {
             self.remove_unreferenced_application(application_number, &application.origin);
         } else {
             self.stable_application_memory.insert(
                 application_number,
                 StorableApplication {
                     origin: application.origin,
-                    stored_accounts,
-                    stored_account_references,
+                    stored_accounts: application_accounts,
+                    stored_account_references: application_references,
                 },
             );
         }
@@ -2904,8 +2969,12 @@ impl<M: Memory + Clone> Storage<M> {
         let anchor_number = params.anchor_number;
         let origin = &params.origin;
 
-        // Create and store account in stable memory
+        // The one step that can refuse runs before anything is stored, so a refusal does
+        // not leave an account and an application row behind with no reference to reap
+        // them by.
         let account_number = self.allocate_account_number()?;
+
+        // Create and store account in stable memory
         let storable_account = StorableAccount {
             name: params.name.clone(),
             seed_from_anchor: None,
@@ -3164,6 +3233,28 @@ impl<M: Memory + Clone> Storage<M> {
             origin,
         } = params;
 
+        // Read and check before anything is written. Allocating a number and storing the
+        // account first left both behind on a refusal, along with the application row and
+        // its config, and nothing reaps them.
+        let existing_references = self
+            .lookup_application_number_with_origin(&origin)
+            .and_then(|application_number| {
+                self.stable_account_reference_list_memory
+                    .get(&(anchor_number, application_number))
+                    .map(Vec::<AccountReference>::from)
+            });
+        if existing_references.as_ref().is_some_and(|references| {
+            !references
+                .iter()
+                .any(|reference| reference.account_number.is_none())
+        }) {
+            // The default reference was removed, so there is nothing here to name.
+            return Err(StorageError::MissingAccount {
+                anchor_number,
+                name,
+            });
+        }
+
         // Create and store the default account.
         let new_account_number = self.allocate_account_number()?;
         let storable_account = StorableAccount {
@@ -3187,36 +3278,20 @@ impl<M: Memory + Clone> Storage<M> {
             self.set_anchor_application_config(anchor_number, application_number, config);
         }
 
-        let account_references_key = (anchor_number, application_number);
-        let references = match self
-            .stable_account_reference_list_memory
-            .get(&account_references_key)
-        {
+        let references = match existing_references {
             None => {
                 // If no list exists for this anchor & application,
                 // Create and insert the default account.
                 // This is because we don't create default accounts explicitly.
                 vec![AccountReference::new(Some(new_account_number), None)]
             }
-            Some(existing_storable_list) => {
-                // If the list exists, update the default account reference with the new account number.
-                let mut refs_vec: Vec<AccountReference> = existing_storable_list.into();
-                let mut found_and_updated = false;
+            Some(mut refs_vec) => {
+                // The check above proved a default reference is here to update.
                 for r_mut in refs_vec.iter_mut() {
                     if r_mut.account_number.is_none() {
-                        // Found the default account reference.
                         r_mut.account_number = Some(new_account_number);
-                        found_and_updated = true;
                         break;
                     }
-                }
-
-                // This could happen if the account was removed and now we try to update it.
-                if !found_and_updated {
-                    return Err(StorageError::MissingAccount {
-                        anchor_number,
-                        name: name.clone(),
-                    });
                 }
                 refs_vec
             }
@@ -3496,6 +3571,10 @@ pub struct CreateSessionParams {
 pub struct AccountPrincipalIndexBackfillOutcome {
     pub next_cursor: Option<(AnchorNumber, ApplicationNumber)>,
     pub indexed: u64,
+    /// Rows whose application is gone, so no principal can be derived for them. A row
+    /// in that state is an inconsistency rather than a normal skip, and a run that
+    /// silently indexes nothing would otherwise look like a run with nothing to do.
+    pub skipped: u64,
     pub is_done: bool,
 }
 
@@ -3540,11 +3619,17 @@ impl ReferenceListDeltas {
         self.accounts == 0 && self.references == 0
     }
 
-    fn apply(&self, accounts: u64, references: u64) -> (u64, u64) {
-        (
-            accounts.saturating_add_signed(self.accounts),
-            references.saturating_add_signed(self.references),
-        )
+    /// Refuses rather than clamping: an under-run means the counters and the stored
+    /// lists have already diverged, and a clamped zero reads as "no anchor references
+    /// this application any more", which retires a row other anchors still point at.
+    fn apply(&self, accounts: u64, references: u64) -> Result<(u64, u64), StorageError> {
+        let accounts = accounts
+            .checked_add_signed(self.accounts)
+            .ok_or(StorageError::AccountCounterOutOfBounds)?;
+        let references = references
+            .checked_add_signed(self.references)
+            .ok_or(StorageError::AccountCounterOutOfBounds)?;
+        Ok((accounts, references))
     }
 }
 
@@ -3581,6 +3666,7 @@ pub enum StorageError {
     ErrorUpdatingAccountCounter,
     SaltNotSet,
     AccountsCounterOverflow,
+    AccountCounterOutOfBounds,
     EmptyAccountReferenceList {
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
@@ -3658,6 +3744,10 @@ impl fmt::Display for StorageError {
                 "the salt is not set, so an account principal cannot be derived"
             ),
             Self::AccountsCounterOverflow => write!(f, "No account numbers left to allocate"),
+            Self::AccountCounterOutOfBounds => write!(
+                f,
+                "An account counter delta would move the count outside its range"
+            ),
             Self::EmptyAccountReferenceList {
                 anchor_number,
                 application_number,

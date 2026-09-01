@@ -747,13 +747,13 @@ pub fn get_account_delegation_with_read_only(
     .map(|(x,)| x)
 }
 
-/// Hidden monitoring endpoint: `(indexed_entries, is_done)` for the account
-/// principal index backfill.
+/// Hidden monitoring endpoint: `(indexed_entries, skipped_rows, is_done)` for the
+/// account principal index backfill.
 pub fn account_principal_index_backfill_status(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-) -> Result<(u64, bool), RejectResponse> {
+) -> Result<(u64, u64, bool), RejectResponse> {
     query_candid_as(
         env,
         canister_id,
