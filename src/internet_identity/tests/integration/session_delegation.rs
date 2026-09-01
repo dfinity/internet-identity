@@ -54,6 +54,9 @@ fn fresh_anchor() -> (
 ) {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
+    // A deployment sets the salt once; account principals cannot be derived without it.
+    canister_tests::api::internet_identity::init_salt(&env, canister_id)
+        .expect("failed to initialize the salt");
     let anchor = flows::register_anchor(&env, canister_id);
     (env, canister_id, anchor)
 }
