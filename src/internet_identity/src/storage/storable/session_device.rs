@@ -17,9 +17,9 @@ pub struct StorableSessionDevice {
     #[n(3)]
     pub last_used: Timestamp,
     #[cbor(n(4), with = "minicbor::bytes")]
-    pub key: Vec<u8>,
+    pub current_device_key: Vec<u8>,
     #[cbor(n(5), with = "minicbor::bytes")]
-    pub pending: Vec<u8>,
+    pub next_device_key: Vec<u8>,
 }
 
 impl Storable for StorableSessionDevice {
