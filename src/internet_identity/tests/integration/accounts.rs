@@ -16,7 +16,7 @@ use canister_tests::{
 };
 use internet_identity_interface::internet_identity::types::{
     AccountDelegationError, AccountInfo, AccountUpdate, GetDelegationResponse,
-    PrepareAccountDelegation,
+    PrepareAccountDelegation, SetDefaultAccountError,
 };
 use pocket_ic::RejectResponse;
 use pretty_assertions::assert_eq;
@@ -1602,6 +1602,43 @@ fn should_track_a_chosen_default_account_without_marking_it_used() -> Result<(),
 }
 
 #[test]
+/// A refused call must not mint an application row. Nothing reaps one: a row is only
+/// retired when a reference list is written, and this path never writes one, so a row
+/// left here would stay for the life of the canister — one per call, at an origin the
+/// caller chooses.
+#[test]
+fn should_not_leave_an_application_behind_when_the_named_account_does_not_exist(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (applications_before, _) = parse_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_total_application_count",
+    );
+
+    let result = set_default_account(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        "https://never-seen-before.com".to_string(),
+        Some(9_999),
+    )?;
+
+    assert!(matches!(
+        result,
+        Err(SetDefaultAccountError::NoSuchAccount { .. })
+    ));
+    let (applications_after, _) = parse_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_total_application_count",
+    );
+    assert_eq!(applications_after, applications_before);
+
+    Ok(())
+}
+
 fn should_remove_unreferenced_applications_an_anchor_stops_referencing(
 ) -> Result<(), RejectResponse> {
     const EVICTABLE_DEFAULT_ACCOUNTS_CAP: u64 = 500;
