@@ -1601,7 +1601,6 @@ fn should_track_a_chosen_default_account_without_marking_it_used() -> Result<(),
     Ok(())
 }
 
-#[test]
 /// A refused call must not mint an application row. Nothing reaps one: a row is only
 /// retired when a reference list is written, and this path never writes one, so a row
 /// left here would stay for the life of the canister — one per call, at an origin the
@@ -1639,6 +1638,7 @@ fn should_not_leave_an_application_behind_when_the_named_account_does_not_exist(
     Ok(())
 }
 
+#[test]
 fn should_remove_unreferenced_applications_an_anchor_stops_referencing(
 ) -> Result<(), RejectResponse> {
     const EVICTABLE_DEFAULT_ACCOUNTS_CAP: u64 = 500;
