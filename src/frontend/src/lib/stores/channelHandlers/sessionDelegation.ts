@@ -331,9 +331,9 @@ const createSession = async (
           account_number: accountNumber !== undefined ? [accountNumber] : [],
           session_key: iiPublicKey,
           device_name: deviceName,
-          device_key: browser.publicKey,
+          current_device_key: browser.publicKey,
           next_device_key: browser.nextPublicKey,
-          device_key_signature: browser.signature,
+          current_device_key_signature: browser.signature,
           next_device_key_signature: browser.nextSignature,
           permissions: toPermissionsArg(authorized.accessLevel),
           // The duration the user chose at consent, clamped by the canister. Dropping it
