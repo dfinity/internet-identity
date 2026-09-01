@@ -1231,6 +1231,10 @@ export interface NotificationConsentedApp {
   'origin' : string,
   'granted_at_ns' : Timestamp,
   'last_sent_ns' : [] | [Timestamp],
+  /**
+   * The account the consent was granted from; absent = the default account.
+   */
+  'account_number' : [] | [bigint],
 }
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
@@ -2304,7 +2308,7 @@ export interface _SERVICE {
    * ===== Notifications: II callable =====
    */
   'notification_grant_consent' : ActorMethod<
-    [UserNumber, string],
+    [UserNumber, string, [] | [bigint]],
     { 'Ok' : null } |
       { 'Err' : string }
   >,

@@ -374,8 +374,9 @@ fn webpush_unsubscribe_device(anchor_number: AnchorNumber, endpoint: String) -> 
 fn notification_grant_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
+    account_number: Option<u64>,
 ) -> Result<(), String> {
-    notifications::consent::grant_consent(anchor_number, origin)
+    notifications::consent::grant_consent(anchor_number, origin, account_number)
 }
 
 #[update]

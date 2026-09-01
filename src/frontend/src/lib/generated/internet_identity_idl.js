@@ -652,6 +652,7 @@ export const idlFactory = ({ IDL }) => {
     'origin' : IDL.Text,
     'granted_at_ns' : Timestamp,
     'last_sent_ns' : IDL.Opt(Timestamp),
+    'account_number' : IDL.Opt(IDL.Nat64),
   });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
@@ -1249,7 +1250,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'notification_grant_consent' : IDL.Func(
-        [UserNumber, IDL.Text],
+        [UserNumber, IDL.Text, IDL.Opt(IDL.Nat64)],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),

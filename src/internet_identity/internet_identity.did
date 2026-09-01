@@ -1586,6 +1586,8 @@ type NotificationConsentedApp = record {
     granted_at_ns : Timestamp;
     last_sent_ns : opt Timestamp;  // coarse; absent = never sent
     muted : bool;                  // consented but skipped by the send path
+    // The account the consent was granted from; absent = the default account.
+    account_number : opt nat64;
 };
 
 service : (opt InternetIdentityInit) -> {
@@ -2039,7 +2041,7 @@ service : (opt InternetIdentityInit) -> {
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
 
     // ===== Notifications: II callable =====
-    notification_grant_consent : (anchor_number : UserNumber, origin : text) -> (variant { Ok; Err : text });
+    notification_grant_consent : (anchor_number : UserNumber, origin : text, account_number : opt nat64) -> (variant { Ok; Err : text });
     notification_revoke_consent : (anchor_number : UserNumber, origin : text) -> (variant { Ok; Err : text });
     // Report on the status of the consent for a given origin
     notification_consent_status : (anchor_number : UserNumber, origin : text) -> (NotificationConsentStatus) query;
