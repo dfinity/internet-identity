@@ -67,7 +67,13 @@ const grantAndMint = async ({
   actor: ActorSubclass<_SERVICE>;
 }): Promise<void> => {
   await actor
-    .notification_grant_consent(identityNumber, origin)
+    // The account rides along so a device that subscribes later can mint the
+    // pull credential for the same account this app knows.
+    .notification_grant_consent(
+      identityNumber,
+      origin,
+      accountNumber !== undefined ? [accountNumber] : [],
+    )
     .then(throwTextCanisterError);
   await storeNotificationCredential(
     await mintNotificationCredential({
