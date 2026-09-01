@@ -190,24 +190,54 @@ const resolveCanister = async (
   return fetched;
 };
 
+// The stored origin is canonicalized to the legacy gateway so the principal
+// stays stable, but that gateway does not serve every canister, so the same
+// canister is tried on the others before giving up.
+const GATEWAYS = [".ic0.app", ".icp0.io", ".icp.net"];
+
+const originCandidates = (origin: string): string[] => {
+  const host = origin.startsWith("https://")
+    ? origin.slice("https://".length)
+    : undefined;
+  if (host === undefined || host.includes("/")) return [origin];
+  const gateway = GATEWAYS.find((g) => host.endsWith(g));
+  if (gateway === undefined) return [origin];
+  const subdomain = host.slice(0, -gateway.length);
+  if (subdomain === "") return [origin];
+  return [
+    origin,
+    ...GATEWAYS.map((g) => `https://${subdomain}${g}`).filter(
+      (candidate) => candidate !== origin,
+    ),
+  ];
+};
+
+const fetchSendersDoc = async (
+  origin: string,
+): Promise<Principal | undefined> => {
+  const response = await fetch(`${origin}/.well-known/ii-notification-senders`);
+  if (!response.ok) return undefined;
+  const doc: unknown = await response.json();
+  const senders =
+    doc !== null && typeof doc === "object" && "senders" in doc
+      ? (doc as { senders: unknown }).senders
+      : undefined;
+  const first = Array.isArray(senders) ? senders[0] : undefined;
+  return typeof first === "string" ? principalOf(first) : undefined;
+};
+
 const fetchSenderCanister = async (
   origin: string,
 ): Promise<Principal | undefined> => {
-  try {
-    const response = await fetch(
-      `${origin}/.well-known/ii-notification-senders`,
-    );
-    if (!response.ok) return undefined;
-    const doc: unknown = await response.json();
-    const senders =
-      doc !== null && typeof doc === "object" && "senders" in doc
-        ? (doc as { senders: unknown }).senders
-        : undefined;
-    const first = Array.isArray(senders) ? senders[0] : undefined;
-    return typeof first === "string" ? principalOf(first) : undefined;
-  } catch {
-    return undefined;
+  for (const candidate of originCandidates(origin)) {
+    try {
+      const sender = await fetchSendersDoc(candidate);
+      if (sender !== undefined) return sender;
+    } catch {
+      // Try the next gateway.
+    }
   }
+  return undefined;
 };
 
 const principalOf = (text: string): Principal | undefined => {
