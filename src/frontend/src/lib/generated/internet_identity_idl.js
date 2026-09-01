@@ -720,13 +720,13 @@ export const idlFactory = ({ IDL }) => {
   });
   const PrepareAccountSessionRequest = IDL.Record({
     'permissions' : IDL.Opt(Permissions),
+    'current_device_key' : PublicKey,
     'session_key' : SessionKey,
     'valid_for' : IDL.Opt(IDL.Nat64),
     'origin' : FrontendHostname,
+    'current_device_key_signature' : IDL.Vec(IDL.Nat8),
     'device_name' : IDL.Text,
     'account_number' : IDL.Opt(AccountNumber),
-    'device_key_signature' : IDL.Vec(IDL.Nat8),
-    'device_key' : PublicKey,
     'identity_number' : UserNumber,
     'next_device_key' : PublicKey,
     'next_device_key_signature' : IDL.Vec(IDL.Nat8),
