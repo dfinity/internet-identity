@@ -1,3 +1,4 @@
+use candid::Principal;
 use canister_tests::{
     api::internet_identity::{
         api_v2::{
@@ -6,7 +7,7 @@ use canister_tests::{
             prepare_account_delegation, prepare_account_delegation_with_read_only,
             set_default_account, update_account, AccountDelegationParams,
         },
-        get_delegation, prepare_delegation,
+        get_delegation, init_salt, prepare_delegation,
     },
     flows,
     framework::{
@@ -17,18 +18,26 @@ use canister_tests::{
 };
 use internet_identity_interface::internet_identity::types::{
     AccountDelegationError, AccountInfo, AccountUpdate, GetDelegationResponse,
-    PrepareAccountDelegation,
+    PrepareAccountDelegation, SetDefaultAccountError,
 };
-use pocket_ic::RejectResponse;
+use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
 use std::time::Duration;
+
+/// Installs II the way a deployment does: the salt is set once, explicitly, rather
+/// than by whichever request happens to need an account principal first.
+fn install_ii_with_salt(env: &PocketIc) -> Principal {
+    let canister_id = install_ii_with_archive(env, None, None);
+    init_salt(env, canister_id).expect("failed to initialize the salt");
+    canister_id
+}
 
 /// Verifies that one account can be created
 #[test]
 fn should_create_account() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
     let name = "Callisto".to_string();
@@ -60,7 +69,7 @@ fn should_create_account() -> Result<(), RejectResponse> {
 #[test]
 fn should_list_accounts() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
     let name = "Ganymede".to_string();
@@ -147,7 +156,7 @@ fn should_list_accounts() -> Result<(), RejectResponse> {
 #[test]
 fn should_list_default_account() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
 
@@ -178,7 +187,7 @@ fn should_list_default_account() -> Result<(), RejectResponse> {
 #[test]
 fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let identity_number = flows::register_anchor(&env, canister_id);
     let another_identity_number =
         flows::register_anchor_with_device(&env, canister_id, &device_data_2());
@@ -290,7 +299,7 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
 #[test]
 fn should_update_account() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
     let name = "Callisto".to_string();
@@ -342,7 +351,7 @@ fn should_update_account() -> Result<(), RejectResponse> {
 #[should_panic]
 fn should_not_update_numberless_account_twice() {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
     let name = Some("Icarus".to_string());
@@ -378,7 +387,7 @@ fn should_not_update_numberless_account_twice() {
 #[test]
 fn should_update_default_account() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
     let name = "Callisto".to_string();
@@ -459,7 +468,7 @@ fn should_update_default_account() -> Result<(), RejectResponse> {
 #[should_panic]
 fn should_only_update_owned_account() {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let identity_number = flows::register_anchor(&env, canister_id);
     let another_identity_number =
         flows::register_anchor_with_device(&env, canister_id, &device_data_2());
@@ -518,7 +527,7 @@ fn should_only_update_owned_account() {
 fn should_get_read_only_account_delegation_with_queries_permissions() -> Result<(), RejectResponse>
 {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -569,7 +578,7 @@ fn should_get_read_only_account_delegation_with_queries_permissions() -> Result<
 fn should_default_to_unrestricted_account_delegation_when_unspecified() -> Result<(), RejectResponse>
 {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -614,7 +623,7 @@ fn should_default_to_unrestricted_account_delegation_when_unspecified() -> Resul
 #[test]
 fn should_issue_explicitly_unrestricted_account_delegation() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let pub_session_key = ByteBuf::from("session public key");
     let params = AccountDelegationParams::new(
@@ -650,7 +659,7 @@ fn should_issue_explicitly_unrestricted_account_delegation() -> Result<(), Rejec
 #[test]
 fn should_issue_read_only_delegation_for_non_default_account() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -704,7 +713,7 @@ fn should_issue_read_only_delegation_for_non_default_account() -> Result<(), Rej
 #[test]
 fn read_only_does_not_change_the_delegated_principal() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let params = AccountDelegationParams::new(
         &env,
@@ -732,7 +741,7 @@ fn read_only_does_not_change_the_delegated_principal() -> Result<(), RejectRespo
 #[test]
 fn should_get_valid_account_delegation() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -772,7 +781,7 @@ fn should_get_valid_account_delegation() -> Result<(), RejectResponse> {
 #[test]
 fn should_get_matching_principals() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -855,7 +864,7 @@ fn should_get_matching_principals() -> Result<(), RejectResponse> {
 #[test]
 fn should_get_valid_account_delegation_with_custom_expiration() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -897,7 +906,7 @@ fn should_get_valid_account_delegation_with_custom_expiration() -> Result<(), Re
 #[test]
 fn should_shorten_account_delegation_expiration_greater_max_ttl() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -944,7 +953,7 @@ fn should_shorten_account_delegation_expiration_greater_max_ttl() -> Result<(), 
 fn should_get_multiple_valid_account_delegations() -> Result<(), RejectResponse> {
     let env = env();
     let root_key = env.root_key().unwrap();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname_1 = "https://dapp1.com".to_string();
     let frontend_hostname_2 = "https://dapp2.com".to_string();
@@ -1027,7 +1036,7 @@ fn should_get_multiple_valid_account_delegations() -> Result<(), RejectResponse>
 #[test]
 fn should_issue_different_principals_for_account_delegations() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let pub_session_key = ByteBuf::from("session public key");
     let frontend_hostname_1 = "https://dapp1.com".to_string();
@@ -1075,7 +1084,7 @@ fn should_issue_different_principals_for_account_delegations() -> Result<(), Rej
 #[test]
 fn can_not_prepare_account_delegation_for_different_user() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -1103,7 +1112,7 @@ fn can_not_prepare_account_delegation_for_different_user() -> Result<(), RejectR
 #[test]
 fn can_not_get_account_delegation_for_different_user() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -1144,7 +1153,7 @@ fn can_not_get_account_delegation_for_different_user() -> Result<(), RejectRespo
 #[test]
 fn should_not_get_account_delegation_after_expiration() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -1181,7 +1190,7 @@ fn should_not_get_account_delegation_after_expiration() -> Result<(), RejectResp
 #[test]
 fn should_issue_different_principals_for_different_accounts() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -1254,7 +1263,7 @@ fn should_issue_different_principals_for_different_accounts() -> Result<(), Reje
 #[test]
 fn should_update_last_used_after_prepare_account_delegation() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -1355,7 +1364,7 @@ fn should_update_last_used_after_prepare_account_delegation() -> Result<(), Reje
 #[test]
 fn should_update_last_used_independently_for_different_accounts() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -1520,7 +1529,7 @@ fn should_update_last_used_independently_for_different_accounts() -> Result<(), 
 #[test]
 fn should_track_the_default_account_on_first_sign_in() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://untouched-dapp.com".to_string();
 
@@ -1559,7 +1568,7 @@ fn should_track_the_default_account_on_first_sign_in() -> Result<(), RejectRespo
 #[test]
 fn should_track_a_chosen_default_account_without_marking_it_used() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://untouched-dapp.com".to_string();
     let (references_before, _) = parse_metric(
@@ -1602,13 +1611,50 @@ fn should_track_a_chosen_default_account_without_marking_it_used() -> Result<(),
     Ok(())
 }
 
+/// A refused call must not mint an application row. Nothing reaps one: a row is only
+/// retired when a reference list is written, and this path never writes one, so a row
+/// left here would stay for the life of the canister — one per call, at an origin the
+/// caller chooses.
+#[test]
+fn should_not_leave_an_application_behind_when_the_named_account_does_not_exist(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_salt(&env);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (applications_before, _) = parse_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_total_application_count",
+    );
+
+    let result = set_default_account(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        "https://never-seen-before.com".to_string(),
+        Some(9_999),
+    )?;
+
+    assert!(matches!(
+        result,
+        Err(SetDefaultAccountError::NoSuchAccount { .. })
+    ));
+    let (applications_after, _) = parse_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_total_application_count",
+    );
+    assert_eq!(applications_after, applications_before);
+
+    Ok(())
+}
+
 #[test]
 fn should_remove_unreferenced_applications_an_anchor_stops_referencing(
 ) -> Result<(), RejectResponse> {
     const EVICTABLE_DEFAULT_ACCOUNTS_CAP: u64 = 500;
 
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id = install_ii_with_salt(&env);
     let identity_number = flows::register_anchor(&env, canister_id);
 
     let evicted_origin = "https://dapp-0.com".to_string();

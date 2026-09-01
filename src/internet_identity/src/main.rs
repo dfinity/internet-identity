@@ -410,12 +410,11 @@ fn get_accounts(
 }
 
 #[update]
-async fn create_account(
+fn create_account(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     name: String,
 ) -> Result<AccountInfo, CreateAccountError> {
-    state::ensure_salt_set().await;
     match check_authorization(anchor_number) {
         Ok(_) => {
             // check if this anchor and acc are actually linked
@@ -427,13 +426,12 @@ async fn create_account(
 }
 
 #[update]
-async fn update_account(
+fn update_account(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
     update: AccountUpdate,
 ) -> Result<AccountInfo, UpdateAccountError> {
-    state::ensure_salt_set().await;
     match check_authorization(anchor_number) {
         Ok(_) => account_management::update_account_for_origin(
             anchor_number,
@@ -475,12 +473,11 @@ impl From<IdentityUpdateError> for SetDefaultAccountError {
 }
 
 #[update]
-async fn set_default_account(
+fn set_default_account(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
-    state::ensure_salt_set().await;
     check_authz_and_record_activity(anchor_number).map_err(SetDefaultAccountError::from)?;
 
     let result =
