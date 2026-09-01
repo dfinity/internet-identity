@@ -2132,8 +2132,12 @@ impl<M: Memory + Clone> Storage<M> {
         let anchor_number = params.anchor_number;
         let origin = &params.origin;
 
-        // Create and store account in stable memory
+        // The one step that can refuse runs before anything is stored, so a refusal does
+        // not leave an account and an application row behind with no reference to reap
+        // them by.
         let account_number = self.allocate_account_number()?;
+
+        // Create and store account in stable memory
         let storable_account = StorableAccount {
             name: params.name.clone(),
             seed_from_anchor: None,
@@ -2400,6 +2404,28 @@ impl<M: Memory + Clone> Storage<M> {
             origin,
         } = params;
 
+        // Read and check before anything is written. Allocating a number and storing the
+        // account first left both behind on a refusal, along with the application row and
+        // its config, and nothing reaps them.
+        let existing_references = self
+            .lookup_application_number_with_origin(&origin)
+            .and_then(|application_number| {
+                self.stable_account_reference_list_memory
+                    .get(&(anchor_number, application_number))
+                    .map(Vec::<AccountReference>::from)
+            });
+        if existing_references.as_ref().is_some_and(|references| {
+            !references
+                .iter()
+                .any(|reference| reference.account_number.is_none())
+        }) {
+            // The default reference was removed, so there is nothing here to name.
+            return Err(StorageError::MissingAccount {
+                anchor_number,
+                name,
+            });
+        }
+
         // Create and store the default account.
         let new_account_number = self.allocate_account_number()?;
         let storable_account = StorableAccount {
@@ -2423,11 +2449,7 @@ impl<M: Memory + Clone> Storage<M> {
             self.set_anchor_application_config(anchor_number, application_number, config);
         }
 
-        let account_references_key = (anchor_number, application_number);
-        let references = match self
-            .stable_account_reference_list_memory
-            .get(&account_references_key)
-        {
+        let references = match existing_references {
             None => {
                 // If no list exists for this anchor & application,
                 // Create and insert the default account.
@@ -2438,25 +2460,13 @@ impl<M: Memory + Clone> Storage<M> {
                     last_used: None,
                 }]
             }
-            Some(existing_storable_list) => {
-                // If the list exists, update the default account reference with the new account number.
-                let mut refs_vec: Vec<AccountReference> = existing_storable_list.into();
-                let mut found_and_updated = false;
+            Some(mut refs_vec) => {
+                // The check above proved a default reference is here to update.
                 for r_mut in refs_vec.iter_mut() {
                     if r_mut.account_number.is_none() {
-                        // Found the default account reference.
                         r_mut.account_number = Some(new_account_number);
-                        found_and_updated = true;
                         break;
                     }
-                }
-
-                // This could happen if the account was removed and now we try to update it.
-                if !found_and_updated {
-                    return Err(StorageError::MissingAccount {
-                        anchor_number,
-                        name: name.clone(),
-                    });
                 }
                 refs_vec
             }

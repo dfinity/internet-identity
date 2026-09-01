@@ -160,11 +160,18 @@ pub fn set_default_account_for_origin(
     account_number: Option<AccountNumber>,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
     check_frontend_length(&origin);
-    let application_number = storage_borrow_mut(|storage| {
-        storage.lookup_or_insert_application_number_with_origin(&origin)
-    });
 
+    // Nothing is written until the account is known to exist. Minting the application
+    // row first left one behind on every refusal, and nothing reaps it: a row is only
+    // retired when a reference list is written, and this path never writes one. The
+    // origin is the caller's to choose, so that is a row per call, unbounded.
     let account = if let Some(account_number) = account_number {
+        let application_number =
+            storage_borrow(|storage| storage.lookup_application_number_with_origin(&origin))
+                .ok_or_else(|| SetDefaultAccountError::NoSuchAccount {
+                    anchor_number,
+                    origin: origin.clone(),
+                })?;
         try_read_account_info(
             anchor_number,
             origin.clone(),
@@ -173,11 +180,15 @@ pub fn set_default_account_for_origin(
         )
         .map_err(|_| SetDefaultAccountError::NoSuchAccount {
             anchor_number,
-            origin,
+            origin: origin.clone(),
         })?
     } else {
-        Account::synthetic(anchor_number, origin).to_info()
+        Account::synthetic(anchor_number, origin.clone()).to_info()
     };
+
+    let application_number = storage_borrow_mut(|storage| {
+        storage.lookup_or_insert_application_number_with_origin(&origin)
+    });
 
     let config = AnchorApplicationConfig {
         default_account_number: account_number,
