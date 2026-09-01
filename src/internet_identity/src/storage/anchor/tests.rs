@@ -1304,7 +1304,10 @@ mod session_device_tests {
         assert_eq!(id, 0);
         assert_eq!(anchor.session_devices().len(), 1);
         assert_eq!(anchor.session_devices()[0].name, "Chrome on MacBook");
-        assert_eq!(anchor.session_devices()[0].key, browser_key(1));
+        assert_eq!(
+            anchor.session_devices()[0].current_device_key,
+            browser_key(1)
+        );
         assert_eq!(anchor.session_devices()[0].created_at, 1_000);
     }
 
@@ -1583,8 +1586,11 @@ mod session_device_tests {
 
         assert_eq!(again, id);
         assert_eq!(anchor.session_devices().len(), 1);
-        assert_eq!(anchor.session_devices()[0].key, successor_key(1));
-        assert_eq!(anchor.session_devices()[0].pending, browser_key(2));
+        assert_eq!(
+            anchor.session_devices()[0].current_device_key,
+            successor_key(1)
+        );
+        assert_eq!(anchor.session_devices()[0].next_device_key, browser_key(2));
     }
 
     #[test]
@@ -1645,8 +1651,14 @@ mod session_device_tests {
 
         assert_eq!(again, id);
         assert_eq!(anchor.session_devices().len(), 1);
-        assert_eq!(anchor.session_devices()[0].key, browser_key(1));
-        assert_eq!(anchor.session_devices()[0].pending, successor_key(2));
+        assert_eq!(
+            anchor.session_devices()[0].current_device_key,
+            browser_key(1)
+        );
+        assert_eq!(
+            anchor.session_devices()[0].next_device_key,
+            successor_key(2)
+        );
     }
 
     #[test]
@@ -1736,17 +1748,53 @@ mod session_device_tests {
     }
 
     #[test]
-    fn a_browser_that_never_rotates_keeps_working() {
+    fn a_browser_cannot_name_itself_its_own_successor() {
         let mut anchor = anchor();
-        let (id, _) = anchor
-            .resolve_session_device(browser_key(1), browser_key(1), "Chrome".to_string(), 1_000)
+
+        // Rotation is what stops a leaked key from outliving one sign-in. A browser that
+        // announced the key it is presenting would keep it alive for as long as it kept
+        // asking, and so would whoever leaked it.
+        assert_eq!(
+            anchor.resolve_session_device(
+                browser_key(1),
+                browser_key(1),
+                "Chrome".to_string(),
+                1_000
+            ),
+            Err(SessionDeviceError::SuccessorMatchesCurrent)
+        );
+        assert!(anchor.session_devices().is_empty());
+    }
+
+    #[test]
+    fn a_registered_browser_cannot_stop_rotating_either() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                1_000,
+            )
             .unwrap();
 
-        let (again, _) = anchor
-            .resolve_session_device(browser_key(1), browser_key(1), "Chrome".to_string(), 2_000)
-            .unwrap();
-
-        assert_eq!(again, id);
-        assert_eq!(anchor.session_devices().len(), 1);
+        assert_eq!(
+            anchor.resolve_session_device(
+                successor_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                2_000
+            ),
+            Err(SessionDeviceError::SuccessorMatchesCurrent)
+        );
+        // The entry is left as it was, still awaiting a successor it has not seen.
+        assert_eq!(
+            anchor.session_devices()[0].current_device_key,
+            browser_key(1)
+        );
+        assert_eq!(
+            anchor.session_devices()[0].next_device_key,
+            successor_key(1)
+        );
     }
 }
