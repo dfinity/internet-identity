@@ -404,7 +404,7 @@ mod tests {
         let anchor = 1;
         let origin = "https://app.example".to_string();
         let recipient = Principal::from_slice(&[3u8; 10]);
-        set_consent(anchor, origin.clone(), recipient, 1_000).unwrap();
+        set_consent(anchor, origin.clone(), recipient, None, 1_000).unwrap();
         assert!(is_deliverable(anchor, origin.clone()));
 
         // Mute at the storage layer (what `set_app_muted` does, minus authz).
@@ -432,7 +432,7 @@ mod tests {
         let anchor = 1;
         let origin = "https://app.example".to_string();
         let recipient = Principal::from_slice(&[3u8; 10]);
-        set_consent(anchor, origin.clone(), recipient, 1_000).unwrap();
+        set_consent(anchor, origin.clone(), recipient, None, 1_000).unwrap();
         let hash = StorableOriginSha256::from_origin(&origin);
         let last = |h: StorableOriginSha256| {
             storage_borrow(|s| {
