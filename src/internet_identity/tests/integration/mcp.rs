@@ -47,7 +47,11 @@ const GRANT_TTL_NS: u64 = 24 * 60 * 60 * 1_000_000_000;
 // The `/mcp` path is not gated by a global config; each identity trusts the
 // server it chooses via its synced config. So a plain install suffices.
 fn install_with_mcp(env: &PocketIc) -> Principal {
-    install_ii_canister_with_arg(env, II_WASM.clone(), None)
+    let canister_id = install_ii_canister_with_arg(env, II_WASM.clone(), None);
+    // A deployment sets the salt once; account principals cannot be derived without it.
+    canister_tests::api::internet_identity::init_salt(env, canister_id)
+        .expect("failed to initialize the salt");
+    canister_id
 }
 
 /// The official MCP connector a deployment can ship. Deliberately a different
