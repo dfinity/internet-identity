@@ -1371,6 +1371,11 @@ export interface PrepareAccountSessionRequest {
    */
   'permissions' : [] | [Permissions],
   /**
+   * The browser's own public key, DER-encoded, as the registry currently holds it. A
+   * key this anchor has not seen registers a browser under it.
+   */
+  'current_device_key' : PublicKey,
+  /**
    * The II frontend's own key. The app never sees this chain's private key.
    */
   'session_key' : SessionKey,
@@ -1380,27 +1385,23 @@ export interface PrepareAccountSessionRequest {
   'valid_for' : [] | [bigint],
   'origin' : FrontendHostname,
   /**
+   * Signature over session_key and next_device_key, verified with current_device_key.
+   */
+  'current_device_key_signature' : Uint8Array | number[],
+  /**
    * Labels the browser in the user's session list, e.g. "Chrome on MacBook".
    */
   'device_name' : string,
   'account_number' : [] | [AccountNumber],
-  /**
-   * Signature over session_key and next_device_key, verified with device_key.
-   */
-  'device_key_signature' : Uint8Array | number[],
-  /**
-   * The browser's own public key, DER-encoded, as the registry currently holds it. A
-   * key this anchor has not seen registers a browser under it.
-   */
-  'device_key' : PublicKey,
   'identity_number' : UserNumber,
   /**
-   * What the browser rotates to once this sign-in succeeds.
+   * What the browser rotates to once this sign-in succeeds. Must differ from
+   * current_device_key: a browser that never rotates keeps a leaked key useful.
    */
   'next_device_key' : PublicKey,
   /**
-   * Signature by next_device_key over session_key and device_key, proving the browser
-   * holds the key it is announcing.
+   * Signature by next_device_key over session_key and current_device_key, proving the
+   * browser holds the key it is announcing.
    */
   'next_device_key_signature' : Uint8Array | number[],
 }
