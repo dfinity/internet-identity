@@ -1751,13 +1751,15 @@ fn should_backfill_the_account_principal_index_after_an_upgrade() -> Result<(), 
         env.tick();
     }
 
-    let (indexed, is_done) =
+    let (indexed, skipped, is_done) =
         account_principal_index_backfill_status(&env, canister_id, principal_1())?;
     assert!(is_done, "the backfill should report completion");
     assert_eq!(
         indexed, 6,
         "three named accounts, each alongside the default reference backfilled with it"
     );
+    // Every row had its application, so nothing was passed over.
+    assert_eq!(skipped, 0);
 
     Ok(())
 }

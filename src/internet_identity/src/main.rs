@@ -842,14 +842,20 @@ thread_local! {
     static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_CURSOR: RefCell<Option<(AnchorNumber, ApplicationNumber)>> = const { RefCell::new(None) };
     static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_DONE: RefCell<bool> = const { RefCell::new(false) };
     static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_INDEXED: RefCell<u64> = const { RefCell::new(0) };
+    static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_SKIPPED: RefCell<u64> = const { RefCell::new(0) };
     static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
 }
 
-/// Returns `(indexed_entries, is_done)` so monitoring can track the sweep.
+/// Returns `(indexed_entries, skipped_rows, is_done)` so monitoring can track the sweep.
+///
+/// A non-zero skip count is not progress: it is reference-list rows whose application
+/// is gone, which the sweep cannot derive a principal for. A run that reports nothing
+/// indexed and nothing skipped had nothing to do; one that reports skips did not.
 #[query(hidden = true)]
-fn account_principal_index_backfill_status() -> (u64, bool) {
+fn account_principal_index_backfill_status() -> (u64, u64, bool) {
     (
         ACCOUNT_PRINCIPAL_INDEX_BACKFILL_INDEXED.with_borrow(|indexed| *indexed),
+        ACCOUNT_PRINCIPAL_INDEX_BACKFILL_SKIPPED.with_borrow(|skipped| *skipped),
         ACCOUNT_PRINCIPAL_INDEX_BACKFILL_DONE.with_borrow(|done| *done),
     )
 }
@@ -870,6 +876,9 @@ fn run_account_principal_index_backfill_batch() {
     ACCOUNT_PRINCIPAL_INDEX_BACKFILL_INDEXED.with_borrow_mut(|indexed| {
         *indexed = indexed.saturating_add(outcome.indexed);
     });
+    ACCOUNT_PRINCIPAL_INDEX_BACKFILL_SKIPPED.with_borrow_mut(|skipped| {
+        *skipped = skipped.saturating_add(outcome.skipped);
+    });
     ACCOUNT_PRINCIPAL_INDEX_BACKFILL_CURSOR.replace(outcome.next_cursor);
 
     if outcome.is_done {
@@ -880,7 +889,10 @@ fn run_account_principal_index_backfill_batch() {
             }
         });
         let indexed = ACCOUNT_PRINCIPAL_INDEX_BACKFILL_INDEXED.with_borrow(|indexed| *indexed);
-        ic_cdk::println!("Account principal index backfill COMPLETED ({indexed} entries).");
+        let skipped = ACCOUNT_PRINCIPAL_INDEX_BACKFILL_SKIPPED.with_borrow(|skipped| *skipped);
+        ic_cdk::println!(
+            "Account principal index backfill COMPLETED ({indexed} entries, {skipped} skipped)."
+        );
     }
 }
 

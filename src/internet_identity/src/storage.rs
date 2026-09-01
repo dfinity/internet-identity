@@ -1998,6 +1998,8 @@ impl<M: Memory + Clone> Storage<M> {
             outcome.is_done = true;
             return outcome;
         }
+        // Not done, so the caller comes back. A canister whose salt is unset has not
+        // finished starting up rather than finished backfilling.
         let Some(salt) = self.salt().copied() else {
             return outcome;
         };
@@ -2026,6 +2028,7 @@ impl<M: Memory + Clone> Storage<M> {
                 .get(&application_number)
                 .map(|application| application.origin)
             else {
+                outcome.skipped += 1;
                 continue;
             };
 
@@ -2950,6 +2953,10 @@ impl<M: Memory + Clone> Storage<M> {
 pub struct AccountPrincipalIndexBackfillOutcome {
     pub next_cursor: Option<(AnchorNumber, ApplicationNumber)>,
     pub indexed: u64,
+    /// Rows whose application is gone, so no principal can be derived for them. A row
+    /// in that state is an inconsistency rather than a normal skip, and a run that
+    /// silently indexes nothing would otherwise look like a run with nothing to do.
+    pub skipped: u64,
     pub is_done: bool,
 }
 
