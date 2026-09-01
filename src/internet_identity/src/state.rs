@@ -267,7 +267,14 @@ pub async fn init_salt() {
     });
 
     let salt = random_salt().await;
-    storage_borrow_mut(|storage| storage.update_salt(salt)); // update_salt() traps if salt has already been set
+    storage_borrow_mut(|storage| {
+        // Re-checked after the await, which is where a second message can have gone all
+        // the way through. Both salts are random, so the loser discards its own rather
+        // than trapping a caller whose request was perfectly good.
+        if storage.salt().is_none() {
+            storage.update_salt(salt);
+        }
+    });
 }
 
 pub fn salt() -> [u8; 32] {
