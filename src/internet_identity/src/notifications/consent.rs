@@ -33,6 +33,7 @@ fn set_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     recipient: Principal,
+    account_number: Option<u64>,
     now_ns: Timestamp,
 ) -> Result<(), String> {
     validate_origin(&origin)?;
@@ -46,6 +47,7 @@ fn set_consent(
                 granted_at_ns: now_ns,
                 last_sent_ns: None,
                 muted: None,
+                account_number,
             },
         );
         storage
@@ -90,11 +92,21 @@ fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
 // ---- caller-facing entry points (called from main.rs's thin wrappers) ----
 
 /// Grants `origin` permission to notify the caller's anchor.
-pub fn grant_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> Result<(), String> {
+pub fn grant_consent(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    account_number: Option<u64>,
+) -> Result<(), String> {
     check_enabled()?;
     authorize_update(anchor_number)?;
     let recipient = crate::delegation::get_principal(anchor_number, origin.clone());
-    set_consent(anchor_number, origin, recipient, ic_cdk::api::time())
+    set_consent(
+        anchor_number,
+        origin,
+        recipient,
+        account_number,
+        ic_cdk::api::time(),
+    )
 }
 
 /// Revokes `origin`'s consent. Device subscriptions stay — they're shared
@@ -142,6 +154,8 @@ pub struct NotificationConsentedApp {
     pub granted_at_ns: Timestamp,
     pub last_sent_ns: Option<Timestamp>,
     pub muted: bool,
+    /// The account the consent was granted from; `None` = the default account.
+    pub account_number: Option<u64>,
 }
 
 /// Every consented app for the caller's anchor, with metadata.
@@ -158,6 +172,7 @@ pub fn consented_apps(anchor_number: AnchorNumber) -> Vec<NotificationConsentedA
                 granted_at_ns: c.granted_at_ns,
                 last_sent_ns: c.last_sent_ns,
                 muted: c.muted.unwrap_or(false),
+                account_number: c.account_number,
             })
             .collect()
     })
@@ -201,7 +216,7 @@ mod tests {
         // needs a canister.
         let recipient = Principal::from_slice(&[3u8; 10]);
 
-        set_consent(anchor, origin.clone(), recipient, 1_000).unwrap();
+        set_consent(anchor, origin.clone(), recipient, None, 1_000).unwrap();
         assert!(has_consent(anchor, origin.clone()));
         assert_eq!(
             storage_borrow(|s| s.notifications_consented_origins(anchor)),
@@ -234,13 +249,13 @@ mod tests {
         setup();
         let recipient = Principal::from_slice(&[3u8; 10]);
         let too_long = "a".repeat(MAX_ORIGIN_LEN + 1);
-        assert!(set_consent(1, too_long, recipient, 0).is_err());
+        assert!(set_consent(1, too_long, recipient, None, 0).is_err());
     }
 
     #[test]
     fn consent_rejects_non_https_origin() {
         setup();
         let recipient = Principal::from_slice(&[3u8; 10]);
-        assert!(set_consent(1, "http://app.example".to_string(), recipient, 0).is_err());
+        assert!(set_consent(1, "http://app.example".to_string(), recipient, None, 0).is_err());
     }
 }

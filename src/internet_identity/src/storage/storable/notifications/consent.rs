@@ -22,6 +22,11 @@ pub struct StorableNotificationConsent {
     /// send path skips it. `None`/`Some(false)` = not muted.
     #[n(3)]
     pub muted: Option<bool>,
+    /// The account the consent was granted from, so a device that subscribes
+    /// later can mint the service worker's pull credential for the same account
+    /// the app knows. `None` = the default account.
+    #[n(4)]
+    pub account_number: Option<u64>,
 }
 
 impl Storable for StorableNotificationConsent {
@@ -35,8 +40,8 @@ impl Storable for StorableNotificationConsent {
         minicbor::decode(&bytes).expect("failed to decode StorableNotificationConsent")
     }
 
-    // origin (≤ MAX_ORIGIN_LEN = 255) + a timestamp, an optional timestamp and
-    // an optional bool, CBOR-encoded.
+    // origin (≤ MAX_ORIGIN_LEN = 255) + a timestamp, two optional u64s and an
+    // optional bool, CBOR-encoded: 291 bytes with every field at its maximum.
     const BOUND: Bound = Bound::Bounded {
         max_size: 448,
         is_fixed_size: false,
@@ -54,6 +59,7 @@ mod tests {
             granted_at_ns: 1_234_567_890,
             last_sent_ns: Some(1_234_999_999),
             muted: Some(true),
+            account_number: Some(7),
         };
 
         let decoded = StorableNotificationConsent::from_bytes(consent.to_bytes());
