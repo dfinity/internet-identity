@@ -115,6 +115,10 @@ pub fn notification_send(request: NotificationSendRequest) -> NotificationSendRe
         response.rejected = Some(reject_all(notifications));
         return response;
     };
+    // The sign-in canonicalizes the origin to the legacy gateway before it
+    // records consent, so canonicalize what the sender declares too: otherwise a
+    // dApp naming the gateway it is actually served on misses its own consent.
+    let origin = super::canonical_origin(&origin);
     if !is_authorized_sender(ic_cdk::caller(), &origin) {
         response.rejected = Some(reject_all(notifications));
         return response;
