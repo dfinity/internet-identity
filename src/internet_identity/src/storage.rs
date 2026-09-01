@@ -2406,7 +2406,22 @@ impl<M: Memory + Clone> Storage<M> {
             .map(|reference| reference.sessions.len())
             .sum();
 
-        // Both of these can refuse, so both run before anything is removed.
+        // The row's sessions go with it, so their index entries have to go too. A browser
+        // keeps its id, and evicting a row leaves the account's principal untouched, so an
+        // entry left behind here would be waiting for the next sign-in at this origin.
+        //
+        // Ahead of the counters because a session's principal is derived through the
+        // application row, and applying the deltas is what retires it — afterwards there
+        // would be nothing left to derive the keys to remove.
+        for reference in &previous {
+            self.unindex_sessions(
+                anchor_number,
+                application_number,
+                reference.account_number,
+                &reference.sessions,
+            );
+        }
+
         let deltas = ReferenceListDeltas::between(&previous, &[]);
         self.apply_reference_counter_deltas(
             anchor_number,
@@ -2418,17 +2433,6 @@ impl<M: Memory + Clone> Storage<M> {
             self.change_session_count(anchor_number, dropped, 0)?;
         }
 
-        // The row's sessions go with it, so their index entries have to go too. A browser
-        // keeps its id, and evicting a row leaves the account's principal untouched, so an
-        // entry left behind here would be waiting for the next sign-in at this origin.
-        for reference in &previous {
-            self.unindex_sessions(
-                anchor_number,
-                application_number,
-                reference.account_number,
-                &reference.sessions,
-            );
-        }
         self.sync_account_principal_index(
             anchor_number,
             application_number,
