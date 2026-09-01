@@ -4,7 +4,9 @@
 
 use super::webpush::subscription::has_subscribed_device;
 use super::{authorize_query, authorize_update, check_enabled, feature_enabled, validate_origin};
+use crate::delegation::der_encode_canister_sig_key;
 use crate::state::{storage_borrow, storage_borrow_mut};
+use crate::storage::account::ReadAccountParams;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::notifications::consent::StorableNotificationConsent;
 use candid::Principal;
@@ -89,6 +91,41 @@ fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
     })
 }
 
+/// The principal an app addresses this identity by, derived the same way the
+/// sign-in delegation was: an added account seeds from its account number, both
+/// kinds of default account from the anchor. Deriving it from the anchor alone
+/// would record a principal the app never sees, so a send from an added account
+/// would find no consent.
+fn recipient_seed(
+    anchor_number: AnchorNumber,
+    origin: &FrontendHostname,
+    account_number: Option<u64>,
+) -> Result<ic_certification::Hash, String> {
+    storage_borrow(|storage| {
+        storage.read_account(ReadAccountParams {
+            account_number,
+            anchor_number,
+            origin,
+            known_app_num: None,
+        })
+    })
+    .map(|account| account.calculate_seed())
+    .ok_or_else(|| "no such account for that origin".to_string())
+}
+
+/// Wraps [`recipient_seed`] into the principal itself. Separate because the DER
+/// encoding reads the canister's own id, which only exists on-canister.
+fn recipient_principal(
+    anchor_number: AnchorNumber,
+    origin: &FrontendHostname,
+    account_number: Option<u64>,
+) -> Result<Principal, String> {
+    let seed = recipient_seed(anchor_number, origin, account_number)?;
+    Ok(Principal::self_authenticating(der_encode_canister_sig_key(
+        seed.to_vec(),
+    )))
+}
+
 // ---- caller-facing entry points (called from main.rs's thin wrappers) ----
 
 /// Grants `origin` permission to notify the caller's anchor.
@@ -99,7 +136,7 @@ pub fn grant_consent(
 ) -> Result<(), String> {
     check_enabled()?;
     authorize_update(anchor_number)?;
-    let recipient = crate::delegation::get_principal(anchor_number, origin.clone());
+    let recipient = recipient_principal(anchor_number, &origin, account_number)?;
     set_consent(
         anchor_number,
         origin,
@@ -114,7 +151,15 @@ pub fn grant_consent(
 pub fn revoke_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> Result<(), String> {
     check_enabled()?;
     authorize_update(anchor_number)?;
-    let recipient = crate::delegation::get_principal(anchor_number, origin.clone());
+    // The account the consent was granted from decides which principal the
+    // index holds, so read it back rather than re-deriving from the anchor.
+    let account_number = storage_borrow(|storage| {
+        storage
+            .notifications_consent_memory
+            .get(&(anchor_number, StorableOriginSha256::from_origin(&origin)))
+            .and_then(|consent| consent.account_number)
+    });
+    let recipient = recipient_principal(anchor_number, &origin, account_number)?;
     clear_consent(anchor_number, origin, recipient)
 }
 
@@ -204,8 +249,10 @@ pub fn set_app_muted(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::delegation::{calculate_account_seed, calculate_anchor_seed};
     use crate::notifications::test_setup as setup;
     use crate::notifications::MAX_ORIGIN_LEN;
+    use crate::storage::account::CreateAccountParams;
 
     #[test]
     fn grant_then_revoke_consent_round_trips() {
@@ -234,6 +281,45 @@ mod tests {
         assert_eq!(
             storage_borrow(|s| s.notifications_recipient_index_memory.get(&recipient)),
             None
+        );
+    }
+
+    /// The bug this guards: deriving the recipient from the anchor alone
+    /// recorded a principal an added account's app never sees, so its sends
+    /// found no consent.
+    #[test]
+    fn an_added_account_is_addressed_by_its_own_principal() {
+        setup();
+        let anchor = 1;
+        let origin = "https://app.example".to_string();
+        let added = storage_borrow_mut(|storage| {
+            storage
+                .create_additional_account(CreateAccountParams {
+                    anchor_number: anchor,
+                    name: "second".to_string(),
+                    origin: origin.clone(),
+                })
+                .expect("failed to create the added account")
+        });
+        let account_number = added.account_number.expect("added account has a number");
+
+        // Seeds, not principals: the principal wraps the seed with the
+        // canister's own id, which does not exist off-canister.
+        let default_seed = recipient_seed(anchor, &origin, None).unwrap();
+        let added_seed = recipient_seed(anchor, &origin, Some(account_number)).unwrap();
+        assert_ne!(
+            default_seed, added_seed,
+            "an added account must not share the default account's principal"
+        );
+        assert_eq!(
+            default_seed,
+            calculate_anchor_seed(anchor, &origin),
+            "a default account is addressed by the anchor's principal"
+        );
+        assert_eq!(
+            added_seed,
+            calculate_account_seed(account_number, &origin),
+            "an added account is addressed by the principal its sign-in derives"
         );
     }
 
