@@ -2239,6 +2239,7 @@ mod reference_list_write_path_tests {
                 vec![AccountReference {
                     account_number: Some(1),
                     last_used: None,
+                    sessions: vec![],
                 }],
             )
             .unwrap();
@@ -2271,10 +2272,12 @@ mod reference_list_write_path_tests {
         let default_reference = AccountReference {
             account_number: None,
             last_used: None,
+            sessions: vec![],
         };
         let named_reference = AccountReference {
             account_number: Some(1),
             last_used: None,
+            sessions: vec![],
         };
         storage
             .write_reference_list(
