@@ -51,9 +51,11 @@ const MAX_DELIVERIES_PER_DISPATCH: usize = 250;
 /// Generous budget for one non-replicated POST; the unused remainder refunds.
 #[cfg(not(test))]
 const RELAY_CYCLES: u128 = 20_000_000_000;
-/// We only read the status line, never the body.
+/// We only read the status line, never the body — but the limit counts the
+/// response headers too, and a relay's own headers (`Location` for the
+/// subscription resource, tracing ids) run well past a status line.
 #[cfg(not(test))]
-const MAX_RESPONSE_BYTES: u64 = 1024;
+const MAX_RESPONSE_BYTES: u64 = 8 * 1024;
 
 /// One ready-to-POST Web Push: the sealed blob plus the headers that carry it.
 struct Delivery {
