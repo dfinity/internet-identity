@@ -673,8 +673,14 @@ impl<M: Memory + Clone> Storage<M> {
         storage
     }
 
-    /// Existing application numbers are dense from zero, so the row count is the
-    /// first free number.
+    /// Seeds the allocator from whichever is higher: the stored counter, or the row
+    /// count.
+    ///
+    /// The row count is a floor rather than the answer. It is exact only for data
+    /// written before this counter existed, where numbering was dense from zero.
+    /// Retiring an application removes its row without reissuing its number, so from
+    /// then on the count undershoots and only the stored counter is right — taking the
+    /// maximum is what keeps allocation monotonic across both.
     fn seed_application_number_allocator(&mut self) {
         let seeded = ApplicationNumber::max(
             *self.next_application_number_memory.get(),
@@ -1899,9 +1905,18 @@ impl<M: Memory + Clone> Storage<M> {
 
         let deltas = ReferenceListDeltas::between(&previous, &current);
 
+        // Counters first: it is the only step here that can fail, and returning an error
+        // after the list is written would commit one without the other. A failure now
+        // leaves nothing written at all.
+        self.apply_reference_counter_deltas(
+            anchor_number,
+            application_number,
+            application,
+            deltas,
+        )?;
         self.stable_account_reference_list_memory
             .insert(key, current.into());
-        self.apply_reference_counter_deltas(anchor_number, application_number, application, deltas)
+        Ok(())
     }
 
     fn apply_reference_counter_deltas(
@@ -1915,27 +1930,30 @@ impl<M: Memory + Clone> Storage<M> {
             return Ok(());
         }
 
+        // Every counter is computed before any of them is written, so an out-of-bounds
+        // delta refuses with all three still holding their old values.
         let anchor_counter = self
             .stable_anchor_account_counter_memory
             .get(&anchor_number)
             .unwrap_or_default();
-        let (stored_accounts, stored_account_references) = deltas.apply(
+        let (anchor_accounts, anchor_references) = deltas.apply(
             anchor_counter.stored_accounts,
             anchor_counter.stored_account_references,
-        );
-        self.stable_anchor_account_counter_memory.insert(
-            anchor_number,
-            StorableAccountsCounter {
-                stored_accounts,
-                stored_account_references,
-            },
-        );
+        )?;
 
         let global_counter = self.stable_account_counter_memory.get().clone();
         let (_, global_references) = deltas.apply(
             global_counter.stored_accounts,
             global_counter.stored_account_references,
-        );
+        )?;
+
+        let (application_accounts, application_references) = deltas.apply(
+            application.stored_accounts,
+            application.stored_account_references,
+        )?;
+
+        // The only write here that reports a failure, so it goes before the two that
+        // cannot: past this line nothing can return an error and leave a partial update.
         self.stable_account_counter_memory
             .set(StorableAccountsCounter {
                 stored_accounts: global_counter.stored_accounts,
@@ -1943,19 +1961,25 @@ impl<M: Memory + Clone> Storage<M> {
             })
             .map_err(|_| StorageError::ErrorUpdatingAccountCounter)?;
 
-        let (stored_accounts, stored_account_references) = deltas.apply(
-            application.stored_accounts,
-            application.stored_account_references,
+        self.stable_anchor_account_counter_memory.insert(
+            anchor_number,
+            StorableAccountsCounter {
+                stored_accounts: anchor_accounts,
+                stored_account_references: anchor_references,
+            },
         );
-        if stored_account_references == 0 {
+        // A zero here now means what it says. The delta refuses rather than clamping, so
+        // the row is only retired when no anchor references it, not when a counter that
+        // had already drifted was pulled below zero.
+        if application_references == 0 {
             self.remove_unreferenced_application(application_number, &application.origin);
         } else {
             self.stable_application_memory.insert(
                 application_number,
                 StorableApplication {
                     origin: application.origin,
-                    stored_accounts,
-                    stored_account_references,
+                    stored_accounts: application_accounts,
+                    stored_account_references: application_references,
                 },
             );
         }
@@ -2722,11 +2746,17 @@ impl ReferenceListDeltas {
         self.accounts == 0 && self.references == 0
     }
 
-    fn apply(&self, accounts: u64, references: u64) -> (u64, u64) {
-        (
-            accounts.saturating_add_signed(self.accounts),
-            references.saturating_add_signed(self.references),
-        )
+    /// Refuses rather than clamping: an under-run means the counters and the stored
+    /// lists have already diverged, and a clamped zero reads as "no anchor references
+    /// this application any more", which retires a row other anchors still point at.
+    fn apply(&self, accounts: u64, references: u64) -> Result<(u64, u64), StorageError> {
+        let accounts = accounts
+            .checked_add_signed(self.accounts)
+            .ok_or(StorageError::AccountCounterOutOfBounds)?;
+        let references = references
+            .checked_add_signed(self.references)
+            .ok_or(StorageError::AccountCounterOutOfBounds)?;
+        Ok((accounts, references))
     }
 }
 
@@ -2762,6 +2792,7 @@ pub enum StorageError {
     },
     ErrorUpdatingAccountCounter,
     AccountsCounterOverflow,
+    AccountCounterOutOfBounds,
     EmptyAccountReferenceList {
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
@@ -2829,6 +2860,10 @@ impl fmt::Display for StorageError {
             ),
             Self::ErrorUpdatingAccountCounter => write!(f, "Error updating account counter"),
             Self::AccountsCounterOverflow => write!(f, "No account numbers left to allocate"),
+            Self::AccountCounterOutOfBounds => write!(
+                f,
+                "An account counter delta would move the count outside its range"
+            ),
             Self::EmptyAccountReferenceList {
                 anchor_number,
                 application_number,

@@ -2182,6 +2182,51 @@ mod reference_list_write_path_tests {
     }
 
     #[test]
+    fn refuses_a_counter_delta_that_would_underflow_without_writing_anything() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let default_reference = AccountReference {
+            account_number: None,
+            last_used: None,
+        };
+        let named_reference = AccountReference {
+            account_number: Some(1),
+            last_used: None,
+        };
+        storage
+            .write_reference_list(
+                anchor_number,
+                application_number,
+                vec![default_reference.clone(), named_reference],
+            )
+            .unwrap();
+
+        // Force the divergence this guards: the stored list holds two references the
+        // anchor counter no longer knows about, so dropping one under-runs it.
+        storage.set_counters_for_testing(anchor_number, 0, 0);
+
+        let result = storage.write_reference_list(
+            anchor_number,
+            application_number,
+            vec![default_reference],
+        );
+
+        assert!(matches!(
+            result,
+            Err(StorageError::AccountCounterOutOfBounds)
+        ));
+        // Refused before anything was written: the list still holds both references.
+        assert_eq!(
+            storage
+                .lookup_account_references(anchor_number, application_number)
+                .unwrap()
+                .len(),
+            2
+        );
+    }
+
+    #[test]
     fn rejects_writing_an_empty_list() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
