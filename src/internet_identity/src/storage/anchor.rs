@@ -59,6 +59,12 @@ pub enum SessionDeviceError {
     /// Presented keys are visible on the wire, so without this a caller could announce a
     /// key another browser is about to present and take over its entry when it does.
     SuccessorAlreadyInUse,
+    /// The announced successor is the key being presented.
+    ///
+    /// Rotation is what stops a leaked key from being useful for longer than one sign-in,
+    /// so a browser that named itself its own successor would keep the key alive for as
+    /// long as it kept asking — and whoever leaked it would too.
+    SuccessorMatchesCurrent,
 }
 
 /// A browser this anchor has signed in from. The name is self-reported by the client.
@@ -66,9 +72,9 @@ pub enum SessionDeviceError {
 pub struct SessionDevice {
     pub id: SessionDeviceId,
     /// The browser's own public key, DER-encoded. What the entry is looked up by.
-    pub key: PublicKey,
+    pub current_device_key: PublicKey,
     /// The successor the browser announced at its last sign-in, also accepted as a proof.
-    pub pending: PublicKey,
+    pub next_device_key: PublicKey,
     pub name: String,
     pub created_at: Timestamp,
     pub last_used: Timestamp,
@@ -78,8 +84,8 @@ impl From<StorableSessionDevice> for SessionDevice {
     fn from(value: StorableSessionDevice) -> Self {
         SessionDevice {
             id: value.id,
-            key: ByteBuf::from(value.key),
-            pending: ByteBuf::from(value.pending),
+            current_device_key: ByteBuf::from(value.current_device_key),
+            next_device_key: ByteBuf::from(value.next_device_key),
             name: value.name,
             created_at: value.created_at,
             last_used: value.last_used,
@@ -91,8 +97,8 @@ impl From<SessionDevice> for StorableSessionDevice {
     fn from(value: SessionDevice) -> Self {
         StorableSessionDevice {
             id: value.id,
-            key: value.key.into_vec(),
-            pending: value.pending.into_vec(),
+            current_device_key: value.current_device_key.into_vec(),
+            next_device_key: value.next_device_key.into_vec(),
             name: value.name,
             created_at: value.created_at,
             last_used: value.last_used,
@@ -745,35 +751,37 @@ impl Anchor {
     /// registering it when this anchor holds neither that key nor a successor equal to it.
     ///
     /// A proof from the successor promotes it, retiring the key it replaces. Either way the
-    /// entry then awaits `next_key`, which is what a browser presents once this sign-in has
-    /// reached it.
+    /// entry then awaits `next_device_key`, which is what a browser presents once this
+    /// sign-in has reached it.
     ///
     /// At the cap the least recently used records are dropped, and their ids returned so
     /// the caller can end their sessions too.
     pub fn resolve_session_device(
         &mut self,
-        key: PublicKey,
-        next_key: PublicKey,
+        current_device_key: PublicKey,
+        next_device_key: PublicKey,
         name: String,
         now: Timestamp,
     ) -> Result<(SessionDeviceId, Vec<SessionDeviceId>), SessionDeviceError> {
-        let holder = |candidate: &PublicKey| {
-            self.session_devices
-                .iter()
-                .find(|device| device.key == *candidate || device.pending == *candidate)
-                .map(|device| device.id)
+        if current_device_key == next_device_key {
+            return Err(SessionDeviceError::SuccessorMatchesCurrent);
+        }
+
+        let device_index_for_key = |candidate: &PublicKey| {
+            self.session_devices.iter().position(|device| {
+                device.current_device_key == *candidate || device.next_device_key == *candidate
+            })
         };
-        if holder(&next_key).is_some() && holder(&next_key) != holder(&key) {
+        let current_index = device_index_for_key(&current_device_key);
+        let next_index = device_index_for_key(&next_device_key);
+        if next_index.is_some() && next_index != current_index {
             return Err(SessionDeviceError::SuccessorAlreadyInUse);
         }
 
-        if let Some(device) = self
-            .session_devices
-            .iter_mut()
-            .find(|device| device.key == key || device.pending == key)
-        {
-            device.key = key;
-            device.pending = next_key;
+        if let Some(index) = current_index {
+            let device = &mut self.session_devices[index];
+            device.current_device_key = current_device_key;
+            device.next_device_key = next_device_key;
             device.last_used = now;
             return Ok((device.id, vec![]));
         }
@@ -782,8 +790,8 @@ impl Anchor {
         self.next_session_device_id = self.next_session_device_id.saturating_add(1);
         self.session_devices.push(SessionDevice {
             id,
-            key,
-            pending: next_key,
+            current_device_key,
+            next_device_key,
             name,
             created_at: now,
             last_used: now,

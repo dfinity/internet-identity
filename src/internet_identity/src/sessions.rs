@@ -74,9 +74,9 @@ pub async fn prepare_account_session(
         account_number,
         session_key,
         device_name,
-        device_key,
+        current_device_key,
         next_device_key,
-        device_key_signature,
+        current_device_key_signature,
         next_device_key_signature,
         permissions,
         valid_for,
@@ -90,8 +90,8 @@ pub async fn prepare_account_session(
         ));
     }
     if !verify_device_keys(
-        &device_key,
-        &device_key_signature,
+        &current_device_key,
+        &current_device_key_signature,
         &next_device_key,
         &next_device_key_signature,
         &session_key,
@@ -127,12 +127,12 @@ pub async fn prepare_account_session(
 
     let mut anchor = state::anchor(identity_number);
     // A rotating browser presents the successor it announced, so both values are known.
-    let known_device = anchor
-        .session_devices()
-        .iter()
-        .any(|device| device.key == device_key || device.pending == device_key);
+    let known_device = anchor.session_devices().iter().any(|device| {
+        device.current_device_key == current_device_key
+            || device.next_device_key == current_device_key
+    });
     let (device_id, dropped_devices) = anchor
-        .resolve_session_device(device_key, next_device_key, device_name, now)
+        .resolve_session_device(current_device_key, next_device_key, device_name, now)
         .map_err(|_| AccountSessionError::InvalidDeviceKey)?;
     storage_borrow_mut(|storage| storage.write(anchor))
         .expect("failed to write the anchor while registering a browser");
