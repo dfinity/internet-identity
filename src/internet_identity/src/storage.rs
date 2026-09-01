@@ -662,8 +662,14 @@ impl<M: Memory + Clone> Storage<M> {
         storage
     }
 
-    /// Existing application numbers are dense from zero, so the row count is the
-    /// first free number.
+    /// Seeds the allocator from whichever is higher: the stored counter, or the row
+    /// count.
+    ///
+    /// The row count is a floor rather than the answer. It is exact only for data
+    /// written before this counter existed, where numbering was dense from zero.
+    /// Retiring an application removes its row without reissuing its number, so from
+    /// then on the count undershoots and only the stored counter is right — taking the
+    /// maximum is what keeps allocation monotonic across both.
     fn seed_application_number_allocator(&mut self) {
         let seeded = ApplicationNumber::max(
             *self.next_application_number_memory.get(),
