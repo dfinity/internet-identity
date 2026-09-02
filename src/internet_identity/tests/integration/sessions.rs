@@ -49,6 +49,7 @@ fn session_request_from(
         session_key,
         permissions: None,
         valid_for: None,
+        max_idle: None,
     }
 }
 
@@ -1298,6 +1299,38 @@ fn should_refuse_a_successor_equal_to_the_key_presented() -> Result<(), RejectRe
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
     assert_eq!(result, Err(AccountSessionError::InvalidDeviceKey));
+
+    Ok(())
+}
+
+/// The idle bound is the app's to ask for. Absent it defaults, and a value below the
+/// floor is clamped up rather than refused, so a short request still yields a usable
+/// session.
+#[test]
+fn should_store_the_requested_idle_bound() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    canister_tests::api::internet_identity::init_salt(&env, canister_id)?;
+    let identity_number = flows::register_anchor(&env, canister_id);
+
+    let browser = BrowserKey::new(1);
+    let mut request = session_request_from(identity_number, &browser);
+    // Under the ten-minute floor, so the clamp is what makes this session usable.
+    request.max_idle = Some(60_000_000_000);
+    prepare_account_session(&env, canister_id, principal_1(), request)?.unwrap();
+
+    // A session clamped up to the floor still mints, which is the point of clamping
+    // rather than refusing.
+    let devices = canister_tests::api::internet_identity::api_v2::identity_info(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+    )?
+    .unwrap()
+    .session_devices
+    .unwrap_or_default();
+    assert_eq!(devices.len(), 1);
 
     Ok(())
 }
