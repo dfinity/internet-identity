@@ -1040,6 +1040,10 @@ type PrepareAccountSessionRequest = record {
     permissions : opt Permissions;
     // Clamped to the session maximum.
     valid_for : opt nat64;
+    // How long the session may go unminted before it is over, clamped to between
+    // 10 minutes and the session's own granted length. Absent leaves the
+    // canister's own default.
+    max_idle : opt nat64;
 };
 
 type PrepareAccountSessionResponse = record {
