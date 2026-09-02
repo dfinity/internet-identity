@@ -55,6 +55,10 @@ const SessionParamsCodec = z.object({
   // request: what the user picks at consent wins, an SSO organization's cap
   // narrows it further, and the canister clamps the result.
   maxTimeToLive: z.optional(StringToBigIntCodec),
+  // How long the session may go unminted before the canister ends it. A ceiling
+  // like `maxTimeToLive`: the canister clamps it to between 10 minutes and the
+  // session's own granted length, and applies its own default where absent.
+  maxTimeToIdle: z.optional(StringToBigIntCodec),
   icrc95DerivationOrigin: z.optional(OriginSchema),
 });
 
@@ -266,6 +270,7 @@ export const handleSessionDelegationRequest =
         const created = await createSession(
           effectiveOrigin,
           params.maxTimeToLive,
+          params.maxTimeToIdle,
           resumable === true,
         );
         const chain = await extendToApp(
@@ -293,6 +298,7 @@ export const handleSessionDelegationRequest =
 const createSession = async (
   effectiveOrigin: string,
   requestedMaxTimeToLive: bigint | undefined,
+  requestedMaxTimeToIdle: bigint | undefined,
   resumable: boolean,
 ): Promise<{ record: AppSessionRecord }> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
@@ -339,6 +345,12 @@ const createSession = async (
           // The duration the user chose at consent, clamped by the canister. Dropping it
           // would honour half of a consent and silently discard the other half.
           valid_for: validFor !== undefined ? [validFor] : [],
+          // Straight through: the bound is the app's to ask for and the
+          // canister's to clamp, and nothing at consent narrows it.
+          max_idle:
+            requestedMaxTimeToIdle !== undefined
+              ? [requestedMaxTimeToIdle]
+              : [],
         })
         .then(throwCanisterError);
       await browser.accept(prepared.device_id);
