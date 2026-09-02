@@ -83,7 +83,10 @@ import { INTERACTION_REQUIRED_ERROR_CODE } from "$lib/utils/transport/utils";
 
 /** Drives one ceremony to the point where the session it created is either kept or
  *  discarded, which is the whole of what `resumable` decides. */
-const runCeremony = async (resumable?: boolean) => {
+const runCeremony = async (
+  resumable?: boolean,
+  extraParams: Record<string, unknown> = {},
+) => {
   const { authorizationPromptStore, authorizedStore } =
     await import("$lib/stores/authorization.store");
   authorizationPromptStore.set(resumable === undefined ? {} : { resumable });
@@ -98,8 +101,10 @@ const runCeremony = async (resumable?: boolean) => {
   );
   const signed = chain.delegations[0];
 
+  const prepared: Record<string, unknown>[] = [];
   const actor = {
-    prepare_account_session: () =>
+    prepare_account_session: (request: Record<string, unknown>) => (
+      prepared.push(request),
       Promise.resolve({
         Ok: {
           user_key: new Uint8Array(chain.publicKey),
@@ -108,7 +113,8 @@ const runCeremony = async (resumable?: boolean) => {
           account_principal: Principal.fromText("2vxsx-fae"),
           device_id: BigInt(1),
         },
-      }),
+      })
+    ),
     get_account_session: () =>
       Promise.resolve({
         Ok: {
@@ -145,9 +151,9 @@ const runCeremony = async (resumable?: boolean) => {
     jsonrpc: "2.0",
     id: 1,
     method: "ii_session_delegation",
-    params: { sessionPublicKey: await appKey() },
+    params: { sessionPublicKey: await appKey(), ...extraParams },
   });
-  return { sent };
+  return { sent, prepared };
 };
 
 const channelWith = () => {
@@ -533,6 +539,46 @@ describe("keeping a session for later", () => {
   beforeEach(async () => {
     await purgeAppSessions(BigInt(10_000));
     await purgeAppSessions(BigInt(10_001));
+  });
+
+  // Earlier tests in this file start a handler and only race it against a
+  // timeout, so one can still be waiting on the auth stores when a later
+  // fixture sets them — and then it prepares a session of its own. The TTL this
+  // ceremony asks for is what picks its request out of the ones captured.
+  const ourRequest = (
+    prepared: Record<string, unknown>[],
+    validForNs: bigint,
+  ): Record<string, unknown> => {
+    const found = prepared.find(
+      (request) =>
+        Array.isArray(request.valid_for) && request.valid_for[0] === validForNs,
+    );
+    expect(found, "this ceremony's prepare_account_session call").toBeDefined();
+    return found as Record<string, unknown>;
+  };
+
+  it("carries the app's idle bound to the canister", async () => {
+    const { sent, prepared } = await runCeremony(true, {
+      maxTimeToLive: "3600000000000",
+      maxTimeToIdle: "600000000000",
+    });
+
+    expect(sent).toHaveLength(1);
+    expect(ourRequest(prepared, BigInt(3_600_000_000_000)).max_idle).toEqual([
+      BigInt(600_000_000_000),
+    ]);
+  });
+
+  it("leaves the bound to the canister when the app names none", async () => {
+    // Absent rather than a number this frontend picked: the default belongs to
+    // the canister, and sending one here would override it.
+    const { prepared } = await runCeremony(true, {
+      maxTimeToLive: "7200000000000",
+    });
+
+    expect(ourRequest(prepared, BigInt(7_200_000_000_000)).max_idle).toEqual(
+      [],
+    );
   });
 
   it("keeps a session the app asked to be resumable", async () => {
