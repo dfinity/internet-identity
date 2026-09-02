@@ -779,6 +779,10 @@ pub struct PrepareAccountSessionRequest {
     pub permissions: Option<Permissions>,
     /// Clamped to the session maximum.
     pub valid_for: Option<u64>,
+    /// How long the session may go unminted before it is over. Clamped to between
+    /// 10 minutes and the session's own granted length; absent leaves the
+    /// canister's own default.
+    pub max_idle: Option<u64>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

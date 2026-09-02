@@ -1344,6 +1344,12 @@ export interface PrepareAccountSessionRequest {
    */
   'permissions' : [] | [Permissions],
   /**
+   * How long the session may go unminted before it is over, clamped to between
+   * 10 minutes and the session's own granted length. Absent leaves the
+   * canister's own default.
+   */
+  'max_idle' : [] | [bigint],
+  /**
    * The browser's own public key, DER-encoded, as the registry currently holds it. A
    * key this anchor has not seen registers a browser under it.
    */

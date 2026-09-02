@@ -76,6 +76,7 @@ pub async fn prepare_account_session(
         next_device_key_signature,
         permissions,
         valid_for,
+        max_idle,
     } = request;
 
     check_authz_and_record_activity(identity_number)?;
@@ -157,7 +158,7 @@ pub async fn prepare_account_session(
             account_number,
             device_id,
             valid_till_ns: valid_till,
-            max_idle_ns: None,
+            max_idle_ns: max_idle,
             read_only,
             now_ns: now,
         })

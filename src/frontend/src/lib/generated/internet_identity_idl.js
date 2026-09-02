@@ -705,6 +705,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const PrepareAccountSessionRequest = IDL.Record({
     'permissions' : IDL.Opt(Permissions),
+    'max_idle' : IDL.Opt(IDL.Nat64),
     'current_device_key' : PublicKey,
     'session_key' : SessionKey,
     'valid_for' : IDL.Opt(IDL.Nat64),
