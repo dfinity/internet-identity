@@ -22,7 +22,9 @@
   import McpCloseWindowView from "./views/McpCloseWindowView.svelte";
   import McpInvalidView from "./views/McpInvalidView.svelte";
   import McpUntrustedView from "./views/McpUntrustedView.svelte";
+  import McpLocalServerNoticeView from "./views/McpLocalServerNoticeView.svelte";
   import McpConnectingView from "./views/McpConnectingView.svelte";
+  import { localServerNoticeStore } from "./local-server-notice.store";
   import ManageHandoff from "$lib/components/ui/ManageHandoff.svelte";
   import { ManageHandoffFlow } from "$lib/flows/manageHandoffFlow.svelte";
   import {
@@ -40,13 +42,14 @@
   const params = $derived(data.params);
 
   // The MCP server the user is connecting is identified by the origin of the
-  // request's callback: each user trusts whichever (remote) server they connect.
-  // The connect flow delivers the registration delegation to that callback —
-  // once `mcpAuthorize` has confirmed the origin is trusted and matched it
-  // against the allow-list the server declares on its origin. MCP is
-  // remote-only, so only https callbacks are accepted (a plain-http or loopback
-  // callback is rejected). A disallowed (or unparsable) callback yields
-  // `undefined` → the invalid screen.
+  // request's callback: each user trusts whichever server they connect. The
+  // connect flow delivers the registration delegation to that callback — once
+  // `mcpAuthorize` has confirmed the origin is the trusted one and, for a
+  // remote server, matched the callback against the allow-list that server
+  // declares. Two shapes are accepted: an https callback for a remote server,
+  // and an `http://127.0.0.1[:port]` one for a local server on this computer.
+  // Anything else (or an unparsable callback) yields `undefined` → the invalid
+  // screen.
   const mcpServer = $derived(
     params.kind === "valid" ? parseMcpServerUrl(params.callback) : undefined,
   );
@@ -78,10 +81,31 @@
   type Phase =
     | { kind: "wizard" }
     | { kind: "authorize" }
+    | { kind: "local-notice" }
     | { kind: "untrusted" }
     | { kind: "connecting" }
     | { kind: "close"; redirecting: boolean }
     | { kind: "invalid" };
+
+  // The identity that accepted the local-server notice in this tab. Held here
+  // rather than written straight to the device store, so a connect that goes on
+  // to be refused (a crafted link naming a loopback callback the identity
+  // doesn't actually permit) can't leave an "already told" behind that would
+  // make the next attempt one screen quieter. It is committed on success.
+  let noticeAcceptedFor = $state<bigint | undefined>(undefined);
+
+  // The connect screen, or the local-server notice that precedes it the first
+  // time this identity signs in to a local server on this computer. Answerable
+  // without the canister — the callback comes from the fragment and the record
+  // is device-local — so it can run before the identity has authenticated,
+  // which is what lets the notice come *before* the consent screen rather than
+  // after the user has already approved the connect.
+  const connectPhase = (identityNumber: bigint): Phase =>
+    mcpServer?.isLoopback === true &&
+    noticeAcceptedFor !== identityNumber &&
+    !localServerNoticeStore.isAcknowledged(identityNumber)
+      ? { kind: "local-notice" }
+      : { kind: "authorize" };
 
   // The phase the page opens on: a returning user with a previously-used
   // identity opens on the connect screen, and a user with no last-used identity
@@ -103,7 +127,7 @@
     if (selected === undefined) {
       return { kind: "wizard" };
     }
-    return { kind: "authorize" };
+    return connectPhase(selected.identityNumber);
   };
 
   let phase = $state<Phase>(initialPhase());
@@ -122,6 +146,7 @@
     showIdentitySwitcher.set(
       phase.kind === "wizard" ||
         phase.kind === "authorize" ||
+        phase.kind === "local-notice" ||
         phase.kind === "untrusted",
     );
   });
@@ -140,6 +165,7 @@
     if (
       phase.kind !== "wizard" &&
       phase.kind !== "authorize" &&
+      phase.kind !== "local-notice" &&
       phase.kind !== "untrusted"
     ) {
       return;
@@ -157,7 +183,7 @@
     }
     if (selected.identityNumber !== phaseIdentity) {
       phaseIdentity = selected.identityNumber;
-      phase = { kind: "authorize" };
+      phase = connectPhase(selected.identityNumber);
     }
   });
 
@@ -289,6 +315,14 @@
           registrationKey: fromBase64URL(request.registrationKey),
         });
         mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Success);
+        // Trust held and the delegation is minted, so the local-server notice
+        // has been earned: record it for this identity on this computer, and
+        // don't show it again here. Committed only now — never at the moment
+        // the user accepted it — so an attempt that ended at the untrusted
+        // screen leaves the next one just as loud.
+        if (server.isLoopback) {
+          localServerNoticeStore.acknowledge(authenticated.identityNumber);
+        }
         // The registration delegation is minted: reach the terminal close
         // screen first, so the page is in the truthful state even when the
         // navigation below never replaces the document or the user comes Back
@@ -323,6 +357,23 @@
   // identity". The returning-user untrusted screen often isn't authenticated
   // yet, so this runs the full ceremony when needed.
   const manageHandoff = new ManageHandoffFlow();
+  // The local-server notice: continuing goes on to the consent screen, which
+  // still gates this connect and every later one. Cancelling drops the connect
+  // rather than proceeding silently, so declining actually declines.
+  const handleLocalNoticeContinue = (): void => {
+    const selected = $lastUsedIdentitiesStore.selected;
+    if (selected === undefined) {
+      return;
+    }
+    noticeAcceptedFor = selected.identityNumber;
+    phase = { kind: "authorize" };
+  };
+
+  const handleLocalNoticeCancel = (): void => {
+    mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Error);
+    phase = { kind: "close", redirecting: false };
+  };
+
   const handleManageTrustedServer = (): void => {
     const selected = $lastUsedIdentitiesStore.selected;
     if (selected === undefined) {
@@ -376,6 +427,12 @@
     mcpServerOrigin={mcpServer.origin}
     requestedTtlSeconds={params.kind === "valid" ? params.ttlSeconds : 3600}
     onAuthorize={handleAuthorize}
+  />
+{:else if phase.kind === "local-notice" && mcpServer !== undefined}
+  <McpLocalServerNoticeView
+    mcpServerHost={mcpServer.host}
+    onContinue={handleLocalNoticeContinue}
+    onCancel={handleLocalNoticeCancel}
   />
 {:else if phase.kind === "untrusted" && mcpServer !== undefined}
   <McpUntrustedView
