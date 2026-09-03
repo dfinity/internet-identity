@@ -17,10 +17,12 @@
 </script>
 
 <!--
-  Shown once per identity per computer, before the first sign-in to a local MCP
-  server on this machine. A local connector is trusted by host and not by port,
-  so this is where the user is told what that means; the consent screen that
-  follows still gates this and every later connect.
+  Shown ahead of the consent screen until this identity has signed in to a local
+  MCP server on this computer, which is recorded only once one actually
+  succeeds — so a connect that ends up refused leaves the next attempt just as
+  loud. A local connector is trusted by host and not by port, so this is where
+  the user is told what that means; the consent screen that follows still gates
+  this and every later connect.
 -->
 <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
   <AuthPanel>
@@ -37,7 +39,7 @@
       </Badge>
     </div>
     <p class="text-text-tertiary mt-4 text-base text-pretty">
-      {$t`Any program on this computer can ask. We won't ask again here.`}
+      {$t`Any program on this computer can ask.`}
     </p>
 
     <button onclick={onContinue} class="btn btn-primary btn-xl mt-8 w-full">
