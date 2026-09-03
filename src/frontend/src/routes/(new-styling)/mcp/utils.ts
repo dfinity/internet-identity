@@ -1,7 +1,10 @@
 import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
 import type { McpConfig } from "$lib/utils/mcpConfig";
 import { isLoopbackUrl, trustsOrigin } from "$lib/utils/mcpServer";
-import { matchDeclaredCallback } from "$lib/utils/authCallbacks";
+import {
+  assertDeliverableCallback,
+  matchDeclaredCallback,
+} from "$lib/utils/authCallbacks";
 import type { BackendCanisterConfig } from "$lib/globals";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import type { PublicKey } from "@icp-sdk/core/agent";
@@ -183,11 +186,16 @@ export const mcpAuthorize = async ({
   // Settings opt-in, the notice before the first local sign-in on a machine,
   // and the consent screen on every connect.
   //
+  // Either way the callback still has to be deliverable — on the trust-confirmed
+  // origin and carrying no fragment of its own, since this flow appends one.
+  // Skipping the allow-list drops the question of *which* callback, never
+  // whether the answer can be delivered to.
+  //
   // Decided on the *certified* `trusted_url`, never on the link: the two are
   // equal by the gate above, but reading it from the certified value keeps this
   // branch impossible to steer from the fragment.
   const callback = isLoopbackUrl(trusted_url)
-    ? requestedCallback
+    ? assertDeliverableCallback(serverOrigin, requestedCallback)
     : await matchDeclaredCallback(serverOrigin, requestedCallback);
 
   // `get` recovers the seed from `user_key` (the value `prepare` returned), so

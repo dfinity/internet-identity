@@ -49,6 +49,21 @@
   type ConnectorKind = "remote" | "local";
 
   let kind = $state<ConnectorKind>("remote");
+
+  const connectorKinds = $derived([
+    {
+      value: "remote" as const,
+      icon: GlobeIcon,
+      label: $t`Remote server`,
+      hint: $t`Hosted, by URL`,
+    },
+    {
+      value: "local" as const,
+      icon: MonitorIcon,
+      label: $t`On this computer`,
+      hint: $t`A local program`,
+    },
+  ]);
   let urlInput = $state("");
   let verifyState = $state<VerifyState>("idle");
   let parsedUrl = $state<string | undefined>(undefined);
@@ -173,31 +188,35 @@
       </p>
     </div>
 
-    <div
-      class="flex flex-row gap-3"
-      role="radiogroup"
-      aria-label={$t`Connector type`}
-    >
-      {#each [{ value: "remote", icon: GlobeIcon, label: $t`Remote server`, hint: $t`Hosted, by URL` }, { value: "local", icon: MonitorIcon, label: $t`On this computer`, hint: $t`A local program` }] as option (option.value)}
-        <button
-          type="button"
-          role="radio"
-          aria-checked={kind === option.value}
-          disabled={saving}
-          onclick={() => selectKind(option.value as ConnectorKind)}
-          class="flex flex-1 flex-col gap-1 rounded-lg border p-3 text-start {kind ===
+    <!-- Native radios rather than ARIA-annotated buttons: the choice is
+         mutually exclusive, so this gets arrow-key navigation, roving focus and
+         the right announcement without reimplementing any of it. The input is
+         visually hidden and the card is the label. -->
+    <fieldset class="flex flex-row gap-3" disabled={saving}>
+      <legend class="sr-only">{$t`Connector type`}</legend>
+      {#each connectorKinds as option (option.value)}
+        <label
+          class="flex flex-1 cursor-pointer flex-col gap-1 rounded-lg border p-3 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 {kind ===
           option.value
             ? 'border-border-brand bg-bg-brand-primary'
             : 'border-border-tertiary bg-bg-primary'}"
         >
+          <input
+            type="radio"
+            name="connector-kind"
+            value={option.value}
+            checked={kind === option.value}
+            onchange={() => selectKind(option.value)}
+            class="sr-only"
+          />
           <option.icon class="text-fg-secondary size-4.5" aria-hidden="true" />
-          <span class="text-text-primary text-sm font-semibold"
-            >{option.label}</span
-          >
+          <span class="text-text-primary text-sm font-semibold">
+            {option.label}
+          </span>
           <span class="text-text-tertiary text-xs">{option.hint}</span>
-        </button>
+        </label>
       {/each}
-    </div>
+    </fieldset>
 
     <ul class="my-2 flex flex-col gap-5">
       <li class="flex flex-row items-start gap-3">

@@ -337,6 +337,36 @@ describe("mcpAuthorize local server (loopback)", () => {
     }
   });
 
+  it("refuses a callback that already carries a fragment", async () => {
+    // Delivery appends its own fragment; one already there would produce
+    // `...#theirs#delegation=...` and mangle what the server reads. Skipping
+    // the allow-list drops the question of *which* callback, not whether the
+    // answer can be delivered to.
+    const actor = withLocalTrustedUrl(makeActor());
+
+    await expect(
+      authorize(actor, "read-only", {
+        origin: LOCAL_ORIGIN,
+        callback: `${LOCAL_CALLBACK}#already`,
+      }),
+    ).rejects.toThrow(/must not carry a fragment/);
+    expect(actor.get_mcp_registration_delegation).not.toHaveBeenCalled();
+  });
+
+  it("refuses a callback that is not on the confirmed origin", async () => {
+    // Belt and braces: today `serverOrigin` is derived from this very callback,
+    // so they cannot disagree — the check keeps the invariant local anyway.
+    const actor = withLocalTrustedUrl(makeActor());
+
+    await expect(
+      authorize(actor, "read-only", {
+        origin: LOCAL_ORIGIN,
+        callback: "http://127.0.0.1:9999/callback",
+      }),
+    ).rejects.toThrow(/not on the trusted server's origin/);
+    expect(actor.get_mcp_registration_delegation).not.toHaveBeenCalled();
+  });
+
   it("does not let a remote trusted server authorize a loopback callback", async () => {
     // The mirror of the above: a crafted link naming a local callback must not
     // ride an identity whose trusted server is remote.
