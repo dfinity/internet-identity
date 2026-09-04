@@ -1,6 +1,6 @@
 # Web Push notifications
 
-**For dApp developers:** [Integrating with II Web Push notifications](web-push-notifications-integration.md)
+**DApp integration design:** [dApp integration with II Web Push notifications](web-push-notifications-integration.md)
 
 **PR-stack follow-ups:** [Web Push notification TODOs](web-push-notifications-todos.md)
 

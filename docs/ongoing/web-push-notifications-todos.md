@@ -1,6 +1,6 @@
 # Web Push notification PR-stack TODOs
 
-These are implementation follow-ups discovered while documenting the open Web Push notification stack. They are kept separate from the design and integration guide so those documents describe the intended contract rather than temporary gaps in the current branches.
+These are implementation follow-ups discovered while documenting the open Web Push notification stack. They are kept separate from the main and dApp integration designs so those documents describe the intended contract rather than temporary gaps in the current branches.
 
 ## Client library: own the campaign and pending-content lifecycle
 
@@ -45,4 +45,4 @@ The current service worker reads only the first principal from `/.well-known/ii-
 - [ ] Treat a successful empty response as an instruction to close every notification previously shown for that canister.
 - [ ] Refresh and retry the sender document when one cached canister is removed or replaced.
 - [ ] Add tests for multiple senders, duplicate IDs across canisters, one failed sender, one empty sender, and removal of a sender from the well-known document.
-- [ ] Update the integration guide once the final multi-canister behavior is implemented.
+- [ ] Update the dApp integration design once the final multi-canister behavior is implemented.
