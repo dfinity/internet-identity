@@ -5,6 +5,7 @@
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import { agentOptions } from "$lib/globals";
 import { throwTextCanisterError } from "$lib/utils/utils";
 import { requestNotificationPermission } from "./pushSubscription";
 import { subscribeAndRegisterDevice } from "./subscribeDevice";
@@ -80,6 +81,7 @@ const grantAndMint = async ({
       identityNumber,
       accountNumber,
       origin,
+      host: agentOptions.host ?? self.location.origin,
       actor,
     }),
   );
