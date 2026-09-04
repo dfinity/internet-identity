@@ -4259,13 +4259,15 @@ mod account_principal_index_backfill_tests {
                 .lookup_or_insert_application_number_with_origin(&format!("https://d-{index}.com"))
                 .unwrap();
             storage
-                .write_reference_list(
+                .write_account_state(
                     anchor_number,
                     application_number,
                     vec![AccountReference {
                         account_number: None,
                         last_used: Some(index + 1),
                     }],
+                    None,
+                    None,
                 )
                 .unwrap();
         }
