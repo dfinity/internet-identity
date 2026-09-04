@@ -15,7 +15,7 @@ An integration has four parts:
 3. Expose the notifications currently pending for the signed-in principal.
 4. Store the content, then send II a content-free ping to wake the user's devices.
 
-The sender and content provider can be the same canister, but they do not have to be. Every canister that calls `notification_send` must appear in the sender document. The first canister in that document is also the one from which the service worker pulls content.
+Every canister that calls `notification_send` must appear in the sender document. A canister that owns notification content must also expose the pull interface described below.
 
 ## 1. Request consent during sign-in
 
@@ -55,8 +55,6 @@ Its body lists every canister allowed to send notifications for that origin:
 ```
 
 II fetches the document when the user grants consent. The request must return `200 OK` with valid JSON and at least one valid canister principal. II reads at most 20 senders.
-
-Order matters to the service worker. The first principal is the content canister and must implement `ii_pending_notifications`. Any remaining principals may send pings for the origin but are not queried for content.
 
 For a canister-hosted frontend, serve the document as a certified asset. The response, including its headers, must fit within 64 KiB. The origin must be publicly reachable over HTTPS, so this part of the flow does not work against localhost.
 
