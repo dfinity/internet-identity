@@ -2,6 +2,27 @@
 
 These are implementation follow-ups discovered while documenting the open Web Push notification stack. They are kept separate from the design and integration guide so those documents describe the intended contract rather than temporary gaps in the current branches.
 
+## Client library: own the campaign and pending-content lifecycle
+
+**Repository:** [internet-identity-notifications-client](https://github.com/dfinity/internet-identity-notifications-client)
+
+The current clients are thin wrappers around `notification_send`. The intended integrator surface is higher-level: an app supplies a campaign and the library owns the durable coordination inside the dApp canister.
+
+- [ ] Define the campaign, recipient, pending-content, progress, and terminal-state types.
+- [ ] Store campaign progress and pending content durably inside the dApp canister.
+- [ ] Accept a campaign ID and notification list as the common send API.
+- [ ] Store each recipient's content before submitting its ping to II.
+- [ ] Split campaigns into bounded `notification_send` batches.
+- [ ] Pace retries using `retry_after_ms`, with jitter, without advancing unaccepted recipients.
+- [ ] Persist the last `resend_epoch` and recover affected campaign work when it changes.
+- [ ] Resume incomplete campaigns after a dApp canister upgrade.
+- [ ] Aggregate accepted and rejected recipients into an honest campaign status that does not claim delivery receipts.
+- [ ] Add update, remove, pause, resume, cancel, and cleanup operations.
+- [ ] Add a Motoko mixin that owns the state and injects `ii_pending_notifications`.
+- [ ] Add the equivalent Rust pending-content abstraction and minimal endpoint wiring.
+- [ ] Keep `sendersDocument` and `SendersDocument` as the only well-known setup required from the app.
+- [ ] Add campaign restart, partial acceptance, epoch change, expiry, update, and removal tests.
+
 ## Service worker: pull content from every sender canister
 
 **PR:** [#4258](https://github.com/dfinity/internet-identity/pull/4258)
