@@ -6,7 +6,7 @@ These are implementation follow-ups discovered while documenting the open Web Pu
 
 **Repository:** [internet-identity-notifications-client](https://github.com/dfinity/internet-identity-notifications-client)
 
-The current clients are thin wrappers around `notification_send`. The intended integrator surface is higher-level: an app supplies a campaign and the library owns the durable coordination inside the dApp canister.
+The current clients only wrap `notification_send`. They need to accept a campaign from the app and manage its durable state inside the dApp canister.
 
 - [ ] Define the campaign, recipient, pending-content, progress, and terminal-state types.
 - [ ] Store campaign progress and pending content durably inside the dApp canister.

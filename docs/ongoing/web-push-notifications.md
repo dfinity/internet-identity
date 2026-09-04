@@ -132,7 +132,7 @@ The response limit for the well-known outcall must include headers as well as th
 
 #### What changes with revocable app sessions
 
-The well-known file is an interim mechanism. A revocable app session gives the app frontend an authenticated path to II from which II can resolve the identity, origin, and account. The frontend can then register its sender canister principals while notification consent is established.
+The well-known file is temporary. The app frontend will instead include its sender canister principals in a notification-consent call signed with the app session. II looks up the session caller to get the identity, origin, and account, then stores the senders with that account's notification access.
 
 II stores that sender set with the account's session-backed notification authorization. At send time it resolves the recipient through the shared account index and checks the calling canister against that recipient's registered set. The backend no longer declares an origin, and consent no longer performs an HTTP outcall.
 
@@ -243,7 +243,7 @@ A Web2 dispatcher changes the operational and trust model, so it should be consi
 
 The current implementation records standing consent against the per-app principal. That consent exists independently of the app session.
 
-The intended model addresses and refreshes notifications through a revocable app session. The app frontend also registers its sender canisters through that authenticated session, replacing the well-known file and its consent-time HTTP outcall. Ending the session then prevents the app from continuing to refresh its notification access or sender authority, and the service worker fetches content using the account associated with that session.
+Notifications will be addressed and refreshed through an app session. The frontend registers its sender canisters in a call signed with that session, replacing the well-known file and its consent-time HTTP outcall. Once the session ends, the app can no longer refresh its notification access or sender registration. The service worker fetches content as the account recorded on the session.
 
 Standing consent is an interim model that allows the notification path to be built and tested before sessions land. It should not become a separate permanent session mechanism.
 

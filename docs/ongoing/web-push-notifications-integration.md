@@ -69,7 +69,7 @@ The application does not implement a push queue, the pending-notification
 endpoint, or recovery from an II buffer reset. Those are part of the client
 contract.
 
-## Consent remains part of sign-in
+## Consent during sign-in
 
 The II authorization request gains an `iiNotifications` option:
 
@@ -101,7 +101,7 @@ directly.
 
 ### Initial implementation: declaration by the origin
 
-An origin participating in notifications serves:
+For the initial implementation, the app origin serves:
 
 ```text
 /.well-known/ii-notification-senders
@@ -134,20 +134,17 @@ has to expose that asset at the well-known path.
 This works before app sessions land, but it adds an HTTPS outcall to the consent
 flow and requires every app origin to maintain another asset.
 
-### Intended design: registration through the app session
+### After app sessions land
 
-Revocable app sessions give an app frontend a direct authenticated path to II.
-II can resolve the caller to the identity, origin, and account behind that
-session, so the frontend can register the app's sender canisters without asking
-II to discover them over HTTPS.
+The app configures `AuthClient` with its sender canister principals.
+`AuthClient` includes them in the notification-consent call, signed with the app
+session. II looks up the session caller to get the identity, origin, and account,
+then stores the sender principals with that account's notification access.
 
-Once sessions are available, the app configures `AuthClient` with its sender
-canister principals. `AuthClient` passes them to II while notification consent
-is established, and II stores them with that account's notification access.
-When a canister sends a ping, II resolves the recipient through the shared
-account index and checks that the caller is registered for the account and app.
-The canister no longer has to supply an origin, and II no longer needs the
-well-known outcall.
+The sender later calls `notification_send` with the recipient principal. II
+uses the shared account index to find the account, then checks whether the
+caller is in that account's sender list. The request no longer includes an
+origin, and consent no longer makes an HTTP outcall.
 
 ```mermaid
 sequenceDiagram
@@ -155,10 +152,10 @@ sequenceDiagram
     participant II as Internet Identity
     participant Canister as Sender canister
 
-    App->>II: Establish notification access and register sender canisters
-    Note over App,II: Authenticated by the app session
-    II->>II: Resolve session to identity, origin, and account
-    II->>II: Store sender set with notification authorization
+    App->>II: Notification consent and sender principals
+    Note over App,II: Call signed with the app session
+    II->>II: Look up the session's identity, origin, and account
+    II->>II: Store senders on the account's notification access
 
     Canister->>II: notification_send(recipient)
     II->>II: Resolve recipient through the shared account index
@@ -166,21 +163,19 @@ sequenceDiagram
     II-->>Canister: Accept or reject ping
 ```
 
-The registration is stored per account rather than shared across all users. A
-frontend acting for one user can authorize a sender for that user's
-notifications, but its call says nothing about what another user has agreed to.
-This means storing the same small sender list more than once, which is the cost
-of keeping those decisions separate.
+II stores the sender list on each account. It cannot reuse one user's
+registration for another user because the first user's frontend cannot
+authorize the second user's notifications. II therefore stores the same sender
+list on every account that enables notifications for the app.
 
-The session work still has to settle the API, sender limit, refresh period, and
-what happens to a registration when its session ends. The registration must not
-become a new permanent credential after the session that created it is gone.
+The sender limit, refresh period, and cleanup when a session ends have not been
+decided yet. A sender registration must not remain valid permanently after its
+session has ended.
 
 ## The client is included in the dApp backend
 
-Campaign and pending-notification state lives in the dApp's stable memory. Its
-schema and lifecycle belong to the notification client rather than to
-application code.
+Campaign and pending-notification state lives in the dApp's stable memory. The
+client defines and manages that state; the application does not.
 
 The Motoko package will follow the same pattern as
 [`identity-attributes`](https://mops.one/identity-attributes). The package root
@@ -311,8 +306,8 @@ a successful empty response closes them.
 
 ## Updating and removing notifications
 
-The application remains the source of truth for whether a notification should
-still exist. It expresses changes through the client library.
+The application decides whether a notification should still exist and passes
+changes to the client library.
 
 Replacing the content while retaining the same notification ID updates the
 displayed notification after the next successful ping and pull. Removing the ID
@@ -323,7 +318,7 @@ This is set reconciliation rather than a stream of notification commands. A
 device that misses intermediate pings still converges on the dApp's current
 pending set the next time it wakes.
 
-## Status semantics
+## What campaign status means
 
 II reports admission into its transient buffer, not delivery to a device. The
 client reports campaign progress using the following states:
@@ -345,8 +340,8 @@ Application code only deals with four things:
 
 1. The `iiNotifications` sign-in option.
 2. The sender canister configuration. The initial implementation exposes it as
-   a well-known document; the intended design registers it through
-   `AuthClient` and the app session.
+   a well-known document. After app sessions land, `AuthClient` registers it
+   with II.
 3. The Motoko mixin or equivalent Rust client configured with the II canister
    and origin.
 4. Campaigns containing recipient principals and notification content.
