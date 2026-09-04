@@ -2039,13 +2039,15 @@ impl<M: Memory + Clone> Storage<M> {
         device_id: SessionDeviceId,
         now: Timestamp,
     ) -> Result<bool, StorageError> {
-        let ReferenceRow::Held(mut references) =
-            self.reference_row(anchor_number, application_number)
+        let Some(mut references) = self.account_references(anchor_number, application_number)
         else {
             return Ok(false);
         };
 
-        let Some(reference) = references.reference_mut(account_number) else {
+        let Some(reference) = references
+            .iter_mut()
+            .find(|reference| reference.account_number == account_number)
+        else {
             return Ok(false);
         };
         let Some(session) = reference
