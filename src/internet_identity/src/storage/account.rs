@@ -7,41 +7,25 @@ use crate::{
 use ic_cdk::trap;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
-    AccountInfo, AccountNameValidationError, AccountNumber, AnchorNumber, ApplicationNumber,
-    FrontendHostname, SessionDeviceId, Timestamp, UserKey,
+    AccountInfo, AccountNameValidationError, AccountNumber, AnchorNumber, FrontendHostname,
+    SessionDeviceId, Timestamp, UserKey,
 };
 use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
 mod tests;
 
-// API to manage accounts.
-pub struct CreateAccountParams {
+/// An account's address: the identity, the origin, and which of that identity's
+/// accounts there, `None` being the tracked default.
+///
+/// Carries no capability. The seed an account signs with lives on [`Account`], which
+/// only [`crate::storage::Storage::read_account`] hands out, and only after checking
+/// that the identity holds a reference to it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AccountKey {
     pub anchor_number: AnchorNumber,
-    pub name: String,
     pub origin: FrontendHostname,
-}
-
-pub struct UpdateAccountParams {
     pub account_number: Option<AccountNumber>,
-    pub anchor_number: AnchorNumber,
-    pub name: String,
-    pub origin: FrontendHostname,
-}
-
-pub struct UpdateExistingAccountParams {
-    pub account_number: AccountNumber,
-    pub anchor_number: AnchorNumber,
-    pub name: String,
-    pub origin: FrontendHostname,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ReadAccountParams<'a> {
-    pub account_number: Option<AccountNumber>,
-    pub anchor_number: AnchorNumber,
-    pub origin: &'a FrontendHostname,
-    pub known_app_num: Option<ApplicationNumber>,
 }
 
 // Types used internally to encapsulate business logic and data.
@@ -134,9 +118,13 @@ pub struct Account {
 }
 
 impl Account {
-    /// A "synthetic" account, i.e., one that is not meant to be stored.
+    /// An identity's default account at an origin, derived rather than stored.
     ///
-    /// One exception when it may be stored is to overwrite an existing stored account.
+    /// Test-only. In production every account comes out of
+    /// [`crate::storage::Storage::read_account`], which builds this one only where the
+    /// identity's row still names it — a derived default handed out without that check
+    /// would sign for an origin the identity may have moved every account away from.
+    #[cfg(test)]
     pub fn synthetic(anchor_number: AnchorNumber, origin: FrontendHostname) -> Self {
         Self {
             anchor_number,
