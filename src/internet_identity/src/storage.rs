@@ -119,7 +119,6 @@ use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
 use crate::storage::storable::account_locator::StorableAccountLocator;
 use crate::storage::storable::account_number::StorableAccountNumber;
-use crate::storage::storable::account_reference::StorableAccountReference;
 use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
@@ -1628,122 +1627,107 @@ impl<M: Memory + Clone> Storage<M> {
             .and_then(|application_number| self.stable_application_memory.get(&application_number))
     }
 
-    fn lookup_account_references(
+    /// What this identity's reference-list row at `application_number` holds.
+    ///
+    /// The one place that maps storage onto [`ReferenceRow`], so no caller has to
+    /// remember that an absent row and an empty one mean opposite things.
+    fn reference_row(
         &self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-    ) -> Option<Vec<StorableAccountReference>> {
-        self.stable_account_reference_list_memory
+    ) -> ReferenceRow {
+        match self
+            .stable_account_reference_list_memory
             .get(&(anchor_number, application_number))
-            .map(|list| list.into_vec())
+        {
+            None => ReferenceRow::Untouched,
+            Some(stored) => {
+                let references = Vec::<AccountReference>::from(stored);
+                match HeldReferences::new(references) {
+                    Some(held) => ReferenceRow::Held(held),
+                    None => ReferenceRow::Tombstone,
+                }
+            }
+        }
     }
 
-    fn find_account_references(
-        &self,
-        anchor_number: AnchorNumber,
-        application_number: Option<ApplicationNumber>,
-    ) -> Option<(
-        (AnchorNumber, ApplicationNumber),
-        Vec<StorableAccountReference>,
-    )> {
-        let application_number = application_number?;
-
-        let key = (anchor_number, application_number);
-
-        let account_references = self.stable_account_reference_list_memory.get(&key)?;
-
-        Some((key, account_references.into_vec()))
-    }
-
-    fn find_account_reference(
-        &self,
-        anchor_number: AnchorNumber,
-        application_number: Option<ApplicationNumber>,
-        account_number: Option<AccountNumber>,
-    ) -> Option<StorableAccountReference> {
-        let (_, account_references) =
-            self.find_account_references(anchor_number, application_number)?;
-
-        account_references
-            .into_iter()
-            .find(|account_reference| account_reference.account_number == account_number)
-    }
-
-    /// Search for an account and account_reference and applies the function `f` if found.
+    /// Applies `f` to one of this identity's account references, and writes the row
+    /// back if it ran.
     ///
+    /// `account_number` names the reference, `None` being the tracked default.
     ///
-    /// The function `f` is called with a mutable reference to the account reference and an option to the mutable reference to the account.
-    ///
-    /// # Arguments
-    ///
-    /// * `anchor_number` - The anchor number of the account.
-    /// * `application_number` - The application number of the account.
-    /// * `account_number` - The account number of the account or None if synthetic account.
-    /// * `f` - The function to apply to the accounts.
-    ///
-    /// If the `account_number` is None, it means the storable account doesn't exist and account reference might exist.
-    /// * If the account reference exists, the function `f` is called with a mutable reference to the account reference and None as the second argument.
-    /// * If the account reference does not exist, None is returned.
-    ///
-    /// If the `account_number` is Some, it means the storable account exists (or existed at some point) and account references exists (or existed at some point).
-    /// * If the storable account exists, the function `f` is called with a mutable reference to the account reference and a mutable reference to the storable account.
-    /// * If the storable account does not exist, None is returned.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(None)` if both account and account_reference are not found
-    /// * `Ok(Some(T))` if the account or account_reference are found where T is the result of the function `f`.
-    /// * `Err` if writing the reference list back failed
-    fn with_account_mut<T, F>(
+    /// `Ok(None)` means there was nothing to apply `f` to and nothing was written:
+    /// the row is absent or a tombstone, or it holds no reference for this account.
+    /// That last case is the ownership check — an account belongs to whichever
+    /// identity's row names it.
+    fn with_reference_mut<T, F>(
         &mut self,
         anchor_number: AnchorNumber,
-        application_number: Option<ApplicationNumber>,
-        maybe_account_number: Option<AccountNumber>,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
         f: F,
     ) -> Result<Option<T>, StorageError>
     where
-        F: FnOnce(&mut StorableAccountReference, Option<&mut StorableAccount>) -> T,
+        F: FnOnce(&mut AccountReference) -> T,
     {
-        // A named account has a stored record to hand to `f`; a default is derived
-        // and has none. A named account with no record was removed, so there is
-        // nothing to update.
-        let mut storable_account = match maybe_account_number {
-            Some(account_number) => match self.stable_account_memory.get(&account_number) {
-                Some(storable_account) => Some(storable_account),
-                None => return Ok(None),
-            },
-            None => None,
-        };
-
-        let Some(((_, application_number), mut account_references)) =
-            self.find_account_references(anchor_number, application_number)
+        let ReferenceRow::Held(mut references) =
+            self.reference_row(anchor_number, application_number)
         else {
             return Ok(None);
         };
 
-        let Some(account_reference) = account_references
-            .iter_mut()
-            .find(|account_reference| account_reference.account_number == maybe_account_number)
-        else {
-            // `f` never ran, so nothing was modified and writing the list back would
+        let Some(reference) = references.reference_mut(account_number) else {
+            // `f` never ran, so nothing changed, and writing the row back here would
             // store the bytes it already holds.
             return Ok(None);
         };
-        let result = f(account_reference, storable_account.as_mut());
+        let result = f(reference);
 
-        self.write_reference_list(
+        self.write_reference_list(anchor_number, application_number, references)?;
+
+        Ok(Some(result))
+    }
+
+    /// Applies `f` to one of this identity's named accounts and the reference to it,
+    /// and writes both back if it ran.
+    ///
+    /// The tracked default is not reachable here: it is derived and has no stored
+    /// account record, so only a named account can be handed to `f`.
+    ///
+    /// `Ok(None)` carries the same meaning as in [`Self::with_reference_mut`], plus
+    /// the account having been removed.
+    fn with_named_account_mut<T, F>(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: AccountNumber,
+        f: F,
+    ) -> Result<Option<T>, StorageError>
+    where
+        F: FnOnce(&mut AccountReference, &mut StorableAccount) -> T,
+    {
+        // A named account with no stored record has been removed, so there is nothing
+        // to modify.
+        let Some(mut storable_account) = self.stable_account_memory.get(&account_number) else {
+            return Ok(None);
+        };
+
+        let result = self.with_reference_mut(
             anchor_number,
             application_number,
-            account_references.into_iter().map(Into::into).collect(),
+            Some(account_number),
+            |reference| f(reference, &mut storable_account),
         )?;
-        if let (Some(account_number), Some(storable_account)) =
-            (maybe_account_number, storable_account)
-        {
+
+        // Skipped on a miss, where `f` never ran: the record would be written back
+        // exactly as it was read, and it belongs to whichever identity does hold a
+        // reference to it.
+        if result.is_some() {
             self.stable_account_memory
                 .insert(account_number, storable_account);
         }
 
-        Ok(Some(result))
+        Ok(result)
     }
 
     /// Records that an account was used at `origin`.
@@ -1777,12 +1761,17 @@ impl<M: Memory + Clone> Storage<M> {
         account_number: Option<AccountNumber>,
         now: Timestamp,
     ) -> Result<(), StorageError> {
-        let application_number = self.lookup_application_number_with_origin(origin);
-        self.with_account_mut(
+        // An origin nothing has ever been stored under holds no reference to stamp,
+        // which is the same answer as a row that holds no reference for this account.
+        let Some(application_number) = self.lookup_application_number_with_origin(origin) else {
+            return Ok(());
+        };
+
+        self.with_reference_mut(
             anchor_number,
             application_number,
             account_number,
-            |account_reference, _| {
+            |account_reference| {
                 account_reference.last_used = Some(now);
             },
         )?;
@@ -1795,29 +1784,28 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: AnchorNumber,
         device_id: SessionDeviceId,
     ) -> Result<u64, StorageError> {
-        let affected: Vec<(ApplicationNumber, Vec<AccountReference>)> = self
+        let affected: Vec<(ApplicationNumber, HeldReferences)> = self
             .stable_account_reference_list_memory
             .range(
                 (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
             )
             .filter_map(|((_, application_number), list)| {
-                let references: Vec<AccountReference> = list.into();
-                references
-                    .iter()
-                    .any(|reference| {
-                        reference
-                            .sessions
-                            .iter()
-                            .any(|session| session.device_id == device_id)
-                    })
-                    .then_some((application_number, references))
+                // A tombstone holds no reference and so no session either.
+                let references = HeldReferences::new(list.into())?;
+                let holds_a_session = references.iter().any(|reference| {
+                    reference
+                        .sessions
+                        .iter()
+                        .any(|session| session.device_id == device_id)
+                });
+                holds_a_session.then_some((application_number, references))
             })
             .collect();
 
         let mut removed = 0u64;
         for (application_number, mut references) in affected {
             let mut dropped: Vec<(Option<AccountNumber>, SessionRecord)> = vec![];
-            for reference in &mut references {
+            for reference in references.iter_mut() {
                 let account_number = reference.account_number;
                 reference.sessions.retain(|session| {
                     if session.device_id == device_id {
@@ -1948,17 +1936,20 @@ impl<M: Memory + Clone> Storage<M> {
         // undercount, and let the stored set climb past the cap from there. An identity's rows
         // are already bounded — the row cap holds the evictable ones and the account cap holds
         // the rest — and a sequential scan of them costs a fraction of the writes it saves.
-        let mut rows: Vec<(ApplicationNumber, Vec<AccountReference>)> = self
+        let mut rows: Vec<(ApplicationNumber, HeldReferences)> = self
             .stable_account_reference_list_memory
             .range(
                 (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
             )
-            .map(|((_, application_number), list)| (application_number, list.into()))
+            .filter_map(|((_, application_number), list)| {
+                // A tombstone holds no reference and so no session to reclaim.
+                Some((application_number, HeldReferences::new(list.into())?))
+            })
             .collect();
 
         let mut candidates: Vec<Candidate> = vec![];
         for (row, (_, references)) in rows.iter().enumerate() {
-            for reference in references {
+            for reference in references.iter() {
                 for session in &reference.sessions {
                     candidates.push(Candidate {
                         order: session.reclaim_order(now),
@@ -2055,14 +2046,11 @@ impl<M: Memory + Clone> Storage<M> {
             .stable_application_memory
             .get(&application_number)
             .map(|application| application.origin)?;
-        let references: Vec<AccountReference> = self
-            .lookup_account_references(anchor_number, application_number)?
-            .into_iter()
-            .map(Into::into)
-            .collect();
-        let reference = references
-            .into_iter()
-            .find(|reference| reference.account_number == account_number)?;
+        let ReferenceRow::Held(references) = self.reference_row(anchor_number, application_number)
+        else {
+            return None;
+        };
+        let reference = references.reference(account_number)?.clone();
         let account = self.read_account(ReadAccountParams {
             account_number,
             anchor_number,
@@ -2079,15 +2067,13 @@ impl<M: Memory + Clone> Storage<M> {
         account_number: Option<AccountNumber>,
     ) -> Option<Vec<SessionRecord>> {
         let application_number = self.lookup_application_number_with_origin(origin)?;
-        let references: Vec<AccountReference> = self
-            .lookup_account_references(anchor_number, application_number)?
-            .into_iter()
-            .map(Into::into)
-            .collect();
+        let ReferenceRow::Held(references) = self.reference_row(anchor_number, application_number)
+        else {
+            return None;
+        };
         references
-            .into_iter()
-            .find(|reference| reference.account_number == account_number)
-            .map(|reference| reference.sessions)
+            .reference(account_number)
+            .map(|reference| reference.sessions.clone())
     }
 
     /// Creates the session `prepare_account_session` mints an identity from, replacing
@@ -2125,9 +2111,8 @@ impl<M: Memory + Clone> Storage<M> {
         // written here: the single write at the end of this function carries `last_used`.
         let application_number = match self.lookup_application_number_with_origin(&origin) {
             Some(application_number)
-                if self
-                    .lookup_account_references(anchor_number, application_number)
-                    .is_some() =>
+                if self.reference_row(anchor_number, application_number)
+                    != ReferenceRow::Untouched =>
             {
                 application_number
             }
@@ -2143,7 +2128,7 @@ impl<M: Memory + Clone> Storage<M> {
                 self.write_reference_list(
                     anchor_number,
                     application_number,
-                    vec![AccountReference::new(None, Some(now_ns))],
+                    HeldReferences::including(vec![], AccountReference::new(None, Some(now_ns))),
                 )?;
                 self.evict_idle_tracked_defaults(anchor_number, application_number)?;
                 application_number
@@ -2156,23 +2141,22 @@ impl<M: Memory + Clone> Storage<M> {
             return Err(StorageError::SessionCapNotReclaimed { anchor_number });
         }
 
-        let mut references: Vec<AccountReference> = self
-            .lookup_account_references(anchor_number, application_number)
-            .ok_or(StorageError::MissingAccount {
+        let ReferenceRow::Held(mut references) =
+            self.reference_row(anchor_number, application_number)
+        else {
+            return Err(StorageError::MissingAccount {
                 anchor_number,
                 name: origin,
-            })?
-            .into_iter()
-            .map(Into::into)
-            .collect();
+            });
+        };
 
-        let reference = references
-            .iter_mut()
-            .find(|reference| reference.account_number == account_number)
-            .ok_or(StorageError::MissingAccount {
-                anchor_number,
-                name: String::new(),
-            })?;
+        let reference =
+            references
+                .reference_mut(account_number)
+                .ok_or(StorageError::MissingAccount {
+                    anchor_number,
+                    name: String::new(),
+                })?;
         reference.last_used = Some(now_ns);
 
         // A ceremony replaces whatever this browser held here, rather than reusing it: the
@@ -2268,17 +2252,16 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
     ) -> Result<(), StorageError> {
-        if self
-            .lookup_account_references(anchor_number, application_number)
-            .is_some()
-        {
+        // Only an untouched row gets one. A tombstone is a default that moved away and
+        // must not be recreated, and a row already holding references needs nothing.
+        if self.reference_row(anchor_number, application_number) != ReferenceRow::Untouched {
             return Ok(());
         }
 
         self.write_reference_list(
             anchor_number,
             application_number,
-            vec![AccountReference::new(None, None)],
+            HeldReferences::including(vec![], AccountReference::new(None, None)),
         )?;
         self.evict_idle_tracked_defaults(anchor_number, application_number)
     }
@@ -2289,11 +2272,10 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
     ) -> Result<(), StorageError> {
-        let key = (anchor_number, application_number);
-        let Some(previous) = self
-            .stable_account_reference_list_memory
-            .get(&key)
-            .map(Vec::<AccountReference>::from)
+        // Only a row that holds references is retired. An absent row has nothing to
+        // remove, and a tombstone has to stay: it is a live row holding nothing, and
+        // taking it away would make the default it stands for reconstructible again.
+        let ReferenceRow::Held(previous) = self.reference_row(anchor_number, application_number)
         else {
             return Ok(());
         };
@@ -2301,6 +2283,7 @@ impl<M: Memory + Clone> Storage<M> {
             .stable_application_memory
             .get(&application_number)
             .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
+
         // Every reference goes, so every principal it derived goes with it — resolved
         // before the first removal so a missing salt refuses with the row intact.
         let salt = *self.salt().ok_or(StorageError::SaltNotSet)?;
@@ -2317,7 +2300,7 @@ impl<M: Memory + Clone> Storage<M> {
         // Ahead of the counters because a session's principal is derived through the
         // application row, and applying the deltas is what retires it — afterwards there
         // would be nothing left to derive the keys to remove.
-        for reference in &previous {
+        for reference in previous.iter() {
             self.unindex_sessions(
                 anchor_number,
                 application_number,
@@ -2326,12 +2309,14 @@ impl<M: Memory + Clone> Storage<M> {
             );
         }
 
-        let deltas = ReferenceListDeltas::between(&previous, &[]);
+        // Counters first, for the reason `write_reference_list` does it: it is the
+        // only fallible step left, and an error after the removes would commit them
+        // without it.
         self.apply_reference_counter_deltas(
             anchor_number,
             application_number,
             application,
-            deltas,
+            ReferenceListDeltas::removing(&previous),
         )?;
         if dropped > 0 {
             self.change_session_count(anchor_number, dropped, 0)?;
@@ -2342,11 +2327,13 @@ impl<M: Memory + Clone> Storage<M> {
             application_number,
             &origin,
             &salt,
-            &previous,
+            previous.as_slice(),
             &[],
         );
+        let key = (anchor_number, application_number);
         self.stable_account_reference_list_memory.remove(&key);
         self.stable_anchor_application_config_memory.remove(&key);
+
         Ok(())
     }
 
@@ -2441,42 +2428,34 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// The single write path for an anchor's account reference list at one
     /// application, including the counters derived from it.
+    ///
+    /// Takes [`HeldReferences`], so it cannot be handed an empty list: that would be a
+    /// tombstone, which only a future move may create and which no path in this design
+    /// should reach by writing references it happens to have none of.
     fn write_reference_list(
         &mut self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-        current: Vec<AccountReference>,
+        new_references: HeldReferences,
     ) -> Result<(), StorageError> {
-        if current.is_empty() {
-            return Err(StorageError::EmptyAccountReferenceList {
-                anchor_number,
-                application_number,
-            });
-        }
-
         let application = self
             .stable_application_memory
             .get(&application_number)
             .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
 
-        let key = (anchor_number, application_number);
-        let previous = self
-            .stable_account_reference_list_memory
-            .get(&key)
-            .map(Vec::<AccountReference>::from)
-            .unwrap_or_default();
-
-        let deltas = ReferenceListDeltas::between(&previous, &current);
+        let previous_row = self.reference_row(anchor_number, application_number);
+        let counter_deltas = ReferenceListDeltas::between(&previous_row, &new_references);
 
         // A derived principal is a function of the anchor, the origin and the account
         // number, so a write that leaves every account number in place — a `last_used`
         // stamp, which is every sign-in — cannot have changed one. Skipping the sync
         // there keeps the hottest write in the system off a per-account hash.
-        let accounts_changed = previous.len() != current.len()
-            || previous
+        let previous_references = previous_row.references();
+        let accounts_changed = previous_references.len() != new_references.as_slice().len()
+            || previous_references
                 .iter()
-                .zip(&current)
-                .any(|(previous, current)| previous.account_number != current.account_number);
+                .zip(new_references.as_slice())
+                .any(|(previous, new)| previous.account_number != new.account_number);
         // Resolved before anything is written, so a missing salt refuses here rather
         // than half-way through.
         let salt = if accounts_changed {
@@ -2492,7 +2471,7 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number,
             application_number,
             application,
-            deltas,
+            counter_deltas,
         )?;
         if let Some(salt) = salt {
             self.sync_account_principal_index(
@@ -2500,12 +2479,14 @@ impl<M: Memory + Clone> Storage<M> {
                 application_number,
                 &origin,
                 &salt,
-                &previous,
-                &current,
+                previous_references,
+                new_references.as_slice(),
             );
         }
-        self.stable_account_reference_list_memory
-            .insert(key, current.into());
+        self.stable_account_reference_list_memory.insert(
+            (anchor_number, application_number),
+            new_references.into_vec().into(),
+        );
         Ok(())
     }
 
@@ -2891,34 +2872,26 @@ impl<M: Memory + Clone> Storage<M> {
             .insert(account_number, storable_account);
 
         // Update application data
-        let app_num = self.lookup_or_insert_application_number_with_origin(origin);
+        let application_number = self.lookup_or_insert_application_number_with_origin(origin);
 
         // last_used will be set once the user signs in with the account.
         let last_used = None;
 
-        // Process account references
-        let references = match self
-            .stable_account_reference_list_memory
-            .get(&(anchor_number, app_num))
-        {
-            None => {
-                // If no list exists for this anchor & application,
-                // Create and insert the default and additional account.
-                // This is because we don't create default accounts explicitly.
-                let additional_account_reference =
-                    AccountReference::new(Some(account_number), last_used);
-                let default_account_reference = AccountReference::new(None, last_used);
-                vec![default_account_reference, additional_account_reference]
-            }
-            Some(existing_storable_list) => {
-                // If the list exists, push the new account and reinsert it to memory
-                let mut refs_vec: Vec<AccountReference> = existing_storable_list.into();
-                refs_vec.push(AccountReference::new(Some(account_number), last_used));
-                refs_vec
-            }
+        let existing_references = match self.reference_row(anchor_number, application_number) {
+            // The default account reference is created alongside this one, because
+            // default accounts are never created explicitly.
+            ReferenceRow::Untouched => vec![AccountReference::new(None, last_used)],
+            // A tombstone must not regain a default reference, which is the whole
+            // reason it is kept, so the named account is all that goes in.
+            ReferenceRow::Tombstone => vec![],
+            ReferenceRow::Held(held) => held.into_vec(),
         };
+        let references = HeldReferences::including(
+            existing_references,
+            AccountReference::new(Some(account_number), last_used),
+        );
 
-        self.write_reference_list(anchor_number, app_num, references)?;
+        self.write_reference_list(anchor_number, application_number, references)?;
 
         // Return the new account
         Ok(Account::new(
@@ -2939,22 +2912,28 @@ impl<M: Memory + Clone> Storage<M> {
         origin: &FrontendHostname,
     ) -> Vec<Account> {
         check_frontend_length(origin);
-        match self.lookup_application_number_with_origin(origin) {
-            None => vec![Account::synthetic(anchor_number, origin.clone())],
-            Some(app_num) => match self.lookup_account_references(anchor_number, app_num) {
-                None => vec![Account::synthetic(anchor_number, origin.clone())],
-                Some(refs) => refs
-                    .iter()
-                    .filter_map(|acc_ref| {
-                        self.read_account(ReadAccountParams {
-                            account_number: acc_ref.account_number,
-                            anchor_number,
-                            origin,
-                            known_app_num: Some(app_num),
-                        })
+        let Some(application_number) = self.lookup_application_number_with_origin(origin) else {
+            // Nothing has ever been stored under this origin, so the default account is
+            // still reconstructible.
+            return vec![Account::synthetic(anchor_number, origin.clone())];
+        };
+
+        match self.reference_row(anchor_number, application_number) {
+            ReferenceRow::Untouched => vec![Account::synthetic(anchor_number, origin.clone())],
+            // Everything here moved away. Not even a synthetic default is offered —
+            // that is what the tombstone exists to prevent.
+            ReferenceRow::Tombstone => vec![],
+            ReferenceRow::Held(held) => held
+                .iter()
+                .filter_map(|reference| {
+                    self.read_account(ReadAccountParams {
+                        account_number: reference.account_number,
+                        anchor_number,
+                        origin,
+                        known_app_num: Some(application_number),
                     })
-                    .collect(),
-            },
+                })
+                .collect(),
         }
     }
 
@@ -2972,75 +2951,56 @@ impl<M: Memory + Clone> Storage<M> {
             .known_app_num
             .or_else(|| self.lookup_application_number_with_origin(params.origin));
 
+        let synthetic_default = || Account::synthetic(params.anchor_number, params.origin.clone());
+
+        // Nothing has ever been stored under this origin. A default account is still
+        // reconstructible, and a named one cannot be here at all.
+        let Some(application_number) = application_number else {
+            return match params.account_number {
+                None => Some(synthetic_default()),
+                Some(_) => None,
+            };
+        };
+        let row = self.reference_row(params.anchor_number, application_number);
+
         match params.account_number {
-            // If a default account is requested
-            None => {
-                // if there is no stored application, return a synthetic default account
-                if application_number.is_none() {
-                    return Some(Account::new(
+            // The tracked default.
+            None => match row {
+                ReferenceRow::Untouched => Some(synthetic_default()),
+                // A tombstone means the default moved away. Answering with a
+                // synthetic one would let its former owner reconstruct it at the same
+                // principal, so there is nothing here to sign in as.
+                ReferenceRow::Tombstone => None,
+                // A row that names other accounts but not the default means the default
+                // was named or moved away; the identity signs in with one of the others.
+                ReferenceRow::Held(held) => held.reference(None).map(|reference| {
+                    Account::new_with_last_used(
                         params.anchor_number,
                         params.origin.clone(),
                         None,
-                        None,
-                    ));
-                }
-                // check if there is a stored account reference list
-                if let Some(acc_ref_vec) =
-                    // we can safely unwrap here
-                    self.lookup_account_references(
-                        params.anchor_number,
-                        application_number.unwrap(),
+                        reference.account_number,
+                        reference.last_used,
                     )
-                {
-                    // if there is a default account in the list, we return it
-                    // else we return None, account has been moved or deleted
-                    // but there is another account in the list, so user can log in with that
-                    acc_ref_vec
-                        .iter()
-                        .find(|acc_ref| acc_ref.account_number.is_none())
-                        .map(|acc_ref| {
-                            Account::new_with_last_used(
-                                params.anchor_number,
-                                params.origin.clone(),
-                                None,
-                                acc_ref.account_number,
-                                acc_ref.last_used,
-                            )
-                        })
-                } else {
-                    //if there is no list, we return a synthetic default account
-                    Some(Account::new(
-                        params.anchor_number,
-                        params.origin.clone(),
-                        None,
-                        None,
-                    ))
-                }
-            }
-            // if a named/stored account is requested
-            Some(account_number) => match self.stable_account_memory.get(&account_number) {
-                // if it does not exist, return None
-                None => None,
-                Some(storable_account) => {
-                    // if it does exist, check whether it is owned by the caller anchor
-                    // and belongs to the correct origin
-                    self.find_account_reference(
-                        params.anchor_number,
-                        application_number,
-                        params.account_number,
-                    )
-                    .map(|acc_ref| {
-                        Account::new_full(
-                            params.anchor_number,
-                            params.origin.clone(),
-                            Some(storable_account.name.clone()),
-                            Some(account_number),
-                            acc_ref.last_used,
-                            storable_account.seed_from_anchor,
-                        )
-                    })
-                }
+                }),
             },
+            // A named account. The stored record carries its name; this identity's row
+            // naming it is what says the identity owns it.
+            Some(account_number) => {
+                let storable_account = self.stable_account_memory.get(&account_number)?;
+                let ReferenceRow::Held(held) = row else {
+                    return None;
+                };
+                held.reference(Some(account_number)).map(|reference| {
+                    Account::new_full(
+                        params.anchor_number,
+                        params.origin.clone(),
+                        Some(storable_account.name.clone()),
+                        Some(account_number),
+                        reference.last_used,
+                        storable_account.seed_from_anchor,
+                    )
+                })
+            }
         }
     }
 
@@ -3087,44 +3047,36 @@ impl<M: Memory + Clone> Storage<M> {
             origin,
         } = params;
 
-        // Check if account reference exists for given anchor number, origin and account number,
-        // if the account refence exists for a given anchor, that means the anchor has access.
-        let application_number = self.lookup_application_number_with_origin(&origin);
+        // Nothing has ever been stored under this origin, so no reference to the
+        // account exists under it either.
+        let Some(application_number) = self.lookup_application_number_with_origin(&origin) else {
+            return Err(StorageError::AccountNotFound { account_number });
+        };
 
-        let account_update_result = self.with_account_mut(
+        // Holding a reference is what grants access, so a miss here means this
+        // identity does not own the account, whether or not it exists.
+        let Some(updated_account) = self.with_named_account_mut(
             anchor_number,
             application_number,
-            Some(account_number),
-            |account_reference, maybe_storable_account| {
-                // Check if the account reference has an account number,
-                // throw error if it doesn't since we only want to update
-                // accounts with an account number in this function.
-                let account_number = account_reference.account_number?;
-                // Check if the storable_account exists.
-                // throw error if it doesn't since we only want to update
-                // existing accounts in this function.
-                let storable_account = maybe_storable_account?;
-
-                // Update account and write back to storage
+            account_number,
+            |account_reference, storable_account| {
                 storable_account.name = name.clone();
 
-                // Return a user-facing account structure
-                Some(Account::new_full(
+                Account::new_full(
                     anchor_number,
                     origin,
                     Some(name),
                     Some(account_number),
                     account_reference.last_used,
                     storable_account.seed_from_anchor,
-                ))
+                )
             },
-        );
-
-        let Some(Some(account_update_result)) = account_update_result? else {
+        )?
+        else {
             return Err(StorageError::AccountNotFound { account_number });
         };
 
-        Ok(account_update_result)
+        Ok(updated_account)
     }
 
     /// Used in `update_account` to create a default account.
@@ -3141,27 +3093,27 @@ impl<M: Memory + Clone> Storage<M> {
             origin,
         } = params;
 
-        // Read and check before anything is written. Allocating a number and storing the
-        // account first left both behind on a refusal, along with the application row and
-        // its config, and nothing reaps them.
-        let existing_references = self
+        // Which reference the new account number goes into, decided before anything is
+        // written: returning `Err` on the IC commits every write that came before it,
+        // so a refusal below this point would leave an allocated account stored with
+        // no reference naming it.
+        let existing_references = match self
             .lookup_application_number_with_origin(&origin)
-            .and_then(|application_number| {
-                self.stable_account_reference_list_memory
-                    .get(&(anchor_number, application_number))
-                    .map(Vec::<AccountReference>::from)
-            });
-        if existing_references.as_ref().is_some_and(|references| {
-            !references
-                .iter()
-                .any(|reference| reference.account_number.is_none())
-        }) {
-            // The default reference was removed, so there is nothing here to name.
-            return Err(StorageError::MissingAccount {
-                anchor_number,
-                name,
-            });
-        }
+            .map(|application_number| self.reference_row(anchor_number, application_number))
+        {
+            // Nothing stored under this origin yet, so the row starts with just this
+            // account. Default accounts are never created explicitly.
+            None | Some(ReferenceRow::Untouched) => None,
+            Some(ReferenceRow::Held(held)) if held.reference(None).is_some() => Some(held),
+            // A tombstone holds nothing to name, and a row whose default reference is
+            // gone never regains one — the account it pointed at was removed.
+            Some(ReferenceRow::Tombstone) | Some(ReferenceRow::Held(_)) => {
+                return Err(StorageError::MissingAccount {
+                    anchor_number,
+                    name,
+                });
+            }
+        };
 
         // Create and store the default account.
         let new_account_number = self.allocate_account_number()?;
@@ -3186,22 +3138,17 @@ impl<M: Memory + Clone> Storage<M> {
             self.set_anchor_application_config(anchor_number, application_number, config);
         }
 
+        // `last_used` is set once the user signs in with this account.
+        let new_reference = AccountReference::new(Some(new_account_number), None);
         let references = match existing_references {
-            None => {
-                // If no list exists for this anchor & application,
-                // Create and insert the default account.
-                // This is because we don't create default accounts explicitly.
-                vec![AccountReference::new(Some(new_account_number), None)]
-            }
-            Some(mut refs_vec) => {
-                // The check above proved a default reference is here to update.
-                for r_mut in refs_vec.iter_mut() {
-                    if r_mut.account_number.is_none() {
-                        r_mut.account_number = Some(new_account_number);
-                        break;
-                    }
+            None => HeldReferences::including(vec![], new_reference),
+            Some(mut held) => {
+                // Present, per the check above. Repointed in place so the reference
+                // keeps both its position in the list and its `last_used`.
+                if let Some(default_reference) = held.reference_mut(None) {
+                    default_reference.account_number = Some(new_account_number);
                 }
-                refs_vec
+                held
             }
         };
 
@@ -3498,28 +3445,161 @@ fn canister_id() -> Principal {
     Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 7, 1, 1])
 }
 
+/// What one `(anchor, application)` reference-list row holds.
+///
+/// Deliberately not `Option<Vec<_>>`: absence and emptiness are opposites here, and
+/// spelling them as one nullable vector is what lets a caller treat them alike.
+///
+/// - Absent means nothing ever happened at this application, so a default account is
+///   reconstructible and reads answer with a synthetic one.
+/// - Empty means everything that was here moved away. The default must never be
+///   reconstructible again, or its former owner could re-mint it at the same
+///   principal.
+///
+/// Matching is exhaustive, so a fourth state cannot be added without every reader
+/// being made to say what it does about it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ReferenceRow {
+    /// No row.
+    Untouched,
+    /// A row holding nothing. A permanent tombstone.
+    Tombstone,
+    /// A row holding references.
+    Held(HeldReferences),
+}
+
+/// The references stored against one row, never empty.
+///
+/// An empty list is a [`ReferenceRow::Tombstone`] and means something else entirely,
+/// so it cannot be built here — which is what keeps the write path from producing one
+/// by accident.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct HeldReferences(Vec<AccountReference>);
+
+impl HeldReferences {
+    /// `None` for an empty list, which is a tombstone rather than references.
+    fn new(references: Vec<AccountReference>) -> Option<Self> {
+        (!references.is_empty()).then_some(Self(references))
+    }
+
+    /// Non-empty because `reference` is in it, whatever `others` holds. The way a
+    /// caller adding a reference builds a row without having to rule out emptiness it
+    /// has just made impossible.
+    fn including(mut others: Vec<AccountReference>, reference: AccountReference) -> Self {
+        others.push(reference);
+        Self(others)
+    }
+
+    /// The reference for one account, where `None` asks for the tracked default.
+    fn reference(&self, account_number: Option<AccountNumber>) -> Option<&AccountReference> {
+        self.0
+            .iter()
+            .find(|reference| reference.account_number == account_number)
+    }
+
+    /// The reference for one account, to modify in place. Answers `None` where this
+    /// identity holds no such reference, which is what makes reference-list
+    /// membership the ownership check.
+    fn reference_mut(
+        &mut self,
+        account_number: Option<AccountNumber>,
+    ) -> Option<&mut AccountReference> {
+        self.0
+            .iter_mut()
+            .find(|reference| reference.account_number == account_number)
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &AccountReference> {
+        self.0.iter()
+    }
+
+    /// Every reference, to modify in place. Safe to hand out because nothing reachable
+    /// through an `&mut AccountReference` can remove one and empty the row.
+    fn iter_mut(&mut self) -> impl Iterator<Item = &mut AccountReference> {
+        self.0.iter_mut()
+    }
+
+    fn as_slice(&self) -> &[AccountReference] {
+        &self.0
+    }
+
+    fn into_vec(self) -> Vec<AccountReference> {
+        self.0
+    }
+}
+
+impl ReferenceRow {
+    /// The references this row holds, which is none for both an absent row and a
+    /// tombstone.
+    ///
+    /// Only for callers that genuinely treat those two alike. The principal index is
+    /// one: every entry in it comes from a reference, and neither state has any.
+    fn references(&self) -> &[AccountReference] {
+        match self {
+            Self::Untouched | Self::Tombstone => &[],
+            Self::Held(held) => held.as_slice(),
+        }
+    }
+}
+
+/// How one write to a reference-list row moves the counters derived from it.
+///
+/// Signed because these are differences rather than totals: a write that drops a
+/// reference has to move the counters down, and there is no unsigned way to say so.
+/// Both are applied to `u64` totals by [`ReferenceListDeltas::apply`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ReferenceListDeltas {
+    /// Change in named accounts — references that carry an account number.
     accounts: i64,
+    /// Change in references, named and tracked-default alike.
     references: i64,
 }
 
 impl ReferenceListDeltas {
-    fn between(previous: &[AccountReference], current: &[AccountReference]) -> Self {
-        fn counts(references: &[AccountReference]) -> (i64, i64) {
-            let stored = references
-                .iter()
-                .filter(|reference| reference.account_number.is_some())
-                .count() as i64;
-            (stored, references.len() as i64)
+    /// What writing `new_references` over `previous_row` does to the counters.
+    ///
+    /// A tombstone counts as no references, which is right for the totals and is why
+    /// removing a row must not consult this: a tombstone's row is still alive while
+    /// holding nothing, so decrementing to zero on it would let the row be retired and
+    /// a moved-away default be reconstructed at the same principal.
+    fn between(previous_row: &ReferenceRow, new_references: &HeldReferences) -> Self {
+        /// Saturating rather than `as`: a list long enough to overflow `i64` cannot
+        /// exist — `MAX_ANCHOR_ACCOUNTS` bounds it far below — and saturating says so
+        /// without a cast that would wrap silently if that ever stopped being true.
+        fn counts<'a>(references: impl Iterator<Item = &'a AccountReference>) -> (i64, i64) {
+            let mut named = 0i64;
+            let mut total = 0i64;
+            for reference in references {
+                total = total.saturating_add(1);
+                if reference.account_number.is_some() {
+                    named = named.saturating_add(1);
+                }
+            }
+            (named, total)
         }
 
-        let (previous_accounts, previous_references) = counts(previous);
-        let (current_accounts, current_references) = counts(current);
+        let (previous_named, previous_total) = match previous_row {
+            ReferenceRow::Untouched | ReferenceRow::Tombstone => (0, 0),
+            ReferenceRow::Held(held) => counts(held.iter()),
+        };
+        let (new_named, new_total) = counts(new_references.iter());
 
         Self {
-            accounts: current_accounts - previous_accounts,
-            references: current_references - previous_references,
+            accounts: new_named.saturating_sub(previous_named),
+            references: new_total.saturating_sub(previous_total),
+        }
+    }
+
+    /// What retiring a row holding `previous` does to the counters.
+    ///
+    /// Separate from [`Self::between`] rather than a write of an empty list, because
+    /// there is no empty [`HeldReferences`] to write: a row holding nothing is a
+    /// tombstone and stays, so only an outright removal gets to zero these out.
+    fn removing(previous: &HeldReferences) -> Self {
+        let removed = Self::between(&ReferenceRow::Untouched, previous);
+        Self {
+            accounts: removed.accounts.saturating_neg(),
+            references: removed.references.saturating_neg(),
         }
     }
 
@@ -3530,14 +3610,14 @@ impl ReferenceListDeltas {
     /// Refuses rather than clamping: an under-run means the counters and the stored
     /// lists have already diverged, and a clamped zero reads as "no anchor references
     /// this application any more", which retires a row other anchors still point at.
-    fn apply(&self, accounts: u64, references: u64) -> Result<(u64, u64), StorageError> {
-        let accounts = accounts
+    fn apply(&self, num_accounts: u64, num_references: u64) -> Result<(u64, u64), StorageError> {
+        let num_accounts = num_accounts
             .checked_add_signed(self.accounts)
             .ok_or(StorageError::AccountCounterOutOfBounds)?;
-        let references = references
+        let num_references = num_references
             .checked_add_signed(self.references)
             .ok_or(StorageError::AccountCounterOutOfBounds)?;
-        Ok((accounts, references))
+        Ok((num_accounts, num_references))
     }
 }
 
@@ -3575,10 +3655,6 @@ pub enum StorageError {
     SaltNotSet,
     AccountsCounterOverflow,
     AccountCounterOutOfBounds,
-    EmptyAccountReferenceList {
-        anchor_number: AnchorNumber,
-        application_number: ApplicationNumber,
-    },
     /// Reclaiming ran and the identity is still at the session cap. Unreachable unless
     /// reclaiming stopped honouring its contract, which is why it is an error rather than a
     /// refused sign-in: the sign-in is the thing this cap must never fail.
@@ -3655,13 +3731,6 @@ impl fmt::Display for StorageError {
             Self::AccountCounterOutOfBounds => write!(
                 f,
                 "An account counter delta would move the count outside its range"
-            ),
-            Self::EmptyAccountReferenceList {
-                anchor_number,
-                application_number,
-            } => write!(
-                f,
-                "refusing to store an empty account reference list for anchor {anchor_number} at application {application_number}"
             ),
             Self::EmailRecoveryAddressAlreadyBound { existing_anchor } => write!(
                 f,
