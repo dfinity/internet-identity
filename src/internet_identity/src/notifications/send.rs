@@ -77,15 +77,15 @@ pub struct NotificationSendResponse {
 const MAX_BUFFER: usize = 10_000;
 const RETRY_AFTER_MS: u32 = 5_000;
 
-// Fields are read by the dispatcher (next PR); here they are only written.
-#[allow(dead_code)]
+/// A content-free routing pointer: enough for the dispatcher to seal a ping to
+/// the anchor's devices for this origin. The sender's notification `id` isn't
+/// kept because the ping carries no content to correlate it to.
 #[derive(Clone)]
 pub struct BufferedNotification {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
-    pub id: Vec<u8>,
     pub expires_at_ns: Option<Timestamp>,
-    pub enqueued_at_ns: Timestamp,
+    pub urgency: Option<NotificationUrgency>,
 }
 
 thread_local! {
@@ -201,9 +201,8 @@ fn accept_one(
     Ok(BufferedNotification {
         anchor_number,
         origin: origin.clone(),
-        id: notification.id.clone().into_vec(),
         expires_at_ns: notification.expires_at,
-        enqueued_at_ns: now_ns,
+        urgency: notification.urgency,
     })
 }
 
@@ -211,8 +210,13 @@ fn buffer_len() -> usize {
     BUFFER.with(|buffer| buffer.borrow().len())
 }
 
-fn enqueue(notification: BufferedNotification) {
+pub(super) fn enqueue(notification: BufferedNotification) {
     BUFFER.with(|buffer| buffer.borrow_mut().push_back(notification));
+}
+
+/// Pops the oldest buffered notification for the delivery drain (FIFO).
+pub(super) fn take_next() -> Option<BufferedNotification> {
+    BUFFER.with(|buffer| buffer.borrow_mut().pop_front())
 }
 
 #[cfg(test)]
@@ -257,18 +261,21 @@ mod tests {
     }
 
     #[test]
-    fn buffer_enqueues_in_order() {
+    fn buffer_drains_fifo() {
         setup();
         clear_buffer();
-        for id in 0..5u8 {
+        for anchor in 1..=5u64 {
             enqueue(BufferedNotification {
-                anchor_number: 1,
+                anchor_number: anchor,
                 origin: "https://app.example".to_string(),
-                id: vec![id],
                 expires_at_ns: None,
-                enqueued_at_ns: 0,
+                urgency: None,
             });
         }
         assert_eq!(buffer_len(), 5);
+        let drained: Vec<_> = std::iter::from_fn(take_next)
+            .map(|n| n.anchor_number)
+            .collect();
+        assert_eq!(drained, vec![1, 2, 3, 4, 5]);
     }
 }
