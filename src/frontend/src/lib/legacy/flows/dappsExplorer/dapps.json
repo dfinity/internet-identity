@@ -752,10 +752,10 @@
   },
   {
     "name": "Open Cloud",
-    "oneLiner": "A portal for provisioning Cloud Engines: a sovereign serverless cloud platform with tamperproof execution, safe upgrades, and horizontal auto-scaling.",
+    "oneLiner": "Sovereign cloud engines on the Internet Computer.",
     "website": "https://opencloud.org",
     "authOrigins": ["https://opencloud.org"],
-    "logo": "open_cloud_logo.png"
+    "logo": "open_cloud_logo.webp"
   },
   {
     "name": "CITADEL",
