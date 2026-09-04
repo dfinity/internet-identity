@@ -2,17 +2,26 @@
 
 ## Summary
 
-A dApp should not have to understand Web Push, keep its own delivery queue, or
-implement the protocol used by the II service worker. Its frontend asks II to
-offer notification consent as part of sign-in. Its origin declares which
-canisters may send on its behalf. Its backend gives a client library the
-notification campaigns it wants to send.
+A dApp integrates with II Web Push notifications as follows:
 
-The client library lives inside the dApp canister. It owns the durable campaign
-and pending-content state, exposes the query used by the II service worker, and
-handles batching, pacing, retries, and II buffer resets. The application owns
-the decision to create, update, or remove a notification. II owns consent,
-sender authorization, and delivery of a sealed, content-free ping.
+1. The app asks II to offer notification consent during sign-in by setting the
+   `iiNotifications` option in its `AuthClient` request.
+2. The app origin publishes a well-known document listing the canisters allowed
+   to send notifications and serve their content.
+3. The app backend includes the notification client and gives it a campaign: a
+   list of recipient principals and the notification content for each one.
+4. The client stores the content in the dApp canister, submits content-free
+   pings to II, and takes care of batching, pacing, retries, partial acceptance,
+   and recovery from II buffer resets.
+5. II checks the user's consent and the origin's sender declaration, then sends
+   a sealed ping to the user's subscribed devices.
+6. The ping wakes the II service worker. It calls the pull endpoint provided by
+   the client library in each sender canister, receives the current pending
+   content for the user, and reconciles the notifications shown on the device.
+
+The application owns the decision to create, update, or remove a notification.
+The client library owns the durable campaign and pending-content state. II owns
+consent, sender authorization, and delivery of the sealed, content-free ping.
 
 This document describes that integration boundary. The trust model and the II
 implementation are covered by [Web Push notifications](web-push-notifications.md).
