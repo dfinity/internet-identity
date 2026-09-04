@@ -1934,8 +1934,8 @@ impl<M: Memory + Clone> Storage<M> {
         // creation time is a guard: it stops a caller removing a session that replaced the
         // one it matched.
         let present = self
-            .reference_row(anchor_number, application_number)
-            .references()
+            .account_references(anchor_number, application_number)
+            .unwrap_or_default()
             .iter()
             .any(|reference| {
                 reference.account_number == account_number
@@ -2150,12 +2150,14 @@ impl<M: Memory + Clone> Storage<M> {
         account_number: Option<AccountNumber>,
         device_id: SessionDeviceId,
     ) -> Result<usize, StorageError> {
-        let ReferenceRow::Held(mut references) =
-            self.reference_row(anchor_number, application_number)
+        let Some(mut references) = self.account_references(anchor_number, application_number)
         else {
             return Ok(0);
         };
-        let Some(reference) = references.reference_mut(account_number) else {
+        let Some(reference) = references
+            .iter_mut()
+            .find(|reference| reference.account_number == account_number)
+        else {
             return Ok(0);
         };
         let dropped: Vec<SessionRecord> = reference

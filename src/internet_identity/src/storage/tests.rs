@@ -5610,7 +5610,7 @@ mod session_refresh_stamp_tests {
 }
 
 mod session_removal_tests {
-    use super::{held_references, ReferenceRow};
+    use super::held_references;
     use crate::storage::CreateSessionParams;
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
@@ -5695,8 +5695,8 @@ mod session_removal_tests {
             .unwrap();
 
         assert_ne!(
-            storage.reference_row(anchor_number, application_number),
-            ReferenceRow::Untouched
+            storage.account_references(anchor_number, application_number),
+            None
         );
     }
 }
