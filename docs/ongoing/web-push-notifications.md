@@ -142,15 +142,17 @@ The exact registration interface, limits, refresh rules, and migration from the 
 
 The dApp does not pass notification content to `notification_send`. After II resolves and authorizes the request, the encrypted Web Push payload sent to the device contains only the app origin.
 
-When the service worker receives the push event, it checks that the origin matches one for which consent and delivery state exist. It then authenticates to the dApp as the account that granted consent and fetches the full set of notifications currently pending for that principal.
+When the service worker receives the push event, it checks that the origin matches one for which consent and delivery state exist. The origin's well-known can authorize several sender canisters (section 3), and any of them may own content, so the service worker authenticates to each authorized canister as the account that granted consent and pulls the set of notifications currently pending for that principal. The pulls run concurrently, each bounded by its own timeout, so one slow or unreachable canister does not hold up the others.
 
-Each notification has a stable ID chosen by the dApp. The service worker compares the returned set with the browser notifications already shown for that origin:
+Each notification has a stable ID chosen by the dApp, unique only within its canister. The service worker reconciles per origin and canister against the browser notifications already shown:
 
 - New IDs are displayed.
 - Existing IDs are updated in place.
-- Notifications that are no longer returned by the dApp are closed.
+- IDs the canister no longer returns are closed.
 
-The notification ID is also used as the browser notification tag, which prevents repeated pulls from stacking duplicate notifications.
+The browser notification tag namespaces each notification by its owning canister and ID, so two canisters authorized for the same origin can reuse an ID without one replacing the other, and repeated pulls do not stack duplicates.
+
+Reconciliation runs only on an authoritative answer. An empty response closes every notification still shown for that canister. A canister that could not be reached is treated as unknown rather than empty, so its notifications stay in place instead of being cleared on a transient failure. When a cached sender fails, the service worker re-resolves the well-known once and closes anything a canister that has since been removed still shows.
 
 Carrying the content through II was rejected because it would allow II to read every notification and would make storage grow with notification traffic. Pulling the content keeps the dApp as the source of truth and leaves II with no inbox to retain or leak.
 
