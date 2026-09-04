@@ -1,4 +1,5 @@
 use crate::storage::account::Account;
+use crate::storage::storable::account_reference_list::StorableAccountReferenceList;
 use crate::storage::storable::application::StorableApplication;
 use crate::storage::{CreateAccountParams, ReadAccountParams, UpdateAccountParams};
 use crate::Storage;
@@ -507,7 +508,7 @@ fn should_not_read_a_default_account_from_an_empty_reference_list() {
     let app_num = storage.lookup_or_insert_application_number_with_origin(&origin);
     storage.stable_account_reference_list_memory.insert(
         (anchor_number, app_num),
-        vec![].into(), // Empty reference list
+        StorableAccountReferenceList::tombstone_for_testing(),
     );
 
     // 3. Try to read default account
