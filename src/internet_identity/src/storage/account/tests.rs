@@ -511,7 +511,9 @@ fn should_not_read_a_default_account_from_an_empty_reference_list() {
     let origin: FrontendHostname = "https://some.origin".to_string();
 
     // 2. Create application but with empty account reference list
-    let app_num = storage.lookup_or_insert_application_number_with_origin(&origin);
+    let app_num = storage
+        .lookup_or_insert_application_number_with_origin(&origin)
+        .unwrap();
     storage.stable_account_reference_list_memory.insert(
         (anchor_number, app_num),
         StorableAccountReferenceList::tombstone_for_testing(),
@@ -535,7 +537,9 @@ fn should_read_a_synthetic_default_account_when_no_reference_list_exists() {
 
     let anchor_number: AnchorNumber = 10_000;
     let origin: FrontendHostname = "https://some.origin".to_string();
-    let app_num = storage.lookup_or_insert_application_number_with_origin(&origin);
+    let app_num = storage
+        .lookup_or_insert_application_number_with_origin(&origin)
+        .unwrap();
 
     let default_account = storage
         .read_account(ReadAccountParams {

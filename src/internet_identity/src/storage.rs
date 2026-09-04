@@ -568,7 +568,7 @@ impl<M: Memory + Clone> Storage<M> {
             MinHeap::init(registration_current_rate_memory.clone())
                 .expect("failed to initialize registration current rate min heap"),
         );
-        let mut storage = Self {
+        Self {
             header,
             header_memory,
             anchor_memory,
@@ -687,27 +687,7 @@ impl<M: Memory + Clone> Storage<M> {
                 sso_stable_id_index_memory.clone(),
             ),
             sso_stable_id_index_memory: StableBTreeMap::init(sso_stable_id_index_memory),
-        };
-        storage.seed_application_number_allocator();
-        storage
-    }
-
-    /// Seeds the allocator from whichever is higher: the stored counter, or the row
-    /// count.
-    ///
-    /// The row count is a floor rather than the answer. It is exact only for data
-    /// written before this counter existed, where numbering was dense from zero.
-    /// Retiring an application removes its row without reissuing its number, so from
-    /// then on the count undershoots and only the stored counter is right — taking the
-    /// maximum is what keeps allocation monotonic across both.
-    fn seed_application_number_allocator(&mut self) {
-        let seeded = ApplicationNumber::max(
-            *self.next_application_number_memory.get(),
-            self.stable_application_memory.len(),
-        );
-        self.next_application_number_memory
-            .set(seeded)
-            .expect("failed to seed the application number allocator");
+        }
     }
 
     pub fn salt(&self) -> Option<&Salt> {
@@ -1539,42 +1519,74 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Look up an application number per origin, create entry in applications and lookup table if it doesn't exist
+    ///
+    /// Fails only where there is no number left to hand out, which
+    /// [`Self::allocate_application_number`] refuses rather than reissuing one.
     pub fn lookup_or_insert_application_number_with_origin(
         &mut self,
         origin: &FrontendHostname,
-    ) -> ApplicationNumber {
+    ) -> Result<ApplicationNumber, StorageError> {
         let origin_sha256 = StorableOriginSha256::from_origin(origin);
 
         if let Some(existing_number) = self
             .lookup_application_with_origin_memory
             .get(&origin_sha256)
         {
-            existing_number
-        } else {
-            let new_number = self.allocate_application_number();
-
-            // Update the source of truth.
-            self.lookup_application_with_origin_memory
-                .insert(origin_sha256, new_number);
-
-            let new_application = StorableApplication {
-                origin: origin.to_string(),
-                stored_accounts: 0u64,
-                stored_account_references: 0u64,
-            };
-
-            self.stable_application_memory
-                .insert(new_number, new_application);
-            new_number
+            return Ok(existing_number);
         }
+
+        let new_number = self.allocate_application_number()?;
+
+        // Update the source of truth.
+        self.lookup_application_with_origin_memory
+            .insert(origin_sha256, new_number);
+
+        let new_application = StorableApplication {
+            origin: origin.to_string(),
+            stored_accounts: 0u64,
+            stored_account_references: 0u64,
+        };
+
+        self.stable_application_memory
+            .insert(new_number, new_application);
+
+        Ok(new_number)
     }
 
-    fn allocate_application_number(&mut self) -> ApplicationNumber {
-        let new_number = *self.next_application_number_memory.get();
+    /// Hands out an application number that no live application holds and no retired
+    /// one ever held.
+    ///
+    /// The counter is what guarantees that: it only ever climbs, so a number it has
+    /// passed is never offered again even after the application's row is retired. Its
+    /// value is not the whole answer only because it postdates the applications
+    /// numbered before it existed, so the highest stored number is taken as a floor —
+    /// exact, unlike a row count, which a retirement leaves undershooting. It cannot be
+    /// the answer on its own either: removing the highest row walks it backwards.
+    ///
+    /// Refuses at the ceiling rather than saturating. The number keys both the
+    /// application row and the origin index, so reissuing one would put two origins on
+    /// a single row and have them share its accounts and counters.
+    fn allocate_application_number(&mut self) -> Result<ApplicationNumber, StorageError> {
+        let above_highest_stored = match self.stable_application_memory.last_key_value() {
+            Some((highest, _)) => highest
+                .checked_add(1)
+                .ok_or(StorageError::ApplicationsCounterOverflow)?,
+            None => 0,
+        };
+        let new_number = ApplicationNumber::max(
+            *self.next_application_number_memory.get(),
+            above_highest_stored,
+        );
+
         self.next_application_number_memory
-            .set(new_number + 1)
-            .expect("failed to advance the application number allocator");
-        new_number
+            .set(
+                new_number
+                    .checked_add(1)
+                    .ok_or(StorageError::ApplicationsCounterOverflow)?,
+            )
+            .map_err(|_| StorageError::ErrorUpdatingApplicationNumberAllocator)?;
+
+        Ok(new_number)
     }
 
     pub fn lookup_application_number_with_origin(
@@ -1681,7 +1693,8 @@ impl<M: Memory + Clone> Storage<M> {
         now: Timestamp,
     ) -> Result<(), StorageError> {
         if account_number.is_none() {
-            let application_number = self.lookup_or_insert_application_number_with_origin(&origin);
+            let application_number =
+                self.lookup_or_insert_application_number_with_origin(&origin)?;
             self.ensure_account_reference_list(anchor_number, application_number)?;
         }
         self.stamp_account_reference(anchor_number, &origin, account_number, now)
@@ -2345,7 +2358,7 @@ impl<M: Memory + Clone> Storage<M> {
             .insert(account_number, storable_account);
 
         // Update application data
-        let application_number = self.lookup_or_insert_application_number_with_origin(origin);
+        let application_number = self.lookup_or_insert_application_number_with_origin(origin)?;
 
         // last_used will be set once the user signs in with the account.
         let last_used = None;
@@ -2612,7 +2625,7 @@ impl<M: Memory + Clone> Storage<M> {
             .insert(new_account_number, storable_account.clone());
 
         // Get or create an application number from the account's origin.
-        let application_number = self.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = self.lookup_or_insert_application_number_with_origin(&origin)?;
 
         // Update default account in the (anchor, origin) config.
         {
@@ -3111,6 +3124,11 @@ pub enum StorageError {
     ErrorUpdatingAccountCounter,
     SaltNotSet,
     AccountsCounterOverflow,
+    /// No application numbers left to hand out. Refused rather than saturated: the
+    /// number keys the application row and the origin index, so reissuing one would
+    /// put two origins on a single row.
+    ApplicationsCounterOverflow,
+    ErrorUpdatingApplicationNumberAllocator,
     /// The references a write assembled cannot be stored as they stand.
     UnstorableAccountReferenceList {
         anchor_number: AnchorNumber,
@@ -3192,6 +3210,12 @@ impl fmt::Display for StorageError {
                 "the salt is not set, so an account principal cannot be derived"
             ),
             Self::AccountsCounterOverflow => write!(f, "No account numbers left to allocate"),
+            Self::ApplicationsCounterOverflow => {
+                write!(f, "No application numbers left to allocate")
+            }
+            Self::ErrorUpdatingApplicationNumberAllocator => {
+                write!(f, "Error updating the application number allocator")
+            }
             Self::UnstorableAccountReferenceList {
                 anchor_number,
                 application_number,
