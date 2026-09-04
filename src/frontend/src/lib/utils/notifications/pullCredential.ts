@@ -29,6 +29,10 @@ const CREDENTIAL_STORE = createStore("ii-notification-credentials", "keys");
 // anchor, so it's cached separately and refreshed on a TTL / on pull failure —
 // a canister-id change then self-heals without re-consent.
 const CANISTER_STORE = createStore("ii-notification-canisters", "keys");
+// Notifications the user has already dismissed on this device, so a pull that
+// still finds them pending (the dApp evicts on its own cycle) does not re-raise
+// them. Keyed by origin, holding the dismissed notifications' tags.
+const DISMISSED_STORE = createStore("ii-notification-dismissed", "keys");
 
 export interface NotificationCredentialRecord {
   /** dApp origin, keyed on and also the routing target the SW pulls for. */
@@ -110,7 +114,27 @@ export const purgeNotificationCredential = async (
 ): Promise<void> => {
   await idbDel(origin, CREDENTIAL_STORE);
   await idbDel(origin, CANISTER_STORE);
+  await idbDel(origin, DISMISSED_STORE);
 };
+
+/** Tags the user has dismissed for `origin`, so they are not re-raised. */
+export const loadDismissed = async (origin: string): Promise<string[]> =>
+  (await idbGet(origin, DISMISSED_STORE)) ?? [];
+
+/** Records that the user dismissed `tag` for `origin`. */
+export const addDismissed = async (
+  origin: string,
+  tag: string,
+): Promise<void> => {
+  const tags = await loadDismissed(origin);
+  if (!tags.includes(tag)) {
+    await idbSet(origin, [...tags, tag], DISMISSED_STORE);
+  }
+};
+
+/** Replaces the dismissed set for `origin`, e.g. to drop tags no longer pending. */
+export const setDismissed = (origin: string, tags: string[]): Promise<void> =>
+  idbSet(origin, tags, DISMISSED_STORE);
 
 export interface CachedCanisters {
   /** Every sender the origin's well-known named, not just the first. */

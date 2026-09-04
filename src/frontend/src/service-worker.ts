@@ -14,10 +14,13 @@ import { Actor, HttpAgent, type Identity } from "@icp-sdk/core/agent";
 import { IDL } from "@icp-sdk/core/candid";
 import { Principal } from "@icp-sdk/core/principal";
 import {
+  addDismissed,
   cacheCanisters,
   loadCachedCanisters,
+  loadDismissed,
   loadNotificationCredential,
   notificationIdentity,
+  setDismissed,
 } from "$lib/utils/notifications/pullCredential";
 import {
   reconcile,
@@ -35,8 +38,17 @@ const CANISTER_TTL_MS = 24 * 60 * 60 * 1000;
 // on timeout the canister is treated as unknown and its notifications are kept.
 const PULL_TIMEOUT_MS = 8_000;
 
+// The dApp side of `ii_pending_notifications` (see the dApp interface in the
+// notification client): `Notification { id: blob; title; body; url; created_at }`.
+interface WirePending {
+  id: Uint8Array | number[];
+  title: string;
+  body: string;
+  url: [] | [string];
+  created_at: bigint;
+}
 interface PullService {
-  ii_pending_notifications: () => Promise<PulledNotification[]>;
+  ii_pending_notifications: () => Promise<WirePending[]>;
 }
 const pullIdl: IDL.InterfaceFactory = ({ IDL }) =>
   IDL.Service({
@@ -45,9 +57,11 @@ const pullIdl: IDL.InterfaceFactory = ({ IDL }) =>
       [
         IDL.Vec(
           IDL.Record({
-            id: IDL.Text,
+            id: IDL.Vec(IDL.Nat8),
             title: IDL.Text,
-            body: IDL.Opt(IDL.Text),
+            body: IDL.Text,
+            url: IDL.Opt(IDL.Text),
+            created_at: IDL.Nat64,
           }),
         ),
       ],
@@ -63,10 +77,21 @@ sw.addEventListener("push", (event) => {
 });
 
 sw.addEventListener("notificationclick", (event) => {
+  const data = event.notification.data as {
+    origin?: string;
+    url?: string;
+  } | null;
+  const tag = event.notification.tag;
+  event.notification.close();
+  event.waitUntil(handleClick(data?.origin, data?.url, tag));
+});
+
+// A dismissed notification is not re-shown, so opening one has to record the
+// dismissal too, not just close it.
+sw.addEventListener("notificationclose", (event) => {
   const origin = (event.notification.data as { origin?: string } | null)
     ?.origin;
-  event.notification.close();
-  event.waitUntil(openApp(origin));
+  event.waitUntil(rememberDismissed(origin, event.notification.tag));
 });
 
 sw.addEventListener("pushsubscriptionchange", (event) => {
@@ -108,8 +133,20 @@ const handlePush = async (payload: unknown): Promise<void> => {
   }
 
   // At least one sender answered: reconcile per canister. Unknown senders in the
-  // set are left alone by `reconcile`.
-  await reconcile(sw.registration, origin as string, results as CanisterPull[]);
+  // set are left alone by `reconcile`, which also skips anything the user has
+  // dismissed and hands back the dismissals to forget.
+  const knownOrigin = origin as string;
+  const dismissed = new Set(await loadDismissed(knownOrigin));
+  const forget = await reconcile(
+    sw.registration,
+    knownOrigin,
+    results as CanisterPull[],
+    dismissed,
+  );
+  if (forget.length > 0) {
+    for (const tag of forget) dismissed.delete(tag);
+    await setDismissed(knownOrigin, [...dismissed]);
+  }
 };
 
 const originOf = (payload: unknown): string | undefined => {
@@ -197,8 +234,19 @@ const pullFrom = async (
     shouldFetchRootKey: isLocalHost(host),
   });
   const actor = Actor.createActor<PullService>(pullIdl, { agent, canisterId });
-  return actor.ii_pending_notifications();
+  const pending = await actor.ii_pending_notifications();
+  return pending.map((notification) => ({
+    id: toHex(notification.id),
+    title: notification.title,
+    body: notification.body,
+    url: notification.url[0],
+  }));
 };
+
+// The dApp's blob id rendered as hex, so it can key the tag, the shown-set, and
+// the dismissed-set as a string.
+const toHex = (bytes: Uint8Array | number[]): string =>
+  Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 
 // The senders come from the consented origin's own well-known, never from the
 // ping (a forged ping can only name an origin II already sealed for). They're
@@ -301,13 +349,43 @@ const withTimeout = <T>(
 const isLocalHost = (host: string): boolean =>
   host.includes("localhost") || host.includes("127.0.0.1");
 
-const openApp = async (origin: string | undefined): Promise<void> => {
-  const url = origin ?? "/";
+const handleClick = async (
+  origin: string | undefined,
+  url: string | undefined,
+  tag: string,
+): Promise<void> => {
+  await rememberDismissed(origin, tag);
+  await openApp(origin, url);
+};
+
+// Records a dismissal for the notifications the reconcile loop tracks. The
+// generic fallback (tag `ii-notification`, no canister prefix) is not tracked,
+// so it is left out.
+const rememberDismissed = async (
+  origin: string | undefined,
+  tag: string,
+): Promise<void> => {
+  if (origin !== undefined && tag.includes(" ")) {
+    await addDismissed(origin, tag);
+  }
+};
+
+const openApp = async (
+  origin: string | undefined,
+  url?: string,
+): Promise<void> => {
+  const base = origin ?? "/";
+  // Only follow a deep link that stays within the consented origin; the url
+  // comes from pulled content and must not navigate off it.
+  const target =
+    url !== undefined && origin !== undefined && url.startsWith(origin)
+      ? url
+      : base;
   const windows = await sw.clients.matchAll({ type: "window" });
-  const existing = windows.find((client) => client.url.startsWith(url));
+  const existing = windows.find((client) => client.url.startsWith(base));
   if (existing !== undefined) {
     await existing.focus();
     return;
   }
-  await sw.clients.openWindow(url);
+  await sw.clients.openWindow(target);
 };

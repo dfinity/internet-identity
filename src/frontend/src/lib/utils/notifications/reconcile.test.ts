@@ -11,7 +11,12 @@ const B = "canister-b";
 
 interface FakeNotification {
   tag: string;
-  data: { origin?: string; canister?: string; id?: string } | null;
+  data: {
+    origin?: string;
+    canister?: string;
+    id?: string;
+    url?: string;
+  } | null;
   close: ReturnType<typeof vi.fn>;
 }
 
@@ -28,7 +33,7 @@ const shownNotification = (
 const pending = (id: string): PulledNotification => ({
   id,
   title: `title-${id}`,
-  body: [`body-${id}`],
+  body: `body-${id}`,
 });
 
 const known = (canister: string, ...ids: string[]): CanisterPull => ({
@@ -56,7 +61,7 @@ describe("reconcile", () => {
     const kept = shownNotification(A, "b", ORIGIN);
     const { registration } = fakeRegistration([stale, kept]);
 
-    await reconcile(registration, ORIGIN, [known(A, "b")]);
+    await reconcile(registration, ORIGIN, [known(A, "b")], new Set());
 
     expect(stale.close).toHaveBeenCalledOnce();
     expect(kept.close).not.toHaveBeenCalled();
@@ -67,7 +72,12 @@ describe("reconcile", () => {
     const two = shownNotification(A, "b", ORIGIN);
     const { registration, showNotification } = fakeRegistration([one, two]);
 
-    await reconcile(registration, ORIGIN, [{ canister: A, pulled: [] }]);
+    await reconcile(
+      registration,
+      ORIGIN,
+      [{ canister: A, pulled: [] }],
+      new Set(),
+    );
 
     expect(one.close).toHaveBeenCalledOnce();
     expect(two.close).toHaveBeenCalledOnce();
@@ -79,7 +89,12 @@ describe("reconcile", () => {
     const noOrigin = shownNotification(A, "b", undefined);
     const { registration } = fakeRegistration([otherApp, noOrigin]);
 
-    await reconcile(registration, ORIGIN, [{ canister: A, pulled: [] }]);
+    await reconcile(
+      registration,
+      ORIGIN,
+      [{ canister: A, pulled: [] }],
+      new Set(),
+    );
 
     expect(otherApp.close).not.toHaveBeenCalled();
     expect(noOrigin.close).not.toHaveBeenCalled();
@@ -90,7 +105,12 @@ describe("reconcile", () => {
     const { registration } = fakeRegistration([otherCanister]);
 
     // A is reconciled to empty; B is not in the results at all.
-    await reconcile(registration, ORIGIN, [{ canister: A, pulled: [] }]);
+    await reconcile(
+      registration,
+      ORIGIN,
+      [{ canister: A, pulled: [] }],
+      new Set(),
+    );
 
     expect(otherCanister.close).not.toHaveBeenCalled();
   });
@@ -98,7 +118,7 @@ describe("reconcile", () => {
   it("shows each pending notification tagged by canister and id", async () => {
     const { registration, showNotification } = fakeRegistration([]);
 
-    await reconcile(registration, ORIGIN, [known(A, "x", "y")]);
+    await reconcile(registration, ORIGIN, [known(A, "x", "y")], new Set());
 
     expect(showNotification).toHaveBeenCalledTimes(2);
     expect(showNotification).toHaveBeenCalledWith(
@@ -106,7 +126,7 @@ describe("reconcile", () => {
       expect.objectContaining({
         body: "body-x",
         tag: `${A} x`,
-        data: { origin: ORIGIN, canister: A, id: "x" },
+        data: { origin: ORIGIN, canister: A, id: "x", url: undefined },
       }),
     );
     expect(showNotification).toHaveBeenCalledWith(
@@ -115,11 +135,35 @@ describe("reconcile", () => {
     );
   });
 
+  it("carries a url through to the notification data", async () => {
+    const { registration, showNotification } = fakeRegistration([]);
+    const withUrl: CanisterPull = {
+      canister: A,
+      pulled: [
+        { id: "x", title: "t", body: "b", url: "https://app.example/deep" },
+      ],
+    };
+
+    await reconcile(registration, ORIGIN, [withUrl], new Set());
+
+    expect(showNotification).toHaveBeenCalledWith(
+      "t",
+      expect.objectContaining({
+        data: {
+          origin: ORIGIN,
+          canister: A,
+          id: "x",
+          url: "https://app.example/deep",
+        },
+      }),
+    );
+  });
+
   it("re-showing the same canister and id replaces in place (same tag)", async () => {
     const existing = shownNotification(A, "x", ORIGIN);
     const { registration, showNotification } = fakeRegistration([existing]);
 
-    await reconcile(registration, ORIGIN, [known(A, "x")]);
+    await reconcile(registration, ORIGIN, [known(A, "x")], new Set());
 
     expect(existing.close).not.toHaveBeenCalled();
     expect(showNotification).toHaveBeenCalledOnce();
@@ -132,21 +176,26 @@ describe("reconcile", () => {
   it("two canisters may use the same id without replacing each other", async () => {
     const { registration, showNotification } = fakeRegistration([]);
 
-    await reconcile(registration, ORIGIN, [known(A, "dup"), known(B, "dup")]);
+    await reconcile(
+      registration,
+      ORIGIN,
+      [known(A, "dup"), known(B, "dup")],
+      new Set(),
+    );
 
     expect(showNotification).toHaveBeenCalledTimes(2);
     expect(showNotification).toHaveBeenCalledWith(
       "title-dup",
       expect.objectContaining({
         tag: `${A} dup`,
-        data: { origin: ORIGIN, canister: A, id: "dup" },
+        data: { origin: ORIGIN, canister: A, id: "dup", url: undefined },
       }),
     );
     expect(showNotification).toHaveBeenCalledWith(
       "title-dup",
       expect.objectContaining({
         tag: `${B} dup`,
-        data: { origin: ORIGIN, canister: B, id: "dup" },
+        data: { origin: ORIGIN, canister: B, id: "dup", url: undefined },
       }),
     );
   });
@@ -160,13 +209,61 @@ describe("reconcile", () => {
     ]);
 
     // A could not be reached (unknown); B answered empty.
-    await reconcile(registration, ORIGIN, [
-      unknown(A),
-      { canister: B, pulled: [] },
-    ]);
+    await reconcile(
+      registration,
+      ORIGIN,
+      [unknown(A), { canister: B, pulled: [] }],
+      new Set(),
+    );
 
     expect(keptOnUnknown.close).not.toHaveBeenCalled();
     expect(staleOnKnown.close).toHaveBeenCalledOnce();
     expect(showNotification).not.toHaveBeenCalled();
+  });
+
+  it("does not re-show a notification the user has dismissed", async () => {
+    const { registration, showNotification } = fakeRegistration([]);
+
+    await reconcile(
+      registration,
+      ORIGIN,
+      [known(A, "x", "y")],
+      new Set([`${A} x`]),
+    );
+
+    // x is dismissed, so only y is shown.
+    expect(showNotification).toHaveBeenCalledOnce();
+    expect(showNotification).toHaveBeenCalledWith(
+      "title-y",
+      expect.objectContaining({ tag: `${A} y` }),
+    );
+  });
+
+  it("reports a dismissed tag to forget once its canister stops listing it", async () => {
+    const { registration } = fakeRegistration([]);
+
+    const forget = await reconcile(
+      registration,
+      ORIGIN,
+      [known(A, "still")],
+      new Set([`${A} gone`, `${A} still`]),
+    );
+
+    // The dismissed "gone" is no longer pending, so it is forgotten; "still" is
+    // still pending, so it is kept.
+    expect(forget).toEqual([`${A} gone`]);
+  });
+
+  it("does not forget a dismissal for a canister that did not answer", async () => {
+    const { registration } = fakeRegistration([]);
+
+    const forget = await reconcile(
+      registration,
+      ORIGIN,
+      [unknown(A)],
+      new Set([`${A} x`]),
+    );
+
+    expect(forget).toEqual([]);
   });
 });
