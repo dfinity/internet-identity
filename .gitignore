@@ -3,7 +3,10 @@
 .idea/
 **/*~
 .windsurf/
-.claude/
+# Agent rules under .claude/rules/ are checked in; everything else Claude Code
+# writes there (settings.local.json, worktrees, shell snapshots) is local state.
+.claude/*
+!.claude/rules/
 
 # Mac OSX temporary files
 .DS_Store
