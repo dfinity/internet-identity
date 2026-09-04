@@ -733,7 +733,9 @@ mod application_lookup_tests {
         let mut storage = Storage::new((10, 20), VectorMemory::default());
         let origin = "https://example.com".to_string();
 
-        let app_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let app_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         // Should create application number 0 for first application
         assert_eq!(app_number, 0);
@@ -756,10 +758,14 @@ mod application_lookup_tests {
         let origin = "https://example.com".to_string();
 
         // Create application first time
-        let app_number1 = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let app_number1 = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         // Should return same application number on second call
-        let app_number2 = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let app_number2 = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         assert_eq!(app_number1, app_number2);
         assert_eq!(app_number1, 0);
@@ -773,9 +779,15 @@ mod application_lookup_tests {
         let origin2 = "https://different.com".to_string();
         let origin3 = "https://another.org".to_string();
 
-        let app_num1 = storage.lookup_or_insert_application_number_with_origin(&origin1);
-        let app_num2 = storage.lookup_or_insert_application_number_with_origin(&origin2);
-        let app_num3 = storage.lookup_or_insert_application_number_with_origin(&origin3);
+        let app_num1 = storage
+            .lookup_or_insert_application_number_with_origin(&origin1)
+            .unwrap();
+        let app_num2 = storage
+            .lookup_or_insert_application_number_with_origin(&origin2)
+            .unwrap();
+        let app_num3 = storage
+            .lookup_or_insert_application_number_with_origin(&origin3)
+            .unwrap();
 
         assert_eq!(app_num1, 0);
         assert_eq!(app_num2, 1);
@@ -799,7 +811,9 @@ mod application_lookup_tests {
 
         let long_origin = format!("https://{}.com", "a".repeat(20_000));
 
-        let app_number = storage.lookup_or_insert_application_number_with_origin(&long_origin);
+        let app_number = storage
+            .lookup_or_insert_application_number_with_origin(&long_origin)
+            .unwrap();
         assert_eq!(app_number, 0);
 
         // Should be findable in both maps
@@ -821,7 +835,9 @@ mod application_lookup_tests {
         ];
 
         for (i, origin) in origins.iter().enumerate() {
-            let app_number = storage.lookup_or_insert_application_number_with_origin(origin);
+            let app_number = storage
+                .lookup_or_insert_application_number_with_origin(origin)
+                .unwrap();
             assert_eq!(app_number, i as u64);
 
             // Total application count should increment
@@ -837,7 +853,9 @@ mod application_lookup_tests {
         // Create storage and add application
         {
             let mut storage = Storage::new((10, 20), memory.clone());
-            let app_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+            let app_number = storage
+                .lookup_or_insert_application_number_with_origin(&origin)
+                .unwrap();
             assert_eq!(app_number, 0);
         }
 
@@ -2261,7 +2279,9 @@ mod reference_list_write_path_tests {
     fn a_refused_default_account_rename_leaves_nothing_behind() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
         // A list with no default reference: the default was removed, so there is nothing
         // for a rename to name.
         storage
@@ -2300,7 +2320,9 @@ mod reference_list_write_path_tests {
     fn refuses_a_counter_delta_that_would_underflow_without_writing_anything() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
         let default_reference = AccountReference {
             account_number: None,
             last_used: None,
@@ -2352,7 +2374,9 @@ mod reference_list_write_path_tests {
     fn the_two_counts_move_independently_and_the_refusal_says_which_one_failed() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
         let default_reference = AccountReference::new(None, None);
         let named_reference = AccountReference::new(Some(1), None);
         storage
@@ -2388,7 +2412,9 @@ mod reference_list_write_path_tests {
         // however the caller assembled it.
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         let result = storage.write_reference_list(anchor_number, application_number, vec![]);
 
@@ -2437,7 +2463,9 @@ mod reference_list_write_path_tests {
     fn a_zero_delta_write_still_requires_a_live_application() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
         let references = vec![AccountReference::new(Some(1), None)];
         storage
             .write_reference_list(anchor_number, application_number, references.clone())
@@ -2458,7 +2486,9 @@ mod reference_list_write_path_tests {
     fn derives_counters_from_added_references() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         storage
             .write_reference_list(
@@ -2491,7 +2521,9 @@ mod reference_list_write_path_tests {
     fn materializing_a_default_moves_only_the_account_counter() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         storage
             .write_reference_list(
@@ -2521,7 +2553,9 @@ mod reference_list_write_path_tests {
     fn rewriting_an_unchanged_list_leaves_counters_alone() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
         let references = vec![AccountReference::new(Some(1), None)];
 
         storage
@@ -2606,7 +2640,9 @@ mod account_reference_state_tests {
     /// needs a tombstone has to write it directly.
     fn plant_tombstone(storage: &mut Storage<VectorMemory>, anchor_number: AnchorNumber) {
         let origin = ORIGIN.to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
         storage.stable_account_reference_list_memory.insert(
             (anchor_number, application_number),
             StorableAccountReferenceList::tombstone_for_testing(),
@@ -2915,12 +2951,15 @@ mod application_number_allocator_tests {
     fn allocates_dense_numbers_from_zero() {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
 
-        let first =
-            storage.lookup_or_insert_application_number_with_origin(&"https://a.com".into());
-        let second =
-            storage.lookup_or_insert_application_number_with_origin(&"https://b.com".into());
-        let third =
-            storage.lookup_or_insert_application_number_with_origin(&"https://c.com".into());
+        let first = storage
+            .lookup_or_insert_application_number_with_origin(&"https://a.com".into())
+            .unwrap();
+        let second = storage
+            .lookup_or_insert_application_number_with_origin(&"https://b.com".into())
+            .unwrap();
+        let third = storage
+            .lookup_or_insert_application_number_with_origin(&"https://c.com".into())
+            .unwrap();
 
         assert_eq!((first, second, third), (0, 1, 2));
     }
@@ -2930,15 +2969,19 @@ mod application_number_allocator_tests {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         let origin = "https://a.com".to_string();
 
-        let first = storage.lookup_or_insert_application_number_with_origin(&origin);
-        let again = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let first = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
+        let again = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         assert_eq!(first, again);
         assert_eq!(storage.get_total_application_count(), 1);
     }
 
     #[test]
-    fn seeds_past_applications_written_before_the_allocator_existed() {
+    fn takes_past_applications_written_before_the_allocator_existed_into_account() {
         let memory = VectorMemory::default();
         let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
         for (number, origin) in [
@@ -2954,28 +2997,66 @@ mod application_number_allocator_tests {
         storage.flush();
 
         let mut storage = Storage::from_memory(memory);
-        let next = storage.lookup_or_insert_application_number_with_origin(&"https://d.com".into());
+        let next = storage
+            .lookup_or_insert_application_number_with_origin(&"https://d.com".into())
+            .unwrap();
 
         assert_eq!(next, 3);
+    }
+
+    #[test]
+    fn a_gap_below_the_highest_number_is_not_handed_out_again() {
+        let memory = VectorMemory::default();
+        let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+        for (number, origin) in [
+            (0, "https://a.com"),
+            (1, "https://b.com"),
+            (2, "https://c.com"),
+        ] {
+            storage
+                .stable_application_memory
+                .insert(number, application(origin));
+        }
+        // The rows now have a hole in them while the counter knows nothing, which is
+        // the one state a row count gets wrong: it would answer 2, the number
+        // `https://c.com` still holds.
+        storage.stable_application_memory.remove(&0);
+        storage.next_application_number_memory.set(0).unwrap();
+        storage.flush();
+
+        let mut storage = Storage::from_memory(memory);
+        let next = storage
+            .lookup_or_insert_application_number_with_origin(&"https://d.com".into())
+            .unwrap();
+
+        assert_eq!(next, 3);
+        assert_eq!(
+            storage.stable_application_memory.get(&2).unwrap().origin,
+            "https://c.com"
+        );
     }
 
     #[test]
     fn never_reissues_the_number_of_a_removed_application() {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         for origin in ["https://a.com", "https://b.com", "https://c.com"] {
-            storage.lookup_or_insert_application_number_with_origin(&origin.into());
+            storage
+                .lookup_or_insert_application_number_with_origin(&origin.into())
+                .unwrap();
         }
 
         storage.stable_application_memory.remove(&1);
 
-        let next = storage.lookup_or_insert_application_number_with_origin(&"https://d.com".into());
+        let next = storage
+            .lookup_or_insert_application_number_with_origin(&"https://d.com".into())
+            .unwrap();
 
         assert_eq!(next, 3);
         assert!(storage.stable_application_memory.get(&2).is_some());
     }
 
     #[test]
-    fn reseeding_after_a_removal_does_not_lower_the_allocator() {
+    fn a_removal_does_not_lower_the_allocator_across_an_upgrade() {
         let memory = VectorMemory::default();
         let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
         for origin in [
@@ -2984,7 +3065,9 @@ mod application_number_allocator_tests {
             "https://c.com",
             "https://d.com",
         ] {
-            storage.lookup_or_insert_application_number_with_origin(&origin.into());
+            storage
+                .lookup_or_insert_application_number_with_origin(&origin.into())
+                .unwrap();
         }
         storage.flush();
         storage.stable_application_memory.remove(&1);
@@ -2992,7 +3075,9 @@ mod application_number_allocator_tests {
         assert_eq!(storage.stable_application_memory.len(), 2);
 
         let mut storage = Storage::from_memory(memory.clone());
-        let next = storage.lookup_or_insert_application_number_with_origin(&"https://e.com".into());
+        let next = storage
+            .lookup_or_insert_application_number_with_origin(&"https://e.com".into())
+            .unwrap();
 
         assert_eq!(next, 4);
         assert_eq!(
@@ -3002,7 +3087,9 @@ mod application_number_allocator_tests {
 
         let mut storage = Storage::from_memory(memory);
         assert_eq!(
-            storage.lookup_or_insert_application_number_with_origin(&"https://f.com".into()),
+            storage
+                .lookup_or_insert_application_number_with_origin(&"https://f.com".into())
+                .unwrap(),
             5
         );
     }
@@ -3012,7 +3099,9 @@ mod application_number_allocator_tests {
         let memory = VectorMemory::default();
         let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
         for origin in ["https://a.com", "https://b.com", "https://c.com"] {
-            storage.lookup_or_insert_application_number_with_origin(&origin.into());
+            storage
+                .lookup_or_insert_application_number_with_origin(&origin.into())
+                .unwrap();
         }
         storage.next_application_number_memory.set(0).unwrap();
         storage.flush();
@@ -3020,7 +3109,9 @@ mod application_number_allocator_tests {
         let mut storage = Storage::from_memory(memory);
         storage.stable_application_memory.remove(&0);
 
-        let next = storage.lookup_or_insert_application_number_with_origin(&"https://d.com".into());
+        let next = storage
+            .lookup_or_insert_application_number_with_origin(&"https://d.com".into())
+            .unwrap();
 
         assert_eq!(next, 3);
         assert_eq!(
@@ -3053,7 +3144,9 @@ mod default_account_tracking_tests {
         let origin = "https://example.com".to_string();
         // Another identity reached this origin first, so the application is known
         // while this identity has no reference list there.
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         storage
             .record_account_use(anchor_number, origin, None, 1_000)
@@ -3069,7 +3162,9 @@ mod default_account_tracking_tests {
     fn recording_a_named_account_never_creates_a_reference() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         storage
             .record_account_use(anchor_number, origin, Some(7), 1_000)
@@ -3129,7 +3224,9 @@ mod default_account_tracking_tests {
     fn tracking_does_not_recreate_a_default_that_was_given_away() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
         storage
             .write_reference_list(
                 anchor_number,
@@ -3176,7 +3273,9 @@ mod default_account_tracking_tests {
     fn a_config_row_implies_a_reference_list_row() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         storage
             .ensure_account_reference_list(anchor_number, application_number)
@@ -3192,7 +3291,9 @@ mod default_account_tracking_tests {
     fn ensuring_a_reference_list_does_not_disturb_an_existing_one() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
         storage
             .record_account_use(anchor_number, origin, None, 7_000)
             .unwrap();
@@ -3274,8 +3375,9 @@ mod tracked_default_eviction_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
 
         for index in 0..MAX_EVICTABLE_DEFAULT_ACCOUNTS * 2 {
-            let application_number =
-                storage.lookup_or_insert_application_number_with_origin(&origin_of(index));
+            let application_number = storage
+                .lookup_or_insert_application_number_with_origin(&origin_of(index))
+                .unwrap();
             storage
                 .ensure_account_reference_list(anchor_number, application_number)
                 .unwrap();
@@ -3314,8 +3416,9 @@ mod tracked_default_eviction_tests {
     fn one_call_evicts_at_most_a_bounded_batch() {
         let (mut storage, anchor_number) = storage_with_anchor();
         for index in 0..MAX_EVICTABLE_DEFAULT_ACCOUNTS * 3 {
-            let application_number =
-                storage.lookup_or_insert_application_number_with_origin(&origin_of(index));
+            let application_number = storage
+                .lookup_or_insert_application_number_with_origin(&origin_of(index))
+                .unwrap();
             storage
                 .write_reference_list(
                     anchor_number,
@@ -3363,8 +3466,9 @@ mod tracked_default_eviction_tests {
     fn a_never_used_default_is_evicted_before_a_used_one() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let never_used_origin = "https://never-used.com".to_string();
-        let never_used_application =
-            storage.lookup_or_insert_application_number_with_origin(&never_used_origin);
+        let never_used_application = storage
+            .lookup_or_insert_application_number_with_origin(&never_used_origin)
+            .unwrap();
         storage
             .ensure_account_reference_list(anchor_number, never_used_application)
             .unwrap();
@@ -3407,7 +3511,9 @@ mod tracked_default_eviction_tests {
     fn eviction_removes_the_config_row_and_the_counters_follow() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
         storage
             .record_account_use(anchor_number, origin.clone(), None, 1_000)
             .unwrap();
@@ -3449,7 +3555,9 @@ mod tracked_default_eviction_tests {
     fn eviction_is_an_exact_round_trip() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         storage
             .record_account_use(anchor_number, origin.clone(), None, 1_000)
@@ -3490,7 +3598,9 @@ mod tracked_default_eviction_tests {
     fn removing_a_row_that_does_not_exist_is_a_no_op() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         storage
             .remove_reference_list(anchor_number, application_number)
@@ -3574,7 +3684,9 @@ mod tracked_default_eviction_tests {
     fn a_default_reference_survives_when_only_named_accounts_are_evictable_candidates() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
         storage
             .write_reference_list(
                 anchor_number,
@@ -3797,7 +3909,9 @@ mod application_removal_tests {
     fn a_tombstone_is_never_pruned() {
         let (mut storage, anchor_number, _) = storage_with_anchors();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
         // Taking the row away would make the moved-away default reconstructible again,
         // which is the one thing the tombstone exists to prevent.
         storage.stable_account_reference_list_memory.insert(
@@ -3819,7 +3933,9 @@ mod application_removal_tests {
     fn removal_leaves_no_config_row_behind() {
         let (mut storage, anchor_number, _) = storage_with_anchors();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
         // A lone tracked default, which is the only thing a row may be retired for.
         storage
             .ensure_account_reference_list(anchor_number, application_number)
@@ -4094,7 +4210,9 @@ mod account_principal_index_tests {
         let anchor_number = anchor.anchor_number();
         storage.write(anchor).unwrap();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         let result = storage.write_reference_list(
             anchor_number,
@@ -4196,7 +4314,8 @@ mod account_principal_index_backfill_tests {
             storage.write(anchor).unwrap();
             anchors.push(anchor_number);
             let application_number = storage
-                .lookup_or_insert_application_number_with_origin(&format!("https://d-{index}.com"));
+                .lookup_or_insert_application_number_with_origin(&format!("https://d-{index}.com"))
+                .unwrap();
             storage
                 .write_reference_list(
                     anchor_number,
@@ -4415,8 +4534,10 @@ mod session_record_tests {
     #[test]
     fn a_row_holding_a_session_is_evictable_like_any_other() {
         let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://has-a-session.com".to_string();
         let application_number = storage
-            .lookup_or_insert_application_number_with_origin(&"https://example.com".to_string());
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
         storage
             .write_reference_list(
                 anchor_number,
@@ -4439,9 +4560,12 @@ mod session_record_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let stale = "https://never-came-back.com".to_string();
         let refreshed = "https://still-in-use.com".to_string();
-        let stale_application = storage.lookup_or_insert_application_number_with_origin(&stale);
-        let refreshed_application =
-            storage.lookup_or_insert_application_number_with_origin(&refreshed);
+        let stale_application = storage
+            .lookup_or_insert_application_number_with_origin(&stale)
+            .unwrap();
+        let refreshed_application = storage
+            .lookup_or_insert_application_number_with_origin(&refreshed)
+            .unwrap();
 
         for (application, last_used) in [(stale_application, 1), (refreshed_application, u64::MAX)]
         {
@@ -4780,8 +4904,9 @@ mod session_creation_tests {
     #[test]
     fn the_session_cap_reclaims_to_the_watermark() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        let application_number =
-            storage.lookup_or_insert_application_number_with_origin(&ORIGIN.to_string());
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
 
         let sessions: Vec<SessionRecord> = (0..MAX_SESSIONS_PER_ANCHOR)
             .map(|device_id| SessionRecord {
@@ -4918,9 +5043,12 @@ mod session_creation_tests {
             }]
         };
 
-        let first = storage.lookup_or_insert_application_number_with_origin(&ORIGIN.to_string());
-        let second =
-            storage.lookup_or_insert_application_number_with_origin(&OTHER_ORIGIN.to_string());
+        let first = storage
+            .lookup_or_insert_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        let second = storage
+            .lookup_or_insert_application_number_with_origin(&OTHER_ORIGIN.to_string())
+            .unwrap();
         storage
             .write_reference_list(anchor_number, first, row(0))
             .unwrap();
@@ -5024,8 +5152,9 @@ mod session_creation_tests {
     #[test]
     fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        let application_number =
-            storage.lookup_or_insert_application_number_with_origin(&ORIGIN.to_string());
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
 
         let mut sessions = vec![SessionRecord {
             created_at_ns: 1_000,
@@ -5116,8 +5245,9 @@ mod session_creation_tests {
     #[test]
     fn an_expired_same_round_record_is_pruned_rather_than_colliding() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        let application_number =
-            storage.lookup_or_insert_application_number_with_origin(&ORIGIN.to_string());
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
         storage
             .write_reference_list(
                 anchor_number,
