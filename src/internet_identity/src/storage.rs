@@ -91,7 +91,9 @@ use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 use std::io::Write;
 use std::ops::RangeInclusive;
-use storable::account_reference_list::StorableAccountReferenceList;
+use storable::account_reference_list::{
+    StorableAccountReferenceList, StorableAccountReferenceListError,
+};
 use storable::anchor_number_list::StorableAnchorNumberList;
 
 use ic_cdk::api::trap;
@@ -1563,28 +1565,20 @@ impl<M: Memory + Clone> Storage<M> {
             .and_then(|application_number| self.stable_application_memory.get(&application_number))
     }
 
-    /// What this identity's reference-list row at `application_number` holds.
+    /// This identity's account references at `application_number`, or `None` where it
+    /// has no row there at all.
     ///
-    /// The one place that maps storage onto [`ReferenceRow`], so no caller has to
-    /// remember that an absent row and an empty one mean opposite things.
-    fn reference_row(
+    /// The one reader, so no caller has to assemble the list from storage itself. The
+    /// `None` is only ever "no row": an empty row is a tombstone and means the
+    /// opposite, so the two must not be collapsed by a caller either.
+    fn account_references(
         &self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-    ) -> ReferenceRow {
-        match self
-            .stable_account_reference_list_memory
+    ) -> Option<Vec<AccountReference>> {
+        self.stable_account_reference_list_memory
             .get(&(anchor_number, application_number))
-        {
-            None => ReferenceRow::Untouched,
-            Some(stored) => {
-                let references = Vec::<AccountReference>::from(stored);
-                match HeldReferences::new(references) {
-                    Some(held) => ReferenceRow::Held(held),
-                    None => ReferenceRow::Tombstone,
-                }
-            }
-        }
+            .map(Vec::<AccountReference>::from)
     }
 
     /// Applies `f` to one of this identity's account references, and writes the row
@@ -1606,13 +1600,15 @@ impl<M: Memory + Clone> Storage<M> {
     where
         F: FnOnce(&mut AccountReference) -> T,
     {
-        let ReferenceRow::Held(mut references) =
-            self.reference_row(anchor_number, application_number)
+        let Some(mut references) = self.account_references(anchor_number, application_number)
         else {
             return Ok(None);
         };
 
-        let Some(reference) = references.reference_mut(account_number) else {
+        let Some(reference) = references
+            .iter_mut()
+            .find(|reference| reference.account_number == account_number)
+        else {
             // `f` never ran, so nothing changed, and writing the row back here would
             // store the bytes it already holds.
             return Ok(None);
@@ -1719,22 +1715,32 @@ impl<M: Memory + Clone> Storage<M> {
     /// The single write path for an anchor's account reference list at one
     /// application, including the counters derived from it.
     ///
-    /// Takes [`HeldReferences`], so it cannot be handed an empty list: that would be a
-    /// tombstone, which only a future move may create and which no path in this design
-    /// should reach by writing references it happens to have none of.
+    /// Refuses an empty list, which would be a tombstone — see
+    /// [`StorableAccountReferenceList::try_from`], which is where that is enforced and
+    /// why it is enforced there.
     fn write_reference_list(
         &mut self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-        new_references: HeldReferences,
+        new_references: Vec<AccountReference>,
     ) -> Result<(), StorageError> {
+        // Before the counters, so a list this identity may not store is refused with
+        // nothing written and no counter moved for it.
+        let storable_references = StorableAccountReferenceList::try_from(new_references.clone())
+            .map_err(|error| StorageError::UnstorableAccountReferenceList {
+                anchor_number,
+                application_number,
+                error,
+            })?;
         let application = self
             .stable_application_memory
             .get(&application_number)
             .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
 
-        let previous_row = self.reference_row(anchor_number, application_number);
-        let counter_deltas = ReferenceListDeltas::between(&previous_row, &new_references);
+        let previous_references = self
+            .account_references(anchor_number, application_number)
+            .unwrap_or_default();
+        let counter_deltas = ReferenceListDeltas::between(&previous_references, &new_references);
 
         // Counters first: it is the only step here that can fail, and returning an error
         // after the list is written would commit one without the other. A failure now
@@ -1745,10 +1751,8 @@ impl<M: Memory + Clone> Storage<M> {
             application,
             counter_deltas,
         )?;
-        self.stable_account_reference_list_memory.insert(
-            (anchor_number, application_number),
-            new_references.into_vec().into(),
-        );
+        self.stable_account_reference_list_memory
+            .insert((anchor_number, application_number), storable_references);
         Ok(())
     }
 
@@ -1964,25 +1968,22 @@ impl<M: Memory + Clone> Storage<M> {
         // last_used will be set once the user signs in with the account.
         let last_used = None;
 
-        let existing_references = match self.reference_row(anchor_number, application_number) {
-            // The default account reference is created alongside this one, because
-            // default accounts are never created explicitly.
-            ReferenceRow::Untouched => vec![AccountReference {
-                account_number: None,
-                last_used,
-            }],
-            // A tombstone must not regain a default reference, which is the whole
-            // reason it is kept, so the named account is all that goes in.
-            ReferenceRow::Tombstone => vec![],
-            ReferenceRow::Held(held) => held.into_vec(),
-        };
-        let references = HeldReferences::including(
-            existing_references,
-            AccountReference {
-                account_number: Some(account_number),
-                last_used,
-            },
-        );
+        // With no row yet the default account reference is created alongside this one,
+        // because default accounts are never created explicitly. An existing row is
+        // added to as it stands: a tombstone must not regain a default reference, which
+        // is the whole reason it is kept.
+        let mut references = self
+            .account_references(anchor_number, application_number)
+            .unwrap_or_else(|| {
+                vec![AccountReference {
+                    account_number: None,
+                    last_used,
+                }]
+            });
+        references.push(AccountReference {
+            account_number: Some(account_number),
+            last_used,
+        });
 
         self.write_reference_list(anchor_number, application_number, references)?;
 
@@ -2011,12 +2012,12 @@ impl<M: Memory + Clone> Storage<M> {
             return vec![Account::synthetic(anchor_number, origin.clone())];
         };
 
-        match self.reference_row(anchor_number, application_number) {
-            ReferenceRow::Untouched => vec![Account::synthetic(anchor_number, origin.clone())],
-            // Everything here moved away. Not even a synthetic default is offered —
-            // that is what the tombstone exists to prevent.
-            ReferenceRow::Tombstone => vec![],
-            ReferenceRow::Held(held) => held
+        // An empty row is a tombstone: everything here moved away, so not even a
+        // synthetic default is offered — that is what it exists to prevent. Its empty
+        // list falls out of the iteration below.
+        match self.account_references(anchor_number, application_number) {
+            None => vec![Account::synthetic(anchor_number, origin.clone())],
+            Some(references) => references
                 .iter()
                 .filter_map(|reference| {
                     self.read_account(ReadAccountParams {
@@ -2054,46 +2055,59 @@ impl<M: Memory + Clone> Storage<M> {
                 Some(_) => None,
             };
         };
-        let row = self.reference_row(params.anchor_number, application_number);
+        // No row: nothing has ever happened at this origin.
+        let Some(references) = self.account_references(params.anchor_number, application_number)
+        else {
+            return match params.account_number {
+                None => Some(synthetic_default()),
+                Some(_) => None,
+            };
+        };
 
         match params.account_number {
             // The tracked default.
-            None => match row {
-                ReferenceRow::Untouched => Some(synthetic_default()),
-                // XXX WARNING: a tombstone means the default moved away, so answering
-                // with a synthetic one lets its former owner reconstruct it at the same
-                // principal. Kept for now because refusing would lock out an identity
-                // that moved its default away and then reached the account limit.
-                ReferenceRow::Tombstone => Some(synthetic_default()),
+            None => {
+                // XXX WARNING: an empty row is a tombstone — the default moved away —
+                // so answering with a synthetic one lets its former owner reconstruct
+                // it at the same principal. Kept for now because refusing would lock
+                // out an identity that moved its default away and then reached the
+                // account limit.
+                if references.is_empty() {
+                    return Some(synthetic_default());
+                }
+
                 // A row that names other accounts but not the default means the default
                 // was named or moved away; the identity signs in with one of the others.
-                ReferenceRow::Held(held) => held.reference(None).map(|reference| {
-                    Account::new_with_last_used(
-                        params.anchor_number,
-                        params.origin.clone(),
-                        None,
-                        reference.account_number,
-                        reference.last_used,
-                    )
-                }),
-            },
+                references
+                    .iter()
+                    .find(|reference| reference.account_number.is_none())
+                    .map(|reference| {
+                        Account::new_with_last_used(
+                            params.anchor_number,
+                            params.origin.clone(),
+                            None,
+                            reference.account_number,
+                            reference.last_used,
+                        )
+                    })
+            }
             // A named account. The stored record carries its name; this identity's row
             // naming it is what says the identity owns it.
             Some(account_number) => {
                 let storable_account = self.stable_account_memory.get(&account_number)?;
-                let ReferenceRow::Held(held) = row else {
-                    return None;
-                };
-                held.reference(Some(account_number)).map(|reference| {
-                    Account::new_full(
-                        params.anchor_number,
-                        params.origin.clone(),
-                        Some(storable_account.name.clone()),
-                        Some(account_number),
-                        reference.last_used,
-                        storable_account.seed_from_anchor,
-                    )
-                })
+                references
+                    .iter()
+                    .find(|reference| reference.account_number == Some(account_number))
+                    .map(|reference| {
+                        Account::new_full(
+                            params.anchor_number,
+                            params.origin.clone(),
+                            Some(storable_account.name.clone()),
+                            Some(account_number),
+                            reference.last_used,
+                            storable_account.seed_from_anchor,
+                        )
+                    })
             }
         }
     }
@@ -2193,15 +2207,22 @@ impl<M: Memory + Clone> Storage<M> {
         // no reference naming it.
         let existing_references = match self
             .lookup_application_number_with_origin(&origin)
-            .map(|application_number| self.reference_row(anchor_number, application_number))
-        {
+            .and_then(|application_number| {
+                self.account_references(anchor_number, application_number)
+            }) {
             // Nothing stored under this origin yet, so the row starts with just this
             // account. Default accounts are never created explicitly.
-            None | Some(ReferenceRow::Untouched) => None,
-            Some(ReferenceRow::Held(held)) if held.reference(None).is_some() => Some(held),
-            // A tombstone holds nothing to name, and a row whose default reference is
-            // gone never regains one — the account it pointed at was removed.
-            Some(ReferenceRow::Tombstone) | Some(ReferenceRow::Held(_)) => {
+            None => None,
+            Some(references)
+                if references
+                    .iter()
+                    .any(|reference| reference.account_number.is_none()) =>
+            {
+                Some(references)
+            }
+            // An empty row is a tombstone and holds nothing to name, and a row whose
+            // default reference is gone never regains one — it was named or moved away.
+            Some(_) => {
                 return Err(StorageError::MissingAccount {
                     anchor_number,
                     name,
@@ -2238,14 +2259,17 @@ impl<M: Memory + Clone> Storage<M> {
             last_used: None,
         };
         let references = match existing_references {
-            None => HeldReferences::including(vec![], new_reference),
-            Some(mut held) => {
+            None => vec![new_reference],
+            Some(mut references) => {
                 // Present, per the check above. Repointed in place so the reference
                 // keeps both its position in the list and its `last_used`.
-                if let Some(default_reference) = held.reference_mut(None) {
+                if let Some(default_reference) = references
+                    .iter_mut()
+                    .find(|reference| reference.account_number.is_none())
+                {
                     default_reference.account_number = Some(new_account_number);
                 }
-                held
+                references
             }
         };
 
@@ -2504,79 +2528,6 @@ impl<M: Memory + Clone> Storage<M> {
     }
 }
 
-/// What one `(anchor, application)` reference-list row holds.
-///
-/// Deliberately not `Option<Vec<_>>`: absence and emptiness are opposites here, and
-/// spelling them as one nullable vector is what lets a caller treat them alike.
-///
-/// - Absent means nothing ever happened at this application, so a default account is
-///   reconstructible and reads answer with a synthetic one.
-/// - Empty means everything that was here moved away. The default must never be
-///   reconstructible again, or its former owner could re-mint it at the same
-///   principal.
-///
-/// Matching is exhaustive, so a fourth state cannot be added without every reader
-/// being made to say what it does about it.
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum ReferenceRow {
-    /// No row.
-    Untouched,
-    /// A row holding nothing. A permanent tombstone.
-    Tombstone,
-    /// A row holding references.
-    Held(HeldReferences),
-}
-
-/// The references stored against one row, never empty.
-///
-/// An empty list is a [`ReferenceRow::Tombstone`] and means something else entirely,
-/// so it cannot be built here — which is what keeps the write path from producing one
-/// by accident.
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct HeldReferences(Vec<AccountReference>);
-
-impl HeldReferences {
-    /// `None` for an empty list, which is a tombstone rather than references.
-    fn new(references: Vec<AccountReference>) -> Option<Self> {
-        (!references.is_empty()).then_some(Self(references))
-    }
-
-    /// Non-empty because `reference` is in it, whatever `others` holds. The way a
-    /// caller adding a reference builds a row without having to rule out emptiness it
-    /// has just made impossible.
-    fn including(mut others: Vec<AccountReference>, reference: AccountReference) -> Self {
-        others.push(reference);
-        Self(others)
-    }
-
-    /// The reference for one account, where `None` asks for the tracked default.
-    fn reference(&self, account_number: Option<AccountNumber>) -> Option<&AccountReference> {
-        self.0
-            .iter()
-            .find(|reference| reference.account_number == account_number)
-    }
-
-    /// The reference for one account, to modify in place. Answers `None` where this
-    /// identity holds no such reference, which is what makes reference-list
-    /// membership the ownership check.
-    fn reference_mut(
-        &mut self,
-        account_number: Option<AccountNumber>,
-    ) -> Option<&mut AccountReference> {
-        self.0
-            .iter_mut()
-            .find(|reference| reference.account_number == account_number)
-    }
-
-    fn iter(&self) -> impl Iterator<Item = &AccountReference> {
-        self.0.iter()
-    }
-
-    fn into_vec(self) -> Vec<AccountReference> {
-        self.0
-    }
-}
-
 /// Which of the counters derived from a reference list a delta is applied to.
 ///
 /// Each carries what identifies its row, so a refusal points at the counter that
@@ -2637,17 +2588,21 @@ struct ReferenceListDeltas {
 }
 
 impl ReferenceListDeltas {
-    /// What writing `new_references` over `previous_row` does to the counters.
+    /// What writing `new_references` over `previous_references` does to the counters.
     ///
-    /// A tombstone counts as no references, which is right for the totals and is why
-    /// removing a row must not consult this: a tombstone's row is still alive while
-    /// holding nothing, so decrementing to zero on it would let the row be retired and
-    /// a moved-away default be reconstructed at the same principal.
-    fn between(previous_row: &ReferenceRow, new_references: &HeldReferences) -> Self {
+    /// A row that does not exist and one holding nothing both count as no references,
+    /// which is right for these totals: neither contributes any. It is also why
+    /// retiring a row must not go through here — a tombstone's row is still alive while
+    /// holding nothing, so a diff against it would report no change and leave the
+    /// counters claiming references the removed row no longer has.
+    fn between(
+        previous_references: &[AccountReference],
+        new_references: &[AccountReference],
+    ) -> Self {
         /// Saturating rather than `as`: a list long enough to overflow `i64` cannot
         /// exist — `MAX_ANCHOR_ACCOUNTS` bounds it far below — and saturating says so
         /// without a cast that would wrap silently if that ever stopped being true.
-        fn counts<'a>(references: impl Iterator<Item = &'a AccountReference>) -> (i64, i64) {
+        fn counts(references: &[AccountReference]) -> (i64, i64) {
             let mut named = 0i64;
             let mut total = 0i64;
             for reference in references {
@@ -2659,11 +2614,8 @@ impl ReferenceListDeltas {
             (named, total)
         }
 
-        let (previous_named, previous_total) = match previous_row {
-            ReferenceRow::Untouched | ReferenceRow::Tombstone => (0, 0),
-            ReferenceRow::Held(held) => counts(held.iter()),
-        };
-        let (new_named, new_total) = counts(new_references.iter());
+        let (previous_named, previous_total) = counts(previous_references);
+        let (new_named, new_total) = counts(new_references);
 
         Self {
             accounts: new_named.saturating_sub(previous_named),
@@ -2751,6 +2703,12 @@ pub enum StorageError {
     },
     ErrorUpdatingAccountCounter,
     AccountsCounterOverflow,
+    /// The references a write assembled cannot be stored as they stand.
+    UnstorableAccountReferenceList {
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        error: StorableAccountReferenceListError,
+    },
     /// A counter derived from a reference list cannot move by the delta a write
     /// implies, which means it and the stored lists have already diverged.
     AccountCounterOutOfBounds {
@@ -2822,6 +2780,15 @@ impl fmt::Display for StorageError {
             ),
             Self::ErrorUpdatingAccountCounter => write!(f, "Error updating account counter"),
             Self::AccountsCounterOverflow => write!(f, "No account numbers left to allocate"),
+            Self::UnstorableAccountReferenceList {
+                anchor_number,
+                application_number,
+                error,
+            } => write!(
+                f,
+                "the account reference list for anchor {anchor_number} at application \
+                 {application_number} cannot be stored: {error}"
+            ),
             Self::AccountCounterOutOfBounds {
                 counter,
                 count,
