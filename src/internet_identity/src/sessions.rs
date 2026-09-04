@@ -10,7 +10,7 @@ use crate::delegation::{
 };
 use crate::sessions::device_key::verify_device_keys;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
-use crate::storage::account::{Account, ReadAccountParams, SessionRecord};
+use crate::storage::account::{Account, AccountKey, SessionRecord};
 use crate::storage::{CreateSessionParams, StorageError};
 use crate::{update_root_hash, DAY_NS, MINUTE_NS};
 use candid::Principal;
@@ -112,11 +112,10 @@ pub async fn prepare_account_session(
     // one failure a caller can provoke, and returning it after the writes below would
     // leave a browser registered for a sign-in that never happened.
     if storage_borrow(|storage| {
-        storage.read_account(ReadAccountParams {
-            account_number,
+        storage.read_account(&AccountKey {
             anchor_number: identity_number,
-            origin: &origin,
-            known_app_num: None,
+            origin: origin.clone(),
+            account_number,
         })
     })
     .is_none()
