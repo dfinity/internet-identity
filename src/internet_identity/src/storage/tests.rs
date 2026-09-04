@@ -2128,7 +2128,9 @@ fn test_anchor_storage_migration_round_trip() {
 mod reference_list_write_path_tests {
     use crate::storage::account::{AccountReference, CreateAccountParams};
     use crate::storage::storable::accounts_counter::StorableAccountsCounter;
-    use crate::storage::{HeldReferences, ReferenceRow, StorageError};
+    use crate::storage::{
+        HeldReferences, ReferenceCount, ReferenceCounter, ReferenceRow, StorageError,
+    };
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
@@ -2202,10 +2204,18 @@ mod reference_list_write_path_tests {
             held(vec![default_reference]),
         );
 
-        assert!(matches!(
-            result,
-            Err(StorageError::AccountCounterOutOfBounds)
-        ));
+        // The refusal names what diverged: this identity's account count, what it held,
+        // and the move that would not fit.
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            StorageError::AccountCounterOutOfBounds {
+                counter: ReferenceCounter::Anchor { anchor_number },
+                count: ReferenceCount::Accounts,
+                stored: 0,
+                delta: -1,
+            }
+            .to_string()
+        );
         // Refused before anything was written: the list still holds both references.
         let ReferenceRow::Held(references) =
             storage.reference_row(anchor_number, application_number)
@@ -2213,6 +2223,49 @@ mod reference_list_write_path_tests {
             panic!("the row written above is gone");
         };
         assert_eq!(references.iter().count(), 2);
+    }
+
+    #[test]
+    fn the_two_counts_move_independently_and_the_refusal_says_which_one_failed() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let default_reference = AccountReference {
+            account_number: None,
+            last_used: None,
+        };
+        let named_reference = AccountReference {
+            account_number: Some(1),
+            last_used: None,
+        };
+        storage
+            .write_reference_list(
+                anchor_number,
+                application_number,
+                held(vec![default_reference, named_reference.clone()]),
+            )
+            .unwrap();
+        storage.set_counters_for_testing(anchor_number, 0, 0);
+
+        // Dropping the tracked default takes a reference without taking a named
+        // account, so the two deltas differ: 0 and -1. Only the reference count can
+        // under-run here, and the refusal has to name that one rather than the other.
+        let result = storage.write_reference_list(
+            anchor_number,
+            application_number,
+            held(vec![named_reference]),
+        );
+
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            StorageError::AccountCounterOutOfBounds {
+                counter: ReferenceCounter::Anchor { anchor_number },
+                count: ReferenceCount::References,
+                stored: 0,
+                delta: -1,
+            }
+            .to_string()
+        );
     }
 
     #[test]
