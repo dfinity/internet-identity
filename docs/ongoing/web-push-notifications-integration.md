@@ -6,8 +6,10 @@ A dApp integrates with II Web Push notifications as follows:
 
 1. The app asks II to offer notification consent during sign-in by setting the
    `iiNotifications` option in its `AuthClient` request.
-2. The app origin publishes a well-known document listing the canisters allowed
-   to send notifications and serve their content.
+2. In the initial implementation, the app origin publishes a well-known
+   document listing the canisters allowed to send notifications and serve their
+   content. Once revocable app sessions are available, `AuthClient` registers
+   those canisters with II through the authenticated app session instead.
 3. The app backend includes the notification client and gives it a campaign: a
    list of recipient principals and the notification content for each one.
 4. The client stores the content in the dApp canister, submits content-free
@@ -91,7 +93,14 @@ second app-owned consent protocol. The option is implemented by the II window
 transport today; general integration also requires it in the published
 `AuthClient` API.
 
-## The origin declares its sender canisters
+## Sender authorization
+
+II has to connect the web origin that received consent to the canister that
+later calls `notification_send`. The initial stack establishes this connection
+through the origin. The intended design establishes it through the user's app
+session.
+
+### Initial implementation: declaration by the origin
 
 An origin participating in notifications serves:
 
@@ -122,6 +131,55 @@ this part of the flow.
 Canister-hosted frontends serve this as a certified asset. The Motoko and Rust
 clients provide helpers for producing the JSON body, so the application only
 has to expose the resulting asset at the well-known path.
+
+This is an interim mechanism. It lets sender authorization ship before II can
+resolve an authenticated app call to its identity, origin, and account, but it
+adds an HTTPS outcall to consent and an asset that every integrating origin has
+to maintain.
+
+### Intended design: registration through the app session
+
+Revocable app sessions give an app frontend a direct authenticated path to II.
+II can resolve the caller to the identity, origin, and account behind that
+session, so the frontend can register the app's sender canisters without asking
+II to discover them over HTTPS.
+
+In that model, `AuthClient` is configured with the sender canister principals
+and passes them to II while notification consent is established. II records the
+sender set with that account's session-backed notification authorization. When
+a canister sends a ping, II resolves the recipient through the shared account
+index and accepts the caller only if it is registered for that account and app.
+The canister no longer supplies an origin for II to trust, and the well-known
+outcall is removed.
+
+```mermaid
+sequenceDiagram
+    participant App as App frontend with AuthClient
+    participant II as Internet Identity
+    participant Canister as Sender canister
+
+    App->>II: Establish notification access and register sender canisters
+    Note over App,II: Authenticated by the app session
+    II->>II: Resolve session to identity, origin, and account
+    II->>II: Store sender set with notification authorization
+
+    Canister->>II: notification_send(recipient)
+    II->>II: Resolve recipient through the shared account index
+    II->>II: Check caller against the recipient's sender set
+    II-->>Canister: Accept or reject ping
+```
+
+The registration is scoped per account rather than shared globally. A frontend
+acting for one user can authorize a sender for that user's notification access;
+it cannot establish that binding for other users. This repeats a small sender
+set across participating accounts, but it preserves the trust boundary between
+them.
+
+The final API shape, sender limit, refresh period, and exact relationship
+between registration and session revocation remain to be specified with the
+revocable-session integration. The intended property is that sender authority
+is derived from and bounded by the app session rather than becoming another
+standing credential.
 
 ## The client is included in the dApp backend
 
@@ -224,7 +282,8 @@ The client owns:
 - Persistence and handling of `resend_epoch`.
 - Resumption of incomplete campaigns after a dApp canister upgrade.
 - Update, removal, cancellation, and cleanup of pending notifications.
-- The service-worker query and well-known document helpers.
+- The service-worker query and, for the initial implementation, well-known
+  document helpers.
 
 II still validates the sender, origin, consent, recipient, and device
 subscription for every notification. The client coordinates a campaign; it
@@ -290,7 +349,9 @@ a `delivered` state.
 The design leaves four concepts visible to application code:
 
 1. The `iiNotifications` sign-in option.
-2. The well-known sender document at the app origin.
+2. The sender canister configuration. The initial implementation exposes it as
+   a well-known document; the intended design registers it through
+   `AuthClient` and the app session.
 3. The Motoko mixin or equivalent Rust client configured with the II canister
    and origin.
 4. Campaigns containing recipient principals and notification content.
