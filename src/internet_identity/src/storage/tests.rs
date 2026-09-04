@@ -3,7 +3,7 @@ use crate::openid::OpenIdCredential;
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
-use crate::storage::account::{CreateAccountParams, ReadAccountParams};
+use crate::storage::account::{Account, AccountKey};
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::{Header, StorageError, MAX_ENTRIES};
 use crate::Storage;
@@ -415,189 +415,158 @@ fn should_not_overwrite_device_credential_lookup() {
 }
 
 #[test]
-fn should_set_account_last_used() {
+fn should_record_that_a_named_account_was_used() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
     let origin = "https://example.com".to_string();
 
-    // Create an anchor
     let anchor = storage.allocate_anchor(0).unwrap();
     let anchor_number = anchor.anchor_number();
     storage.write(anchor).unwrap();
 
-    // Create an additional account for this anchor and origin
     let account = storage
-        .create_additional_account(CreateAccountParams {
-            anchor_number,
-            name: "Test Account".to_string(),
-            origin: origin.clone(),
-        })
+        .create_account(anchor_number, origin.clone(), "Test Account".to_string())
         .unwrap();
-
-    let account_number = account.account_number.unwrap();
-
-    // Initially, last_used should be None
-    let read_account = storage
-        .read_account(ReadAccountParams {
-            anchor_number,
-            origin: &origin,
-            account_number: Some(account_number),
-            known_app_num: None,
-        })
-        .unwrap();
-    assert_eq!(read_account.last_used, None);
-
-    // Set last_used for the additional account
-    let timestamp = 123456789u64;
-    let result = storage.set_account_last_used(
+    let key = AccountKey {
         anchor_number,
-        origin.clone(),
-        Some(account_number),
-        timestamp,
-    );
-    assert!(result.unwrap().is_some());
+        origin: origin.clone(),
+        account_number: account.account_number,
+    };
 
-    // Verify last_used was updated
-    let read_account = storage
-        .read_account(ReadAccountParams {
-            anchor_number,
-            origin: &origin,
-            account_number: Some(account_number),
-            known_app_num: None,
-        })
-        .unwrap();
-    assert_eq!(read_account.last_used, Some(timestamp));
+    assert_eq!(storage.read_account(&key).unwrap().last_used, None);
 
-    // Update last_used again with a new timestamp
-    let new_timestamp = 987654321u64;
-    let result = storage.set_account_last_used(
-        anchor_number,
-        origin.clone(),
-        Some(account_number),
-        new_timestamp,
-    );
-    assert!(result.unwrap().is_some());
+    for timestamp in [123456789u64, 987654321u64] {
+        let mut account = storage.read_account(&key).unwrap();
+        account.last_used = Some(timestamp);
+        storage.write_account(account).unwrap();
 
-    // Verify last_used was updated to the new timestamp
-    let read_account = storage
-        .read_account(ReadAccountParams {
-            anchor_number,
-            origin: &origin,
-            account_number: Some(account_number),
-            known_app_num: None,
-        })
-        .unwrap();
-    assert_eq!(read_account.last_used, Some(new_timestamp));
+        assert_eq!(
+            storage.read_account(&key).unwrap().last_used,
+            Some(timestamp)
+        );
+    }
 }
 
 #[test]
-fn should_set_account_last_used_for_synthethic_account() {
+fn should_not_store_a_row_to_record_use_of_a_derived_default() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
     let origin = "https://example.com".to_string();
 
-    // Create an anchor
     let anchor = storage.allocate_anchor(0).unwrap();
     let anchor_number = anchor.anchor_number();
     storage.write(anchor).unwrap();
 
-    // Set last_used for the synthetic account (account_number = None)
-    let timestamp = 555555u64;
-    let result = storage.set_account_last_used(anchor_number, origin.clone(), None, timestamp);
-    assert!(result.unwrap().is_none());
+    let key = AccountKey {
+        anchor_number,
+        origin: origin.clone(),
+        account_number: None,
+    };
 
-    // Verify last_used was updated for the synthetic account
-    let read_account = storage
-        .read_account(ReadAccountParams {
-            anchor_number,
-            origin: &origin,
-            account_number: None,
-            known_app_num: None,
-        })
-        .unwrap();
-    // Because the account reference doesn't exist, the `last_used` is not updated.
-    assert_eq!(read_account.last_used, None);
+    let mut account = storage.read_account(&key).unwrap();
+    account.last_used = Some(555_555u64);
+    storage.write_account(account).unwrap();
+
+    // Nothing is stored at this origin, so the default here is still derived from it.
+    // A row saying only that it was used would keep bytes to repeat what absence
+    // already says, so none is written and the read is unchanged.
+    assert_eq!(storage.read_account(&key).unwrap().last_used, None);
+    assert!(storage
+        .lookup_application_number_with_origin(&origin)
+        .is_none());
 }
 
 #[test]
-fn should_set_account_last_used_for_synthetic_account_with_reference() {
+fn should_record_that_a_tracked_default_was_used() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
     let origin = "https://example.com".to_string();
 
-    // Create an anchor
     let anchor = storage.allocate_anchor(0).unwrap();
     let anchor_number = anchor.anchor_number();
     storage.write(anchor).unwrap();
 
-    // Create an additional account to force creation of account references
+    // A named account gives the origin a row, which the default is tracked in.
     storage
-        .create_additional_account(CreateAccountParams {
-            anchor_number,
-            name: "Test Account".to_string(),
-            origin: origin.clone(),
-        })
+        .create_account(anchor_number, origin.clone(), "Test Account".to_string())
         .unwrap();
 
-    // Set last_used for the synthetic account (account_number = None)
-    let timestamp = 555555u64;
-    let result = storage.set_account_last_used(anchor_number, origin.clone(), None, timestamp);
-    assert!(result.unwrap().is_some());
+    let key = AccountKey {
+        anchor_number,
+        origin: origin.clone(),
+        account_number: None,
+    };
+    let timestamp = 555_555u64;
 
-    // Verify last_used was updated for the synthetic account
-    let read_account = storage
-        .read_account(ReadAccountParams {
-            anchor_number,
-            origin: &origin,
-            account_number: None,
-            known_app_num: None,
-        })
-        .unwrap();
-    assert_eq!(read_account.last_used, Some(timestamp));
+    let mut account = storage.read_account(&key).unwrap();
+    account.last_used = Some(timestamp);
+    storage.write_account(account).unwrap();
+
+    assert_eq!(
+        storage.read_account(&key).unwrap().last_used,
+        Some(timestamp)
+    );
 }
 
 #[test]
-fn should_return_none_when_setting_last_used_for_nonexistent_account() {
+fn should_refuse_to_write_an_account_no_reference_names() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
     let origin = "https://example.com".to_string();
 
-    // Create an anchor
     let anchor = storage.allocate_anchor(0).unwrap();
     let anchor_number = anchor.anchor_number();
     storage.write(anchor).unwrap();
 
-    // Try to set last_used for a non-existent account number
-    let nonexistent_account_number = 99999u64;
-    let timestamp = 123456u64;
-    let result = storage.set_account_last_used(
-        anchor_number,
-        origin,
-        Some(nonexistent_account_number),
-        timestamp,
-    );
+    storage
+        .create_account(anchor_number, origin.clone(), "Test Account".to_string())
+        .unwrap();
 
-    // Should return None because the account doesn't exist
-    assert!(result.unwrap().is_none());
+    let unheld_account_number = 99_999u64;
+    let key = AccountKey {
+        anchor_number,
+        origin: origin.clone(),
+        account_number: Some(unheld_account_number),
+    };
+
+    // Holding a reference is what grants access, so an account this identity does not
+    // hold cannot be read, and writing one it names anyway is refused rather than
+    // adopted.
+    assert!(storage.read_account(&key).is_none());
+    assert!(matches!(
+        storage.write_account(Account::new_with_last_used(
+            anchor_number,
+            origin,
+            None,
+            Some(unheld_account_number),
+            Some(123_456u64),
+        )),
+        Err(StorageError::AccountNotFound { account_number })
+            if account_number == unheld_account_number
+    ));
 }
 
 #[test]
-fn should_return_none_when_setting_last_used_for_nonexistent_origin() {
+fn should_refuse_to_write_an_account_at_an_unknown_origin() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
 
-    // Create an anchor
     let anchor = storage.allocate_anchor(0).unwrap();
     let anchor_number = anchor.anchor_number();
     storage.write(anchor).unwrap();
 
-    // Try to set last_used for an origin that hasn't been registered
-    let nonexistent_origin = "https://nonexistent.com".to_string();
-    let timestamp = 123456u64;
-    let result = storage.set_account_last_used(anchor_number, nonexistent_origin, None, timestamp);
+    let unknown_origin = "https://nonexistent.com".to_string();
 
-    // Should return None because the origin/application doesn't exist
-    assert!(result.unwrap().is_none());
+    assert!(matches!(
+        storage.write_account(Account::new_with_last_used(
+            anchor_number,
+            unknown_origin,
+            None,
+            Some(99_999u64),
+            Some(123_456u64),
+        )),
+        Err(StorageError::AccountNotFound { .. })
+    ));
 }
 
 fn sample_device() -> Device {
@@ -2144,7 +2113,7 @@ fn test_anchor_storage_migration_round_trip() {
 }
 
 mod reference_list_write_path_tests {
-    use crate::storage::account::{AccountReference, CreateAccountParams};
+    use crate::storage::account::AccountReference;
     use crate::storage::storable::accounts_counter::StorableAccountsCounter;
     use crate::storage::{ReferenceCount, ReferenceCounter, StorageError};
     use crate::Storage;
@@ -2174,11 +2143,11 @@ mod reference_list_write_path_tests {
             })
             .unwrap();
 
-        let result = storage.create_additional_account(CreateAccountParams {
+        let result = storage.create_account(
             anchor_number,
-            name: "named".to_string(),
-            origin: "https://example.com".to_string(),
-        });
+            "https://example.com".to_string(),
+            "named".to_string(),
+        );
 
         assert!(matches!(result, Err(StorageError::AccountsCounterOverflow)));
     }
@@ -2199,10 +2168,12 @@ mod reference_list_write_path_tests {
             last_used: None,
         };
         storage
-            .write_reference_list(
+            .write_account_state(
                 anchor_number,
                 application_number,
                 vec![default_reference.clone(), named_reference],
+                None,
+                None,
             )
             .unwrap();
 
@@ -2210,10 +2181,12 @@ mod reference_list_write_path_tests {
         // anchor counter no longer knows about, so dropping one under-runs it.
         storage.set_counters_for_testing(anchor_number, 0, 0);
 
-        let result = storage.write_reference_list(
+        let result = storage.write_account_state(
             anchor_number,
             application_number,
             vec![default_reference],
+            None,
+            None,
         );
 
         // The refusal names what diverged: this identity's account count, what it held,
@@ -2230,7 +2203,7 @@ mod reference_list_write_path_tests {
         );
         // Refused before anything was written: the list still holds both references.
         let references = storage
-            .account_references(anchor_number, application_number)
+            .stored_account_references(anchor_number, application_number)
             .expect("the row written above is gone");
         assert_eq!(references.len(), 2);
     }
@@ -2251,10 +2224,12 @@ mod reference_list_write_path_tests {
             last_used: None,
         };
         storage
-            .write_reference_list(
+            .write_account_state(
                 anchor_number,
                 application_number,
                 vec![default_reference, named_reference.clone()],
+                None,
+                None,
             )
             .unwrap();
         storage.set_counters_for_testing(anchor_number, 0, 0);
@@ -2262,8 +2237,13 @@ mod reference_list_write_path_tests {
         // Dropping the tracked default takes a reference without taking a named
         // account, so the two deltas differ: 0 and -1. Only the reference count can
         // under-run here, and the refusal has to name that one rather than the other.
-        let result =
-            storage.write_reference_list(anchor_number, application_number, vec![named_reference]);
+        let result = storage.write_account_state(
+            anchor_number,
+            application_number,
+            vec![named_reference],
+            None,
+            None,
+        );
 
         assert_eq!(
             result.unwrap_err().to_string(),
@@ -2287,14 +2267,15 @@ mod reference_list_write_path_tests {
             .lookup_or_insert_application_number_with_origin(&origin)
             .unwrap();
 
-        let result = storage.write_reference_list(anchor_number, application_number, vec![]);
+        let result =
+            storage.write_account_state(anchor_number, application_number, vec![], None, None);
 
         assert!(matches!(
             result,
             Err(StorageError::UnstorableAccountReferenceList { .. })
         ));
         assert_eq!(
-            storage.account_references(anchor_number, application_number),
+            storage.stored_account_references(anchor_number, application_number),
             None
         );
     }
@@ -2304,13 +2285,15 @@ mod reference_list_write_path_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let unknown_application_number = 42u64;
 
-        let result = storage.write_reference_list(
+        let result = storage.write_account_state(
             anchor_number,
             unknown_application_number,
             vec![AccountReference {
                 account_number: None,
                 last_used: None,
             }],
+            None,
+            None,
         );
 
         assert!(matches!(
@@ -2318,7 +2301,7 @@ mod reference_list_write_path_tests {
             Err(StorageError::OriginNotFoundForApplicationNumber { .. })
         ));
         assert_eq!(
-            storage.account_references(anchor_number, unknown_application_number),
+            storage.stored_account_references(anchor_number, unknown_application_number),
             None
         );
         assert_eq!(
@@ -2334,7 +2317,7 @@ mod reference_list_write_path_tests {
     }
 
     #[test]
-    fn a_zero_delta_write_still_requires_a_live_application() {
+    fn writing_the_list_the_row_already_holds_touches_nothing() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
         let application_number = storage
@@ -2345,18 +2328,34 @@ mod reference_list_write_path_tests {
             last_used: None,
         }];
         storage
-            .write_reference_list(anchor_number, application_number, references.clone())
+            .write_account_state(
+                anchor_number,
+                application_number,
+                references.clone(),
+                None,
+                None,
+            )
             .unwrap();
+        // Retiring the application makes a write visible: the write path refuses
+        // without one, so a write that still went through it could not succeed here.
         storage
             .stable_application_memory
             .remove(&application_number);
 
-        let result = storage.write_reference_list(anchor_number, application_number, references);
+        storage
+            .write_account_state(
+                anchor_number,
+                application_number,
+                references.clone(),
+                None,
+                None,
+            )
+            .unwrap();
 
-        assert!(matches!(
-            result,
-            Err(StorageError::OriginNotFoundForApplicationNumber { .. })
-        ));
+        assert_eq!(
+            storage.stored_account_references(anchor_number, application_number),
+            Some(references)
+        );
     }
 
     #[test]
@@ -2368,7 +2367,7 @@ mod reference_list_write_path_tests {
             .unwrap();
 
         storage
-            .write_reference_list(
+            .write_account_state(
                 anchor_number,
                 application_number,
                 vec![
@@ -2381,6 +2380,8 @@ mod reference_list_write_path_tests {
                         last_used: None,
                     },
                 ],
+                None,
+                None,
             )
             .unwrap();
 
@@ -2409,23 +2410,27 @@ mod reference_list_write_path_tests {
             .unwrap();
 
         storage
-            .write_reference_list(
+            .write_account_state(
                 anchor_number,
                 application_number,
                 vec![AccountReference {
                     account_number: None,
                     last_used: None,
                 }],
+                None,
+                None,
             )
             .unwrap();
         storage
-            .write_reference_list(
+            .write_account_state(
                 anchor_number,
                 application_number,
                 vec![AccountReference {
                     account_number: Some(3),
                     last_used: None,
                 }],
+                None,
+                None,
             )
             .unwrap();
 
@@ -2451,18 +2456,26 @@ mod reference_list_write_path_tests {
         }];
 
         storage
-            .write_reference_list(anchor_number, application_number, references.clone())
+            .write_account_state(
+                anchor_number,
+                application_number,
+                references.clone(),
+                None,
+                None,
+            )
             .unwrap();
         let after_first_write = storage.get_account_counter(anchor_number);
 
         storage
-            .write_reference_list(
+            .write_account_state(
                 anchor_number,
                 application_number,
                 vec![AccountReference {
                     account_number: Some(1),
                     last_used: Some(123),
                 }],
+                None,
+                None,
             )
             .unwrap();
 
@@ -2479,18 +2492,10 @@ mod reference_list_write_path_tests {
         for origin in ["https://a.com", "https://b.com", "https://c.com"] {
             let origin = origin.to_string();
             storage
-                .create_additional_account(CreateAccountParams {
-                    anchor_number,
-                    name: "account".to_string(),
-                    origin: origin.clone(),
-                })
+                .create_account(anchor_number, origin.clone(), "account".to_string())
                 .unwrap();
             storage
-                .create_additional_account(CreateAccountParams {
-                    anchor_number,
-                    name: "another account".to_string(),
-                    origin,
-                })
+                .create_account(anchor_number, origin, "another account".to_string())
                 .unwrap();
         }
 
@@ -2507,9 +2512,7 @@ mod reference_list_write_path_tests {
 /// mean three different things. Absence says a default account is still
 /// reconstructible; emptiness is a tombstone and says it never can be again.
 mod account_reference_state_tests {
-    use crate::storage::account::{
-        AccountReference, CreateAccountParams, ReadAccountParams, UpdateAccountParams,
-    };
+    use crate::storage::account::{Account, AccountKey, AccountReference};
     use crate::storage::storable::account_reference_list::StorableAccountReferenceList;
     use crate::storage::StorageError;
     use crate::Storage;
@@ -2540,7 +2543,7 @@ mod account_reference_state_tests {
             StorableAccountReferenceList::tombstone_for_testing(),
         );
         assert_eq!(
-            storage.account_references(anchor_number, application_number),
+            storage.stored_account_references(anchor_number, application_number),
             Some(vec![])
         );
     }
@@ -2554,11 +2557,10 @@ mod account_reference_state_tests {
     ) -> Option<Option<AccountNumber>> {
         let origin = ORIGIN.to_string();
         storage
-            .read_account(ReadAccountParams {
-                account_number: None,
+            .read_account(&AccountKey {
                 anchor_number,
-                origin: &origin,
-                known_app_num: None,
+                origin: origin.clone(),
+                account_number: None,
             })
             .map(|account| account.account_number)
     }
@@ -2592,11 +2594,7 @@ mod account_reference_state_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         let account = storage
-            .create_additional_account(CreateAccountParams {
-                anchor_number,
-                name: "named".to_string(),
-                origin: origin.clone(),
-            })
+            .create_account(anchor_number, origin.clone(), "named".to_string())
             .unwrap();
         let account_number = account.account_number.unwrap();
         let application_number = storage
@@ -2605,13 +2603,15 @@ mod account_reference_state_tests {
 
         // Drop just the default reference, as moving it away would.
         storage
-            .write_reference_list(
+            .write_account_state(
                 anchor_number,
                 application_number,
                 vec![AccountReference {
                     account_number: Some(account_number),
                     last_used: None,
                 }],
+                None,
+                None,
             )
             .unwrap();
 
@@ -2629,18 +2629,14 @@ mod account_reference_state_tests {
         plant_tombstone(&mut storage, anchor_number);
 
         let account = storage
-            .create_additional_account(CreateAccountParams {
-                anchor_number,
-                name: "named".to_string(),
-                origin: origin.clone(),
-            })
+            .create_account(anchor_number, origin.clone(), "named".to_string())
             .unwrap();
 
         let application_number = storage
             .lookup_application_number_with_origin(&origin)
             .unwrap();
         let references = storage
-            .account_references(anchor_number, application_number)
+            .stored_account_references(anchor_number, application_number)
             .expect("the named account should have left references behind");
         assert_eq!(
             references
@@ -2658,12 +2654,12 @@ mod account_reference_state_tests {
         plant_tombstone(&mut storage, anchor_number);
         let counter_before = storage.get_total_accounts_counter().clone();
 
-        let result = storage.update_account(UpdateAccountParams {
-            account_number: None,
+        let result = storage.write_account(Account::new(
             anchor_number,
-            name: "named default".to_string(),
-            origin: origin.clone(),
-        });
+            origin.clone(),
+            Some("named default".to_string()),
+            None,
+        ));
 
         assert!(matches!(result, Err(StorageError::MissingAccount { .. })));
         // Refused before the allocation, so no account number was spent on a record
@@ -2676,7 +2672,7 @@ mod account_reference_state_tests {
             .lookup_application_number_with_origin(&origin)
             .unwrap();
         assert_eq!(
-            storage.account_references(anchor_number, application_number),
+            storage.stored_account_references(anchor_number, application_number),
             Some(vec![])
         );
         assert_eq!(
@@ -2692,32 +2688,27 @@ mod account_reference_state_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         let named = storage
-            .create_additional_account(CreateAccountParams {
-                anchor_number,
-                name: "named".to_string(),
-                origin: origin.clone(),
-            })
+            .create_account(anchor_number, origin.clone(), "named".to_string())
             .unwrap();
         let stamped_at = 123456u64;
-        storage
-            .set_account_last_used(anchor_number, origin.clone(), None, stamped_at)
-            .unwrap()
-            .unwrap();
+        let default_key = AccountKey {
+            anchor_number,
+            origin: origin.clone(),
+            account_number: None,
+        };
+        let mut used_default = storage.read_account(&default_key).unwrap();
+        used_default.last_used = Some(stamped_at);
+        storage.write_account(used_default).unwrap();
 
-        let default = storage
-            .update_account(UpdateAccountParams {
-                account_number: None,
-                anchor_number,
-                name: "named default".to_string(),
-                origin: origin.clone(),
-            })
-            .unwrap();
+        let mut default_to_name = storage.read_account(&default_key).unwrap();
+        default_to_name.name = Some("named default".to_string());
+        let default = storage.write_account(default_to_name).unwrap();
 
         let application_number = storage
             .lookup_application_number_with_origin(&origin)
             .unwrap();
         let references = storage
-            .account_references(anchor_number, application_number)
+            .stored_account_references(anchor_number, application_number)
             .expect("naming the default should not have emptied the row");
         // Repointed where it stood, keeping the order accounts are listed in and the
         // timestamp the reference already carried.
@@ -2741,40 +2732,37 @@ mod account_reference_state_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         let account = storage
-            .create_additional_account(CreateAccountParams {
-                anchor_number,
-                name: "named".to_string(),
-                origin: origin.clone(),
-            })
+            .create_account(anchor_number, origin.clone(), "named".to_string())
             .unwrap();
         let account_number = account.account_number.unwrap();
         let application_number = storage
             .lookup_application_number_with_origin(&origin)
             .unwrap();
         let references_before = storage
-            .account_references(anchor_number, application_number)
+            .stored_account_references(anchor_number, application_number)
             .unwrap();
 
         // A skipped write is invisible in the stored bytes, since rewriting the row
         // would store what it already holds. Retiring the application row makes it
-        // visible: `write_reference_list` refuses without one, so a rename that still
-        // went through it could not succeed here.
+        // visible: `write_account_state` refuses without one, so a rename that still
+        // wrote the list could not succeed here.
         storage
             .stable_application_memory
             .remove(&application_number);
 
-        let renamed = storage
-            .update_account(UpdateAccountParams {
-                account_number: Some(account_number),
+        let mut account_to_rename = storage
+            .read_account(&AccountKey {
                 anchor_number,
-                name: "renamed".to_string(),
                 origin: origin.clone(),
+                account_number: Some(account_number),
             })
             .unwrap();
+        account_to_rename.name = Some("renamed".to_string());
+        let renamed = storage.write_account(account_to_rename).unwrap();
 
         assert_eq!(renamed.name, Some("renamed".to_string()));
         assert_eq!(
-            storage.account_references(anchor_number, application_number),
+            storage.stored_account_references(anchor_number, application_number),
             Some(references_before)
         );
     }
@@ -2790,44 +2778,39 @@ mod account_reference_state_tests {
         };
         let origin = ORIGIN.to_string();
         let account = storage
-            .create_additional_account(CreateAccountParams {
-                anchor_number: owner,
-                name: "named".to_string(),
-                origin: origin.clone(),
-            })
+            .create_account(owner, origin.clone(), "named".to_string())
             .unwrap();
         let account_number = account.account_number.unwrap();
         // The other identity has a row of its own at this origin, so what refuses the
         // attempts below is the row not naming this account rather than there being no
         // row to look in.
         storage
-            .create_additional_account(CreateAccountParams {
-                anchor_number: other,
-                name: "mine".to_string(),
-                origin: origin.clone(),
-            })
+            .create_account(other, origin.clone(), "mine".to_string())
             .unwrap();
 
-        let rename = storage.update_account(UpdateAccountParams {
-            account_number: Some(account_number),
-            anchor_number: other,
-            name: "stolen".to_string(),
-            origin: origin.clone(),
-        });
+        let rename = storage.write_account(Account::new(
+            other,
+            origin.clone(),
+            Some("stolen".to_string()),
+            Some(account_number),
+        ));
         assert!(matches!(rename, Err(StorageError::AccountNotFound { .. })));
 
-        let stamp = storage
-            .set_account_last_used(other, origin.clone(), Some(account_number), 123456)
-            .unwrap();
-        assert_eq!(stamp, None);
+        let stamp = storage.write_account(Account::new_with_last_used(
+            other,
+            origin.clone(),
+            None,
+            Some(account_number),
+            Some(123456),
+        ));
+        assert!(matches!(stamp, Err(StorageError::AccountNotFound { .. })));
 
         // The owner's record and reference are untouched by either attempt.
         let owned = storage
-            .read_account(ReadAccountParams {
-                account_number: Some(account_number),
+            .read_account(&AccountKey {
                 anchor_number: owner,
-                origin: &origin,
-                known_app_num: None,
+                origin: origin.clone(),
+                account_number: Some(account_number),
             })
             .unwrap();
         assert_eq!(owned.name, Some("named".to_string()));
