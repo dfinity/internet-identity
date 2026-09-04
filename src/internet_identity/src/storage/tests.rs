@@ -4205,7 +4205,9 @@ mod account_principal_index_tests {
         let anchor_number = anchor.anchor_number();
         storage.write(anchor).unwrap();
         let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
 
         let result = storage.write_reference_list(
             anchor_number,
