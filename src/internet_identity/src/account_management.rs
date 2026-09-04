@@ -351,6 +351,17 @@ pub async fn prepare_account_delegation(
     let effective_duration_ns = expiration.saturating_sub(time());
     let seed = account.calculate_seed();
 
+    // Stamped before the delegation is signed. On the IC returning `Err` commits
+    // every write that came before it, so propagating a failure from here once the
+    // signature was in the map would report an error for a delegation that has
+    // already been issued. `Ok(None)` is not a failure: it means the row holds no
+    // reference to stamp, which is how a default account that is still derived rather
+    // than stored reads.
+    storage_borrow_mut(|storage| {
+        storage.set_account_last_used(anchor_number, origin.clone(), account_number, time())
+    })
+    .map_err(|err| AccountDelegationError::InternalCanisterError(err.to_string()))?;
+
     state::signature_map_mut(|sigs| {
         add_delegation_signature(
             sigs,
@@ -361,11 +372,6 @@ pub async fn prepare_account_delegation(
         );
     });
     update_root_hash();
-
-    storage_borrow_mut(|storage| {
-        let _ =
-            storage.set_account_last_used(anchor_number, origin.clone(), account_number, time());
-    });
 
     delegation_bookkeeping(origin, ii_domain.clone(), effective_duration_ns);
 
