@@ -16,7 +16,7 @@ use canister_tests::{
 };
 use internet_identity_interface::internet_identity::types::{
     AccountDelegationError, AccountInfo, AccountUpdate, GetDelegationResponse,
-    PrepareAccountDelegation, SetDefaultAccountError,
+    PrepareAccountDelegation, SetDefaultAccountError, UpdateAccountError,
 };
 use pocket_ic::RejectResponse;
 use pretty_assertions::assert_eq;
@@ -335,10 +335,9 @@ fn should_update_account() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// When a default / numberless account gets updated, it becomes stored and numbered.
-/// It should not be possible to update
+/// When a default / numberless account gets updated, it becomes stored and numbered,
+/// so there is no numberless account left to update a second time.
 #[test]
-#[should_panic]
 fn should_not_update_numberless_account_twice() {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
@@ -361,7 +360,7 @@ fn should_not_update_numberless_account_twice() {
 
     assert!(updated_account.is_ok());
 
-    let _ = update_account(
+    let second_update = update_account(
         &env,
         canister_id,
         principal_1(),
@@ -370,7 +369,12 @@ fn should_not_update_numberless_account_twice() {
         None,
         update,
     )
-    .expect("The call itself should succeed, but should panic inside");
+    .expect("This call should succeed!");
+
+    assert!(matches!(
+        second_update,
+        Err(UpdateAccountError::Unauthorized(_))
+    ));
 }
 
 /// Verifies that a default account can be updated
@@ -455,7 +459,6 @@ fn should_update_default_account() -> Result<(), RejectResponse> {
 
 /// Verifies that only owned accounts can be updated
 #[test]
-#[should_panic]
 fn should_only_update_owned_account() {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
@@ -496,7 +499,7 @@ fn should_only_update_owned_account() {
 
     // Here we try to update the account created by the first identity using the second identity.
     // This should fail.
-    let _ = update_account(
+    let update_by_another_identity = update_account(
         &env,
         canister_id,
         principal_2(),
@@ -505,8 +508,12 @@ fn should_only_update_owned_account() {
         created_account.account_number,
         update,
     )
-    .unwrap()
-    .unwrap();
+    .expect("This call should succeed!");
+
+    assert!(matches!(
+        update_by_another_identity,
+        Err(UpdateAccountError::Unauthorized(_))
+    ));
 }
 
 /// Verifies that read-only account delegations carry the `permissions`

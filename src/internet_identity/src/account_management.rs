@@ -264,6 +264,11 @@ pub fn update_account_for_origin(
                         .map_err(Into::<UpdateAccountError>::into)?
                     }
 
+                    // A caller reaches this with nothing readable in two ways: the
+                    // account belongs to another identity, or the tracked default has
+                    // already been named and so is no longer numberless. Both are the
+                    // caller naming an account it does not have, which is what
+                    // `prepare_account_delegation` answers for the same read.
                     let old_account = storage
                         .read_account(ReadAccountParams {
                             account_number,
@@ -271,7 +276,7 @@ pub fn update_account_for_origin(
                             origin: &origin,
                             known_app_num: None
                         })
-                        .expect("Updating an unreadable account should be impossible!");
+                        .ok_or_else(|| UpdateAccountError::Unauthorized(caller()))?;
 
                     let updated_account = storage
                         .update_account(UpdateAccountParams {
@@ -367,6 +372,12 @@ pub async fn prepare_account_delegation(
     let effective_duration_ns = expiration.saturating_sub(time());
     let seed = account.calculate_seed();
 
+    // Stamped before the delegation is signed. On the IC returning `Err` commits
+    // every write that came before it, so propagating a failure from here once the
+    // signature was in the map would report an error for a delegation that has
+    // already been issued. `Ok(None)` is not a failure: it means the row holds no
+    // reference to stamp, which is how a default account that is still derived rather
+    // than stored reads.
     storage_borrow_mut(|storage| {
         storage.record_account_use(anchor_number, origin.clone(), account_number, time())
     })
