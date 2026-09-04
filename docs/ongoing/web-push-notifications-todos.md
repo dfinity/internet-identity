@@ -18,7 +18,13 @@ The current clients are thin wrappers around `notification_send`. The intended i
 - [ ] Resume incomplete campaigns after a dApp canister upgrade.
 - [ ] Aggregate accepted and rejected recipients into an honest campaign status that does not claim delivery receipts.
 - [ ] Add update, remove, pause, resume, cancel, and cleanup operations.
-- [ ] Add a Motoko mixin that owns the state and injects `ii_pending_notifications`.
+- [ ] Refactor the Motoko package to follow the
+      [`identity-attributes`](https://mops.one/identity-attributes) layout: make
+      the root `src/lib.mo` a bare mixin and move public types, low-level II
+      calls, and implementation details into separate modules.
+- [ ] Have the Motoko mixin own the durable campaign and pending-content state,
+      inject `ii_pending_notifications`, and expose campaign operations to the
+      containing actor.
 - [ ] Add the equivalent Rust pending-content abstraction and minimal endpoint wiring.
 - [ ] Keep `sendersDocument` and `SendersDocument` as the only well-known setup required from the app.
 - [ ] Add campaign restart, partial acceptance, epoch change, expiry, update, and removal tests.
