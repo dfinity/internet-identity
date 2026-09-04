@@ -79,10 +79,7 @@
 //!
 //! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
 //! bucket of 128 pages.
-use account::{
-    Account, AccountsCounter, CreateAccountParams, ReadAccountParams, UpdateAccountParams,
-    UpdateExistingAccountParams,
-};
+use account::{Account, AccountKey, AccountsCounter};
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use ic_stable_structures::cell::ValueError;
@@ -1641,13 +1638,48 @@ impl<M: Memory + Clone> Storage<M> {
             .and_then(|application_number| self.stable_application_memory.get(&application_number))
     }
 
-    /// This identity's account references at `application_number`, or `None` where it
-    /// has no row there at all.
+    /// This identity's account references at `application_number`.
     ///
-    /// The one reader, so no caller has to assemble the list from storage itself. The
-    /// `None` is only ever "no row": an empty row is a tombstone and means the
-    /// opposite, so the two must not be collapsed by a caller either.
+    /// An absent row normalises to the derived default: nothing has happened at this
+    /// origin, so the identity still has the default it has always had. A stored empty
+    /// row is a tombstone and stays empty — everything here moved away and the default
+    /// must never be derived again.
+    ///
+    /// Absence and emptiness are opposites, and this is the only place that knows it.
     fn account_references(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+    ) -> Vec<AccountReference> {
+        self.stored_account_references(anchor_number, application_number)
+            .unwrap_or_else(Self::derived_default_references)
+    }
+
+    /// [`Self::account_references`] for a caller that has an origin rather than an
+    /// application number. An origin nothing has ever been stored under has no row, so
+    /// it normalises the same way.
+    fn account_references_for_origin(
+        &self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+    ) -> Vec<AccountReference> {
+        match self.lookup_application_number_with_origin(origin) {
+            Some(application_number) => self.account_references(anchor_number, application_number),
+            None => Self::derived_default_references(),
+        }
+    }
+
+    /// What an identity holds where nothing is stored: the default it has always had,
+    /// derived from the origin rather than kept.
+    fn derived_default_references() -> Vec<AccountReference> {
+        vec![AccountReference::new(None, None)]
+    }
+
+    /// The row as stored, with no default derived for an absent one.
+    ///
+    /// Only the write path may see this. The counters describe stored rows, so a row
+    /// that never existed must not be diffed against as though it held the default.
+    fn stored_account_references(
         &self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
@@ -1657,110 +1689,8 @@ impl<M: Memory + Clone> Storage<M> {
             .map(Vec::<AccountReference>::from)
     }
 
-    /// This identity's reference for one account, or `None` where it holds none.
-    ///
-    /// `account_number` names the reference, `None` being the tracked default.
-    /// Answering `None` is the ownership check: an account belongs to whichever
-    /// identity's row names it, so a caller that finds no reference here has no claim
-    /// on the account whether or not it exists.
-    fn account_reference(
-        &self,
-        anchor_number: AnchorNumber,
-        application_number: ApplicationNumber,
-        account_number: Option<AccountNumber>,
-    ) -> Option<AccountReference> {
-        self.account_references(anchor_number, application_number)?
-            .into_iter()
-            .find(|reference| reference.account_number == account_number)
-    }
-
-    /// Applies `f` to one of this identity's account references, and writes the row
-    /// back if it ran.
-    ///
-    /// `account_number` names the reference, `None` being the tracked default.
-    ///
-    /// `Ok(None)` means there was nothing to apply `f` to and nothing was written:
-    /// the row is absent or a tombstone, or it holds no reference for this account —
-    /// see [`Self::account_reference`] for what that last case means.
-    fn with_account_reference_mut<T, F>(
-        &mut self,
-        anchor_number: AnchorNumber,
-        application_number: ApplicationNumber,
-        account_number: Option<AccountNumber>,
-        f: F,
-    ) -> Result<Option<T>, StorageError>
-    where
-        F: FnOnce(&mut AccountReference) -> T,
-    {
-        let Some(mut references) = self.account_references(anchor_number, application_number)
-        else {
-            return Ok(None);
-        };
-
-        let Some(reference) = references
-            .iter_mut()
-            .find(|reference| reference.account_number == account_number)
-        else {
-            // `f` never ran, so nothing changed, and writing the row back here would
-            // store the bytes it already holds.
-            return Ok(None);
-        };
-        let result = f(reference);
-
-        self.write_reference_list(anchor_number, application_number, references)?;
-
-        Ok(Some(result))
-    }
-
-    /// Records that an account was used at `origin`.
-    ///
-    /// A default account has no reference stored until it is used, so recording a
-    /// use is also what creates one. A named account's reference is its existence:
-    /// where it is gone the account was removed, and writing one back would undo
-    /// that, so only the default gets the pre-step.
-    pub fn record_account_use(
-        &mut self,
-        anchor_number: AnchorNumber,
-        origin: FrontendHostname,
-        account_number: Option<AccountNumber>,
-        now: Timestamp,
-    ) -> Result<(), StorageError> {
-        if account_number.is_none() {
-            let application_number =
-                self.lookup_or_insert_application_number_with_origin(&origin)?;
-            self.ensure_account_reference_list(anchor_number, application_number)?;
-        }
-        self.stamp_account_reference(anchor_number, &origin, account_number, now)
-    }
-
-    /// Stamps `last_used` on the reference for `account_number` at `origin`.
-    ///
-    /// Does nothing when the identity has no such reference stored: nothing is
-    /// recorded against an account it cannot reach.
-    fn stamp_account_reference(
-        &mut self,
-        anchor_number: AnchorNumber,
-        origin: &FrontendHostname,
-        account_number: Option<AccountNumber>,
-        now: Timestamp,
-    ) -> Result<(), StorageError> {
-        // An origin nothing has ever been stored under holds no reference to stamp,
-        // which is the same answer as a row that holds no reference for this account.
-        let Some(application_number) = self.lookup_application_number_with_origin(origin) else {
-            return Ok(());
-        };
-
-        self.with_account_reference_mut(
-            anchor_number,
-            application_number,
-            account_number,
-            |account_reference| {
-                account_reference.last_used = Some(now);
-            },
-        )?;
-        Ok(())
-    }
-
+    // Called by the sign-in ceremony, which lands two PRs up.
+    #[allow(dead_code)]
     /// Signs one browser out of everything, in a single message.
     pub fn revoke_device_sessions(
         &mut self,
@@ -1798,7 +1728,7 @@ impl<M: Memory + Clone> Storage<M> {
                 });
             }
             removed += dropped.len() as u64;
-            self.write_reference_list(anchor_number, application_number, references)?;
+            self.write_account_state(anchor_number, application_number, references, None, None)?;
             for (account_number, session) in &dropped {
                 self.unindex_sessions(
                     anchor_number,
@@ -1842,14 +1772,14 @@ impl<M: Memory + Clone> Storage<M> {
         session: &SessionRecord,
     ) -> Option<Principal> {
         let salt = self.salt().copied()?;
-        let account = self.read_account(ReadAccountParams {
-            account_number,
+        let account = self.read_account(&AccountKey {
             anchor_number,
-            origin: &self
+            origin: self
                 .stable_application_memory
                 .get(&application_number)?
-                .origin,
-            known_app_num: Some(application_number),
+                .origin
+                .clone(),
+            account_number,
         })?;
         let seed = calculate_session_seed_with_salt(
             &salt,
@@ -2032,7 +1962,13 @@ impl<M: Memory + Clone> Storage<M> {
             if removed.is_empty() {
                 continue;
             }
-            self.write_reference_list(anchor_number, application_number, references.clone())?;
+            self.write_account_state(
+                anchor_number,
+                application_number,
+                references.clone(),
+                None,
+                None,
+            )?;
             for (account_number, session) in &removed {
                 self.unindex_sessions(
                     anchor_number,
@@ -2060,10 +1996,7 @@ impl<M: Memory + Clone> Storage<M> {
         device_id: SessionDeviceId,
         now: Timestamp,
     ) -> Result<bool, StorageError> {
-        let Some(mut references) = self.account_references(anchor_number, application_number)
-        else {
-            return Ok(false);
-        };
+        let mut references = self.account_references(anchor_number, application_number);
 
         let Some(reference) = references
             .iter_mut()
@@ -2097,7 +2030,7 @@ impl<M: Memory + Clone> Storage<M> {
             });
         }
 
-        self.write_reference_list(anchor_number, application_number, references)?;
+        self.write_account_state(anchor_number, application_number, references, None, None)?;
         for (account_number, session) in &expired {
             self.unindex_sessions(
                 anchor_number,
@@ -2192,16 +2125,14 @@ impl<M: Memory + Clone> Storage<M> {
             .stable_application_memory
             .get(&application_number)
             .map(|application| application.origin)?;
-        let references = self.account_references(anchor_number, application_number)?;
-        let reference = references
-            .iter()
-            .find(|reference| reference.account_number == account_number)?
-            .clone();
-        let account = self.read_account(ReadAccountParams {
-            account_number,
+        let reference = self
+            .account_references(anchor_number, application_number)
+            .into_iter()
+            .find(|reference| reference.account_number == account_number)?;
+        let account = self.read_account(&AccountKey {
             anchor_number,
-            origin: &origin,
-            known_app_num: Some(application_number),
+            origin,
+            account_number,
         })?;
         Some((account, reference.sessions))
     }
@@ -2213,11 +2144,10 @@ impl<M: Memory + Clone> Storage<M> {
         account_number: Option<AccountNumber>,
     ) -> Option<Vec<SessionRecord>> {
         let application_number = self.lookup_application_number_with_origin(origin)?;
-        let references = self.account_references(anchor_number, application_number)?;
-        references
-            .iter()
+        self.account_references(anchor_number, application_number)
+            .into_iter()
             .find(|reference| reference.account_number == account_number)
-            .map(|reference| reference.sessions.clone())
+            .map(|reference| reference.sessions)
     }
 
     /// Creates the session `prepare_account_session` mints an identity from, replacing
@@ -2256,7 +2186,7 @@ impl<M: Memory + Clone> Storage<M> {
         let application_number = match self.lookup_application_number_with_origin(&origin) {
             Some(application_number)
                 if self
-                    .account_references(anchor_number, application_number)
+                    .stored_account_references(anchor_number, application_number)
                     .is_some() =>
             {
                 application_number
@@ -2270,12 +2200,12 @@ impl<M: Memory + Clone> Storage<M> {
                 }
                 let application_number =
                     self.lookup_or_insert_application_number_with_origin(&origin)?;
-                self.write_reference_list(
+                self.write_tracked_default(
                     anchor_number,
                     application_number,
                     vec![AccountReference::new(None, Some(now_ns))],
+                    None,
                 )?;
-                self.evict_idle_tracked_defaults(anchor_number, application_number)?;
                 application_number
             }
         };
@@ -2286,13 +2216,7 @@ impl<M: Memory + Clone> Storage<M> {
             return Err(StorageError::SessionCapNotReclaimed { anchor_number });
         }
 
-        let Some(mut references) = self.account_references(anchor_number, application_number)
-        else {
-            return Err(StorageError::MissingAccount {
-                anchor_number,
-                name: origin,
-            });
-        };
+        let mut references = self.account_references(anchor_number, application_number);
 
         let reference = references
             .iter_mut()
@@ -2339,7 +2263,7 @@ impl<M: Memory + Clone> Storage<M> {
             });
         }
 
-        self.write_reference_list(anchor_number, application_number, references)?;
+        self.write_account_state(anchor_number, application_number, references, None, None)?;
         for (account_number, session) in &dropped {
             self.unindex_sessions(
                 anchor_number,
@@ -2374,44 +2298,19 @@ impl<M: Memory + Clone> Storage<M> {
         account_number: Option<AccountNumber>,
     ) -> Option<Principal> {
         let salt = self.salt().copied()?;
-        let account = self.read_account(ReadAccountParams {
-            account_number,
+        let account = self.read_account(&AccountKey {
             anchor_number,
-            origin: &self
+            origin: self
                 .stable_application_memory
                 .get(&application_number)?
-                .origin,
-            known_app_num: Some(application_number),
+                .origin
+                .clone(),
+            account_number,
         })?;
         Some(canister_sig_principal(
             canister_id(),
             account.calculate_seed_with_salt(&salt).to_vec(),
         ))
-    }
-
-    /// Writes the reference-list row an `AnchorApplicationConfig` row implies, leaving
-    /// `last_used` unset.
-    pub fn ensure_account_reference_list(
-        &mut self,
-        anchor_number: AnchorNumber,
-        application_number: ApplicationNumber,
-    ) -> Result<(), StorageError> {
-        // Only a row that does not exist gets one. An empty row is a tombstone — a
-        // default that moved away — and must not be recreated, and a row already
-        // holding references needs nothing.
-        if self
-            .account_references(anchor_number, application_number)
-            .is_some()
-        {
-            return Ok(());
-        }
-
-        self.write_reference_list(
-            anchor_number,
-            application_number,
-            vec![AccountReference::new(None, None)],
-        )?;
-        self.evict_idle_tracked_defaults(anchor_number, application_number)
     }
 
     /// Removes a reference-list row and everything derived from it.
@@ -2430,7 +2329,7 @@ impl<M: Memory + Clone> Storage<M> {
         // - a row holding named accounts, or whose default was named or moved away,
         //   would lose references that nothing else records.
         let previous = match self
-            .account_references(anchor_number, application_number)
+            .stored_account_references(anchor_number, application_number)
             .as_deref()
         {
             Some([reference]) if reference.account_number.is_none() => vec![reference.clone()],
@@ -2466,7 +2365,7 @@ impl<M: Memory + Clone> Storage<M> {
             );
         }
 
-        // Counters first, for the reason `write_reference_list` does it: it is the
+        // Counters first, for the reason `write_account_state` does it: it is the
         // only fallible step left, and an error after the removes would commit them
         // without it.
         self.apply_reference_counter_deltas(
@@ -2571,86 +2470,145 @@ impl<M: Memory + Clone> Storage<M> {
         AnchorApplicationConfig::default()
     }
 
-    pub fn set_anchor_application_config(
+    /// The single write path for everything keyed by `(anchor_number,
+    /// application_number)`: the reference list, an account record, and the config
+    /// naming the default.
+    ///
+    /// The three describe one state and drift apart if written apart, so they are
+    /// written together or not at all. Every fallible step runs before any of them:
+    /// on the IC returning `Err` commits what was written before it, and only a trap
+    /// rolls back, so a refusal here must leave nothing behind.
+    ///
+    /// `references` is the whole new list. It is diffed against the stored row for the
+    /// counter deltas, so a caller supplies only what it wants stored and cannot move a
+    /// counter by the default [`Self::account_references`] derived for it. A list equal
+    /// to the stored row writes nothing: the row is a single blob, so writing it back
+    /// would store the bytes it already holds.
+    fn write_account_state(
         &mut self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-        anchor_application_config: AnchorApplicationConfig,
-    ) {
-        self.stable_anchor_application_config_memory.insert(
-            (anchor_number, application_number),
-            anchor_application_config,
-        );
+        references: Vec<AccountReference>,
+        record: Option<(AccountNumber, StorableAccount)>,
+        config: Option<AnchorApplicationConfig>,
+    ) -> Result<(), StorageError> {
+        let stored_references = self.stored_account_references(anchor_number, application_number);
+
+        // Nothing to say: the row already holds these bytes, so it is not written and
+        // nothing about it is checked either. This is what lets a rename leave every
+        // reference alone without its caller having to know to skip the write.
+        let list_write = if stored_references.as_deref() == Some(references.as_slice()) {
+            None
+        } else {
+            // Refuses a list this identity may not store — see
+            // [`StorableAccountReferenceList::try_from`], which is where that is
+            // enforced and why it is enforced there.
+            let storable_references = StorableAccountReferenceList::try_from(references.clone())
+                .map_err(|error| StorageError::UnstorableAccountReferenceList {
+                    anchor_number,
+                    application_number,
+                    error,
+                })?;
+            let application = self
+                .stable_application_memory
+                .get(&application_number)
+                .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
+            let deltas = ReferenceListDeltas::between(
+                stored_references.as_deref().unwrap_or_default(),
+                &references,
+            );
+
+            // A derived principal is a function of the anchor, the origin and the
+            // account number, so a write that leaves every account number in place — a
+            // `last_used` stamp, which is every sign-in — cannot have changed one.
+            // Skipping the sync there keeps the hottest write in the system off a
+            // per-account hash.
+            let previous = stored_references.as_deref().unwrap_or_default();
+            let accounts_changed = previous.len() != references.len()
+                || previous
+                    .iter()
+                    .zip(&references)
+                    .any(|(previous, new)| previous.account_number != new.account_number);
+            // Resolved here, so a missing salt refuses with nothing written rather than
+            // half-way through.
+            let salt = if accounts_changed {
+                Some(*self.salt().ok_or(StorageError::SaltNotSet)?)
+            } else {
+                None
+            };
+
+            Some((storable_references, application, deltas, salt))
+        };
+
+        let mut record = record;
+        if let Some((storable_references, application, deltas, salt)) = list_write {
+            let origin = application.origin.clone();
+            // Counters first: the only step left that can fail, so an out-of-bounds
+            // delta refuses with nothing stored rather than a list without its counts.
+            self.apply_reference_counter_deltas(
+                anchor_number,
+                application_number,
+                application,
+                deltas,
+            )?;
+
+            // Nothing below this line can fail. The record goes in before the index,
+            // because a principal is derived from an account's stored row and one that
+            // is not in yet derives nothing — a new account would get no entry.
+            if let Some((account_number, storable_account)) = record.take() {
+                self.stable_account_memory
+                    .insert(account_number, storable_account);
+            }
+            if let Some(salt) = salt {
+                self.sync_account_principal_index(
+                    anchor_number,
+                    application_number,
+                    &origin,
+                    &salt,
+                    stored_references.as_deref().unwrap_or_default(),
+                    &references,
+                );
+            }
+            self.stable_account_reference_list_memory
+                .insert((anchor_number, application_number), storable_references);
+        }
+
+        // Still held where the list was not written, so there was no index to sync.
+        if let Some((account_number, storable_account)) = record {
+            self.stable_account_memory
+                .insert(account_number, storable_account);
+        }
+
+        if let Some(config) = config {
+            self.stable_anchor_application_config_memory
+                .insert((anchor_number, application_number), config);
+        }
+
+        Ok(())
     }
 
-    /// The single write path for an anchor's account reference list at one
-    /// application, including the counters derived from it.
+    /// [`Self::write_account_state`] for a row the tracked default is the reason for,
+    /// reaping idle ones where this took the anchor over the cap.
     ///
-    /// Refuses an empty list, which would be a tombstone — see
-    /// [`StorableAccountReferenceList::try_from`], which is where that is enforced and
-    /// why it is enforced there.
-    fn write_reference_list(
+    /// Only a row that did not exist can take it over: stamping or repointing one
+    /// leaves the count where it was, so there would be nothing to reap.
+    fn write_tracked_default(
         &mut self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-        new_references: Vec<AccountReference>,
+        references: Vec<AccountReference>,
+        config: Option<AnchorApplicationConfig>,
     ) -> Result<(), StorageError> {
-        // Before the counters, so a list this identity may not store is refused with
-        // nothing written and no counter moved for it.
-        let storable_references = StorableAccountReferenceList::try_from(new_references.clone())
-            .map_err(|error| StorageError::UnstorableAccountReferenceList {
-                anchor_number,
-                application_number,
-                error,
-            })?;
-        let application = self
-            .stable_application_memory
-            .get(&application_number)
-            .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
+        let is_new_row = self
+            .stored_account_references(anchor_number, application_number)
+            .is_none();
 
-        let previous_references = self
-            .account_references(anchor_number, application_number)
-            .unwrap_or_default();
-        let counter_deltas = ReferenceListDeltas::between(&previous_references, &new_references);
+        self.write_account_state(anchor_number, application_number, references, None, config)?;
 
-        // A derived principal is a function of the anchor, the origin and the account
-        // number, so a write that leaves every account number in place — a `last_used`
-        // stamp, which is every sign-in — cannot have changed one. Skipping the sync
-        // there keeps the hottest write in the system off a per-account hash.
-        let accounts_changed = previous_references.len() != new_references.len()
-            || previous_references
-                .iter()
-                .zip(&new_references)
-                .any(|(previous, new)| previous.account_number != new.account_number);
-        // Resolved before anything is written, so a missing salt refuses here rather
-        // than half-way through.
-        let salt = if accounts_changed {
-            Some(*self.salt().ok_or(StorageError::SaltNotSet)?)
-        } else {
-            None
-        };
-        let origin = application.origin.clone();
-
-        // Counters before the list: returning an error after the list is written would
-        // commit one without the other. Past this line nothing can fail.
-        self.apply_reference_counter_deltas(
-            anchor_number,
-            application_number,
-            application,
-            counter_deltas,
-        )?;
-        if let Some(salt) = salt {
-            self.sync_account_principal_index(
-                anchor_number,
-                application_number,
-                &origin,
-                &salt,
-                &previous_references,
-                &new_references,
-            );
+        if is_new_row {
+            self.evict_idle_tracked_defaults(anchor_number, application_number)?;
         }
-        self.stable_account_reference_list_memory
-            .insert((anchor_number, application_number), storable_references);
+
         Ok(())
     }
 
@@ -3017,338 +2975,257 @@ impl<M: Memory + Clone> Storage<M> {
         self.stable_account_counter_discrepancy_counter_memory.get()
     }
 
-    /// Creates an account for that identity.
-    /// If the identity doesn't yet have accounts, it will create the account reference for the synthetic account.
-    /// But not a storable account for the synthetic one.
-    pub fn create_additional_account(
-        &mut self,
-        params: CreateAccountParams,
-    ) -> Result<Account, StorageError> {
-        check_frontend_length(&params.origin);
-        let anchor_number = params.anchor_number;
-        let origin = &params.origin;
+    /// One account this identity holds at `key.origin`, or `None` where it holds none.
+    ///
+    /// `key.account_number` names it, `None` being the tracked default. Answering
+    /// `None` is the ownership check: an account belongs to whichever identity's row
+    /// names it, so a caller that finds no reference here has no claim on the account
+    /// whether or not it exists.
+    ///
+    /// The `Account` returned carries the seed the account signs with, so this is also
+    /// the only place that capability is handed out — a caller that holds one has been
+    /// through the check above.
+    pub fn read_account(&self, key: &AccountKey) -> Option<Account> {
+        check_frontend_length(&key.origin);
 
-        // The one step that can refuse runs before anything is stored, so a refusal does
-        // not leave an account and an application row behind with no reference to reap
-        // them by.
-        let account_number = self.allocate_account_number()?;
+        let reference = self
+            .account_references_for_origin(key.anchor_number, &key.origin)
+            .into_iter()
+            .find(|reference| reference.account_number == key.account_number)?;
 
-        // Create and store account in stable memory
-        let storable_account = StorableAccount {
-            name: params.name.clone(),
-            seed_from_anchor: None,
-        };
-        self.stable_account_memory
-            .insert(account_number, storable_account);
-
-        // Update application data
-        let application_number = self.lookup_or_insert_application_number_with_origin(origin)?;
-
-        // last_used will be set once the user signs in with the account.
-        let last_used = None;
-
-        // With no row yet the default account reference is created alongside this one,
-        // because default accounts are never created explicitly. An existing row is
-        // added to as it stands: a tombstone must not regain a default reference, which
-        // is the whole reason it is kept.
-        let mut references = self
-            .account_references(anchor_number, application_number)
-            .unwrap_or_else(|| vec![AccountReference::new(None, last_used)]);
-        references.push(AccountReference::new(Some(account_number), last_used));
-
-        self.write_reference_list(anchor_number, application_number, references)?;
-
-        // Return the new account
-        Ok(Account::new(
-            anchor_number,
-            origin.to_string(),
-            Some(params.name),
-            Some(account_number),
-        ))
+        self.account_for_reference(key.anchor_number, &key.origin, &reference)
     }
 
-    #[allow(dead_code)]
-    /// Returns a list of accounts for a given anchor and application.
-    /// If the application doesn't exist, returns a list with a synthetic default account.
-    /// If the account references don't exist, returns a list with a synthetic default account.
+    /// Every account this identity holds at `origin`.
     pub fn list_accounts(
         &self,
         anchor_number: AnchorNumber,
         origin: &FrontendHostname,
     ) -> Vec<Account> {
         check_frontend_length(origin);
-        let Some(application_number) = self.lookup_application_number_with_origin(origin) else {
-            // Nothing has ever been stored under this origin, so the default account is
-            // still reconstructible.
-            return vec![Account::synthetic(anchor_number, origin.clone())];
-        };
 
-        // An empty row is a tombstone: everything here moved away, so not even a
-        // synthetic default is offered — that is what it exists to prevent. Its empty
-        // list falls out of the iteration below.
-        match self.account_references(anchor_number, application_number) {
-            None => vec![Account::synthetic(anchor_number, origin.clone())],
-            Some(references) => references
-                .iter()
-                .filter_map(|reference| {
-                    self.read_account(ReadAccountParams {
-                        account_number: reference.account_number,
-                        anchor_number,
-                        origin,
-                        known_app_num: Some(application_number),
-                    })
-                })
-                .collect(),
-        }
+        self.account_references_for_origin(anchor_number, origin)
+            .iter()
+            .filter_map(|reference| self.account_for_reference(anchor_number, origin, reference))
+            .collect()
     }
 
-    /// Returns the requested `Account`.
-    /// If the anchor doesn't own this `Account`, returns None.
-    /// If the `Account` is default but has been moved/deleted, returns None.
-    /// If the `Account` is default and ALL `Account`s for this origin have been moved or deleted, returns None.
-    /// If nothing has ever happened at this origin, returns a default `Account`.
-    /// If the `Account` number exists but the `Account` doesn't exist, returns None.
-    /// If the `Account` exists, returns it as `Account`.
-    /// Optionally an application number can be passed if it is already known, so we don't look it up more than necessary.
-    pub fn read_account(&self, params: ReadAccountParams) -> Option<Account> {
-        check_frontend_length(params.origin);
-        let application_number = params
-            .known_app_num
-            .or_else(|| self.lookup_application_number_with_origin(params.origin));
-
-        let synthetic_default = || Account::synthetic(params.anchor_number, params.origin.clone());
-
-        // Nothing has ever been stored under this origin. A default account is still
-        // reconstructible, and a named one cannot be here at all.
-        let Some(application_number) = application_number else {
-            return match params.account_number {
-                None => Some(synthetic_default()),
-                Some(_) => None,
-            };
-        };
-        // No row: nothing has ever happened at this origin.
-        let Some(references) = self.account_references(params.anchor_number, application_number)
-        else {
-            return match params.account_number {
-                None => Some(synthetic_default()),
-                Some(_) => None,
-            };
-        };
-
-        match params.account_number {
-            // The tracked default.
-            None => {
-                // An empty row is a tombstone — the default moved away — and a row
-                // that names other accounts but not the default had it named or
-                // moved away too. Neither can be reconstructed from the origin, and
-                // both fall out of the lookup below finding nothing.
-                // A row that names other accounts but not the default means the default
-                // was named or moved away; the identity signs in with one of the others.
-                references
-                    .iter()
-                    .find(|reference| reference.account_number.is_none())
-                    .map(|reference| {
-                        Account::new_with_last_used(
-                            params.anchor_number,
-                            params.origin.clone(),
-                            None,
-                            reference.account_number,
-                            reference.last_used,
-                        )
-                    })
-            }
-            // A named account. The stored record carries its name; this identity's row
-            // naming it is what says the identity owns it.
-            Some(account_number) => {
-                let storable_account = self.stable_account_memory.get(&account_number)?;
-                references
-                    .iter()
-                    .find(|reference| reference.account_number == Some(account_number))
-                    .map(|reference| {
-                        Account::new_full(
-                            params.anchor_number,
-                            params.origin.clone(),
-                            Some(storable_account.name.clone()),
-                            Some(account_number),
-                            reference.last_used,
-                            storable_account.seed_from_anchor,
-                        )
-                    })
-            }
-        }
-    }
-
-    /// Updates an account.
-    /// If the account number exists, then updates that account.
-    /// If the account number doesn't exist, then gets or creates an application and creates and stores a default account.
-    pub fn update_account(&mut self, params: UpdateAccountParams) -> Result<Account, StorageError> {
-        let UpdateAccountParams {
-            account_number,
-            anchor_number,
-            name,
-            origin,
-        } = params;
-
-        check_frontend_length(&origin);
-        match account_number {
-            Some(account_number) => self.update_existing_account(UpdateExistingAccountParams {
-                account_number,
+    /// The account one reference names, or `None` where its record is gone.
+    fn account_for_reference(
+        &self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+        reference: &AccountReference,
+    ) -> Option<Account> {
+        // The tracked default has no record: its name is the origin's and its seed is
+        // the anchor's, both derived rather than stored.
+        let Some(account_number) = reference.account_number else {
+            return Some(Account::new_with_last_used(
                 anchor_number,
-                name,
-                origin,
-            }),
-            None => {
-                // Default accounts are not stored by default.
-                // They are created only once they are updated.
-                self.create_default_account(CreateAccountParams {
-                    anchor_number,
-                    name,
-                    origin,
-                })
-            }
-        }
-    }
+                origin.clone(),
+                None,
+                None,
+                reference.last_used,
+            ));
+        };
 
-    /// Used in `update_account` to update an existing account.
-    fn update_existing_account(
-        &mut self,
-        params: UpdateExistingAccountParams,
-    ) -> Result<Account, StorageError> {
-        let UpdateExistingAccountParams {
-            account_number,
+        let storable_account = self.stable_account_memory.get(&account_number)?;
+        Some(Account::new_full(
             anchor_number,
-            name,
-            origin,
-        } = params;
-
-        // Nothing has ever been stored under this origin, so no reference to the
-        // account exists under it either.
-        let Some(application_number) = self.lookup_application_number_with_origin(&origin) else {
-            return Err(StorageError::AccountNotFound { account_number });
-        };
-
-        // Holding a reference is what grants access, so a miss here means this
-        // identity does not own the account, whether or not it exists.
-        let Some(reference) =
-            self.account_reference(anchor_number, application_number, Some(account_number))
-        else {
-            return Err(StorageError::AccountNotFound { account_number });
-        };
-        let Some(mut storable_account) = self.stable_account_memory.get(&account_number) else {
-            return Err(StorageError::AccountNotFound { account_number });
-        };
-
-        // Only the account record is written. Renaming leaves every reference as it
-        // was, and the row is a single blob, so writing it back would store the bytes
-        // it already holds.
-        storable_account.name = name.clone();
-        self.stable_account_memory
-            .insert(account_number, storable_account.clone());
-
-        Ok(Account::new_full(
-            anchor_number,
-            origin,
-            Some(name),
+            origin.clone(),
+            Some(storable_account.name),
             Some(account_number),
             reference.last_used,
             storable_account.seed_from_anchor,
         ))
     }
 
-    /// Used in `update_account` to create a default account.
-    /// Default account are not initially stored. They are stored when updated.
-    /// If the default account reference does not exist, it must be created.
-    /// If the default account reference exists, its account number must be updated.
-    fn create_default_account(
+    /// Creates an account named `name` at `origin` for this identity.
+    ///
+    /// The only place an account number is minted, and it takes none. A number that
+    /// nothing references can only be allocated here, never adopted — see
+    /// [`Self::write_account`] for what adopting one would hand a caller.
+    pub fn create_account(
         &mut self,
-        params: CreateAccountParams,
+        anchor_number: AnchorNumber,
+        origin: FrontendHostname,
+        name: String,
     ) -> Result<Account, StorageError> {
-        let CreateAccountParams {
-            anchor_number,
-            name,
-            origin,
-        } = params;
+        check_frontend_length(&origin);
 
-        // Which reference the new account number goes into, decided before anything is
-        // written: returning `Err` on the IC commits every write that came before it,
-        // so a refusal below this point would leave an allocated account stored with
-        // no reference naming it.
-        let existing_references = match self
-            .lookup_application_number_with_origin(&origin)
-            .and_then(|application_number| {
-                self.account_references(anchor_number, application_number)
-            }) {
-            // Nothing stored under this origin yet, so the row starts with just this
-            // account. Default accounts are never created explicitly.
-            None => None,
-            Some(references)
-                if references
-                    .iter()
-                    .any(|reference| reference.account_number.is_none()) =>
-            {
-                Some(references)
-            }
-            // An empty row is a tombstone and holds nothing to name, and a row whose
-            // default reference is gone never regains one — it was named or moved away.
-            Some(_) => {
-                return Err(StorageError::MissingAccount {
-                    anchor_number,
-                    name,
-                });
-            }
-        };
+        // Both fallible, so both before the record is built. An allocated number that
+        // is never stored only leaves a gap, and the counter is monotonic by design;
+        // a stored record nothing references would be visible and permanent.
+        let application_number = self.lookup_or_insert_application_number_with_origin(&origin)?;
+        let account_number = self.allocate_account_number()?;
 
-        // Create and store the default account.
-        let new_account_number = self.allocate_account_number()?;
+        // An absent row normalises to the derived default, which is how the first named
+        // account at an origin does not cost the identity the default it had. A
+        // tombstone normalises to nothing and stays that way.
+        let mut references = self.account_references(anchor_number, application_number);
+        // `last_used` is set when the identity signs in with the account.
+        references.push(AccountReference::new(Some(account_number), None));
+
         let storable_account = StorableAccount {
             name: name.clone(),
-            // This was a default account which uses the anchor number for the seed.
-            seed_from_anchor: Some(anchor_number),
+            seed_from_anchor: None,
         };
-        self.stable_account_memory
-            .insert(new_account_number, storable_account.clone());
+        self.write_account_state(
+            anchor_number,
+            application_number,
+            references,
+            Some((account_number, storable_account)),
+            None,
+        )?;
 
-        // Get or create an application number from the account's origin.
-        let application_number = self.lookup_or_insert_application_number_with_origin(&origin)?;
+        Ok(Account::new(
+            anchor_number,
+            origin,
+            Some(name),
+            Some(account_number),
+        ))
+    }
 
-        // Update default account in the (anchor, origin) config.
-        {
-            let mut config =
-                self.lookup_anchor_application_config(anchor_number, application_number);
+    /// Stores an account read back from [`Self::read_account`].
+    ///
+    /// Renaming one, naming the tracked default, and recording that an account was used
+    /// are the same read-modify-write: the account is the state to store, not a patch
+    /// over it, so what it carries is what the row ends up holding.
+    ///
+    /// A number no reference names is [`StorageError::AccountNotFound`] and never a
+    /// create. `update_account_for_origin` takes its account number straight from the
+    /// client, so a write that adopted an unreferenced number would hand a caller a
+    /// reference to another identity's account, and with it that account's principal.
+    pub fn write_account(&mut self, account: Account) -> Result<Account, StorageError> {
+        check_frontend_length(&account.origin);
 
-            config.default_account_number = Some(new_account_number);
+        let Account {
+            account_number,
+            anchor_number,
+            origin,
+            last_used,
+            name,
+            ..
+        } = account;
 
-            self.set_anchor_application_config(anchor_number, application_number, config);
-        }
+        let application_number = match account_number {
+            // The tracked default is stored the first time it is named or used, so its
+            // origin gets an application number on either.
+            None => self.lookup_or_insert_application_number_with_origin(&origin)?,
+            // A stored account writes to a row that already exists, and an origin
+            // nothing has been stored under has none.
+            Some(account_number) => self
+                .lookup_application_number_with_origin(&origin)
+                .ok_or(StorageError::AccountNotFound { account_number })?,
+        };
 
-        // `last_used` is set once the user signs in with this account.
-        let new_reference = AccountReference::new(Some(new_account_number), None);
-        let references = match existing_references {
-            None => vec![new_reference],
-            Some(mut references) => {
-                // Present, per the check above. Repointed in place so the reference
-                // keeps both its position in the list and its `last_used`.
-                if let Some(default_reference) = references
-                    .iter_mut()
-                    .find(|reference| reference.account_number.is_none())
-                {
-                    default_reference.account_number = Some(new_account_number);
-                }
-                references
+        let mut references = self.account_references(anchor_number, application_number);
+        let Some(position) = references
+            .iter()
+            .position(|reference| reference.account_number == account_number)
+        else {
+            // Holding a reference is what grants access, so a miss means this identity
+            // does not have the account. For the tracked default it means the row is a
+            // tombstone or the default was named and is no longer numberless — neither
+            // can be reconstructed from the origin.
+            return Err(match account_number {
+                Some(account_number) => StorageError::AccountNotFound { account_number },
+                None => StorageError::MissingAccount {
+                    anchor_number,
+                    name: name.unwrap_or_default(),
+                },
+            });
+        };
+        references[position].last_used = last_used;
+
+        let (account_number, storable_account, config) = match (account_number, name) {
+            // A stored account, whose record carries the name. Only the tracked default
+            // goes without one, so an account that has a number and no name is not a
+            // state a read can hand back.
+            (Some(_), None) => return Err(StorageError::MissingAccountName),
+            (Some(account_number), Some(name)) => {
+                let Some(mut storable_account) = self.stable_account_memory.get(&account_number)
+                else {
+                    return Err(StorageError::AccountNotFound { account_number });
+                };
+                storable_account.name = name;
+                (account_number, storable_account, None)
+            }
+            // Naming the tracked default is what stores it, and storing it is what
+            // mints its number. Its seed stays the anchor's, so the principal this
+            // identity already signs in with here is preserved.
+            (None, Some(name)) => {
+                let account_number = self.allocate_account_number()?;
+                references[position].account_number = Some(account_number);
+                (
+                    account_number,
+                    StorableAccount {
+                        name,
+                        seed_from_anchor: Some(anchor_number),
+                    },
+                    Some(AnchorApplicationConfig {
+                        default_account_number: Some(account_number),
+                    }),
+                )
+            }
+            // The tracked default, unnamed: nothing to store but the use of a
+            // reference the row already holds.
+            (None, None) => {
+                self.write_tracked_default(anchor_number, application_number, references, None)?;
+                return Ok(Account::new_with_last_used(
+                    anchor_number,
+                    origin,
+                    None,
+                    None,
+                    last_used,
+                ));
             }
         };
 
-        self.write_reference_list(anchor_number, application_number, references)?;
+        let name = storable_account.name.clone();
+        let seed_from_anchor = storable_account.seed_from_anchor;
+        self.write_account_state(
+            anchor_number,
+            application_number,
+            references,
+            Some((account_number, storable_account)),
+            config,
+        )?;
 
-        // Return created default account
         Ok(Account::new_full(
             anchor_number,
             origin,
-            Some(storable_account.name),
-            Some(new_account_number),
-            None,
-            storable_account.seed_from_anchor,
+            Some(name),
+            Some(account_number),
+            last_used,
+            seed_from_anchor,
         ))
+    }
+
+    /// Points this identity's default at `origin` to `account_number`, or clears it
+    /// where that is `None`.
+    ///
+    /// The config and the reference list go through one write, so a config naming a
+    /// number no reference names cannot be left behind.
+    pub fn set_default_account(
+        &mut self,
+        anchor_number: AnchorNumber,
+        origin: FrontendHostname,
+        account_number: Option<AccountNumber>,
+    ) -> Result<(), StorageError> {
+        check_frontend_length(&origin);
+
+        let application_number = self.lookup_or_insert_application_number_with_origin(&origin)?;
+        let references = self.account_references(anchor_number, application_number);
+
+        self.write_tracked_default(
+            anchor_number,
+            application_number,
+            references,
+            Some(AnchorApplicationConfig {
+                default_account_number: account_number,
+            }),
+        )
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
