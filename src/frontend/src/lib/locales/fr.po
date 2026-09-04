@@ -505,6 +505,9 @@ msgstr "Créé le {0}"
 msgid "Created {date}"
 msgstr "Créé le {date}"
 
+msgid "Created on the old Internet Identity site. Can only be used to <0>recover</0>, when upgrading from an identity number."
+msgstr "Créé sur l'ancien site d'Internet Identity. Ne peut être utilisé que pour <0>récupérer</0>, lors de la mise à niveau depuis un numéro d'identité."
+
 msgid "Creating account..."
 msgstr "Création du compte..."
 
@@ -1648,7 +1651,7 @@ msgid "This is the recovery method you're currently signed in with."
 msgstr "Voici la méthode de récupération avec laquelle vous êtes actuellement connecté."
 
 msgid "This legacy passkey is no longer usable and should be removed."
-msgstr "Cette ancienne passkey n’est plus utilisable et doit être supprimée."
+msgstr "Cette ancienne passkey n'est plus utilisable et doit être supprimée."
 
 msgid "This may take a few seconds"
 msgstr "Cela peut prendre quelques secondes"
