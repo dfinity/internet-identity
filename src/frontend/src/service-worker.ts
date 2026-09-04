@@ -3,32 +3,36 @@
 
 // The push service worker. The browser decrypts II's sealed ping before `push`
 // fires, so the payload is just the routing origin (`{"o":"<origin>"}`). The
-// worker pulls the real content from the dApp as the user's per-app identity
-// and renders it; anything missing (no credential, an expired one, an
-// unreachable canister) falls back to a generic notification. It has no
-// `fetch` handler, so it never intercepts requests on the auth origin.
+// worker pulls the real content from the dApp as the user's per-app identity and
+// renders it. The origin's well-known can authorize several sender canisters, and
+// any of them may own content, so the worker pulls each one and reconciles per
+// canister; anything missing (no credential, an expired one, an unreachable
+// canister) falls back to a generic notification. It has no `fetch` handler, so
+// it never intercepts requests on the auth origin.
 
 import { Actor, HttpAgent, type Identity } from "@icp-sdk/core/agent";
 import { IDL } from "@icp-sdk/core/candid";
 import { Principal } from "@icp-sdk/core/principal";
 import {
-  cacheCanister,
-  loadCachedCanister,
+  cacheCanisters,
+  loadCachedCanisters,
   loadNotificationCredential,
   notificationIdentity,
 } from "$lib/utils/notifications/pullCredential";
 import {
   reconcile,
+  type CanisterPull,
   type PulledNotification,
 } from "$lib/utils/notifications/reconcile";
+import { MAX_SENDERS, parseSenders } from "$lib/utils/notifications/senders";
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
-// Re-resolve origin -> canister at most this often; a stale entry refreshes
+// Re-resolve origin -> senders at most this often; a stale entry refreshes
 // lazily on the next push (or immediately on a pull failure).
 const CANISTER_TTL_MS = 24 * 60 * 60 * 1000;
-// Bound resolve + pull so a slow dApp can't blow the push handler's budget; on
-// timeout the generic notification still shows.
+// Bound each canister pull so a slow dApp can't blow the push handler's budget;
+// on timeout the canister is treated as unknown and its notifications are kept.
 const PULL_TIMEOUT_MS = 8_000;
 
 interface PullService {
@@ -85,15 +89,15 @@ const handleSubscriptionChange = async (
 
 const handlePush = async (payload: unknown): Promise<void> => {
   const origin = originOf(payload);
-  const pulled =
-    origin === undefined
-      ? undefined
-      : await withTimeout(pull(origin), PULL_TIMEOUT_MS, undefined);
+  const results = origin === undefined ? undefined : await pull(origin);
 
-  // Pull failed (no origin, no credential, timeout, unreachable): the real
-  // pending set is unknown, so show a generic notification and touch nothing
-  // that is already on screen.
-  if (pulled === undefined) {
+  // No sender answered (no origin, no credential, every sender unreachable or
+  // timed out): the real pending set is unknown, so show a generic notification
+  // and touch nothing already on screen.
+  const anyKnown = (results ?? []).some(
+    (result) => result.pulled !== undefined,
+  );
+  if (!anyKnown) {
     await sw.registration.showNotification(appName(origin), {
       body: "You have a new notification.",
       icon: "/favicon.svg",
@@ -103,8 +107,9 @@ const handlePush = async (payload: unknown): Promise<void> => {
     return;
   }
 
-  // Pull succeeded: the returned set is authoritative for this origin.
-  await reconcile(sw.registration, origin as string, pulled);
+  // At least one sender answered: reconcile per canister. Unknown senders in the
+  // set are left alone by `reconcile`.
+  await reconcile(sw.registration, origin as string, results as CanisterPull[]);
 };
 
 const originOf = (payload: unknown): string | undefined => {
@@ -124,34 +129,62 @@ const appName = (origin: string | undefined): string => {
   }
 };
 
-// Returns the dApp's pending set (possibly empty) on success, or `undefined`
-// when the pull can't be made: no credential, an expired one, an unresolvable
-// or unreachable canister. The caller treats `undefined` as "state unknown" and
-// only reconciles on a real answer.
-const pull = async (
-  origin: string,
-): Promise<PulledNotification[] | undefined> => {
+// Returns one result per authorized sender canister, or `undefined` when the
+// pull can't be attempted at all: no credential, an expired one, or an origin
+// whose well-known names no valid sender. Each result carries that canister's
+// pending set, or `undefined` if it could not be reached; the caller reconciles
+// the answers and leaves the unknowns alone.
+const pull = async (origin: string): Promise<CanisterPull[] | undefined> => {
   const record = await loadNotificationCredential(origin);
   if (record === undefined || record.expiresAtMillis <= Date.now()) {
     return undefined;
   }
   const identity = await notificationIdentity(record);
-  const canisterId = await resolveCanister(origin, false);
-  if (canisterId === undefined) {
+
+  const cached = await resolveCanisters(origin, false);
+  const canisters =
+    cached.length > 0 ? cached : await resolveCanisters(origin, true);
+  if (canisters.length === 0) {
     return undefined;
   }
-  try {
-    return await pullFrom(canisterId, identity, record.host);
-  } catch {
-    // The cached canister may be stale (the dApp changed its id). Re-resolve
-    // from the well-known and retry once, but only if it actually moved.
-    const fresh = await resolveCanister(origin, true);
-    if (fresh === undefined || fresh.toText() === canisterId.toText()) {
-      return undefined;
+
+  const results = await pullAll(canisters, identity, record.host);
+
+  // A cached sender that failed may mean the well-known moved (a sender added,
+  // removed, or replaced). Re-resolve once; if the set changed, pull the fresh
+  // set and close anything a now-absent sender still has on screen.
+  const usedCache = cached.length > 0;
+  if (usedCache && results.some((result) => result.pulled === undefined)) {
+    const fresh = await resolveCanisters(origin, true);
+    if (!sameCanisters(fresh, canisters)) {
+      const freshResults = await pullAll(fresh, identity, record.host);
+      const removed: CanisterPull[] = canisters
+        .filter((was) => !fresh.some((now) => now.toText() === was.toText()))
+        .map((gone) => ({ canister: gone.toText(), pulled: [] }));
+      return [...freshResults, ...removed];
     }
-    return pullFrom(fresh, identity, record.host).catch(() => undefined);
   }
+  return results;
 };
+
+// Pulls every canister concurrently, each bounded by its own timeout. A pull that
+// rejects or outlives the timeout becomes `undefined` (unknown) for that canister
+// without affecting the others.
+const pullAll = (
+  canisters: Principal[],
+  identity: Identity,
+  host: string,
+): Promise<CanisterPull[]> =>
+  Promise.all(
+    canisters.map(async (canister) => ({
+      canister: canister.toText(),
+      pulled: await withTimeout<PulledNotification[] | undefined>(
+        pullFrom(canister, identity, host),
+        PULL_TIMEOUT_MS,
+        undefined,
+      ),
+    })),
+  );
 
 const pullFrom = async (
   canisterId: Principal,
@@ -167,25 +200,31 @@ const pullFrom = async (
   return actor.ii_pending_notifications();
 };
 
-// The canister comes from the consented origin's own well-known, never from the
-// ping (a forged ping can only name an origin II already sealed for). It's cached
-// and reused within a TTL; a stale entry is re-resolved here or on a pull failure.
-const resolveCanister = async (
+// The senders come from the consented origin's own well-known, never from the
+// ping (a forged ping can only name an origin II already sealed for). They're
+// cached and reused within a TTL; a stale set is re-resolved here or on a pull
+// failure.
+const resolveCanisters = async (
   origin: string,
   forceRefresh: boolean,
-): Promise<Principal | undefined> => {
+): Promise<Principal[]> => {
   if (!forceRefresh) {
-    const cached = await loadCachedCanister(origin);
+    const cached = await loadCachedCanisters(origin);
     if (
       cached !== undefined &&
       cached.resolvedAtMillis + CANISTER_TTL_MS > Date.now()
     ) {
-      return principalOf(cached.canisterId);
+      return cached.canisterIds
+        .map(principalOf)
+        .filter((canister): canister is Principal => canister !== undefined);
     }
   }
-  const fetched = await fetchSenderCanister(origin);
-  if (fetched !== undefined) {
-    await cacheCanister(origin, fetched.toText());
+  const fetched = await fetchSenderCanisters(origin);
+  if (fetched.length > 0) {
+    await cacheCanisters(
+      origin,
+      fetched.map((canister) => canister.toText()),
+    );
   }
   return fetched;
 };
@@ -212,32 +251,31 @@ const originCandidates = (origin: string): string[] => {
   ];
 };
 
-const fetchSendersDoc = async (
-  origin: string,
-): Promise<Principal | undefined> => {
+const fetchSendersDoc = async (origin: string): Promise<Principal[]> => {
   const response = await fetch(`${origin}/.well-known/ii-notification-senders`);
-  if (!response.ok) return undefined;
+  if (!response.ok) return [];
   const doc: unknown = await response.json();
-  const senders =
-    doc !== null && typeof doc === "object" && "senders" in doc
-      ? (doc as { senders: unknown }).senders
-      : undefined;
-  const first = Array.isArray(senders) ? senders[0] : undefined;
-  return typeof first === "string" ? principalOf(first) : undefined;
+  return parseSenders(doc, MAX_SENDERS)
+    .map(principalOf)
+    .filter((canister): canister is Principal => canister !== undefined);
 };
 
-const fetchSenderCanister = async (
-  origin: string,
-): Promise<Principal | undefined> => {
+const fetchSenderCanisters = async (origin: string): Promise<Principal[]> => {
   for (const candidate of originCandidates(origin)) {
     try {
-      const sender = await fetchSendersDoc(candidate);
-      if (sender !== undefined) return sender;
+      const senders = await fetchSendersDoc(candidate);
+      if (senders.length > 0) return senders;
     } catch {
       // Try the next gateway.
     }
   }
-  return undefined;
+  return [];
+};
+
+const sameCanisters = (a: Principal[], b: Principal[]): boolean => {
+  if (a.length !== b.length) return false;
+  const texts = new Set(a.map((canister) => canister.toText()));
+  return b.every((canister) => texts.has(canister.toText()));
 };
 
 const principalOf = (text: string): Principal | undefined => {

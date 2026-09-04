@@ -1,20 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
-import { reconcile, type PulledNotification } from "./reconcile";
+import {
+  reconcile,
+  type CanisterPull,
+  type PulledNotification,
+} from "./reconcile";
 
 const ORIGIN = "https://app.example";
+const A = "canister-a";
+const B = "canister-b";
 
 interface FakeNotification {
   tag: string;
-  data: { origin?: string } | null;
+  data: { origin?: string; canister?: string; id?: string } | null;
   close: ReturnType<typeof vi.fn>;
 }
 
 const shownNotification = (
-  tag: string,
+  canister: string | undefined,
+  id: string,
   origin: string | undefined,
 ): FakeNotification => ({
-  tag,
-  data: origin === undefined ? null : { origin },
+  tag: canister === undefined ? id : `${canister} ${id}`,
+  data: origin === undefined ? null : { origin, canister, id },
   close: vi.fn(),
 });
 
@@ -22,6 +29,16 @@ const pending = (id: string): PulledNotification => ({
   id,
   title: `title-${id}`,
   body: [`body-${id}`],
+});
+
+const known = (canister: string, ...ids: string[]): CanisterPull => ({
+  canister,
+  pulled: ids.map(pending),
+});
+
+const unknown = (canister: string): CanisterPull => ({
+  canister,
+  pulled: undefined,
 });
 
 const fakeRegistration = (shown: FakeNotification[]) => {
@@ -34,23 +51,23 @@ const fakeRegistration = (shown: FakeNotification[]) => {
 };
 
 describe("reconcile", () => {
-  it("closes this origin's notifications that are no longer pending", async () => {
-    const stale = shownNotification("a", ORIGIN);
-    const kept = shownNotification("b", ORIGIN);
+  it("closes a canister's notifications that are no longer pending", async () => {
+    const stale = shownNotification(A, "a", ORIGIN);
+    const kept = shownNotification(A, "b", ORIGIN);
     const { registration } = fakeRegistration([stale, kept]);
 
-    await reconcile(registration, ORIGIN, [pending("b")]);
+    await reconcile(registration, ORIGIN, [known(A, "b")]);
 
     expect(stale.close).toHaveBeenCalledOnce();
     expect(kept.close).not.toHaveBeenCalled();
   });
 
-  it("empty pending closes all of this origin's notifications and shows nothing", async () => {
-    const one = shownNotification("a", ORIGIN);
-    const two = shownNotification("b", ORIGIN);
+  it("an empty (or removed) sender closes all its notifications and shows nothing", async () => {
+    const one = shownNotification(A, "a", ORIGIN);
+    const two = shownNotification(A, "b", ORIGIN);
     const { registration, showNotification } = fakeRegistration([one, two]);
 
-    await reconcile(registration, ORIGIN, []);
+    await reconcile(registration, ORIGIN, [{ canister: A, pulled: [] }]);
 
     expect(one.close).toHaveBeenCalledOnce();
     expect(two.close).toHaveBeenCalledOnce();
@@ -58,49 +75,98 @@ describe("reconcile", () => {
   });
 
   it("never touches another origin's notifications", async () => {
-    const otherApp = shownNotification("a", "https://other.example");
-    const noOrigin = shownNotification("b", undefined);
+    const otherApp = shownNotification(A, "a", "https://other.example");
+    const noOrigin = shownNotification(A, "b", undefined);
     const { registration } = fakeRegistration([otherApp, noOrigin]);
 
-    await reconcile(registration, ORIGIN, []);
+    await reconcile(registration, ORIGIN, [{ canister: A, pulled: [] }]);
 
     expect(otherApp.close).not.toHaveBeenCalled();
     expect(noOrigin.close).not.toHaveBeenCalled();
   });
 
-  it("shows or replaces each pending notification keyed by its id", async () => {
+  it("never touches another canister's notifications on the same origin", async () => {
+    const otherCanister = shownNotification(B, "a", ORIGIN);
+    const { registration } = fakeRegistration([otherCanister]);
+
+    // A is reconciled to empty; B is not in the results at all.
+    await reconcile(registration, ORIGIN, [{ canister: A, pulled: [] }]);
+
+    expect(otherCanister.close).not.toHaveBeenCalled();
+  });
+
+  it("shows each pending notification tagged by canister and id", async () => {
     const { registration, showNotification } = fakeRegistration([]);
 
-    await reconcile(registration, ORIGIN, [pending("x"), pending("y")]);
+    await reconcile(registration, ORIGIN, [known(A, "x", "y")]);
 
     expect(showNotification).toHaveBeenCalledTimes(2);
     expect(showNotification).toHaveBeenCalledWith(
       "title-x",
       expect.objectContaining({
         body: "body-x",
-        tag: "x",
-        data: { origin: ORIGIN, id: "x" },
+        tag: `${A} x`,
+        data: { origin: ORIGIN, canister: A, id: "x" },
       }),
     );
     expect(showNotification).toHaveBeenCalledWith(
       "title-y",
-      expect.objectContaining({ tag: "y", data: { origin: ORIGIN, id: "y" } }),
+      expect.objectContaining({ tag: `${A} y` }),
     );
   });
 
-  it("re-showing the same id replaces in place (same tag), not a duplicate", async () => {
-    // A notification for id "x" is already on screen; a fresh pull of "x"
-    // reuses its tag, so the browser updates rather than stacks.
-    const existing = shownNotification("x", ORIGIN);
+  it("re-showing the same canister and id replaces in place (same tag)", async () => {
+    const existing = shownNotification(A, "x", ORIGIN);
     const { registration, showNotification } = fakeRegistration([existing]);
 
-    await reconcile(registration, ORIGIN, [pending("x")]);
+    await reconcile(registration, ORIGIN, [known(A, "x")]);
 
     expect(existing.close).not.toHaveBeenCalled();
     expect(showNotification).toHaveBeenCalledOnce();
     expect(showNotification).toHaveBeenCalledWith(
       "title-x",
-      expect.objectContaining({ tag: "x" }),
+      expect.objectContaining({ tag: `${A} x` }),
     );
+  });
+
+  it("two canisters may use the same id without replacing each other", async () => {
+    const { registration, showNotification } = fakeRegistration([]);
+
+    await reconcile(registration, ORIGIN, [known(A, "dup"), known(B, "dup")]);
+
+    expect(showNotification).toHaveBeenCalledTimes(2);
+    expect(showNotification).toHaveBeenCalledWith(
+      "title-dup",
+      expect.objectContaining({
+        tag: `${A} dup`,
+        data: { origin: ORIGIN, canister: A, id: "dup" },
+      }),
+    );
+    expect(showNotification).toHaveBeenCalledWith(
+      "title-dup",
+      expect.objectContaining({
+        tag: `${B} dup`,
+        data: { origin: ORIGIN, canister: B, id: "dup" },
+      }),
+    );
+  });
+
+  it("a failed (unknown) sender keeps its notifications while a known one reconciles", async () => {
+    const keptOnUnknown = shownNotification(A, "a", ORIGIN);
+    const staleOnKnown = shownNotification(B, "b", ORIGIN);
+    const { registration, showNotification } = fakeRegistration([
+      keptOnUnknown,
+      staleOnKnown,
+    ]);
+
+    // A could not be reached (unknown); B answered empty.
+    await reconcile(registration, ORIGIN, [
+      unknown(A),
+      { canister: B, pulled: [] },
+    ]);
+
+    expect(keptOnUnknown.close).not.toHaveBeenCalled();
+    expect(staleOnKnown.close).toHaveBeenCalledOnce();
+    expect(showNotification).not.toHaveBeenCalled();
   });
 });
