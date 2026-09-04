@@ -322,7 +322,7 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 
 #[update]
 #[allow(clippy::too_many_arguments)]
-fn webpush_subscribe_device(
+async fn webpush_subscribe_device(
     anchor_number: AnchorNumber,
     endpoint: String,
     p256dh: ByteBuf,
@@ -340,6 +340,7 @@ fn webpush_subscribe_device(
         jwt_signatures.into_iter().map(ByteBuf::into_vec).collect(),
         jwt_issued_at_ns,
     )
+    .await
 }
 
 #[update]
@@ -371,12 +372,12 @@ fn webpush_unsubscribe_device(anchor_number: AnchorNumber, endpoint: String) -> 
 }
 
 #[update]
-fn notification_grant_consent(
+async fn notification_grant_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     account_number: Option<u64>,
 ) -> Result<(), String> {
-    notifications::consent::grant_consent(anchor_number, origin, account_number)
+    notifications::consent::grant_consent(anchor_number, origin, account_number).await
 }
 
 #[update]
