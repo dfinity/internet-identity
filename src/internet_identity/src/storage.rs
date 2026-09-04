@@ -1689,7 +1689,7 @@ impl<M: Memory + Clone> Storage<M> {
         &mut self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-        current: HeldReferences,
+        new_references: HeldReferences,
     ) -> Result<(), StorageError> {
         let application = self
             .stable_application_memory
@@ -1697,7 +1697,7 @@ impl<M: Memory + Clone> Storage<M> {
             .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
 
         let previous_row = self.reference_row(anchor_number, application_number);
-        let deltas = ReferenceListDeltas::between(&previous_row, &current);
+        let counter_deltas = ReferenceListDeltas::between(&previous_row, &new_references);
 
         // Counters first: it is the only step here that can fail, and returning an error
         // after the list is written would commit one without the other. A failure now
@@ -1706,11 +1706,11 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number,
             application_number,
             application,
-            deltas,
+            counter_deltas,
         )?;
         self.stable_account_reference_list_memory.insert(
             (anchor_number, application_number),
-            current.into_vec().into(),
+            new_references.into_vec().into(),
         );
         Ok(())
     }
@@ -2548,13 +2548,13 @@ struct ReferenceListDeltas {
 }
 
 impl ReferenceListDeltas {
-    /// What writing `current` over `previous_row` does to the counters.
+    /// What writing `new_references` over `previous_row` does to the counters.
     ///
     /// A tombstone counts as no references, which is right for the totals and is why
     /// removing a row must not consult this: a tombstone's row is still alive while
     /// holding nothing, so decrementing to zero on it would let the row be retired and
     /// a moved-away default be reconstructed at the same principal.
-    fn between(previous_row: &ReferenceRow, current: &HeldReferences) -> Self {
+    fn between(previous_row: &ReferenceRow, new_references: &HeldReferences) -> Self {
         /// Saturating rather than `as`: a list long enough to overflow `i64` cannot
         /// exist — `MAX_ANCHOR_ACCOUNTS` bounds it far below — and saturating says so
         /// without a cast that would wrap silently if that ever stopped being true.
@@ -2574,11 +2574,11 @@ impl ReferenceListDeltas {
             ReferenceRow::Untouched | ReferenceRow::Tombstone => (0, 0),
             ReferenceRow::Held(held) => counts(held.iter()),
         };
-        let (current_named, current_total) = counts(current.iter());
+        let (new_named, new_total) = counts(new_references.iter());
 
         Self {
-            accounts: current_named.saturating_sub(previous_named),
-            references: current_total.saturating_sub(previous_total),
+            accounts: new_named.saturating_sub(previous_named),
+            references: new_total.saturating_sub(previous_total),
         }
     }
 
