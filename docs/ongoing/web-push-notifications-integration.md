@@ -25,13 +25,14 @@ The application owns the decision to create, update, or remove a notification.
 The client library owns the durable campaign and pending-content state. II owns
 consent, sender authorization, and delivery of the sealed, content-free ping.
 
-This document describes that integration boundary. The trust model and the II
-implementation are covered by [Web Push notifications](web-push-notifications.md).
+This document covers the pieces a dApp and the client library provide. The
+trust model and the II implementation are covered by
+[Web Push notifications](web-push-notifications.md).
 
 > **Status:** The feature is not enabled in production and
 > `internet-identity-notifications-client` has not been published. The
-> interfaces below describe the intended integrator surface. Exact names may
-> change before release.
+> examples below show how the integration is expected to work, but the API has
+> not been finalized.
 
 The Rust and Motoko implementations live in
 [internet-identity-notifications-client](https://github.com/dfinity/internet-identity-notifications-client).
@@ -47,14 +48,13 @@ content outside II, but it leaves two pieces of work on the dApp side:
 2. Something has to submit and, when necessary, resubmit the corresponding ping
    to II.
 
-Making every application implement those pieces would expose the most subtle
-parts of the protocol as application code. It would also give Motoko and Rust
-applications different delivery behavior. The client library therefore owns
-both pieces inside the dApp canister. The application supplies notification
-intent, while the library turns that intent into the storage and calls required
-by the protocol.
+These are easy details for applications to get wrong, and implementing them in
+every dApp would also lead to different behavior between the Motoko and Rust
+clients. The client library handles both inside the dApp canister. The
+application gives it the notifications to send, and the library stores them and
+makes the required calls to II.
 
-## Integration boundary
+## Who owns what
 
 | Component           | Responsibility                                                                                                          |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
@@ -88,17 +88,16 @@ being used for sign-in. The delegated identity returned to the dApp is otherwise
 unchanged. Its principal is also the recipient principal used in a notification
 campaign.
 
-Consent stays in the existing II ceremony. This design does not introduce a
-second app-owned consent protocol. The option is implemented by the II window
-transport today; general integration also requires it in the published
-`AuthClient` API.
+Consent stays in the existing II ceremony. There is no second consent flow for
+the app to manage. The option is implemented by the II window transport today;
+general integration also requires it in the published `AuthClient` API.
 
 ## Sender authorization
 
-II has to connect the web origin that received consent to the canister that
-later calls `notification_send`. The initial stack establishes this connection
-through the origin. The intended design establishes it through the user's app
-session.
+II needs to know that the canister calling `notification_send` belongs to the
+app that received consent. The initial stack checks this through the app origin.
+Once app sessions are available, the app frontend can register the canister
+directly.
 
 ### Initial implementation: declaration by the origin
 
@@ -130,12 +129,10 @@ this part of the flow.
 
 Canister-hosted frontends serve this as a certified asset. The Motoko and Rust
 clients provide helpers for producing the JSON body, so the application only
-has to expose the resulting asset at the well-known path.
+has to expose that asset at the well-known path.
 
-This is an interim mechanism. It lets sender authorization ship before II can
-resolve an authenticated app call to its identity, origin, and account, but it
-adds an HTTPS outcall to consent and an asset that every integrating origin has
-to maintain.
+This works before app sessions land, but it adds an HTTPS outcall to the consent
+flow and requires every app origin to maintain another asset.
 
 ### Intended design: registration through the app session
 
@@ -144,13 +141,13 @@ II can resolve the caller to the identity, origin, and account behind that
 session, so the frontend can register the app's sender canisters without asking
 II to discover them over HTTPS.
 
-In that model, `AuthClient` is configured with the sender canister principals
-and passes them to II while notification consent is established. II records the
-sender set with that account's session-backed notification authorization. When
-a canister sends a ping, II resolves the recipient through the shared account
-index and accepts the caller only if it is registered for that account and app.
-The canister no longer supplies an origin for II to trust, and the well-known
-outcall is removed.
+Once sessions are available, the app configures `AuthClient` with its sender
+canister principals. `AuthClient` passes them to II while notification consent
+is established, and II stores them with that account's notification access.
+When a canister sends a ping, II resolves the recipient through the shared
+account index and checks that the caller is registered for the account and app.
+The canister no longer has to supply an origin, and II no longer needs the
+well-known outcall.
 
 ```mermaid
 sequenceDiagram
@@ -169,17 +166,15 @@ sequenceDiagram
     II-->>Canister: Accept or reject ping
 ```
 
-The registration is scoped per account rather than shared globally. A frontend
-acting for one user can authorize a sender for that user's notification access;
-it cannot establish that binding for other users. This repeats a small sender
-set across participating accounts, but it preserves the trust boundary between
-them.
+The registration is stored per account rather than shared across all users. A
+frontend acting for one user can authorize a sender for that user's
+notifications, but its call says nothing about what another user has agreed to.
+This means storing the same small sender list more than once, which is the cost
+of keeping those decisions separate.
 
-The final API shape, sender limit, refresh period, and exact relationship
-between registration and session revocation remain to be specified with the
-revocable-session integration. The intended property is that sender authority
-is derived from and bounded by the app session rather than becoming another
-standing credential.
+The session work still has to settle the API, sender limit, refresh period, and
+what happens to a registration when its session ends. The registration must not
+become a new permanent credential after the session that created it is gone.
 
 ## The client is included in the dApp backend
 
@@ -187,7 +182,7 @@ Campaign and pending-notification state lives in the dApp's stable memory. Its
 schema and lifecycle belong to the notification client rather than to
 application code.
 
-For Motoko, the proposed package follows the same pattern as
+The Motoko package will follow the same pattern as
 [`identity-attributes`](https://mops.one/identity-attributes). The package root
 is a mixin included in the dApp's persistent actor:
 
@@ -219,7 +214,7 @@ the same across both implementations.
 
 A campaign has an application-defined ID and a list of notifications. Each
 notification carries a stable ID, the recipient principal, the content to be
-shown, and delivery options. The proposed Motoko surface is:
+shown, and delivery options. The Motoko API should look roughly like this:
 
 ```motoko
 await sendNotificationCampaign({
@@ -245,10 +240,10 @@ await sendNotificationCampaign({
 });
 ```
 
-The exact method and field names are not final. The boundary is: the
-application supplies the complete campaign, and the client owns its execution.
-The `recipient` is the principal obtained from the user's II delegation for the
-same app origin and account.
+The names may change before the client is published. The important part is that
+the application passes the whole campaign to the client instead of managing
+each delivery itself. The `recipient` is the principal obtained from the user's
+II delegation for the same app origin and account.
 
 The campaign API is local to the containing canister. This avoids a second
 Candid boundary between the application's notification logic and the library,
@@ -331,7 +326,7 @@ pending set the next time it wakes.
 ## Status semantics
 
 II reports admission into its transient buffer, not delivery to a device. The
-client therefore exposes campaign progress using admission states:
+client reports campaign progress using the following states:
 
 | State            | Meaning                                                 |
 | ---------------- | ------------------------------------------------------- |
@@ -344,9 +339,9 @@ client therefore exposes campaign progress using admission states:
 Neither II nor the client receives a device receipt, so the API does not expose
 a `delivered` state.
 
-## Resulting integrator surface
+## What the app sees
 
-The design leaves four concepts visible to application code:
+Application code only deals with four things:
 
 1. The `iiNotifications` sign-in option.
 2. The sender canister configuration. The initial implementation exposes it as
@@ -356,6 +351,6 @@ The design leaves four concepts visible to application code:
    and origin.
 4. Campaigns containing recipient principals and notification content.
 
-The Web Push subscription, VAPID credentials, payload encryption, II delivery
-buffer, service-worker pull protocol, retry policy, and durable campaign schema
-remain below that boundary.
+II and the client library handle the Web Push subscription, VAPID credentials,
+payload encryption, II delivery buffer, service-worker pull protocol, retry
+policy, and durable campaign schema.
