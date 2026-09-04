@@ -121,6 +121,7 @@ use crate::storage::storable::anchor_application_config::AnchorApplicationConfig
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::notifications::consent::StorableNotificationConsent;
+use crate::storage::storable::notifications::sender::StorableSenderBinding;
 use crate::storage::storable::notifications::webpush::endpoint_hash::StorableEndpointSha256;
 use crate::storage::storable::notifications::webpush::seal::StorableWebPushSeal;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
@@ -219,6 +220,7 @@ const WEBPUSH_SUBSCRIPTIONS_MEMORY_INDEX: u8 = 33u8;
 const NOTIFICATIONS_CONSENT_MEMORY_INDEX: u8 = 35u8;
 const NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_INDEX: u8 = 36u8;
 const WEBPUSH_SEAL_MEMORY_INDEX: u8 = 37u8;
+const NOTIFICATION_SENDER_BINDINGS_MEMORY_INDEX: u8 = 38u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -312,6 +314,12 @@ const NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_ID: MemoryId =
 /// sealed payloads, computed at consent and reused per send. Keyed device-first
 /// so a device's seals are a contiguous range for re-subscribe/unsubscribe.
 const WEBPUSH_SEAL_MEMORY_ID: MemoryId = MemoryId::new(WEBPUSH_SEAL_MEMORY_INDEX);
+/// `(sender_canister, origin_sha256) -> StorableSenderBinding`. Verified sender
+/// bindings — which origins each canister may send notifications for, from the
+/// dApp's well-known file at consent time. Composite key so no origin can
+/// overwrite another's canister binding.
+const NOTIFICATION_SENDER_BINDINGS_MEMORY_ID: MemoryId =
+    MemoryId::new(NOTIFICATION_SENDER_BINDINGS_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -486,6 +494,10 @@ pub struct Storage<M: Memory> {
         ManagedMemory<M>,
     >,
 
+    notification_sender_bindings_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    pub(crate) notification_sender_bindings_memory:
+        StableBTreeMap<(Principal, StorableOriginSha256), StorableSenderBinding, ManagedMemory<M>>,
+
     notifications_consent_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     pub(crate) notifications_consent_memory: StableBTreeMap<
         (StorableAnchorNumber, StorableOriginSha256),
@@ -588,6 +600,8 @@ impl<M: Memory + Clone> Storage<M> {
         let sso_stable_id_index_memory = memory_manager.get(SSO_STABLE_ID_INDEX_MEMORY_ID);
         let webpush_subscriptions_memory = memory_manager.get(WEBPUSH_SUBSCRIPTIONS_MEMORY_ID);
         let webpush_seal_memory = memory_manager.get(WEBPUSH_SEAL_MEMORY_ID);
+        let notification_sender_bindings_memory =
+            memory_manager.get(NOTIFICATION_SENDER_BINDINGS_MEMORY_ID);
         let notifications_consent_memory = memory_manager.get(NOTIFICATIONS_CONSENT_MEMORY_ID);
         let notifications_recipient_index_memory =
             memory_manager.get(NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_ID);
@@ -716,6 +730,12 @@ impl<M: Memory + Clone> Storage<M> {
             webpush_subscriptions_memory: StableBTreeMap::init(webpush_subscriptions_memory),
             webpush_seal_memory_wrapper: MemoryWrapper::new(webpush_seal_memory.clone()),
             webpush_seal_memory: StableBTreeMap::init(webpush_seal_memory),
+            notification_sender_bindings_memory_wrapper: MemoryWrapper::new(
+                notification_sender_bindings_memory.clone(),
+            ),
+            notification_sender_bindings_memory: StableBTreeMap::init(
+                notification_sender_bindings_memory,
+            ),
             notifications_consent_memory_wrapper: MemoryWrapper::new(
                 notifications_consent_memory.clone(),
             ),
@@ -2675,6 +2695,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "webpush_seal_memory".to_string(),
                 self.webpush_seal_memory_wrapper.size(),
+            ),
+            (
+                "notification_sender_bindings_memory".to_string(),
+                self.notification_sender_bindings_memory_wrapper.size(),
             ),
             (
                 "notifications_consent_memory".to_string(),

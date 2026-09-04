@@ -372,6 +372,13 @@ fn webpush_unsubscribe_device(anchor_number: AnchorNumber, endpoint: String) -> 
 }
 
 #[update]
+fn notification_send(
+    request: notifications::send::NotificationSendRequest,
+) -> notifications::send::NotificationSendResponse {
+    notifications::send::notification_send(request)
+}
+
+#[update]
 async fn notification_grant_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
