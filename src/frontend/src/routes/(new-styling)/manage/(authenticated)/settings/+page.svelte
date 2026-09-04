@@ -3,8 +3,11 @@
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { fromCanisterMcpConfig } from "$lib/utils/mcpConfig";
+  import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
   import CliAccessSection from "./components/CliAccessSection.svelte";
   import McpTrustedServersSection from "./components/McpTrustedServersSection.svelte";
+  import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
+  import { BellIcon, ChevronRightIcon } from "@lucide/svelte";
   import type { PageProps } from "./$types";
 
   const { data }: PageProps = $props();
@@ -32,4 +35,23 @@
     identityNumber={$authenticatedStore.identityNumber}
     {mcpConfig}
   />
+  {#if $PUSH_NOTIFICATIONS}
+    <ButtonCard href="/manage/notifications" class="group !p-4 sm:!p-5">
+      <span
+        class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-10 shrink-0 items-center justify-center rounded-lg border"
+        aria-hidden="true"
+      >
+        <BellIcon class="size-5" />
+      </span>
+      <span class="flex min-w-0 flex-1 flex-col gap-1 text-start">
+        <span class="text-text-primary text-base font-semibold">
+          {$t`Notifications`}
+        </span>
+        <span class="text-text-tertiary text-sm font-normal">
+          {$t`Manage which apps can send push notifications to this device.`}
+        </span>
+      </span>
+      <ChevronRightIcon class="text-fg-tertiary size-5 shrink-0" />
+    </ButtonCard>
+  {/if}
 </div>
