@@ -2128,7 +2128,7 @@ fn test_anchor_storage_migration_round_trip() {
 mod reference_list_write_path_tests {
     use crate::storage::account::{AccountReference, CreateAccountParams};
     use crate::storage::storable::accounts_counter::StorableAccountsCounter;
-    use crate::storage::StorageError;
+    use crate::storage::{HeldReferences, ReferenceRow, StorageError};
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
@@ -2140,6 +2140,12 @@ mod reference_list_write_path_tests {
         let anchor_number = anchor.anchor_number();
         storage.write(anchor).unwrap();
         (storage, anchor_number)
+    }
+
+    /// The references a test means to write, for the cases where a non-empty list is
+    /// the premise rather than the thing under test.
+    fn held(references: Vec<AccountReference>) -> HeldReferences {
+        HeldReferences::new(references).expect("test wrote an empty reference list")
     }
 
     #[test]
@@ -2182,7 +2188,7 @@ mod reference_list_write_path_tests {
             .write_reference_list(
                 anchor_number,
                 application_number,
-                vec![default_reference.clone(), named_reference],
+                held(vec![default_reference.clone(), named_reference]),
             )
             .unwrap();
 
@@ -2193,7 +2199,7 @@ mod reference_list_write_path_tests {
         let result = storage.write_reference_list(
             anchor_number,
             application_number,
-            vec![default_reference],
+            held(vec![default_reference]),
         );
 
         assert!(matches!(
@@ -2201,30 +2207,24 @@ mod reference_list_write_path_tests {
             Err(StorageError::AccountCounterOutOfBounds)
         ));
         // Refused before anything was written: the list still holds both references.
-        assert_eq!(
-            storage
-                .lookup_account_references(anchor_number, application_number)
-                .unwrap()
-                .len(),
-            2
-        );
+        let ReferenceRow::Held(references) =
+            storage.reference_row(anchor_number, application_number)
+        else {
+            panic!("the row written above is gone");
+        };
+        assert_eq!(references.iter().count(), 2);
     }
 
     #[test]
-    fn rejects_writing_an_empty_list() {
-        let (mut storage, anchor_number) = storage_with_anchor();
-        let origin = "https://example.com".to_string();
-        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
-
-        let result = storage.write_reference_list(anchor_number, application_number, vec![]);
-
-        assert!(matches!(
-            result,
-            Err(StorageError::EmptyAccountReferenceList { .. })
-        ));
-        assert!(storage
-            .lookup_account_references(anchor_number, application_number)
-            .is_none());
+    fn an_empty_list_cannot_be_handed_to_the_write_path() {
+        // The write path takes `HeldReferences`, which has no empty value, so an
+        // empty list is refused at construction rather than at the write.
+        assert!(HeldReferences::new(vec![]).is_none());
+        assert!(HeldReferences::new(vec![AccountReference {
+            account_number: None,
+            last_used: None,
+        }])
+        .is_some());
     }
 
     #[test]
@@ -2235,19 +2235,20 @@ mod reference_list_write_path_tests {
         let result = storage.write_reference_list(
             anchor_number,
             unknown_application_number,
-            vec![AccountReference {
+            held(vec![AccountReference {
                 account_number: None,
                 last_used: None,
-            }],
+            }]),
         );
 
         assert!(matches!(
             result,
             Err(StorageError::OriginNotFoundForApplicationNumber { .. })
         ));
-        assert!(storage
-            .lookup_account_references(anchor_number, unknown_application_number)
-            .is_none());
+        assert_eq!(
+            storage.reference_row(anchor_number, unknown_application_number),
+            ReferenceRow::Untouched
+        );
         assert_eq!(
             storage.get_account_counter(anchor_number),
             crate::storage::account::AccountsCounter::default()
@@ -2270,13 +2271,14 @@ mod reference_list_write_path_tests {
             last_used: None,
         }];
         storage
-            .write_reference_list(anchor_number, application_number, references.clone())
+            .write_reference_list(anchor_number, application_number, held(references.clone()))
             .unwrap();
         storage
             .stable_application_memory
             .remove(&application_number);
 
-        let result = storage.write_reference_list(anchor_number, application_number, references);
+        let result =
+            storage.write_reference_list(anchor_number, application_number, held(references));
 
         assert!(matches!(
             result,
@@ -2294,7 +2296,7 @@ mod reference_list_write_path_tests {
             .write_reference_list(
                 anchor_number,
                 application_number,
-                vec![
+                held(vec![
                     AccountReference {
                         account_number: None,
                         last_used: None,
@@ -2303,7 +2305,7 @@ mod reference_list_write_path_tests {
                         account_number: Some(7),
                         last_used: None,
                     },
-                ],
+                ]),
             )
             .unwrap();
 
@@ -2333,20 +2335,20 @@ mod reference_list_write_path_tests {
             .write_reference_list(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
+                held(vec![AccountReference {
                     account_number: None,
                     last_used: None,
-                }],
+                }]),
             )
             .unwrap();
         storage
             .write_reference_list(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
+                held(vec![AccountReference {
                     account_number: Some(3),
                     last_used: None,
-                }],
+                }]),
             )
             .unwrap();
 
@@ -2370,7 +2372,7 @@ mod reference_list_write_path_tests {
         }];
 
         storage
-            .write_reference_list(anchor_number, application_number, references.clone())
+            .write_reference_list(anchor_number, application_number, held(references.clone()))
             .unwrap();
         let after_first_write = storage.get_account_counter(anchor_number);
 
@@ -2378,10 +2380,10 @@ mod reference_list_write_path_tests {
             .write_reference_list(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
+                held(vec![AccountReference {
                     account_number: Some(1),
                     last_used: Some(123),
-                }],
+                }]),
             )
             .unwrap();
 
@@ -2419,6 +2421,296 @@ mod reference_list_write_path_tests {
         assert_eq!(storage.get_account_counter(anchor_number), written);
         assert_eq!(written.stored_account_references, 9);
         assert_eq!(written.stored_accounts, 6);
+    }
+}
+
+/// The three states a reference-list row can be in mean three different things, and
+/// the reads have to keep telling them apart. Absence says a default account is still
+/// reconstructible; emptiness says it never can be again.
+mod reference_row_state_tests {
+    use crate::storage::account::{
+        AccountReference, CreateAccountParams, ReadAccountParams, UpdateAccountParams,
+    };
+    use crate::storage::{HeldReferences, ReferenceRow, StorageError};
+    use crate::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::{AccountNumber, AnchorNumber};
+    use pretty_assertions::assert_eq;
+
+    const ORIGIN: &str = "https://example.com";
+
+    fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        (storage, anchor_number)
+    }
+
+    /// Plants the row a future account move would leave behind. The write path cannot
+    /// produce one, which is the whole point of [`HeldReferences`], so a test that
+    /// needs a tombstone has to write it directly.
+    fn plant_tombstone(storage: &mut Storage<VectorMemory>, anchor_number: AnchorNumber) {
+        let origin = ORIGIN.to_string();
+        let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+        storage
+            .stable_account_reference_list_memory
+            .insert((anchor_number, application_number), vec![].into());
+        assert_eq!(
+            storage.reference_row(anchor_number, application_number),
+            ReferenceRow::Tombstone
+        );
+    }
+
+    /// The account number the default reads back as, or `None` where there is no
+    /// default to read. The inner `None` is a default that is still derived rather
+    /// than stored, so the two levels have to stay apart.
+    fn read_default(
+        storage: &Storage<VectorMemory>,
+        anchor_number: AnchorNumber,
+    ) -> Option<Option<AccountNumber>> {
+        let origin = ORIGIN.to_string();
+        storage
+            .read_account(ReadAccountParams {
+                account_number: None,
+                anchor_number,
+                origin: &origin,
+                known_app_num: None,
+            })
+            .map(|account| account.account_number)
+    }
+
+    #[test]
+    fn an_untouched_row_offers_a_reconstructible_default() {
+        let (storage, anchor_number) = storage_with_anchor();
+        let origin = ORIGIN.to_string();
+
+        assert_eq!(read_default(&storage, anchor_number), Some(None));
+        let accounts = storage.list_accounts(anchor_number, &origin);
+        assert_eq!(accounts.len(), 1);
+        assert_eq!(accounts[0].account_number, None);
+    }
+
+    #[test]
+    fn a_tombstoned_row_lists_nothing_but_still_answers_the_default() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = ORIGIN.to_string();
+        plant_tombstone(&mut storage, anchor_number);
+
+        // Nothing to list: every reference moved away.
+        assert!(storage.list_accounts(anchor_number, &origin).is_empty());
+        // But the default is still answered, which is the lock-out escape hatch the
+        // `XXX WARNING` in `read_account` describes rather than a property to rely on.
+        assert_eq!(read_default(&storage, anchor_number), Some(None));
+    }
+
+    #[test]
+    fn a_row_that_names_no_default_has_no_default_to_read() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = ORIGIN.to_string();
+        let account = storage
+            .create_additional_account(CreateAccountParams {
+                anchor_number,
+                name: "named".to_string(),
+                origin: origin.clone(),
+            })
+            .unwrap();
+        let account_number = account.account_number.unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+
+        // Drop just the default reference, as moving it away would.
+        storage
+            .write_reference_list(
+                anchor_number,
+                application_number,
+                HeldReferences::new(vec![AccountReference {
+                    account_number: Some(account_number),
+                    last_used: None,
+                }])
+                .unwrap(),
+            )
+            .unwrap();
+
+        // No synthetic default here: the identity signs in with the named account.
+        assert_eq!(read_default(&storage, anchor_number), None);
+        let accounts = storage.list_accounts(anchor_number, &origin);
+        assert_eq!(accounts.len(), 1);
+        assert_eq!(accounts[0].account_number, Some(account_number));
+    }
+
+    #[test]
+    fn a_named_account_added_to_a_tombstoned_row_does_not_revive_the_default() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = ORIGIN.to_string();
+        plant_tombstone(&mut storage, anchor_number);
+
+        let account = storage
+            .create_additional_account(CreateAccountParams {
+                anchor_number,
+                name: "named".to_string(),
+                origin: origin.clone(),
+            })
+            .unwrap();
+
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        let ReferenceRow::Held(references) =
+            storage.reference_row(anchor_number, application_number)
+        else {
+            panic!("the named account should have left references behind");
+        };
+        assert_eq!(
+            references
+                .iter()
+                .map(|r| r.account_number)
+                .collect::<Vec<_>>(),
+            vec![account.account_number]
+        );
+    }
+
+    #[test]
+    fn a_default_that_can_no_longer_be_named_is_refused_before_anything_is_written() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = ORIGIN.to_string();
+        plant_tombstone(&mut storage, anchor_number);
+        let counter_before = storage.get_total_accounts_counter().clone();
+
+        let result = storage.update_account(UpdateAccountParams {
+            account_number: None,
+            anchor_number,
+            name: "named default".to_string(),
+            origin: origin.clone(),
+        });
+
+        assert!(matches!(result, Err(StorageError::MissingAccount { .. })));
+        // Refused before the allocation, so no account number was spent on a record
+        // that no reference would have named.
+        assert_eq!(
+            storage.get_total_accounts_counter().stored_accounts,
+            counter_before.stored_accounts
+        );
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        assert_eq!(
+            storage.reference_row(anchor_number, application_number),
+            ReferenceRow::Tombstone
+        );
+        assert_eq!(
+            storage
+                .lookup_anchor_application_config(anchor_number, application_number)
+                .default_account_number,
+            None
+        );
+    }
+
+    #[test]
+    fn naming_a_default_keeps_its_reference_in_place() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = ORIGIN.to_string();
+        let named = storage
+            .create_additional_account(CreateAccountParams {
+                anchor_number,
+                name: "named".to_string(),
+                origin: origin.clone(),
+            })
+            .unwrap();
+        let stamped_at = 123456u64;
+        storage
+            .set_account_last_used(anchor_number, origin.clone(), None, stamped_at)
+            .unwrap()
+            .unwrap();
+
+        let default = storage
+            .update_account(UpdateAccountParams {
+                account_number: None,
+                anchor_number,
+                name: "named default".to_string(),
+                origin: origin.clone(),
+            })
+            .unwrap();
+
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        let ReferenceRow::Held(references) =
+            storage.reference_row(anchor_number, application_number)
+        else {
+            panic!("naming the default should not have emptied the row");
+        };
+        // Repointed where it stood, keeping the order accounts are listed in and the
+        // timestamp the reference already carried.
+        assert_eq!(
+            references.iter().collect::<Vec<_>>(),
+            vec![
+                &AccountReference {
+                    account_number: default.account_number,
+                    last_used: Some(stamped_at),
+                },
+                &AccountReference {
+                    account_number: named.account_number,
+                    last_used: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn an_identity_holding_no_reference_can_neither_rename_nor_stamp_the_account() {
+        let (mut storage, owner) = storage_with_anchor();
+        let other = {
+            let anchor = storage.allocate_anchor(0).unwrap();
+            let anchor_number = anchor.anchor_number();
+            storage.write(anchor).unwrap();
+            anchor_number
+        };
+        let origin = ORIGIN.to_string();
+        let account = storage
+            .create_additional_account(CreateAccountParams {
+                anchor_number: owner,
+                name: "named".to_string(),
+                origin: origin.clone(),
+            })
+            .unwrap();
+        let account_number = account.account_number.unwrap();
+        // The other identity has a row of its own at this origin, so what refuses the
+        // attempts below is the row not naming this account rather than there being no
+        // row to look in.
+        storage
+            .create_additional_account(CreateAccountParams {
+                anchor_number: other,
+                name: "mine".to_string(),
+                origin: origin.clone(),
+            })
+            .unwrap();
+
+        let rename = storage.update_account(UpdateAccountParams {
+            account_number: Some(account_number),
+            anchor_number: other,
+            name: "stolen".to_string(),
+            origin: origin.clone(),
+        });
+        assert!(matches!(rename, Err(StorageError::AccountNotFound { .. })));
+
+        let stamp = storage
+            .set_account_last_used(other, origin.clone(), Some(account_number), 123456)
+            .unwrap();
+        assert_eq!(stamp, None);
+
+        // The owner's record and reference are untouched by either attempt.
+        let owned = storage
+            .read_account(ReadAccountParams {
+                account_number: Some(account_number),
+                anchor_number: owner,
+                origin: &origin,
+                known_app_num: None,
+            })
+            .unwrap();
+        assert_eq!(owned.name, Some("named".to_string()));
+        assert_eq!(owned.last_used, None);
     }
 }
 
