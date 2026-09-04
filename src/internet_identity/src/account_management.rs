@@ -343,6 +343,13 @@ pub async fn prepare_account_delegation(
             .ok_or(AccountDelegationError::Unauthorized(caller()))
     })?;
 
+    // One read, passed to everything below. `time()` is constant only within a single
+    // execution, and an `await` on an inter-canister call ends one — the continuation
+    // resumes with a later time. Reading it at each use would make "the same instant"
+    // rest on no `await` ever appearing between them, which is not a property to leave
+    // to where the calls happen to sit.
+    let now = time();
+
     let session_duration_ns = u64::min(
         max_ttl.unwrap_or(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS),
         crate::delegation::MAX_EXPIRATION_PERIOD_NS,
@@ -356,20 +363,19 @@ pub async fn prepare_account_delegation(
     // success while wasting a signature-map entry on an unusable delegation.
     // For the MCP path this is exactly the session-over signal: the grant
     // expired mid-call.
-    if max_expiration.is_some_and(|cap| cap <= time()) {
+    if max_expiration.is_some_and(|cap| cap <= now) {
         return Err(AccountDelegationError::Unauthorized(caller()));
     }
     let expiration = u64::min(
-        time().saturating_add(session_duration_ns),
+        now.saturating_add(session_duration_ns),
         max_expiration.unwrap_or(u64::MAX),
     );
     // The metrics duration is the delegation's *effective* lifetime: the
     // absolute `max_expiration` cap can shorten it below the requested
     // `session_duration_ns` (e.g. an MCP grant near expiry). With no cap the two
     // are equal, so this matches the regular path exactly while keeping the
-    // recorded duration honest when the cap binds. `time()` is stable here (no
-    // await since it was read for `expiration`).
-    let effective_duration_ns = expiration.saturating_sub(time());
+    // recorded duration honest when the cap binds.
+    let effective_duration_ns = expiration.saturating_sub(now);
     let seed = account.calculate_seed();
 
     // Stamped before the delegation is signed. On the IC returning `Err` commits
@@ -379,7 +385,7 @@ pub async fn prepare_account_delegation(
     // reference to stamp, which is how a default account that is still derived rather
     // than stored reads.
     storage_borrow_mut(|storage| {
-        storage.record_account_use(anchor_number, origin.clone(), account_number, time())
+        storage.record_account_use(anchor_number, origin.clone(), account_number, now)
     })
     .map_err(|err| AccountDelegationError::InternalCanisterError(err.to_string()))?;
 
