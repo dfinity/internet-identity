@@ -2140,17 +2140,23 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&anchor_number)
             .unwrap_or_default();
         let (anchor_accounts, anchor_references) = deltas.apply(
+            ReferenceCounter::Anchor { anchor_number },
             anchor_counter.stored_accounts,
             anchor_counter.stored_account_references,
         )?;
 
+        // Only the reference count: the global account count is the account-number
+        // allocator, which `allocate_account_number` owns and this rewrites unchanged.
+        // Moving it here would refuse a write over a count nothing was going to store.
         let global_counter = self.stable_account_counter_memory.get().clone();
-        let (_, global_references) = deltas.apply(
-            global_counter.stored_accounts,
+        let global_references = deltas.apply_one(
+            ReferenceCounter::Global,
+            ReferenceCount::References,
             global_counter.stored_account_references,
         )?;
 
         let (application_accounts, application_references) = deltas.apply(
+            ReferenceCounter::Application { application_number },
             application.stored_accounts,
             application.stored_account_references,
         )?;
@@ -3002,6 +3008,52 @@ impl ReferenceRow {
     }
 }
 
+/// Which of the counters derived from a reference list a delta is applied to.
+///
+/// Each carries what identifies its row, so a refusal points at the counter that
+/// diverged rather than only saying that one did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReferenceCounter {
+    /// One identity's totals across every application.
+    Anchor { anchor_number: AnchorNumber },
+    /// The canister-wide gauge.
+    Global,
+    /// One application's totals across every identity.
+    Application {
+        application_number: ApplicationNumber,
+    },
+}
+
+impl fmt::Display for ReferenceCounter {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Anchor { anchor_number } => write!(f, "anchor {anchor_number}"),
+            Self::Global => write!(f, "global"),
+            Self::Application { application_number } => {
+                write!(f, "application {application_number}")
+            }
+        }
+    }
+}
+
+/// Which of the two counts every reference-list counter holds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReferenceCount {
+    /// Named accounts — references that carry an account number.
+    Accounts,
+    /// References, named and tracked-default alike.
+    References,
+}
+
+impl fmt::Display for ReferenceCount {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Accounts => write!(f, "stored accounts"),
+            Self::References => write!(f, "stored account references"),
+        }
+    }
+}
+
 /// How one write to a reference-list row moves the counters derived from it.
 ///
 /// Signed because these are differences rather than totals: a write that drops a
@@ -3067,17 +3119,47 @@ impl ReferenceListDeltas {
         self.accounts == 0 && self.references == 0
     }
 
+    /// Both counts of `counter`, moved by this delta.
+    ///
     /// Refuses rather than clamping: an under-run means the counters and the stored
     /// lists have already diverged, and a clamped zero reads as "no anchor references
     /// this application any more", which retires a row other anchors still point at.
-    fn apply(&self, num_accounts: u64, num_references: u64) -> Result<(u64, u64), StorageError> {
-        let num_accounts = num_accounts
-            .checked_add_signed(self.accounts)
-            .ok_or(StorageError::AccountCounterOutOfBounds)?;
-        let num_references = num_references
-            .checked_add_signed(self.references)
-            .ok_or(StorageError::AccountCounterOutOfBounds)?;
-        Ok((num_accounts, num_references))
+    fn apply(
+        &self,
+        counter: ReferenceCounter,
+        num_accounts: u64,
+        num_references: u64,
+    ) -> Result<(u64, u64), StorageError> {
+        Ok((
+            self.apply_one(counter, ReferenceCount::Accounts, num_accounts)?,
+            self.apply_one(counter, ReferenceCount::References, num_references)?,
+        ))
+    }
+
+    /// One count of one counter, moved by this delta.
+    ///
+    /// The refusal names the counter, the count, the value stored and the delta that
+    /// would not fit, because that is the whole of what diverged and there is nothing
+    /// left to read it off afterwards: the write is refused, so the counters keep the
+    /// values that disagreed with the lists.
+    fn apply_one(
+        &self,
+        counter: ReferenceCounter,
+        count: ReferenceCount,
+        stored: u64,
+    ) -> Result<u64, StorageError> {
+        let delta = match count {
+            ReferenceCount::Accounts => self.accounts,
+            ReferenceCount::References => self.references,
+        };
+        stored
+            .checked_add_signed(delta)
+            .ok_or(StorageError::AccountCounterOutOfBounds {
+                counter,
+                count,
+                stored,
+                delta,
+            })
     }
 }
 
@@ -3114,7 +3196,14 @@ pub enum StorageError {
     ErrorUpdatingAccountCounter,
     SaltNotSet,
     AccountsCounterOverflow,
-    AccountCounterOutOfBounds,
+    /// A counter derived from a reference list cannot move by the delta a write
+    /// implies, which means it and the stored lists have already diverged.
+    AccountCounterOutOfBounds {
+        counter: ReferenceCounter,
+        count: ReferenceCount,
+        stored: u64,
+        delta: i64,
+    },
     /// Tried to bind a recovery email that's already on a different
     /// anchor. The "one anchor per address" invariant from design
     /// §8.2 is enforced at the storage layer; the caller surfaces
@@ -3182,9 +3271,15 @@ impl fmt::Display for StorageError {
                 "the salt is not set, so an account principal cannot be derived"
             ),
             Self::AccountsCounterOverflow => write!(f, "No account numbers left to allocate"),
-            Self::AccountCounterOutOfBounds => write!(
+            Self::AccountCounterOutOfBounds {
+                counter,
+                count,
+                stored,
+                delta,
+            } => write!(
                 f,
-                "An account counter delta would move the count outside its range"
+                "the {counter} {count} counter cannot move from {stored} by {delta}, \
+                 so it no longer agrees with the stored reference lists"
             ),
             Self::EmailRecoveryAddressAlreadyBound { existing_anchor } => write!(
                 f,
