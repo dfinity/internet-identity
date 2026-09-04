@@ -248,6 +248,11 @@ pub fn update_account_for_origin(
                         .map_err(Into::<UpdateAccountError>::into)?
                     }
 
+                    // A caller reaches this with nothing readable in two ways: the
+                    // account belongs to another identity, or the tracked default has
+                    // already been named and so is no longer numberless. Both are the
+                    // caller naming an account it does not have, which is what
+                    // `prepare_account_delegation` answers for the same read.
                     let old_account = storage
                         .read_account(ReadAccountParams {
                             account_number,
@@ -255,7 +260,7 @@ pub fn update_account_for_origin(
                             origin: &origin,
                             known_app_num: None
                         })
-                        .expect("Updating an unreadable account should be impossible!");
+                        .ok_or_else(|| UpdateAccountError::Unauthorized(caller()))?;
 
                     let updated_account = storage
                         .update_account(UpdateAccountParams {
