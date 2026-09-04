@@ -16,13 +16,15 @@
 // top-level `self`/event-listener side effects; the worker passes its own
 // `registration`.
 
-// Provisional pull interface: the dApp returns the notifications currently
-// pending for the authenticated caller. Finalized alongside the client crate.
-// `id` is the dApp's stable notification id, unique only within its canister.
+// One pulled notification, normalized from the dApp's `ii_pending_notifications`
+// (`id: blob; title; body; url; created_at`). `id` is the blob rendered as hex:
+// the dApp's stable notification id, unique only within its canister, and the
+// service worker's key for the tag, the shown-set, and the dismissed-set.
 export interface PulledNotification {
   id: string;
   title: string;
-  body: [] | [string];
+  body: string;
+  url?: string;
 }
 
 // One sender canister's pull result. `canister` is its principal text; `pulled`
@@ -41,13 +43,23 @@ interface NotificationData {
   origin?: string;
   canister?: string;
   id?: string;
+  url?: string;
 }
 
+// Reconciles one origin's on-screen notifications against what its answering
+// canisters report as pending, and keeps the local dismissed-set honest.
+//
+// `dismissed` holds the tags the user has already dismissed on this device. A
+// dismissed tag is never re-shown, so the dApp evicting on its own cycle (rather
+// than being told what was displayed) does not resurrect a notification the user
+// closed. Returns the dismissed tags to forget: those an answering canister no
+// longer lists, so a re-issued id can raise a fresh notification.
 export const reconcile = async (
   registration: ServiceWorkerRegistration,
   origin: string,
   results: CanisterPull[],
-): Promise<void> => {
+  dismissed: Set<string>,
+): Promise<string[]> => {
   // Only canisters that actually answered touch the screen; an unknown result
   // leaves its notifications untouched.
   const known = results.filter(
@@ -55,6 +67,7 @@ export const reconcile = async (
       result.pulled !== undefined,
   );
   const shown = await registration.getNotifications();
+  const forget: string[] = [];
 
   for (const { canister, pulled } of known) {
     const pending = new Set(pulled.map((notification) => notification.id));
@@ -68,18 +81,37 @@ export const reconcile = async (
         notification.close();
       }
     }
+    // A dismissed notification is not on screen, so it is dropped here, not in
+    // the close loop: once its canister stops listing the id, forget it.
+    const prefix = `${canister} `;
+    for (const tag of dismissed) {
+      if (tag.startsWith(prefix) && !pending.has(tag.slice(prefix.length))) {
+        forget.push(tag);
+      }
+    }
   }
 
   await Promise.all(
     known.flatMap(({ canister, pulled }) =>
-      pulled.map((notification) =>
-        registration.showNotification(notification.title, {
-          body: notification.body[0],
-          icon: "/favicon.svg",
-          tag: tagFor(canister, notification.id),
-          data: { origin, canister, id: notification.id },
-        }),
-      ),
+      pulled
+        .filter(
+          (notification) => !dismissed.has(tagFor(canister, notification.id)),
+        )
+        .map((notification) =>
+          registration.showNotification(notification.title, {
+            body: notification.body,
+            icon: "/favicon.svg",
+            tag: tagFor(canister, notification.id),
+            data: {
+              origin,
+              canister,
+              id: notification.id,
+              url: notification.url,
+            },
+          }),
+        ),
     ),
   );
+
+  return forget;
 };
