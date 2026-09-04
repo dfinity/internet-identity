@@ -2739,6 +2739,49 @@ mod account_reference_state_tests {
     }
 
     #[test]
+    fn renaming_an_account_writes_only_its_record() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = ORIGIN.to_string();
+        let account = storage
+            .create_additional_account(CreateAccountParams {
+                anchor_number,
+                name: "named".to_string(),
+                origin: origin.clone(),
+            })
+            .unwrap();
+        let account_number = account.account_number.unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        let references_before = storage
+            .account_references(anchor_number, application_number)
+            .unwrap();
+
+        // A skipped write is invisible in the stored bytes, since rewriting the row
+        // would store what it already holds. Retiring the application row makes it
+        // visible: `write_reference_list` refuses without one, so a rename that still
+        // went through it could not succeed here.
+        storage
+            .stable_application_memory
+            .remove(&application_number);
+
+        let renamed = storage
+            .update_account(UpdateAccountParams {
+                account_number: Some(account_number),
+                anchor_number,
+                name: "renamed".to_string(),
+                origin: origin.clone(),
+            })
+            .unwrap();
+
+        assert_eq!(renamed.name, Some("renamed".to_string()));
+        assert_eq!(
+            storage.account_references(anchor_number, application_number),
+            Some(references_before)
+        );
+    }
+
+    #[test]
     fn an_identity_holding_no_reference_can_neither_rename_nor_stamp_the_account() {
         let (mut storage, owner) = storage_with_anchor();
         let other = {
