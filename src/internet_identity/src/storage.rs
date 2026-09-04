@@ -1610,16 +1610,32 @@ impl<M: Memory + Clone> Storage<M> {
             .map(Vec::<AccountReference>::from)
     }
 
+    /// This identity's reference for one account, or `None` where it holds none.
+    ///
+    /// `account_number` names the reference, `None` being the tracked default.
+    /// Answering `None` is the ownership check: an account belongs to whichever
+    /// identity's row names it, so a caller that finds no reference here has no claim
+    /// on the account whether or not it exists.
+    fn account_reference(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+    ) -> Option<AccountReference> {
+        self.account_references(anchor_number, application_number)?
+            .into_iter()
+            .find(|reference| reference.account_number == account_number)
+    }
+
     /// Applies `f` to one of this identity's account references, and writes the row
     /// back if it ran.
     ///
     /// `account_number` names the reference, `None` being the tracked default.
     ///
     /// `Ok(None)` means there was nothing to apply `f` to and nothing was written:
-    /// the row is absent or a tombstone, or it holds no reference for this account.
-    /// That last case is the ownership check — an account belongs to whichever
-    /// identity's row names it.
-    fn with_reference_mut<T, F>(
+    /// the row is absent or a tombstone, or it holds no reference for this account —
+    /// see [`Self::account_reference`] for what that last case means.
+    fn with_account_reference_mut<T, F>(
         &mut self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
@@ -1647,48 +1663,6 @@ impl<M: Memory + Clone> Storage<M> {
         self.write_reference_list(anchor_number, application_number, references)?;
 
         Ok(Some(result))
-    }
-
-    /// Applies `f` to one of this identity's named accounts and the reference to it,
-    /// and writes both back if it ran.
-    ///
-    /// The tracked default is not reachable here: it is derived and has no stored
-    /// account record, so only a named account can be handed to `f`.
-    ///
-    /// `Ok(None)` carries the same meaning as in [`Self::with_reference_mut`], plus
-    /// the account having been removed.
-    fn with_named_account_mut<T, F>(
-        &mut self,
-        anchor_number: AnchorNumber,
-        application_number: ApplicationNumber,
-        account_number: AccountNumber,
-        f: F,
-    ) -> Result<Option<T>, StorageError>
-    where
-        F: FnOnce(&mut AccountReference, &mut StorableAccount) -> T,
-    {
-        // A named account with no stored record has been removed, so there is nothing
-        // to modify.
-        let Some(mut storable_account) = self.stable_account_memory.get(&account_number) else {
-            return Ok(None);
-        };
-
-        let result = self.with_reference_mut(
-            anchor_number,
-            application_number,
-            Some(account_number),
-            |reference| f(reference, &mut storable_account),
-        )?;
-
-        // Skipped on a miss, where `f` never ran: the record would be written back
-        // exactly as it was read, and it belongs to whichever identity does hold a
-        // reference to it.
-        if result.is_some() {
-            self.stable_account_memory
-                .insert(account_number, storable_account);
-        }
-
-        Ok(result)
     }
 
     /// Records that an account was used at `origin`.
@@ -1728,7 +1702,7 @@ impl<M: Memory + Clone> Storage<M> {
             return Ok(());
         };
 
-        self.with_reference_mut(
+        self.with_account_reference_mut(
             anchor_number,
             application_number,
             account_number,
@@ -2567,28 +2541,30 @@ impl<M: Memory + Clone> Storage<M> {
 
         // Holding a reference is what grants access, so a miss here means this
         // identity does not own the account, whether or not it exists.
-        let Some(updated_account) = self.with_named_account_mut(
-            anchor_number,
-            application_number,
-            account_number,
-            |account_reference, storable_account| {
-                storable_account.name = name.clone();
-
-                Account::new_full(
-                    anchor_number,
-                    origin,
-                    Some(name),
-                    Some(account_number),
-                    account_reference.last_used,
-                    storable_account.seed_from_anchor,
-                )
-            },
-        )?
+        let Some(reference) =
+            self.account_reference(anchor_number, application_number, Some(account_number))
         else {
             return Err(StorageError::AccountNotFound { account_number });
         };
+        let Some(mut storable_account) = self.stable_account_memory.get(&account_number) else {
+            return Err(StorageError::AccountNotFound { account_number });
+        };
 
-        Ok(updated_account)
+        // Only the account record is written. Renaming leaves every reference as it
+        // was, and the row is a single blob, so writing it back would store the bytes
+        // it already holds.
+        storable_account.name = name.clone();
+        self.stable_account_memory
+            .insert(account_number, storable_account.clone());
+
+        Ok(Account::new_full(
+            anchor_number,
+            origin,
+            Some(name),
+            Some(account_number),
+            reference.last_used,
+            storable_account.seed_from_anchor,
+        ))
     }
 
     /// Used in `update_account` to create a default account.
