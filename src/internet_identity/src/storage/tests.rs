@@ -4101,7 +4101,6 @@ mod account_principal_index_tests {
 }
 
 mod account_principal_index_backfill_tests {
-    use super::held;
     use crate::delegation::canister_sig_principal;
     use crate::storage::account::{Account, AccountReference};
     use crate::storage::canister_id;
@@ -4128,10 +4127,10 @@ mod account_principal_index_backfill_tests {
                 .write_reference_list(
                     anchor_number,
                     application_number,
-                    held(vec![AccountReference {
+                    vec![AccountReference {
                         account_number: None,
                         last_used: Some(index + 1),
-                    }]),
+                    }],
                 )
                 .unwrap();
         }
