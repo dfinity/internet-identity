@@ -1850,10 +1850,7 @@ impl<M: Memory + Clone> Storage<M> {
         let Some(application_number) = self.lookup_application_number_with_origin(origin) else {
             return Ok(0);
         };
-        let Some(mut references) = self.account_references(anchor_number, application_number)
-        else {
-            return Ok(0);
-        };
+        let mut references = self.account_references(anchor_number, application_number);
         let Some(reference) = references
             .iter_mut()
             .find(|reference| reference.account_number == account_number)
@@ -1874,7 +1871,7 @@ impl<M: Memory + Clone> Storage<M> {
             .sessions
             .retain(|session| session.created_at_ns != created_at);
 
-        self.write_reference_list(anchor_number, application_number, references)?;
+        self.write_account_state(anchor_number, application_number, references, None, None)?;
         self.unindex_sessions(anchor_number, application_number, account_number, &dropped);
         self.change_session_count(anchor_number, dropped.len(), 0)?;
         Ok(dropped.len() as u64)
