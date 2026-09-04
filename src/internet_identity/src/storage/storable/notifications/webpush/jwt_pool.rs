@@ -1,4 +1,5 @@
 use internet_identity_interface::internet_identity::types::Timestamp;
+use minicbor::bytes::ByteVec;
 use minicbor::{Decode, Encode};
 
 /// A device's pre-signed VAPID JWTs. II holds no VAPID private key: only the
@@ -13,8 +14,10 @@ use minicbor::{Decode, Encode};
 #[cbor(map)]
 pub struct StorableWebPushJwtPool {
     /// Raw ECDSA P-256 signatures (r‖s, 64 bytes each), in window order.
+    /// `ByteVec` so each signature encodes as a compact CBOR byte string rather
+    /// than an array of integers (the latter ~doubles high-entropy bytes).
     #[n(0)]
-    pub signatures: Vec<Vec<u8>>,
+    pub signatures: Vec<ByteVec>,
     /// Wall-clock time (ns) the device minted this pool. Window `i` expires at
     /// `issued_at_ns + (i + 1) * window_ns`.
     #[n(1)]
