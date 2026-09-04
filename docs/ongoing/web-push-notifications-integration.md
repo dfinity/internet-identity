@@ -65,10 +65,12 @@ Every canister that sends a campaign for the origin must be listed. The service 
 
 The notification client runs inside the dApp canister. Campaign and pending-notification state therefore lives in the dApp's stable memory, but its schema and lifecycle are managed by the client library rather than by application code.
 
-For Motoko, the intended integration is a mixin:
+For Motoko, the intended integration follows the same package pattern as
+[`identity-attributes`](https://mops.one/identity-attributes): the package root
+is a mixin that the dApp includes in its persistent actor.
 
 ```motoko
-import Notifications "mo:ii-notification-client/Notifications";
+import Notifications "mo:ii-notification-client";
 import Principal "mo:base/Principal";
 
 persistent actor {
@@ -81,7 +83,10 @@ persistent actor {
 };
 ```
 
-The mixin owns the notification state and injects the service-worker query into the actor's Candid interface:
+The mixin owns the notification state. It injects the service-worker query into
+the actor's Candid interface and gives the application functions for creating,
+updating, and removing campaigns. Internal storage, retry, and II API details
+remain inside the package.
 
 ```candid
 type PendingNotification = record {
