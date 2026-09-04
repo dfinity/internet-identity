@@ -5824,7 +5824,7 @@ mod session_removal_tests {
             .unwrap();
 
         assert_ne!(
-            storage.account_references(anchor_number, application_number),
+            storage.stored_account_references(anchor_number, application_number),
             None
         );
     }

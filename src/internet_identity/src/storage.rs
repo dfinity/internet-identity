@@ -1852,7 +1852,6 @@ impl<M: Memory + Clone> Storage<M> {
         // one it matched.
         let present = self
             .account_references(anchor_number, application_number)
-            .unwrap_or_default()
             .iter()
             .any(|reference| {
                 reference.account_number == account_number
@@ -2070,10 +2069,7 @@ impl<M: Memory + Clone> Storage<M> {
         account_number: Option<AccountNumber>,
         device_id: SessionDeviceId,
     ) -> Result<usize, StorageError> {
-        let Some(mut references) = self.account_references(anchor_number, application_number)
-        else {
-            return Ok(0);
-        };
+        let mut references = self.account_references(anchor_number, application_number);
         let Some(reference) = references
             .iter_mut()
             .find(|reference| reference.account_number == account_number)
@@ -2092,7 +2088,7 @@ impl<M: Memory + Clone> Storage<M> {
         reference
             .sessions
             .retain(|session| session.device_id != device_id);
-        self.write_reference_list(anchor_number, application_number, references)?;
+        self.write_account_state(anchor_number, application_number, references, None, None)?;
         self.unindex_sessions(anchor_number, application_number, account_number, &dropped);
         Ok(dropped.len())
     }
