@@ -2305,14 +2305,8 @@ mod reference_list_write_path_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
         let application_number = storage.lookup_or_insert_application_number_with_origin(&origin);
-        let default_reference = AccountReference {
-            account_number: None,
-            last_used: None,
-        };
-        let named_reference = AccountReference {
-            account_number: Some(1),
-            last_used: None,
-        };
+        let default_reference = AccountReference::new(None, None);
+        let named_reference = AccountReference::new(Some(1), None);
         storage
             .write_reference_list(
                 anchor_number,
