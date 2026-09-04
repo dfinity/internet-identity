@@ -5528,7 +5528,7 @@ mod session_refresh_stamp_tests {
 }
 
 mod session_removal_tests {
-    use crate::storage::account::AccountReference;
+    use super::{held_references, ReferenceRow};
     use crate::storage::CreateSessionParams;
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
@@ -5567,11 +5567,8 @@ mod session_removal_tests {
         let application_number = storage
             .lookup_application_number_with_origin(&ORIGIN.to_string())
             .unwrap();
-        storage
-            .lookup_account_references(anchor_number, application_number)
-            .unwrap()
+        held_references(storage, anchor_number, application_number)
             .into_iter()
-            .map(AccountReference::from)
             .find(|reference| reference.account_number.is_none())
             .unwrap()
             .sessions
@@ -5615,8 +5612,9 @@ mod session_removal_tests {
             .remove_session(anchor_number, application_number, None, 1_000, 1)
             .unwrap();
 
-        assert!(storage
-            .lookup_account_references(anchor_number, application_number)
-            .is_some());
+        assert_ne!(
+            storage.reference_row(anchor_number, application_number),
+            ReferenceRow::Untouched
+        );
     }
 }

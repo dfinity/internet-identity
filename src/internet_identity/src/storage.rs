@@ -1939,19 +1939,15 @@ impl<M: Memory + Clone> Storage<M> {
         // creation time is a guard: it stops a caller removing a session that replaced the
         // one it matched.
         let present = self
-            .lookup_account_references(anchor_number, application_number)
-            .map(|list| {
-                list.into_iter()
-                    .map(AccountReference::from)
-                    .any(|reference| {
-                        reference.account_number == account_number
-                            && reference.sessions.iter().any(|session| {
-                                session.device_id == device_id
-                                    && session.created_at_ns == created_at
-                            })
+            .reference_row(anchor_number, application_number)
+            .references()
+            .iter()
+            .any(|reference| {
+                reference.account_number == account_number
+                    && reference.sessions.iter().any(|session| {
+                        session.device_id == device_id && session.created_at_ns == created_at
                     })
-            })
-            .unwrap_or(false);
+            });
         if !present {
             return Ok(false);
         }
@@ -2158,15 +2154,12 @@ impl<M: Memory + Clone> Storage<M> {
         account_number: Option<AccountNumber>,
         device_id: SessionDeviceId,
     ) -> Result<usize, StorageError> {
-        let mut references: Vec<AccountReference> =
-            match self.lookup_account_references(anchor_number, application_number) {
-                Some(list) => list.into_iter().map(Into::into).collect(),
-                None => return Ok(0),
-            };
-        let Some(reference) = references
-            .iter_mut()
-            .find(|reference| reference.account_number == account_number)
+        let ReferenceRow::Held(mut references) =
+            self.reference_row(anchor_number, application_number)
         else {
+            return Ok(0);
+        };
+        let Some(reference) = references.reference_mut(account_number) else {
             return Ok(0);
         };
         let dropped: Vec<SessionRecord> = reference
