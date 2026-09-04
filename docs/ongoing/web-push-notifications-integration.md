@@ -1,24 +1,66 @@
-# Integrating with II Web Push notifications
+# dApp integration with II Web Push notifications
 
-This guide describes the intended dApp integration for sending notifications through Internet Identity. For the design and trust model, see [Web Push notifications](web-push-notifications.md).
+## Summary
 
-> **Status:** The feature is not enabled in production and `internet-identity-notifications-client` has not been published yet. The API shown here is the target integrator surface. Exact names may change before release.
+A dApp should not have to understand Web Push, keep its own delivery queue, or
+implement the protocol used by the II service worker. Its frontend asks II to
+offer notification consent as part of sign-in. Its origin declares which
+canisters may send on its behalf. Its backend gives a client library the
+notification campaigns it wants to send.
 
-The Rust and Motoko clients live in [internet-identity-notifications-client](https://github.com/dfinity/internet-identity-notifications-client).
+The client library lives inside the dApp canister. It owns the durable campaign
+and pending-content state, exposes the query used by the II service worker, and
+handles batching, pacing, retries, and II buffer resets. The application owns
+the decision to create, update, or remove a notification. II owns consent,
+sender authorization, and delivery of a sealed, content-free ping.
 
-## What an app has to do
+This document describes that integration boundary. The trust model and the II
+implementation are covered by [Web Push notifications](web-push-notifications.md).
 
-The common integration has three parts:
+> **Status:** The feature is not enabled in production and
+> `internet-identity-notifications-client` has not been published. The
+> interfaces below describe the intended integrator surface. Exact names may
+> change before release.
 
-1. Ask II to offer notification consent during sign-in.
-2. Publish the canisters allowed to send for the app origin.
-3. Include the notification client in the backend and give it campaigns to send.
+The Rust and Motoko implementations live in
+[internet-identity-notifications-client](https://github.com/dfinity/internet-identity-notifications-client).
 
-The app should not implement its own push queue, pending-notification endpoint, batching, retry loop, or II upgrade recovery. Those belong to the client library.
+## Context
 
-## 1. Request consent during sign-in
+II sends a content-free ping rather than the notification itself. When the ping
+wakes a device, the II service worker returns to the dApp canister and fetches
+the notification content as the user's per-app principal. This keeps the
+content outside II, but it leaves two pieces of work on the dApp side:
 
-Set `iiNotifications` to `true` in the II authorization request:
+1. Something has to retain the content until the device asks for it.
+2. Something has to submit and, when necessary, resubmit the corresponding ping
+   to II.
+
+Making every application implement those pieces would expose the most subtle
+parts of the protocol as application code. It would also give Motoko and Rust
+applications different delivery behavior. The client library therefore owns
+both pieces inside the dApp canister. The application supplies notification
+intent, while the library turns that intent into the storage and calls required
+by the protocol.
+
+## Integration boundary
+
+| Component           | Responsibility                                                                                                          |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| App frontend        | Requests notification consent as part of the existing II sign-in request.                                               |
+| App origin          | Publishes the canisters authorized to send and serve content for that origin.                                           |
+| App backend         | Supplies campaigns and decides when their notifications are updated or no longer pending.                               |
+| Notification client | Owns campaign progress, pending content, the service-worker query, batching, pacing, and retry.                         |
+| II                  | Records consent, authorizes the sender and origin, and sends sealed content-free pings to subscribed devices.           |
+| II service worker   | Pulls the current pending content from each authorized sender and reconciles it with notifications shown on the device. |
+
+The application does not implement a push queue, the pending-notification
+endpoint, or recovery from an II buffer reset. Those are part of the client
+contract.
+
+## Consent remains part of sign-in
+
+The II authorization request gains an `iiNotifications` option:
 
 ```ts
 const request = {
@@ -30,44 +72,57 @@ const request = {
 };
 ```
 
-II may then offer notification consent for the origin the user is signing in to. The application still receives an ordinary delegated identity. Its principal is the recipient used when creating a notification.
+When this option is present, II may offer notification consent for the origin
+being used for sign-in. The delegated identity returned to the dApp is otherwise
+unchanged. Its principal is also the recipient principal used in a notification
+campaign.
 
-The option is currently implemented by the II window transport. Support in the published `AuthClient` API is required before general release. Applications should not maintain a second notification-consent flow of their own.
+Consent stays in the existing II ceremony. This design does not introduce a
+second app-owned consent protocol. The option is implemented by the II window
+transport today; general integration also requires it in the published
+`AuthClient` API.
 
-## 2. Publish the authorized senders
+## The origin declares its sender canisters
 
-Before requesting consent, serve this file from the exact app origin used during sign-in:
+An origin participating in notifications serves:
 
 ```text
 /.well-known/ii-notification-senders
 ```
 
-Its body lists every canister allowed to send notifications for that origin:
+The document lists the canisters allowed to send and serve notification content
+for that origin:
 
 ```json
 {
-  "senders": [
-    "bkyz2-fmaaa-aaaaa-qaaaq-cai",
-    "bd3sg-teaaa-aaaaa-qaaba-cai"
-  ]
+  "senders": ["bkyz2-fmaaa-aaaaa-qaaaq-cai", "bd3sg-teaaa-aaaaa-qaaba-cai"]
 }
 ```
 
-II fetches the document when the user grants consent. The request must return `200 OK` with valid JSON and at least one valid canister principal. II reads at most 20 senders.
+II fetches the document when consent is granted and records the binding between
+the origin and its senders. A later campaign is accepted only when its caller is
+listed for its declared origin. On the pull side, the service worker queries
+each listed canister, so list order assigns no special role to any sender.
 
-For a canister-hosted frontend, serve the document as a certified asset. The response, including its headers, must fit within 64 KiB. The origin must be publicly reachable over HTTPS, so this part of the flow does not work against localhost.
+The response is valid when it returns `200 OK`, contains valid JSON, and lists
+at least one canister principal. II reads at most 20 senders. The full HTTP
+response, including headers such as `IC-Certificate`, must fit within 64 KiB.
+The origin must be publicly reachable over HTTPS, which excludes localhost from
+this part of the flow.
 
-The Motoko client generates the JSON body with `sendersDocument`. The Rust client provides the equivalent `well_known::SendersDocument` helper.
+Canister-hosted frontends serve this as a certified asset. The Motoko and Rust
+clients provide helpers for producing the JSON body, so the application only
+has to expose the resulting asset at the well-known path.
 
-Every canister that sends a campaign for the origin must be listed. The service worker will query the listed canisters for pending content, so each canister using the notification client exposes the standard pull endpoint.
+## The client is included in the dApp backend
 
-## 3. Include the client in the backend
+Campaign and pending-notification state lives in the dApp's stable memory. Its
+schema and lifecycle belong to the notification client rather than to
+application code.
 
-The notification client runs inside the dApp canister. Campaign and pending-notification state therefore lives in the dApp's stable memory, but its schema and lifecycle are managed by the client library rather than by application code.
-
-For Motoko, the intended integration follows the same package pattern as
-[`identity-attributes`](https://mops.one/identity-attributes): the package root
-is a mixin that the dApp includes in its persistent actor.
+For Motoko, the proposed package follows the same pattern as
+[`identity-attributes`](https://mops.one/identity-attributes). The package root
+is a mixin included in the dApp's persistent actor:
 
 ```motoko
 import Notifications "mo:ii-notification-client";
@@ -83,30 +138,21 @@ persistent actor {
 };
 ```
 
-The mixin owns the notification state. It injects the service-worker query into
-the actor's Candid interface and gives the application functions for creating,
-updating, and removing campaigns. Internal storage, retry, and II API details
-remain inside the package.
+The mixin injects the service-worker query and makes campaign operations
+available to the containing actor. Campaign operations are not automatically
+exposed as public Candid methods. The application decides which of its own
+methods may create a campaign and applies its normal authorization rules there.
 
-```candid
-type PendingNotification = record {
-  id : text;
-  title : text;
-  body : opt text;
-};
+Rust has no equivalent to Motoko's `include`. Its client exposes the same state
+and campaign abstraction, together with the minimal endpoint wiring required by
+the application's canister framework. Storage and reconciliation semantics stay
+the same across both implementations.
 
-service : {
-  ii_pending_notifications : () -> (vec PendingNotification) query;
-};
-```
+## The application supplies campaigns
 
-The service worker calls this query as the user's per-app principal. The client uses `caller` to return that recipient's complete pending set. The integrator does not implement or call this method directly.
-
-The Rust client should provide the same campaign and pending-state abstraction. Rust does not have Motoko's `include` mechanism, so the exact endpoint wiring differs, but the application should not have to reimplement the storage and reconciliation contract.
-
-## 4. Submit a campaign
-
-The app gives the client a campaign ID and a list of notifications. Each notification contains its recipient and content:
+A campaign has an application-defined ID and a list of notifications. Each
+notification carries a stable ID, the recipient principal, the content to be
+shown, and delivery options. The proposed Motoko surface is:
 
 ```motoko
 await sendNotificationCampaign({
@@ -132,59 +178,114 @@ await sendNotificationCampaign({
 });
 ```
 
-This is the target shape, not a finalized method signature. The important boundary is that the app supplies the campaign and the client performs the delivery work.
+The exact method and field names are not final. The boundary is: the
+application supplies the complete campaign, and the client owns its execution.
+The `recipient` is the principal obtained from the user's II delegation for the
+same app origin and account.
 
-For each recipient, the client stores the content before asking II to send a ping. This prevents a device from waking before the content is available. The client then batches and paces `notification_send` calls until the campaign has been admitted or reaches a terminal state.
+The campaign API is local to the containing canister. This avoids a second
+Candid boundary between the application's notification logic and the library,
+and it lets the application create campaigns directly from its existing state.
 
-`recipient` is the principal obtained from the user's II delegation for this app and account. The configured `origin` must match the origin used during sign-in and the one serving the sender document.
+## Client-owned state and lifecycle
 
-## What the client handles
+The client stores each recipient's content before asking II to send its ping.
+This ordering is required because a device may wake and pull immediately after
+II accepts the ping. Once the content exists, the client submits recipients to
+`notification_send` in bounded batches.
+
+II may accept part of a batch and return `retry_after_ms` for the rest. The
+client records the accepted recipients, retains the unaccepted ones, and resumes
+after the requested delay with jitter. A canister upgrade does not discard this
+progress because the campaign and pending-content state is durable.
+
+II's delivery buffer is transient. Each response carries a `resend_epoch`,
+which changes if II loses that buffer during an upgrade. The client persists the
+last epoch it observed and resubmits affected pings when the value changes.
+Duplicate pings are harmless because the service worker reconciles the dApp's
+current pending set by notification ID.
 
 The client owns:
 
-- Durable campaign state and progress.
+- Durable campaign state and per-recipient progress.
 - Pending content indexed by recipient and notification ID.
-- The authenticated `ii_pending_notifications` query.
-- Storing content before sending its ping.
-- Splitting large campaigns into bounded batches.
-- Pacing and retrying calls when II returns `retry_after_ms`.
+- Storage of content before submission of its ping.
+- Bounded batching, pacing, and retry using `retry_after_ms`.
 - Partial acceptance and terminal recipient rejections.
-- Persisting and reacting to `resend_epoch` changes.
-- Resuming campaigns after the dApp canister upgrades.
-- Updating and removing pending notifications.
-- Producing the well-known sender document.
+- Persistence and handling of `resend_epoch`.
+- Resumption of incomplete campaigns after a dApp canister upgrade.
+- Update, removal, cancellation, and cleanup of pending notifications.
+- The service-worker query and well-known document helpers.
 
-II still validates the sender, origin, consent, recipient, and subscription on every accepted notification. The client is responsible for campaign coordination, not authorization.
+II still validates the sender, origin, consent, recipient, and device
+subscription for every notification. The client coordinates a campaign; it
+does not replace II's authorization checks.
 
-## Campaign status
+## Content pull interface
 
-II reports admission into its transient buffer, not delivery to a device. The client should expose campaign progress using terms such as:
+The mixin injects the query used by the II service worker:
 
-- `pending`: not yet accepted by II.
-- `sent`: accepted into II's buffer.
-- `no_consent`: rejected because the recipient cannot be notified for this origin.
-- `not_subscribed`: consent exists but no device can currently be reached.
-- `invalid`: the request or expiry is invalid.
+```candid
+type PendingNotification = record {
+  id : text;
+  title : text;
+  body : opt text;
+};
 
-It must not report `delivered`, since neither II nor the client receives a device receipt.
+service : {
+  ii_pending_notifications : () -> (vec PendingNotification) query;
+};
+```
 
-If II's `resend_epoch` changes, the client resends the affected pings. Duplicate pings are safe because the service worker reconciles the dApp's current pending content by notification ID.
+The service worker calls this query as the user's per-app principal. The client
+uses `caller` to return that recipient's complete pending set. The application
+does not implement or call this method itself.
+
+Every sender listed by an origin may own notification content. The service
+worker queries all of them and reconciles results independently per canister. A
+failed query leaves that canister's previously displayed notifications alone;
+a successful empty response closes them.
 
 ## Updating and removing notifications
 
-The application updates or removes notifications through the client library.
+The application remains the source of truth for whether a notification should
+still exist. It expresses changes through the client library.
 
-Updating content while keeping the same notification ID updates the displayed notification in place after the next ping. Removing the ID from the pending set and sending another ping closes it on each reached device after the next pull.
+Replacing the content while retaining the same notification ID updates the
+displayed notification after the next successful ping and pull. Removing the ID
+from the recipient's pending set and sending a new ping causes reached devices
+to close it after reconciliation.
 
-The application decides when a notification is no longer pending. The client handles the corresponding state update and wake-up.
+This is set reconciliation rather than a stream of notification commands. A
+device that misses intermediate pings still converges on the dApp's current
+pending set the next time it wakes.
 
-## Integration checklist
+## Status semantics
 
-- Use one canonical HTTPS origin for sign-in, consent, the sender document, and campaign sending.
-- Set `iiNotifications: true` in the II authorization request.
-- Publish `/.well-known/ii-notification-senders` before asking for consent.
-- List every canister that includes the notification client and sends for the origin.
-- Include and configure the client in the dApp backend.
-- Pass the client stable notification IDs, recipient principals, content, and delivery options.
-- Display campaign progress as admission status, not confirmed delivery.
-- Test from a publicly reachable HTTPS origin. Sender discovery cannot reach localhost.
+II reports admission into its transient buffer, not delivery to a device. The
+client therefore exposes campaign progress using admission states:
+
+| State            | Meaning                                                 |
+| ---------------- | ------------------------------------------------------- |
+| `pending`        | The recipient has not yet been accepted by II.          |
+| `sent`           | The ping was accepted into II's buffer.                 |
+| `no_consent`     | II cannot notify the recipient for this origin.         |
+| `not_subscribed` | Consent exists, but no device can currently be reached. |
+| `invalid`        | The request or expiry is invalid.                       |
+
+Neither II nor the client receives a device receipt, so the API does not expose
+a `delivered` state.
+
+## Resulting integrator surface
+
+The design leaves four concepts visible to application code:
+
+1. The `iiNotifications` sign-in option.
+2. The well-known sender document at the app origin.
+3. The Motoko mixin or equivalent Rust client configured with the II canister
+   and origin.
+4. Campaigns containing recipient principals and notification content.
+
+The Web Push subscription, VAPID credentials, payload encryption, II delivery
+buffer, service-worker pull protocol, retry policy, and durable campaign schema
+remain below that boundary.
