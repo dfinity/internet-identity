@@ -12,7 +12,7 @@ This design makes Internet Identity the shared push origin. A user grants notifi
 
 II never receives the notification title or body. It holds consent and delivery state, not messages.
 
-The initial implementation has two temporary parts. It keeps its own principal-to-anchor index until the shared account index lands, and it uses device-signed VAPID JWTs because the IC cannot currently create the required P-256 signatures. Both can be replaced without changing the dApp-facing interface.
+The initial implementation has three pieces of interim plumbing. It keeps its own principal-to-anchor index until the shared account index lands. It discovers sender canisters through a well-known file until an app frontend can register them through a revocable session. It uses device-signed VAPID JWTs because the IC cannot currently create the required P-256 signatures. These can be replaced without changing the notification model.
 
 Delivery is buffered and best-effort. The current dispatcher processes approximately 250 device deliveries every two seconds. Since one ping can fan out to several devices, the number of pings processed in each dispatch depends on the recipient device count. The batch size is a bound on delivery work, not a throughput guarantee.
 
@@ -88,9 +88,11 @@ Since principal derivation cannot be reversed, granting consent currently writes
 
 Tracked default accounts introduces a shared account-by-principal index. Once that index is available and its backfill has completed, the notification send path should use it and remove the notification-specific mapping.
 
-### 3. Authorize sender canisters through the app origin
+### 3. Authorize sender canisters
 
 The caller of `notification_send` is a canister principal, but the consent belongs to a web origin. II therefore needs proof that the caller is allowed to represent that origin.
+
+#### Initial implementation: declaration by the origin
 
 Each app serves:
 
@@ -124,9 +126,19 @@ sequenceDiagram
     end
 ```
 
-A sender-registration method was considered and rejected. A canister principal does not prove control over a custom web origin. Accepting the origin as an unchecked parameter would let a canister claim another app’s consent.
+An unauthenticated sender-registration method was considered and rejected. A canister principal does not prove control over a custom web origin. Accepting the origin as an unchecked parameter would let a canister claim another app's consent.
 
 The response limit for the well-known outcall must include headers as well as the JSON body. In particular, the `IC-Certificate` header of a certified asset can be several kilobytes.
+
+#### What changes with revocable app sessions
+
+The well-known file is an interim mechanism. A revocable app session gives the app frontend an authenticated path to II from which II can resolve the identity, origin, and account. The frontend can then register its sender canister principals while notification consent is established.
+
+II stores that sender set with the account's session-backed notification authorization. At send time it resolves the recipient through the shared account index and checks the calling canister against that recipient's registered set. The backend no longer declares an origin, and consent no longer performs an HTTP outcall.
+
+The binding is scoped per account. A frontend acting through one user's session may authorize a sender for that user's notification access, but it cannot establish the same trust decision for another user. This costs a small sender set per participating account and avoids treating one user's declaration as trusted data for everyone.
+
+The exact registration interface, limits, refresh rules, and migration from the well-known binding remain part of the revocable-session integration.
 
 ### 4. Send a ping and pull the content
 
@@ -231,7 +243,7 @@ A Web2 dispatcher changes the operational and trust model, so it should be consi
 
 The current implementation records standing consent against the per-app principal. That consent exists independently of the app session.
 
-The intended model addresses and refreshes notifications through a revocable app session. Ending the session then prevents the app from continuing to refresh its notification access, and the service worker fetches content using the account associated with that session.
+The intended model addresses and refreshes notifications through a revocable app session. The app frontend also registers its sender canisters through that authenticated session, replacing the well-known file and its consent-time HTTP outcall. Ending the session then prevents the app from continuing to refresh its notification access or sender authority, and the service worker fetches content using the account associated with that session.
 
 Standing consent is an interim model that allows the notification path to be built and tested before sessions land. It should not become a separate permanent session mechanism.
 

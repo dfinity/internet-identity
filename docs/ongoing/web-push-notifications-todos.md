@@ -26,7 +26,8 @@ The current clients are thin wrappers around `notification_send`. The intended i
       inject `ii_pending_notifications`, and expose campaign operations to the
       containing actor.
 - [ ] Add the equivalent Rust pending-content abstraction and minimal endpoint wiring.
-- [ ] Keep `sendersDocument` and `SendersDocument` as the only well-known setup required from the app.
+- [ ] Keep `sendersDocument` and `SendersDocument` as the only well-known setup
+      required from the app while the initial sender-binding mechanism remains.
 - [ ] Add campaign restart, partial acceptance, epoch change, expiry, update, and removal tests.
 
 ## Service worker: pull content from every sender canister
@@ -46,3 +47,29 @@ The current service worker reads only the first principal from `/.well-known/ii-
 - [ ] Refresh and retry the sender document when one cached canister is removed or replaced.
 - [ ] Add tests for multiple senders, duplicate IDs across canisters, one failed sender, one empty sender, and removal of a sender from the well-known document.
 - [ ] Update the dApp integration design once the final multi-canister behavior is implemented.
+
+## Sender authorization: replace the well-known binding with app-session registration
+
+**Depends on:** revocable app sessions and the shared account-by-principal
+index.
+
+The well-known document and its consent-time HTTP outcall are interim plumbing.
+Once an app frontend can call II through a session that resolves to an identity,
+origin, and account, it can register its sender canisters directly for that
+account's notification authorization.
+
+- [ ] Define how an app supplies its sender canister principals to `AuthClient`.
+- [ ] Add a session-authenticated II method that records the sender set without
+      accepting an origin from the caller.
+- [ ] Store the sender set per account or session-backed notification
+      authorization, with an explicit cap and refresh policy.
+- [ ] Specify how ending or expiring the app session removes or stops refreshing
+      the sender authority and notification access.
+- [ ] Resolve the notification recipient through the shared account index and
+      authorize the calling canister against that recipient's registered set.
+- [ ] Do not deduplicate a sender binding across users; one user's frontend
+      cannot authorize a sender for another user's notification access.
+- [ ] Remove the consent-time HTTP outcall, cached well-known binding, and the
+      caller-supplied `origin` from `notification_send` after migration.
+- [ ] Update the client libraries and integration design once the session-backed
+      interface is fixed.
