@@ -112,22 +112,23 @@ export const purgeNotificationCredential = async (
   await idbDel(origin, CANISTER_STORE);
 };
 
-export interface CachedCanister {
-  canisterId: string;
+export interface CachedCanisters {
+  /** Every sender the origin's well-known named, not just the first. */
+  canisterIds: string[];
   resolvedAtMillis: number;
 }
 
-/** The SW's cached `origin -> canister` resolution, if any. */
-export const loadCachedCanister = (
+/** The SW's cached `origin -> senders` resolution, if any. */
+export const loadCachedCanisters = (
   origin: string,
-): Promise<CachedCanister | undefined> => idbGet(origin, CANISTER_STORE);
+): Promise<CachedCanisters | undefined> => idbGet(origin, CANISTER_STORE);
 
-/** Records the canister resolved for `origin` from its well-known. */
-export const cacheCanister = (
+/** Records the senders resolved for `origin` from its well-known. */
+export const cacheCanisters = (
   origin: string,
-  canisterId: string,
+  canisterIds: string[],
 ): Promise<void> =>
-  idbSet(origin, { canisterId, resolvedAtMillis: Date.now() }, CANISTER_STORE);
+  idbSet(origin, { canisterIds, resolvedAtMillis: Date.now() }, CANISTER_STORE);
 
 /** The service worker's read side: the stored credential for `origin`, if any. */
 export const loadNotificationCredential = (
