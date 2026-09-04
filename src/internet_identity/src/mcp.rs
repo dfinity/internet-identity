@@ -44,7 +44,7 @@ use crate::{
     account_management,
     delegation::DelegationAccess,
     state::{persistent_state, storage_borrow, storage_borrow_mut},
-    storage::account::{Account, AccountDelegationError, ReadAccountParams},
+    storage::account::{AccountDelegationError, AccountKey},
     storage::storable::mcp_config::StorableMcpConfig,
     storage::storable::mcp_grant::StorableMcpGrant,
     storage::Storage,
@@ -129,35 +129,30 @@ pub fn resolve_connect_url(anchor_number: AnchorNumber) -> Option<String> {
         .and_then(trusted_url)
 }
 
-/// The anchor's default account at `origin` (synthetic when none is reserved).
-fn default_account(anchor_number: AnchorNumber, origin: &FrontendHostname) -> Account {
-    storage_borrow(|storage| {
-        let Some(app_num) = storage.lookup_application_number_with_origin(origin) else {
-            return Account::synthetic(anchor_number, origin.clone());
-        };
-        let Some(default_num) = storage
-            .lookup_anchor_application_config(anchor_number, app_num)
-            .default_account_number
-        else {
-            return Account::synthetic(anchor_number, origin.clone());
-        };
-        storage
-            .read_account(ReadAccountParams {
-                account_number: Some(default_num),
-                anchor_number,
-                origin,
-                known_app_num: Some(app_num),
-            })
-            .unwrap_or_else(|| Account::synthetic(anchor_number, origin.clone()))
-    })
-}
-
 /// The default-account number for `(anchor, origin)` (None = unreserved default).
 fn default_account_number(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
 ) -> Option<AccountNumber> {
-    default_account(anchor_number, origin).account_number
+    storage_borrow(|storage| {
+        // What the anchor reserved here, if anything. Read back through the account so
+        // a config left naming an account the anchor no longer holds answers the same
+        // as no reservation at all.
+        let reserved = storage
+            .lookup_application_number_with_origin(origin)
+            .and_then(|application_number| {
+                storage
+                    .lookup_anchor_application_config(anchor_number, application_number)
+                    .default_account_number
+            });
+
+        storage.read_account(&AccountKey {
+            anchor_number,
+            origin: origin.clone(),
+            account_number: reserved,
+        })
+    })?
+    .account_number
 }
 
 /// Register the trusted MCP server's session key for `anchor_number`, granting
