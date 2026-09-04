@@ -161,7 +161,8 @@ pub fn set_default_account_for_origin(
 ) -> Result<AccountInfo, SetDefaultAccountError> {
     let application_number = storage_borrow_mut(|storage| {
         storage.lookup_or_insert_application_number_with_origin(&origin)
-    });
+    })
+    .map_err(|err| SetDefaultAccountError::InternalCanisterError(err.to_string()))?;
 
     let account = if let Some(account_number) = account_number {
         try_read_account_info(
