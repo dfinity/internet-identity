@@ -1,5 +1,7 @@
 # Web Push notifications
 
+**For dApp developers:** [Integrating with II Web Push notifications](web-push-notifications-integration.md)
+
 ## Summary
 
 A dApp cannot reach a user once it has been closed. It can implement Web Push itself, but that means maintaining its own permission flow, service worker, VAPID keys, subscriptions, and delivery infrastructure. Every app must ask separately, and on iOS the app must first be installed on the Home Screen.
