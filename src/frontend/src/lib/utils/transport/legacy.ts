@@ -263,6 +263,7 @@ class LegacyChannel implements Channel {
             publicKey,
             maxTimeToLive: authRequest.maxTimeToLive,
             icrc95DerivationOrigin: authRequest.derivationOrigin,
+            iiNotifications: authRequest.iiNotifications,
           }),
         });
       })();

@@ -29,6 +29,10 @@
   import type { AccessLevel } from "$lib/utils/accessLevel";
   import AuthWizardView from "./views/AuthWizardView.svelte";
   import AttributeConsentView from "./views/AttributeConsentView.svelte";
+  import NotifOptInView from "./views/NotifOptInView.svelte";
+  import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
+  import { isPushSupported } from "$lib/utils/notifications/pushSubscription";
+  import { actorForIdentity } from "$lib/stores/session-delegation.store";
   import {
     type AttributeConsent,
     attributeConsentStore,
@@ -39,6 +43,7 @@
   import {
     authorizationContextStore,
     authorizationStore,
+    notificationsRequestedStore,
     requestedMaxTimeToLiveStore,
   } from "$lib/stores/authorization.store";
   import {
@@ -186,12 +191,68 @@
   const handleSsoNormalLoginCancel = () => {
     ssoNormalLogin = undefined;
   };
+  // Authorize args stashed while the notification opt-in is shown, so Allow/Not
+  // now can resume the exact same authorization afterwards.
+  let notifOptIn = $state<{
+    accountNumber: Promise<bigint | undefined>;
+    accessLevel: AccessLevel;
+    maxTimeToLive?: bigint;
+    origin: string;
+  }>();
+
+  // Offer notifications before authorizing when the app asked for them and this
+  // browser can receive, stashing the authorization so the opt-in can resume it.
+  // Returns true when the opt-in took over, so the caller stops before
+  // authorizing. Every authorize path funnels through here — the continue
+  // screen, upgrade-success, and the 1-click OpenID/SSO resume — so a returning
+  // 1-click user still gets the chance to allow a requesting app.
+  const maybeOfferOptIn = (
+    accountNumber: Promise<bigint | undefined>,
+    accessLevel: AccessLevel,
+    maxTimeToLive?: bigint,
+  ): boolean => {
+    const effectiveOrigin = get(authorizationStore)?.effectiveOrigin;
+    if (
+      $PUSH_NOTIFICATIONS &&
+      $notificationsRequestedStore === true &&
+      isPushSupported() &&
+      selectedIdentity !== undefined &&
+      effectiveOrigin !== undefined &&
+      notifOptIn === undefined
+    ) {
+      notifOptIn = {
+        accountNumber,
+        accessLevel,
+        maxTimeToLive,
+        origin: effectiveOrigin,
+      };
+      return true;
+    }
+    return false;
+  };
+
   const handleAuthorize = (
     accountNumber: Promise<bigint | undefined>,
     accessLevel: AccessLevel,
     maxTimeToLive?: bigint,
   ) => {
+    if (maybeOfferOptIn(accountNumber, accessLevel, maxTimeToLive)) {
+      return;
+    }
     authorizationStore.authorize(accountNumber, accessLevel, maxTimeToLive);
+  };
+
+  const resumeAuthorize = () => {
+    const args = notifOptIn;
+    if (args === undefined) {
+      return;
+    }
+    notifOptIn = undefined;
+    authorizationStore.authorize(
+      args.accountNumber,
+      args.accessLevel,
+      args.maxTimeToLive,
+    );
   };
 
   const handleAttributeConsent = (consent: AttributeConsent) => {
@@ -460,7 +521,13 @@
         throw e;
       }
     }
-    // 1-click OpenID flow: no access-level toggle, always full access.
+    // 1-click OpenID/SSO flow: no access-level toggle, always full access.
+    if (maybeOfferOptIn(Promise.resolve(undefined), "full-access")) {
+      // Stop the resume animation so the opt-in screen shows; the stashed
+      // authorization resumes once the user chooses.
+      openIdResumeProcessing = false;
+      return;
+    }
     authorizationStore.authorize(Promise.resolve(undefined), "full-access");
     directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToApp);
   };
@@ -617,6 +684,9 @@
   <!-- 1-click SSO hit the normal-login-required fail-safe — show the one-step
        "First sign-in with X" dialog instead of proceeding. -->
   {@render panelWrapper(ssoNormalLoginContent)}
+{:else if notifOptIn !== undefined}
+  <!-- User chose to authorize — offer notifications before redirecting. -->
+  {@render panelWrapper(notifOptInContent)}
 {:else if selectedIdentity !== undefined}
   <!-- Returning user with a selected identity — show account selection.
        Its header shows the channel origin, so the panel may name the app. -->
@@ -641,6 +711,20 @@
 
 {#snippet upgradeSuccessContent()}
   <UpgradeSuccessView onAuthorize={handleAuthorize} />
+{/snippet}
+
+{#snippet notifOptInContent()}
+  {#if notifOptIn !== undefined && selectedIdentity !== undefined}
+    {@const identityNumber = selectedIdentity.identityNumber}
+    <NotifOptInView
+      appName={dapp?.name}
+      {identityNumber}
+      origin={notifOptIn.origin}
+      accountNumber={notifOptIn.accountNumber}
+      resolveActor={() => actorForIdentity(identityNumber)}
+      onDone={resumeAuthorize}
+    />
+  {/if}
 {/snippet}
 
 {#snippet continueContent()}
