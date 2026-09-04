@@ -120,6 +120,9 @@ use crate::storage::storable::accounts_counter::{AccountType, StorableAccountsCo
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
+use crate::storage::storable::notifications::consent::StorableNotificationConsent;
+use crate::storage::storable::notifications::webpush::endpoint_hash::StorableEndpointSha256;
+use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use internet_identity_interface::internet_identity::types::*;
@@ -209,6 +212,11 @@ const MCP_GRANT_MEMORY_INDEX: u8 = 29u8;
 // const DEPRECATED_MCP_REGISTRATION_URL_MEMORY_INDEX: u8 = 30u8;
 const MCP_REGISTRATION_MEMORY_INDEX: u8 = 31u8;
 const SSO_STABLE_ID_INDEX_MEMORY_INDEX: u8 = 32u8;
+// Notification indexes, appended after the current max (32)
+const WEBPUSH_SUBSCRIPTIONS_MEMORY_INDEX: u8 = 33u8;
+// 34 retired: the JWT pool now rides on the subscription row (index 33).
+const NOTIFICATIONS_CONSENT_MEMORY_INDEX: u8 = 35u8;
+const NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_INDEX: u8 = 36u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -287,6 +295,17 @@ const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
 /// SSO stable-id bridge:
 /// `SHA-256(sso_domain, iss, ii_client_id, stable_id) -> AnchorNumber`.
 const SSO_STABLE_ID_INDEX_MEMORY_ID: MemoryId = MemoryId::new(SSO_STABLE_ID_INDEX_MEMORY_INDEX);
+
+/// Device subscriptions, keyed `(anchor, sha256(endpoint))`. One row per
+/// browser; re-subscribe overwrites. Capped at 20/anchor, evict-oldest.
+const WEBPUSH_SUBSCRIPTIONS_MEMORY_ID: MemoryId = MemoryId::new(WEBPUSH_SUBSCRIPTIONS_MEMORY_INDEX);
+/// Per-`(anchor, origin)` consent grants; presence means granted.
+const NOTIFICATIONS_CONSENT_MEMORY_ID: MemoryId = MemoryId::new(NOTIFICATIONS_CONSENT_MEMORY_INDEX);
+/// `recipient_principal -> anchor` reverse index for the send path, where
+/// `recipient = delegation::get_principal(anchor, origin)`. Recomputing it from
+/// the sender's origin at send time also checks the sender isn't lying.
+const NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_ID: MemoryId =
+    MemoryId::new(NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -440,6 +459,25 @@ pub struct Storage<M: Memory> {
     /// [`SSO_STABLE_ID_INDEX_MEMORY_ID`].
     sso_stable_id_index_memory:
         StableBTreeMap<StorableSsoStableIdKey, StorableAnchorNumberList, ManagedMemory<M>>,
+
+    // ---- Notifications ------------------------------------------
+    webpush_subscriptions_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    pub(crate) webpush_subscriptions_memory: StableBTreeMap<
+        (StorableAnchorNumber, StorableEndpointSha256),
+        StorableWebPushSubscription,
+        ManagedMemory<M>,
+    >,
+
+    notifications_consent_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    pub(crate) notifications_consent_memory: StableBTreeMap<
+        (StorableAnchorNumber, StorableOriginSha256),
+        StorableNotificationConsent,
+        ManagedMemory<M>,
+    >,
+
+    notifications_recipient_index_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    pub(crate) notifications_recipient_index_memory:
+        StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -530,6 +568,10 @@ impl<M: Memory + Clone> Storage<M> {
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
         let sso_stable_id_index_memory = memory_manager.get(SSO_STABLE_ID_INDEX_MEMORY_ID);
+        let webpush_subscriptions_memory = memory_manager.get(WEBPUSH_SUBSCRIPTIONS_MEMORY_ID);
+        let notifications_consent_memory = memory_manager.get(NOTIFICATIONS_CONSENT_MEMORY_ID);
+        let notifications_recipient_index_memory =
+            memory_manager.get(NOTIFICATIONS_RECIPIENT_INDEX_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -648,6 +690,21 @@ impl<M: Memory + Clone> Storage<M> {
                 sso_stable_id_index_memory.clone(),
             ),
             sso_stable_id_index_memory: StableBTreeMap::init(sso_stable_id_index_memory),
+
+            webpush_subscriptions_memory_wrapper: MemoryWrapper::new(
+                webpush_subscriptions_memory.clone(),
+            ),
+            webpush_subscriptions_memory: StableBTreeMap::init(webpush_subscriptions_memory),
+            notifications_consent_memory_wrapper: MemoryWrapper::new(
+                notifications_consent_memory.clone(),
+            ),
+            notifications_consent_memory: StableBTreeMap::init(notifications_consent_memory),
+            notifications_recipient_index_memory_wrapper: MemoryWrapper::new(
+                notifications_recipient_index_memory.clone(),
+            ),
+            notifications_recipient_index_memory: StableBTreeMap::init(
+                notifications_recipient_index_memory,
+            ),
         }
     }
 
@@ -1514,6 +1571,32 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Option<ApplicationNumber> {
         self.lookup_application_with_origin_memory
             .get(&StorableOriginSha256::from_origin(origin))
+    }
+
+    /// Every origin `anchor_number` has consented to notifications from.
+    pub fn notifications_consented_origins(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> Vec<FrontendHostname> {
+        let start = (anchor_number, StorableOriginSha256::MIN);
+        let end = (anchor_number, StorableOriginSha256::MAX);
+        self.notifications_consent_memory
+            .range(start..=end)
+            .map(|(_, consent)| consent.origin)
+            .collect()
+    }
+
+    /// Every consent row for `anchor_number` (origin plus its metadata).
+    pub fn notifications_consented_apps(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> Vec<StorableNotificationConsent> {
+        let start = (anchor_number, StorableOriginSha256::MIN);
+        let end = (anchor_number, StorableOriginSha256::MAX);
+        self.notifications_consent_memory
+            .range(start..=end)
+            .map(|(_, consent)| consent)
+            .collect()
     }
 
     /// Only used in tests.
@@ -2472,6 +2555,18 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "sso_stable_id_index_memory".to_string(),
                 self.sso_stable_id_index_memory_wrapper.size(),
+            ),
+            (
+                "webpush_subscriptions_memory".to_string(),
+                self.webpush_subscriptions_memory_wrapper.size(),
+            ),
+            (
+                "notifications_consent_memory".to_string(),
+                self.notifications_consent_memory_wrapper.size(),
+            ),
+            (
+                "notifications_recipient_index_memory".to_string(),
+                self.notifications_recipient_index_memory_wrapper.size(),
             ),
         ])
     }

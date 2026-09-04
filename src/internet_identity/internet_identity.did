@@ -1565,6 +1565,31 @@ type ListAvailableAttributesError = variant {
     AuthorizationError : principal;
 };
 
+// Delivery channels a notification can travel over. Web Push is the only one
+// today; a second channel (email, SMS) in the future is a variant addition here rather than a
+// new endpoint, because consent is per app and not per channel.
+type NotificationChannel = variant {
+    push;
+};
+
+// Whether an app may notify this identity, and whether anything can actually
+// reach them. Kept as a record so channels can be reported without changing the
+// method signature.
+type NotificationConsentStatus = record {
+    consented : opt bool;                                // the user allowed this app; channel-agnostic
+    deliverable_channels : opt vec NotificationChannel;  // channels set up right now; empty means consented but unreachable
+};
+
+// One consented app with its metadata, for the Settings notifications page.
+type NotificationConsentedApp = record {
+    origin : text;
+    granted_at_ns : Timestamp;
+    last_sent_ns : opt Timestamp;  // coarse; absent = never sent
+    muted : bool;                  // consented but skipped by the send path
+    // The account the consent was granted from; absent = the default account.
+    account_number : opt nat64;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2014,4 +2039,24 @@ service : (opt InternetIdentityInit) -> {
 
     // Looks up identity number when called with a recovery phrase
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
+
+    // ===== Notifications: II callable =====
+    notification_grant_consent : (anchor_number : UserNumber, origin : text, account_number : opt nat64) -> (variant { Ok; Err : text });
+    notification_revoke_consent : (anchor_number : UserNumber, origin : text) -> (variant { Ok; Err : text });
+    // Report on the status of the consent for a given origin
+    notification_consent_status : (anchor_number : UserNumber, origin : text) -> (NotificationConsentStatus) query;
+    // Report the full list of consented apps for a given anchor
+    notification_consented_origins : (anchor_number : UserNumber) -> (vec text) query;
+    // Report the consented apps for an anchor with metadata (grant time, last
+    // send, mute state) for the Settings notifications page.
+    notification_consented_apps : (anchor_number : UserNumber) -> (vec NotificationConsentedApp) query;
+    // Mute or unmute an already-consented app (keeps consent, skips the send path).
+    notification_set_app_muted : (anchor_number : UserNumber, origin : text, muted : bool) -> (variant { Ok; Err : text });
+
+    // Register the device push subscription and a pool of JWTs so that we don't have to store a VAPID key-pair in the canister.
+    webpush_subscribe_device : (anchor_number : UserNumber, endpoint : text, p256dh : blob, auth : blob, vapid_public_key : blob, jwt_signatures : vec blob, jwt_issued_at_ns : nat64) -> (variant { Ok; Err : text });
+    webpush_refresh_jwts : (anchor_number : UserNumber, endpoint : text, jwt_signatures : vec blob, jwt_issued_at_ns : nat64) -> (variant { Ok; Err : text });
+    // Check the status of the jwt pool so that we can issue more if needed.
+    webpush_jwt_pool_status : (anchor_number : UserNumber, endpoint : text) -> (opt record { remaining : nat32; issued_at_ns : nat64 }) query;
+    webpush_unsubscribe_device : (anchor_number : UserNumber, endpoint : text) -> (variant { Ok; Err : text });
 };
