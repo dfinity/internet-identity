@@ -1938,17 +1938,12 @@ impl<M: Memory + Clone> Storage<M> {
         let Some(application_number) = self.lookup_application_number_with_origin(origin) else {
             return Ok(0);
         };
-        let Some(references) = self.lookup_account_references(anchor_number, application_number)
+        let ReferenceRow::Held(mut references) =
+            self.reference_row(anchor_number, application_number)
         else {
             return Ok(0);
         };
-        let mut references: Vec<AccountReference> =
-            references.into_iter().map(Into::into).collect();
-
-        let Some(reference) = references
-            .iter_mut()
-            .find(|reference| reference.account_number == account_number)
-        else {
+        let Some(reference) = references.reference_mut(account_number) else {
             return Ok(0);
         };
 
