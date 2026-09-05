@@ -1650,9 +1650,11 @@ mod session_device_tests {
             )
             .unwrap();
 
+        // The successor it re-announces is the one this entry is already waiting for, which
+        // is the shape a retry actually takes: the browser has not moved on either.
         let retried = anchor.resolve_session_device(
             browser_key(1),
-            successor_key(2),
+            successor_key(1),
             "Chrome".to_string(),
             2_000,
         );
