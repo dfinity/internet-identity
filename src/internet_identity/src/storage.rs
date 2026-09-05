@@ -79,7 +79,7 @@
 //!
 //! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
 //! bucket of 128 pages.
-use account::{Account, AccountKey, AccountsCounter};
+use account::{Account, AccountKey, AccountsCounter, SessionRecordKey};
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use ic_stable_structures::cell::ValueError;
@@ -104,11 +104,14 @@ use identity_jose::jwk::Jwk;
 use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::delegation::{self, check_frontend_length};
+use crate::delegation::{calculate_session_seed_with_salt, canister_sig_principal};
 use crate::openid::OpenIdCredentialKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
-use crate::storage::account::AccountReference;
+use crate::storage::account::{
+    AccountReference, SessionRecord, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
+};
 use crate::storage::anchor::Anchor;
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
@@ -121,6 +124,8 @@ use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
+use crate::storage::storable::session_handle::StorableSessionHandle;
+use crate::storage::storable::session_id::StorableSessionId;
 use internet_identity_interface::internet_identity::types::*;
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
@@ -210,6 +215,8 @@ const MCP_REGISTRATION_MEMORY_INDEX: u8 = 31u8;
 const SSO_STABLE_ID_INDEX_MEMORY_INDEX: u8 = 32u8;
 const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
+const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
+const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -295,8 +302,14 @@ const NEXT_APPLICATION_NUMBER_MEMORY_ID: MemoryId =
 
 /// Reverse index from the principal a dapp sees to the account that produced it:
 /// `self_authenticating(der_encode_canister_sig_key(seed)) -> (anchor, application, account)`.
+const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX);
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX);
+
+/// Monotonic [`SessionId`] allocator. A revoked session's id is retired, never reissued,
+/// which is what makes the revocation final: the id is an input to the session seed.
+const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -398,9 +411,15 @@ pub struct Storage<M: Memory> {
     >,
     stable_account_counter_memory: StableCell<StorableAccountsCounter, ManagedMemory<M>>,
     next_application_number_memory: StableCell<StorableApplicationNumber, ManagedMemory<M>>,
+    next_session_id_memory: StableCell<StorableSessionId, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
+    /// Where a session lives, keyed by the principal its chain is rooted at. An app-facing
+    /// call carries nothing but that principal, so this is what turns `caller()` into a
+    /// session.
+    lookup_session_with_principal_memory:
+        StableBTreeMap<Principal, StorableSessionHandle, ManagedMemory<M>>,
     /// Counter that counts how often there was a discrepancy between the anchor accounts counter and the actual number of accounts
     stable_account_counter_discrepancy_counter_memory:
         StableCell<StorableDiscrepancyCounter, ManagedMemory<M>>,
@@ -537,8 +556,11 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(STABLE_DEFAULT_ACCOUNT_REFERENCE_MEMORY_ID);
         let stable_account_counter_memory = memory_manager.get(STABLE_ACCOUNT_COUNTER_MEMORY_ID);
         let next_application_number_memory = memory_manager.get(NEXT_APPLICATION_NUMBER_MEMORY_ID);
+        let next_session_id_memory = memory_manager.get(NEXT_SESSION_ID_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
+        let lookup_session_with_principal_memory =
+            memory_manager.get(LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_ID);
         let stable_account_counter_discrepancy_counter_memory =
             memory_manager.get(STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_ID);
         let lookup_anchor_with_openid_credential_memory =
@@ -623,8 +645,13 @@ impl<M: Memory + Clone> Storage<M> {
             .expect("stable_account_counter_memory"),
             next_application_number_memory: StableCell::init(next_application_number_memory, 0)
                 .expect("next_application_number_memory"),
+            next_session_id_memory: StableCell::init(next_session_id_memory, 0)
+                .expect("next_session_id_memory"),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
+            ),
+            lookup_session_with_principal_memory: StableBTreeMap::init(
+                lookup_session_with_principal_memory,
             ),
             lookup_account_with_principal_memory: StableBTreeMap::init(
                 lookup_account_with_principal_memory,
@@ -871,6 +898,7 @@ impl<M: Memory + Clone> Storage<M> {
             verified_emails: _,
             session_devices: _,
             next_session_device_id: _,
+            session_count: _,
         }) = previous_anchor_maybe
         {
             (
@@ -1587,6 +1615,23 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(new_number)
     }
 
+    /// Hands out the next session id, which no session has held before.
+    ///
+    /// Refuses at the ceiling rather than saturating. The id is an input to the session
+    /// seed, so reissuing one would let a revoked session's identity be arrived at a
+    /// second time — the thing this counter exists to prevent.
+    fn allocate_session_id(&mut self) -> Result<SessionId, StorageError> {
+        let session_id = *self.next_session_id_memory.get();
+        self.next_session_id_memory
+            .set(
+                session_id
+                    .checked_add(1)
+                    .ok_or(StorageError::SessionIdOverflow)?,
+            )
+            .map_err(|_| StorageError::ErrorUpdatingSessionIdAllocator)?;
+        Ok(session_id)
+    }
+
     pub fn lookup_application_number_with_origin(
         &self,
         origin: &FrontendHostname,
@@ -1657,6 +1702,223 @@ impl<M: Memory + Clone> Storage<M> {
             .map(Vec::<AccountReference>::from)
     }
 
+    // Called by the sign-in ceremony, which lands two PRs up.
+    #[allow(dead_code)]
+    /// Signs one browser out of everything, in a single message.
+    pub fn revoke_device_sessions(
+        &mut self,
+        anchor_number: AnchorNumber,
+        device_id: SessionDeviceId,
+    ) -> Result<u64, StorageError> {
+        let affected: Vec<(ApplicationNumber, Vec<AccountReference>)> = self
+            .stable_account_reference_list_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .filter_map(|((_, application_number), list)| {
+                let references = Vec::<AccountReference>::from(list);
+                let holds_a_session = references.iter().any(|reference| {
+                    reference
+                        .sessions
+                        .iter()
+                        .any(|session| session.device_id == device_id)
+                });
+                holds_a_session.then_some((application_number, references))
+            })
+            .collect();
+
+        // One anchor write for the whole sweep rather than one per application: each row
+        // reports what it did to the count, and the total is applied once at the end.
+        let mut delta = 0i64;
+        for (application_number, mut references) in affected {
+            for reference in &mut references {
+                reference
+                    .sessions
+                    .retain(|session| session.device_id != device_id);
+            }
+            delta += self.write_account_state_deferring_count(
+                anchor_number,
+                application_number,
+                references,
+                None,
+                None,
+            )?;
+        }
+        self.apply_session_count_delta(anchor_number, delta)?;
+
+        Ok(delta.unsigned_abs())
+    }
+
+    // Called by the sign-in ceremony, which lands two PRs up.
+    #[allow(dead_code)]
+    /// The session `key` names, or `None` where the identity holds no such session.
+    ///
+    /// A key whose session was replaced reads as `None` rather than as its successor:
+    /// the successor was allocated an id of its own.
+    pub fn read_session(&self, key: &SessionRecordKey) -> Option<SessionRecord> {
+        let application_number = self.lookup_application_number_with_origin(&key.origin)?;
+
+        self.account_references(key.anchor_number, application_number)
+            .into_iter()
+            .find(|reference| reference.account_number == key.account_number)?
+            .sessions
+            .into_iter()
+            .find(|session| session.session_id == key.session_id)
+    }
+
+    // Called by the sign-in ceremony, which lands two PRs up.
+    #[allow(dead_code)]
+    /// Creates the session `prepare_account_session` mints an identity from, replacing
+    /// whatever this browser already held at this account.
+    pub fn create_session(
+        &mut self,
+        params: CreateSessionParams,
+    ) -> Result<(SessionRecordKey, SessionRecord), StorageError> {
+        let CreateSessionParams {
+            anchor_number,
+            origin,
+            account_number,
+            device_id,
+            valid_till_ns,
+            max_idle_ns,
+            read_only,
+            now_ns,
+        } = params;
+
+        // Defaulted and clamped here rather than at the caller, so every path that
+        // creates a session gets the same answer whatever it asked for. The ceiling is
+        // the life this session was actually granted: a bound longer than that could
+        // never be reached, and storing one would say something untrue about it.
+        //
+        // Raised then lowered rather than clamped in one call: `clamp` panics when its
+        // floor exceeds its ceiling, which a session granted less than the floor would
+        // do, and a trap is a poor answer to a short session.
+        let granted = valid_till_ns.saturating_sub(now_ns);
+        let max_idle_ns = max_idle_ns
+            .unwrap_or(DEFAULT_SESSION_IDLE_NS)
+            .max(MIN_SESSION_IDLE_NS)
+            .min(granted);
+
+        // The row this session lands in has to exist first, but an existing one must not be
+        // written here: the single write at the end of this function carries `last_used`.
+        let application_number = match self.lookup_application_number_with_origin(&origin) {
+            Some(application_number)
+                if self
+                    .stored_account_references(anchor_number, application_number)
+                    .is_some() =>
+            {
+                application_number
+            }
+            _ => {
+                if account_number.is_some() {
+                    return Err(StorageError::MissingAccount {
+                        anchor_number,
+                        name: origin,
+                    });
+                }
+                let application_number =
+                    self.lookup_or_insert_application_number_with_origin(&origin)?;
+                self.write_tracked_default(
+                    anchor_number,
+                    application_number,
+                    vec![AccountReference::new(None, Some(now_ns))],
+                    None,
+                )?;
+                application_number
+            }
+        };
+
+        let mut references = self.account_references(anchor_number, application_number);
+
+        let reference = references
+            .iter_mut()
+            .find(|reference| reference.account_number == account_number)
+            .ok_or(StorageError::MissingAccount {
+                anchor_number,
+                name: String::new(),
+            })?;
+        reference.last_used = Some(now_ns);
+
+        // A ceremony replaces whatever this browser held here, rather than reusing it: the
+        // copy of an old session's chain stops working at the user's next sign-in instead of
+        // at its expiry.
+        let mut dropped: Vec<(Option<AccountNumber>, SessionRecord)> = vec![];
+        reference.sessions.retain(|session| {
+            if session.device_id == device_id {
+                dropped.push((account_number, session.clone()));
+                return false;
+            }
+            true
+        });
+
+        // After the checks that can refuse this ceremony, so a refused one does not burn
+        // an id. Ids need not be contiguous, so a later failure leaving a gap is fine;
+        // what must never happen is one being handed out twice.
+        let session_id = self.allocate_session_id()?;
+        let session = SessionRecord {
+            session_id,
+            created_at_ns: now_ns,
+            valid_till_ns,
+            max_idle_ns,
+            last_refreshed_ns: None,
+            device_id,
+            read_only,
+        };
+        reference.sessions.push(session.clone());
+
+        // The whole row, not just the reference being written: this row is about to be
+        // rewritten anyway, and a dead session on a sibling reference has nothing else
+        // coming for it.
+        for reference in references.iter_mut() {
+            let account_number = reference.account_number;
+            reference.sessions.retain(|session| {
+                if session.is_over(now_ns) {
+                    dropped.push((account_number, session.clone()));
+                    return false;
+                }
+                true
+            });
+        }
+
+        // The row is the whole of it: the index entries for the session created here and
+        // for the ones pruned above, and the identity's session count, all follow from
+        // the list this writes.
+        self.write_account_state(anchor_number, application_number, references, None, None)?;
+
+        let key = SessionRecordKey {
+            anchor_number,
+            origin,
+            account_number,
+            session_id,
+        };
+        Ok((key, session))
+    }
+
+    // Called by the sign-in ceremony, which lands two PRs up.
+    #[allow(dead_code)]
+    /// The principal an app sees for an account, which is what a session handle names.
+    fn account_principal_of(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+    ) -> Option<Principal> {
+        let salt = self.salt().copied()?;
+        let account = self.read_account(&AccountKey {
+            anchor_number,
+            origin: self
+                .stable_application_memory
+                .get(&application_number)?
+                .origin
+                .clone(),
+            account_number,
+        })?;
+        Some(canister_sig_principal(
+            canister_id(),
+            account.calculate_seed_with_salt(&salt).to_vec(),
+        ))
+    }
+
     /// Removes a reference-list row and everything derived from it.
     fn remove_reference_list(
         &mut self,
@@ -1688,16 +1950,27 @@ impl<M: Memory + Clone> Storage<M> {
         // before the first removal so a missing salt refuses with the row intact.
         let salt = *self.salt().ok_or(StorageError::SaltNotSet)?;
         let origin = application.origin.clone();
+        // Removing the row rather than writing one, so this is the one place that says
+        // what leaves outside the gate — and it says it the same way, by diffing what the
+        // row held against nothing.
+        let delta = self.sync_session_index(
+            anchor_number,
+            application_number,
+            &origin,
+            &salt,
+            &previous,
+            &[],
+        );
 
-        // Counters first, for the reason `write_account_state` does it: it is the
-        // only fallible step left, and an error after the removes would commit them
-        // without it.
+        // Counters first, for the reason `write_account_state` does it: an error after
+        // the removes would commit them without it.
         self.apply_reference_counter_deltas(
             anchor_number,
             application_number,
             application,
             ReferenceListDeltas::removing(&previous),
         )?;
+        self.apply_session_count_delta(anchor_number, delta)?;
 
         self.sync_account_principal_index(
             anchor_number,
@@ -1813,6 +2086,30 @@ impl<M: Memory + Clone> Storage<M> {
         record: Option<(AccountNumber, StorableAccount)>,
         config: Option<AnchorApplicationConfig>,
     ) -> Result<(), StorageError> {
+        let delta = self.write_account_state_deferring_count(
+            anchor_number,
+            application_number,
+            references,
+            record,
+            config,
+        )?;
+        self.apply_session_count_delta(anchor_number, delta)
+    }
+
+    /// [`Self::write_account_state`], reporting the change in the identity's session
+    /// count rather than applying it.
+    ///
+    /// The delta is still *derived* here — no caller says what it is. What a caller may
+    /// choose is when to apply it, so an operation spanning rows moves the anchor once
+    /// instead of once per row.
+    fn write_account_state_deferring_count(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        references: Vec<AccountReference>,
+        record: Option<(AccountNumber, StorableAccount)>,
+        config: Option<AnchorApplicationConfig>,
+    ) -> Result<i64, StorageError> {
         let stored_references = self.stored_account_references(anchor_number, application_number);
 
         // Nothing to say: the row already holds these bytes, so it is not written and
@@ -1847,19 +2144,41 @@ impl<M: Memory + Clone> Storage<M> {
                     .iter()
                     .zip(&references)
                     .any(|(previous, new)| previous.account_number != new.account_number);
+            // A session's principal is derived from its id, so a write that leaves every
+            // id in place — a refresh stamp, which is the most frequent write there is —
+            // cannot have changed one. Compared as sets because a ceremony replaces one
+            // session with another and leaves the count where it was.
+            let sessions_changed =
+                Self::session_ids_of(previous) != Self::session_ids_of(&references);
             // Resolved here, so a missing salt refuses with nothing written rather than
             // half-way through.
-            let salt = if accounts_changed {
+            let salt = if accounts_changed || sessions_changed {
                 Some(*self.salt().ok_or(StorageError::SaltNotSet)?)
             } else {
                 None
             };
 
-            Some((storable_references, application, deltas, salt))
+            Some((
+                storable_references,
+                application,
+                deltas,
+                salt,
+                accounts_changed,
+                sessions_changed,
+            ))
         };
 
         let mut record = record;
-        if let Some((storable_references, application, deltas, salt)) = list_write {
+        let mut session_delta = 0i64;
+        if let Some((
+            storable_references,
+            application,
+            deltas,
+            salt,
+            accounts_changed,
+            sessions_changed,
+        )) = list_write
+        {
             let origin = application.origin.clone();
             // Counters first: the only step left that can fail, so an out-of-bounds
             // delta refuses with nothing stored rather than a list without its counts.
@@ -1878,14 +2197,27 @@ impl<M: Memory + Clone> Storage<M> {
                     .insert(account_number, storable_account);
             }
             if let Some(salt) = salt {
-                self.sync_account_principal_index(
-                    anchor_number,
-                    application_number,
-                    &origin,
-                    &salt,
-                    stored_references.as_deref().unwrap_or_default(),
-                    &references,
-                );
+                let previous = stored_references.as_deref().unwrap_or_default();
+                if accounts_changed {
+                    self.sync_account_principal_index(
+                        anchor_number,
+                        application_number,
+                        &origin,
+                        &salt,
+                        previous,
+                        &references,
+                    );
+                }
+                if sessions_changed {
+                    session_delta = self.sync_session_index(
+                        anchor_number,
+                        application_number,
+                        &origin,
+                        &salt,
+                        previous,
+                        &references,
+                    );
+                }
             }
             self.stable_account_reference_list_memory
                 .insert((anchor_number, application_number), storable_references);
@@ -1902,7 +2234,42 @@ impl<M: Memory + Clone> Storage<M> {
                 .insert((anchor_number, application_number), config);
         }
 
-        Ok(())
+        Ok(session_delta)
+    }
+
+    /// Moves the identity's session count by what a write to its rows implied.
+    ///
+    /// Cannot report a failure: the caller has already written the anchor to get here, so
+    /// the read resolves, and writing it back with one `u32` changed leaves every field
+    /// the write validates — the email recovery binding included — as it was read.
+    fn apply_session_count_delta(
+        &mut self,
+        anchor_number: AnchorNumber,
+        delta: i64,
+    ) -> Result<(), StorageError> {
+        if delta == 0 {
+            return Ok(());
+        }
+        let mut anchor = self.read(anchor_number)?;
+        anchor.session_count = if delta < 0 {
+            anchor
+                .session_count
+                .saturating_sub(delta.unsigned_abs() as u32)
+        } else {
+            anchor.session_count.saturating_add(delta as u32)
+        };
+        self.write(anchor)
+    }
+
+    /// The ids of every session a reference list holds, sorted, for comparing two
+    /// versions of a list.
+    fn session_ids_of(references: &[AccountReference]) -> Vec<SessionId> {
+        let mut ids: Vec<SessionId> = references
+            .iter()
+            .flat_map(|reference| reference.sessions.iter().map(|session| session.session_id))
+            .collect();
+        ids.sort_unstable();
+        ids
     }
 
     /// [`Self::write_account_state`] for a row the tracked default is the reason for,
@@ -2096,6 +2463,119 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// The principals a set of references derives to. A reference whose account row is
     /// gone derives nothing and is skipped.
+    /// The account one reference names, built from the reference and the record it
+    /// points at.
+    ///
+    /// Not [`Self::read_account`], which reads the stored list and so answers `None` for
+    /// a reference that is being removed. This derives from the list it is handed, which
+    /// is what lets the index be diffed across a write.
+    fn account_of_reference(
+        &self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+        reference: &AccountReference,
+    ) -> Option<Account> {
+        match reference.account_number {
+            None => Some(Account::new(anchor_number, origin.clone(), None, None)),
+            Some(account_number) => {
+                let stored = self.stable_account_memory.get(&account_number)?;
+                Some(Account::new_full(
+                    anchor_number,
+                    origin.clone(),
+                    Some(stored.name),
+                    Some(account_number),
+                    reference.last_used,
+                    stored.seed_from_anchor,
+                ))
+            }
+        }
+    }
+
+    /// The session index entries a reference list implies: one per session it holds,
+    /// each with the account entry its handle needs in order to resolve.
+    fn session_entries(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        origin: &FrontendHostname,
+        salt: &[u8; 32],
+        references: &[AccountReference],
+    ) -> BTreeMap<Principal, (StorableSessionHandle, StorableAccountKey)> {
+        let mut entries = BTreeMap::new();
+        for reference in references {
+            let Some(account) = self.account_of_reference(anchor_number, origin, reference) else {
+                continue;
+            };
+            let account_seed = account.calculate_seed_with_salt(salt);
+            let account_principal =
+                delegation::canister_sig_principal(canister_id(), account_seed.to_vec());
+            for session in &reference.sessions {
+                let seed =
+                    calculate_session_seed_with_salt(salt, &account_seed, session.session_id);
+                entries.insert(
+                    delegation::canister_sig_principal(canister_id(), seed.to_vec()),
+                    (
+                        StorableSessionHandle {
+                            account_principal: account_principal.as_slice().to_vec(),
+                            session_id: session.session_id,
+                        },
+                        StorableAccountKey {
+                            anchor_number,
+                            application_number,
+                            account_number: reference.account_number,
+                        },
+                    ),
+                );
+            }
+        }
+        entries
+    }
+
+    /// Keeps the session index in step with one reference-list write, and reports what
+    /// the write does to the identity's session count.
+    ///
+    /// Sessions live on the reference, so a reference that goes takes its sessions with
+    /// it and this sees them as removed without any caller saying so. That is the point:
+    /// the row and everything derived from it move together, in the one place holding
+    /// both versions of it.
+    fn sync_session_index(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        origin: &FrontendHostname,
+        salt: &[u8; 32],
+        previous: &[AccountReference],
+        current: &[AccountReference],
+    ) -> i64 {
+        let before =
+            self.session_entries(anchor_number, application_number, origin, salt, previous);
+        let after = self.session_entries(anchor_number, application_number, origin, salt, current);
+
+        for principal in before.keys() {
+            if !after.contains_key(principal) {
+                self.lookup_session_with_principal_memory.remove(principal);
+            }
+        }
+        for (principal, (handle, account)) in &after {
+            if before.contains_key(principal) {
+                continue;
+            }
+            // The account's entry goes in with the session's. A handle names its account
+            // by principal, and that index gains entries only where a row's set of
+            // account numbers changes or when the backfill reaches the row — neither of
+            // which a sign-in does. Without this a session at a row that predates the
+            // index resolves to nothing until the sweep happens to arrive.
+            self.lookup_account_with_principal_memory.insert(
+                Principal::from_slice(&handle.account_principal),
+                account.clone(),
+            );
+            self.lookup_session_with_principal_memory
+                .insert(*principal, handle.clone());
+        }
+
+        after.len() as i64 - before.len() as i64
+    }
+
     fn account_principals(
         &self,
         anchor_number: AnchorNumber,
@@ -2107,20 +2587,7 @@ impl<M: Memory + Clone> Storage<M> {
         references
             .iter()
             .filter_map(|reference| {
-                let account = match reference.account_number {
-                    None => Account::new(anchor_number, origin.clone(), None, None),
-                    Some(account_number) => {
-                        let stored = self.stable_account_memory.get(&account_number)?;
-                        Account::new_full(
-                            anchor_number,
-                            origin.clone(),
-                            Some(stored.name),
-                            Some(account_number),
-                            reference.last_used,
-                            stored.seed_from_anchor,
-                        )
-                    }
-                };
+                let account = self.account_of_reference(anchor_number, origin, reference)?;
                 let principal = delegation::canister_sig_principal(
                     canister_id(),
                     account.calculate_seed_with_salt(salt).to_vec(),
@@ -2854,6 +3321,19 @@ impl<M: Memory + Clone> Storage<M> {
     }
 }
 
+// Constructed by the sign-in ceremony, which lands two PRs up.
+#[allow(dead_code)]
+pub struct CreateSessionParams {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub device_id: SessionDeviceId,
+    pub valid_till_ns: Timestamp,
+    pub max_idle_ns: Option<u64>,
+    pub read_only: bool,
+    pub now_ns: Timestamp,
+}
+
 /// How far the sweep has got: which row, and how many of that row's references are
 /// already indexed. The offset is what lets a batch stop inside a row that holds more
 /// references than one message can derive principals for.
@@ -3108,6 +3588,11 @@ pub enum StorageError {
     /// put two origins on a single row.
     ApplicationsCounterOverflow,
     ErrorUpdatingApplicationNumberAllocator,
+    /// No session ids left to hand out. Refused rather than saturated: the id is an
+    /// input to the session seed, so reissuing one would resurrect a revoked session's
+    /// identity.
+    SessionIdOverflow,
+    ErrorUpdatingSessionIdAllocator,
     /// The references a write assembled cannot be stored as they stand.
     UnstorableAccountReferenceList {
         anchor_number: AnchorNumber,
@@ -3121,6 +3606,12 @@ pub enum StorageError {
         count: ReferenceCount,
         stored: u64,
         delta: i64,
+    },
+    /// Reclaiming ran and the identity is still at the session cap. Unreachable unless
+    /// reclaiming stopped honouring its contract, which is why it is an error rather than a
+    /// refused sign-in: the sign-in is the thing this cap must never fail.
+    SessionCapNotReclaimed {
+        anchor_number: AnchorNumber,
     },
     /// Tried to bind a recovery email that's already on a different
     /// anchor. The "one anchor per address" invariant from design
@@ -3195,6 +3686,10 @@ impl fmt::Display for StorageError {
             Self::ErrorUpdatingApplicationNumberAllocator => {
                 write!(f, "Error updating the application number allocator")
             }
+            Self::SessionIdOverflow => write!(f, "No session ids left to allocate"),
+            Self::ErrorUpdatingSessionIdAllocator => {
+                write!(f, "Error updating the session id allocator")
+            }
             Self::UnstorableAccountReferenceList {
                 anchor_number,
                 application_number,
@@ -3217,6 +3712,10 @@ impl fmt::Display for StorageError {
             Self::EmailRecoveryAddressAlreadyBound { existing_anchor } => write!(
                 f,
                 "recovery email is already bound to a different anchor ({existing_anchor})",
+            ),
+            Self::SessionCapNotReclaimed { anchor_number } => write!(
+                f,
+                "anchor {anchor_number} is at the session cap and reclaiming freed nothing"
             ),
         }
     }

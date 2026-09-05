@@ -8,7 +8,7 @@ use ic_cdk::trap;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountInfo, AccountNameValidationError, AccountNumber, AnchorNumber, FrontendHostname,
-    SessionDeviceId, Timestamp, UserKey,
+    SessionDeviceId, SessionId, Timestamp, UserKey,
 };
 use serde::{Deserialize, Serialize};
 
@@ -53,8 +53,54 @@ impl AccountReference {
     }
 }
 
-/// A revocable session at one account. Only `last_refreshed` is mutable, which is why
-/// it is the one field absent from the seed.
+/// The shortest idle bound a session may be given.
+///
+/// An app delegation lasts five minutes and an active application replaces it a
+/// little before it expires, so a bound anywhere near that would end sessions
+/// plainly in use. Ten minutes is already the floor on a session's own length,
+/// so this shares that range rather than introducing a second one.
+pub const MIN_SESSION_IDLE_NS: u64 = 10 * crate::MINUTE_NS;
+
+/// What a session gets when its ceremony asks for no bound of its own.
+///
+/// Seven days of nobody touching an application ends the sign-in, well inside the
+/// thirty days a session may otherwise live. It is the length of an absence rather
+/// than of a session: coming back inside a week keeps you signed in indefinitely,
+/// and a machine walked away from stops being signed in within one.
+pub const DEFAULT_SESSION_IDLE_NS: u64 = 7 * crate::DAY_NS;
+
+/// Where one session is stored, and which session it is.
+///
+/// The account addresses the row; `session_id` picks the record out of it. The id is
+/// unique on its own, so every operation is compare-and-act: a key for a session that
+/// was replaced reads as `None` and revokes nothing, instead of landing on its
+/// successor.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SessionRecordKey {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub session_id: SessionId,
+}
+
+impl SessionRecordKey {
+    // Used by the app delegation path, which lands four PRs up.
+    #[allow(dead_code)]
+    /// The account this session is at.
+    pub fn account(&self) -> AccountKey {
+        AccountKey {
+            anchor_number: self.anchor_number,
+            origin: self.origin.clone(),
+            account_number: self.account_number,
+        }
+    }
+}
+
+/// A revocable session at one account.
+///
+/// `session_id` is what the seed binds, so the identity this session signs with is
+/// tied to the one record that was allocated that id. Every other field describes the
+/// session and can be rewritten without changing who it signs as.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct SessionRecord {
     pub created_at_ns: Timestamp,
@@ -63,6 +109,7 @@ pub struct SessionRecord {
     pub last_refreshed_ns: Option<Timestamp>,
     pub device_id: SessionDeviceId,
     pub read_only: bool,
+    pub session_id: SessionId,
 }
 
 impl SessionRecord {
@@ -96,13 +143,14 @@ impl SessionRecord {
     ///
     /// The extension is what separates an app in weekly use from one opened once and
     /// abandoned, which recency alone gets backwards — the abandoned one was touched more
-    /// recently. `device_id` only makes the order total.
-    pub fn reclaim_order(&self, now: Timestamp) -> (bool, Timestamp, SessionDeviceId) {
+    /// recently. `session_id` only makes the order total, which it can because no two
+    /// sessions share one.
+    pub fn reclaim_order(&self, now: Timestamp) -> (bool, Timestamp, SessionId) {
         let last_used = self.last_refreshed_ns.unwrap_or(self.created_at_ns);
         (
             !self.is_over(now),
             last_used.saturating_add(self.demonstrated_use()),
-            self.device_id,
+            self.session_id,
         )
     }
 }

@@ -225,6 +225,7 @@ fn should_prevent_mutation_when_invariants_are_violated() {
     let mut anchor = Anchor {
         session_devices: vec![],
         next_session_device_id: 0,
+        session_count: 0,
         anchor_number: ANCHOR_NUMBER,
         devices: vec![
             device1.clone(),
@@ -249,6 +250,7 @@ fn should_prevent_addition_when_invariants_are_violated() {
     let mut anchor = Anchor {
         session_devices: vec![],
         next_session_device_id: 0,
+        session_count: 0,
         anchor_number: ANCHOR_NUMBER,
         devices: vec![
             recovery_phrase(1, DeviceProtection::Unprotected),
@@ -273,6 +275,7 @@ fn should_allow_removal_when_invariants_are_violated() {
     let mut anchor = Anchor {
         session_devices: vec![],
         next_session_device_id: 0,
+        session_count: 0,
         anchor_number: ANCHOR_NUMBER,
         devices: vec![
             device1.clone(),

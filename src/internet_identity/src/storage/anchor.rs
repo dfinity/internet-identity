@@ -42,6 +42,7 @@ pub struct Anchor {
     /// Capped by `MAX_SESSION_DEVICES`.
     pub(crate) session_devices: Vec<SessionDevice>,
     pub(crate) next_session_device_id: SessionDeviceId,
+    pub(crate) session_count: u32,
     pub(crate) metadata: Option<HashMap<String, MetadataEntry>>,
     pub(crate) name: Option<String>,
     pub(crate) created_at: Option<Timestamp>,
@@ -249,6 +250,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             verified_emails,
             session_devices,
             next_session_device_id,
+            session_count,
             metadata,
             name,
             created_at,
@@ -516,6 +518,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 verified_emails,
                 session_devices,
                 next_session_device_id,
+                session_count: Some(session_count),
             },
         )
     }
@@ -533,6 +536,7 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             verified_emails,
             session_devices,
             next_session_device_id,
+            session_count,
         } = storable_anchor;
 
         let name = name.clone();
@@ -653,6 +657,7 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             verified_emails,
             session_devices,
             next_session_device_id,
+            session_count: session_count.unwrap_or_default(),
             devices,
             metadata,
         }
@@ -676,6 +681,7 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
         let Some(storable_anchor) = storable_anchor else {
             return Anchor {
                 name: None,
+                session_count: 0,
                 openid_credentials: vec![],
                 email_recovery: vec![],
                 verified_emails: vec![],
@@ -722,6 +728,7 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
             verified_emails,
             session_devices,
             next_session_device_id: storable_anchor.next_session_device_id.unwrap_or_default(),
+            session_count: storable_anchor.session_count.unwrap_or_default(),
             metadata,
             name,
             created_at,
@@ -829,6 +836,7 @@ impl Anchor {
         Self {
             anchor_number,
             created_at: Some(created_at),
+            session_count: 0,
             devices: vec![],
             openid_credentials: vec![],
             email_recovery: vec![],
