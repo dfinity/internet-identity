@@ -119,6 +119,17 @@ describe("signOutSessionDevice", () => {
     });
   });
 
+  it("surfaces an internal failure", async () => {
+    const actor = {
+      revoke_device_sessions: () =>
+        Promise.resolve({ Err: { InternalCanisterError: "boom" } }),
+    } as unknown as ActorSubclass<_SERVICE>;
+
+    await expect(
+      signOutSessionDevice(actor, BigInt(10_000), 3),
+    ).rejects.toThrow("boom");
+  });
+
   it("surfaces an unauthorized refusal", async () => {
     const actor = {
       revoke_device_sessions: () =>

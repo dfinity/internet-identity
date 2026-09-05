@@ -54,10 +54,12 @@ export const signOutSessionDevice = async (
     identity_number: identityNumber,
     device_id: deviceId,
   });
-  // The only refusal the canister can report. A storage failure traps, which arrives as
-  // a rejected call rather than as an `Err`, so there is nothing else to name here.
   if ("Err" in result) {
-    throw new Error("Not authorized to end this browser's sessions");
+    throw new Error(
+      "Unauthorized" in result.Err
+        ? "Not authorized to end this browser's sessions"
+        : result.Err.InternalCanisterError,
+    );
   }
   if ((await currentDeviceId(identityNumber)) === deviceId) {
     await purgeAppSessions(identityNumber);
