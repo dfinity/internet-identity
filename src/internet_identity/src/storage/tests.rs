@@ -4386,11 +4386,11 @@ mod account_principal_index_backfill_tests {
 
     const SALT: [u8; 32] = [17u8; 32];
 
-    fn storage_with_rows(rows: u64) -> (Storage<VectorMemory>, Vec<AnchorNumber>) {
+    fn storage_with_rows(lists: u64) -> (Storage<VectorMemory>, Vec<AnchorNumber>) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         storage.update_salt(SALT);
         let mut anchors = vec![];
-        for index in 0..rows {
+        for index in 0..lists {
             let anchor = storage.allocate_anchor(0).unwrap();
             let anchor_number = anchor.anchor_number();
             storage.write(anchor).unwrap();
@@ -4510,7 +4510,7 @@ mod account_principal_index_backfill_tests {
         assert_eq!(outcome.indexed, 0);
     }
 
-    /// A canister that has never been signed in to has no salt and no rows, and the sweep
+    /// A canister that has never been signed in to has no salt and no lists, and the sweep
     /// has to finish on the second of those. Waiting for the salt would leave its timer
     /// running for the life of the canister.
     #[test]
@@ -4536,9 +4536,9 @@ mod account_principal_index_backfill_tests {
         assert_eq!(outcome.indexed, 0);
     }
 
-    /// A row can hold up to `MAX_ANCHOR_ACCOUNTS` references, so a batch that stopped only
-    /// on row boundaries would derive that many principals in one message however small
-    /// the batch. It stops inside the row and the cursor says where.
+    /// A list can hold up to `MAX_ANCHOR_ACCOUNTS` references, so a batch that stopped only
+    /// on list boundaries would derive that many principals in one message however small
+    /// the batch. It stops inside the list and the cursor says where.
     #[test]
     fn a_batch_stops_inside_a_row_too_big_to_finish() {
         let (mut storage, anchors) = storage_with_rows(1);
@@ -4566,7 +4566,7 @@ mod account_principal_index_backfill_tests {
         assert_eq!(
             first.next_cursor.map(|cursor| cursor.references_done),
             Some(2),
-            "the cursor should point inside the row, not past it"
+            "the cursor should point inside the list, not past it"
         );
         assert_eq!(storage.lookup_account_with_principal_memory.len(), 2);
 

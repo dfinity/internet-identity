@@ -1931,14 +1931,14 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Indexes one batch of existing reference-list rows. Entries are only inserted,
+    /// Indexes one batch of existing reference-list lists. Entries are only inserted,
     /// never removed, so a batch that runs twice writes the same values.
     ///
-    /// `batch_size` bounds **derivations**, not rows. One row is an identity's references
+    /// `batch_size` bounds **derivations**, not lists. One list is an identity's references
     /// at one origin and holds up to [`MAX_ANCHOR_ACCOUNTS`] of them, each costing a seed
-    /// hash, a principal derivation and a stable write — so a row-bounded batch is only
-    /// bounded in the shape of data that happens to be common. A batch stops mid-row and
-    /// the cursor says where, which is why it carries an offset into the row.
+    /// hash, a principal derivation and a stable write — so a list-bounded batch is only
+    /// bounded in the shape of data that happens to be common. A batch stops mid-list and
+    /// the cursor says where, which is why it carries an offset into the list.
     pub fn backfill_account_principal_index_batch(
         &mut self,
         cursor: Option<AccountPrincipalIndexBackfillCursor>,
@@ -1950,26 +1950,26 @@ impl<M: Memory + Clone> Storage<M> {
         };
 
         // Examining nothing is not finishing. Reporting completion here would stop a
-        // sweep that has not read a single row, and a lookup miss would then be taken as
+        // sweep that has not read a single list, and a lookup miss would then be taken as
         // proof no account has that principal.
         if batch_size == 0 {
             return outcome;
         }
 
         use std::ops::Bound as RangeBound;
-        // Inclusive of the cursor's own row: a batch may have stopped part-way through
+        // Inclusive of the cursor's own list: a batch may have stopped part-way through
         // it, and the offset says how far it got.
         let range = match cursor {
-            Some(cursor) => (RangeBound::Included(cursor.row()), RangeBound::Unbounded),
+            Some(cursor) => (RangeBound::Included(cursor.list()), RangeBound::Unbounded),
             None => (RangeBound::Unbounded, RangeBound::Unbounded),
         };
 
-        // Read far enough ahead to spend the budget and no further, so the rows behind
+        // Read far enough ahead to spend the budget and no further, so the lists behind
         // this batch are never materialised. The borrow ends here, which is what lets the
         // indexing below write.
         let mut outstanding = batch_size;
         let mut ran_out = false;
-        let mut rows: Vec<(
+        let mut lists: Vec<(
             AnchorNumber,
             ApplicationNumber,
             Vec<AccountReference>,
@@ -1978,11 +1978,11 @@ impl<M: Memory + Clone> Storage<M> {
         for (key, list) in self.stable_account_reference_list_memory.range(range) {
             let references = Vec::<AccountReference>::from(list);
             let already_done = match cursor {
-                Some(cursor) if cursor.row() == key => cursor.references_done,
+                Some(cursor) if cursor.list() == key => cursor.references_done,
                 _ => 0,
             };
             let left_in_row = references.len().saturating_sub(already_done) as u64;
-            rows.push((key.0, key.1, references, already_done));
+            lists.push((key.0, key.1, references, already_done));
             if left_in_row >= outstanding {
                 ran_out = true;
                 break;
@@ -1992,9 +1992,9 @@ impl<M: Memory + Clone> Storage<M> {
 
         // Nothing left to index, whatever else is true of this canister. Checked before
         // the salt, because a fresh install has no salt until its first sign-in and no
-        // rows either — and a sweep that waits for the salt there never reports done and
+        // lists either — and a sweep that waits for the salt there never reports done and
         // ticks its timer for the life of the canister.
-        if rows.is_empty() {
+        if lists.is_empty() {
             outcome.is_done = true;
             return outcome;
         }
@@ -2008,7 +2008,7 @@ impl<M: Memory + Clone> Storage<M> {
         outcome.is_done = !ran_out;
 
         let mut budget = batch_size;
-        for (anchor_number, application_number, references, already_done) in rows {
+        for (anchor_number, application_number, references, already_done) in lists {
             let Some(origin) = self
                 .stable_application_memory
                 .get(&application_number)
@@ -2858,8 +2858,8 @@ impl<M: Memory + Clone> Storage<M> {
     }
 }
 
-/// How far the sweep has got: which row, and how many of that row's references are
-/// already indexed. The offset is what lets a batch stop inside a row that holds more
+/// How far the sweep has got: which list, and how many of that list's references are
+/// already indexed. The offset is what lets a batch stop inside a list that holds more
 /// references than one message can derive principals for.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AccountPrincipalIndexBackfillCursor {
@@ -2869,7 +2869,7 @@ pub struct AccountPrincipalIndexBackfillCursor {
 }
 
 impl AccountPrincipalIndexBackfillCursor {
-    fn row(&self) -> (AnchorNumber, ApplicationNumber) {
+    fn list(&self) -> (AnchorNumber, ApplicationNumber) {
         (self.anchor_number, self.application_number)
     }
 }
@@ -2878,7 +2878,7 @@ impl AccountPrincipalIndexBackfillCursor {
 pub struct AccountPrincipalIndexBackfillOutcome {
     pub next_cursor: Option<AccountPrincipalIndexBackfillCursor>,
     pub indexed: u64,
-    /// Rows whose application is gone, so no principal can be derived for them. A row
+    /// Rows whose application is gone, so no principal can be derived for them. A list
     /// in that state is an inconsistency rather than a normal skip, and a run that
     /// silently indexes nothing would otherwise look like a run with nothing to do.
     pub skipped: u64,
