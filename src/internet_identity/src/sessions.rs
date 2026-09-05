@@ -463,15 +463,9 @@ pub fn revoke_device_sessions(
     check_authorization(request.identity_number)
         .map_err(|err| SessionRevokeError::Unauthorized(err.principal))?;
 
-    // Trapping rather than reporting a failure, as `app_revoke_session` does for the same
-    // class of error: the sweep writes one row per application and adjusts the count after
-    // the loop, and an `Err` reply commits everything written before it. That would leave
-    // a browser signed out of some of its applications and not others, told the sign-out
-    // failed, with a retry the only way back to a defined state. A trap rolls the whole
-    // message back.
     storage_borrow_mut(|storage| {
         storage.revoke_device_sessions(request.identity_number, request.device_id)
     })
-    .expect("failed to sign out a browser of an identity the caller is authorized for");
-    Ok(())
+    .map(|_| ())
+    .map_err(|err| SessionRevokeError::InternalCanisterError(err.to_string()))
 }
