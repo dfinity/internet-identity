@@ -726,15 +726,12 @@ export type GetAccountError = {
     }
   };
 export interface GetAccountSessionRequest {
+  /**
+   * The session prepare_account_session created, named exactly rather than searched for.
+   */
+  'session_id' : bigint,
   'session_key' : SessionKey,
   'origin' : FrontendHostname,
-  /**
-   * Which browser and which sign-in, both returned by prepare_account_session. The
-   * pair names one session: a browser keeps its id across sign-ins, so the creation
-   * time is what tells two of its sessions apart.
-   */
-  'device_id' : number,
-  'created_at' : Timestamp,
   'account_number' : [] | [AccountNumber],
   'expiration' : Timestamp,
   'identity_number' : UserNumber,
@@ -1421,11 +1418,17 @@ export interface PrepareAccountSessionRequest {
 export interface PrepareAccountSessionResponse {
   'user_key' : PublicKey,
   /**
+   * Names the session this ceremony created, and is what get_account_session is given
+   * to collect the delegation signed for it. Not a credential: it names a session, it
+   * does not authorise one.
+   */
+  'session_id' : bigint,
+  /**
    * Which browser this sign-in was attributed to, so the settings list can mark the one
-   * the user is looking at. Not a credential: a caller never presents it.
+   * the user is looking at, and so the browser knows which registration its key now
+   * belongs to. Not a credential: a caller never presents it.
    */
   'device_id' : number,
-  'created_at' : Timestamp,
   /**
    * The session's valid_till.
    */
