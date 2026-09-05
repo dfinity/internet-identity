@@ -3,7 +3,7 @@
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2::{
     app_get_delegation, app_prepare_delegation, app_revoke_session, get_account_session,
-    prepare_account_session, revoke_account_session, revoke_device_sessions,
+    prepare_account_session, revoke_device_sessions,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
@@ -12,8 +12,7 @@ use canister_tests::framework::{
 use internet_identity_interface::internet_identity::types::{
     AccountSessionError, AppGetDelegationRequest, AppPrepareDelegationRequest, AppSessionError,
     GetAccountSessionRequest, Permissions, PrepareAccountSessionRequest,
-    PrepareAccountSessionResponse, RevokeAccountSessionRequest, RevokeDeviceSessionsRequest,
-    SessionDeviceInfo, SessionRevokeError,
+    PrepareAccountSessionResponse, RevokeDeviceSessionsRequest, SessionDeviceInfo,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -90,6 +89,8 @@ fn should_create_a_session_and_witness_its_delegation() -> Result<(), RejectResp
             account_number: None,
             session_key: ByteBuf::from(vec![1; 32]),
             expiration: prepared.expiration,
+            device_id: prepared.device_id,
+            created_at: prepared.created_at,
         },
     )?
     .unwrap();
@@ -682,63 +683,6 @@ fn should_leave_another_browsers_session_alone() -> Result<(), RejectResponse> {
 }
 
 #[test]
-fn should_revoke_one_session_from_settings() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
-    let identity_number = flows::register_anchor(&env, canister_id);
-    let (prepared, session_principal) = create_session(&env, canister_id, identity_number);
-
-    revoke_account_session(
-        &env,
-        canister_id,
-        principal_1(),
-        RevokeAccountSessionRequest {
-            identity_number,
-            origin: ORIGIN.to_string(),
-            account_number: None,
-            created_at: prepared.created_at,
-        },
-    )?
-    .unwrap();
-
-    let refreshed = app_prepare_delegation(
-        &env,
-        canister_id,
-        session_principal,
-        AppPrepareDelegationRequest {
-            session_key: ByteBuf::from(vec![7; 32]),
-        },
-    )?;
-    assert_eq!(refreshed, Err(AppSessionError::NoMatchingSession));
-
-    Ok(())
-}
-
-#[test]
-fn should_refuse_revocation_by_another_anchor() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
-    let identity_number = flows::register_anchor(&env, canister_id);
-    let (prepared, _) = create_session(&env, canister_id, identity_number);
-
-    let result = revoke_account_session(
-        &env,
-        canister_id,
-        Principal::anonymous(),
-        RevokeAccountSessionRequest {
-            identity_number,
-            origin: ORIGIN.to_string(),
-            account_number: None,
-            created_at: prepared.created_at,
-        },
-    )?;
-
-    assert!(matches!(result, Err(SessionRevokeError::Unauthorized(_))));
-
-    Ok(())
-}
-
-#[test]
 fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
     use canister_tests::api::internet_identity::api_v2::identity_info;
 
@@ -852,15 +796,13 @@ fn should_report_a_revoked_session_as_gone() -> Result<(), RejectResponse> {
     let identity_number = flows::register_anchor(&env, canister_id);
     let (prepared, session_principal) = create_session(&env, canister_id, identity_number);
 
-    revoke_account_session(
+    revoke_device_sessions(
         &env,
         canister_id,
         principal_1(),
-        RevokeAccountSessionRequest {
+        RevokeDeviceSessionsRequest {
             identity_number,
-            origin: ORIGIN.to_string(),
-            account_number: None,
-            created_at: prepared.created_at,
+            device_id: prepared.device_id,
         },
     )?
     .unwrap();
