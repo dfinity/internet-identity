@@ -1931,7 +1931,7 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Indexes one batch of existing reference-list lists. Entries are only inserted,
+    /// Indexes one batch of existing account reference lists. Entries are only inserted,
     /// never removed, so a batch that runs twice writes the same values.
     ///
     /// `batch_size` bounds **derivations**, not lists. One list is an identity's references
@@ -1981,13 +1981,13 @@ impl<M: Memory + Clone> Storage<M> {
                 Some(cursor) if cursor.list() == key => cursor.references_done,
                 _ => 0,
             };
-            let left_in_row = references.len().saturating_sub(already_done) as u64;
+            let left_in_list = references.len().saturating_sub(already_done) as u64;
             lists.push((key.0, key.1, references, already_done));
-            if left_in_row >= outstanding {
+            if left_in_list >= outstanding {
                 ran_out = true;
                 break;
             }
-            outstanding -= left_in_row;
+            outstanding -= left_in_list;
         }
 
         // Nothing left to index, whatever else is true of this canister. Checked before
@@ -2878,7 +2878,7 @@ impl AccountPrincipalIndexBackfillCursor {
 pub struct AccountPrincipalIndexBackfillOutcome {
     pub next_cursor: Option<AccountPrincipalIndexBackfillCursor>,
     pub indexed: u64,
-    /// Rows whose application is gone, so no principal can be derived for them. A list
+    /// Lists whose application is gone, so no principal can be derived for them. A list
     /// in that state is an inconsistency rather than a normal skip, and a run that
     /// silently indexes nothing would otherwise look like a run with nothing to do.
     pub skipped: u64,

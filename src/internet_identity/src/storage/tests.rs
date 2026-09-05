@@ -4386,7 +4386,7 @@ mod account_principal_index_backfill_tests {
 
     const SALT: [u8; 32] = [17u8; 32];
 
-    fn storage_with_rows(lists: u64) -> (Storage<VectorMemory>, Vec<AnchorNumber>) {
+    fn storage_with_lists(lists: u64) -> (Storage<VectorMemory>, Vec<AnchorNumber>) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         storage.update_salt(SALT);
         let mut anchors = vec![];
@@ -4426,8 +4426,8 @@ mod account_principal_index_backfill_tests {
     }
 
     #[test]
-    fn a_sweep_indexes_every_pre_existing_row() {
-        let (mut storage, anchors) = storage_with_rows(5);
+    fn a_sweep_indexes_every_pre_existing_list() {
+        let (mut storage, anchors) = storage_with_lists(5);
         clear_index(&mut storage);
         assert_eq!(storage.lookup_account_with_principal_memory.len(), 0);
 
@@ -4456,7 +4456,7 @@ mod account_principal_index_backfill_tests {
 
     #[test]
     fn a_sweep_resumes_from_its_cursor() {
-        let (mut storage, _) = storage_with_rows(5);
+        let (mut storage, _) = storage_with_lists(5);
         clear_index(&mut storage);
 
         let first = storage.backfill_account_principal_index_batch(None, 2);
@@ -4475,7 +4475,7 @@ mod account_principal_index_backfill_tests {
 
     #[test]
     fn a_repeated_sweep_writes_nothing_new() {
-        let (mut storage, _) = storage_with_rows(3);
+        let (mut storage, _) = storage_with_lists(3);
 
         let outcome = storage.backfill_account_principal_index_batch(None, 100);
 
@@ -4527,7 +4527,7 @@ mod account_principal_index_backfill_tests {
     /// meaningful once the sweep says it is finished.
     #[test]
     fn an_empty_batch_size_does_not_report_completion() {
-        let (mut storage, _) = storage_with_rows(3);
+        let (mut storage, _) = storage_with_lists(3);
         clear_index(&mut storage);
 
         let outcome = storage.backfill_account_principal_index_batch(None, 0);
@@ -4540,8 +4540,8 @@ mod account_principal_index_backfill_tests {
     /// on list boundaries would derive that many principals in one message however small
     /// the batch. It stops inside the list and the cursor says where.
     #[test]
-    fn a_batch_stops_inside_a_row_too_big_to_finish() {
-        let (mut storage, anchors) = storage_with_rows(1);
+    fn a_batch_stops_inside_a_list_too_big_to_finish() {
+        let (mut storage, anchors) = storage_with_lists(1);
         let anchor_number = anchors[0];
         let origin = "https://d-0.com".to_string();
         let mut references = vec![AccountReference {
