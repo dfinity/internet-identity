@@ -292,7 +292,7 @@ fn session_identity(
 /// and never by the numbers behind it, which are II's alone.
 ///
 /// The account is read rather than reconstructed: a materialized default derives from
-/// `seed_from_anchor`, which only the stored row carries.
+/// `seed_from_anchor`, which only the stored list carries.
 fn account_principal(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
