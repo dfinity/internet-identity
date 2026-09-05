@@ -1893,9 +1893,8 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Removes one session. Returns whether anything was removed.
     pub fn revoke_session(&mut self, key: &SessionRecordKey) -> Result<bool, StorageError> {
-        // The key carries the creation time as well as the browser, so a key for a
-        // session that was replaced since finds nothing rather than taking its
-        // successor down with it.
+        // The key names one session by its id, so a key for a session that was replaced
+        // since finds nothing rather than taking its successor down with it.
         if self.read_session(key).is_none() {
             return Ok(false);
         }
@@ -1910,7 +1909,7 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number,
             application_number,
             key.account_number,
-            key.device_id,
+            key.session_id,
         )?;
         if dropped > 0 {
             self.change_session_count(anchor_number, dropped, 0)?;
@@ -2116,7 +2115,7 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
         account_number: Option<AccountNumber>,
-        device_id: SessionDeviceId,
+        session_id: SessionId,
     ) -> Result<usize, StorageError> {
         let mut references = self.account_references(anchor_number, application_number);
         let Some(reference) = references
@@ -2128,7 +2127,7 @@ impl<M: Memory + Clone> Storage<M> {
         let dropped: Vec<SessionRecord> = reference
             .sessions
             .iter()
-            .filter(|session| session.device_id == device_id)
+            .filter(|session| session.session_id == session_id)
             .cloned()
             .collect();
         if dropped.is_empty() {
@@ -2136,7 +2135,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
         reference
             .sessions
-            .retain(|session| session.device_id != device_id);
+            .retain(|session| session.session_id != session_id);
         self.write_account_state(anchor_number, application_number, references, None, None)?;
         self.unindex_sessions(anchor_number, application_number, account_number, &dropped);
         Ok(dropped.len())
