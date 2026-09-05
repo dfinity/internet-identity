@@ -141,9 +141,13 @@ describe("signOutSessionDevice", () => {
     ).rejects.toThrow("boom");
   });
 
+  /// Which browser is signing out is read from the key record, not passed in: the list
+  /// renders that flag from a promise, and a click landing before it resolved used to
+  /// leave this browser's own chains behind — the one thing signing out must not do.
   it("discards this browser's stored chains, and another browser's not", async () => {
     const { storeAppSession, appSessionsForOrigin } =
       await import("$lib/stores/app-session.store");
+    const { set: idbSet, createStore } = await import("idb-keyval");
     const record = {
       keyPair: undefined as unknown as CryptoKeyPair,
       chainJson: "{}",
@@ -155,18 +159,24 @@ describe("signOutSessionDevice", () => {
     const actor = {
       revoke_device_sessions: vi.fn(() => Promise.resolve({ Ok: null })),
     } as unknown as ActorSubclass<_SERVICE>;
+    // This browser is device 3.
+    await idbSet(
+      BigInt(10_000).toString(),
+      { keyPair: undefined, deviceId: 3 },
+      createStore("ii-browser-keys", "keys"),
+    );
 
     await storeAppSession(
       { identityNumber: BigInt(10_000), origin: "https://app.example.com" },
       record,
     );
     // Signing another browser out must leave this one signed in locally.
-    await signOutSessionDevice(actor, BigInt(10_000), 3, false);
+    await signOutSessionDevice(actor, BigInt(10_000), 9);
     expect(await appSessionsForOrigin("https://app.example.com")).toHaveLength(
       1,
     );
 
-    await signOutSessionDevice(actor, BigInt(10_000), 3, true);
+    await signOutSessionDevice(actor, BigInt(10_000), 3);
     expect(await appSessionsForOrigin("https://app.example.com")).toEqual([]);
   });
 });
