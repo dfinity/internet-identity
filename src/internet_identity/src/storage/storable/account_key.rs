@@ -9,7 +9,7 @@ use std::borrow::Cow;
 /// The stored form of an [`crate::storage::account::AccountKey`], with the origin
 /// interned to an application number.
 ///
-/// The number rather than the origin, because a row per principal would otherwise
+/// The number rather than the origin, because a list per principal would otherwise
 /// carry a copy of the origin string, and interning it is what application numbers are
 /// for. Which is also why the two types stay apart: the number is storage's own, and
 /// what leaves is the `AccountKey` it maps to. Absent account number means the tracked

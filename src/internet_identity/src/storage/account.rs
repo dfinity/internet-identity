@@ -170,7 +170,7 @@ impl Account {
     ///
     /// Test-only. In production every account comes out of
     /// [`crate::storage::Storage::read_account`], which builds this one only where the
-    /// identity's row still names it — a derived default handed out without that check
+    /// identity's list still names it — a derived default handed out without that check
     /// would sign for an origin the identity may have moved every account away from.
     #[cfg(test)]
     pub fn synthetic(anchor_number: AnchorNumber, origin: FrontendHostname) -> Self {

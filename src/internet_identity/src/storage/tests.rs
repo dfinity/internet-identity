@@ -39,7 +39,7 @@ fn record_use(
 
 const HEADER_SIZE: usize = 58;
 
-/// The references a row holds, for assertions that go on to index them.
+/// The references a list holds, for assertions that go on to index them.
 fn held_references(
     storage: &Storage<VectorMemory>,
     anchor_number: AnchorNumber,
@@ -47,7 +47,7 @@ fn held_references(
 ) -> Vec<AccountReference> {
     storage
         .stored_account_references(anchor_number, application_number)
-        .expect("expected a row holding references, found none")
+        .expect("expected a list holding references, found none")
 }
 
 #[test]
@@ -503,7 +503,7 @@ fn should_track_the_default_account_on_first_use() {
     storage.write_account(account).unwrap();
 
     // Nothing was stored at this origin, so recording the use is what gives the
-    // default a row: the timestamp has nowhere else to live.
+    // default a list: the timestamp has nowhere else to live.
     assert_eq!(
         storage.read_account(&key).unwrap().last_used,
         Some(timestamp)
@@ -528,7 +528,7 @@ fn should_record_that_a_tracked_default_was_used() {
     let anchor_number = anchor.anchor_number();
     storage.write(anchor).unwrap();
 
-    // A named account gives the origin a row, which the default is tracked in.
+    // A named account gives the origin a list, which the default is tracked in.
     storage
         .create_account(anchor_number, origin.clone(), "Test Account".to_string())
         .unwrap();
@@ -2343,7 +2343,7 @@ mod reference_list_write_path_tests {
         // Refused before anything was written: the list still holds both references.
         let references = storage
             .stored_account_references(anchor_number, application_number)
-            .expect("the row written above is gone");
+            .expect("the list written above is gone");
         assert_eq!(references.len(), 2);
     }
 
@@ -2617,7 +2617,7 @@ mod reference_list_write_path_tests {
     }
 }
 
-/// A `(anchor, application)` row can be absent, empty, or hold references, and those
+/// A `(anchor, application)` list can be absent, empty, or hold references, and those
 /// mean three different things. Absence says a default account is still
 /// reconstructible; emptiness is a tombstone and says it never can be again.
 mod account_reference_state_tests {
@@ -2643,7 +2643,7 @@ mod account_reference_state_tests {
         (storage, anchor_number)
     }
 
-    /// Plants the row a future account move would leave behind. The write path cannot
+    /// Plants the list a future account move would leave behind. The write path cannot
     /// store one, which is the whole point, so a test that
     /// needs a tombstone has to write it directly.
     fn plant_tombstone(storage: &mut Storage<VectorMemory>, anchor_number: AnchorNumber) {
@@ -2655,7 +2655,7 @@ mod account_reference_state_tests {
             (anchor_number, application_number),
             StorableAccountReferenceList::tombstone_for_testing(),
         );
-        // The counter goes up with the row, as the move that will one day leave a
+        // The counter goes up with the list, as the move that will one day leave a
         // tombstone behind has to do: a stored tombstone the application does not count
         // is a divergence, and the write path refuses those rather than papering over
         // them.
@@ -2834,7 +2834,7 @@ mod account_reference_state_tests {
             .unwrap();
         let references = storage
             .stored_account_references(anchor_number, application_number)
-            .expect("naming the default should not have emptied the row");
+            .expect("naming the default should not have emptied the list");
         // Repointed where it stood, keeping the order accounts are listed in and the
         // timestamp the reference already carried.
         assert_eq!(
@@ -2861,8 +2861,8 @@ mod account_reference_state_tests {
             .stored_account_references(anchor_number, application_number)
             .unwrap();
 
-        // A skipped write is invisible in the stored bytes, since rewriting the row
-        // would store what it already holds. Retiring the application row makes it
+        // A skipped write is invisible in the stored bytes, since rewriting the list
+        // would store what it already holds. Retiring the application makes it
         // visible: `write_account_state` refuses without one, so a rename that still
         // wrote the list could not succeed here.
         storage
@@ -2900,9 +2900,9 @@ mod account_reference_state_tests {
             .create_account(owner, origin.clone(), "named".to_string())
             .unwrap();
         let account_number = account.account_number.unwrap();
-        // The other identity has a row of its own at this origin, so what refuses the
-        // attempts below is the row not naming this account rather than there being no
-        // row to look in.
+        // The other identity has a list of its own at this origin, so what refuses the
+        // attempts below is the list not naming this account rather than there being no
+        // list to look in.
         storage
             .create_account(other, origin.clone(), "mine".to_string())
             .unwrap();
@@ -3023,8 +3023,8 @@ mod application_number_allocator_tests {
                 .stable_application_memory
                 .insert(number, application(origin));
         }
-        // The rows now have a hole in them while the counter knows nothing, which is
-        // the one state a row count gets wrong: it would answer 2, the number
+        // The lists now have a hole in them while the counter knows nothing, which is
+        // the one state a list count gets wrong: it would answer 2, the number
         // `https://c.com` still holds.
         storage.stable_application_memory.remove(&0);
         storage.next_application_number_memory.set(0).unwrap();
@@ -3435,8 +3435,8 @@ mod tracked_default_eviction_tests {
             sign_in_at(&mut storage, anchor_number, index);
         }
 
-        let rows = storage.evictable_default_rows(anchor_number).len() as u64;
-        assert!(rows <= MAX_EVICTABLE_DEFAULT_ACCOUNTS);
+        let lists = storage.evictable_default_rows(anchor_number).len() as u64;
+        assert!(lists <= MAX_EVICTABLE_DEFAULT_ACCOUNTS);
         let newest = storage
             .lookup_application_number_with_origin(&origin_of(
                 MAX_EVICTABLE_DEFAULT_ACCOUNTS * 2 - 1,
@@ -3766,7 +3766,7 @@ mod application_removal_tests {
             .unwrap();
         plant_tombstone(&mut storage, anchor_number, application_number);
 
-        // The move back: the tombstoned row gains a reference again.
+        // The move back: the tombstoned list gains a reference again.
         storage
             .write_account_state(
                 anchor_number,
@@ -3793,7 +3793,7 @@ mod application_removal_tests {
             .is_none());
     }
 
-    /// Moves every account out of a row, leaving the tombstone a future account move
+    /// Moves every account out of a list, leaving the tombstone a future account move
     /// will. The write path refuses to store an empty list, which is what makes a
     /// tombstone a thing only a move can create, so it is written here directly — with
     /// the application's counters moved as that move will have to move them.
@@ -3804,7 +3804,7 @@ mod application_removal_tests {
     ) {
         let moved_away = storage
             .stored_account_references(anchor_number, application_number)
-            .expect("a row has to exist before it can be emptied");
+            .expect("a list has to exist before it can be emptied");
         let named = moved_away
             .iter()
             .filter(|reference| reference.account_number.is_some())
@@ -3974,7 +3974,7 @@ mod application_removal_tests {
     fn only_a_lone_tracked_default_may_be_pruned() {
         let (mut storage, anchor_number, _) = storage_with_anchors();
         let origin = "https://example.com".to_string();
-        // A default alongside a named account. Retiring the row would drop a reference
+        // A default alongside a named account. Retiring the list would drop a reference
         // nothing else records, so it is refused even though the caller asked.
         storage
             .create_account(anchor_number, origin.clone(), "named".to_string())
@@ -4003,7 +4003,7 @@ mod application_removal_tests {
         let application_number = storage
             .lookup_or_insert_application_number_with_origin(&origin)
             .unwrap();
-        // Taking the row away would make the moved-away default reconstructible again,
+        // Taking the list away would make the moved-away default reconstructible again,
         // which is the one thing the tombstone exists to prevent.
         storage.stable_account_reference_list_memory.insert(
             (anchor_number, application_number),
@@ -4027,8 +4027,8 @@ mod application_removal_tests {
         let application_number = storage
             .lookup_or_insert_application_number_with_origin(&origin)
             .unwrap();
-        // A lone tracked default, which is the only thing a row may be retired for,
-        // and the config row that goes with it.
+        // A lone tracked default, which is the only thing a list may be retired for,
+        // and the config list that goes with it.
         storage
             .set_default_account(anchor_number, origin.clone(), None)
             .unwrap();
@@ -4370,11 +4370,11 @@ mod account_principal_index_backfill_tests {
 
     const SALT: [u8; 32] = [17u8; 32];
 
-    fn storage_with_rows(rows: u64) -> (Storage<VectorMemory>, Vec<AnchorNumber>) {
+    fn storage_with_rows(lists: u64) -> (Storage<VectorMemory>, Vec<AnchorNumber>) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         storage.update_salt(SALT);
         let mut anchors = vec![];
-        for index in 0..rows {
+        for index in 0..lists {
             let anchor = storage.allocate_anchor(0).unwrap();
             let anchor_number = anchor.anchor_number();
             storage.write(anchor).unwrap();
@@ -4488,7 +4488,7 @@ mod account_principal_index_backfill_tests {
         assert_eq!(outcome.indexed, 0);
     }
 
-    /// A canister that has never been signed in to has no salt and no rows, and the sweep
+    /// A canister that has never been signed in to has no salt and no lists, and the sweep
     /// has to finish on the second of those. Waiting for the salt would leave its timer
     /// running for the life of the canister.
     #[test]
@@ -4514,9 +4514,9 @@ mod account_principal_index_backfill_tests {
         assert_eq!(outcome.indexed, 0);
     }
 
-    /// A row can hold up to `MAX_ANCHOR_ACCOUNTS` references, so a batch that stopped only
-    /// on row boundaries would derive that many principals in one message however small
-    /// the batch. It stops inside the row and the cursor says where.
+    /// A list can hold up to `MAX_ANCHOR_ACCOUNTS` references, so a batch that stopped only
+    /// on list boundaries would derive that many principals in one message however small
+    /// the batch. It stops inside the list and the cursor says where.
     #[test]
     fn a_batch_stops_inside_a_row_too_big_to_finish() {
         let (mut storage, anchors) = storage_with_rows(1);
@@ -4538,7 +4538,7 @@ mod account_principal_index_backfill_tests {
         assert_eq!(
             first.next_cursor.map(|cursor| cursor.references_done),
             Some(2),
-            "the cursor should point inside the row, not past it"
+            "the cursor should point inside the list, not past it"
         );
         assert_eq!(storage.lookup_account_with_principal_memory.len(), 2);
 
@@ -4691,7 +4691,7 @@ mod session_record_tests {
         assert_eq!(StorableAccountReference::from(reference).sessions, None);
     }
 
-    /// A row is evictable on its shape alone. Sparing one because it holds a live session
+    /// A list is evictable on its shape alone. Sparing one because it holds a live session
     /// would leave the user with access that settings cannot show them, and a session
     /// nobody can find is a session nobody can revoke.
     #[test]
