@@ -192,7 +192,7 @@ const storedSession = async (identityNumber: bigint) => {
       keyPair: key.getKeyPair(),
       chainJson: JSON.stringify(chain.toJSON()),
       expiresAtMillis: Date.now() + 60 * 60 * 1000,
-      createdAtNanos: BigInt(1_000),
+      sessionId: BigInt(1_000),
       accessLevel: "full-access" as const,
     },
   );
