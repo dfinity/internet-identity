@@ -17,8 +17,9 @@ export interface AppSessionRecord {
   keyPair: CryptoKeyPair;
   chainJson: string;
   expiresAtMillis: number;
-  /** Names this session to `revoke_account_session`, which is how one session is revoked
-   *  once a surface exists that lists them. */
+  /** Which sign-in this is. Paired with the browser's device id it names the session to
+   *  `get_account_session`, since a browser keeps its id across sign-ins. Ending one
+   *  session is the app's own call; from settings the user signs a whole browser out. */
   createdAtNanos: bigint;
   /** What the user consented to when this session was created. Recorded for display; the
    *  canister enforces it at every mint, and an app cannot request a level of its own. */

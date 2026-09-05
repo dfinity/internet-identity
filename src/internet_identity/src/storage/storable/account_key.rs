@@ -6,10 +6,17 @@ use ic_stable_structures::Storable;
 use minicbor::{Decode, Encode};
 use std::borrow::Cow;
 
-/// The triple that identifies one account. Absent account number means the default.
+/// The stored form of an [`crate::storage::account::AccountKey`], with the origin
+/// interned to an application number.
+///
+/// The number rather than the origin, because a row per principal would otherwise
+/// carry a copy of the origin string, and interning it is what application numbers are
+/// for. Which is also why the two types stay apart: the number is storage's own, and
+/// what leaves is the `AccountKey` it maps to. Absent account number means the tracked
+/// default.
 #[derive(Encode, Decode, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 #[cbor(map)]
-pub struct StorableAccountLocator {
+pub struct StorableAccountKey {
     #[n(0)]
     pub anchor_number: StorableAnchorNumber,
     #[n(1)]
@@ -18,15 +25,15 @@ pub struct StorableAccountLocator {
     pub account_number: Option<StorableAccountNumber>,
 }
 
-impl Storable for StorableAccountLocator {
+impl Storable for StorableAccountKey {
     fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buffer = Vec::new();
-        minicbor::encode(self, &mut buffer).expect("failed to encode StorableAccountLocator");
+        minicbor::encode(self, &mut buffer).expect("failed to encode StorableAccountKey");
         Cow::Owned(buffer)
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        minicbor::decode(&bytes).expect("failed to decode StorableAccountLocator")
+        minicbor::decode(&bytes).expect("failed to decode StorableAccountKey")
     }
 
     const BOUND: Bound = Bound::Unbounded;
