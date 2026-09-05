@@ -4673,7 +4673,8 @@ mod session_creation_tests {
                 valid_till_ns: DAY_NS,
                 ..params(anchor_number, 1, 0)
             })
-            .unwrap();
+            .unwrap()
+            .1;
 
         assert_eq!(session.max_idle_ns, asked);
     }
@@ -4688,7 +4689,8 @@ mod session_creation_tests {
                 valid_till_ns: DAY_NS,
                 ..params(anchor_number, 1, 0)
             })
-            .unwrap();
+            .unwrap()
+            .1;
 
         // An app delegation lasts five minutes, so a bound under that would end a
         // session between two mints of one that is plainly in use.
@@ -4705,7 +4707,8 @@ mod session_creation_tests {
                 valid_till_ns: DAY_NS,
                 ..params(anchor_number, 1, 0)
             })
-            .unwrap();
+            .unwrap()
+            .1;
 
         // A bound it could never reach says something about the session that is not
         // true, so it is stored as the life the session actually got.
@@ -4721,7 +4724,8 @@ mod session_creation_tests {
                 valid_till_ns: 30 * DAY_NS,
                 ..params(anchor_number, 1, 0)
             })
-            .unwrap();
+            .unwrap()
+            .1;
 
         // Every session gets a bound now. A week of nobody touching the application
         // ends the sign-in, well inside the thirty days it could otherwise live.
@@ -4741,7 +4745,8 @@ mod session_creation_tests {
                 max_idle_ns: Some(30 * MINUTE_NS),
                 ..params(anchor_number, 1, 0)
             })
-            .unwrap();
+            .unwrap()
+            .1;
 
         assert_eq!(session.max_idle_ns, MINUTE_NS);
     }
@@ -4752,7 +4757,8 @@ mod session_creation_tests {
 
         let session = storage
             .create_session(params(anchor_number, 1, 1_000))
-            .unwrap();
+            .unwrap()
+            .1;
 
         assert_eq!(session.created_at_ns, 1_000);
         assert_eq!(session.valid_till_ns, 11_000);
@@ -4768,11 +4774,13 @@ mod session_creation_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let first = storage
             .create_session(params(anchor_number, 1, 1_000))
-            .unwrap();
+            .unwrap()
+            .1;
 
         let again = storage
             .create_session(params(anchor_number, 1, 5_000))
-            .unwrap();
+            .unwrap()
+            .1;
 
         assert_ne!(again.created_at_ns, first.created_at_ns);
         assert_eq!(sessions_of(&storage, anchor_number).len(), 1);
@@ -5151,7 +5159,8 @@ mod session_creation_tests {
         // reachable shape is a live record the reuse step declined, which cannot happen.
         let created = storage
             .create_session(params(anchor_number, 1, 1_000))
-            .unwrap();
+            .unwrap()
+            .1;
         assert_eq!(created.created_at_ns, 1_000);
     }
 
@@ -5171,11 +5180,11 @@ mod session_creation_tests {
             now_ns: 1_000,
         };
 
-        let first = storage.create_session(params(false)).unwrap();
+        let first = storage.create_session(params(false)).unwrap().1;
         storage.create_session(params(false)).unwrap();
         assert_eq!(sessions_of(&storage, anchor_number).len(), 1);
 
-        let replaced = storage.create_session(params(true)).unwrap();
+        let replaced = storage.create_session(params(true)).unwrap().1;
         assert_ne!(replaced.read_only, first.read_only);
         assert_eq!(sessions_of(&storage, anchor_number).len(), 1);
     }
@@ -5293,6 +5302,7 @@ mod session_consent_change_tests {
                 now_ns: now,
             })
             .unwrap()
+            .1
             .created_at_ns
     }
 
