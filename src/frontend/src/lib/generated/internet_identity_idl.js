@@ -402,10 +402,9 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
   });
   const GetAccountSessionRequest = IDL.Record({
+    'session_id' : IDL.Nat64,
     'session_key' : SessionKey,
     'origin' : FrontendHostname,
-    'device_id' : IDL.Nat32,
-    'created_at' : Timestamp,
     'account_number' : IDL.Opt(AccountNumber),
     'expiration' : Timestamp,
     'identity_number' : UserNumber,
@@ -736,8 +735,8 @@ export const idlFactory = ({ IDL }) => {
   });
   const PrepareAccountSessionResponse = IDL.Record({
     'user_key' : PublicKey,
+    'session_id' : IDL.Nat64,
     'device_id' : IDL.Nat32,
-    'created_at' : Timestamp,
     'expiration' : Timestamp,
     'account_principal' : IDL.Principal,
   });
