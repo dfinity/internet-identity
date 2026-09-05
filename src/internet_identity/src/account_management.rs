@@ -1149,7 +1149,11 @@ fn should_fall_back_to_the_tracked_default_when_the_reservation_is_stale() {
     use crate::storage::Storage;
     use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let mut storage = Storage::new((0, 10000), VectorMemory::default());
+    // A write of this row derives account principals on later branches, so the salt has
+    // to be there for the same test to hold all the way up the stack.
+    storage.update_salt([17u8; 32]);
+    storage_replace(storage);
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let anchor_number = anchor.anchor_number();
     let origin = "https://example.com".to_string();
