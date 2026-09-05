@@ -1526,15 +1526,15 @@ impl<M: Memory + Clone> Storage<M> {
     /// one ever held.
     ///
     /// The counter is what guarantees that: it only ever climbs, so a number it has
-    /// passed is never offered again even after the application's list is retired. Its
+    /// passed is never offered again even after the application is retired. Its
     /// value is not the whole answer only because it postdates the applications
     /// numbered before it existed, so the highest stored number is taken as a floor —
-    /// exact, unlike a list count, which a retirement leaves undershooting. It cannot be
-    /// the answer on its own either: removing the highest list walks it backwards.
+    /// exact, unlike an application count, which a retirement leaves undershooting. It cannot be
+    /// the answer on its own either: removing the highest application walks it backwards.
     ///
     /// Refuses at the ceiling rather than saturating. The number keys both the
     /// application and the origin index, so reissuing one would put two origins on
-    /// a single list and have them share its accounts and counters.
+    /// a single application and have them share its accounts and counters.
     fn allocate_application_number(&mut self) -> Result<ApplicationNumber, StorageError> {
         let above_highest_stored = match self.stable_application_memory.last_key_value() {
             Some((highest, _)) => highest
