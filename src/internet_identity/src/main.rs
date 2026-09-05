@@ -42,7 +42,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::time::Duration;
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
-use storage::{Salt, Storage};
+use storage::{AccountPrincipalIndexBackfillCursor, Salt, Storage};
 
 mod account_management;
 mod anchor_management;
@@ -868,7 +868,7 @@ const ACCOUNT_PRINCIPAL_INDEX_BACKFILL_BACKOFF: Duration = Duration::from_secs(1
 const ACCOUNT_PRINCIPAL_INDEX_BACKFILL_BATCH_SIZE: u64 = 2_000;
 
 thread_local! {
-    static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_CURSOR: RefCell<Option<(AnchorNumber, ApplicationNumber)>> = const { RefCell::new(None) };
+    static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_CURSOR: RefCell<Option<AccountPrincipalIndexBackfillCursor>> = const { RefCell::new(None) };
     static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_DONE: RefCell<bool> = const { RefCell::new(false) };
     static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_INDEXED: RefCell<u64> = const { RefCell::new(0) };
     static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_SKIPPED: RefCell<u64> = const { RefCell::new(0) };
