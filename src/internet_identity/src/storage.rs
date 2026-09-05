@@ -210,6 +210,7 @@ const MCP_GRANT_MEMORY_INDEX: u8 = 29u8;
 // const DEPRECATED_MCP_REGISTRATION_URL_MEMORY_INDEX: u8 = 30u8;
 const MCP_REGISTRATION_MEMORY_INDEX: u8 = 31u8;
 const SSO_STABLE_ID_INDEX_MEMORY_INDEX: u8 = 32u8;
+const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -288,6 +289,10 @@ const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
 /// SSO stable-id bridge:
 /// `SHA-256(sso_domain, iss, ii_client_id, stable_id) -> AnchorNumber`.
 const SSO_STABLE_ID_INDEX_MEMORY_ID: MemoryId = MemoryId::new(SSO_STABLE_ID_INDEX_MEMORY_INDEX);
+
+/// Monotonic `ApplicationNumber` allocator. A removed number is retired, never reissued.
+const NEXT_APPLICATION_NUMBER_MEMORY_ID: MemoryId =
+    MemoryId::new(NEXT_APPLICATION_NUMBER_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -377,6 +382,7 @@ pub struct Storage<M: Memory> {
         ManagedMemory<M>,
     >,
     stable_account_counter_memory: StableCell<StorableAccountsCounter, ManagedMemory<M>>,
+    next_application_number_memory: StableCell<StorableApplicationNumber, ManagedMemory<M>>,
     /// Counter that counts how often there was a discrepancy between the anchor accounts counter and the actual number of accounts
     stable_account_counter_discrepancy_counter_memory:
         StableCell<StorableDiscrepancyCounter, ManagedMemory<M>>,
@@ -512,6 +518,7 @@ impl<M: Memory + Clone> Storage<M> {
         let stable_default_account_reference_memory =
             memory_manager.get(STABLE_DEFAULT_ACCOUNT_REFERENCE_MEMORY_ID);
         let stable_account_counter_memory = memory_manager.get(STABLE_ACCOUNT_COUNTER_MEMORY_ID);
+        let next_application_number_memory = memory_manager.get(NEXT_APPLICATION_NUMBER_MEMORY_ID);
         let stable_account_counter_discrepancy_counter_memory =
             memory_manager.get(STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_ID);
         let lookup_anchor_with_openid_credential_memory =
@@ -594,6 +601,8 @@ impl<M: Memory + Clone> Storage<M> {
                 StorableAccountsCounter::default(),
             )
             .expect("stable_account_counter_memory"),
+            next_application_number_memory: StableCell::init(next_application_number_memory, 0)
+                .expect("next_application_number_memory"),
             stable_account_counter_discrepancy_counter_memory: StableCell::init(
                 stable_account_counter_discrepancy_counter_memory,
                 StorableDiscrepancyCounter::default(),
@@ -1479,34 +1488,74 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Look up an application number per origin, create entry in applications and lookup table if it doesn't exist
+    ///
+    /// Fails only where there is no number left to hand out, which
+    /// [`Self::allocate_application_number`] refuses rather than reissuing one.
     pub fn lookup_or_insert_application_number_with_origin(
         &mut self,
         origin: &FrontendHostname,
-    ) -> ApplicationNumber {
+    ) -> Result<ApplicationNumber, StorageError> {
         let origin_sha256 = StorableOriginSha256::from_origin(origin);
 
         if let Some(existing_number) = self
             .lookup_application_with_origin_memory
             .get(&origin_sha256)
         {
-            existing_number
-        } else {
-            let new_number: ApplicationNumber = self.lookup_application_with_origin_memory.len();
-
-            // Update the source of truth.
-            self.lookup_application_with_origin_memory
-                .insert(origin_sha256, new_number);
-
-            let new_application = StorableApplication {
-                origin: origin.to_string(),
-                stored_accounts: 0u64,
-                stored_account_references: 0u64,
-            };
-
-            self.stable_application_memory
-                .insert(new_number, new_application);
-            new_number
+            return Ok(existing_number);
         }
+
+        let new_number = self.allocate_application_number()?;
+
+        // Update the source of truth.
+        self.lookup_application_with_origin_memory
+            .insert(origin_sha256, new_number);
+
+        let new_application = StorableApplication {
+            origin: origin.to_string(),
+            stored_accounts: 0u64,
+            stored_account_references: 0u64,
+        };
+
+        self.stable_application_memory
+            .insert(new_number, new_application);
+
+        Ok(new_number)
+    }
+
+    /// Hands out an application number that no live application holds and no retired
+    /// one ever held.
+    ///
+    /// The counter is what guarantees that: it only ever climbs, so a number it has
+    /// passed is never offered again even after the application's row is retired. Its
+    /// value is not the whole answer only because it postdates the applications
+    /// numbered before it existed, so the highest stored number is taken as a floor —
+    /// exact, unlike a row count, which a retirement leaves undershooting. It cannot be
+    /// the answer on its own either: removing the highest row walks it backwards.
+    ///
+    /// Refuses at the ceiling rather than saturating. The number keys both the
+    /// application row and the origin index, so reissuing one would put two origins on
+    /// a single row and have them share its accounts and counters.
+    fn allocate_application_number(&mut self) -> Result<ApplicationNumber, StorageError> {
+        let above_highest_stored = match self.stable_application_memory.last_key_value() {
+            Some((highest, _)) => highest
+                .checked_add(1)
+                .ok_or(StorageError::ApplicationsCounterOverflow)?,
+            None => 0,
+        };
+        let new_number = ApplicationNumber::max(
+            *self.next_application_number_memory.get(),
+            above_highest_stored,
+        );
+
+        self.next_application_number_memory
+            .set(
+                new_number
+                    .checked_add(1)
+                    .ok_or(StorageError::ApplicationsCounterOverflow)?,
+            )
+            .map_err(|_| StorageError::ErrorUpdatingApplicationNumberAllocator)?;
+
+        Ok(new_number)
     }
 
     pub fn lookup_application_number_with_origin(
@@ -1890,6 +1939,11 @@ impl<M: Memory + Clone> Storage<M> {
         let anchor_number = params.anchor_number;
         let origin = &params.origin;
 
+        // Ahead of the allocation, which writes: nothing between the two depends on the
+        // account number, and an `Err` here after it would commit a number that is now
+        // burned and an account record nothing references.
+        let application_number = self.lookup_or_insert_application_number_with_origin(origin)?;
+
         // Create and store account in stable memory
         let account_number = self.allocate_account_number()?;
         let storable_account = StorableAccount {
@@ -1898,9 +1952,6 @@ impl<M: Memory + Clone> Storage<M> {
         };
         self.stable_account_memory
             .insert(account_number, storable_account);
-
-        // Update application data
-        let application_number = self.lookup_or_insert_application_number_with_origin(origin);
 
         // last_used will be set once the user signs in with the account.
         let last_used = None;
@@ -2169,6 +2220,12 @@ impl<M: Memory + Clone> Storage<M> {
             }
         };
 
+        // Get or create an application number from the account's origin. Ahead of the
+        // allocation, which writes: nothing between the two depends on the account number,
+        // and an `Err` here after it would commit a number that is now burned and an
+        // account record nothing references.
+        let application_number = self.lookup_or_insert_application_number_with_origin(&origin)?;
+
         // Create and store the default account.
         let new_account_number = self.allocate_account_number()?;
         let storable_account = StorableAccount {
@@ -2178,9 +2235,6 @@ impl<M: Memory + Clone> Storage<M> {
         };
         self.stable_account_memory
             .insert(new_account_number, storable_account.clone());
-
-        // Get or create an application number from the account's origin.
-        let application_number = self.lookup_or_insert_application_number_with_origin(&origin);
 
         // Update default account in the (anchor, origin) config.
         {
@@ -2642,6 +2696,11 @@ pub enum StorageError {
     },
     ErrorUpdatingAccountCounter,
     AccountsCounterOverflow,
+    /// No application numbers left to hand out. Refused rather than saturated: the
+    /// number keys the application row and the origin index, so reissuing one would
+    /// put two origins on a single row.
+    ApplicationsCounterOverflow,
+    ErrorUpdatingApplicationNumberAllocator,
     /// The references a write assembled cannot be stored as they stand.
     UnstorableAccountReferenceList {
         anchor_number: AnchorNumber,
@@ -2719,6 +2778,12 @@ impl fmt::Display for StorageError {
             ),
             Self::ErrorUpdatingAccountCounter => write!(f, "Error updating account counter"),
             Self::AccountsCounterOverflow => write!(f, "No account numbers left to allocate"),
+            Self::ApplicationsCounterOverflow => {
+                write!(f, "No application numbers left to allocate")
+            }
+            Self::ErrorUpdatingApplicationNumberAllocator => {
+                write!(f, "Error updating the application number allocator")
+            }
             Self::UnstorableAccountReferenceList {
                 anchor_number,
                 application_number,
