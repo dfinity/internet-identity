@@ -508,6 +508,11 @@ fn app_prepare_delegation(
     sessions::app_prepare_delegation(request)
 }
 
+#[update]
+fn app_revoke_session() {
+    sessions::app_revoke_session()
+}
+
 #[query]
 fn app_get_delegation(
     request: AppGetDelegationRequest,

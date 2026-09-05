@@ -814,3 +814,17 @@ pub fn app_get_delegation(
 ) -> Result<Result<SignedDelegation, AppSessionError>, RejectResponse> {
     query_candid_as(env, canister_id, sender, "app_get_delegation", (request,)).map(|(x,)| x)
 }
+
+pub fn app_revoke_session(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<(), RejectResponse> {
+    env.update_call(
+        canister_id,
+        sender,
+        "app_revoke_session",
+        candid::encode_args(()).expect("encode app_revoke_session args"),
+    )
+    .map(|_| ())
+}

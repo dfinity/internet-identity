@@ -1836,6 +1836,28 @@ impl<M: Memory + Clone> Storage<M> {
         self.write(anchor)
     }
 
+    /// Removes one session. Returns whether anything was removed.
+    pub fn revoke_session(&mut self, key: &SessionRecordKey) -> Result<bool, StorageError> {
+        // The key names one session by its id, so a key for a session that was replaced
+        // since finds nothing rather than taking its successor down with it.
+        if self.read_session(key).is_none() {
+            return Ok(false);
+        }
+
+        let Some(application_number) = self.lookup_application_number_with_origin(&key.origin)
+        else {
+            return Ok(false);
+        };
+        let anchor_number = key.anchor_number;
+
+        self.drop_session(
+            anchor_number,
+            application_number,
+            key.account_number,
+            key.session_id,
+        )
+    }
+
     /// Walks the anchor's rows once and reclaims down to the watermark, taking sessions in
     /// [`SessionRecord::reclaim_order`]: dead ones first, then the least recently used.
     ///
@@ -1989,6 +2011,37 @@ impl<M: Memory + Clone> Storage<M> {
             return Ok(());
         }
         self.write(anchor)
+    }
+
+    /// Removes one browser's session from one account reference, index entry included, and
+    /// reports whether anything went. Keyed by browser rather than by creation time, since
+    /// two browsers signing in during one round share a `created_at`.
+    fn drop_session(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+        session_id: SessionId,
+    ) -> Result<bool, StorageError> {
+        let mut references = self.account_references(anchor_number, application_number);
+        let Some(reference) = references
+            .iter_mut()
+            .find(|reference| reference.account_number == account_number)
+        else {
+            return Ok(false);
+        };
+        let held = reference
+            .sessions
+            .iter()
+            .any(|session| session.session_id == session_id);
+        if !held {
+            return Ok(false);
+        }
+        reference
+            .sessions
+            .retain(|session| session.session_id != session_id);
+        self.write_account_state(anchor_number, application_number, references, None, None)?;
+        Ok(true)
     }
 
     /// The session `key` names, or `None` where the identity holds no such session.

@@ -2,7 +2,8 @@
 
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2::{
-    app_get_delegation, app_prepare_delegation, get_account_session, prepare_account_session,
+    app_get_delegation, app_prepare_delegation, app_revoke_session, get_account_session,
+    prepare_account_session,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
@@ -617,6 +618,76 @@ fn should_advance_the_device_last_used_on_every_refresh() -> Result<(), RejectRe
     let refreshed = device(&env)?;
     assert!(refreshed.last_used > enrolled.last_used);
     assert_eq!(refreshed.created_at, enrolled.created_at);
+
+    Ok(())
+}
+
+#[test]
+fn should_end_access_when_the_app_signs_out() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    let refresh = |env: &PocketIc| {
+        app_prepare_delegation(
+            env,
+            canister_id,
+            session_principal,
+            AppPrepareDelegationRequest {
+                session_key: ByteBuf::from(vec![7; 32]),
+            },
+        )
+        .unwrap()
+    };
+    assert!(refresh(&env).is_ok());
+
+    app_revoke_session(&env, canister_id, session_principal)?;
+
+    assert_eq!(refresh(&env), Err(AppSessionError::NoMatchingSession));
+
+    Ok(())
+}
+
+#[test]
+fn should_treat_a_repeated_sign_out_as_success() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    for _ in 0..3 {
+        app_revoke_session(&env, canister_id, session_principal)?;
+    }
+
+    Ok(())
+}
+
+#[test]
+fn should_leave_another_browsers_session_alone() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (first, first_principal) = create_session(&env, canister_id, identity_number);
+
+    let mut second_request = session_request_from(identity_number, &BrowserKey::new(2));
+    second_request.device_name = "Firefox on Linux".to_string();
+    let second =
+        prepare_account_session(&env, canister_id, principal_1(), second_request)?.unwrap();
+    let second_principal = Principal::self_authenticating(&second.user_key);
+    assert_ne!(second.user_key, first.user_key);
+
+    app_revoke_session(&env, canister_id, first_principal)?;
+
+    let still_works = app_prepare_delegation(
+        &env,
+        canister_id,
+        second_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?;
+    assert!(still_works.is_ok());
 
     Ok(())
 }

@@ -920,6 +920,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'app_revoke_session' : IDL.Func([], [], []),
     'authn_method_add' : IDL.Func(
         [IdentityNumber, AuthnMethodData],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : AuthnMethodAddError })],

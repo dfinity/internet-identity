@@ -403,6 +403,31 @@ pub fn app_get_delegation(
 fn authorize_session(
     now: Timestamp,
 ) -> Result<(SessionRecordKey, Account, SessionRecord), AppSessionError> {
+    let matched = match_session()?;
+    // Either bound: a session past its lifetime and one nobody has used for longer
+    // than it was allowed are equally gone, and a refresh is the thing that finds out.
+    if matched.2.is_over(now) {
+        return Err(AppSessionError::NoMatchingSession);
+    }
+    Ok(matched)
+}
+
+/// Signs the caller's own session out. A caller cannot produce another session's
+/// principal, so the seed match is the whole authorization. Always succeeds.
+pub fn app_revoke_session() {
+    // Matched rather than authorized: a session past its bounds is still the caller's to
+    // sign out, and refusing here would leave its record and index entry behind.
+    let Ok((key, _, _)) = match_session() else {
+        return;
+    };
+    // Trapping rather than reporting success: the caller is told nothing either way, so a
+    // storage failure that left the session live would end as a silent no-op. A trap rolls
+    // the message back and reaches the caller as a reject.
+    storage_borrow_mut(|storage| storage.revoke_session(&key))
+        .expect("failed to revoke a session that was just matched");
+}
+
+fn match_session() -> Result<(SessionRecordKey, Account, SessionRecord), AppSessionError> {
     let key = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
         .ok_or(AppSessionError::NoMatchingSession)?;
 
@@ -414,9 +439,6 @@ fn authorize_session(
     })
     .ok_or(AppSessionError::NoMatchingSession)?;
 
-    if session.is_over(now) {
-        return Err(AppSessionError::NoMatchingSession);
-    }
     Ok((key, account, session))
 }
 
