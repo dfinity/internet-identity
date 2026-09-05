@@ -125,6 +125,7 @@ use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::session_handle::StorableSessionHandle;
+use crate::storage::storable::session_id::StorableSessionId;
 use internet_identity_interface::internet_identity::types::*;
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
@@ -215,6 +216,7 @@ const SSO_STABLE_ID_INDEX_MEMORY_INDEX: u8 = 32u8;
 const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
 const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
+const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -304,6 +306,10 @@ const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX);
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX);
+
+/// Monotonic [`SessionId`] allocator. A revoked session's id is retired, never reissued,
+/// which is what makes the revocation final: the id is an input to the session seed.
+const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -420,6 +426,7 @@ pub struct Storage<M: Memory> {
     >,
     stable_account_counter_memory: StableCell<StorableAccountsCounter, ManagedMemory<M>>,
     next_application_number_memory: StableCell<StorableApplicationNumber, ManagedMemory<M>>,
+    next_session_id_memory: StableCell<StorableSessionId, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -564,6 +571,7 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(STABLE_DEFAULT_ACCOUNT_REFERENCE_MEMORY_ID);
         let stable_account_counter_memory = memory_manager.get(STABLE_ACCOUNT_COUNTER_MEMORY_ID);
         let next_application_number_memory = memory_manager.get(NEXT_APPLICATION_NUMBER_MEMORY_ID);
+        let next_session_id_memory = memory_manager.get(NEXT_SESSION_ID_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
@@ -652,6 +660,8 @@ impl<M: Memory + Clone> Storage<M> {
             .expect("stable_account_counter_memory"),
             next_application_number_memory: StableCell::init(next_application_number_memory, 0)
                 .expect("next_application_number_memory"),
+            next_session_id_memory: StableCell::init(next_session_id_memory, 0)
+                .expect("next_session_id_memory"),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
             ),
@@ -1619,6 +1629,23 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(new_number)
     }
 
+    /// Hands out the next session id, which no session has held before.
+    ///
+    /// Refuses at the ceiling rather than saturating. The id is an input to the session
+    /// seed, so reissuing one would let a revoked session's identity be arrived at a
+    /// second time — the thing this counter exists to prevent.
+    fn allocate_session_id(&mut self) -> Result<SessionId, StorageError> {
+        let session_id = *self.next_session_id_memory.get();
+        self.next_session_id_memory
+            .set(
+                session_id
+                    .checked_add(1)
+                    .ok_or(StorageError::SessionIdOverflow)?,
+            )
+            .map_err(|_| StorageError::ErrorUpdatingSessionIdAllocator)?;
+        Ok(session_id)
+    }
+
     pub fn lookup_application_number_with_origin(
         &self,
         origin: &FrontendHostname,
@@ -1774,8 +1801,8 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// A resolution, not an authorisation: the session it names may be expired or
     /// read-only, which is the caller's to check. What it does rule out is a stale
-    /// entry, since the key it builds carries the creation time the entry recorded and
-    /// [`Self::read_session`] will not match a later session of the same browser.
+    /// entry, since the key it builds carries the id the entry recorded and no later
+    /// session is ever allocated that id.
     pub fn lookup_session_with_principal(&self, principal: Principal) -> Option<SessionRecordKey> {
         let handle = self.lookup_session_with_principal_memory.get(&principal)?;
         let account = self.lookup_account_with_principal(handle.account())?;
@@ -1784,8 +1811,7 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number: account.anchor_number,
             origin: account.origin,
             account_number: account.account_number,
-            device_id: handle.device_id,
-            created_at: handle.created_at,
+            session_id: handle.session_id,
         })
     }
 
@@ -1812,8 +1838,7 @@ impl<M: Memory + Clone> Storage<M> {
         let seed = calculate_session_seed_with_salt(
             &salt,
             &account.calculate_seed_with_salt(&salt),
-            session.created_at_ns,
-            session.device_id,
+            session.session_id,
         );
         Some(canister_sig_principal(canister_id(), seed.to_vec()))
     }
@@ -1881,10 +1906,9 @@ impl<M: Memory + Clone> Storage<M> {
         now: Timestamp,
     ) -> Result<u32, StorageError> {
         struct Candidate {
-            order: (bool, Timestamp, SessionDeviceId),
+            order: (bool, Timestamp, SessionId),
             row: usize,
-            account_number: Option<AccountNumber>,
-            device_id: SessionDeviceId,
+            session_id: SessionId,
         }
 
         // Every row, not a bounded prefix of them: the number this returns is what the cap is
@@ -1909,8 +1933,7 @@ impl<M: Memory + Clone> Storage<M> {
                     candidates.push(Candidate {
                         order: session.reclaim_order(now),
                         row,
-                        account_number: reference.account_number,
-                        device_id: session.device_id,
+                        session_id: session.session_id,
                     });
                 }
             }
@@ -1939,14 +1962,9 @@ impl<M: Memory + Clone> Storage<M> {
             for reference in references.iter_mut() {
                 let account_number = reference.account_number;
                 reference.sessions.retain(|session| {
-                    // The row has to be part of the match: one browser holds one session per
-                    // account, but the same browser and the same account number appear in
-                    // every row, so matching on that pair alone reaches across applications.
-                    let doomed = victims.iter().any(|victim| {
-                        victim.row == row
-                            && victim.account_number == account_number
-                            && victim.device_id == session.device_id
-                    });
+                    let doomed = victims
+                        .iter()
+                        .any(|victim| victim.session_id == session.session_id);
                     if doomed {
                         removed.push((account_number, session.clone()));
                     }
@@ -1999,8 +2017,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// The session `key` names, or `None` where the identity holds no such session.
     ///
     /// A key whose session was replaced reads as `None` rather than as its successor:
-    /// a browser keeps its id across sign-ins, so the creation time is what tells two
-    /// of that browser's sessions apart.
+    /// the successor was allocated an id of its own.
     pub fn read_session(&self, key: &SessionRecordKey) -> Option<SessionRecord> {
         let application_number = self.lookup_application_number_with_origin(&key.origin)?;
 
@@ -2009,9 +2026,7 @@ impl<M: Memory + Clone> Storage<M> {
             .find(|reference| reference.account_number == key.account_number)?
             .sessions
             .into_iter()
-            .find(|session| {
-                session.device_id == key.device_id && session.created_at_ns == key.created_at
-            })
+            .find(|session| session.session_id == key.session_id)
     }
 
     /// Creates the session `prepare_account_session` mints an identity from, replacing
@@ -2103,7 +2118,12 @@ impl<M: Memory + Clone> Storage<M> {
             true
         });
 
+        // After the checks that can refuse this ceremony, so a refused one does not burn
+        // an id. Ids need not be contiguous, so a later failure leaving a gap is fine;
+        // what must never happen is one being handed out twice.
+        let session_id = self.allocate_session_id()?;
         let session = SessionRecord {
+            session_id,
             created_at_ns: now_ns,
             valid_till_ns,
             max_idle_ns,
@@ -2144,8 +2164,7 @@ impl<M: Memory + Clone> Storage<M> {
                 principal,
                 StorableSessionHandle {
                     account_principal: account_principal.as_slice().to_vec(),
-                    device_id,
-                    created_at: session.created_at_ns,
+                    session_id,
                 },
             );
         }
@@ -2155,8 +2174,7 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number,
             origin,
             account_number,
-            device_id,
-            created_at: session.created_at_ns,
+            session_id,
         };
         Ok((key, session))
     }
@@ -3572,6 +3590,11 @@ pub enum StorageError {
     /// put two origins on a single row.
     ApplicationsCounterOverflow,
     ErrorUpdatingApplicationNumberAllocator,
+    /// No session ids left to hand out. Refused rather than saturated: the id is an
+    /// input to the session seed, so reissuing one would resurrect a revoked session's
+    /// identity.
+    SessionIdOverflow,
+    ErrorUpdatingSessionIdAllocator,
     /// The references a write assembled cannot be stored as they stand.
     UnstorableAccountReferenceList {
         anchor_number: AnchorNumber,
@@ -3664,6 +3687,10 @@ impl fmt::Display for StorageError {
             }
             Self::ErrorUpdatingApplicationNumberAllocator => {
                 write!(f, "Error updating the application number allocator")
+            }
+            Self::SessionIdOverflow => write!(f, "No session ids left to allocate"),
+            Self::ErrorUpdatingSessionIdAllocator => {
+                write!(f, "Error updating the session id allocator")
             }
             Self::UnstorableAccountReferenceList {
                 anchor_number,
