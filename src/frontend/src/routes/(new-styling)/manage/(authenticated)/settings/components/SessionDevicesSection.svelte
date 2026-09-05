@@ -26,7 +26,6 @@
         $authenticatedStore.actor,
         identityNumber,
         device.id,
-        device.isCurrent,
       );
       signedOut = [...signedOut, device.id];
     } catch (error) {

@@ -1,5 +1,6 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import { purgeAppSessions } from "$lib/stores/app-session.store";
+import { currentDeviceId } from "$lib/stores/browser-key.store";
 import type {
   _SERVICE,
   SessionDeviceInfo,
@@ -38,12 +39,16 @@ export const fromCanisterSessionDevices = (
  * Signing *this* browser out also discards the session chains it holds locally. The
  * canister has already stopped honouring them, and leaving them would have the next
  * silent request offer a chain that cannot mint.
+ *
+ * Which browser this is comes from the key record here rather than from a caller: the
+ * list renders that flag from a promise, so a click landing before it resolves would
+ * otherwise pass `false` for the user's own browser and leave exactly those chains
+ * behind.
  */
 export const signOutSessionDevice = async (
   actor: ActorSubclass<_SERVICE>,
   identityNumber: bigint,
   deviceId: number,
-  isCurrentBrowser = false,
 ): Promise<void> => {
   const result = await actor.revoke_device_sessions({
     identity_number: identityNumber,
@@ -56,7 +61,7 @@ export const signOutSessionDevice = async (
         : result.Err.InternalCanisterError,
     );
   }
-  if (isCurrentBrowser) {
+  if ((await currentDeviceId(identityNumber)) === deviceId) {
     await purgeAppSessions(identityNumber);
   }
 };
