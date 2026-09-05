@@ -4718,8 +4718,8 @@ mod session_record_tests {
         assert_eq!(storage.evictable_default_rows(anchor_number).len(), 1);
     }
 
-    /// Eviction orders on the row's `last_used`, which every refresh stamps, so a session
-    /// in use keeps its row at the newest end and survives the cap on its own.
+    /// Eviction orders on the list's `last_used`, which every refresh stamps, so a session
+    /// in use keeps its list at the newest end and survives the cap on its own.
     #[test]
     fn a_refreshed_session_keeps_its_row_and_a_stale_one_does_not() {
         let (mut storage, anchor_number) = storage_with_anchor();
@@ -4883,9 +4883,9 @@ mod session_creation_tests {
         }
     }
 
-    /// A row that predates the principal index, which is every row an existing user has:
-    /// the index is written only where a row's set of account numbers changes, and by the
-    /// backfill sweep. Emptied here to stand in for a row the sweep has not reached.
+    /// A list that predates the principal index, which is every list an existing user has:
+    /// the index is written only where a list's set of account numbers changes, and by the
+    /// backfill sweep. Emptied here to stand in for a list the sweep has not reached.
     fn forget_account_principals(storage: &mut Storage<VectorMemory>) {
         let principals: Vec<_> = storage
             .lookup_account_with_principal_memory
