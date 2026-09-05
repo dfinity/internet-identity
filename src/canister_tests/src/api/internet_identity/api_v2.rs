@@ -828,3 +828,20 @@ pub fn app_revoke_session(
     )
     .map(|_| ())
 }
+
+pub fn revoke_device_sessions(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: RevokeDeviceSessionsRequest,
+) -> Result<Result<(), SessionRevokeError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "revoke_device_sessions",
+        (request,),
+    )
+    .map(|(x,)| x)
+}

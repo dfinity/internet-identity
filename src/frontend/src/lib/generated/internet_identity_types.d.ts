@@ -1644,6 +1644,10 @@ export type RegistrationFlowNextStep = {
     'Finish' : null
   };
 export type RegistrationId = string;
+export interface RevokeDeviceSessionsRequest {
+  'device_id' : number,
+  'identity_number' : UserNumber,
+}
 /**
  * DNSSEC proof bundle and supporting types — see
  * `internet_identity_interface::types::dnssec`.
@@ -1678,6 +1682,14 @@ export interface SessionDeviceInfo {
   'last_used' : Timestamp,
 }
 export type SessionKey = PublicKey;
+export type SessionRevokeError = {
+    /**
+     * Raised before the sweep writes anything, so a browser is never left signed out of
+     * some of its applications and not others.
+     */
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal };
 export type SetDefaultAccountError = {
     'NoSuchOrigin' : { 'anchor_number' : UserNumber }
   } |
@@ -2574,6 +2586,11 @@ export interface _SERVICE {
    * Atomically replace device matching the device key with the new device data
    */
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
+  'revoke_device_sessions' : ActorMethod<
+    [RevokeDeviceSessionsRequest],
+    { 'Ok' : null } |
+      { 'Err' : SessionRevokeError }
+  >,
   'set_default_account' : ActorMethod<
     [UserNumber, FrontendHostname, [] | [AccountNumber]],
     { 'Ok' : AccountInfo } |

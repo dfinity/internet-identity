@@ -25,7 +25,8 @@ use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountSessionError, AnchorNumber, AppGetDelegationRequest,
     AppPrepareDelegationRequest, AppPrepareDelegationResponse, AppSessionError, Delegation,
     FrontendHostname, GetAccountSessionRequest, GetAccountSessionResponse,
-    PrepareAccountSessionRequest, PrepareAccountSessionResponse, SignedDelegation, Timestamp,
+    PrepareAccountSessionRequest, PrepareAccountSessionResponse, RevokeDeviceSessionsRequest,
+    SessionRevokeError, SignedDelegation, Timestamp,
 };
 use serde_bytes::ByteBuf;
 
@@ -447,4 +448,17 @@ fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {
         AppSessionError::InternalCanisterError(StorageError::SaltNotSet.to_string())
     })?;
     Ok(account.calculate_seed_with_salt(&salt))
+}
+
+pub fn revoke_device_sessions(
+    request: RevokeDeviceSessionsRequest,
+) -> Result<(), SessionRevokeError> {
+    check_authorization(request.identity_number)
+        .map_err(|err| SessionRevokeError::Unauthorized(err.principal))?;
+
+    storage_borrow_mut(|storage| {
+        storage.revoke_device_sessions(request.identity_number, request.device_id)
+    })
+    .map(|_| ())
+    .map_err(|err| SessionRevokeError::InternalCanisterError(err.to_string()))
 }

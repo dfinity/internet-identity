@@ -1107,6 +1107,19 @@ type AppGetDelegationRequest = record {
     expiration : Timestamp;
 };
 
+
+type RevokeDeviceSessionsRequest = record {
+    identity_number : UserNumber;
+    device_id : nat32;
+};
+
+type SessionRevokeError = variant {
+    Unauthorized : principal;
+    // Raised before the sweep writes anything, so a browser is never left signed out of
+    // some of its applications and not others.
+    InternalCanisterError : text;
+};
+
 type AppSessionError = variant {
     // No usable session behind this caller: revoked, expired, pruned, or never one at
     // all. One outcome, because which of those it is depends on whether a prune has run
@@ -1986,6 +1999,8 @@ service : (opt InternetIdentityInit) -> {
     // that retries, or that signs out twice, does not have to reason about whether its
     // session was already gone. An app can revoke only its own session.
     app_revoke_session : () -> ();
+
+    revoke_device_sessions : (RevokeDeviceSessionsRequest) -> (variant { Ok; Err : SessionRevokeError });
 
     prepare_account_delegation : (
         anchor_number : UserNumber,

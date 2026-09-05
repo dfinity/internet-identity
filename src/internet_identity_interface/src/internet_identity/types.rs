@@ -866,3 +866,16 @@ pub enum AppSessionError {
     NoMatchingSession,
     InternalCanisterError(String),
 }
+
+/// Signs one browser out of every app it is signed into.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RevokeDeviceSessionsRequest {
+    pub identity_number: IdentityNumber,
+    pub device_id: SessionDeviceId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SessionRevokeError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}

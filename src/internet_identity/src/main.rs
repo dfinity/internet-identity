@@ -509,6 +509,11 @@ fn app_prepare_delegation(
 }
 
 #[update]
+fn revoke_device_sessions(request: RevokeDeviceSessionsRequest) -> Result<(), SessionRevokeError> {
+    sessions::revoke_device_sessions(request)
+}
+
+#[update]
 fn app_revoke_session() {
     sessions::app_revoke_session()
 }

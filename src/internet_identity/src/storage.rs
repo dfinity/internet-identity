@@ -1740,6 +1740,28 @@ impl<M: Memory + Clone> Storage<M> {
             })
             .collect();
 
+        // Every application this sweep will write is resolved before it writes any of
+        // them. It is the one failure the loop below could otherwise report, and it would
+        // report it having already signed the browser out of the applications ahead of
+        // it — an `Err` commits those — leaving a browser out of some of its apps and
+        // still in others, told the sign-out failed.
+        //
+        // What remains cannot report a failure: removing sessions leaves the reference
+        // list non-empty and every account number where it was, so the deltas are zero
+        // and the counter write short-circuits, and the count at the end is this anchor
+        // read and written back with one `u32` changed.
+        for (application_number, _) in &affected {
+            if self
+                .stable_application_memory
+                .get(application_number)
+                .is_none()
+            {
+                return Err(StorageError::OriginNotFoundForApplicationNumber {
+                    application_number: *application_number,
+                });
+            }
+        }
+
         // One anchor write for the whole sweep rather than one per application: each row
         // reports what it did to the count, and the total is applied once at the end.
         let mut delta = 0i64;

@@ -3,7 +3,7 @@
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2::{
     app_get_delegation, app_prepare_delegation, app_revoke_session, get_account_session,
-    prepare_account_session,
+    prepare_account_session, revoke_device_sessions,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
@@ -12,7 +12,7 @@ use canister_tests::framework::{
 use internet_identity_interface::internet_identity::types::{
     AccountSessionError, AppGetDelegationRequest, AppPrepareDelegationRequest, AppSessionError,
     GetAccountSessionRequest, Permissions, PrepareAccountSessionRequest,
-    PrepareAccountSessionResponse, SessionDeviceInfo,
+    PrepareAccountSessionResponse, RevokeDeviceSessionsRequest, SessionDeviceInfo,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -688,6 +688,106 @@ fn should_leave_another_browsers_session_alone() -> Result<(), RejectResponse> {
         },
     )?;
     assert!(still_works.is_ok());
+
+    Ok(())
+}
+
+#[test]
+fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::identity_info;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+
+    // One browser, three sign-ins, each presenting the successor announced by the last.
+    let browser = BrowserKey::new(1);
+    let first_app = prepare_account_session(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request_from(identity_number, &browser),
+    )?
+    .unwrap();
+    let first_principal = Principal::self_authenticating(&first_app.user_key);
+
+    let mut other_app = session_request_from(identity_number, &browser.successor());
+    other_app.origin = "https://another-dapp.com".to_string();
+    let second_app = prepare_account_session(&env, canister_id, principal_1(), other_app)?.unwrap();
+    let second_principal = Principal::self_authenticating(&second_app.user_key);
+
+    let mut other_browser = session_request_from(identity_number, &BrowserKey::new(2));
+    other_browser.device_name = "Firefox on Linux".to_string();
+    let untouched =
+        prepare_account_session(&env, canister_id, principal_1(), other_browser)?.unwrap();
+    let untouched_principal = Principal::self_authenticating(&untouched.user_key);
+
+    // Settings names a browser by the id `identity_info` reports, never by its key.
+    let device_id = identity_info(&env, canister_id, principal_1(), identity_number)?
+        .unwrap()
+        .session_devices
+        .unwrap()
+        .into_iter()
+        .find(|device| device.name == "Chrome on MacBook")
+        .expect("the browser that signed in should be listed")
+        .id;
+
+    revoke_device_sessions(
+        &env,
+        canister_id,
+        principal_1(),
+        RevokeDeviceSessionsRequest {
+            identity_number,
+            device_id,
+        },
+    )?
+    .unwrap();
+
+    let refresh = |principal: Principal| {
+        app_prepare_delegation(
+            &env,
+            canister_id,
+            principal,
+            AppPrepareDelegationRequest {
+                session_key: ByteBuf::from(vec![7; 32]),
+            },
+        )
+        .unwrap()
+    };
+
+    assert_eq!(
+        refresh(first_principal),
+        Err(AppSessionError::NoMatchingSession)
+    );
+    assert_eq!(
+        refresh(second_principal),
+        Err(AppSessionError::NoMatchingSession)
+    );
+    assert!(refresh(untouched_principal).is_ok());
+
+    let devices = identity_info(&env, canister_id, principal_1(), identity_number)?
+        .unwrap()
+        .session_devices
+        .unwrap();
+    assert!(devices.iter().any(|device| device.id == device_id));
+
+    // The browser keeps its id, so signing in again puts a session back in the slot the
+    // revoked one occupied. The revoked chain must not reach it — and no time is allowed
+    // to pass, because the new session is told apart from the revoked one by its id and
+    // not by anything a shared consensus round would make equal.
+    prepare_account_session(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request_from(identity_number, &browser.successor().successor()),
+    )?
+    .unwrap();
+
+    assert_eq!(
+        refresh(first_principal),
+        Err(AppSessionError::NoMatchingSession),
+        "a revoked session came back when its browser signed in again"
+    );
 
     Ok(())
 }
