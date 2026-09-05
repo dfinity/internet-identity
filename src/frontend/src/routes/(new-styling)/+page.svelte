@@ -13,8 +13,7 @@
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
   import { beforeNavigate, preloadData } from "$app/navigation";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { purgeSession } from "$lib/stores/session-delegation.store";
-  import { purgeAppSessions } from "$lib/stores/app-session.store";
+  import { forgetIdentity } from "$lib/stores/session-delegation.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import {
@@ -111,8 +110,7 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void purgeSession(identityNumber);
-    void purgeAppSessions(identityNumber);
+    void forgetIdentity(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
