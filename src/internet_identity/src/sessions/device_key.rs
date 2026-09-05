@@ -23,20 +23,24 @@ const DEVICE_KEY_SIGNATURE_BYTES: usize = 64;
 /// hold it — without it, keys read off the wire could be planted as another browser's
 /// successor and claimed when that browser next presented one.
 pub fn verify_device_keys(
-    device_key: &PublicKey,
-    device_key_signature: &[u8],
+    current_device_key: &PublicKey,
+    current_device_key_signature: &[u8],
     next_device_key: &PublicKey,
     next_device_key_signature: &[u8],
     session_key: &SessionKey,
 ) -> bool {
     verify(
-        device_key,
-        device_key_signature,
+        current_device_key,
+        current_device_key_signature,
         &signed_message(DEVICE_KEY_SIGNATURE_DOMAIN, session_key, next_device_key),
     ) && verify(
         next_device_key,
         next_device_key_signature,
-        &signed_message(SUCCESSOR_KEY_SIGNATURE_DOMAIN, session_key, device_key),
+        &signed_message(
+            SUCCESSOR_KEY_SIGNATURE_DOMAIN,
+            session_key,
+            current_device_key,
+        ),
     )
 }
 

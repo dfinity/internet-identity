@@ -103,8 +103,8 @@ use ic_stable_structures::{
 use identity_jose::jwk::Jwk;
 use internet_identity_interface::archive::types::BufferedEntry;
 
+use crate::delegation::calculate_session_seed_with_salt;
 use crate::delegation::{self, check_frontend_length};
-use crate::delegation::{calculate_session_seed_with_salt, canister_sig_principal};
 use crate::openid::OpenIdCredentialKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
@@ -1717,8 +1717,6 @@ impl<M: Memory + Clone> Storage<M> {
             .map(Vec::<AccountReference>::from)
     }
 
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
     /// Signs one browser out of everything, in a single message.
     pub fn revoke_device_sessions(
         &mut self,
@@ -1885,8 +1883,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(remaining)
     }
 
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
     /// The session `key` names, or `None` where the identity holds no such session.
     ///
     /// A key whose session was replaced reads as `None` rather than as its successor:
@@ -1902,8 +1898,6 @@ impl<M: Memory + Clone> Storage<M> {
             .find(|session| session.session_id == key.session_id)
     }
 
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
     /// Creates the session `prepare_account_session` mints an identity from, replacing
     /// whatever this browser already held at this account.
     pub fn create_session(
@@ -2034,31 +2028,6 @@ impl<M: Memory + Clone> Storage<M> {
             session_id,
         };
         Ok((key, session))
-    }
-
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
-    /// The principal an app sees for an account, which is what a session handle names.
-    fn account_principal_of(
-        &self,
-        anchor_number: AnchorNumber,
-        application_number: ApplicationNumber,
-        account_number: Option<AccountNumber>,
-    ) -> Option<Principal> {
-        let salt = self.salt().copied()?;
-        let account = self.read_account(&AccountKey {
-            anchor_number,
-            origin: self
-                .stable_application_memory
-                .get(&application_number)?
-                .origin
-                .clone(),
-            account_number,
-        })?;
-        Some(canister_sig_principal(
-            canister_id(),
-            account.calculate_seed_with_salt(&salt).to_vec(),
-        ))
     }
 
     /// Removes a reference-list row and everything derived from it.
@@ -3463,8 +3432,6 @@ impl<M: Memory + Clone> Storage<M> {
     }
 }
 
-// Constructed by the sign-in ceremony, which lands two PRs up.
-#[allow(dead_code)]
 pub struct CreateSessionParams {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,

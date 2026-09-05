@@ -488,6 +488,20 @@ fn set_default_account(
 }
 
 #[update]
+async fn prepare_account_session(
+    request: PrepareAccountSessionRequest,
+) -> Result<PrepareAccountSessionResponse, AccountSessionError> {
+    sessions::prepare_account_session(request).await
+}
+
+#[query]
+fn get_account_session(
+    request: GetAccountSessionRequest,
+) -> Result<GetAccountSessionResponse, AccountSessionError> {
+    sessions::get_account_session(request)
+}
+
+#[update]
 async fn prepare_account_delegation(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,

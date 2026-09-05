@@ -1017,6 +1017,79 @@ type SessionDeviceInfo = record {
     last_used : Timestamp;
 };
 
+type PrepareAccountSessionRequest = record {
+    identity_number : UserNumber;
+    origin : FrontendHostname;
+    account_number : opt AccountNumber;
+    // The II frontend's own key. The app never sees this chain's private key.
+    session_key : SessionKey;
+    // Labels the browser in the user's session list, e.g. "Chrome on MacBook".
+    device_name : text;
+    // The browser's own public key, DER-encoded, as the registry currently holds it. A
+    // key this anchor has not seen registers a browser under it.
+    current_device_key : PublicKey;
+    // What the browser rotates to once this sign-in succeeds. Must differ from
+    // current_device_key: a browser that never rotates keeps a leaked key useful.
+    next_device_key : PublicKey;
+    // Signature over session_key and next_device_key, verified with current_device_key.
+    current_device_key_signature : blob;
+    // Signature by next_device_key over session_key and current_device_key, proving the
+    // browser holds the key it is announcing.
+    next_device_key_signature : blob;
+    // The consented access level, fixed for the session's life.
+    permissions : opt Permissions;
+    // Clamped to the session maximum.
+    valid_for : opt nat64;
+    // How long the session may go unminted before it is over, clamped to between
+    // 10 minutes and the session's own granted length. Absent leaves the
+    // canister's own default.
+    max_idle : opt nat64;
+};
+
+type PrepareAccountSessionResponse = record {
+    user_key : PublicKey;
+    // The session's valid_till.
+    expiration : Timestamp;
+    // Names the session this ceremony created, and is what get_account_session is given
+    // to collect the delegation signed for it. Not a credential: it names a session, it
+    // does not authorise one.
+    session_id : nat64;
+    // Which browser this sign-in was attributed to, so the settings list can mark the one
+    // the user is looking at, and so the browser knows which registration its key now
+    // belongs to. Not a credential: a caller never presents it.
+    device_id : nat32;
+    // The principal apps see for this account, so the frontend can tell its own
+    // sessions apart without minting a delegation to learn it.
+    account_principal : principal;
+};
+
+type GetAccountSessionRequest = record {
+    identity_number : UserNumber;
+    origin : FrontendHostname;
+    account_number : opt AccountNumber;
+    session_key : SessionKey;
+    expiration : Timestamp;
+    // The session prepare_account_session created, named exactly rather than searched for.
+    session_id : nat64;
+};
+
+type GetAccountSessionResponse = record {
+    signed_delegation : SignedDelegation;
+};
+
+type AccountSessionError = variant {
+    Unauthorized : principal;
+    NoSuchAccount;
+    NoSuchSession;
+    // The browser's key is unusable, or its signature does not verify against it.
+    InvalidDeviceKey;
+    // The browser presented a key it has already rotated away from, which happens when it
+    // never learned that its last sign-in succeeded. It holds the successor that does
+    // resolve, so the answer is to promote that one and present it.
+    StaleDeviceKey;
+    InternalCanisterError : text;
+};
+
 type IdentityInfo = record {
     authn_methods : vec AuthnMethodData;
     authn_method_registration : opt AuthnMethodRegistrationInfo;
@@ -1870,6 +1943,13 @@ service : (opt InternetIdentityInit) -> {
         account_number : opt AccountNumber, // Null is unreserved default account
         update : AccountUpdate
     ) ->  (variant { Ok : AccountInfo; Err: UpdateAccountError });
+
+    // Creates or reuses a revocable session at one account and signs its identity to
+    // the II frontend's own key. Called only by the II frontend, which ships with the
+    // canister; requires an anchor access method, so a session can neither spawn nor
+    // extend itself.
+    prepare_account_session : (PrepareAccountSessionRequest) -> (variant { Ok : PrepareAccountSessionResponse; Err : AccountSessionError });
+    get_account_session : (GetAccountSessionRequest) -> (variant { Ok : GetAccountSessionResponse; Err : AccountSessionError }) query;
 
     prepare_account_delegation : (
         anchor_number : UserNumber,
