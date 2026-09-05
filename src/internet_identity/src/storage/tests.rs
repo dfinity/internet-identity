@@ -2920,8 +2920,8 @@ mod application_number_allocator_tests {
                 .stable_application_memory
                 .insert(number, application(origin));
         }
-        // The rows now have a hole in them while the counter knows nothing, which is
-        // the one state a row count gets wrong: it would answer 2, the number
+        // The lists now have a hole in them while the counter knows nothing, which is
+        // the one state a list count gets wrong: it would answer 2, the number
         // `https://c.com` still holds.
         storage.stable_application_memory.remove(&0);
         storage.next_application_number_memory.set(0).unwrap();
