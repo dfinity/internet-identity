@@ -3942,7 +3942,7 @@ mod account_principal_index_tests {
     use super::record_use;
     use crate::delegation::canister_sig_principal;
     use crate::storage::account::{Account, AccountReference};
-    use crate::storage::storable::account_locator::StorableAccountLocator;
+    use crate::storage::storable::account_key::StorableAccountKey;
     use crate::storage::{canister_id, StorageError};
     use crate::Storage;
     use candid::Principal;
@@ -3983,7 +3983,7 @@ mod account_principal_index_tests {
             storage
                 .lookup_account_with_principal_memory
                 .get(&default_account_principal(anchor_number, &origin)),
-            Some(StorableAccountLocator {
+            Some(StorableAccountKey {
                 anchor_number,
                 application_number,
                 account_number: None,
@@ -4012,7 +4012,7 @@ mod account_principal_index_tests {
 
         assert_eq!(
             storage.lookup_account_with_principal_memory.get(&principal),
-            Some(StorableAccountLocator {
+            Some(StorableAccountKey {
                 anchor_number,
                 application_number,
                 account_number: materialized.account_number,
@@ -4040,7 +4040,7 @@ mod account_principal_index_tests {
             storage
                 .lookup_account_with_principal_memory
                 .get(&named_principal),
-            Some(StorableAccountLocator {
+            Some(StorableAccountKey {
                 anchor_number,
                 application_number,
                 account_number: named.account_number,
@@ -4199,7 +4199,7 @@ mod account_principal_index_tests {
         let other_anchor_number = anchor_number + 1;
         storage.lookup_account_with_principal_memory.insert(
             principal,
-            StorableAccountLocator {
+            StorableAccountKey {
                 anchor_number: other_anchor_number,
                 application_number,
                 account_number: None,
