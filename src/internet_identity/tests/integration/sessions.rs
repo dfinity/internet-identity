@@ -487,16 +487,18 @@ fn should_archive_a_browser_registration_with_the_name_redacted() -> Result<(), 
     };
     let identity_number = flows::register_anchor(&env, ii_canister);
 
+    let browser = BrowserKey::new(1);
     prepare_account_session(
         &env,
         ii_canister,
         principal_1(),
-        session_request(identity_number),
+        session_request_from(identity_number, &browser),
     )?
     .unwrap();
 
-    // The same browser signing in again is not a registration.
-    let mut again = session_request(identity_number);
+    // The same browser signing in again is not a registration. It presents the successor
+    // it announced, which is the only key that reaches its entry.
+    let mut again = session_request_from(identity_number, &browser.successor());
     again.origin = "https://another-dapp.com".to_string();
     prepare_account_session(&env, ii_canister, principal_1(), again)?.unwrap();
 
@@ -940,10 +942,12 @@ fn should_refuse_a_replayed_announcement() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// A response the browser never received leaves it proving with the key the entry still
-/// holds, which must not cost it its identity.
+/// A response the browser never received leaves it proving with a key the entry has
+/// already retired. That is refused, and named so the browser knows what to do about it:
+/// promote the successor it announced and present that, which lands on its own entry
+/// rather than on a second one.
 #[test]
-fn should_accept_the_current_key_when_a_response_was_lost() -> Result<(), RejectResponse> {
+fn should_refuse_a_retired_key_and_accept_the_successor() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -957,11 +961,21 @@ fn should_accept_the_current_key_when_a_response_was_lost() -> Result<(), Reject
     )?
     .unwrap();
 
+    assert_eq!(
+        prepare_account_session(
+            &env,
+            canister_id,
+            principal_1(),
+            session_request_from(identity_number, &browser),
+        )?,
+        Err(AccountSessionError::StaleDeviceKey)
+    );
+
     let retried = prepare_account_session(
         &env,
         canister_id,
         principal_1(),
-        session_request_from(identity_number, &browser),
+        session_request_from(identity_number, &browser.successor()),
     )?
     .unwrap();
 
