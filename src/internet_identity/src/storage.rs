@@ -319,7 +319,7 @@ const BUCKET_SIZE_IN_PAGES: u16 = 128;
 const MAX_MANAGED_MEMORY_SIZE: u64 = 256 * GB;
 const MAX_MANAGED_WASM_PAGES: u64 = MAX_MANAGED_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES;
 
-/// Per-anchor cap on reference-list rows that hold nothing but a tracked default
+/// Per-anchor cap on reference-list lists that hold nothing but a tracked default
 /// account.
 const MAX_EVICTABLE_DEFAULT_ACCOUNTS: u64 = 500;
 
@@ -338,7 +338,7 @@ const EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK: u64 = MAX_EVICTABLE_DEFAULT_ACCOUNTS
 /// the set is the apps used in the last month times the browsers they were used from.
 pub const MAX_SESSIONS_PER_ANCHOR: u32 = 500;
 /// Reclaiming goes down to here rather than to the cap, so the pass that walks an identity's
-/// rows runs once and then not again for the next fifty sign-ins.
+/// lists runs once and then not again for the next fifty sign-ins.
 pub const SESSIONS_WATERMARK_PER_ANCHOR: u32 = 450;
 
 /// Bounds one message's eviction work.
@@ -1598,15 +1598,15 @@ impl<M: Memory + Clone> Storage<M> {
     /// one ever held.
     ///
     /// The counter is what guarantees that: it only ever climbs, so a number it has
-    /// passed is never offered again even after the application's row is retired. Its
+    /// passed is never offered again even after the application's list is retired. Its
     /// value is not the whole answer only because it postdates the applications
     /// numbered before it existed, so the highest stored number is taken as a floor —
-    /// exact, unlike a row count, which a retirement leaves undershooting. It cannot be
-    /// the answer on its own either: removing the highest row walks it backwards.
+    /// exact, unlike a list count, which a retirement leaves undershooting. It cannot be
+    /// the answer on its own either: removing the highest list walks it backwards.
     ///
     /// Refuses at the ceiling rather than saturating. The number keys both the
-    /// application row and the origin index, so reissuing one would put two origins on
-    /// a single row and have them share its accounts and counters.
+    /// application and the origin index, so reissuing one would put two origins on
+    /// a single list and have them share its accounts and counters.
     fn allocate_application_number(&mut self) -> Result<ApplicationNumber, StorageError> {
         let above_highest_stored = match self.stable_application_memory.last_key_value() {
             Some((highest, _)) => highest
@@ -1668,9 +1668,9 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// This identity's account references at `application_number`.
     ///
-    /// An absent row normalises to the derived default: nothing has happened at this
+    /// An absent list normalises to the derived default: nothing has happened at this
     /// origin, so the identity still has the default it has always had. A stored empty
-    /// row is a tombstone and stays empty — everything here moved away and the default
+    /// list is a tombstone and stays empty — everything here moved away and the default
     /// must never be derived again.
     ///
     /// Absence and emptiness are opposites, and this is the only place that knows it.
@@ -1684,7 +1684,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// [`Self::account_references`] for a caller that has an origin rather than an
-    /// application number. An origin nothing has ever been stored under has no row, so
+    /// application number. An origin nothing has ever been stored under has no list, so
     /// it normalises the same way.
     fn account_references_for_origin(
         &self,
@@ -1703,9 +1703,9 @@ impl<M: Memory + Clone> Storage<M> {
         vec![AccountReference::new(None, None)]
     }
 
-    /// The row as stored, with no default derived for an absent one.
+    /// The list as stored, with no default derived for an absent one.
     ///
-    /// Only the write path may see this. The counters describe stored rows, so a row
+    /// Only the write path may see this. The counters describe stored lists, so a list
     /// that never existed must not be diffed against as though it held the default.
     fn stored_account_references(
         &self,
@@ -1762,7 +1762,7 @@ impl<M: Memory + Clone> Storage<M> {
             }
         }
 
-        // One anchor write for the whole sweep rather than one per application: each row
+        // One anchor write for the whole sweep rather than one per application: each list
         // reports what it did to the count, and the total is applied once at the end.
         let mut delta = 0i64;
         for (application_number, mut references) in affected {
@@ -1794,7 +1794,7 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// A stored account address resolved to the one callers use.
     ///
-    /// `None` where the application is gone, which leaves the stored row naming
+    /// `None` where the application is gone, which leaves the stored list naming
     /// nothing. Not a `From`, because the origin the number stands for comes out of
     /// storage.
     fn account_key_of(&self, stored: &StorableAccountKey) -> Option<AccountKey> {
@@ -1831,7 +1831,7 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// The stored count is a trigger, never the thing the cap is enforced against: a
     /// session can expire with no write anywhere, so the count drifts upwards. Once it
-    /// reaches the cap this recounts what the rows hold and reclaims against that, so an
+    /// reaches the cap this recounts what the lists hold and reclaims against that, so an
     /// admission is only ever granted against a number that was just counted.
     fn ensure_session_slot(
         &mut self,
@@ -1880,15 +1880,15 @@ impl<M: Memory + Clone> Storage<M> {
         )
     }
 
-    /// Walks the anchor's rows once and reclaims down to the watermark, taking sessions in
+    /// Walks the anchor's lists once and reclaims down to the watermark, taking sessions in
     /// [`SessionRecord::reclaim_order`]: dead ones first, then the least recently used.
     ///
-    /// Returns what the rows actually hold once it is done, which is the number the cap is
+    /// Returns what the lists actually hold once it is done, which is the number the cap is
     /// enforced against. The stored counter is only ever a trigger for running this pass —
     /// it can drift, this cannot, because it counts the sessions themselves.
     ///
     /// One pass per fifty sign-ins, because it reclaims to the watermark rather than to the
-    /// cap, and bounded by the same row limit account eviction uses.
+    /// cap, and bounded by the same list limit account eviction uses.
     fn reclaim_sessions(
         &mut self,
         anchor_number: AnchorNumber,
@@ -1896,16 +1896,16 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Result<u32, StorageError> {
         struct Candidate {
             order: (bool, Timestamp, SessionId),
-            row: usize,
+            list: usize,
             session_id: SessionId,
         }
 
-        // Every row, not a bounded prefix of them: the number this returns is what the cap is
+        // Every list, not a bounded prefix of them: the number this returns is what the cap is
         // enforced against, and a truncated scan would undercount, lower the counter to the
-        // undercount, and let the stored set climb past the cap from there. An identity's rows
-        // are already bounded — the row cap holds the evictable ones and the account cap holds
+        // undercount, and let the stored set climb past the cap from there. An identity's lists
+        // are already bounded — the list cap holds the evictable ones and the account cap holds
         // the rest — and a sequential scan of them costs a fraction of the writes it saves.
-        let mut rows: Vec<(ApplicationNumber, Vec<AccountReference>)> = self
+        let mut lists: Vec<(ApplicationNumber, Vec<AccountReference>)> = self
             .stable_account_reference_list_memory
             .range(
                 (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
@@ -1916,12 +1916,12 @@ impl<M: Memory + Clone> Storage<M> {
             .collect();
 
         let mut candidates: Vec<Candidate> = vec![];
-        for (row, (_, references)) in rows.iter().enumerate() {
+        for (list, (_, references)) in lists.iter().enumerate() {
             for reference in references.iter() {
                 for session in &reference.sessions {
                     candidates.push(Candidate {
                         order: session.reclaim_order(now),
-                        row,
+                        list,
                         session_id: session.session_id,
                     });
                 }
@@ -1937,17 +1937,17 @@ impl<M: Memory + Clone> Storage<M> {
             return Ok(stored);
         }
 
-        // One write per row rather than one per victim: the row is a single blob, so
+        // One write per list rather than one per victim: the list is a single blob, so
         // dropping several of its sessions one at a time would rewrite it several times.
-        let mut touched: Vec<usize> = victims.iter().map(|victim| victim.row).collect();
+        let mut touched: Vec<usize> = victims.iter().map(|victim| victim.list).collect();
         touched.sort_unstable();
         touched.dedup();
 
-        // One anchor write for the pass rather than one per row: each row reports what it
+        // One anchor write for the pass rather than one per list: each list reports what it
         // did to the count, and the recount below is what the cap is enforced against.
         let mut dropped_total = 0i64;
-        for row in touched {
-            let (application_number, references) = &mut rows[row];
+        for list in touched {
+            let (application_number, references) = &mut lists[list];
             let application_number = *application_number;
             for reference in references.iter_mut() {
                 reference.sessions.retain(|session| {
@@ -2009,9 +2009,9 @@ impl<M: Memory + Clone> Storage<M> {
         let device_id = session.device_id;
         reference.last_used = Some(now);
 
-        // This row is being rewritten anyway, so its dead sessions go now. It costs one
+        // This list is being rewritten anyway, so its dead sessions go now. It costs one
         // pass over a list already in memory and no write of its own, and it means every
-        // row anyone still uses stays clean without anything having to sweep for it.
+        // list anyone still uses stays clean without anything having to sweep for it.
         for reference in references.iter_mut() {
             reference.sessions.retain(|session| !session.is_over(now));
         }
@@ -2112,7 +2112,7 @@ impl<M: Memory + Clone> Storage<M> {
             .max(MIN_SESSION_IDLE_NS)
             .min(granted);
 
-        // The row this session lands in has to exist first, but an existing one must not be
+        // The list this session lands in has to exist first, but an existing one must not be
         // written here: the single write at the end of this function carries `last_used`.
         let application_number = match self.lookup_application_number_with_origin(&origin) {
             Some(application_number)
@@ -2185,7 +2185,7 @@ impl<M: Memory + Clone> Storage<M> {
         };
         reference.sessions.push(session.clone());
 
-        // The whole row, not just the reference being written: this row is about to be
+        // The whole list, not just the reference being written: this list is about to be
         // rewritten anyway, and a dead session on a sibling reference has nothing else
         // coming for it.
         for reference in references.iter_mut() {
@@ -2199,7 +2199,7 @@ impl<M: Memory + Clone> Storage<M> {
             });
         }
 
-        // The row is the whole of it: the index entries for the session created here and
+        // The list is the whole of it: the index entries for the session created here and
         // for the ones pruned above, and the identity's session count, all follow from
         // the list this writes.
         self.write_account_state(anchor_number, application_number, references, None, None)?;
@@ -2213,20 +2213,20 @@ impl<M: Memory + Clone> Storage<M> {
         Ok((key, session))
     }
 
-    /// Removes a reference-list row and everything derived from it.
+    /// Removes a reference-list list and everything derived from it.
     fn remove_reference_list(
         &mut self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
     ) -> Result<(), StorageError> {
-        // A row is retired only when a live tracked default is all it holds. Nothing
+        // A list is retired only when a live tracked default is all it holds. Nothing
         // else may be pruned, and the rule sits here rather than only in the caller
         // that picks victims, because this is the irreversible step:
         //
-        // - an absent row has nothing to remove;
-        // - an empty row is a tombstone, and taking it away would make the default it
+        // - an absent list has nothing to remove;
+        // - an empty list is a tombstone, and taking it away would make the default it
         //   stands for reconstructible again;
-        // - a row holding named accounts, or whose default was named or moved away,
+        // - a list holding named accounts, or whose default was named or moved away,
         //   would lose references that nothing else records.
         let previous = match self
             .stored_account_references(anchor_number, application_number)
@@ -2241,12 +2241,12 @@ impl<M: Memory + Clone> Storage<M> {
             .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
 
         // Every reference goes, so every principal it derived goes with it — resolved
-        // before the first removal so a missing salt refuses with the row intact.
+        // before the first removal so a missing salt refuses with the list intact.
         let salt = *self.salt().ok_or(StorageError::SaltNotSet)?;
         let origin = application.origin.clone();
-        // Removing the row rather than writing one, so this is the one place that says
+        // Removing the list rather than writing one, so this is the one place that says
         // what leaves outside the gate — and it says it the same way, by diffing what the
-        // row held against nothing.
+        // list held against nothing.
         let delta = self.sync_session_index(
             anchor_number,
             application_number,
@@ -2302,7 +2302,7 @@ impl<M: Memory + Clone> Storage<M> {
             .collect()
     }
 
-    /// Upper bound on an anchor's evictable rows, from counters that already exist.
+    /// Upper bound on an anchor's evictable lists, from counters that already exist.
     fn tracked_default_account_upper_bound(&self, anchor_number: AnchorNumber) -> u64 {
         let counter = self.get_account_counter(anchor_number);
         counter
@@ -2367,10 +2367,10 @@ impl<M: Memory + Clone> Storage<M> {
     /// on the IC returning `Err` commits what was written before it, and only a trap
     /// rolls back, so a refusal here must leave nothing behind.
     ///
-    /// `references` is the whole new list. It is diffed against the stored row for the
+    /// `references` is the whole new list. It is diffed against the stored list for the
     /// counter deltas, so a caller supplies only what it wants stored and cannot move a
     /// counter by the default [`Self::account_references`] derived for it. A list equal
-    /// to the stored row writes nothing: the row is a single blob, so writing it back
+    /// to the stored list writes nothing: the list is a single blob, so writing it back
     /// would store the bytes it already holds.
     fn write_account_state(
         &mut self,
@@ -2394,8 +2394,8 @@ impl<M: Memory + Clone> Storage<M> {
     /// count rather than applying it.
     ///
     /// The delta is still *derived* here — no caller says what it is. What a caller may
-    /// choose is when to apply it, so an operation spanning rows moves the anchor once
-    /// instead of once per row.
+    /// choose is when to apply it, so an operation spanning lists moves the anchor once
+    /// instead of once per list.
     fn write_account_state_deferring_count(
         &mut self,
         anchor_number: AnchorNumber,
@@ -2406,7 +2406,7 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Result<i64, StorageError> {
         let stored_references = self.stored_account_references(anchor_number, application_number);
 
-        // Nothing to say: the row already holds these bytes, so it is not written and
+        // Nothing to say: the list already holds these bytes, so it is not written and
         // nothing about it is checked either. This is what lets a rename leave every
         // reference alone without its caller having to know to skip the write.
         let list_write = if stored_references.as_deref() == Some(references.as_slice()) {
@@ -2484,7 +2484,7 @@ impl<M: Memory + Clone> Storage<M> {
             )?;
 
             // Nothing below this line can fail. The record goes in before the index,
-            // because a principal is derived from an account's stored row and one that
+            // because a principal is derived from an account's stored list and one that
             // is not in yet derives nothing — a new account would get no entry.
             if let Some((account_number, storable_account)) = record.take() {
                 self.stable_account_memory
@@ -2531,7 +2531,7 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(session_delta)
     }
 
-    /// Moves the identity's session count by what a write to its rows implied.
+    /// Moves the identity's session count by what a write to its lists implied.
     ///
     /// Cannot report a failure: the caller has already written the anchor to get here, so
     /// the read resolves, and writing it back with one `u32` changed leaves every field
@@ -2566,10 +2566,10 @@ impl<M: Memory + Clone> Storage<M> {
         ids
     }
 
-    /// [`Self::write_account_state`] for a row the tracked default is the reason for,
+    /// [`Self::write_account_state`] for a list the tracked default is the reason for,
     /// reaping idle ones where this took the anchor over the cap.
     ///
-    /// Only a row that did not exist can take it over: stamping or repointing one
+    /// Only a list that did not exist can take it over: stamping or repointing one
     /// leaves the count where it was, so there would be nothing to reap.
     fn write_tracked_default(
         &mut self,
@@ -2591,14 +2591,14 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Indexes one batch of existing reference-list rows. Entries are only inserted,
+    /// Indexes one batch of existing reference-list lists. Entries are only inserted,
     /// never removed, so a batch that runs twice writes the same values.
     ///
-    /// `batch_size` bounds **derivations**, not rows. One row is an identity's references
+    /// `batch_size` bounds **derivations**, not lists. One list is an identity's references
     /// at one origin and holds up to [`MAX_ANCHOR_ACCOUNTS`] of them, each costing a seed
-    /// hash, a principal derivation and a stable write — so a row-bounded batch is only
-    /// bounded in the shape of data that happens to be common. A batch stops mid-row and
-    /// the cursor says where, which is why it carries an offset into the row.
+    /// hash, a principal derivation and a stable write — so a list-bounded batch is only
+    /// bounded in the shape of data that happens to be common. A batch stops mid-list and
+    /// the cursor says where, which is why it carries an offset into the list.
     pub fn backfill_account_principal_index_batch(
         &mut self,
         cursor: Option<AccountPrincipalIndexBackfillCursor>,
@@ -2610,26 +2610,26 @@ impl<M: Memory + Clone> Storage<M> {
         };
 
         // Examining nothing is not finishing. Reporting completion here would stop a
-        // sweep that has not read a single row, and a lookup miss would then be taken as
+        // sweep that has not read a single list, and a lookup miss would then be taken as
         // proof no account has that principal.
         if batch_size == 0 {
             return outcome;
         }
 
         use std::ops::Bound as RangeBound;
-        // Inclusive of the cursor's own row: a batch may have stopped part-way through
+        // Inclusive of the cursor's own list: a batch may have stopped part-way through
         // it, and the offset says how far it got.
         let range = match cursor {
-            Some(cursor) => (RangeBound::Included(cursor.row()), RangeBound::Unbounded),
+            Some(cursor) => (RangeBound::Included(cursor.list()), RangeBound::Unbounded),
             None => (RangeBound::Unbounded, RangeBound::Unbounded),
         };
 
-        // Read far enough ahead to spend the budget and no further, so the rows behind
+        // Read far enough ahead to spend the budget and no further, so the lists behind
         // this batch are never materialised. The borrow ends here, which is what lets the
         // indexing below write.
         let mut outstanding = batch_size;
         let mut ran_out = false;
-        let mut rows: Vec<(
+        let mut lists: Vec<(
             AnchorNumber,
             ApplicationNumber,
             Vec<AccountReference>,
@@ -2638,11 +2638,11 @@ impl<M: Memory + Clone> Storage<M> {
         for (key, list) in self.stable_account_reference_list_memory.range(range) {
             let references = Vec::<AccountReference>::from(list);
             let already_done = match cursor {
-                Some(cursor) if cursor.row() == key => cursor.references_done,
+                Some(cursor) if cursor.list() == key => cursor.references_done,
                 _ => 0,
             };
             let left_in_row = references.len().saturating_sub(already_done) as u64;
-            rows.push((key.0, key.1, references, already_done));
+            lists.push((key.0, key.1, references, already_done));
             if left_in_row >= outstanding {
                 ran_out = true;
                 break;
@@ -2652,9 +2652,9 @@ impl<M: Memory + Clone> Storage<M> {
 
         // Nothing left to index, whatever else is true of this canister. Checked before
         // the salt, because a fresh install has no salt until its first sign-in and no
-        // rows either — and a sweep that waits for the salt there never reports done and
+        // lists either — and a sweep that waits for the salt there never reports done and
         // ticks its timer for the life of the canister.
-        if rows.is_empty() {
+        if lists.is_empty() {
             outcome.is_done = true;
             return outcome;
         }
@@ -2668,7 +2668,7 @@ impl<M: Memory + Clone> Storage<M> {
         outcome.is_done = !ran_out;
 
         let mut budget = batch_size;
-        for (anchor_number, application_number, references, already_done) in rows {
+        for (anchor_number, application_number, references, already_done) in lists {
             let Some(origin) = self
                 .stable_application_memory
                 .get(&application_number)
@@ -2755,7 +2755,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    /// The principals a set of references derives to. A reference whose account row is
+    /// The principals a set of references derives to. A reference whose account list is
     /// gone derives nothing and is skipped.
     /// The account one reference names, built from the reference and the record it
     /// points at.
@@ -2830,7 +2830,7 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// Sessions live on the reference, so a reference that goes takes its sessions with
     /// it and this sees them as removed without any caller saying so. That is the point:
-    /// the row and everything derived from it move together, in the one place holding
+    /// the list and everything derived from it move together, in the one place holding
     /// both versions of it.
     fn sync_session_index(
         &mut self,
@@ -2855,9 +2855,9 @@ impl<M: Memory + Clone> Storage<M> {
                 continue;
             }
             // The account's entry goes in with the session's. A handle names its account
-            // by principal, and that index gains entries only where a row's set of
-            // account numbers changes or when the backfill reaches the row — neither of
-            // which a sign-in does. Without this a session at a row that predates the
+            // by principal, and that index gains entries only where a list's set of
+            // account numbers changes or when the backfill reaches the list — neither of
+            // which a sign-in does. Without this a session at a list that predates the
             // index resolves to nothing until the sweep happens to arrive.
             self.lookup_account_with_principal_memory.insert(
                 Principal::from_slice(&handle.account_principal),
@@ -2959,7 +2959,7 @@ impl<M: Memory + Clone> Storage<M> {
             },
         );
         // A zero here now means what it says. The delta refuses rather than clamping, so
-        // the row is only retired when no anchor references it, not when a counter that
+        // the list is only retired when no anchor references it, not when a counter that
         // had already drifted was pulled below zero.
         //
         // Tombstones count too, and they are the reason references alone are not enough:
@@ -3119,7 +3119,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// One account this identity holds at `key.origin`, or `None` where it holds none.
     ///
     /// `key.account_number` names it, `None` being the tracked default. Answering
-    /// `None` is the ownership check: an account belongs to whichever identity's row
+    /// `None` is the ownership check: an account belongs to whichever identity's list
     /// names it, so a caller that finds no reference here has no claim on the account
     /// whether or not it exists.
     ///
@@ -3200,7 +3200,7 @@ impl<M: Memory + Clone> Storage<M> {
         let application_number = self.lookup_or_insert_application_number_with_origin(&origin)?;
         let account_number = self.allocate_account_number()?;
 
-        // An absent row normalises to the derived default, which is how the first named
+        // An absent list normalises to the derived default, which is how the first named
         // account at an origin does not cost the identity the default it had. A
         // tombstone normalises to nothing and stays that way.
         let mut references = self.account_references(anchor_number, application_number);
@@ -3231,7 +3231,7 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// Renaming one, naming the tracked default, and recording that an account was used
     /// are the same read-modify-write: the account is the state to store, not a patch
-    /// over it, so what it carries is what the row ends up holding.
+    /// over it, so what it carries is what the list ends up holding.
     ///
     /// A number no reference names is [`StorageError::AccountNotFound`] and never a
     /// create. `update_account_for_origin` takes its account number straight from the
@@ -3253,7 +3253,7 @@ impl<M: Memory + Clone> Storage<M> {
             // The tracked default is stored the first time it is named or used, so its
             // origin gets an application number on either.
             None => self.lookup_or_insert_application_number_with_origin(&origin)?,
-            // A stored account writes to a row that already exists, and an origin
+            // A stored account writes to a list that already exists, and an origin
             // nothing has been stored under has none.
             Some(account_number) => self
                 .lookup_application_number_with_origin(&origin)
@@ -3266,7 +3266,7 @@ impl<M: Memory + Clone> Storage<M> {
             .position(|reference| reference.account_number == account_number)
         else {
             // Holding a reference is what grants access, so a miss means this identity
-            // does not have the account. For the tracked default it means the row is a
+            // does not have the account. For the tracked default it means the list is a
             // tombstone or the default was named and is no longer numberless — neither
             // can be reconstructed from the origin.
             return Err(match account_number {
@@ -3310,7 +3310,7 @@ impl<M: Memory + Clone> Storage<M> {
                 )
             }
             // The tracked default, unnamed: nothing to store but the use of a
-            // reference the row already holds.
+            // reference the list already holds.
             (None, None) => {
                 self.write_tracked_default(anchor_number, application_number, references, None)?;
                 return Ok(Account::new_with_last_used(
@@ -3626,8 +3626,8 @@ pub struct CreateSessionParams {
     pub now_ns: Timestamp,
 }
 
-/// How far the sweep has got: which row, and how many of that row's references are
-/// already indexed. The offset is what lets a batch stop inside a row that holds more
+/// How far the sweep has got: which list, and how many of that list's references are
+/// already indexed. The offset is what lets a batch stop inside a list that holds more
 /// references than one message can derive principals for.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AccountPrincipalIndexBackfillCursor {
@@ -3637,7 +3637,7 @@ pub struct AccountPrincipalIndexBackfillCursor {
 }
 
 impl AccountPrincipalIndexBackfillCursor {
-    fn row(&self) -> (AnchorNumber, ApplicationNumber) {
+    fn list(&self) -> (AnchorNumber, ApplicationNumber) {
         (self.anchor_number, self.application_number)
     }
 }
@@ -3646,7 +3646,7 @@ impl AccountPrincipalIndexBackfillCursor {
 pub struct AccountPrincipalIndexBackfillOutcome {
     pub next_cursor: Option<AccountPrincipalIndexBackfillCursor>,
     pub indexed: u64,
-    /// Rows whose application is gone, so no principal can be derived for them. A row
+    /// Rows whose application is gone, so no principal can be derived for them. A list
     /// in that state is an inconsistency rather than a normal skip, and a run that
     /// silently indexes nothing would otherwise look like a run with nothing to do.
     pub skipped: u64,
@@ -3666,7 +3666,7 @@ fn canister_id() -> Principal {
 }
 /// Which of the counters derived from a reference list a delta is applied to.
 ///
-/// Each carries what identifies its row, so a refusal points at the counter that
+/// Each carries what identifies its list, so a refusal points at the counter that
 /// diverged rather than only saying that one did.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReferenceCounter {
@@ -3713,7 +3713,7 @@ impl fmt::Display for ReferenceCount {
     }
 }
 
-/// How one write to a reference-list row moves the counters derived from it.
+/// How one write to a reference-list list moves the counters derived from it.
 ///
 /// Signed because these are differences rather than totals: a write that drops a
 /// reference has to move the counters down, and there is no unsigned way to say so.
@@ -3724,19 +3724,19 @@ struct ReferenceListDeltas {
     accounts: i64,
     /// Change in references, named and tracked-default alike.
     references: i64,
-    /// Change in rows that exist while holding no reference. Only ever -1, 0 or 1: one
-    /// write touches one row.
+    /// Change in lists that exist while holding no reference. Only ever -1, 0 or 1: one
+    /// write touches one list.
     tombstones: i64,
 }
 
 impl ReferenceListDeltas {
     /// What writing `new_references` over `previous_references` does to the counters.
     ///
-    /// A row that does not exist and one holding nothing both count as no references,
+    /// A list that does not exist and one holding nothing both count as no references,
     /// which is right for these totals: neither contributes any. It is also why
-    /// retiring a row must not go through here — a tombstone's row is still alive while
+    /// retiring a list must not go through here — a tombstone's list is still alive while
     /// holding nothing, so a diff against it would report no change and leave the
-    /// counters claiming references the removed row no longer has.
+    /// counters claiming references the removed list no longer has.
     fn between(
         previous_references: Option<&[AccountReference]>,
         new_references: &[AccountReference],
@@ -3759,7 +3759,7 @@ impl ReferenceListDeltas {
         let (previous_named, previous_total) = counts(previous_references.unwrap_or_default());
         let (new_named, new_total) = counts(new_references);
 
-        // A row that does not exist is not a tombstone — a tombstone is a row someone
+        // A list that does not exist is not a tombstone — a tombstone is a list someone
         // stored, and absence is what normalisation reads as "derive the default".
         let was_tombstone = previous_references.is_some_and(<[_]>::is_empty);
         let is_tombstone = new_references.is_empty();
@@ -3776,19 +3776,19 @@ impl ReferenceListDeltas {
         }
     }
 
-    /// What retiring a row holding `previous` does to the counters.
+    /// What retiring a list holding `previous` does to the counters.
     ///
     /// Separate from [`Self::between`] rather than a write of an empty list, because
-    /// an empty list cannot be written at all: a row holding nothing is a tombstone
+    /// an empty list cannot be written at all: a list holding nothing is a tombstone
     /// and stays, so only an outright removal gets to zero these out.
     fn removing(previous: &[AccountReference]) -> Self {
         let removed = Self::between(Some(&[]), previous);
         Self {
             accounts: removed.accounts.saturating_neg(),
             references: removed.references.saturating_neg(),
-            // The row is gone, so a tombstone goes with it. Not the negation of what
+            // The list is gone, so a tombstone goes with it. Not the negation of what
             // `between` reported: that describes writing this list, and this describes
-            // removing the row it was in.
+            // removing the list it was in.
             tombstones: if previous.is_empty() { -1 } else { 0 },
         }
     }
@@ -3801,7 +3801,7 @@ impl ReferenceListDeltas {
     ///
     /// Refuses rather than clamping: an under-run means the counters and the stored
     /// lists have already diverged, and a clamped zero reads as "no anchor references
-    /// this application any more", which retires a row other anchors still point at.
+    /// this application any more", which retires a list other anchors still point at.
     fn apply(
         &self,
         counter: ReferenceCounter,
@@ -3876,8 +3876,8 @@ pub enum StorageError {
     SaltNotSet,
     AccountsCounterOverflow,
     /// No application numbers left to hand out. Refused rather than saturated: the
-    /// number keys the application row and the origin index, so reissuing one would
-    /// put two origins on a single row.
+    /// number keys the application and the origin index, so reissuing one would
+    /// put two origins on a single list.
     ApplicationsCounterOverflow,
     ErrorUpdatingApplicationNumberAllocator,
     /// No session ids left to hand out. Refused rather than saturated: the id is an
