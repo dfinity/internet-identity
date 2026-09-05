@@ -113,7 +113,7 @@ use crate::storage::anchor::Anchor;
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
-use crate::storage::storable::account_locator::StorableAccountLocator;
+use crate::storage::storable::account_key::StorableAccountKey;
 use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
@@ -400,7 +400,7 @@ pub struct Storage<M: Memory> {
     next_application_number_memory: StableCell<StorableApplicationNumber, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
-        StableBTreeMap<Principal, StorableAccountLocator, ManagedMemory<M>>,
+        StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
     /// Counter that counts how often there was a discrepancy between the anchor accounts counter and the actual number of accounts
     stable_account_counter_discrepancy_counter_memory:
         StableCell<StorableDiscrepancyCounter, ManagedMemory<M>>,
@@ -2053,7 +2053,7 @@ impl<M: Memory + Clone> Storage<M> {
         origin: &FrontendHostname,
         salt: &[u8; 32],
         references: &[AccountReference],
-    ) -> BTreeMap<Principal, StorableAccountLocator> {
+    ) -> BTreeMap<Principal, StorableAccountKey> {
         references
             .iter()
             .filter_map(|reference| {
@@ -2077,7 +2077,7 @@ impl<M: Memory + Clone> Storage<M> {
                 );
                 Some((
                     principal,
-                    StorableAccountLocator {
+                    StorableAccountKey {
                         anchor_number,
                         application_number,
                         account_number: reference.account_number,
