@@ -885,9 +885,9 @@ thread_local! {
     static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
 }
 
-/// Returns `(indexed_entries, skipped_rows, is_done)` so monitoring can track the sweep.
+/// Returns `(indexed_entries, skipped_lists, is_done)` so monitoring can track the sweep.
 ///
-/// A non-zero skip count is not progress: it is reference-list lists whose application
+/// A non-zero skip count is not progress: it is account reference lists whose application
 /// is gone, which the sweep cannot derive a principal for. A run that reports nothing
 /// indexed and nothing skipped had nothing to do; one that reports skips did not.
 #[query(hidden = true)]
