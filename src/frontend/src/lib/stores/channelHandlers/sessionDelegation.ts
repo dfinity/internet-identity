@@ -262,6 +262,8 @@ const createSession = async (
         origin: effectiveOrigin,
         account_number: accountNumber !== undefined ? [accountNumber] : [],
         session_key: iiPublicKey,
+        device_id: prepared.device_id,
+        created_at: prepared.created_at,
         expiration: prepared.expiration,
       })
       .then(throwCanisterError),
