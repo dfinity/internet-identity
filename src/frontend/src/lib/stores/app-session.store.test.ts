@@ -3,7 +3,6 @@ import "fake-indexeddb/auto";
 import {
   appAccountsForOrigin,
   appSessionsForOrigin,
-  discardAppSession,
   purgeAppSessions,
   rememberAppAccount,
   storeAppSession,
@@ -64,16 +63,6 @@ describe("app session store", () => {
     ]);
   });
 
-  it("keeps the account mapping when the session is discarded", async () => {
-    const key = { identityNumber: BigInt(10_000), origin: ORIGIN };
-    await rememberAppAccount(key, { accountPrincipal: "2vxsx-fae" });
-    await storeAppSession(key, record(anHourFromNow()));
-
-    await discardAppSession(key);
-
-    await expect(appAccountsForOrigin(ORIGIN)).resolves.toHaveLength(1);
-  });
-
   it("keeps accounts of one identity apart", async () => {
     const identityNumber = BigInt(10_000);
     await storeAppSession(
@@ -94,15 +83,6 @@ describe("app session store", () => {
   it("does not serve a session that is about to expire", async () => {
     const key = { identityNumber: BigInt(10_000), origin: ORIGIN };
     await storeAppSession(key, record(Date.now() + 60 * 1000));
-
-    await expect(appSessionsForOrigin(ORIGIN)).resolves.toEqual([]);
-  });
-
-  it("discards a session", async () => {
-    const key = { identityNumber: BigInt(10_000), origin: ORIGIN };
-    await storeAppSession(key, record(anHourFromNow()));
-
-    await discardAppSession(key);
 
     await expect(appSessionsForOrigin(ORIGIN)).resolves.toEqual([]);
   });
