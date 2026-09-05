@@ -1926,6 +1926,71 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(remaining)
     }
 
+    /// Records that a session was used. Reports whether a session matched. The
+    /// reference's `last_used` rides on the same write.
+    pub fn record_session_use(
+        &mut self,
+        key: &SessionRecordKey,
+        now: Timestamp,
+    ) -> Result<bool, StorageError> {
+        let SessionRecordKey {
+            anchor_number,
+            origin,
+            account_number,
+            session_id,
+        } = key;
+        let (anchor_number, account_number, session_id) =
+            (*anchor_number, *account_number, *session_id);
+
+        let Some(application_number) = self.lookup_application_number_with_origin(origin) else {
+            return Ok(false);
+        };
+        let mut references = self.account_references(anchor_number, application_number);
+
+        let Some(reference) = references
+            .iter_mut()
+            .find(|reference| reference.account_number == account_number)
+        else {
+            return Ok(false);
+        };
+        let Some(session) = reference
+            .sessions
+            .iter_mut()
+            .find(|session| session.session_id == session_id)
+        else {
+            return Ok(false);
+        };
+
+        session.last_refreshed_ns = Some(now);
+        let device_id = session.device_id;
+        reference.last_used = Some(now);
+
+        // This row is being rewritten anyway, so its dead sessions go now. It costs one
+        // pass over a list already in memory and no write of its own, and it means every
+        // row anyone still uses stays clean without anything having to sweep for it.
+        for reference in references.iter_mut() {
+            reference.sessions.retain(|session| !session.is_over(now));
+        }
+
+        self.write_account_state(anchor_number, application_number, references, None, None)?;
+        self.stamp_session_device_use(anchor_number, device_id, now)?;
+        Ok(true)
+    }
+
+    /// Advances the device registry's `last_used` for the browser driving this session.
+    fn stamp_session_device_use(
+        &mut self,
+        anchor_number: AnchorNumber,
+        device_id: SessionDeviceId,
+        now: Timestamp,
+    ) -> Result<(), StorageError> {
+        let mut anchor = self.read(anchor_number)?;
+        if !anchor.stamp_session_device_use(device_id, now) {
+            return Ok(());
+        }
+        self.write(anchor)
+    }
+
     /// The session `key` names, or `None` where the identity holds no such session.
     ///
     /// A key whose session was replaced reads as `None` rather than as its successor:

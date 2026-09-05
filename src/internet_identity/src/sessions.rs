@@ -325,7 +325,10 @@ pub fn app_prepare_delegation(
     request: AppPrepareDelegationRequest,
 ) -> Result<AppPrepareDelegationResponse, AppSessionError> {
     let now = time();
-    let (account, session) = authorize_session(now)?;
+    let (key, account, session) = authorize_session(now)?;
+
+    storage_borrow_mut(|storage| storage.record_session_use(&key, now))
+        .map_err(|err| AppSessionError::InternalCanisterError(err.to_string()))?;
 
     let expiration = u64::min(
         now.saturating_add(APP_DELEGATION_TTL_NS),
@@ -355,7 +358,7 @@ pub fn app_get_delegation(
     request: AppGetDelegationRequest,
 ) -> Result<SignedDelegation, AppSessionError> {
     let now = time();
-    let (account, session) = authorize_session(now)?;
+    let (_, account, session) = authorize_session(now)?;
 
     if request.expiration > now.saturating_add(APP_DELEGATION_TTL_NS)
         || request.expiration > session.valid_till_ns
@@ -397,7 +400,9 @@ pub fn app_get_delegation(
 /// The session index is keyed by the principal a session's chain is rooted at, so a hit is
 /// itself the proof that the caller is that session: nothing is named in the request and
 /// nothing is attached to it.
-fn authorize_session(now: Timestamp) -> Result<(Account, SessionRecord), AppSessionError> {
+fn authorize_session(
+    now: Timestamp,
+) -> Result<(SessionRecordKey, Account, SessionRecord), AppSessionError> {
     let key = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
         .ok_or(AppSessionError::NoMatchingSession)?;
 
@@ -412,7 +417,7 @@ fn authorize_session(now: Timestamp) -> Result<(Account, SessionRecord), AppSess
     if session.is_over(now) {
         return Err(AppSessionError::NoMatchingSession);
     }
-    Ok((account, session))
+    Ok((key, account, session))
 }
 
 fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {

@@ -11,7 +11,7 @@ use canister_tests::framework::{
 use internet_identity_interface::internet_identity::types::{
     AccountSessionError, AppGetDelegationRequest, AppPrepareDelegationRequest, AppSessionError,
     GetAccountSessionRequest, Permissions, PrepareAccountSessionRequest,
-    PrepareAccountSessionResponse,
+    PrepareAccountSessionResponse, SessionDeviceInfo,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -529,6 +529,94 @@ fn should_archive_a_browser_registration_with_the_name_redacted() -> Result<(), 
         })
         .count();
     assert_eq!(registrations, 1);
+
+    Ok(())
+}
+
+#[test]
+fn should_stamp_every_refresh() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::get_accounts;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    let refresh = |env: &PocketIc| {
+        app_prepare_delegation(
+            env,
+            canister_id,
+            session_principal,
+            AppPrepareDelegationRequest {
+                session_key: ByteBuf::from(vec![7; 32]),
+            },
+        )
+        .unwrap()
+        .unwrap()
+    };
+    let last_used = |env: &PocketIc| -> Result<Option<u64>, RejectResponse> {
+        Ok(get_accounts(
+            env,
+            canister_id,
+            principal_1(),
+            identity_number,
+            ORIGIN.to_string(),
+        )?
+        .unwrap()[0]
+            .last_used)
+    };
+
+    let before = last_used(&env)?;
+
+    env.advance_time(Duration::from_secs(60));
+    refresh(&env);
+    let after_a_minute = last_used(&env)?;
+    assert!(after_a_minute > before);
+
+    env.advance_time(Duration::from_secs(60));
+    refresh(&env);
+    assert!(last_used(&env)? > after_a_minute);
+
+    Ok(())
+}
+
+#[test]
+fn should_advance_the_device_last_used_on_every_refresh() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::identity_info;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    let device = |env: &PocketIc| -> Result<SessionDeviceInfo, RejectResponse> {
+        Ok(
+            identity_info(env, canister_id, principal_1(), identity_number)?
+                .unwrap()
+                .session_devices
+                .unwrap()[0]
+                .clone(),
+        )
+    };
+
+    let enrolled = device(&env)?;
+    assert_eq!(enrolled.created_at, enrolled.last_used);
+
+    env.advance_time(Duration::from_secs(300));
+    app_prepare_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )
+    .unwrap()
+    .unwrap();
+
+    let refreshed = device(&env)?;
+    assert!(refreshed.last_used > enrolled.last_used);
+    assert_eq!(refreshed.created_at, enrolled.created_at);
 
     Ok(())
 }
