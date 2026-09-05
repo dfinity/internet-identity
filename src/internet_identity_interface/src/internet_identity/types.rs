@@ -832,6 +832,10 @@ pub enum AccountSessionError {
     NoSuchSession,
     /// The browser's key is unusable, or its signature does not verify against it.
     InvalidDeviceKey,
+    /// The browser presented a key it has already rotated away from, which happens when
+    /// it never learned that its last sign-in succeeded. It holds the successor that does
+    /// resolve, so the answer is to promote that one and present it.
+    StaleDeviceKey,
     InternalCanisterError(String),
 }
 
