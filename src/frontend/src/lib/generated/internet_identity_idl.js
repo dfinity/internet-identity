@@ -814,7 +814,10 @@ export const idlFactory = ({ IDL }) => {
     'device_id' : IDL.Nat32,
     'identity_number' : UserNumber,
   });
-  const SessionRevokeError = IDL.Variant({ 'Unauthorized' : IDL.Principal });
+  const SessionRevokeError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const SetDefaultAccountError = IDL.Variant({
     'NoSuchOrigin' : IDL.Record({ 'anchor_number' : UserNumber }),
     'NoSuchAnchor' : IDL.Null,
