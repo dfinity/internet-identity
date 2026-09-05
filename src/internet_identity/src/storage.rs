@@ -1540,6 +1540,7 @@ impl<M: Memory + Clone> Storage<M> {
             origin: origin.to_string(),
             stored_accounts: 0u64,
             stored_account_references: 0u64,
+            tombstones: 0u64,
         };
 
         self.stable_application_memory
@@ -1834,10 +1835,7 @@ impl<M: Memory + Clone> Storage<M> {
                 .stable_application_memory
                 .get(&application_number)
                 .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
-            let deltas = ReferenceListDeltas::between(
-                stored_references.as_deref().unwrap_or_default(),
-                &references,
-            );
+            let deltas = ReferenceListDeltas::between(stored_references.as_deref(), &references);
 
             // A derived principal is a function of the anchor, the origin and the
             // account number, so a write that leaves every account number in place — a
@@ -2126,6 +2124,11 @@ impl<M: Memory + Clone> Storage<M> {
             application.stored_accounts,
             application.stored_account_references,
         )?;
+        let application_tombstones = deltas.apply_one(
+            ReferenceCounter::Application { application_number },
+            ReferenceCount::Tombstones,
+            application.tombstones,
+        )?;
 
         // The only write here that reports a failure, so it goes before the two that
         // cannot: past this line nothing can return an error and leave a partial update.
@@ -2146,7 +2149,11 @@ impl<M: Memory + Clone> Storage<M> {
         // A zero here now means what it says. The delta refuses rather than clamping, so
         // the row is only retired when no anchor references it, not when a counter that
         // had already drifted was pulled below zero.
-        if application_references == 0 {
+        //
+        // Tombstones count too, and they are the reason references alone are not enough:
+        // a tombstone holds no reference and still has to keep this application number
+        // alive, or the identity it belongs to gets its moved-away default back.
+        if application_references == 0 && application_tombstones == 0 {
             self.remove_unreferenced_application(application_number, &application.origin);
         } else {
             self.stable_application_memory.insert(
@@ -2155,6 +2162,7 @@ impl<M: Memory + Clone> Storage<M> {
                     origin: application.origin,
                     stored_accounts: application_accounts,
                     stored_account_references: application_references,
+                    tombstones: application_tombstones,
                 },
             );
         }
@@ -2855,6 +2863,8 @@ pub enum ReferenceCount {
     Accounts,
     /// References, named and tracked-default alike.
     References,
+    /// Rows that exist while holding no reference.
+    Tombstones,
 }
 
 impl fmt::Display for ReferenceCount {
@@ -2862,6 +2872,7 @@ impl fmt::Display for ReferenceCount {
         match self {
             Self::Accounts => write!(f, "stored accounts"),
             Self::References => write!(f, "stored account references"),
+            Self::Tombstones => write!(f, "stored tombstones"),
         }
     }
 }
@@ -2877,6 +2888,9 @@ struct ReferenceListDeltas {
     accounts: i64,
     /// Change in references, named and tracked-default alike.
     references: i64,
+    /// Change in rows that exist while holding no reference. Only ever -1, 0 or 1: one
+    /// write touches one row.
+    tombstones: i64,
 }
 
 impl ReferenceListDeltas {
@@ -2888,7 +2902,7 @@ impl ReferenceListDeltas {
     /// holding nothing, so a diff against it would report no change and leave the
     /// counters claiming references the removed row no longer has.
     fn between(
-        previous_references: &[AccountReference],
+        previous_references: Option<&[AccountReference]>,
         new_references: &[AccountReference],
     ) -> Self {
         /// Saturating rather than `as`: a list long enough to overflow `i64` cannot
@@ -2906,12 +2920,23 @@ impl ReferenceListDeltas {
             (named, total)
         }
 
-        let (previous_named, previous_total) = counts(previous_references);
+        let (previous_named, previous_total) = counts(previous_references.unwrap_or_default());
         let (new_named, new_total) = counts(new_references);
+
+        // A row that does not exist is not a tombstone — a tombstone is a row someone
+        // stored, and absence is what normalisation reads as "derive the default".
+        let was_tombstone = previous_references.is_some_and(<[_]>::is_empty);
+        let is_tombstone = new_references.is_empty();
+        let tombstones = match (was_tombstone, is_tombstone) {
+            (false, true) => 1,
+            (true, false) => -1,
+            _ => 0,
+        };
 
         Self {
             accounts: new_named.saturating_sub(previous_named),
             references: new_total.saturating_sub(previous_total),
+            tombstones,
         }
     }
 
@@ -2921,15 +2946,19 @@ impl ReferenceListDeltas {
     /// an empty list cannot be written at all: a row holding nothing is a tombstone
     /// and stays, so only an outright removal gets to zero these out.
     fn removing(previous: &[AccountReference]) -> Self {
-        let removed = Self::between(&[], previous);
+        let removed = Self::between(Some(&[]), previous);
         Self {
             accounts: removed.accounts.saturating_neg(),
             references: removed.references.saturating_neg(),
+            // The row is gone, so a tombstone goes with it. Not the negation of what
+            // `between` reported: that describes writing this list, and this describes
+            // removing the row it was in.
+            tombstones: if previous.is_empty() { -1 } else { 0 },
         }
     }
 
     fn is_empty(&self) -> bool {
-        self.accounts == 0 && self.references == 0
+        self.accounts == 0 && self.references == 0 && self.tombstones == 0
     }
 
     /// Both counts of `counter`, moved by this delta.
@@ -2964,6 +2993,7 @@ impl ReferenceListDeltas {
         let delta = match count {
             ReferenceCount::Accounts => self.accounts,
             ReferenceCount::References => self.references,
+            ReferenceCount::Tombstones => self.tombstones,
         };
         stored
             .checked_add_signed(delta)
