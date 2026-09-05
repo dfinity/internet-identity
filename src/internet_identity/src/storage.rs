@@ -326,6 +326,21 @@ const MAX_EVICTABLE_DEFAULT_ACCOUNTS: u64 = 500;
 /// Eviction target, below the cap.
 const EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK: u64 = MAX_EVICTABLE_DEFAULT_ACCOUNTS * 9 / 10;
 
+/// Session records one identity may hold, counted as stored rather than as live.
+///
+/// Counting what is stored is what makes the cap cheap to trigger on: a session expires with
+/// no write anywhere, so no counter can follow the live set — something would have to
+/// decrement at the moment of expiry, and nothing runs then. An expired record holds its slot
+/// until something reclaims it, and because it is the first thing reclaimed, a held slot is
+/// never taken from a session in use.
+///
+/// A bound on concurrent activity, not on history: every session expires within 30 days, so
+/// the set is the apps used in the last month times the browsers they were used from.
+pub const MAX_SESSIONS_PER_ANCHOR: u32 = 500;
+/// Reclaiming goes down to here rather than to the cap, so the pass that walks an identity's
+/// rows runs once and then not again for the next fifty sign-ins.
+pub const SESSIONS_WATERMARK_PER_ANCHOR: u32 = 450;
+
 /// Bounds one message's eviction work.
 const MAX_EVICTIONS_PER_CALL: u64 =
     MAX_EVICTABLE_DEFAULT_ACCOUNTS - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK;
@@ -1749,6 +1764,127 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(delta.unsigned_abs())
     }
 
+    /// Frees a slot for one more session, and reports whether the anchor has one.
+    ///
+    /// The stored count is a trigger, never the thing the cap is enforced against: a
+    /// session can expire with no write anywhere, so the count drifts upwards. Once it
+    /// reaches the cap this recounts what the rows hold and reclaims against that, so an
+    /// admission is only ever granted against a number that was just counted.
+    fn ensure_session_slot(
+        &mut self,
+        anchor_number: AnchorNumber,
+        now: Timestamp,
+    ) -> Result<bool, StorageError> {
+        if self.read(anchor_number)?.session_count < MAX_SESSIONS_PER_ANCHOR {
+            return Ok(true);
+        }
+        Ok(self.reclaim_sessions(anchor_number, now)? < MAX_SESSIONS_PER_ANCHOR)
+    }
+
+    /// Replaces the count with a number that was counted rather than accumulated.
+    fn set_session_count(
+        &mut self,
+        anchor_number: AnchorNumber,
+        count: u32,
+    ) -> Result<(), StorageError> {
+        let mut anchor = self.read(anchor_number)?;
+        if anchor.session_count == count {
+            return Ok(());
+        }
+        anchor.session_count = count;
+        self.write(anchor)
+    }
+
+    /// Walks the anchor's rows once and reclaims down to the watermark, taking sessions in
+    /// [`SessionRecord::reclaim_order`]: dead ones first, then the least recently used.
+    ///
+    /// Returns what the rows actually hold once it is done, which is the number the cap is
+    /// enforced against. The stored counter is only ever a trigger for running this pass —
+    /// it can drift, this cannot, because it counts the sessions themselves.
+    ///
+    /// One pass per fifty sign-ins, because it reclaims to the watermark rather than to the
+    /// cap, and bounded by the same row limit account eviction uses.
+    fn reclaim_sessions(
+        &mut self,
+        anchor_number: AnchorNumber,
+        now: Timestamp,
+    ) -> Result<u32, StorageError> {
+        struct Candidate {
+            order: (bool, Timestamp, SessionId),
+            row: usize,
+            session_id: SessionId,
+        }
+
+        // Every row, not a bounded prefix of them: the number this returns is what the cap is
+        // enforced against, and a truncated scan would undercount, lower the counter to the
+        // undercount, and let the stored set climb past the cap from there. An identity's rows
+        // are already bounded — the row cap holds the evictable ones and the account cap holds
+        // the rest — and a sequential scan of them costs a fraction of the writes it saves.
+        let mut rows: Vec<(ApplicationNumber, Vec<AccountReference>)> = self
+            .stable_account_reference_list_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .map(|((_, application_number), list)| {
+                (application_number, Vec::<AccountReference>::from(list))
+            })
+            .collect();
+
+        let mut candidates: Vec<Candidate> = vec![];
+        for (row, (_, references)) in rows.iter().enumerate() {
+            for reference in references.iter() {
+                for session in &reference.sessions {
+                    candidates.push(Candidate {
+                        order: session.reclaim_order(now),
+                        row,
+                        session_id: session.session_id,
+                    });
+                }
+            }
+        }
+        let stored = candidates.len() as u32;
+        candidates.sort_by_key(|candidate| candidate.order);
+
+        let surplus = stored.saturating_sub(SESSIONS_WATERMARK_PER_ANCHOR) as usize;
+        let victims = &candidates[..surplus.min(candidates.len())];
+        if victims.is_empty() {
+            self.set_session_count(anchor_number, stored)?;
+            return Ok(stored);
+        }
+
+        // One write per row rather than one per victim: the row is a single blob, so
+        // dropping several of its sessions one at a time would rewrite it several times.
+        let mut touched: Vec<usize> = victims.iter().map(|victim| victim.row).collect();
+        touched.sort_unstable();
+        touched.dedup();
+
+        // One anchor write for the pass rather than one per row: each row reports what it
+        // did to the count, and the recount below is what the cap is enforced against.
+        let mut dropped_total = 0i64;
+        for row in touched {
+            let (application_number, references) = &mut rows[row];
+            let application_number = *application_number;
+            for reference in references.iter_mut() {
+                reference.sessions.retain(|session| {
+                    !victims
+                        .iter()
+                        .any(|victim| victim.session_id == session.session_id)
+                });
+            }
+            dropped_total -= self.write_account_state_deferring_count(
+                anchor_number,
+                application_number,
+                references.clone(),
+                None,
+                None,
+            )?;
+        }
+
+        let remaining = stored.saturating_sub(dropped_total.unsigned_abs() as u32);
+        self.set_session_count(anchor_number, remaining)?;
+        Ok(remaining)
+    }
+
     // Called by the sign-in ceremony, which lands two PRs up.
     #[allow(dead_code)]
     /// The session `key` names, or `None` where the identity holds no such session.
@@ -1827,6 +1963,12 @@ impl<M: Memory + Clone> Storage<M> {
                 application_number
             }
         };
+
+        // Reclaiming before the session is admitted rather than after it: the stored set
+        // never sits above the cap, not even for the rest of this message.
+        if !self.ensure_session_slot(anchor_number, now_ns)? {
+            return Err(StorageError::SessionCapNotReclaimed { anchor_number });
+        }
 
         let mut references = self.account_references(anchor_number, application_number);
 
