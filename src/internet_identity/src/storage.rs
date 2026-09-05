@@ -2035,11 +2035,10 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number,
             origin,
             account_number,
-            device_id,
-            created_at,
+            session_id,
         } = key;
-        let (anchor_number, account_number, device_id, created_at) =
-            (*anchor_number, *account_number, *device_id, *created_at);
+        let (anchor_number, account_number, session_id) =
+            (*anchor_number, *account_number, *session_id);
 
         let Some(application_number) = self.lookup_application_number_with_origin(origin) else {
             return Ok(false);
@@ -2055,12 +2054,13 @@ impl<M: Memory + Clone> Storage<M> {
         let Some(session) = reference
             .sessions
             .iter_mut()
-            .find(|session| session.created_at_ns == created_at && session.device_id == device_id)
+            .find(|session| session.session_id == session_id)
         else {
             return Ok(false);
         };
 
         session.last_refreshed_ns = Some(now);
+        let device_id = session.device_id;
         reference.last_used = Some(now);
 
         // This row is being rewritten anyway, so its dead sessions go now. It costs one
