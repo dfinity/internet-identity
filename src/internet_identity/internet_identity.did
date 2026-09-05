@@ -1065,6 +1065,11 @@ type GetAccountSessionRequest = record {
     account_number : opt AccountNumber;
     session_key : SessionKey;
     expiration : Timestamp;
+    // Which browser and which sign-in, both returned by prepare_account_session. The
+    // pair names one session: a browser keeps its id across sign-ins, so the creation
+    // time is what tells two of its sessions apart.
+    device_id : nat32;
+    created_at : Timestamp;
 };
 
 type GetAccountSessionResponse = record {

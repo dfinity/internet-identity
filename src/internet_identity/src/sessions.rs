@@ -10,7 +10,7 @@ use crate::delegation::{
 };
 use crate::sessions::device_key::verify_device_keys;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
-use crate::storage::account::{Account, AccountKey, SessionRecord};
+use crate::storage::account::{Account, AccountKey, SessionRecord, SessionRecordKey};
 use crate::storage::{CreateSessionParams, StorageError};
 use crate::{update_root_hash, DAY_NS, MINUTE_NS};
 use candid::Principal;
@@ -22,8 +22,8 @@ use ic_certification::Hash;
 use internet_identity_interface::archive::types::{Operation, Private};
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountSessionError, AnchorNumber, AppGetDelegationRequest,
-    AppPrepareDelegationRequest, AppPrepareDelegationResponse, AppSessionError, ApplicationNumber,
-    Delegation, FrontendHostname, GetAccountSessionRequest, GetAccountSessionResponse,
+    AppPrepareDelegationRequest, AppPrepareDelegationResponse, AppSessionError, Delegation,
+    FrontendHostname, GetAccountSessionRequest, GetAccountSessionResponse,
     PrepareAccountSessionRequest, PrepareAccountSessionResponse, SignedDelegation, Timestamp,
 };
 use serde_bytes::ByteBuf;
@@ -152,7 +152,7 @@ pub async fn prepare_account_session(
     // The account was checked above, so anything left is a broken storage invariant
     // rather than a request this caller could have got wrong. Trapping rolls the whole
     // message back, including the browser registration.
-    let session = storage_borrow_mut(|storage| {
+    let (_, session) = storage_borrow_mut(|storage| {
         storage.create_session(CreateSessionParams {
             anchor_number: identity_number,
             origin: origin.clone(),
@@ -166,10 +166,9 @@ pub async fn prepare_account_session(
     })
     .expect("failed to create a session for an account that was just read");
 
-    let (seed, application_number) =
-        session_identity(identity_number, &origin, account_number, &session)
-            .expect("failed to derive the identity of a session that was just created");
-    let account_principal = account_principal(identity_number, application_number, account_number)
+    let seed = session_identity(identity_number, &origin, account_number, &session)
+        .expect("failed to derive the identity of a session that was just created");
+    let account_principal = account_principal(identity_number, &origin, account_number)
         .expect("failed to derive the principal of an account that was just read");
 
     state::signature_map_mut(|sigs| {
@@ -201,26 +200,34 @@ pub fn get_account_session(
         account_number,
         session_key,
         expiration,
+        device_id,
+        created_at,
     } = request;
 
     check_authorization(identity_number)?;
     check_frontend_length(&origin);
 
-    let sessions = storage_borrow(|storage| {
-        storage.account_sessions(identity_number, &origin, account_number)
-    })
-    .ok_or(AccountSessionError::NoSuchAccount)?;
-
-    sessions
-        .into_iter()
-        .filter(|session| session.valid_till_ns == expiration)
-        .find_map(|session| {
-            let (seed, _) =
-                session_identity(identity_number, &origin, account_number, &session).ok()?;
-            let signed_delegation = witness_session_delegation(&seed, &session_key, expiration)?;
-            Some(GetAccountSessionResponse { signed_delegation })
+    // `prepare_account_session` handed the browser back both halves of this key, so the
+    // session is named exactly rather than searched for. A key naming a session that was
+    // replaced since finds nothing, which is the honest answer: the delegation this call
+    // is collecting was signed for the session that is gone.
+    let session = storage_borrow(|storage| {
+        storage.read_session(&SessionRecordKey {
+            anchor_number: identity_number,
+            origin: origin.clone(),
+            account_number,
+            device_id,
+            created_at,
         })
-        .ok_or(AccountSessionError::NoSuchSession)
+    })
+    .ok_or(AccountSessionError::NoSuchSession)?;
+
+    let seed = session_identity(identity_number, &origin, account_number, &session)
+        .map_err(|_| AccountSessionError::NoSuchSession)?;
+    let signed_delegation = witness_session_delegation(&seed, &session_key, expiration)
+        .ok_or(AccountSessionError::NoSuchSession)?;
+
+    Ok(GetAccountSessionResponse { signed_delegation })
 }
 
 fn witness_session_delegation(
@@ -258,21 +265,17 @@ fn session_identity(
     origin: &FrontendHostname,
     account_number: Option<AccountNumber>,
     session: &SessionRecord,
-) -> Result<(Hash, ApplicationNumber), AccountSessionError> {
-    let (salt, application_number) = storage_borrow(|storage| {
-        (
-            storage.salt().copied(),
-            storage.lookup_application_number_with_origin(origin),
-        )
-    });
-    let salt = salt.ok_or_else(|| {
+) -> Result<Hash, AccountSessionError> {
+    let salt = storage_borrow(|storage| storage.salt().copied()).ok_or_else(|| {
         AccountSessionError::InternalCanisterError(StorageError::SaltNotSet.to_string())
     })?;
-    let application_number: ApplicationNumber =
-        application_number.ok_or(AccountSessionError::NoSuchAccount)?;
 
-    let (account, _) = storage_borrow(|storage| {
-        storage.account_with_sessions(anchor_number, application_number, account_number)
+    let account = storage_borrow(|storage| {
+        storage.read_account(&AccountKey {
+            anchor_number,
+            origin: origin.clone(),
+            account_number,
+        })
     })
     .ok_or(AccountSessionError::NoSuchAccount)?;
     let seed = calculate_session_seed_with_salt(
@@ -281,7 +284,7 @@ fn session_identity(
         session.created_at_ns,
         session.device_id,
     );
-    Ok((seed, application_number))
+    Ok(seed)
 }
 
 /// The principal an app sees for this account. A session handle names the account by this
@@ -291,14 +294,18 @@ fn session_identity(
 /// `seed_from_anchor`, which only the stored row carries.
 fn account_principal(
     anchor_number: AnchorNumber,
-    application_number: ApplicationNumber,
+    origin: &FrontendHostname,
     account_number: Option<AccountNumber>,
 ) -> Result<Principal, AccountSessionError> {
     let salt = storage_borrow(|storage| storage.salt().copied()).ok_or_else(|| {
         AccountSessionError::InternalCanisterError(StorageError::SaltNotSet.to_string())
     })?;
-    let (account, _) = storage_borrow(|storage| {
-        storage.account_with_sessions(anchor_number, application_number, account_number)
+    let account = storage_borrow(|storage| {
+        storage.read_account(&AccountKey {
+            anchor_number,
+            origin: origin.clone(),
+            account_number,
+        })
     })
     .ok_or(AccountSessionError::NoSuchAccount)?;
     Ok(canister_sig_principal(
@@ -388,29 +395,17 @@ pub fn app_get_delegation(
 /// itself the proof that the caller is that session: nothing is named in the request and
 /// nothing is attached to it.
 fn authorize_session(now: Timestamp) -> Result<(Account, SessionRecord), AppSessionError> {
-    let handle = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
-        .ok_or(AppSessionError::NoMatchingSession)?;
-    let locator = storage_borrow(|storage| storage.lookup_account_with_principal(handle.account()))
+    let key = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
         .ok_or(AppSessionError::NoMatchingSession)?;
 
-    let (account, sessions) = storage_borrow(|storage| {
-        storage.account_with_sessions(
-            locator.anchor_number,
-            locator.application_number,
-            locator.account_number,
-        )
+    let (account, session) = storage_borrow(|storage| {
+        Some((
+            storage.read_account(&key.account())?,
+            storage.read_session(&key)?,
+        ))
     })
     .ok_or(AppSessionError::NoMatchingSession)?;
 
-    // The browser and the creation time together, because a browser keeps its id across
-    // sign-ins: on the browser alone, an index entry that outlived its session would
-    // authenticate its holder as whatever that browser created next.
-    let session = sessions
-        .into_iter()
-        .find(|session| {
-            session.device_id == handle.device_id && session.created_at_ns == handle.created_at
-        })
-        .ok_or(AppSessionError::NoMatchingSession)?;
     if session.is_over(now) {
         return Err(AppSessionError::NoMatchingSession);
     }
