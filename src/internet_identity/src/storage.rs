@@ -1965,9 +1965,9 @@ impl<M: Memory + Clone> Storage<M> {
         let device_id = session.device_id;
         reference.last_used = Some(now);
 
-        // This row is being rewritten anyway, so its dead sessions go now. It costs one
+        // This list is being rewritten anyway, so its dead sessions go now. It costs one
         // pass over a list already in memory and no write of its own, and it means every
-        // row anyone still uses stays clean without anything having to sweep for it.
+        // list anyone still uses stays clean without anything having to sweep for it.
         for reference in references.iter_mut() {
             reference.sessions.retain(|session| !session.is_over(now));
         }

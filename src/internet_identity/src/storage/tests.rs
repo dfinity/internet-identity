@@ -5811,7 +5811,7 @@ mod session_refresh_stamp_tests {
         }
     }
 
-    /// The row is rewritten anyway, so the refresh is where a dead sibling is collected —
+    /// The list is rewritten anyway, so the refresh is where a dead sibling is collected —
     /// index entry and session count included, since nothing else will come for them.
     #[test]
     fn a_refresh_collects_the_dead_sessions_beside_it() {
