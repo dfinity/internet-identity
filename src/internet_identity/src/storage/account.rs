@@ -8,7 +8,7 @@ use ic_cdk::trap;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountInfo, AccountNameValidationError, AccountNumber, AnchorNumber, FrontendHostname,
-    SessionDeviceId, Timestamp, UserKey,
+    SessionDeviceId, SessionId, Timestamp, UserKey,
 };
 use serde::{Deserialize, Serialize};
 
@@ -69,20 +69,18 @@ pub const MIN_SESSION_IDLE_NS: u64 = 10 * crate::MINUTE_NS;
 /// and a machine walked away from stops being signed in within one.
 pub const DEFAULT_SESSION_IDLE_NS: u64 = 7 * crate::DAY_NS;
 
-/// The four things that name one session, plus the creation time that tells two of one
-/// browser's apart.
+/// Where one session is stored, and which session it is.
 ///
-/// A browser keeps its id across sign-ins, so `device_id` alone names whatever that
-/// browser holds now rather than the session a caller means. With `created_at` every
-/// operation is compare-and-act: a key for a session that was replaced reads as `None`
-/// and revokes nothing, instead of landing on its successor.
+/// The account addresses the row; `session_id` picks the record out of it. The id is
+/// unique on its own, so every operation is compare-and-act: a key for a session that
+/// was replaced reads as `None` and revokes nothing, instead of landing on its
+/// successor.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SessionRecordKey {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
-    pub device_id: SessionDeviceId,
-    pub created_at: Timestamp,
+    pub session_id: SessionId,
 }
 
 impl SessionRecordKey {
@@ -98,8 +96,11 @@ impl SessionRecordKey {
     }
 }
 
-/// A revocable session at one account. Only `last_refreshed` is mutable, which is why
-/// it is the one field absent from the seed.
+/// A revocable session at one account.
+///
+/// `session_id` is what the seed binds, so the identity this session signs with is
+/// tied to the one record that was allocated that id. Every other field describes the
+/// session and can be rewritten without changing who it signs as.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct SessionRecord {
     pub created_at_ns: Timestamp,
@@ -108,6 +109,7 @@ pub struct SessionRecord {
     pub last_refreshed_ns: Option<Timestamp>,
     pub device_id: SessionDeviceId,
     pub read_only: bool,
+    pub session_id: SessionId,
 }
 
 impl SessionRecord {
@@ -141,13 +143,14 @@ impl SessionRecord {
     ///
     /// The extension is what separates an app in weekly use from one opened once and
     /// abandoned, which recency alone gets backwards — the abandoned one was touched more
-    /// recently. `device_id` only makes the order total.
-    pub fn reclaim_order(&self, now: Timestamp) -> (bool, Timestamp, SessionDeviceId) {
+    /// recently. `session_id` only makes the order total, which it can because no two
+    /// sessions share one.
+    pub fn reclaim_order(&self, now: Timestamp) -> (bool, Timestamp, SessionId) {
         let last_used = self.last_refreshed_ns.unwrap_or(self.created_at_ns);
         (
             !self.is_over(now),
             last_used.saturating_add(self.demonstrated_use()),
-            self.device_id,
+            self.session_id,
         )
     }
 }

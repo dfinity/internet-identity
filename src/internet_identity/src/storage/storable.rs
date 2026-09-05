@@ -28,6 +28,7 @@ pub mod recovery_key;
 pub mod session_device;
 pub mod session_device_id;
 pub mod session_handle;
+pub mod session_id;
 pub mod session_record;
 pub mod special_device_migration;
 pub mod sso_stable_id_key;

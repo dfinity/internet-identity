@@ -89,8 +89,7 @@ fn should_create_a_session_and_witness_its_delegation() -> Result<(), RejectResp
             account_number: None,
             session_key: ByteBuf::from(vec![1; 32]),
             expiration: prepared.expiration,
-            device_id: prepared.device_id,
-            created_at: prepared.created_at,
+            session_id: prepared.session_id,
         },
     )?
     .unwrap();
@@ -111,8 +110,9 @@ fn should_replace_the_session_of_a_browser_signing_in_again() -> Result<(), Reje
     let identity_number = flows::register_anchor(&env, canister_id);
 
     let (first, first_principal) = create_session(&env, canister_id, identity_number);
-    env.advance_time(Duration::from_secs(60));
 
+    // No time is allowed to pass: two ceremonies in one consensus round agree on every
+    // field that describes them, and it is the id that keeps them apart.
     let second = prepare_account_session(
         &env,
         canister_id,
@@ -121,7 +121,7 @@ fn should_replace_the_session_of_a_browser_signing_in_again() -> Result<(), Reje
     )?
     .unwrap();
 
-    assert_ne!(second.created_at, first.created_at);
+    assert_ne!(second.session_id, first.session_id);
     assert_ne!(second.user_key, first.user_key);
 
     // The chain the first ceremony handed out stops working, which is what bounds a copy of
@@ -351,10 +351,9 @@ fn should_not_reuse_a_session_across_a_consent_change() -> Result<(), RejectResp
 
     let mut downgraded = session_request(identity_number);
     downgraded.permissions = Some(Permissions::Queries);
-    env.advance_time(Duration::from_secs(60));
     let read_only = prepare_account_session(&env, canister_id, principal_1(), downgraded)?.unwrap();
 
-    assert_ne!(read_only.created_at, full_access.created_at);
+    assert_ne!(read_only.session_id, full_access.session_id);
     assert_ne!(read_only.user_key, full_access.user_key);
 
     let minted = app_prepare_delegation(
@@ -1088,7 +1087,6 @@ fn should_keep_the_browser_entry_across_a_rotation() -> Result<(), RejectRespons
     )?
     .unwrap();
 
-    env.advance_time(Duration::from_secs(60));
     let rotated = prepare_account_session(
         &env,
         canister_id,
@@ -1100,7 +1098,7 @@ fn should_keep_the_browser_entry_across_a_rotation() -> Result<(), RejectRespons
     // A ceremony replaces the session, so what a rotation must not cost is the browser's
     // identity: same entry, new session.
     assert_eq!(rotated.device_id, first.device_id);
-    assert_ne!(rotated.created_at, first.created_at);
+    assert_ne!(rotated.session_id, first.session_id);
 
     assert!(app_prepare_delegation(
         &env,
