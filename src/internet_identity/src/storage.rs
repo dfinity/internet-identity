@@ -1745,12 +1745,28 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(removed)
     }
 
-    /// The account a principal a dapp sees was derived for.
-    pub fn lookup_account_with_principal(
-        &self,
-        principal: Principal,
-    ) -> Option<StorableAccountLocator> {
-        self.lookup_account_with_principal_memory.get(&principal)
+    /// The account a principal a dapp sees was derived for, as an address.
+    ///
+    /// An [`Account`] carries the seed it signs with, so one only ever comes out of
+    /// [`Self::read_account`], which is where the identity's claim on it is checked.
+    pub fn lookup_account_with_principal(&self, principal: Principal) -> Option<AccountKey> {
+        self.account_key_of(&self.lookup_account_with_principal_memory.get(&principal)?)
+    }
+
+    /// A stored account address resolved to the one callers use.
+    ///
+    /// `None` where the application is gone, which leaves the stored row naming
+    /// nothing. Not a `From`, because the origin the number stands for comes out of
+    /// storage.
+    fn account_key_of(&self, stored: &StorableAccountKey) -> Option<AccountKey> {
+        Some(AccountKey {
+            anchor_number: stored.anchor_number,
+            origin: self
+                .stable_application_memory
+                .get(&stored.application_number)?
+                .origin,
+            account_number: stored.account_number,
+        })
     }
 
     /// The session a caller's principal names, or `None` where the index no longer
@@ -1762,16 +1778,12 @@ impl<M: Memory + Clone> Storage<M> {
     /// [`Self::read_session`] will not match a later session of the same browser.
     pub fn lookup_session_with_principal(&self, principal: Principal) -> Option<SessionRecordKey> {
         let handle = self.lookup_session_with_principal_memory.get(&principal)?;
-        let locator = self.lookup_account_with_principal(handle.account())?;
-        let origin = self
-            .stable_application_memory
-            .get(&locator.application_number)?
-            .origin;
+        let account = self.lookup_account_with_principal(handle.account())?;
 
         Some(SessionRecordKey {
-            anchor_number: locator.anchor_number,
-            origin,
-            account_number: locator.account_number,
+            anchor_number: account.anchor_number,
+            origin: account.origin,
+            account_number: account.account_number,
             device_id: handle.device_id,
             created_at: handle.created_at,
         })

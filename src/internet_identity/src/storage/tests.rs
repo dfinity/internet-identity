@@ -4225,16 +4225,13 @@ mod account_principal_index_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
         record_use(&mut storage, anchor_number, origin.clone(), None, 1_000).unwrap();
-        let application_number = storage
-            .lookup_application_number_with_origin(&origin)
-            .unwrap();
         let principal = default_account_principal(anchor_number, &origin);
 
-        let locator = storage.lookup_account_with_principal(principal).unwrap();
+        let key = storage.lookup_account_with_principal(principal).unwrap();
 
-        assert_eq!(locator.anchor_number, anchor_number);
-        assert_eq!(locator.application_number, application_number);
-        assert_eq!(locator.account_number, None);
+        assert_eq!(key.anchor_number, anchor_number);
+        assert_eq!(key.origin, origin);
+        assert_eq!(key.account_number, None);
     }
 
     #[test]
