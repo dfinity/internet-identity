@@ -418,6 +418,7 @@ export const idlFactory = ({ IDL }) => {
     'NoSuchSession' : IDL.Null,
     'NoSuchAccount' : IDL.Null,
     'InvalidDeviceKey' : IDL.Null,
+    'StaleDeviceKey' : IDL.Null,
   });
   const GetAccountsError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
