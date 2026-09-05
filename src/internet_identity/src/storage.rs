@@ -1772,7 +1772,7 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// A stored account address resolved to the one callers use.
     ///
-    /// `None` where the application is gone, which leaves the stored row naming
+    /// `None` where the application is gone, which leaves the stored list naming
     /// nothing. Not a `From`, because the origin the number stands for comes out of
     /// storage.
     fn account_key_of(&self, stored: &StorableAccountKey) -> Option<AccountKey> {

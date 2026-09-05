@@ -5406,7 +5406,7 @@ mod session_creation_tests {
 
         assert!(
             storage.lookup_session_with_principal(principal).is_none(),
-            "an evicted row left its sessions resolvable"
+            "an evicted list left its sessions resolvable"
         );
         assert_eq!(storage.read(anchor_number).unwrap().session_count, 0);
     }
