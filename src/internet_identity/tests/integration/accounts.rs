@@ -2,17 +2,18 @@ use candid::Principal;
 use canister_tests::{
     api::internet_identity::{
         api_v2::{
-            create_account, get_account_delegation, get_account_delegation_with_read_only,
-            get_accounts, get_default_account, prepare_account_delegation,
-            prepare_account_delegation_with_read_only, set_default_account, update_account,
-            AccountDelegationParams,
+            account_principal_index_backfill_status, create_account, get_account_delegation,
+            get_account_delegation_with_read_only, get_accounts, get_default_account,
+            prepare_account_delegation, prepare_account_delegation_with_read_only,
+            set_default_account, update_account, AccountDelegationParams,
         },
         get_delegation, init_salt, prepare_delegation,
     },
     flows,
     framework::{
-        device_data_2, env, get_metrics, install_ii_with_archive, parse_metric, principal_1,
-        principal_2, time, verify_delegation,
+        device_data_2, env, get_metrics, install_ii_canister, install_ii_with_archive,
+        parse_metric, principal_1, principal_2, time, upgrade_ii_canister, verify_delegation,
+        II_WASM, II_WASM_PREVIOUS,
     },
 };
 use internet_identity_interface::internet_identity::types::{
@@ -1713,6 +1714,59 @@ fn should_remove_unreferenced_applications_an_anchor_stops_referencing(
     .unwrap();
     assert_eq!(accounts.len(), 1);
     assert!(accounts[0].last_used.is_some());
+
+    Ok(())
+}
+
+/// Verifies that account references written before the principal index existed are
+/// swept into it, so a lookup miss is unambiguous once the sweep reports completion.
+#[test]
+fn should_backfill_the_account_principal_index_after_an_upgrade() -> Result<(), RejectResponse> {
+    let env = env();
+    // Installed from the release that has no index, so its account references are the
+    // ones the sweep has to pick up.
+    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    let identity_number = flows::register_anchor(&env, canister_id);
+
+    for index in 0..3 {
+        create_account(
+            &env,
+            canister_id,
+            principal_1(),
+            identity_number,
+            format!("https://dapp-{index}.com"),
+            format!("account-{index}"),
+        )?
+        .unwrap();
+    }
+
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        "https://dapp-0.com".to_string(),
+        None,
+        ByteBuf::from(vec![1; 32]),
+    );
+    prepare_account_delegation(&params, None)?.unwrap();
+
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+    env.advance_time(Duration::from_secs(5));
+    for _ in 0..5 {
+        env.tick();
+    }
+
+    let (indexed, skipped, is_done) =
+        account_principal_index_backfill_status(&env, canister_id, principal_1())?;
+    assert!(is_done, "the backfill should report completion");
+    assert_eq!(
+        indexed, 6,
+        "three named accounts, each alongside the default reference backfilled with it"
+    );
+    // Every row had its application, so nothing was passed over.
+    assert_eq!(skipped, 0);
 
     Ok(())
 }

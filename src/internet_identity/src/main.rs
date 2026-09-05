@@ -15,6 +15,7 @@ use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
+use ic_cdk_timers::TimerId;
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
@@ -37,9 +38,11 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::time::Duration;
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
-use storage::{Salt, Storage};
+use storage::{AccountPrincipalIndexBackfillCursor, Salt, Storage};
 
 mod account_management;
 mod anchor_management;
@@ -828,6 +831,84 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
     }
+    init_account_principal_index_backfill_timer();
+}
+
+const ACCOUNT_PRINCIPAL_INDEX_BACKFILL_BACKOFF: Duration = Duration::from_secs(1);
+
+const ACCOUNT_PRINCIPAL_INDEX_BACKFILL_BATCH_SIZE: u64 = 2_000;
+
+thread_local! {
+    static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_CURSOR: RefCell<Option<AccountPrincipalIndexBackfillCursor>> = const { RefCell::new(None) };
+    static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_DONE: RefCell<bool> = const { RefCell::new(false) };
+    static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_INDEXED: RefCell<u64> = const { RefCell::new(0) };
+    static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_SKIPPED: RefCell<u64> = const { RefCell::new(0) };
+    static ACCOUNT_PRINCIPAL_INDEX_BACKFILL_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
+}
+
+/// Returns `(indexed_entries, skipped_rows, is_done)` so monitoring can track the sweep.
+///
+/// A non-zero skip count is not progress: it is reference-list rows whose application
+/// is gone, which the sweep cannot derive a principal for. A run that reports nothing
+/// indexed and nothing skipped had nothing to do; one that reports skips did not.
+#[query(hidden = true)]
+fn account_principal_index_backfill_status() -> (u64, u64, bool) {
+    (
+        ACCOUNT_PRINCIPAL_INDEX_BACKFILL_INDEXED.with_borrow(|indexed| *indexed),
+        ACCOUNT_PRINCIPAL_INDEX_BACKFILL_SKIPPED.with_borrow(|skipped| *skipped),
+        ACCOUNT_PRINCIPAL_INDEX_BACKFILL_DONE.with_borrow(|done| *done),
+    )
+}
+
+fn run_account_principal_index_backfill_batch() {
+    if ACCOUNT_PRINCIPAL_INDEX_BACKFILL_DONE.with_borrow(|done| *done) {
+        return;
+    }
+
+    let cursor = ACCOUNT_PRINCIPAL_INDEX_BACKFILL_CURSOR.with_borrow(|cursor| *cursor);
+    let outcome = state::storage_borrow_mut(|storage| {
+        storage.backfill_account_principal_index_batch(
+            cursor,
+            ACCOUNT_PRINCIPAL_INDEX_BACKFILL_BATCH_SIZE,
+        )
+    });
+
+    ACCOUNT_PRINCIPAL_INDEX_BACKFILL_INDEXED.with_borrow_mut(|indexed| {
+        *indexed = indexed.saturating_add(outcome.indexed);
+    });
+    ACCOUNT_PRINCIPAL_INDEX_BACKFILL_SKIPPED.with_borrow_mut(|skipped| {
+        *skipped = skipped.saturating_add(outcome.skipped);
+    });
+    ACCOUNT_PRINCIPAL_INDEX_BACKFILL_CURSOR.replace(outcome.next_cursor);
+
+    if outcome.is_done {
+        ACCOUNT_PRINCIPAL_INDEX_BACKFILL_DONE.replace(true);
+        ACCOUNT_PRINCIPAL_INDEX_BACKFILL_TIMER_ID.with_borrow_mut(|id_slot| {
+            if let Some(timer_id) = id_slot.take() {
+                ic_cdk_timers::clear_timer(timer_id);
+            }
+        });
+        let indexed = ACCOUNT_PRINCIPAL_INDEX_BACKFILL_INDEXED.with_borrow(|indexed| *indexed);
+        let skipped = ACCOUNT_PRINCIPAL_INDEX_BACKFILL_SKIPPED.with_borrow(|skipped| *skipped);
+        ic_cdk::println!(
+            "Account principal index backfill COMPLETED ({indexed} entries, {skipped} skipped)."
+        );
+    }
+}
+
+/// Safe to call from both `init` and `post_upgrade`: with nothing to index the
+/// first batch immediately reports completion. A batch before the salt exists
+/// indexes nothing and leaves the sweep running, so it resumes once it is set.
+fn init_account_principal_index_backfill_timer() {
+    let timer_id = ic_cdk_timers::set_timer_interval(
+        ACCOUNT_PRINCIPAL_INDEX_BACKFILL_BACKOFF,
+        run_account_principal_index_backfill_batch,
+    );
+    ACCOUNT_PRINCIPAL_INDEX_BACKFILL_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(old_id) = id_slot.replace(timer_id) {
+            ic_cdk_timers::clear_timer(old_id);
+        }
+    });
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
