@@ -701,6 +701,13 @@ export type GetAccountError = {
 export interface GetAccountSessionRequest {
   'session_key' : SessionKey,
   'origin' : FrontendHostname,
+  /**
+   * Which browser and which sign-in, both returned by prepare_account_session. The
+   * pair names one session: a browser keeps its id across sign-ins, so the creation
+   * time is what tells two of its sessions apart.
+   */
+  'device_id' : number,
+  'created_at' : Timestamp,
   'account_number' : [] | [AccountNumber],
   'expiration' : Timestamp,
   'identity_number' : UserNumber,
