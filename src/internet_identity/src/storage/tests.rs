@@ -3771,10 +3771,7 @@ mod application_removal_tests {
             .write_account_state(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: None,
-                    last_used: Some(2_000),
-                }],
+                vec![AccountReference::new(None, Some(2_000))],
                 None,
                 None,
             )
