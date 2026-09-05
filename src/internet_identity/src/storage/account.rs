@@ -84,8 +84,6 @@ pub struct SessionRecordKey {
 }
 
 impl SessionRecordKey {
-    // Used by the app delegation path, which lands four PRs up.
-    #[allow(dead_code)]
     /// The account this session is at.
     pub fn account(&self) -> AccountKey {
         AccountKey {
