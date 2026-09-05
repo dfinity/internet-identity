@@ -108,7 +108,15 @@ fn should_replace_the_session_of_a_browser_signing_in_again() -> Result<(), Reje
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
 
-    let (first, first_principal) = create_session(&env, canister_id, identity_number);
+    let browser = BrowserKey::new(1);
+    let first = prepare_account_session(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request_from(identity_number, &browser),
+    )?
+    .unwrap();
+    let first_principal = Principal::self_authenticating(&first.user_key);
 
     // No time is allowed to pass: two ceremonies in one consensus round agree on every
     // field that describes them, and it is the id that keeps them apart.
@@ -116,7 +124,7 @@ fn should_replace_the_session_of_a_browser_signing_in_again() -> Result<(), Reje
         &env,
         canister_id,
         principal_1(),
-        session_request(identity_number),
+        session_request_from(identity_number, &browser.successor()),
     )?
     .unwrap();
 
@@ -340,15 +348,16 @@ fn should_not_reuse_a_session_across_a_consent_change() -> Result<(), RejectResp
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
 
+    let browser = BrowserKey::new(1);
     let full_access = prepare_account_session(
         &env,
         canister_id,
         principal_1(),
-        session_request(identity_number),
+        session_request_from(identity_number, &browser),
     )?
     .unwrap();
 
-    let mut downgraded = session_request(identity_number);
+    let mut downgraded = session_request_from(identity_number, &browser.successor());
     downgraded.permissions = Some(Permissions::Queries);
     let read_only = prepare_account_session(&env, canister_id, principal_1(), downgraded)?.unwrap();
 
