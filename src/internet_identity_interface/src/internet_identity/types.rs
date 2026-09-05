@@ -16,6 +16,10 @@ pub type ApplicationNumber = u64;
 pub type Timestamp = u64; // in nanos since epoch
 /// Per-anchor label for one browser, so a browser's sessions can be revoked together.
 pub type SessionDeviceId = u32;
+/// Names one session for as long as the canister runs. Allocated from a single
+/// counter, so no two sessions ever share one, and a revoked session's id is never
+/// handed out again.
+pub type SessionId = u64;
 pub type Signature = ByteBuf;
 pub type DeviceConfirmationCode = String;
 pub type FailedAttemptsCounter = u8;
@@ -789,9 +793,14 @@ pub struct PrepareAccountSessionRequest {
 pub struct PrepareAccountSessionResponse {
     pub user_key: UserKey,
     pub expiration: Timestamp,
-    pub created_at: Timestamp,
+    /// Names the session this ceremony created, and is what `get_account_session` is
+    /// given to collect the delegation signed for it. Not a credential: it names a
+    /// session, it does not authorise one, and the caller has just proved it owns this
+    /// one anyway.
+    pub session_id: SessionId,
     /// Which browser this sign-in was attributed to, so the settings list can mark the one
-    /// the user is looking at. Not a credential: a caller never presents it.
+    /// the user is looking at, and so the browser knows which registration its key now
+    /// belongs to. Not a credential: a caller never presents it.
     pub device_id: SessionDeviceId,
     /// The principal apps see for this account. The caller is the anchor that owns it
     /// and can mint a delegation for it at any time, so this reveals nothing new; it
@@ -806,8 +815,9 @@ pub struct GetAccountSessionRequest {
     pub account_number: Option<AccountNumber>,
     pub session_key: SessionKey,
     pub expiration: Timestamp,
-    pub device_id: SessionDeviceId,
-    pub created_at: Timestamp,
+    /// The session `prepare_account_session` created, named exactly rather than
+    /// searched for.
+    pub session_id: SessionId,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
