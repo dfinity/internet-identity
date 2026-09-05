@@ -4365,7 +4365,7 @@ mod session_record_tests {
     /// what the tests about the absolute bound want.
     const NEVER_IDLE: u64 = u64::MAX;
 
-    fn session(created_at_ns: u64, valid_till_ns: u64) -> SessionRecord {
+    fn session(session_id: u64, created_at_ns: u64, valid_till_ns: u64) -> SessionRecord {
         SessionRecord {
             created_at_ns,
             valid_till_ns,
@@ -4373,6 +4373,7 @@ mod session_record_tests {
             last_refreshed_ns: None,
             device_id: 1,
             read_only: false,
+            session_id,
         }
     }
 
@@ -4401,14 +4402,16 @@ mod session_record_tests {
                     last_refreshed_ns: Some(44),
                     device_id: 55,
                     read_only: false,
+                    session_id: 66,
                 },
                 SessionRecord {
-                    created_at_ns: 66,
-                    valid_till_ns: 77,
-                    max_idle_ns: 88,
+                    created_at_ns: 77,
+                    valid_till_ns: 88,
+                    max_idle_ns: 99,
                     last_refreshed_ns: None,
-                    device_id: 99,
+                    device_id: 111,
                     read_only: true,
+                    session_id: 122,
                 },
             ],
         };
@@ -4422,7 +4425,7 @@ mod session_record_tests {
 
     #[test]
     fn a_bound_further_out_than_the_session_never_bites() {
-        let record = session(0, DAY_NS);
+        let record = session(1, 0, DAY_NS);
 
         assert!(!record.is_over(0));
         // Past its own lifetime, so over on the other bound — which is the point:
@@ -4435,7 +4438,7 @@ mod session_record_tests {
         let record = SessionRecord {
             max_idle_ns: 30 * MINUTE_NS,
             last_refreshed_ns: Some(10 * MINUTE_NS),
-            ..session(0, DAY_NS)
+            ..session(1, 0, DAY_NS)
         };
 
         assert!(!record.is_over(39 * MINUTE_NS));
@@ -4448,7 +4451,7 @@ mod session_record_tests {
         let record = SessionRecord {
             max_idle_ns: 30 * MINUTE_NS,
             last_refreshed_ns: None,
-            ..session(5 * MINUTE_NS, DAY_NS)
+            ..session(1, 5 * MINUTE_NS, DAY_NS)
         };
 
         // Otherwise a session abandoned straight after sign-in would sit unbounded
@@ -4497,7 +4500,7 @@ mod session_record_tests {
                 vec![AccountReference {
                     account_number: None,
                     last_used: Some(1),
-                    sessions: vec![session(0, u64::MAX)],
+                    sessions: vec![session(1, 0, u64::MAX)],
                 }],
                 None,
                 None,
@@ -4530,7 +4533,7 @@ mod session_record_tests {
                     vec![AccountReference {
                         account_number: None,
                         last_used: Some(last_used),
-                        sessions: vec![session(1, u64::MAX)],
+                        sessions: vec![session(1, 1, u64::MAX)],
                     }],
                     None,
                     None,
@@ -4565,11 +4568,11 @@ mod session_record_tests {
         let idle = SessionRecord {
             max_idle_ns: DAY_NS,
             last_refreshed_ns: Some(now - 10 * DAY_NS),
-            ..session(now - 20 * DAY_NS, now + DAY_NS)
+            ..session(1, now - 20 * DAY_NS, now + DAY_NS)
         };
         let live = SessionRecord {
             last_refreshed_ns: Some(now - 1),
-            ..session(now - 20 * DAY_NS, now + DAY_NS)
+            ..session(2, now - 20 * DAY_NS, now + DAY_NS)
         };
 
         // Both are inside their lifetime, so ranking on that alone would have them
@@ -4580,13 +4583,13 @@ mod session_record_tests {
     #[test]
     fn reclaim_order_ranks_dead_sessions_first() {
         let now = 1_000;
-        let expired = session(1, 500);
+        let expired = session(1, 1, 500);
         let live = SessionRecord {
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(900),
-            ..session(400, 10_000)
+            ..session(2, 400, 10_000)
         };
-        let live_untouched = session(400, 10_000);
+        let live_untouched = session(3, 400, 10_000);
 
         assert!(expired.reclaim_order(now) < live.reclaim_order(now));
         assert!(expired.reclaim_order(now) < live_untouched.reclaim_order(now));
@@ -4598,14 +4601,14 @@ mod session_record_tests {
         let held = SessionRecord {
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - DAY_NS),
-            ..session(now - 20 * DAY_NS, now + DAY_NS)
+            ..session(501, now - 20 * DAY_NS, now + DAY_NS)
         };
         // Created after the session it would have to outrank, which under a plain recency
         // order would protect it.
         let flood: Vec<SessionRecord> = (0..500)
             .map(|index| SessionRecord {
                 device_id: index,
-                ..session(now - 1, now + DAY_NS)
+                ..session(index as u64 + 1, now - 1, now + DAY_NS)
             })
             .collect();
 
@@ -4621,13 +4624,13 @@ mod session_record_tests {
         let weekly = SessionRecord {
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - 3 * DAY_NS),
-            ..session(now - 90 * DAY_NS, now + DAY_NS)
+            ..session(1, now - 90 * DAY_NS, now + DAY_NS)
         };
         // Signed in yesterday, used for five minutes, never opened again.
         let one_sitting = SessionRecord {
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - DAY_NS + 5 * MINUTE_NS),
-            ..session(now - DAY_NS, now + DAY_NS)
+            ..session(2, now - DAY_NS, now + DAY_NS)
         };
 
         assert!(
@@ -4880,6 +4883,7 @@ mod session_creation_tests {
                 last_refreshed_ns: Some(500_000 + device_id as u64),
                 device_id,
                 read_only: false,
+                session_id: device_id as u64,
             })
             .map(|mut session| {
                 if session.device_id == 1 {
@@ -4977,9 +4981,12 @@ mod session_creation_tests {
         // Two rows of this size put the identity two over the watermark, so the pass selects
         // exactly two victims — one in each row.
         const PER_ROW: u32 = SESSIONS_WATERMARK_PER_ANCHOR / 2 + 1;
-        let row = |expired_device: u32| -> Vec<AccountReference> {
+        // The browser ids repeat across the rows; the session ids do not, because no two
+        // sessions ever share one.
+        let row = |id_base: u64, expired_device: u32| -> Vec<AccountReference> {
             let sessions = (0..PER_ROW)
                 .map(|device_id| {
+                    let session_id = id_base + device_id as u64;
                     if device_id == expired_device {
                         SessionRecord {
                             created_at_ns: 1,
@@ -4988,6 +4995,7 @@ mod session_creation_tests {
                             last_refreshed_ns: None,
                             device_id,
                             read_only: false,
+                            session_id,
                         }
                     } else {
                         SessionRecord {
@@ -4997,6 +5005,7 @@ mod session_creation_tests {
                             last_refreshed_ns: Some(500_000),
                             device_id,
                             read_only: false,
+                            session_id,
                         }
                     }
                 })
@@ -5015,10 +5024,10 @@ mod session_creation_tests {
             .lookup_or_insert_application_number_with_origin(&OTHER_ORIGIN.to_string())
             .unwrap();
         storage
-            .write_account_state(anchor_number, first, row(0), None, None)
+            .write_account_state(anchor_number, first, row(1_000, 0), None, None)
             .unwrap();
         storage
-            .write_account_state(anchor_number, second, row(1), None, None)
+            .write_account_state(anchor_number, second, row(2_000, 1), None, None)
             .unwrap();
 
         let mut anchor = storage.read(anchor_number).unwrap();
@@ -5077,6 +5086,7 @@ mod session_creation_tests {
             last_refreshed_ns: Some(400_000),
             device_id: 1,
             read_only: false,
+            session_id: 1,
         }];
         sessions.extend(
             (2..=MAX_SESSIONS_PER_ANCHOR).map(|device_id| SessionRecord {
@@ -5086,6 +5096,7 @@ mod session_creation_tests {
                 last_refreshed_ns: None,
                 device_id,
                 read_only: false,
+                session_id: device_id as u64,
             }),
         );
         storage
@@ -5154,42 +5165,33 @@ mod session_creation_tests {
         assert!(result.is_err());
     }
 
+    /// The hazard the session id exists for: `time()` is constant across a consensus
+    /// round, so two records created in one round agree on every field that describes
+    /// them. If identity came from those fields, the second would sign as the first —
+    /// and a chain issued against a session that has since been replaced would verify
+    /// again.
     #[test]
-    fn an_expired_same_round_record_is_pruned_rather_than_colliding() {
+    fn a_session_replaced_in_the_same_round_does_not_inherit_its_identity() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        let application_number = storage
-            .lookup_or_insert_application_number_with_origin(&ORIGIN.to_string())
-            .unwrap();
-        storage
-            .write_account_state(
-                anchor_number,
-                application_number,
-                vec![AccountReference {
-                    account_number: None,
-                    last_used: Some(1),
-                    sessions: vec![SessionRecord {
-                        created_at_ns: 1_000,
-                        // Already expired at `now`, so it is not reused, but it is still
-                        // present when the seed for the new record is derived.
-                        valid_till_ns: 1_000,
-                        max_idle_ns: u64::MAX,
-                        last_refreshed_ns: None,
-                        device_id: 1,
-                        read_only: false,
-                    }],
-                }],
-                None,
-                None,
-            )
-            .unwrap();
+        let same_round = |device_id| CreateSessionParams {
+            anchor_number,
+            origin: ORIGIN.to_string(),
+            account_number: None,
+            device_id,
+            valid_till_ns: 10_000,
+            max_idle_ns: None,
+            read_only: false,
+            now_ns: 1_000,
+        };
 
-        // Pruning removes the expired record, so the guard does not fire here; the
-        // reachable shape is a live record the reuse step declined, which cannot happen.
-        let created = storage
-            .create_session(params(anchor_number, 1, 1_000))
-            .unwrap()
-            .1;
-        assert_eq!(created.created_at_ns, 1_000);
+        let first = storage.create_session(same_round(1)).unwrap().1;
+        let replacement = storage.create_session(same_round(1)).unwrap().1;
+        let sibling = storage.create_session(same_round(2)).unwrap().1;
+
+        assert_eq!(first.created_at_ns, replacement.created_at_ns);
+        assert_eq!(first.device_id, replacement.device_id);
+        assert_ne!(first.session_id, replacement.session_id);
+        assert_ne!(replacement.session_id, sibling.session_id);
     }
 
     /// Creating twice from one browser at one account replaces, so there is never a second
@@ -5218,7 +5220,7 @@ mod session_creation_tests {
     }
 
     #[test]
-    fn the_session_seed_binds_the_account_and_every_immutable_field() {
+    fn the_session_seed_binds_the_account_and_the_session_id() {
         use crate::storage::account::Account;
 
         let account = Account::new(10_000, ORIGIN.to_string(), None, None);
@@ -5226,27 +5228,23 @@ mod session_creation_tests {
         let other_account = Account::new(10_001, ORIGIN.to_string(), None, None);
         let other_seed = other_account.calculate_seed_with_salt(&SALT);
 
-        let base = calculate_session_seed_with_salt(&SALT, &account_seed, 1_000, 1);
+        let base = calculate_session_seed_with_salt(&SALT, &account_seed, 1);
 
         assert_ne!(
             base,
-            calculate_session_seed_with_salt(&SALT, &other_seed, 1_000, 1)
+            calculate_session_seed_with_salt(&SALT, &other_seed, 1)
         );
         assert_ne!(
             base,
-            calculate_session_seed_with_salt(&SALT, &account_seed, 1_001, 1)
+            calculate_session_seed_with_salt(&SALT, &account_seed, 2)
         );
         assert_ne!(
             base,
-            calculate_session_seed_with_salt(&SALT, &account_seed, 1_000, 2)
-        );
-        assert_ne!(
-            base,
-            calculate_session_seed_with_salt(&[18u8; 32], &account_seed, 1_000, 1)
+            calculate_session_seed_with_salt(&[18u8; 32], &account_seed, 1)
         );
         assert_eq!(
             base,
-            calculate_session_seed_with_salt(&SALT, &account_seed, 1_000, 1)
+            calculate_session_seed_with_salt(&SALT, &account_seed, 1)
         );
     }
 
@@ -5256,7 +5254,7 @@ mod session_creation_tests {
 
         let account = Account::new(10_000, ORIGIN.to_string(), None, None);
         let account_seed = account.calculate_seed_with_salt(&SALT);
-        let session_seed = calculate_session_seed_with_salt(&SALT, &account_seed, 1_000, 1);
+        let session_seed = calculate_session_seed_with_salt(&SALT, &account_seed, 1);
 
         assert_ne!(account_seed, session_seed);
     }
@@ -5267,12 +5265,8 @@ mod session_creation_tests {
         use crate::storage::account::Account;
 
         let default = Account::new(10_000, ORIGIN.to_string(), None, None);
-        let before = calculate_session_seed_with_salt(
-            &SALT,
-            &default.calculate_seed_with_salt(&SALT),
-            1_000,
-            1,
-        );
+        let before =
+            calculate_session_seed_with_salt(&SALT, &default.calculate_seed_with_salt(&SALT), 1);
 
         let named = Account::new_full(
             10_000,
@@ -5282,12 +5276,8 @@ mod session_creation_tests {
             None,
             Some(10_000),
         );
-        let after = calculate_session_seed_with_salt(
-            &SALT,
-            &named.calculate_seed_with_salt(&SALT),
-            1_000,
-            1,
-        );
+        let after =
+            calculate_session_seed_with_salt(&SALT, &named.calculate_seed_with_salt(&SALT), 1);
 
         assert_eq!(before, after);
     }
