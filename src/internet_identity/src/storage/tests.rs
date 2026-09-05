@@ -4883,6 +4883,55 @@ mod session_creation_tests {
         }
     }
 
+    /// A row that predates the principal index, which is every row an existing user has:
+    /// the index is written only where a row's set of account numbers changes, and by the
+    /// backfill sweep. Emptied here to stand in for a row the sweep has not reached.
+    fn forget_account_principals(storage: &mut Storage<VectorMemory>) {
+        let principals: Vec<_> = storage
+            .lookup_account_with_principal_memory
+            .iter()
+            .map(|(principal, _)| principal)
+            .collect();
+        for principal in principals {
+            storage
+                .lookup_account_with_principal_memory
+                .remove(&principal);
+        }
+    }
+
+    /// Creating a session indexes its own account, rather than waiting for the sweep to.
+    /// A session handle names its account by principal, so a handle whose account is not
+    /// indexed resolves to nothing — which would be every returning user, for as long as
+    /// the backfill takes, presenting as "sign in again".
+    #[test]
+    fn creating_a_session_indexes_the_account_it_belongs_to() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        storage
+            .create_session(params(anchor_number, 1, 1_000))
+            .unwrap();
+        forget_account_principals(&mut storage);
+
+        storage
+            .create_session(params(anchor_number, 2, 2_000))
+            .unwrap();
+
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        assert_eq!(
+            storage
+                .lookup_account_with_principal_memory
+                .iter()
+                .map(|(_, stored)| (
+                    stored.anchor_number,
+                    stored.application_number,
+                    stored.account_number
+                ))
+                .collect::<Vec<_>>(),
+            vec![(anchor_number, application_number, None)]
+        );
+    }
+
     fn sessions_of(
         storage: &Storage<VectorMemory>,
         anchor_number: AnchorNumber,

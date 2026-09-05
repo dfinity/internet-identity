@@ -1964,6 +1964,23 @@ impl<M: Memory + Clone> Storage<M> {
             self.session_principal(anchor_number, application_number, account_number, &session),
             self.account_principal_of(anchor_number, application_number, account_number),
         ) {
+            // The account's own entry goes in alongside the session's. A handle names its
+            // account by principal, and resolving that principal is a second index lookup —
+            // one whose entry is written only when a row's set of account numbers changes,
+            // or by the backfill sweep. Creating a session changes neither, so a session at
+            // a row that predates the index would resolve to nothing until the sweep
+            // happened to reach it, which is every returning user of an app they have used
+            // before, for as long as the sweep takes.
+            //
+            // Writing the same value the sweep would write, so the two cannot disagree.
+            self.lookup_account_with_principal_memory.insert(
+                account_principal,
+                StorableAccountKey {
+                    anchor_number,
+                    application_number,
+                    account_number,
+                },
+            );
             self.lookup_session_with_principal_memory.insert(
                 principal,
                 StorableSessionHandle {
