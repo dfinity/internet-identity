@@ -365,8 +365,7 @@ const createSession = async (
         origin: effectiveOrigin,
         account_number: accountNumber !== undefined ? [accountNumber] : [],
         session_key: iiPublicKey,
-        device_id: prepared.device_id,
-        created_at: prepared.created_at,
+        session_id: prepared.session_id,
         expiration: prepared.expiration,
       })
       .then(throwCanisterError),
@@ -391,7 +390,7 @@ const createSession = async (
     keyPair: iiKey.getKeyPair(),
     chainJson: JSON.stringify(canisterChain.toJSON()),
     expiresAtMillis: Number(prepared.expiration / BigInt(1_000_000)),
-    createdAtNanos: prepared.created_at,
+    sessionId: prepared.session_id,
     accessLevel: authorized.accessLevel,
   };
   // The mapping is not a credential and is kept either way, so a later hint still names
