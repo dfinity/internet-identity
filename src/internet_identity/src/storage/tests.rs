@@ -5386,10 +5386,10 @@ mod session_creation_tests {
         assert_eq!(storage.read(anchor_number).unwrap().session_count, 0);
     }
 
-    /// Row eviction leaves the account's principal untouched, so the same origin comes back
+    /// List eviction leaves the account's principal untouched, so the same origin comes back
     /// at the same account. Its sessions must not.
     #[test]
-    fn evicting_a_row_removes_its_sessions_index_entries() {
+    fn evicting_a_list_removes_its_sessions_index_entries() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let session = storage
             .create_session(params(anchor_number, 7, 1_000))
