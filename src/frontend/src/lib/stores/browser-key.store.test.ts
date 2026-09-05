@@ -1,7 +1,26 @@
 import "fake-indexeddb/auto";
-import { beforeEach, describe, expect, it } from "vitest";
-import { clear, createStore } from "idb-keyval";
-import { currentDeviceId, withBrowserProof } from "./browser-key.store";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { clear, createStore, set as idbSet } from "idb-keyval";
+
+/** Lets one test refuse a write, which is the only way the store ends up holding a key
+ *  without the successor it announced. */
+const storage = vi.hoisted(() => ({ writesFail: false }));
+
+vi.mock("idb-keyval", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("idb-keyval")>();
+  return {
+    ...actual,
+    set: (...args: Parameters<typeof actual.set>) =>
+      storage.writesFail
+        ? Promise.reject(new Error("quota exceeded"))
+        : actual.set(...args),
+  };
+});
+import {
+  currentDeviceId,
+  StaleBrowserKeyError,
+  withBrowserProof,
+} from "./browser-key.store";
 
 /// Names the same store the module under test writes to, so a test can wipe it.
 const BROWSER_KEY_STORE = createStore("ii-browser-keys", "keys");
@@ -89,6 +108,7 @@ const withoutLockApi = (): void => {
 
 describe("browser key", () => {
   beforeEach(async () => {
+    storage.writesFail = false;
     await clear(BROWSER_KEY_STORE);
     withoutLockApi();
   });
@@ -135,7 +155,80 @@ describe("browser key", () => {
     const second = await attempt(IDENTITY, 2);
 
     expect(second.publicKey).toEqual(first.publicKey);
-    expect(second.nextPublicKey).not.toEqual(first.nextPublicKey);
+  });
+
+  /// The canister may have accepted the sign-in and never told us, and from then on the
+  /// announced successor is the only key that reaches our entry. Announcing a fresh one
+  /// instead would leave the entry waiting for a key nobody holds.
+  it("re-announces the successor it already announced", async () => {
+    const first = await attempt(IDENTITY, 1);
+
+    const second = await attempt(IDENTITY, 2);
+
+    expect(second.nextPublicKey).toEqual(first.nextPublicKey);
+  });
+
+  it("promotes the announced successor when the canister calls the key stale", async () => {
+    const first = await attempt(IDENTITY, 1);
+
+    let seen = 0;
+    const proof = await withBrowserProof(
+      IDENTITY,
+      sessionKey(2),
+      (attempted) => {
+        seen += 1;
+        if (seen === 1) {
+          return Promise.reject(new StaleBrowserKeyError());
+        }
+        return Promise.resolve(attempted);
+      },
+    );
+
+    expect(seen).toBe(2);
+    expect(proof.publicKey).toEqual(first.nextPublicKey);
+  });
+
+  /// Reachable because a write is allowed to fail silently: a browser that could not keep
+  /// the successor it announced holds nothing the canister's entry is waiting for. A second
+  /// row in the user's list beats a browser that can never sign in again.
+  it("starts over when a stale key has no successor to promote", async () => {
+    const orphaned = await crypto.subtle.generateKey(
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["sign", "verify"],
+    );
+    await idbSet(IDENTITY.toString(), { keyPair: orphaned }, BROWSER_KEY_STORE);
+    const stranded = new Uint8Array(
+      await crypto.subtle.exportKey("spki", orphaned.publicKey),
+    );
+    storage.writesFail = true;
+
+    let seen = 0;
+    const proof = await withBrowserProof(
+      IDENTITY,
+      sessionKey(1),
+      (attempted) => {
+        seen += 1;
+        return seen === 1
+          ? Promise.reject(new StaleBrowserKeyError())
+          : Promise.resolve(attempted);
+      },
+    );
+
+    expect(seen).toBe(2);
+    expect(proof.publicKey).not.toEqual(stranded);
+  });
+
+  it("does not retry a failure that is not a stale key", async () => {
+    let seen = 0;
+
+    await expect(
+      withBrowserProof(IDENTITY, sessionKey(1), () => {
+        seen += 1;
+        return Promise.reject(new Error("network"));
+      }),
+    ).rejects.toThrow("network");
+    expect(seen).toBe(1);
   });
 
   it("holds a separate key per identity", async () => {
