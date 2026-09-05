@@ -11,6 +11,7 @@ use crate::delegation::{
 use crate::sessions::device_key::verify_device_keys;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
 use crate::storage::account::{AccountKey, SessionRecord, SessionRecordKey};
+use crate::storage::anchor::SessionDeviceError;
 use crate::storage::{CreateSessionParams, StorageError};
 use crate::{update_root_hash, DAY_NS, MINUTE_NS};
 use candid::Principal;
@@ -129,7 +130,12 @@ pub async fn prepare_account_session(
     });
     let (device_id, dropped_devices) = anchor
         .resolve_session_device(current_device_key, next_device_key, device_name, now)
-        .map_err(|_| AccountSessionError::InvalidDeviceKey)?;
+        .map_err(|error| match error {
+            // Told apart from the rest because the browser can act on it: it is the only
+            // party holding the successor that does resolve.
+            SessionDeviceError::StaleDeviceKey => AccountSessionError::StaleDeviceKey,
+            _ => AccountSessionError::InvalidDeviceKey,
+        })?;
     storage_borrow_mut(|storage| storage.write(anchor))
         .expect("failed to write the anchor while registering a browser");
 
