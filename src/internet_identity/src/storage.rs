@@ -1752,7 +1752,8 @@ impl<M: Memory + Clone> Storage<M> {
             }
         }
         if removed > 0 {
-            self.change_session_count(anchor_number, removed as usize, 0)?;
+            self.change_session_count(anchor_number, removed as usize, 0)
+                .expect("failed to move the session count of an anchor that was just read");
         }
 
         Ok(removed)
@@ -1787,6 +1788,12 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Moves the count without considering the cap, for the paths that only remove.
+    ///
+    /// Traps rather than reporting, at every caller. It runs after the row writes it
+    /// describes, and on the IC an `Err` commits those — so reporting a failure here
+    /// would leave the stored sessions and the count that gates sign-in permanently
+    /// disagreeing, while telling the caller nothing happened. A trap rolls the whole
+    /// message back.
     fn change_session_count(
         &mut self,
         anchor_number: AnchorNumber,
@@ -1989,7 +1996,8 @@ impl<M: Memory + Clone> Storage<M> {
                 },
             );
         }
-        self.change_session_count(anchor_number, dropped.len(), 1)?;
+        self.change_session_count(anchor_number, dropped.len(), 1)
+            .expect("failed to move the session count of an anchor that was just read");
 
         let key = SessionRecordKey {
             anchor_number,
@@ -2077,9 +2085,9 @@ impl<M: Memory + Clone> Storage<M> {
             );
         }
 
-        // Counters first, for the reason `write_account_state` does it: it is the
-        // only fallible step left, and an error after the removes would commit them
-        // without it.
+        // Counters first, for the reason `write_account_state` does it: it is the only
+        // step left that can *report* a failure, and an error after the removes would
+        // commit them without it. What follows either cannot fail or traps.
         self.apply_reference_counter_deltas(
             anchor_number,
             application_number,
@@ -2087,7 +2095,8 @@ impl<M: Memory + Clone> Storage<M> {
             ReferenceListDeltas::removing(&previous),
         )?;
         if dropped > 0 {
-            self.change_session_count(anchor_number, dropped, 0)?;
+            self.change_session_count(anchor_number, dropped, 0)
+                .expect("failed to move the session count of an anchor that was just read");
         }
 
         self.sync_account_principal_index(
