@@ -2231,7 +2231,7 @@ mod reference_list_write_path_tests {
         // Refused before anything was written: the list still holds both references.
         let references = storage
             .account_references(anchor_number, application_number)
-            .expect("the row written above is gone");
+            .expect("the list written above is gone");
         assert_eq!(references.len(), 2);
     }
 
@@ -2503,7 +2503,8 @@ mod reference_list_write_path_tests {
     }
 }
 
-/// A `(anchor, application)` row can be absent, empty, or hold references, and those
+/// A `(anchor, application)` account reference list can be absent, empty, or hold
+/// account references, and those
 /// mean three different things. Absence says a default account is still
 /// reconstructible; emptiness is a tombstone and says it never can be again.
 mod account_reference_state_tests {
@@ -2527,7 +2528,7 @@ mod account_reference_state_tests {
         (storage, anchor_number)
     }
 
-    /// Plants the row a future account move would leave behind. The write path cannot
+    /// Plants the list a future account move would leave behind. The write path cannot
     /// store one, which is the whole point, so a test that
     /// needs a tombstone has to write it directly.
     fn plant_tombstone(storage: &mut Storage<VectorMemory>, anchor_number: AnchorNumber) {
@@ -2718,7 +2719,7 @@ mod account_reference_state_tests {
             .unwrap();
         let references = storage
             .account_references(anchor_number, application_number)
-            .expect("naming the default should not have emptied the row");
+            .expect("naming the default should not have emptied the list");
         // Repointed where it stood, keeping the order accounts are listed in and the
         // timestamp the reference already carried.
         assert_eq!(
@@ -2755,8 +2756,8 @@ mod account_reference_state_tests {
             .account_references(anchor_number, application_number)
             .unwrap();
 
-        // A skipped write is invisible in the stored bytes, since rewriting the row
-        // would store what it already holds. Retiring the application row makes it
+        // A skipped write is invisible in the stored bytes, since rewriting the list
+        // would store what it already holds. Retiring the application makes it
         // visible: `write_reference_list` refuses without one, so a rename that still
         // went through it could not succeed here.
         storage
@@ -2797,9 +2798,9 @@ mod account_reference_state_tests {
             })
             .unwrap();
         let account_number = account.account_number.unwrap();
-        // The other identity has a row of its own at this origin, so what refuses the
-        // attempts below is the row not naming this account rather than there being no
-        // row to look in.
+        // The other identity has a list of its own at this origin, so what refuses the
+        // attempts below is the list not naming this account rather than there being no
+        // list to look in.
         storage
             .create_additional_account(CreateAccountParams {
                 anchor_number: other,
