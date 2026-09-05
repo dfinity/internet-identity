@@ -5350,6 +5350,21 @@ mod session_creation_tests {
         );
     }
 
+    /// The principal the index knows this session by. Read out of the index rather than
+    /// re-derived, so a test asserting the entry is gone is asserting about the entry
+    /// that was really there.
+    fn indexed_principal_of(
+        storage: &Storage<VectorMemory>,
+        session: &crate::storage::account::SessionRecord,
+    ) -> candid::Principal {
+        storage
+            .lookup_session_with_principal_memory
+            .iter()
+            .find(|(_, handle)| handle.session_id == session.session_id)
+            .map(|(principal, _)| principal)
+            .expect("the session should be indexed")
+    }
+
     /// A browser keeps its id across sign-ins, so an index entry left behind by a removal
     /// would be waiting for whatever that browser creates next.
     #[test]
@@ -5359,12 +5374,7 @@ mod session_creation_tests {
             .create_session(params(anchor_number, 7, 1_000))
             .unwrap()
             .1;
-        let application_number = storage
-            .lookup_application_number_with_origin(&ORIGIN.to_string())
-            .unwrap();
-        let principal = storage
-            .session_principal(anchor_number, application_number, None, &session)
-            .unwrap();
+        let principal = indexed_principal_of(&storage, &session);
         assert!(storage.lookup_session_with_principal(principal).is_some());
 
         storage.revoke_device_sessions(anchor_number, 7).unwrap();
@@ -5388,9 +5398,7 @@ mod session_creation_tests {
         let application_number = storage
             .lookup_application_number_with_origin(&ORIGIN.to_string())
             .unwrap();
-        let principal = storage
-            .session_principal(anchor_number, application_number, None, &session)
-            .unwrap();
+        let principal = indexed_principal_of(&storage, &session);
 
         storage
             .remove_reference_list(anchor_number, application_number)
@@ -5821,12 +5829,12 @@ mod session_refresh_stamp_tests {
                 now_ns: 1_000,
             })
             .unwrap();
-        let application_number = storage
-            .lookup_application_number_with_origin(&ORIGIN.to_string())
-            .unwrap();
         let dead_principal = storage
-            .session_principal(anchor_number, application_number, None, &dead)
-            .unwrap();
+            .lookup_session_with_principal_memory
+            .iter()
+            .find(|(_, handle)| handle.session_id == dead.session_id)
+            .map(|(principal, _)| principal)
+            .expect("the session should be indexed");
         assert!(storage
             .lookup_session_with_principal(dead_principal)
             .is_some());
