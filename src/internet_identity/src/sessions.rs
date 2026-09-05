@@ -183,7 +183,7 @@ pub async fn prepare_account_session(
     Ok(PrepareAccountSessionResponse {
         user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
         expiration: session.valid_till_ns,
-        created_at: session.created_at_ns,
+        session_id: session.session_id,
         device_id,
         account_principal,
     })
@@ -198,24 +198,22 @@ pub fn get_account_session(
         account_number,
         session_key,
         expiration,
-        device_id,
-        created_at,
+        session_id,
     } = request;
 
     check_authorization(identity_number)?;
     check_frontend_length(&origin);
 
-    // `prepare_account_session` handed the browser back both halves of this key, so the
-    // session is named exactly rather than searched for. A key naming a session that was
-    // replaced since finds nothing, which is the honest answer: the delegation this call
-    // is collecting was signed for the session that is gone.
+    // `prepare_account_session` handed the browser this id, so the session is named
+    // exactly rather than searched for. An id naming a session that was replaced since
+    // finds nothing, which is the honest answer: the delegation this call is collecting
+    // was signed for the session that is gone.
     let session = storage_borrow(|storage| {
         storage.read_session(&SessionRecordKey {
             anchor_number: identity_number,
             origin: origin.clone(),
             account_number,
-            device_id,
-            created_at,
+            session_id,
         })
     })
     .ok_or(AccountSessionError::NoSuchSession)?;
@@ -279,8 +277,7 @@ fn session_identity(
     let seed = calculate_session_seed_with_salt(
         &salt,
         &account.calculate_seed_with_salt(&salt),
-        session.created_at_ns,
-        session.device_id,
+        session.session_id,
     );
     Ok(seed)
 }

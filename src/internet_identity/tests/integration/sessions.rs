@@ -86,8 +86,7 @@ fn should_create_a_session_and_witness_its_delegation() -> Result<(), RejectResp
             account_number: None,
             session_key: ByteBuf::from(vec![1; 32]),
             expiration: prepared.expiration,
-            device_id: prepared.device_id,
-            created_at: prepared.created_at,
+            session_id: prepared.session_id,
         },
     )?
     .unwrap();

@@ -793,9 +793,14 @@ pub struct PrepareAccountSessionRequest {
 pub struct PrepareAccountSessionResponse {
     pub user_key: UserKey,
     pub expiration: Timestamp,
-    pub created_at: Timestamp,
+    /// Names the session this ceremony created, and is what `get_account_session` is
+    /// given to collect the delegation signed for it. Not a credential: it names a
+    /// session, it does not authorise one, and the caller has just proved it owns this
+    /// one anyway.
+    pub session_id: SessionId,
     /// Which browser this sign-in was attributed to, so the settings list can mark the one
-    /// the user is looking at. Not a credential: a caller never presents it.
+    /// the user is looking at, and so the browser knows which registration its key now
+    /// belongs to. Not a credential: a caller never presents it.
     pub device_id: SessionDeviceId,
     /// The principal apps see for this account. The caller is the anchor that owns it
     /// and can mint a delegation for it at any time, so this reveals nothing new; it
@@ -810,8 +815,9 @@ pub struct GetAccountSessionRequest {
     pub account_number: Option<AccountNumber>,
     pub session_key: SessionKey,
     pub expiration: Timestamp,
-    pub device_id: SessionDeviceId,
-    pub created_at: Timestamp,
+    /// The session `prepare_account_session` created, named exactly rather than
+    /// searched for.
+    pub session_id: SessionId,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
