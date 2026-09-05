@@ -404,6 +404,8 @@ export const idlFactory = ({ IDL }) => {
   const GetAccountSessionRequest = IDL.Record({
     'session_key' : SessionKey,
     'origin' : FrontendHostname,
+    'device_id' : IDL.Nat32,
+    'created_at' : Timestamp,
     'account_number' : IDL.Opt(AccountNumber),
     'expiration' : Timestamp,
     'identity_number' : UserNumber,

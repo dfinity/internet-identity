@@ -3942,7 +3942,7 @@ mod account_principal_index_tests {
     use super::record_use;
     use crate::delegation::canister_sig_principal;
     use crate::storage::account::{Account, AccountReference};
-    use crate::storage::storable::account_locator::StorableAccountLocator;
+    use crate::storage::storable::account_key::StorableAccountKey;
     use crate::storage::{canister_id, StorageError};
     use crate::Storage;
     use candid::Principal;
@@ -3983,7 +3983,7 @@ mod account_principal_index_tests {
             storage
                 .lookup_account_with_principal_memory
                 .get(&default_account_principal(anchor_number, &origin)),
-            Some(StorableAccountLocator {
+            Some(StorableAccountKey {
                 anchor_number,
                 application_number,
                 account_number: None,
@@ -4012,7 +4012,7 @@ mod account_principal_index_tests {
 
         assert_eq!(
             storage.lookup_account_with_principal_memory.get(&principal),
-            Some(StorableAccountLocator {
+            Some(StorableAccountKey {
                 anchor_number,
                 application_number,
                 account_number: materialized.account_number,
@@ -4040,7 +4040,7 @@ mod account_principal_index_tests {
             storage
                 .lookup_account_with_principal_memory
                 .get(&named_principal),
-            Some(StorableAccountLocator {
+            Some(StorableAccountKey {
                 anchor_number,
                 application_number,
                 account_number: named.account_number,
@@ -4199,7 +4199,7 @@ mod account_principal_index_tests {
         let other_anchor_number = anchor_number + 1;
         storage.lookup_account_with_principal_memory.insert(
             principal,
-            StorableAccountLocator {
+            StorableAccountKey {
                 anchor_number: other_anchor_number,
                 application_number,
                 account_number: None,
@@ -4225,16 +4225,13 @@ mod account_principal_index_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
         record_use(&mut storage, anchor_number, origin.clone(), None, 1_000).unwrap();
-        let application_number = storage
-            .lookup_application_number_with_origin(&origin)
-            .unwrap();
         let principal = default_account_principal(anchor_number, &origin);
 
-        let locator = storage.lookup_account_with_principal(principal).unwrap();
+        let key = storage.lookup_account_with_principal(principal).unwrap();
 
-        assert_eq!(locator.anchor_number, anchor_number);
-        assert_eq!(locator.application_number, application_number);
-        assert_eq!(locator.account_number, None);
+        assert_eq!(key.anchor_number, anchor_number);
+        assert_eq!(key.origin, origin);
+        assert_eq!(key.account_number, None);
     }
 
     #[test]
@@ -4700,7 +4697,8 @@ mod session_creation_tests {
                 valid_till_ns: DAY_NS,
                 ..params(anchor_number, 1, 0)
             })
-            .unwrap();
+            .unwrap()
+            .1;
 
         assert_eq!(session.max_idle_ns, asked);
     }
@@ -4715,7 +4713,8 @@ mod session_creation_tests {
                 valid_till_ns: DAY_NS,
                 ..params(anchor_number, 1, 0)
             })
-            .unwrap();
+            .unwrap()
+            .1;
 
         // An app delegation lasts five minutes, so a bound under that would end a
         // session between two mints of one that is plainly in use.
@@ -4732,7 +4731,8 @@ mod session_creation_tests {
                 valid_till_ns: DAY_NS,
                 ..params(anchor_number, 1, 0)
             })
-            .unwrap();
+            .unwrap()
+            .1;
 
         // A bound it could never reach says something about the session that is not
         // true, so it is stored as the life the session actually got.
@@ -4748,7 +4748,8 @@ mod session_creation_tests {
                 valid_till_ns: 30 * DAY_NS,
                 ..params(anchor_number, 1, 0)
             })
-            .unwrap();
+            .unwrap()
+            .1;
 
         // Every session gets a bound now. A week of nobody touching the application
         // ends the sign-in, well inside the thirty days it could otherwise live.
@@ -4768,7 +4769,8 @@ mod session_creation_tests {
                 max_idle_ns: Some(30 * MINUTE_NS),
                 ..params(anchor_number, 1, 0)
             })
-            .unwrap();
+            .unwrap()
+            .1;
 
         assert_eq!(session.max_idle_ns, MINUTE_NS);
     }
@@ -4779,7 +4781,8 @@ mod session_creation_tests {
 
         let session = storage
             .create_session(params(anchor_number, 1, 1_000))
-            .unwrap();
+            .unwrap()
+            .1;
 
         assert_eq!(session.created_at_ns, 1_000);
         assert_eq!(session.valid_till_ns, 11_000);
@@ -4795,11 +4798,13 @@ mod session_creation_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let first = storage
             .create_session(params(anchor_number, 1, 1_000))
-            .unwrap();
+            .unwrap()
+            .1;
 
         let again = storage
             .create_session(params(anchor_number, 1, 5_000))
-            .unwrap();
+            .unwrap()
+            .1;
 
         assert_ne!(again.created_at_ns, first.created_at_ns);
         assert_eq!(sessions_of(&storage, anchor_number).len(), 1);
@@ -5058,7 +5063,8 @@ mod session_creation_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let session = storage
             .create_session(params(anchor_number, 7, 1_000))
-            .unwrap();
+            .unwrap()
+            .1;
         let application_number = storage
             .lookup_application_number_with_origin(&ORIGIN.to_string())
             .unwrap();
@@ -5083,7 +5089,8 @@ mod session_creation_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let session = storage
             .create_session(params(anchor_number, 7, 1_000))
-            .unwrap();
+            .unwrap()
+            .1;
         let application_number = storage
             .lookup_application_number_with_origin(&ORIGIN.to_string())
             .unwrap();
@@ -5229,7 +5236,8 @@ mod session_creation_tests {
         // reachable shape is a live record the reuse step declined, which cannot happen.
         let created = storage
             .create_session(params(anchor_number, 1, 1_000))
-            .unwrap();
+            .unwrap()
+            .1;
         assert_eq!(created.created_at_ns, 1_000);
     }
 
@@ -5249,11 +5257,11 @@ mod session_creation_tests {
             now_ns: 1_000,
         };
 
-        let first = storage.create_session(params(false)).unwrap();
+        let first = storage.create_session(params(false)).unwrap().1;
         storage.create_session(params(false)).unwrap();
         assert_eq!(sessions_of(&storage, anchor_number).len(), 1);
 
-        let replaced = storage.create_session(params(true)).unwrap();
+        let replaced = storage.create_session(params(true)).unwrap().1;
         assert_ne!(replaced.read_only, first.read_only);
         assert_eq!(sessions_of(&storage, anchor_number).len(), 1);
     }
@@ -5371,6 +5379,7 @@ mod session_consent_change_tests {
                 now_ns: now,
             })
             .unwrap()
+            .1
             .created_at_ns
     }
 
@@ -5447,23 +5456,23 @@ mod session_consent_change_tests {
 
 mod session_refresh_stamp_tests {
     use super::held_references;
-    use crate::storage::account::{AccountReference, SessionRecord};
+    use crate::storage::account::{AccountReference, SessionRecord, SessionRecordKey};
     use crate::storage::CreateSessionParams;
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
-    use internet_identity_interface::internet_identity::types::{AnchorNumber, ApplicationNumber};
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
     use serde_bytes::ByteBuf;
 
     const ORIGIN: &str = "https://example.com";
 
-    fn storage_with_session() -> (Storage<VectorMemory>, AnchorNumber, ApplicationNumber, u64) {
+    fn storage_with_session() -> (Storage<VectorMemory>, AnchorNumber, SessionRecordKey) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         storage.update_salt([17u8; 32]);
         let anchor = storage.allocate_anchor(0).unwrap();
         let anchor_number = anchor.anchor_number();
         storage.write(anchor).unwrap();
-        let session = storage
+        let (key, _) = storage
             .create_session(CreateSessionParams {
                 anchor_number,
                 origin: ORIGIN.to_string(),
@@ -5475,15 +5484,7 @@ mod session_refresh_stamp_tests {
                 now_ns: 1_000,
             })
             .unwrap();
-        let application_number = storage
-            .lookup_application_number_with_origin(&ORIGIN.to_string())
-            .unwrap();
-        (
-            storage,
-            anchor_number,
-            application_number,
-            session.created_at_ns,
-        )
+        (storage, anchor_number, key)
     }
 
     fn reference(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> AccountReference {
@@ -5502,18 +5503,9 @@ mod session_refresh_stamp_tests {
 
     #[test]
     fn a_refresh_stamps_the_session_and_the_reference() {
-        let (mut storage, anchor_number, application_number, created_at) = storage_with_session();
+        let (mut storage, anchor_number, key) = storage_with_session();
 
-        let stamped = storage
-            .stamp_session_refresh(
-                anchor_number,
-                application_number,
-                None,
-                created_at,
-                1,
-                2_000,
-            )
-            .unwrap();
+        let stamped = storage.record_session_use(&key, 2_000).unwrap();
 
         assert!(stamped);
         assert_eq!(
@@ -5525,12 +5517,10 @@ mod session_refresh_stamp_tests {
 
     #[test]
     fn every_refresh_advances_the_stamp() {
-        let (mut storage, anchor_number, application_number, created_at) = storage_with_session();
+        let (mut storage, anchor_number, key) = storage_with_session();
 
         for now in [1_001, 1_002, 1_003] {
-            assert!(storage
-                .stamp_session_refresh(anchor_number, application_number, None, created_at, 1, now)
-                .unwrap());
+            assert!(storage.record_session_use(&key, now).unwrap());
             assert_eq!(
                 session_of(&storage, anchor_number).last_refreshed_ns,
                 Some(now)
@@ -5542,9 +5532,9 @@ mod session_refresh_stamp_tests {
     /// index entry and session count included, since nothing else will come for them.
     #[test]
     fn a_refresh_collects_the_dead_sessions_beside_it() {
-        let (mut storage, anchor_number, application_number, created_at) = storage_with_session();
+        let (mut storage, anchor_number, key) = storage_with_session();
 
-        let dead = storage
+        let (_, dead) = storage
             .create_session(CreateSessionParams {
                 anchor_number,
                 origin: ORIGIN.to_string(),
@@ -5556,6 +5546,9 @@ mod session_refresh_stamp_tests {
                 now_ns: 1_000,
             })
             .unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
         let dead_principal = storage
             .session_principal(anchor_number, application_number, None, &dead)
             .unwrap();
@@ -5564,16 +5557,7 @@ mod session_refresh_stamp_tests {
             .is_some());
         assert_eq!(storage.read(anchor_number).unwrap().session_count, 2);
 
-        assert!(storage
-            .stamp_session_refresh(
-                anchor_number,
-                application_number,
-                None,
-                created_at,
-                1,
-                2_000
-            )
-            .unwrap());
+        assert!(storage.record_session_use(&key, 2_000).unwrap());
 
         let sessions = reference(&storage, anchor_number).sessions;
         assert_eq!(sessions.len(), 1, "the expired sibling was left behind");
@@ -5589,10 +5573,19 @@ mod session_refresh_stamp_tests {
 
     #[test]
     fn a_stamp_for_a_session_that_is_gone_writes_nothing() {
-        let (mut storage, anchor_number, application_number, _) = storage_with_session();
+        let (mut storage, anchor_number, _key) = storage_with_session();
 
         let wrote = storage
-            .stamp_session_refresh(anchor_number, application_number, None, 9_999, 1, 5_000)
+            .record_session_use(
+                &SessionRecordKey {
+                    anchor_number,
+                    origin: ORIGIN.to_string(),
+                    account_number: None,
+                    device_id: 1,
+                    created_at: 9_999,
+                },
+                5_000,
+            )
             .unwrap();
 
         assert!(!wrote);
@@ -5600,7 +5593,7 @@ mod session_refresh_stamp_tests {
 
     #[test]
     fn stamping_leaves_a_second_device_alone() {
-        let (mut storage, anchor_number, application_number, created_at) = storage_with_session();
+        let (mut storage, anchor_number, key) = storage_with_session();
         storage
             .create_session(CreateSessionParams {
                 anchor_number,
@@ -5615,9 +5608,7 @@ mod session_refresh_stamp_tests {
             .unwrap();
         let now = 2_000;
 
-        storage
-            .stamp_session_refresh(anchor_number, application_number, None, created_at, 1, now)
-            .unwrap();
+        storage.record_session_use(&key, now).unwrap();
 
         let sessions = reference(&storage, anchor_number).sessions;
         assert_eq!(sessions.len(), 2);
@@ -5627,13 +5618,8 @@ mod session_refresh_stamp_tests {
         assert_eq!(untouched.last_refreshed_ns, None);
     }
 
-    fn storage_with_registered_device() -> (
-        Storage<VectorMemory>,
-        AnchorNumber,
-        ApplicationNumber,
-        u64,
-        u32,
-    ) {
+    fn storage_with_registered_device(
+    ) -> (Storage<VectorMemory>, AnchorNumber, SessionRecordKey, u32) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         storage.update_salt([17u8; 32]);
         let mut anchor = storage.allocate_anchor(0).unwrap();
@@ -5647,7 +5633,7 @@ mod session_refresh_stamp_tests {
             )
             .unwrap();
         storage.write(anchor).unwrap();
-        let session = storage
+        let (key, _) = storage
             .create_session(CreateSessionParams {
                 anchor_number,
                 origin: ORIGIN.to_string(),
@@ -5659,16 +5645,7 @@ mod session_refresh_stamp_tests {
                 now_ns: 1_000,
             })
             .unwrap();
-        let application_number = storage
-            .lookup_application_number_with_origin(&ORIGIN.to_string())
-            .unwrap();
-        (
-            storage,
-            anchor_number,
-            application_number,
-            session.created_at_ns,
-            device_id,
-        )
+        (storage, anchor_number, key, device_id)
     }
 
     fn device_last_used(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> u64 {
@@ -5677,38 +5654,18 @@ mod session_refresh_stamp_tests {
 
     #[test]
     fn a_refresh_advances_the_device_registry() {
-        let (mut storage, anchor_number, application_number, created_at, device_id) =
-            storage_with_registered_device();
+        let (mut storage, anchor_number, key, _device_id) = storage_with_registered_device();
 
-        storage
-            .stamp_session_refresh(
-                anchor_number,
-                application_number,
-                None,
-                created_at,
-                device_id,
-                9_000,
-            )
-            .unwrap();
+        storage.record_session_use(&key, 9_000).unwrap();
 
         assert_eq!(device_last_used(&storage, anchor_number), 9_000);
     }
 
     #[test]
     fn a_refresh_leaves_the_device_enrolment_timestamp_alone() {
-        let (mut storage, anchor_number, application_number, created_at, device_id) =
-            storage_with_registered_device();
+        let (mut storage, anchor_number, key, _device_id) = storage_with_registered_device();
 
-        storage
-            .stamp_session_refresh(
-                anchor_number,
-                application_number,
-                None,
-                created_at,
-                device_id,
-                9_000,
-            )
-            .unwrap();
+        storage.record_session_use(&key, 9_000).unwrap();
 
         let device = storage.read(anchor_number).unwrap().session_devices()[0].clone();
         assert_eq!(device.created_at, 1_000);
@@ -5717,18 +5674,9 @@ mod session_refresh_stamp_tests {
 
     #[test]
     fn a_refresh_for_a_device_the_anchor_never_registered_still_stamps_the_session() {
-        let (mut storage, anchor_number, application_number, created_at) = storage_with_session();
+        let (mut storage, anchor_number, key) = storage_with_session();
 
-        let stamped = storage
-            .stamp_session_refresh(
-                anchor_number,
-                application_number,
-                None,
-                created_at,
-                1,
-                9_000,
-            )
-            .unwrap();
+        let stamped = storage.record_session_use(&key, 9_000).unwrap();
 
         assert!(stamped);
         assert_eq!(
@@ -5740,6 +5688,7 @@ mod session_refresh_stamp_tests {
 
 mod session_removal_tests {
     use super::held_references;
+    use crate::storage::account::SessionRecordKey;
     use crate::storage::CreateSessionParams;
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
@@ -5790,10 +5739,16 @@ mod session_removal_tests {
 
     #[test]
     fn removing_a_session_leaves_the_others() {
-        let (mut storage, anchor_number, application_number) = storage_with_sessions(&[1, 2, 3]);
+        let (mut storage, anchor_number, _) = storage_with_sessions(&[1, 2, 3]);
 
         let removed = storage
-            .remove_session(anchor_number, application_number, None, 1_000, 2)
+            .revoke_session(&SessionRecordKey {
+                anchor_number,
+                origin: ORIGIN.to_string(),
+                account_number: None,
+                device_id: 2,
+                created_at: 1_000,
+            })
             .unwrap();
 
         assert!(removed);
@@ -5802,13 +5757,25 @@ mod session_removal_tests {
 
     #[test]
     fn removing_a_session_twice_reports_nothing_removed() {
-        let (mut storage, anchor_number, application_number) = storage_with_sessions(&[1]);
+        let (mut storage, anchor_number, _) = storage_with_sessions(&[1]);
         storage
-            .remove_session(anchor_number, application_number, None, 1_000, 1)
+            .revoke_session(&SessionRecordKey {
+                anchor_number,
+                origin: ORIGIN.to_string(),
+                account_number: None,
+                device_id: 1,
+                created_at: 1_000,
+            })
             .unwrap();
 
         let removed = storage
-            .remove_session(anchor_number, application_number, None, 1_000, 1)
+            .revoke_session(&SessionRecordKey {
+                anchor_number,
+                origin: ORIGIN.to_string(),
+                account_number: None,
+                device_id: 1,
+                created_at: 1_000,
+            })
             .unwrap();
 
         assert!(!removed);
@@ -5820,7 +5787,13 @@ mod session_removal_tests {
         let (mut storage, anchor_number, application_number) = storage_with_sessions(&[1]);
 
         storage
-            .remove_session(anchor_number, application_number, None, 1_000, 1)
+            .revoke_session(&SessionRecordKey {
+                anchor_number,
+                origin: ORIGIN.to_string(),
+                account_number: None,
+                device_id: 1,
+                created_at: 1_000,
+            })
             .unwrap();
 
         assert_ne!(
