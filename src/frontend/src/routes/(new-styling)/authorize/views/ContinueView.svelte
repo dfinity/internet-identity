@@ -18,11 +18,7 @@
     authenticationStore,
     isAuthenticatedStore,
   } from "$lib/stores/authentication.store";
-  import {
-    actorForIdentity,
-    purgeSession,
-  } from "$lib/stores/session-delegation.store";
-  import { purgeAppSessions } from "$lib/stores/app-session.store";
+  import { actorForIdentity, forgetIdentity } from "$lib/stores/session-delegation.store";
   import { throwCanisterError, isCanisterError } from "$lib/utils/utils";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
   import type {
@@ -263,8 +259,7 @@
               isCanisterError<SessionDelegationError>(err) &&
               err.type === "Unauthorized"
             ) {
-              void purgeSession(selectedIdentityNumber);
-              void purgeAppSessions(selectedIdentityNumber);
+              void forgetIdentity(selectedIdentityNumber);
             } else {
               throw err;
             }
@@ -352,8 +347,7 @@
             isCanisterError<SessionDelegationError>(err) &&
             err.type === "Unauthorized"
           ) {
-            void purgeSession(selectedIdentityNumber);
-            void purgeAppSessions(selectedIdentityNumber);
+            void forgetIdentity(selectedIdentityNumber);
           } else {
             throw err;
           }
@@ -484,8 +478,7 @@
               isCanisterError<SessionDelegationError>(err) &&
               err.type === "Unauthorized"
             ) {
-              void purgeSession(selectedIdentityNumber);
-              void purgeAppSessions(selectedIdentityNumber);
+              void forgetIdentity(selectedIdentityNumber);
             } else {
               throw err;
             }
