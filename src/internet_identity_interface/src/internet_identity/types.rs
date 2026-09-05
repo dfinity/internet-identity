@@ -877,5 +877,4 @@ pub struct RevokeDeviceSessionsRequest {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum SessionRevokeError {
     Unauthorized(Principal),
-    InternalCanisterError(String),
 }
