@@ -1114,8 +1114,9 @@ type RevokeDeviceSessionsRequest = record {
 };
 
 type SessionRevokeError = variant {
+    // The only way this can fail. A storage failure traps instead, so a browser is never
+    // left signed out of some of its applications and not others.
     Unauthorized : principal;
-    InternalCanisterError : text;
 };
 
 type AppSessionError = variant {
