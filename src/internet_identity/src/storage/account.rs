@@ -71,7 +71,7 @@ pub const DEFAULT_SESSION_IDLE_NS: u64 = 7 * crate::DAY_NS;
 
 /// Where one session is stored, and which session it is.
 ///
-/// The account addresses the row; `session_id` picks the record out of it. The id is
+/// The account addresses the list; `session_id` picks the record out of it. The id is
 /// unique on its own, so every operation is compare-and-act: a key for a session that
 /// was replaced reads as `None` and revokes nothing, instead of landing on its
 /// successor.
@@ -170,7 +170,7 @@ impl Account {
     ///
     /// Test-only. In production every account comes out of
     /// [`crate::storage::Storage::read_account`], which builds this one only where the
-    /// identity's row still names it — a derived default handed out without that check
+    /// identity's list still names it — a derived default handed out without that check
     /// would sign for an origin the identity may have moved every account away from.
     #[cfg(test)]
     pub fn synthetic(anchor_number: AnchorNumber, origin: FrontendHostname) -> Self {
