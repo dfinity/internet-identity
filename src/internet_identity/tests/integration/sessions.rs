@@ -700,8 +700,18 @@ fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
 
-    let (_, first_principal) = create_session(&env, canister_id, identity_number);
-    let mut other_app = session_request(identity_number);
+    // One browser, three sign-ins, each presenting the successor announced by the last.
+    let browser = BrowserKey::new(1);
+    let first_app = prepare_account_session(
+        &env,
+        canister_id,
+        principal_1(),
+        session_request_from(identity_number, &browser),
+    )?
+    .unwrap();
+    let first_principal = Principal::self_authenticating(&first_app.user_key);
+
+    let mut other_app = session_request_from(identity_number, &browser.successor());
     other_app.origin = "https://another-dapp.com".to_string();
     let second_app = prepare_account_session(&env, canister_id, principal_1(), other_app)?.unwrap();
     let second_principal = Principal::self_authenticating(&second_app.user_key);
@@ -769,7 +779,7 @@ fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
         &env,
         canister_id,
         principal_1(),
-        session_request(identity_number),
+        session_request_from(identity_number, &browser.successor().successor()),
     )?
     .unwrap();
 
