@@ -23,7 +23,12 @@ import {
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 import { toPermissionsArg } from "$lib/utils/accessLevel";
-import { retryFor, throwCanisterError, waitForStore } from "$lib/utils/utils";
+import {
+  isCanisterError,
+  retryFor,
+  throwCanisterError,
+  waitForStore,
+} from "$lib/utils/utils";
 import { agentOptions, canisterId } from "$lib/globals";
 import { Actor, HttpAgent } from "@icp-sdk/core/agent";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
@@ -41,8 +46,12 @@ import {
   chooseSilentSession,
   type SilentDenial,
 } from "../../../routes/(new-styling)/authorize/silentReauth";
+import type { AccountSessionError } from "$lib/generated/internet_identity_types";
 import { serializeAuthorizationRequest } from "$lib/stores/channelHandlers/serialize";
-import { withBrowserProof } from "$lib/stores/browser-key.store";
+import {
+  StaleBrowserKeyError,
+  withBrowserProof,
+} from "$lib/stores/browser-key.store";
 import { describeBrowser } from "$lib/stores/channelHandlers/describeBrowser";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
@@ -295,6 +304,16 @@ export const handleSessionDelegationRequest =
     });
   };
 
+/**
+ * The canister reaches a browser's entry only through the successor that browser
+ * announced, so a key it has retired is refused rather than enrolled again. Named in the
+ * form the key store acts on, which is where the successor that does resolve is kept.
+ */
+export const asBrowserKeyError = (error: unknown): unknown =>
+  isCanisterError<AccountSessionError>(error) && error.type === "StaleDeviceKey"
+    ? new StaleBrowserKeyError()
+    : error;
+
 const createSession = async (
   effectiveOrigin: string,
   requestedMaxTimeToLive: bigint | undefined,
@@ -352,7 +371,10 @@ const createSession = async (
               ? [requestedMaxTimeToIdle]
               : [],
         })
-        .then(throwCanisterError);
+        .then(throwCanisterError)
+        .catch((error: unknown) => {
+          throw asBrowserKeyError(error);
+        });
       await browser.accept(prepared.device_id);
       return prepared;
     },
