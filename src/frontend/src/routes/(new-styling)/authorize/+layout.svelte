@@ -13,7 +13,7 @@
   import { authorizationPromptStore } from "$lib/stores/authorization.store";
   import { resolvePromptParams, stripPromptParams } from "./promptParams";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { forgetIdentity } from "$lib/stores/session-delegation.store";
   import { authenticationStore } from "$lib/stores/authentication.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
@@ -201,7 +201,7 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void purgeSession(identityNumber);
+    void forgetIdentity(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
