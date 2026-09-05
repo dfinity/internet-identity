@@ -1635,7 +1635,7 @@ mod session_device_tests {
     }
 
     /// A response that never reached the browser leaves it proving with the key the entry
-    /// has already retired. That is refused rather than registered: a second row for one
+    /// has already retired. That is refused rather than registered: a second list for one
     /// browser is exactly what a dropped response must not cost, and the browser holds the
     /// successor that does resolve.
     #[test]
