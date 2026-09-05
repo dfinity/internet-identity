@@ -17,7 +17,7 @@ pub struct StorableApplication {
     pub stored_accounts: u64,
     #[n(2)]
     pub stored_account_references: u64,
-    /// Rows that exist here while holding no reference at all.
+    /// Lists that exist here while holding no reference at all.
     ///
     /// A list holding nothing is a tombstone: it says every account an identity had at
     /// this origin was moved away and its default must never be derived again. It

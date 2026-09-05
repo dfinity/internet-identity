@@ -299,7 +299,7 @@ const BUCKET_SIZE_IN_PAGES: u16 = 128;
 const MAX_MANAGED_MEMORY_SIZE: u64 = 256 * GB;
 const MAX_MANAGED_WASM_PAGES: u64 = MAX_MANAGED_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES;
 
-/// Per-anchor cap on reference-list lists that hold nothing but a tracked default
+/// Per-anchor cap on account reference lists that hold nothing but a tracked default
 /// account.
 const MAX_EVICTABLE_DEFAULT_ACCOUNTS: u64 = 500;
 
@@ -1640,7 +1640,7 @@ impl<M: Memory + Clone> Storage<M> {
             .map(Vec::<AccountReference>::from)
     }
 
-    /// Removes a reference-list list and everything derived from it.
+    /// Removes a account reference list and everything derived from it.
     fn remove_reference_list(
         &mut self,
         anchor_number: AnchorNumber,
@@ -1684,8 +1684,8 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Rows whose only reference is a tracked default.
-    fn evictable_default_rows(
+    /// Lists whose only reference is a tracked default.
+    fn evictable_default_lists(
         &self,
         anchor_number: AnchorNumber,
     ) -> Vec<(ApplicationNumber, Option<Timestamp>)> {
@@ -1725,7 +1725,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         let mut candidates: Vec<_> = self
-            .evictable_default_rows(anchor_number)
+            .evictable_default_lists(anchor_number)
             .into_iter()
             .filter(|(application_number, _)| *application_number != just_written)
             .collect();
@@ -1846,13 +1846,13 @@ impl<M: Memory + Clone> Storage<M> {
         references: Vec<AccountReference>,
         config: Option<AnchorApplicationConfig>,
     ) -> Result<(), StorageError> {
-        let is_new_row = self
+        let is_new_list = self
             .stored_account_references(anchor_number, application_number)
             .is_none();
 
         self.write_account_state(anchor_number, application_number, references, None, config)?;
 
-        if is_new_row {
+        if is_new_list {
             self.evict_idle_tracked_defaults(anchor_number, application_number)?;
         }
 
@@ -2610,7 +2610,7 @@ pub enum ReferenceCount {
     Accounts,
     /// References, named and tracked-default alike.
     References,
-    /// Rows that exist while holding no reference.
+    /// Lists that exist while holding no reference.
     Tombstones,
 }
 
