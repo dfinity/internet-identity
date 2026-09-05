@@ -338,7 +338,7 @@ const EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK: u64 = MAX_EVICTABLE_DEFAULT_ACCOUNTS
 /// the set is the apps used in the last month times the browsers they were used from.
 pub const MAX_SESSIONS_PER_ANCHOR: u32 = 500;
 /// Reclaiming goes down to here rather than to the cap, so the pass that walks an identity's
-/// rows runs once and then not again for the next fifty sign-ins.
+/// lists runs once and then not again for the next fifty sign-ins.
 pub const SESSIONS_WATERMARK_PER_ANCHOR: u32 = 450;
 
 /// Bounds one message's eviction work.
@@ -1768,7 +1768,7 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// The stored count is a trigger, never the thing the cap is enforced against: a
     /// session can expire with no write anywhere, so the count drifts upwards. Once it
-    /// reaches the cap this recounts what the rows hold and reclaims against that, so an
+    /// reaches the cap this recounts what the lists hold and reclaims against that, so an
     /// admission is only ever granted against a number that was just counted.
     fn ensure_session_slot(
         &mut self,
@@ -1795,15 +1795,15 @@ impl<M: Memory + Clone> Storage<M> {
         self.write(anchor)
     }
 
-    /// Walks the anchor's rows once and reclaims down to the watermark, taking sessions in
+    /// Walks the anchor's lists once and reclaims down to the watermark, taking sessions in
     /// [`SessionRecord::reclaim_order`]: dead ones first, then the least recently used.
     ///
-    /// Returns what the rows actually hold once it is done, which is the number the cap is
+    /// Returns what the lists actually hold once it is done, which is the number the cap is
     /// enforced against. The stored counter is only ever a trigger for running this pass —
     /// it can drift, this cannot, because it counts the sessions themselves.
     ///
     /// One pass per fifty sign-ins, because it reclaims to the watermark rather than to the
-    /// cap, and bounded by the same row limit account eviction uses.
+    /// cap, and bounded by the same list limit account eviction uses.
     fn reclaim_sessions(
         &mut self,
         anchor_number: AnchorNumber,
@@ -1811,16 +1811,16 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Result<u32, StorageError> {
         struct Candidate {
             order: (bool, Timestamp, SessionId),
-            row: usize,
+            list: usize,
             session_id: SessionId,
         }
 
-        // Every row, not a bounded prefix of them: the number this returns is what the cap is
+        // Every list, not a bounded prefix of them: the number this returns is what the cap is
         // enforced against, and a truncated scan would undercount, lower the counter to the
-        // undercount, and let the stored set climb past the cap from there. An identity's rows
-        // are already bounded — the row cap holds the evictable ones and the account cap holds
+        // undercount, and let the stored set climb past the cap from there. An identity's lists
+        // are already bounded — the list cap holds the evictable ones and the account cap holds
         // the rest — and a sequential scan of them costs a fraction of the writes it saves.
-        let mut rows: Vec<(ApplicationNumber, Vec<AccountReference>)> = self
+        let mut lists: Vec<(ApplicationNumber, Vec<AccountReference>)> = self
             .stable_account_reference_list_memory
             .range(
                 (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
@@ -1831,12 +1831,12 @@ impl<M: Memory + Clone> Storage<M> {
             .collect();
 
         let mut candidates: Vec<Candidate> = vec![];
-        for (row, (_, references)) in rows.iter().enumerate() {
+        for (list, (_, references)) in lists.iter().enumerate() {
             for reference in references.iter() {
                 for session in &reference.sessions {
                     candidates.push(Candidate {
                         order: session.reclaim_order(now),
-                        row,
+                        list,
                         session_id: session.session_id,
                     });
                 }
@@ -1852,17 +1852,17 @@ impl<M: Memory + Clone> Storage<M> {
             return Ok(stored);
         }
 
-        // One write per row rather than one per victim: the row is a single blob, so
+        // One write per list rather than one per victim: the list is a single blob, so
         // dropping several of its sessions one at a time would rewrite it several times.
-        let mut touched: Vec<usize> = victims.iter().map(|victim| victim.row).collect();
+        let mut touched: Vec<usize> = victims.iter().map(|victim| victim.list).collect();
         touched.sort_unstable();
         touched.dedup();
 
-        // One anchor write for the pass rather than one per row: each row reports what it
+        // One anchor write for the pass rather than one per list: each list reports what it
         // did to the count, and the recount below is what the cap is enforced against.
         let mut dropped_total = 0i64;
-        for row in touched {
-            let (application_number, references) = &mut rows[row];
+        for list in touched {
+            let (application_number, references) = &mut lists[list];
             let application_number = *application_number;
             for reference in references.iter_mut() {
                 reference.sessions.retain(|session| {

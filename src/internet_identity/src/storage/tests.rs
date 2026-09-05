@@ -5202,7 +5202,7 @@ mod session_creation_tests {
             assert_eq!(
                 storage.read(anchor_number).unwrap().session_count as usize,
                 stored,
-                "the counter parted ways with the rows after {device_id} sign-ins"
+                "the counter parted ways with the lists after {device_id} sign-ins"
             );
         }
     }
@@ -5215,7 +5215,7 @@ mod session_creation_tests {
             .unwrap();
 
         // Nothing observes a session expiring, so the count drifts up. The cap must be
-        // enforced against what the rows hold, not against the drift.
+        // enforced against what the lists hold, not against the drift.
         let mut anchor = storage.read(anchor_number).unwrap();
         anchor.session_count = MAX_SESSIONS_PER_ANCHOR;
         storage.write(anchor).unwrap();
@@ -5228,19 +5228,19 @@ mod session_creation_tests {
         assert_eq!(storage.read(anchor_number).unwrap().session_count, 2);
     }
 
-    /// Two rows, both holding a default account, and both holding sessions for the same
+    /// Two lists, both holding a default account, and both holding sessions for the same
     /// browser ids. Reclaiming must take only the sessions it selected.
     #[test]
     fn reclaiming_takes_only_the_sessions_it_selected() {
         const OTHER_ORIGIN: &str = "https://other.example";
         let (mut storage, anchor_number) = storage_with_anchor();
 
-        // Two rows of this size put the identity two over the watermark, so the pass selects
-        // exactly two victims — one in each row.
+        // Two lists of this size put the identity two over the watermark, so the pass selects
+        // exactly two victims — one in each list.
         const PER_ROW: u32 = SESSIONS_WATERMARK_PER_ANCHOR / 2 + 1;
-        // The browser ids repeat across the rows; the session ids do not, because no two
+        // The browser ids repeat across the lists; the session ids do not, because no two
         // sessions ever share one.
-        let row = |id_base: u64, expired_device: u32| -> Vec<AccountReference> {
+        let list = |id_base: u64, expired_device: u32| -> Vec<AccountReference> {
             let sessions = (0..PER_ROW)
                 .map(|device_id| {
                     let session_id = id_base + device_id as u64;
@@ -5281,10 +5281,10 @@ mod session_creation_tests {
             .lookup_or_insert_application_number_with_origin(&OTHER_ORIGIN.to_string())
             .unwrap();
         storage
-            .write_account_state(anchor_number, first, row(1_000, 0), None, None)
+            .write_account_state(anchor_number, first, list(1_000, 0), None, None)
             .unwrap();
         storage
-            .write_account_state(anchor_number, second, row(2_000, 1), None, None)
+            .write_account_state(anchor_number, second, list(2_000, 1), None, None)
             .unwrap();
 
         let mut anchor = storage.read(anchor_number).unwrap();
@@ -5310,24 +5310,24 @@ mod session_creation_tests {
 
         assert!(
             !first_devices.contains(&0),
-            "the expired session selected in the first row should be gone"
+            "the expired session selected in the first list should be gone"
         );
         assert!(
             !second_devices.contains(&1),
-            "the expired session selected in the second row should be gone"
+            "the expired session selected in the second list should be gone"
         );
         assert!(
             first_devices.contains(&1),
-            "the first row's live session for browser 1 was not selected and must survive"
+            "the first list's live session for browser 1 was not selected and must survive"
         );
         assert!(
             second_devices.contains(&0),
-            "the second row's live session for browser 0 was not selected and must survive"
+            "the second list's live session for browser 0 was not selected and must survive"
         );
     }
 
     /// The flood bound, exercised through the cap rather than through the order alone: a
-    /// session the user has actually kept alive survives a row full of sign-ins nobody
+    /// session the user has actually kept alive survives a list full of sign-ins nobody
     /// came back to, even though every one of them is newer than it.
     #[test]
     fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
