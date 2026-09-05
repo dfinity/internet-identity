@@ -795,8 +795,12 @@ impl Anchor {
         };
 
         let advances = entry_awaiting(&current_device_key);
+        // The entry this request belongs to, which is not always one it can advance: a
+        // browser retrying a lost sign-in still belongs to the entry that retired its key,
+        // and re-announcing the successor it announced then is not stealing anyone's key.
+        let owner = entry_holding(&current_device_key);
         let successor_holder = entry_holding(&next_device_key);
-        if successor_holder.is_some() && successor_holder != advances {
+        if successor_holder.is_some() && successor_holder != owner {
             return Err(SessionDeviceError::SuccessorAlreadyInUse);
         }
 
@@ -808,7 +812,7 @@ impl Anchor {
             return Ok((device.id, vec![]));
         }
 
-        if entry_holding(&current_device_key).is_some() {
+        if owner.is_some() {
             return Err(SessionDeviceError::StaleDeviceKey);
         }
 
