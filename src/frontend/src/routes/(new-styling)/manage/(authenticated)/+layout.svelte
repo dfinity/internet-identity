@@ -25,7 +25,7 @@
   } from "$lib/stores/authentication.store";
   import { DelegationIdentity } from "@icp-sdk/core/identity";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { forgetIdentity } from "$lib/stores/session-delegation.store";
   import { sessionStore } from "$lib/stores/session.store";
   import { locales, localeStore, t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -118,7 +118,7 @@
   const handleConfirmSignOutAndRemove = () => {
     const identityNumber = $authenticatedStore.identityNumber;
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void purgeSession(identityNumber);
+    void forgetIdentity(identityNumber);
     sessionStore.reset();
     window.location.replace("/");
   };
@@ -129,14 +129,14 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void purgeSession(identityNumber);
+    void forgetIdentity(identityNumber);
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
       const identityName =
         removedIdentity.name ?? `${removedIdentity.identityNumber}`;
       toaster.create({
         title: $t`Identity removed`,
-        description: $t`${identityName} has been removed from this device.`,
+        description: $t`${identityName} has been removed from this device. Apps you were signed into here have been signed out.`,
         closable: true,
         duration: 5000,
         action: {

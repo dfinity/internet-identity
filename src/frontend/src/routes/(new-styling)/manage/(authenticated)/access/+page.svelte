@@ -23,7 +23,7 @@
   } from "$app/navigation";
   import { canisterId } from "$lib/globals";
   import { authenticationStore } from "$lib/stores/authentication.store";
-  import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { forgetIdentity } from "$lib/stores/session-delegation.store";
   import { authenticateWithPasskey } from "$lib/utils/authentication/passkey";
   import { authenticateWithJWT } from "$lib/utils/authentication/jwt";
   import {
@@ -395,7 +395,9 @@
       if (isCurrentAccessMethod($authenticatedStore, removingAccessMethod)) {
         const identityNumber = $authenticatedStore.identityNumber;
         lastUsedIdentitiesStore.removeIdentity(identityNumber);
-        void purgeSession(identityNumber);
+        // Awaited, unlike the other forget sites: the navigation below would cut a
+        // fire-and-forget call off before it reached the canister.
+        await forgetIdentity(identityNumber);
         sessionStore.reset();
         location.replace("/login");
         return;

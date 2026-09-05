@@ -38,7 +38,7 @@
   import { throwCanisterError } from "$lib/utils/utils";
   import { handleError } from "$lib/components/utils/error";
   import { authenticationStore } from "$lib/stores/authentication.store";
-  import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { forgetIdentity, purgeSession } from "$lib/stores/session-delegation.store";
   import { authenticateWithSession } from "$lib/utils/authentication";
   import { goto, preloadData } from "$app/navigation";
   import { page } from "$app/state";
@@ -200,7 +200,7 @@
     } catch (error) {
       showRecoveryDialog = false;
       authenticationStore.reset();
-      void purgeSession(identityNumber);
+      void forgetIdentity(identityNumber);
       handleError(error);
     }
   };

@@ -2,7 +2,7 @@
   import type { LayoutProps } from "./$types";
   import { ChevronDownIcon, UserIcon } from "@lucide/svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { forgetIdentity } from "$lib/stores/session-delegation.store";
   import { t } from "$lib/stores/locale.store";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import Header from "$lib/components/layout/Header.svelte";
@@ -63,7 +63,7 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void purgeSession(identityNumber);
+    void forgetIdentity(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
@@ -71,7 +71,7 @@
         removedIdentity.name ?? `${removedIdentity.identityNumber}`;
       toaster.create({
         title: $t`Identity removed`,
-        description: $t`${identityName} has been removed from this device.`,
+        description: $t`${identityName} has been removed from this device. Apps you were signed into here have been signed out.`,
         closable: true,
         duration: 5000,
         action: {
