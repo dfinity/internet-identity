@@ -728,6 +728,13 @@ export type GetAccountError = {
 export interface GetAccountSessionRequest {
   'session_key' : SessionKey,
   'origin' : FrontendHostname,
+  /**
+   * Which browser and which sign-in, both returned by prepare_account_session. The
+   * pair names one session: a browser keeps its id across sign-ins, so the creation
+   * time is what tells two of its sessions apart.
+   */
+  'device_id' : number,
+  'created_at' : Timestamp,
   'account_number' : [] | [AccountNumber],
   'expiration' : Timestamp,
   'identity_number' : UserNumber,
@@ -1626,12 +1633,6 @@ export type RegistrationFlowNextStep = {
     'Finish' : null
   };
 export type RegistrationId = string;
-export interface RevokeAccountSessionRequest {
-  'origin' : string,
-  'created_at' : Timestamp,
-  'account_number' : [] | [AccountNumber],
-  'identity_number' : UserNumber,
-}
 export interface RevokeDeviceSessionsRequest {
   'device_id' : number,
   'identity_number' : UserNumber,
@@ -2568,16 +2569,6 @@ export interface _SERVICE {
    * Atomically replace device matching the device key with the new device data
    */
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
-  /**
-   * Revocation from the user's own settings, authenticated by an anchor access method
-   * rather than by a session chain. Sessions are named by locator, never by principal,
-   * so these do not touch the principal index.
-   */
-  'revoke_account_session' : ActorMethod<
-    [RevokeAccountSessionRequest],
-    { 'Ok' : null } |
-      { 'Err' : SessionRevokeError }
-  >,
   'revoke_device_sessions' : ActorMethod<
     [RevokeDeviceSessionsRequest],
     { 'Ok' : null } |

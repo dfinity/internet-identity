@@ -69,6 +69,35 @@ pub const MIN_SESSION_IDLE_NS: u64 = 10 * crate::MINUTE_NS;
 /// and a machine walked away from stops being signed in within one.
 pub const DEFAULT_SESSION_IDLE_NS: u64 = 7 * crate::DAY_NS;
 
+/// The four things that name one session, plus the creation time that tells two of one
+/// browser's apart.
+///
+/// A browser keeps its id across sign-ins, so `device_id` alone names whatever that
+/// browser holds now rather than the session a caller means. With `created_at` every
+/// operation is compare-and-act: a key for a session that was replaced reads as `None`
+/// and revokes nothing, instead of landing on its successor.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SessionRecordKey {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub device_id: SessionDeviceId,
+    pub created_at: Timestamp,
+}
+
+impl SessionRecordKey {
+    // Used by the app delegation path, which lands four PRs up.
+    #[allow(dead_code)]
+    /// The account this session is at.
+    pub fn account(&self) -> AccountKey {
+        AccountKey {
+            anchor_number: self.anchor_number,
+            origin: self.origin.clone(),
+            account_number: self.account_number,
+        }
+    }
+}
+
 /// A revocable session at one account. Only `last_refreshed` is mutable, which is why
 /// it is the one field absent from the seed.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
