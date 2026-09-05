@@ -806,6 +806,8 @@ pub struct GetAccountSessionRequest {
     pub account_number: Option<AccountNumber>,
     pub session_key: SessionKey,
     pub expiration: Timestamp,
+    pub device_id: SessionDeviceId,
+    pub created_at: Timestamp,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
