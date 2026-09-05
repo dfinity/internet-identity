@@ -2,16 +2,19 @@ import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 import {
   Base64ToBytesCodec,
   Base64ToPublicKeyCodec,
+  INTERACTION_REQUIRED_ERROR_CODE,
   INVALID_PARAMS_ERROR_CODE,
   OriginSchema,
   StringToBigIntCodec,
 } from "$lib/utils/transport/utils";
 import {
+  authorizationPromptStore,
   authorizationStore,
   authorizedStore,
 } from "$lib/stores/authorization.store";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import {
+  appSessionsForOrigin,
   rememberAppAccount,
   storeAppSession,
   type AppSessionRecord,
@@ -25,14 +28,23 @@ import {
   throwCanisterError,
   waitForStore,
 } from "$lib/utils/utils";
-import { canisterId } from "$lib/globals";
+import { agentOptions, canisterId } from "$lib/globals";
+import { Actor, HttpAgent } from "@icp-sdk/core/agent";
+import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
+import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { Principal } from "@icp-sdk/core/principal";
 import {
   Delegation,
   DelegationChain,
+  DelegationIdentity,
   ECDSAKeyIdentity,
 } from "@icp-sdk/core/identity";
 import type { PublicKey, Signature } from "@icp-sdk/core/agent";
+import { get } from "svelte/store";
+import {
+  chooseSilentSession,
+  type SilentDenial,
+} from "../../../routes/(new-styling)/authorize/silentReauth";
 import type { AccountSessionError } from "$lib/generated/internet_identity_types";
 import { serializeAuthorizationRequest } from "$lib/stores/channelHandlers/serialize";
 import {
@@ -131,6 +143,36 @@ const extendToApp = async (
   );
 
 /**
+ * Whether the canister still holds the session this record names.
+ *
+ * A record can outlive its session: revoking from settings or from another app leaves
+ * this browser's copy in place. Answering from the record alone would hand the app a
+ * chain that cannot mint, and the failure would surface later as something the client
+ * cannot tell apart from a real error.
+ *
+ * A hint and not an authority. The reply is a query reply, so it is uncertified and
+ * anyone able to answer it can say no — which is why a no only skips the silent path.
+ * Nothing here is deleted on it: a wrong no would otherwise destroy a working session's
+ * key, turning a flake into something an attacker can trigger. A no that was a lie costs
+ * one silent attempt, and the next one asks again.
+ */
+const sessionIsLive = async (record: AppSessionRecord): Promise<boolean> => {
+  try {
+    const identity = DelegationIdentity.fromDelegation(
+      await ECDSAKeyIdentity.fromKeyPair(record.keyPair),
+      DelegationChain.fromJSON(JSON.parse(record.chainJson)),
+    );
+    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+      agent: HttpAgent.createSync({ ...agentOptions, identity }),
+      canisterId,
+    });
+    return await actor.check_session();
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Obtains the session an app re-issues its own delegations from.
  *
  * The response carries a session and nothing else: the app mints its first app
@@ -149,6 +191,19 @@ export const handleSessionDelegationRequest =
     }
     const requestId = request.id;
 
+    const isSilent = get(authorizationPromptStore).prompt === "none";
+    const deny = async (reason: SilentDenial) => {
+      await channel.send({
+        jsonrpc: "2.0",
+        id: requestId,
+        error: {
+          code: INTERACTION_REQUIRED_ERROR_CODE,
+          message: "Interaction required",
+          data: { reason },
+        },
+      });
+    };
+
     const parsed = SessionParamsCodec.safeParse(request.params);
     if (!parsed.success) {
       await channel.send({
@@ -159,7 +214,12 @@ export const handleSessionDelegationRequest =
           message: z.prettifyError(parsed.error),
         },
       });
-      onError("invalid-request");
+      // A malformed request is still a protocol error rather than a denial, so the code
+      // stays INVALID_PARAMS. What the silent path must not do is render: it was asked to
+      // answer without showing the user anything, and that holds however it fails.
+      if (!isSilent) {
+        onError("invalid-request");
+      }
       return;
     }
 
@@ -171,6 +231,10 @@ export const handleSessionDelegationRequest =
           derivationOrigin: params.icrc95DerivationOrigin,
         });
         if (validation.result === "invalid") {
+          if (isSilent) {
+            await deny("login_required");
+            return;
+          }
           onError("unverified-origin");
           return;
         }
@@ -179,10 +243,47 @@ export const handleSessionDelegationRequest =
           params.icrc95DerivationOrigin ?? channel.origin,
         );
 
+        const { prompt, hint, resumable } = get(authorizationPromptStore);
+        // Silence is something an app asks for. Anything else, an absent `prompt` included,
+        // runs the ceremony, so a held session is never handed over without the user
+        // seeing a screen they did not request.
+        const held =
+          prompt === "none" ? await appSessionsForOrigin(effectiveOrigin) : [];
+        const chosen = chooseSilentSession({ held, hint });
+
+        let usable = "session" in chosen ? chosen.session : undefined;
+        if (usable && !(await sessionIsLive(usable.record))) {
+          // The record stays. A session that is really gone leaves a record that is
+          // filtered out on read once it expires, and removing it would need a certified
+          // answer — which is an update call, made by the app, not by this.
+          usable = undefined;
+        }
+
+        if (usable) {
+          const chain = await extendToApp(
+            usable.record,
+            params.sessionPublicKey,
+          );
+          await channel.send({
+            jsonrpc: "2.0",
+            id: requestId,
+            result: SessionResultSchema.encode({
+              chain,
+            }),
+          });
+          return;
+        }
+
+        if (isSilent) {
+          await deny("denial" in chosen ? chosen.denial : "login_required");
+          return;
+        }
+
         const created = await createSession(
           effectiveOrigin,
           params.maxTimeToLive,
           params.maxTimeToIdle,
+          resumable === true,
         );
         const chain = await extendToApp(
           created.record,
@@ -197,6 +298,10 @@ export const handleSessionDelegationRequest =
         });
       } catch (error) {
         console.error(error);
+        if (isSilent) {
+          await deny("login_required");
+          return;
+        }
         onError("delegation-failed");
       }
     });
@@ -216,6 +321,7 @@ const createSession = async (
   effectiveOrigin: string,
   requestedMaxTimeToLive: bigint | undefined,
   requestedMaxTimeToIdle: bigint | undefined,
+  resumable: boolean,
 ): Promise<{ record: AppSessionRecord }> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
   const authorized = await waitForStore(authorizedStore);
@@ -312,9 +418,13 @@ const createSession = async (
     sessionId: prepared.session_id,
     accessLevel: authorized.accessLevel,
   };
+  // The mapping is not a credential and is kept either way, so a later hint still names
+  // an account this browser has seen. The session is what an app has to ask to have kept.
   await rememberAppAccount(key, {
     accountPrincipal: prepared.account_principal.toText(),
   });
-  await storeAppSession(key, record);
+  if (resumable) {
+    await storeAppSession(key, record);
+  }
   return { record };
 };

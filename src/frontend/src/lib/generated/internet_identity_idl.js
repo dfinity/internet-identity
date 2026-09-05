@@ -1029,6 +1029,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'check_session' : IDL.Func([], [IDL.Bool], ['query']),
     'config' : IDL.Func([], [InternetIdentityInit], ['query']),
     'create_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Text],
