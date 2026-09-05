@@ -1765,7 +1765,8 @@ impl<M: Memory + Clone> Storage<M> {
             }
         }
         if removed > 0 {
-            self.change_session_count(anchor_number, removed as usize, 0)?;
+            self.change_session_count(anchor_number, removed as usize, 0)
+                .expect("failed to move the session count of an anchor that was just read");
         }
 
         Ok(removed)
@@ -1831,6 +1832,12 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Moves the count without considering the cap, for the paths that only remove.
+    ///
+    /// Traps rather than reporting, at every caller. It runs after the row writes it
+    /// describes, and on the IC an `Err` commits those — so reporting a failure here
+    /// would leave the stored sessions and the count that gates sign-in permanently
+    /// disagreeing, while telling the caller nothing happened. A trap rolls the whole
+    /// message back.
     fn change_session_count(
         &mut self,
         anchor_number: AnchorNumber,
@@ -1949,7 +1956,10 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         let remaining = stored.saturating_sub(dropped_total as u32);
-        self.set_session_count(anchor_number, remaining)?;
+        // Trapping for the reason `change_session_count` does: the rows above are already
+        // written, so reporting a failure here would commit them with the count untouched.
+        self.set_session_count(anchor_number, remaining)
+            .expect("failed to set the session count of an anchor that was just read");
         Ok(remaining)
     }
 
@@ -2116,6 +2126,23 @@ impl<M: Memory + Clone> Storage<M> {
             self.session_principal(anchor_number, application_number, account_number, &session),
             self.account_principal_of(anchor_number, application_number, account_number),
         ) {
+            // The account's own entry goes in alongside the session's. A handle names its
+            // account by principal, and resolving that principal is a second index lookup —
+            // one whose entry is written only when a row's set of account numbers changes,
+            // or by the backfill sweep. Creating a session changes neither, so a session at
+            // a row that predates the index would resolve to nothing until the sweep
+            // happened to reach it, which is every returning user of an app they have used
+            // before, for as long as the sweep takes.
+            //
+            // Writing the same value the sweep would write, so the two cannot disagree.
+            self.lookup_account_with_principal_memory.insert(
+                account_principal,
+                StorableAccountKey {
+                    anchor_number,
+                    application_number,
+                    account_number,
+                },
+            );
             self.lookup_session_with_principal_memory.insert(
                 principal,
                 StorableSessionHandle {
@@ -2124,7 +2151,8 @@ impl<M: Memory + Clone> Storage<M> {
                 },
             );
         }
-        self.change_session_count(anchor_number, dropped.len(), 1)?;
+        self.change_session_count(anchor_number, dropped.len(), 1)
+            .expect("failed to move the session count of an anchor that was just read");
 
         let key = SessionRecordKey {
             anchor_number,
@@ -2210,9 +2238,9 @@ impl<M: Memory + Clone> Storage<M> {
             );
         }
 
-        // Counters first, for the reason `write_account_state` does it: it is the
-        // only fallible step left, and an error after the removes would commit them
-        // without it.
+        // Counters first, for the reason `write_account_state` does it: it is the only
+        // step left that can *report* a failure, and an error after the removes would
+        // commit them without it. What follows either cannot fail or traps.
         self.apply_reference_counter_deltas(
             anchor_number,
             application_number,
@@ -2220,7 +2248,8 @@ impl<M: Memory + Clone> Storage<M> {
             ReferenceListDeltas::removing(&previous),
         )?;
         if dropped > 0 {
-            self.change_session_count(anchor_number, dropped, 0)?;
+            self.change_session_count(anchor_number, dropped, 0)
+                .expect("failed to move the session count of an anchor that was just read");
         }
 
         self.sync_account_principal_index(
