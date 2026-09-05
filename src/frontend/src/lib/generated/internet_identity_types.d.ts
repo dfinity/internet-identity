@@ -1684,11 +1684,12 @@ export interface SessionDeviceInfo {
 export type SessionKey = PublicKey;
 export type SessionRevokeError = {
     /**
-     * The only way this can fail. A storage failure traps instead, so a browser is never
-     * left signed out of some of its applications and not others.
+     * Raised before the sweep writes anything, so a browser is never left signed out of
+     * some of its applications and not others.
      */
-    'Unauthorized' : Principal
-  };
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal };
 export type SetDefaultAccountError = {
     'NoSuchOrigin' : { 'anchor_number' : UserNumber }
   } |
