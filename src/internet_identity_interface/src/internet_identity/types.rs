@@ -806,6 +806,8 @@ pub struct GetAccountSessionRequest {
     pub account_number: Option<AccountNumber>,
     pub session_key: SessionKey,
     pub expiration: Timestamp,
+    pub device_id: SessionDeviceId,
+    pub created_at: Timestamp,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -849,15 +851,6 @@ pub enum AppSessionError {
     /// yet, and because an app can act on none of them differently.
     NoMatchingSession,
     InternalCanisterError(String),
-}
-
-/// Revokes one session of an anchor, named by where it was created.
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct RevokeAccountSessionRequest {
-    pub identity_number: IdentityNumber,
-    pub origin: FrontendHostname,
-    pub account_number: Option<AccountNumber>,
-    pub created_at: Timestamp,
 }
 
 /// Signs one browser out of every app it is signed into.
