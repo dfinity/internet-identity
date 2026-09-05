@@ -81,6 +81,33 @@ export interface AnchorCredentials {
   'credentials' : Array<WebAuthnCredential>,
   'recovery_credentials' : Array<WebAuthnCredential>,
 }
+export interface AppGetDelegationRequest {
+  'session_key' : SessionKey,
+  /**
+   * Must match the prepared value.
+   */
+  'expiration' : Timestamp,
+}
+export interface AppPrepareDelegationRequest {
+  /**
+   * The key the app delegation delegates to. Nothing about the account is named:
+   * the caller's own session chain is what identifies it.
+   */
+  'session_key' : SessionKey,
+}
+export interface AppPrepareDelegationResponse {
+  'user_key' : PublicKey,
+  'expiration' : Timestamp,
+}
+export type AppSessionError = {
+    /**
+     * No usable session behind this caller: revoked, expired, pruned, or never one at
+     * all. One outcome, because which of those it is depends on whether a prune has run
+     * yet, and because an app can act on none of them differently.
+     */
+    'NoMatchingSession' : null
+  } |
+  { 'InternalCanisterError' : string };
 /**
  * Configuration parameters related to the archive.
  */
@@ -1894,6 +1921,21 @@ export interface _SERVICE {
   'add_tentative_device' : ActorMethod<
     [UserNumber, DeviceData],
     AddTentativeDeviceResponse
+  >,
+  'app_get_delegation' : ActorMethod<
+    [AppGetDelegationRequest],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : AppSessionError }
+  >,
+  /**
+   * Mints a short-lived app delegation from a live session. Called by app frontends
+   * with the session chain, so revoking the session ends access within one delegation
+   * lifetime.
+   */
+  'app_prepare_delegation' : ActorMethod<
+    [AppPrepareDelegationRequest],
+    { 'Ok' : AppPrepareDelegationResponse } |
+      { 'Err' : AppSessionError }
   >,
   /**
    * Adds a new authentication method to the identity.

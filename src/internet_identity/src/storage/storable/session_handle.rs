@@ -1,4 +1,5 @@
 use crate::storage::storable::session_id::StorableSessionId;
+use candid::Principal;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use minicbor::{Decode, Encode};
@@ -19,6 +20,12 @@ pub struct StorableSessionHandle {
     pub account_principal: Vec<u8>,
     #[n(1)]
     pub session_id: StorableSessionId,
+}
+
+impl StorableSessionHandle {
+    pub fn account(&self) -> Principal {
+        Principal::from_slice(&self.account_principal)
+    }
 }
 
 impl Storable for StorableSessionHandle {

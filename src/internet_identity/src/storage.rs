@@ -1762,6 +1762,49 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(delta.unsigned_abs())
     }
 
+    /// The account a principal a dapp sees was derived for, as an address.
+    ///
+    /// An [`Account`] carries the seed it signs with, so one only ever comes out of
+    /// [`Self::read_account`], which is where the identity's claim on it is checked.
+    pub fn lookup_account_with_principal(&self, principal: Principal) -> Option<AccountKey> {
+        self.account_key_of(&self.lookup_account_with_principal_memory.get(&principal)?)
+    }
+
+    /// A stored account address resolved to the one callers use.
+    ///
+    /// `None` where the application is gone, which leaves the stored row naming
+    /// nothing. Not a `From`, because the origin the number stands for comes out of
+    /// storage.
+    fn account_key_of(&self, stored: &StorableAccountKey) -> Option<AccountKey> {
+        Some(AccountKey {
+            anchor_number: stored.anchor_number,
+            origin: self
+                .stable_application_memory
+                .get(&stored.application_number)?
+                .origin,
+            account_number: stored.account_number,
+        })
+    }
+
+    /// The session a caller's principal names, or `None` where the index no longer
+    /// leads to one.
+    ///
+    /// A resolution, not an authorisation: the session it names may be expired or
+    /// read-only, which is the caller's to check. What it does rule out is a stale
+    /// entry, since the key it builds carries the id the entry recorded and no later
+    /// session is ever allocated that id.
+    pub fn lookup_session_with_principal(&self, principal: Principal) -> Option<SessionRecordKey> {
+        let handle = self.lookup_session_with_principal_memory.get(&principal)?;
+        let account = self.lookup_account_with_principal(handle.account())?;
+
+        Some(SessionRecordKey {
+            anchor_number: account.anchor_number,
+            origin: account.origin,
+            account_number: account.account_number,
+            session_id: handle.session_id,
+        })
+    }
+
     /// Frees a slot for one more session, and reports whether the anchor has one.
     ///
     /// The stored count is a trigger, never the thing the cap is enforced against: a

@@ -502,6 +502,20 @@ fn get_account_session(
 }
 
 #[update]
+fn app_prepare_delegation(
+    request: AppPrepareDelegationRequest,
+) -> Result<AppPrepareDelegationResponse, AppSessionError> {
+    sessions::app_prepare_delegation(request)
+}
+
+#[query]
+fn app_get_delegation(
+    request: AppGetDelegationRequest,
+) -> Result<SignedDelegation, AppSessionError> {
+    sessions::app_get_delegation(request)
+}
+
+#[update]
 async fn prepare_account_delegation(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
