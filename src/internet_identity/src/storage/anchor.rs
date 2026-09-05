@@ -65,6 +65,16 @@ pub enum SessionDeviceError {
     /// so a browser that named itself its own successor would keep the key alive for as
     /// long as it kept asking — and whoever leaked it would too.
     SuccessorMatchesCurrent,
+    /// The presented key is one this anchor has already retired: an entry holds it as the
+    /// key it was last proven with, and now awaits that entry's successor.
+    ///
+    /// A browser reaches this only when it never learned that its last sign-in succeeded,
+    /// so it is still proving with the key it announced a successor for. The answer is for
+    /// the browser to promote its own successor and present that — it is the only party
+    /// holding both keys. Registering it as a new browser instead would turn every dropped
+    /// response into a second row for one browser, and accepting it would leave a leaked
+    /// key useful for longer than the one sign-in rotation allows it.
+    StaleDeviceKey,
 }
 
 /// A browser this anchor has signed in from. The name is self-reported by the client.
@@ -747,12 +757,15 @@ impl Anchor {
         }
     }
 
-    /// Resolves the browser a sign-in came from by the public key it proved possession of,
-    /// registering it when this anchor holds neither that key nor a successor equal to it.
+    /// Resolves the browser a sign-in came from by the public key it proved possession of.
     ///
-    /// A proof from the successor promotes it, retiring the key it replaces. Either way the
-    /// entry then awaits `next_device_key`, which is what a browser presents once this
-    /// sign-in has reached it.
+    /// An entry is reached only by the successor it announced. Presenting it promotes that
+    /// successor, retires the key it replaces, and leaves the entry awaiting
+    /// `next_device_key` — what the browser presents at its next sign-in. A key some entry
+    /// has already retired is refused with [`SessionDeviceError::StaleDeviceKey`] rather
+    /// than accepted or registered afresh, so a key is good for exactly one sign-in and a
+    /// browser that lost a response is told to promote its own successor instead of
+    /// becoming a second row. A key no entry holds at all registers a new browser.
     ///
     /// At the cap the least recently used records are dropped, and their ids returned so
     /// the caller can end their sessions too.
@@ -767,23 +780,36 @@ impl Anchor {
             return Err(SessionDeviceError::SuccessorMatchesCurrent);
         }
 
-        let device_index_for_key = |candidate: &PublicKey| {
+        // Two questions, and they are not the same one. An entry is *advanced* only by the
+        // successor it is waiting for; an entry *holds* a key in either slot, which is what
+        // a successor must not collide with.
+        let entry_awaiting = |candidate: &PublicKey| {
+            self.session_devices
+                .iter()
+                .position(|device| device.next_device_key == *candidate)
+        };
+        let entry_holding = |candidate: &PublicKey| {
             self.session_devices.iter().position(|device| {
                 device.current_device_key == *candidate || device.next_device_key == *candidate
             })
         };
-        let current_index = device_index_for_key(&current_device_key);
-        let next_index = device_index_for_key(&next_device_key);
-        if next_index.is_some() && next_index != current_index {
+
+        let advances = entry_awaiting(&current_device_key);
+        let successor_holder = entry_holding(&next_device_key);
+        if successor_holder.is_some() && successor_holder != advances {
             return Err(SessionDeviceError::SuccessorAlreadyInUse);
         }
 
-        if let Some(index) = current_index {
+        if let Some(index) = advances {
             let device = &mut self.session_devices[index];
             device.current_device_key = current_device_key;
             device.next_device_key = next_device_key;
             device.last_used = now;
             return Ok((device.id, vec![]));
+        }
+
+        if entry_holding(&current_device_key).is_some() {
+            return Err(SessionDeviceError::StaleDeviceKey);
         }
 
         let id = self.next_session_device_id;
