@@ -365,7 +365,7 @@ pub async fn prepare_account_delegation(
     // Stamped before the delegation is signed. On the IC returning `Err` commits
     // every write that came before it, so propagating a failure from here once the
     // signature was in the map would report an error for a delegation that has
-    // already been issued. `Ok(None)` is not a failure: it means the row holds no
+    // already been issued. `Ok(None)` is not a failure: it means the list holds no
     // reference to stamp, which is how a default account that is still derived rather
     // than stored reads.
     storage_borrow_mut(|storage| {
