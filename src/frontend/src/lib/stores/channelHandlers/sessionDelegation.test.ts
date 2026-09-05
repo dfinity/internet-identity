@@ -41,7 +41,8 @@ vi.mock("$lib/stores/authentication.store", async () => {
   const { writable } = await import("svelte/store");
   return { authenticationStore: writable<unknown>(undefined) };
 });
-vi.mock("$lib/stores/browser-key.store", () => ({
+vi.mock("$lib/stores/browser-key.store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("$lib/stores/browser-key.store")>()),
   withBrowserProof: (
     _identityNumber: bigint,
     _sessionKey: Uint8Array,
@@ -71,7 +72,12 @@ vi.mock("$lib/stores/authorization.store", async () => {
   };
 });
 
-import { handleSessionDelegationRequest } from "./sessionDelegation";
+import {
+  asBrowserKeyError,
+  handleSessionDelegationRequest,
+} from "./sessionDelegation";
+import { StaleBrowserKeyError } from "$lib/stores/browser-key.store";
+import { CanisterError } from "$lib/utils/utils";
 import {
   appAccountsForOrigin,
   appSessionsForOrigin,
@@ -109,7 +115,7 @@ const runCeremony = async (
         Ok: {
           user_key: new Uint8Array(chain.publicKey),
           expiration,
-          created_at: BigInt(1_000),
+          session_id: BigInt(1_000),
           account_principal: Principal.fromText("2vxsx-fae"),
           device_id: BigInt(1),
         },
@@ -603,5 +609,27 @@ describe("keeping a session for later", () => {
     await expect(appAccountsForOrigin(ORIGIN)).resolves.toMatchObject([
       { record: { accountPrincipal: "2vxsx-fae" } },
     ]);
+  });
+});
+
+describe("asBrowserKeyError", () => {
+  it("names a retired browser key so the key store can promote its successor", () => {
+    const stale = asBrowserKeyError(
+      new CanisterError({ StaleDeviceKey: null }),
+    );
+
+    expect(stale).toBeInstanceOf(StaleBrowserKeyError);
+  });
+
+  it("leaves every other canister error alone", () => {
+    const other = new CanisterError({ NoSuchAccount: null });
+
+    expect(asBrowserKeyError(other)).toBe(other);
+  });
+
+  it("leaves a transport failure alone", () => {
+    const network = new Error("network");
+
+    expect(asBrowserKeyError(network)).toBe(network);
   });
 });
