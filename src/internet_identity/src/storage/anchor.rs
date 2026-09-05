@@ -72,7 +72,7 @@ pub enum SessionDeviceError {
     /// so it is still proving with the key it announced a successor for. The answer is for
     /// the browser to promote its own successor and present that — it is the only party
     /// holding both keys. Registering it as a new browser instead would turn every dropped
-    /// response into a second row for one browser, and accepting it would leave a leaked
+    /// response into a second list for one browser, and accepting it would leave a leaked
     /// key useful for longer than the one sign-in rotation allows it.
     StaleDeviceKey,
 }
@@ -765,7 +765,7 @@ impl Anchor {
     /// has already retired is refused with [`SessionDeviceError::StaleDeviceKey`] rather
     /// than accepted or registered afresh, so a key is good for exactly one sign-in and a
     /// browser that lost a response is told to promote its own successor instead of
-    /// becoming a second row. A key no entry holds at all registers a new browser.
+    /// becoming a second list. A key no entry holds at all registers a new browser.
     ///
     /// At the cap the least recently used records are dropped, and their ids returned so
     /// the caller can end their sessions too.
