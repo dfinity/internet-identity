@@ -1523,15 +1523,15 @@ impl<M: Memory + Clone> Storage<M> {
     /// one ever held.
     ///
     /// The counter is what guarantees that: it only ever climbs, so a number it has
-    /// passed is never offered again even after the application's row is retired. Its
+    /// passed is never offered again even after the application's list is retired. Its
     /// value is not the whole answer only because it postdates the applications
     /// numbered before it existed, so the highest stored number is taken as a floor —
-    /// exact, unlike a row count, which a retirement leaves undershooting. It cannot be
-    /// the answer on its own either: removing the highest row walks it backwards.
+    /// exact, unlike a list count, which a retirement leaves undershooting. It cannot be
+    /// the answer on its own either: removing the highest list walks it backwards.
     ///
     /// Refuses at the ceiling rather than saturating. The number keys both the
-    /// application row and the origin index, so reissuing one would put two origins on
-    /// a single row and have them share its accounts and counters.
+    /// application and the origin index, so reissuing one would put two origins on
+    /// a single list and have them share its accounts and counters.
     fn allocate_application_number(&mut self) -> Result<ApplicationNumber, StorageError> {
         let above_highest_stored = match self.stable_application_memory.last_key_value() {
             Some((highest, _)) => highest
@@ -1576,9 +1576,9 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// This identity's account references at `application_number`.
     ///
-    /// An absent row normalises to the derived default: nothing has happened at this
+    /// An absent list normalises to the derived default: nothing has happened at this
     /// origin, so the identity still has the default it has always had. A stored empty
-    /// row is a tombstone and stays empty — everything here moved away and the default
+    /// list is a tombstone and stays empty — everything here moved away and the default
     /// must never be derived again.
     ///
     /// Absence and emptiness are opposites, and this is the only place that knows it.
@@ -1592,7 +1592,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// [`Self::account_references`] for a caller that has an origin rather than an
-    /// application number. An origin nothing has ever been stored under has no row, so
+    /// application number. An origin nothing has ever been stored under has no list, so
     /// it normalises the same way.
     fn account_references_for_origin(
         &self,
@@ -1614,9 +1614,9 @@ impl<M: Memory + Clone> Storage<M> {
         }]
     }
 
-    /// The row as stored, with no default derived for an absent one.
+    /// The list as stored, with no default derived for an absent one.
     ///
-    /// Only the write path may see this. The counters describe stored rows, so a row
+    /// Only the write path may see this. The counters describe stored lists, so a list
     /// that never existed must not be diffed against as though it held the default.
     fn stored_account_references(
         &self,
@@ -1652,10 +1652,10 @@ impl<M: Memory + Clone> Storage<M> {
     /// on the IC returning `Err` commits what was written before it, and only a trap
     /// rolls back, so a refusal here must leave nothing behind.
     ///
-    /// `references` is the whole new list. It is diffed against the stored row for the
+    /// `references` is the whole new list. It is diffed against the stored list for the
     /// counter deltas, so a caller supplies only what it wants stored and cannot move a
     /// counter by the default [`Self::account_references`] derived for it. A list equal
-    /// to the stored row writes nothing: the row is a single blob, so writing it back
+    /// to the stored list writes nothing: the list is a single blob, so writing it back
     /// would store the bytes it already holds.
     fn write_account_state(
         &mut self,
@@ -1667,7 +1667,7 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Result<(), StorageError> {
         let stored_references = self.stored_account_references(anchor_number, application_number);
 
-        // Nothing to say: the row already holds these bytes, so it is not written and
+        // Nothing to say: the list already holds these bytes, so it is not written and
         // nothing about it is checked either. This is what lets a rename leave every
         // reference alone without its caller having to know to skip the write.
         let list_write = if stored_references.as_deref() == Some(references.as_slice()) {
@@ -1686,9 +1686,9 @@ impl<M: Memory + Clone> Storage<M> {
                 .stable_application_memory
                 .get(&application_number)
                 .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
-            // A first row holding nothing but a derived default records nothing:
+            // A first list holding nothing but a derived default records nothing:
             // absence already says the identity has its default here, so storing it
-            // would keep bytes to repeat that. Only an account number is worth a row.
+            // would keep bytes to repeat that. Only an account number is worth a list.
             // Checked after the refusals above, so a caller still hears about a list or
             // an application it had no business passing.
             let records_nothing = stored_references.is_none()
@@ -1918,7 +1918,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// One account this identity holds at `key.origin`, or `None` where it holds none.
     ///
     /// `key.account_number` names it, `None` being the tracked default. Answering
-    /// `None` is the ownership check: an account belongs to whichever identity's row
+    /// `None` is the ownership check: an account belongs to whichever identity's list
     /// names it, so a caller that finds no reference here has no claim on the account
     /// whether or not it exists.
     ///
@@ -1999,7 +1999,7 @@ impl<M: Memory + Clone> Storage<M> {
         let application_number = self.lookup_or_insert_application_number_with_origin(&origin)?;
         let account_number = self.allocate_account_number()?;
 
-        // An absent row normalises to the derived default, which is how the first named
+        // An absent list normalises to the derived default, which is how the first named
         // account at an origin does not cost the identity the default it had. A
         // tombstone normalises to nothing and stays that way.
         let mut references = self.account_references(anchor_number, application_number);
@@ -2033,7 +2033,7 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// Renaming one, naming the tracked default, and recording that an account was used
     /// are the same read-modify-write: the account is the state to store, not a patch
-    /// over it, so what it carries is what the row ends up holding.
+    /// over it, so what it carries is what the list ends up holding.
     ///
     /// A number no reference names is [`StorageError::AccountNotFound`] and never a
     /// create. `update_account_for_origin` takes its account number straight from the
@@ -2055,7 +2055,7 @@ impl<M: Memory + Clone> Storage<M> {
             // Naming the tracked default stores this identity's first account here, so
             // the origin gets its application number now.
             (None, Some(_)) => self.lookup_or_insert_application_number_with_origin(&origin)?,
-            // Everything else writes to a row that already exists, and an origin
+            // Everything else writes to a list that already exists, and an origin
             // nothing has been stored under has none.
             _ => match self.lookup_application_number_with_origin(&origin) {
                 Some(application_number) => application_number,
@@ -2084,7 +2084,7 @@ impl<M: Memory + Clone> Storage<M> {
             .position(|reference| reference.account_number == account_number)
         else {
             // Holding a reference is what grants access, so a miss means this identity
-            // does not have the account. For the tracked default it means the row is a
+            // does not have the account. For the tracked default it means the list is a
             // tombstone or the default was named and is no longer numberless — neither
             // can be reconstructed from the origin.
             return Err(match account_number {
@@ -2128,7 +2128,7 @@ impl<M: Memory + Clone> Storage<M> {
                 )
             }
             // The tracked default, unnamed: nothing to store but the use of a
-            // reference the row already holds.
+            // reference the list already holds.
             (None, None) => {
                 self.write_account_state(
                     anchor_number,
@@ -2438,7 +2438,7 @@ impl<M: Memory + Clone> Storage<M> {
 
 /// Which of the counters derived from a reference list a delta is applied to.
 ///
-/// Each carries what identifies its row, so a refusal points at the counter that
+/// Each carries what identifies its list, so a refusal points at the counter that
 /// diverged rather than only saying that one did.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReferenceCounter {
@@ -2482,7 +2482,7 @@ impl fmt::Display for ReferenceCount {
     }
 }
 
-/// How one write to a reference-list row moves the counters derived from it.
+/// How one write to a reference-list list moves the counters derived from it.
 ///
 /// Signed because these are differences rather than totals: a write that drops a
 /// reference has to move the counters down, and there is no unsigned way to say so.
@@ -2498,11 +2498,11 @@ struct ReferenceListDeltas {
 impl ReferenceListDeltas {
     /// What writing `new_references` over `previous_references` does to the counters.
     ///
-    /// A row that does not exist and one holding nothing both count as no references,
+    /// A list that does not exist and one holding nothing both count as no references,
     /// which is right for these totals: neither contributes any. It is also why
-    /// retiring a row must not go through here — a tombstone's row is still alive while
+    /// retiring a list must not go through here — a tombstone's list is still alive while
     /// holding nothing, so a diff against it would report no change and leave the
-    /// counters claiming references the removed row no longer has.
+    /// counters claiming references the removed list no longer has.
     fn between(
         previous_references: &[AccountReference],
         new_references: &[AccountReference],
@@ -2539,7 +2539,7 @@ impl ReferenceListDeltas {
     ///
     /// Refuses rather than clamping: an under-run means the counters and the stored
     /// lists have already diverged, and a clamped zero reads as "no anchor references
-    /// this application any more", which retires a row other anchors still point at.
+    /// this application any more", which retires a list other anchors still point at.
     fn apply(
         &self,
         counter: ReferenceCounter,
@@ -2612,8 +2612,8 @@ pub enum StorageError {
     ErrorUpdatingAccountCounter,
     AccountsCounterOverflow,
     /// No application numbers left to hand out. Refused rather than saturated: the
-    /// number keys the application row and the origin index, so reissuing one would
-    /// put two origins on a single row.
+    /// number keys the application and the origin index, so reissuing one would
+    /// put two origins on a single list.
     ApplicationsCounterOverflow,
     ErrorUpdatingApplicationNumberAllocator,
     /// The references a write assembled cannot be stored as they stand.
