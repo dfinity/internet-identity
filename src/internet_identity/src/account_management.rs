@@ -104,8 +104,8 @@ pub fn get_account_for_origin(
 /// The account this identity signs in with at `origin` by default: the one it reserved,
 /// or its tracked default where it reserved none.
 ///
-/// An `Err` means the identity has neither, which it can only reach by moving every
-/// account away from the origin.
+/// An `Err` means the identity has no account at this origin at all, which it can only
+/// reach by moving every account away from it.
 pub fn get_default_account_for_origin(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
@@ -122,7 +122,16 @@ pub fn get_default_account_for_origin(
 
     // A `None` here reads the tracked default, so an anchor that reserved nothing and
     // one whose reservation is still the default answer the same way.
-    try_read_account_info(anchor_number, &origin, reserved)
+    if let Ok(account) = try_read_account_info(anchor_number, &origin, reserved) {
+        return Ok(account);
+    }
+
+    // A reservation naming an account this identity no longer holds answers the same as
+    // no reservation at all, which is what `mcp::default_account_number` already does
+    // with the same config. Reporting an internal error here would tell an identity that
+    // still holds its tracked default that it has no default, over a state a rename or a
+    // move can leave behind.
+    try_read_account_info(anchor_number, &origin, None)
         .map_err(GetDefaultAccountError::InternalCanisterError)
 }
 
@@ -1123,6 +1132,46 @@ fn should_succeed_get_default_account_for_nonexistent_anchor() {
         Ok(AccountInfo {
             account_number: None,
             origin: "https://example.com".to_string(),
+            last_used: None,
+            name: None,
+        })
+    );
+}
+
+/// A reservation can outlive the account it names — a rename or a move leaves the config
+/// pointing at a number this identity no longer holds. That identity still has its
+/// tracked default, so answering with an internal error would tell it it has no default
+/// when it does, and would disagree with `mcp::default_account_number`, which reads the
+/// same config and falls back.
+#[test]
+fn should_fall_back_to_the_tracked_default_when_the_reservation_is_stale() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor_number = anchor.anchor_number();
+    let origin = "https://example.com".to_string();
+    storage_borrow_mut(|storage| storage.write(anchor)).unwrap();
+    create_account_for_origin(anchor_number, origin.clone(), "Alice".to_string()).unwrap();
+
+    // A number this identity does not hold, which is the shape a stale reservation has.
+    // Written through storage rather than through `set_default_account_for_origin`,
+    // which reads the account first and so cannot produce this state — a rename or a
+    // move is what leaves it behind.
+    storage_borrow_mut(|storage| {
+        storage.set_default_account(anchor_number, origin.clone(), Some(9_999))
+    })
+    .unwrap();
+
+    let result = get_default_account_for_origin(anchor_number, origin.clone());
+
+    assert_eq!(
+        result,
+        Ok(AccountInfo {
+            account_number: None,
+            origin,
             last_used: None,
             name: None,
         })
