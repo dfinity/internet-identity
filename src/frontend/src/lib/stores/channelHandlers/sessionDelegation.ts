@@ -15,7 +15,6 @@ import {
 import { authenticationStore } from "$lib/stores/authentication.store";
 import {
   appSessionsForOrigin,
-  discardAppSession,
   rememberAppAccount,
   storeAppSession,
   type AppSessionRecord,
@@ -150,6 +149,12 @@ const extendToApp = async (
  * this browser's copy in place. Answering from the record alone would hand the app a
  * chain that cannot mint, and the failure would surface later as something the client
  * cannot tell apart from a real error.
+ *
+ * A hint and not an authority. The reply is a query reply, so it is uncertified and
+ * anyone able to answer it can say no — which is why a no only skips the silent path.
+ * Nothing here is deleted on it: a wrong no would otherwise destroy a working session's
+ * key, turning a flake into something an attacker can trigger. A no that was a lie costs
+ * one silent attempt, and the next one asks again.
  */
 const sessionIsLive = async (record: AppSessionRecord): Promise<boolean> => {
   try {
@@ -248,11 +253,9 @@ export const handleSessionDelegationRequest =
 
         let usable = "session" in chosen ? chosen.session : undefined;
         if (usable && !(await sessionIsLive(usable.record))) {
-          await discardAppSession({
-            identityNumber: usable.identityNumber,
-            accountNumber: usable.accountNumber,
-            origin: effectiveOrigin,
-          });
+          // The record stays. A session that is really gone leaves a record that is
+          // filtered out on read once it expires, and removing it would need a certified
+          // answer — which is an update call, made by the app, not by this.
           usable = undefined;
         }
 
