@@ -1686,7 +1686,7 @@ impl<M: Memory + Clone> Storage<M> {
             .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
 
         // Every reference goes, so every principal it derived goes with it — resolved
-        // before the first removal so a missing salt refuses with the row intact.
+        // before the first removal so a missing salt refuses with the list intact.
         let salt = *self.salt().ok_or(StorageError::SaltNotSet)?;
         let origin = application.origin.clone();
 
@@ -1872,7 +1872,7 @@ impl<M: Memory + Clone> Storage<M> {
             )?;
 
             // Nothing below this line can fail. The record goes in before the index,
-            // because a principal is derived from an account's stored row and one that
+            // because a principal is derived from an account's stored list and one that
             // is not in yet derives nothing — a new account would get no entry.
             if let Some((account_number, storable_account)) = record.take() {
                 self.stable_account_memory
@@ -1971,7 +1971,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    /// The principals a set of references derives to. A reference whose account row is
+    /// The principals a set of references derives to. A reference whose account list is
     /// gone derives nothing and is skipped.
     fn account_principals(
         &self,
