@@ -306,7 +306,7 @@ const BUCKET_SIZE_IN_PAGES: u16 = 128;
 const MAX_MANAGED_MEMORY_SIZE: u64 = 256 * GB;
 const MAX_MANAGED_WASM_PAGES: u64 = MAX_MANAGED_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES;
 
-/// Per-anchor cap on reference-list lists that hold nothing but a tracked default
+/// Per-anchor cap on account reference lists that hold nothing but a tracked default
 /// account.
 const MAX_EVICTABLE_DEFAULT_ACCOUNTS: u64 = 500;
 
@@ -1553,15 +1553,15 @@ impl<M: Memory + Clone> Storage<M> {
     /// one ever held.
     ///
     /// The counter is what guarantees that: it only ever climbs, so a number it has
-    /// passed is never offered again even after the application's list is retired. Its
+    /// passed is never offered again even after the application is retired. Its
     /// value is not the whole answer only because it postdates the applications
     /// numbered before it existed, so the highest stored number is taken as a floor —
-    /// exact, unlike a list count, which a retirement leaves undershooting. It cannot be
-    /// the answer on its own either: removing the highest list walks it backwards.
+    /// exact, unlike an application count, which a retirement leaves undershooting. It cannot be
+    /// the answer on its own either: removing the highest application walks it backwards.
     ///
     /// Refuses at the ceiling rather than saturating. The number keys both the
     /// application and the origin index, so reissuing one would put two origins on
-    /// a single list and have them share its accounts and counters.
+    /// a single application and have them share its accounts and counters.
     fn allocate_application_number(&mut self) -> Result<ApplicationNumber, StorageError> {
         let above_highest_stored = match self.stable_application_memory.last_key_value() {
             Some((highest, _)) => highest
@@ -1658,7 +1658,7 @@ impl<M: Memory + Clone> Storage<M> {
             .map(Vec::<AccountReference>::from)
     }
 
-    /// Removes a reference-list list and everything derived from it.
+    /// Removes a account reference list and everything derived from it.
     fn remove_reference_list(
         &mut self,
         anchor_number: AnchorNumber,
@@ -1715,8 +1715,8 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Rows whose only reference is a tracked default.
-    fn evictable_default_rows(
+    /// Lists whose only reference is a tracked default.
+    fn evictable_default_lists(
         &self,
         anchor_number: AnchorNumber,
     ) -> Vec<(ApplicationNumber, Option<Timestamp>)> {
@@ -1756,7 +1756,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         let mut candidates: Vec<_> = self
-            .evictable_default_rows(anchor_number)
+            .evictable_default_lists(anchor_number)
             .into_iter()
             .filter(|(application_number, _)| *application_number != just_written)
             .collect();
@@ -1918,13 +1918,13 @@ impl<M: Memory + Clone> Storage<M> {
         references: Vec<AccountReference>,
         config: Option<AnchorApplicationConfig>,
     ) -> Result<(), StorageError> {
-        let is_new_row = self
+        let is_new_list = self
             .stored_account_references(anchor_number, application_number)
             .is_none();
 
         self.write_account_state(anchor_number, application_number, references, None, config)?;
 
-        if is_new_row {
+        if is_new_list {
             self.evict_idle_tracked_defaults(anchor_number, application_number)?;
         }
 
@@ -2931,7 +2931,7 @@ pub enum ReferenceCount {
     Accounts,
     /// References, named and tracked-default alike.
     References,
-    /// Rows that exist while holding no reference.
+    /// Lists that exist while holding no reference.
     Tombstones,
 }
 
@@ -2945,7 +2945,7 @@ impl fmt::Display for ReferenceCount {
     }
 }
 
-/// How one write to a reference-list list moves the counters derived from it.
+/// How one write to a account reference list moves the counters derived from it.
 ///
 /// Signed because these are differences rather than totals: a write that drops a
 /// reference has to move the counters down, and there is no unsigned way to say so.
