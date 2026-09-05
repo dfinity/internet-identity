@@ -9,6 +9,8 @@ import { Actor, ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import { authenticationStore } from "$lib/stores/authentication.store";
+import { currentDeviceId } from "$lib/stores/browser-key.store";
+import { purgeAppSessions } from "$lib/stores/app-session.store";
 import { canisterId, agentOptions } from "$lib/globals";
 import {
   mintSessionDelegation,
@@ -96,4 +98,36 @@ export const actorForIdentity = async (
     void purgeSession(identityNumber);
     return undefined;
   }
+};
+
+/**
+ * Forgets an identity on this device, and signs it out of every app it is signed into
+ * from here.
+ *
+ * Dropping the local records alone would only stop II from silently signing the user
+ * back in: the apps hold delegation chains rooted at session records the canister still
+ * has, and go on refreshing against them until they expire. Ending this browser's
+ * sessions for this identity is what makes "forget" mean signed out.
+ *
+ * Sessions are per browser and per identity, so this leaves other identities on this
+ * browser, and this identity on the user's other browsers, alone.
+ */
+export const forgetIdentity = async (identityNumber: bigint): Promise<void> => {
+  const deviceId = await currentDeviceId(identityNumber);
+  const actor =
+    deviceId === undefined ? undefined : await actorForIdentity(identityNumber);
+  if (deviceId !== undefined && actor !== undefined) {
+    try {
+      await actor.revoke_device_sessions({
+        identity_number: identityNumber,
+        device_id: deviceId,
+      });
+    } catch {
+      // The local records go either way. Keeping them because the canister could not be
+      // reached would leave II able to sign the user back in silently, which is the
+      // thing the user asked it to stop doing.
+    }
+  }
+  await purgeSession(identityNumber);
+  await purgeAppSessions(identityNumber);
 };
