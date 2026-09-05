@@ -1939,6 +1939,11 @@ impl<M: Memory + Clone> Storage<M> {
         let anchor_number = params.anchor_number;
         let origin = &params.origin;
 
+        // Ahead of the allocation, which writes: nothing between the two depends on the
+        // account number, and an `Err` here after it would commit a number that is now
+        // burned and an account record nothing references.
+        let application_number = self.lookup_or_insert_application_number_with_origin(origin)?;
+
         // Create and store account in stable memory
         let account_number = self.allocate_account_number()?;
         let storable_account = StorableAccount {
@@ -1947,9 +1952,6 @@ impl<M: Memory + Clone> Storage<M> {
         };
         self.stable_account_memory
             .insert(account_number, storable_account);
-
-        // Update application data
-        let application_number = self.lookup_or_insert_application_number_with_origin(origin)?;
 
         // last_used will be set once the user signs in with the account.
         let last_used = None;
@@ -2218,6 +2220,12 @@ impl<M: Memory + Clone> Storage<M> {
             }
         };
 
+        // Get or create an application number from the account's origin. Ahead of the
+        // allocation, which writes: nothing between the two depends on the account number,
+        // and an `Err` here after it would commit a number that is now burned and an
+        // account record nothing references.
+        let application_number = self.lookup_or_insert_application_number_with_origin(&origin)?;
+
         // Create and store the default account.
         let new_account_number = self.allocate_account_number()?;
         let storable_account = StorableAccount {
@@ -2227,9 +2235,6 @@ impl<M: Memory + Clone> Storage<M> {
         };
         self.stable_account_memory
             .insert(new_account_number, storable_account.clone());
-
-        // Get or create an application number from the account's origin.
-        let application_number = self.lookup_or_insert_application_number_with_origin(&origin)?;
 
         // Update default account in the (anchor, origin) config.
         {
