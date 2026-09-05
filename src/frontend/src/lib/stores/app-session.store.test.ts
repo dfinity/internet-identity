@@ -16,7 +16,7 @@ const record = (expiresAtMillis: number): AppSessionRecord => ({
   keyPair: {} as CryptoKeyPair,
   chainJson: "{}",
   expiresAtMillis,
-  createdAtNanos: BigInt(1_000),
+  sessionId: BigInt(1_000),
   accessLevel: "full-access" as const,
 });
 
