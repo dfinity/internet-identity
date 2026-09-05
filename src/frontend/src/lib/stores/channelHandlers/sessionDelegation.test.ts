@@ -26,7 +26,12 @@ vi.mock("$lib/stores/authorization.store", () => ({
   authorizedStore: { subscribe: () => () => {} },
 }));
 
-import { handleSessionDelegationRequest } from "./sessionDelegation";
+import {
+  asBrowserKeyError,
+  handleSessionDelegationRequest,
+} from "./sessionDelegation";
+import { StaleBrowserKeyError } from "$lib/stores/browser-key.store";
+import { CanisterError } from "$lib/utils/utils";
 import { purgeAppSessions } from "$lib/stores/app-session.store";
 
 const channelWith = () => {
@@ -88,5 +93,27 @@ describe("ii_session_delegation", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ id: 1, error: { code: -32602 } });
     expect(onError).toHaveBeenCalledWith("invalid-request");
+  });
+});
+
+describe("asBrowserKeyError", () => {
+  it("names a retired browser key so the key store can promote its successor", () => {
+    const stale = asBrowserKeyError(
+      new CanisterError({ StaleDeviceKey: null }),
+    );
+
+    expect(stale).toBeInstanceOf(StaleBrowserKeyError);
+  });
+
+  it("leaves every other canister error alone", () => {
+    const other = new CanisterError({ NoSuchAccount: null });
+
+    expect(asBrowserKeyError(other)).toBe(other);
+  });
+
+  it("leaves a transport failure alone", () => {
+    const network = new Error("network");
+
+    expect(asBrowserKeyError(network)).toBe(network);
   });
 });
