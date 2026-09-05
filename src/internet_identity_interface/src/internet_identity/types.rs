@@ -853,8 +853,6 @@ pub enum AppSessionError {
     InternalCanisterError(String),
 }
 
-/// Revokes one session of an anchor, named by where it was created.
-
 /// Signs one browser out of every app it is signed into.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct RevokeDeviceSessionsRequest {
