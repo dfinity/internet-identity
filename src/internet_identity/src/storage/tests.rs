@@ -2531,7 +2531,7 @@ mod account_reference_state_tests {
     }
 
     #[test]
-    fn an_untouched_row_offers_a_reconstructible_default() {
+    fn an_untouched_list_offers_a_reconstructible_default() {
         let (storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
 
@@ -2542,7 +2542,7 @@ mod account_reference_state_tests {
     }
 
     #[test]
-    fn a_tombstoned_row_lists_nothing_but_still_answers_the_default() {
+    fn a_tombstoned_list_holds_nothing_but_still_answers_the_default() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         plant_tombstone(&mut storage, anchor_number);
@@ -2555,7 +2555,7 @@ mod account_reference_state_tests {
     }
 
     #[test]
-    fn a_row_that_names_no_default_has_no_default_to_read() {
+    fn a_list_that_names_no_default_has_no_default_to_read() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         let account = storage
@@ -2590,7 +2590,7 @@ mod account_reference_state_tests {
     }
 
     #[test]
-    fn a_named_account_added_to_a_tombstoned_row_does_not_revive_the_default() {
+    fn a_named_account_added_to_a_tombstoned_list_does_not_revive_the_default() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         plant_tombstone(&mut storage, anchor_number);
