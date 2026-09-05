@@ -4721,7 +4721,7 @@ mod session_record_tests {
     /// Eviction orders on the list's `last_used`, which every refresh stamps, so a session
     /// in use keeps its list at the newest end and survives the cap on its own.
     #[test]
-    fn a_refreshed_session_keeps_its_row_and_a_stale_one_does_not() {
+    fn a_refreshed_session_keeps_its_list_and_a_stale_one_does_not() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let stale = "https://never-came-back.com".to_string();
         let refreshed = "https://still-in-use.com".to_string();
