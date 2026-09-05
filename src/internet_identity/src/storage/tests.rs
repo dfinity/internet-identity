@@ -4458,11 +4458,8 @@ mod account_principal_index_backfill_tests {
             .unwrap();
         storage.stable_account_reference_list_memory.insert(
             (anchor_number, application_number),
-            StorableAccountReferenceList::try_from(vec![AccountReference {
-                account_number: None,
-                last_used: Some(1),
-            }])
-            .unwrap(),
+            StorableAccountReferenceList::try_from(vec![AccountReference::new(None, Some(1))])
+                .unwrap(),
         );
 
         let outcome = storage.backfill_account_principal_index_batch(None, 100);
@@ -4505,18 +4502,12 @@ mod account_principal_index_backfill_tests {
         let (mut storage, anchors) = storage_with_rows(1);
         let anchor_number = anchors[0];
         let origin = "https://d-0.com".to_string();
-        let mut references = vec![AccountReference {
-            account_number: None,
-            last_used: Some(1),
-        }];
+        let mut references = vec![AccountReference::new(None, Some(1))];
         for _ in 0..4 {
             let account = storage
                 .create_account(anchor_number, origin.clone(), "named".to_string())
                 .unwrap();
-            references.push(AccountReference {
-                account_number: account.account_number,
-                last_used: None,
-            });
+            references.push(AccountReference::new(account.account_number, None));
         }
         clear_index(&mut storage);
 
