@@ -29,8 +29,9 @@ impl Storable for StorableAccountReferenceList {
 /// Why a list of account references cannot be stored.
 ///
 /// Only ever raised on the way in. Decoding stays infallible, so a rule added here
-/// applies to every future write of an existing row as well as to new ones — a stored
-/// row that broke one would become unwritable, and for a reference list that means an
+/// applies to every future write of an existing list as well as to new ones — a stored
+/// list that broke one would become unwritable, and for an account reference list that
+/// means an
 /// identity locked out of the origin. So the rules here are limited to states nothing
 /// has ever written.
 #[derive(Debug, Eq, PartialEq)]
@@ -59,7 +60,7 @@ impl StorableAccountReferenceList {
         self.0
     }
 
-    /// The row a future account move will leave behind, for tests that need one to
+    /// The list a future account move will leave behind, for tests that need one to
     /// exist. Test-only because [`Self::try_from`] refuses it, which is the point.
     #[cfg(test)]
     pub fn tombstone_for_testing() -> Self {
@@ -130,7 +131,7 @@ mod tests {
 
     #[test]
     fn a_list_without_a_tracked_default_is_storable() {
-        // Not a tombstone: the default was named, so the row legitimately holds only
+        // Not a tombstone: the default was named, so the list legitimately holds only
         // numbered references.
         assert!(StorableAccountReferenceList::try_from(vec![reference(Some(7))]).is_ok());
     }
