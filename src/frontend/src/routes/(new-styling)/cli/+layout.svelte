@@ -71,7 +71,7 @@
         removedIdentity.name ?? `${removedIdentity.identityNumber}`;
       toaster.create({
         title: $t`Identity removed`,
-        description: $t`${identityName} has been removed from this device.`,
+        description: $t`${identityName} has been removed from this device. Apps you were signed into here have been signed out.`,
         closable: true,
         duration: 5000,
         action: {
