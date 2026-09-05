@@ -1065,6 +1065,11 @@ type GetAccountSessionRequest = record {
     account_number : opt AccountNumber;
     session_key : SessionKey;
     expiration : Timestamp;
+    // Which browser and which sign-in, both returned by prepare_account_session. The
+    // pair names one session: a browser keeps its id across sign-ins, so the creation
+    // time is what tells two of its sessions apart.
+    device_id : nat32;
+    created_at : Timestamp;
 };
 
 type GetAccountSessionResponse = record {
@@ -1097,12 +1102,6 @@ type AppGetDelegationRequest = record {
     expiration : Timestamp;
 };
 
-type RevokeAccountSessionRequest = record {
-    identity_number : UserNumber;
-    origin : text;
-    account_number : opt AccountNumber;
-    created_at : Timestamp;
-};
 
 type RevokeDeviceSessionsRequest = record {
     identity_number : UserNumber;
@@ -1994,10 +1993,6 @@ service : (opt InternetIdentityInit) -> {
     // session was already gone. An app can revoke only its own session.
     app_revoke_session : () -> ();
 
-    // Revocation from the user's own settings, authenticated by an anchor access method
-    // rather than by a session chain. A session is named by locator here, never by
-    // principal, but removing one still drops its entry from the session index.
-    revoke_account_session : (RevokeAccountSessionRequest) -> (variant { Ok; Err : SessionRevokeError });
     revoke_device_sessions : (RevokeDeviceSessionsRequest) -> (variant { Ok; Err : SessionRevokeError });
 
     prepare_account_delegation : (
