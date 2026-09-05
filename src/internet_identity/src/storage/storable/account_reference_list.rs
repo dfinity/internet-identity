@@ -105,10 +105,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     fn reference(account_number: Option<u64>) -> AccountReference {
-        AccountReference {
-            account_number,
-            last_used: None,
-        }
+        AccountReference::new(account_number, None)
     }
 
     #[test]

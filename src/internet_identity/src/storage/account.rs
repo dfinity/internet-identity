@@ -8,7 +8,7 @@ use ic_cdk::trap;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountInfo, AccountNameValidationError, AccountNumber, AnchorNumber, FrontendHostname,
-    Timestamp, UserKey,
+    SessionDeviceId, Timestamp, UserKey,
 };
 use serde::{Deserialize, Serialize};
 
@@ -40,6 +40,71 @@ pub struct AccountsCounter {
 pub struct AccountReference {
     pub account_number: Option<AccountNumber>, // None is the unreserved synthetic account
     pub last_used: Option<Timestamp>,
+    pub sessions: Vec<SessionRecord>,
+}
+
+impl AccountReference {
+    pub fn new(account_number: Option<AccountNumber>, last_used: Option<Timestamp>) -> Self {
+        Self {
+            account_number,
+            last_used,
+            sessions: vec![],
+        }
+    }
+}
+
+/// A revocable session at one account. Only `last_refreshed` is mutable, which is why
+/// it is the one field absent from the seed.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct SessionRecord {
+    pub created_at_ns: Timestamp,
+    pub valid_till_ns: Timestamp,
+    pub max_idle_ns: u64,
+    pub last_refreshed_ns: Option<Timestamp>,
+    pub device_id: SessionDeviceId,
+    pub read_only: bool,
+}
+
+impl SessionRecord {
+    /// Whether this session is finished, on either bound.
+    ///
+    /// One question rather than two, because a caller has no use for the halves
+    /// apart: a session past its lifetime and one nobody has used for longer than
+    /// it was allowed are equally over. Asking separately is how a caller ends up
+    /// checking one and forgetting the other.
+    ///
+    /// Idleness is measured from the last mint, or from creation where nothing has
+    /// minted yet, so a session abandoned immediately after sign-in is bounded like
+    /// any other.
+    pub fn is_over(&self, now: Timestamp) -> bool {
+        if self.valid_till_ns <= now {
+            return true;
+        }
+        let last_used = self.last_refreshed_ns.unwrap_or(self.created_at_ns);
+        now.saturating_sub(last_used) >= self.max_idle_ns
+    }
+
+    /// How long this session stayed in service: the span from its creation to the last time
+    /// its app asked for a delegation. Bounded by the session's own lifetime.
+    pub fn demonstrated_use(&self) -> u64 {
+        self.last_refreshed_ns
+            .map_or(0, |refreshed| refreshed.saturating_sub(self.created_at_ns))
+    }
+
+    /// What the caps reclaim on, ascending: dead sessions first, then live ones by how
+    /// recently used, extended by how long they stayed in service.
+    ///
+    /// The extension is what separates an app in weekly use from one opened once and
+    /// abandoned, which recency alone gets backwards — the abandoned one was touched more
+    /// recently. `device_id` only makes the order total.
+    pub fn reclaim_order(&self, now: Timestamp) -> (bool, Timestamp, SessionDeviceId) {
+        let last_used = self.last_refreshed_ns.unwrap_or(self.created_at_ns);
+        (
+            !self.is_over(now),
+            last_used.saturating_add(self.demonstrated_use()),
+            self.device_id,
+        )
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -129,10 +194,7 @@ impl Account {
     // Used in tests (for now)
     #[allow(dead_code)]
     pub fn to_reference(&self) -> AccountReference {
-        AccountReference {
-            account_number: self.account_number,
-            last_used: self.last_used,
-        }
+        AccountReference::new(self.account_number, self.last_used)
     }
 
     pub fn to_info(&self) -> AccountInfo {

@@ -513,10 +513,7 @@ fn should_track_the_default_account_on_first_use() {
         .unwrap();
     assert_eq!(
         storage.stored_account_references(anchor_number, application_number),
-        Some(vec![AccountReference {
-            account_number: None,
-            last_used: Some(timestamp),
-        }])
+        Some(vec![AccountReference::new(None, Some(timestamp))])
     );
 }
 
@@ -2213,10 +2210,7 @@ mod reference_list_write_path_tests {
             .write_account_state(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: Some(1),
-                    last_used: None,
-                }],
+                vec![AccountReference::new(Some(1), None)],
                 None,
                 None,
             )
@@ -2250,14 +2244,8 @@ mod reference_list_write_path_tests {
         let application_number = storage
             .lookup_or_insert_application_number_with_origin(&origin)
             .unwrap();
-        let default_reference = AccountReference {
-            account_number: None,
-            last_used: None,
-        };
-        let named_reference = AccountReference {
-            account_number: Some(1),
-            last_used: None,
-        };
+        let default_reference = AccountReference::new(None, None);
+        let named_reference = AccountReference::new(Some(1), None);
         storage
             .write_account_state(
                 anchor_number,
@@ -2306,14 +2294,8 @@ mod reference_list_write_path_tests {
         let application_number = storage
             .lookup_or_insert_application_number_with_origin(&origin)
             .unwrap();
-        let default_reference = AccountReference {
-            account_number: None,
-            last_used: None,
-        };
-        let named_reference = AccountReference {
-            account_number: Some(1),
-            last_used: None,
-        };
+        let default_reference = AccountReference::new(None, None);
+        let named_reference = AccountReference::new(Some(1), None);
         storage
             .write_account_state(
                 anchor_number,
@@ -2379,10 +2361,7 @@ mod reference_list_write_path_tests {
         let result = storage.write_account_state(
             anchor_number,
             unknown_application_number,
-            vec![AccountReference {
-                account_number: None,
-                last_used: None,
-            }],
+            vec![AccountReference::new(None, None)],
             None,
             None,
         );
@@ -2414,10 +2393,7 @@ mod reference_list_write_path_tests {
         let application_number = storage
             .lookup_or_insert_application_number_with_origin(&origin)
             .unwrap();
-        let references = vec![AccountReference {
-            account_number: Some(1),
-            last_used: None,
-        }];
+        let references = vec![AccountReference::new(Some(1), None)];
         storage
             .write_account_state(
                 anchor_number,
@@ -2462,14 +2438,8 @@ mod reference_list_write_path_tests {
                 anchor_number,
                 application_number,
                 vec![
-                    AccountReference {
-                        account_number: None,
-                        last_used: None,
-                    },
-                    AccountReference {
-                        account_number: Some(7),
-                        last_used: None,
-                    },
+                    AccountReference::new(None, None),
+                    AccountReference::new(Some(7), None),
                 ],
                 None,
                 None,
@@ -2504,10 +2474,7 @@ mod reference_list_write_path_tests {
             .write_account_state(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: None,
-                    last_used: None,
-                }],
+                vec![AccountReference::new(None, None)],
                 None,
                 None,
             )
@@ -2516,10 +2483,7 @@ mod reference_list_write_path_tests {
             .write_account_state(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: Some(3),
-                    last_used: None,
-                }],
+                vec![AccountReference::new(Some(3), None)],
                 None,
                 None,
             )
@@ -2541,10 +2505,7 @@ mod reference_list_write_path_tests {
         let application_number = storage
             .lookup_or_insert_application_number_with_origin(&origin)
             .unwrap();
-        let references = vec![AccountReference {
-            account_number: Some(1),
-            last_used: None,
-        }];
+        let references = vec![AccountReference::new(Some(1), None)];
 
         storage
             .write_account_state(
@@ -2561,10 +2522,7 @@ mod reference_list_write_path_tests {
             .write_account_state(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: Some(1),
-                    last_used: Some(123),
-                }],
+                vec![AccountReference::new(Some(1), Some(123))],
                 None,
                 None,
             )
@@ -2716,10 +2674,7 @@ mod account_reference_state_tests {
             .write_account_state(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: Some(account_number),
-                    last_used: None,
-                }],
+                vec![AccountReference::new(Some(account_number), None)],
                 None,
                 None,
             )
@@ -2825,14 +2780,8 @@ mod account_reference_state_tests {
         assert_eq!(
             references.iter().collect::<Vec<_>>(),
             vec![
-                &AccountReference {
-                    account_number: default.account_number,
-                    last_used: Some(stamped_at),
-                },
-                &AccountReference {
-                    account_number: named.account_number,
-                    last_used: None,
-                },
+                &AccountReference::new(default.account_number, Some(stamped_at)),
+                &AccountReference::new(named.account_number, None),
             ]
         );
     }
@@ -3150,10 +3099,7 @@ mod default_account_tracking_tests {
 
         assert_eq!(
             storage.stored_account_references(anchor_number, application_number),
-            Some(vec![AccountReference {
-                account_number: None,
-                last_used: Some(1_000),
-            }])
+            Some(vec![AccountReference::new(None, Some(1_000))])
         );
     }
 
@@ -3185,10 +3131,7 @@ mod default_account_tracking_tests {
             .unwrap();
         assert_eq!(
             storage.stored_account_references(anchor_number, application_number),
-            Some(vec![AccountReference {
-                account_number: None,
-                last_used: Some(1_000),
-            }])
+            Some(vec![AccountReference::new(None, Some(1_000))])
         );
     }
 
@@ -3225,10 +3168,7 @@ mod default_account_tracking_tests {
             .write_account_state(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: Some(9),
-                    last_used: None,
-                }],
+                vec![AccountReference::new(Some(9), None)],
                 None,
                 None,
             )
@@ -3275,10 +3215,7 @@ mod default_account_tracking_tests {
 
         assert_eq!(
             storage.stored_account_references(anchor_number, application_number),
-            Some(vec![AccountReference {
-                account_number: None,
-                last_used: None,
-            }])
+            Some(vec![AccountReference::new(None, None)])
         );
     }
 
@@ -3407,10 +3344,7 @@ mod tracked_default_eviction_tests {
                 .write_account_state(
                     anchor_number,
                     application_number,
-                    vec![AccountReference {
-                        account_number: None,
-                        last_used: Some(index + 1),
-                    }],
+                    vec![AccountReference::new(None, Some(index + 1))],
                     None,
                     None,
                 )
@@ -3427,8 +3361,10 @@ mod tracked_default_eviction_tests {
         )
         .unwrap();
 
-        let after = storage.evictable_default_rows(anchor_number).len() as u64;
-        assert_eq!(before + 1 - after, MAX_EVICTIONS_PER_CALL);
+        assert_eq!(
+            before + 1 - storage.evictable_default_rows(anchor_number).len() as u64,
+            MAX_EVICTIONS_PER_CALL
+        );
     }
 
     #[test]
@@ -3659,10 +3595,7 @@ mod tracked_default_eviction_tests {
             .write_account_state(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: Some(1),
-                    last_used: None,
-                }],
+                vec![AccountReference::new(Some(1), None)],
                 None,
                 None,
             )
@@ -3778,10 +3711,7 @@ mod application_removal_tests {
             .write_account_state(
                 anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: None,
-                    last_used: Some(2_000),
-                }],
+                vec![AccountReference::new(None, Some(2_000))],
                 None,
                 None,
             )
@@ -3964,10 +3894,7 @@ mod application_removal_tests {
             .write_account_state(
                 other_anchor_number,
                 application_number,
-                vec![AccountReference {
-                    account_number: None,
-                    last_used: Some(1_000),
-                }],
+                vec![AccountReference::new(None, Some(1_000))],
                 None,
                 None,
             )
@@ -4324,10 +4251,7 @@ mod account_principal_index_tests {
         let result = storage.write_account_state(
             anchor_number,
             application_number,
-            vec![AccountReference {
-                account_number: None,
-                last_used: Some(1),
-            }],
+            vec![AccountReference::new(None, Some(1))],
             None,
             None,
         );
@@ -4402,10 +4326,7 @@ mod account_principal_index_backfill_tests {
                 .write_account_state(
                     anchor_number,
                     application_number,
-                    vec![AccountReference {
-                        account_number: None,
-                        last_used: Some(index + 1),
-                    }],
+                    vec![AccountReference::new(None, Some(index + 1))],
                     None,
                     None,
                 )
@@ -4497,11 +4418,8 @@ mod account_principal_index_backfill_tests {
             .unwrap();
         storage.stable_account_reference_list_memory.insert(
             (anchor_number, application_number),
-            StorableAccountReferenceList::try_from(vec![AccountReference {
-                account_number: None,
-                last_used: Some(1),
-            }])
-            .unwrap(),
+            StorableAccountReferenceList::try_from(vec![AccountReference::new(None, Some(1))])
+                .unwrap(),
         );
 
         let outcome = storage.backfill_account_principal_index_batch(None, 100);
@@ -4544,18 +4462,12 @@ mod account_principal_index_backfill_tests {
         let (mut storage, anchors) = storage_with_rows(1);
         let anchor_number = anchors[0];
         let origin = "https://d-0.com".to_string();
-        let mut references = vec![AccountReference {
-            account_number: None,
-            last_used: Some(1),
-        }];
+        let mut references = vec![AccountReference::new(None, Some(1))];
         for _ in 0..4 {
             let account = storage
                 .create_account(anchor_number, origin.clone(), "named".to_string())
                 .unwrap();
-            references.push(AccountReference {
-                account_number: account.account_number,
-                last_used: None,
-            });
+            references.push(AccountReference::new(account.account_number, None));
         }
         clear_index(&mut storage);
 
@@ -4583,6 +4495,238 @@ mod account_principal_index_backfill_tests {
         assert_eq!(
             storage.lookup_account_with_principal_memory.len() as usize,
             references.len()
+        );
+    }
+}
+
+mod session_record_tests {
+    use crate::storage::account::{AccountReference, SessionRecord};
+    use crate::storage::storable::account_reference::StorableAccountReference;
+    use crate::{Storage, DAY_NS, MINUTE_NS};
+    use ic_stable_structures::{Storable, VectorMemory};
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    /// A bound so far out that only `valid_till_ns` can end these records, which is
+    /// what the tests about the absolute bound want.
+    const NEVER_IDLE: u64 = u64::MAX;
+
+    fn session(created_at_ns: u64, valid_till_ns: u64) -> SessionRecord {
+        SessionRecord {
+            created_at_ns,
+            valid_till_ns,
+            max_idle_ns: NEVER_IDLE,
+            last_refreshed_ns: None,
+            device_id: 1,
+            read_only: false,
+        }
+    }
+
+    fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        (storage, anchor_number)
+    }
+
+    #[test]
+    fn a_reference_with_sessions_round_trips() {
+        // Every field differs, inside a record and between the two, so a pair of fields
+        // swapped on the way through either conversion reads back as a mismatch rather
+        // than as a value that happens to match the one it was swapped with.
+        let reference = AccountReference {
+            account_number: Some(3),
+            last_used: Some(9),
+            sessions: vec![
+                SessionRecord {
+                    created_at_ns: 11,
+                    valid_till_ns: 22,
+                    max_idle_ns: 33,
+                    last_refreshed_ns: Some(44),
+                    device_id: 55,
+                    read_only: false,
+                },
+                SessionRecord {
+                    created_at_ns: 66,
+                    valid_till_ns: 77,
+                    max_idle_ns: 88,
+                    last_refreshed_ns: None,
+                    device_id: 99,
+                    read_only: true,
+                },
+            ],
+        };
+
+        let stored = StorableAccountReference::from(reference.clone());
+        let decoded =
+            AccountReference::from(StorableAccountReference::from_bytes(stored.to_bytes()));
+
+        assert_eq!(decoded, reference);
+    }
+
+    #[test]
+    fn a_bound_further_out_than_the_session_never_bites() {
+        let record = session(0, DAY_NS);
+
+        assert!(!record.is_over(0));
+        // Past its own lifetime, so over on the other bound — which is the point:
+        // one question, answered by whichever bound is reached first.
+        assert!(record.is_over(DAY_NS));
+    }
+
+    #[test]
+    fn a_session_is_idle_once_nothing_has_minted_for_its_bound() {
+        let record = SessionRecord {
+            max_idle_ns: 30 * MINUTE_NS,
+            last_refreshed_ns: Some(10 * MINUTE_NS),
+            ..session(0, DAY_NS)
+        };
+
+        assert!(!record.is_over(39 * MINUTE_NS));
+        // Still inside its absolute lifetime, and over anyway: either bound ends it.
+        assert!(record.is_over(40 * MINUTE_NS));
+    }
+
+    #[test]
+    fn a_session_that_never_minted_is_measured_from_its_creation() {
+        let record = SessionRecord {
+            max_idle_ns: 30 * MINUTE_NS,
+            last_refreshed_ns: None,
+            ..session(5 * MINUTE_NS, DAY_NS)
+        };
+
+        // Otherwise a session abandoned straight after sign-in would sit unbounded
+        // until its lifetime ran out, which is the case the bound exists for.
+        assert!(!record.is_over(34 * MINUTE_NS));
+        assert!(record.is_over(35 * MINUTE_NS));
+    }
+
+    #[test]
+    fn a_reference_written_before_sessions_existed_decodes_with_none() {
+        let stored = StorableAccountReference {
+            account_number: Some(1),
+            last_used: Some(5),
+            sessions: None,
+        };
+
+        let decoded =
+            AccountReference::from(StorableAccountReference::from_bytes(stored.to_bytes()));
+
+        assert_eq!(decoded.sessions, vec![]);
+        assert_eq!(decoded.account_number, Some(1));
+        assert_eq!(decoded.last_used, Some(5));
+    }
+
+    #[test]
+    fn an_empty_session_list_is_not_stored() {
+        let reference = AccountReference::new(Some(1), None);
+
+        assert_eq!(StorableAccountReference::from(reference).sessions, None);
+    }
+
+    /// A row is evictable on its shape alone. Sparing one because it holds a live session
+    /// would leave the user with access that settings cannot show them, and a session
+    /// nobody can find is a session nobody can revoke.
+    #[test]
+    fn a_row_holding_a_session_is_evictable_like_any_other() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://has-a-session.com".to_string();
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
+        storage
+            .write_account_state(
+                anchor_number,
+                application_number,
+                vec![AccountReference {
+                    account_number: None,
+                    last_used: Some(1),
+                    sessions: vec![session(0, u64::MAX)],
+                }],
+                None,
+                None,
+            )
+            .unwrap();
+
+        assert_eq!(storage.evictable_default_rows(anchor_number).len(), 1);
+    }
+
+    #[test]
+    fn a_session_over_by_idleness_reclaims_like_a_dead_one() {
+        let now = 100 * DAY_NS;
+        let idle = SessionRecord {
+            max_idle_ns: DAY_NS,
+            last_refreshed_ns: Some(now - 10 * DAY_NS),
+            ..session(now - 20 * DAY_NS, now + DAY_NS)
+        };
+        let live = SessionRecord {
+            last_refreshed_ns: Some(now - 1),
+            ..session(now - 20 * DAY_NS, now + DAY_NS)
+        };
+
+        // Both are inside their lifetime, so ranking on that alone would have them
+        // compete for a slot. One of them is finished.
+        assert!(idle.reclaim_order(now) < live.reclaim_order(now));
+    }
+
+    #[test]
+    fn reclaim_order_ranks_dead_sessions_first() {
+        let now = 1_000;
+        let expired = session(1, 500);
+        let live = SessionRecord {
+            max_idle_ns: NEVER_IDLE,
+            last_refreshed_ns: Some(900),
+            ..session(400, 10_000)
+        };
+        let live_untouched = session(400, 10_000);
+
+        assert!(expired.reclaim_order(now) < live.reclaim_order(now));
+        assert!(expired.reclaim_order(now) < live_untouched.reclaim_order(now));
+    }
+
+    #[test]
+    fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
+        let now = 100 * DAY_NS;
+        let held = SessionRecord {
+            max_idle_ns: NEVER_IDLE,
+            last_refreshed_ns: Some(now - DAY_NS),
+            ..session(now - 20 * DAY_NS, now + DAY_NS)
+        };
+        // Created after the session it would have to outrank, which under a plain recency
+        // order would protect it.
+        let flood: Vec<SessionRecord> = (0..500)
+            .map(|index| SessionRecord {
+                device_id: index,
+                ..session(now - 1, now + DAY_NS)
+            })
+            .collect();
+
+        assert!(flood
+            .iter()
+            .all(|session| session.reclaim_order(now) < held.reclaim_order(now)));
+    }
+
+    #[test]
+    fn an_app_in_weekly_use_outranks_one_opened_once_yesterday() {
+        let now = 100 * DAY_NS;
+        // Signed in three months ago, still being opened every few days.
+        let weekly = SessionRecord {
+            max_idle_ns: NEVER_IDLE,
+            last_refreshed_ns: Some(now - 3 * DAY_NS),
+            ..session(now - 90 * DAY_NS, now + DAY_NS)
+        };
+        // Signed in yesterday, used for five minutes, never opened again.
+        let one_sitting = SessionRecord {
+            max_idle_ns: NEVER_IDLE,
+            last_refreshed_ns: Some(now - DAY_NS + 5 * MINUTE_NS),
+            ..session(now - DAY_NS, now + DAY_NS)
+        };
+
+        assert!(
+            one_sitting.reclaim_order(now) < weekly.reclaim_order(now),
+            "the more recently touched session goes first, having stayed in service for minutes"
         );
     }
 }

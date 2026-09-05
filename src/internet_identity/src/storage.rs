@@ -1638,10 +1638,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// What an identity holds where nothing is stored: the default it has always had,
     /// derived from the origin rather than kept.
     fn derived_default_references() -> Vec<AccountReference> {
-        vec![AccountReference {
-            account_number: None,
-            last_used: None,
-        }]
+        vec![AccountReference::new(None, None)]
     }
 
     /// The row as stored, with no default derived for an absent one.
@@ -1725,7 +1722,7 @@ impl<M: Memory + Clone> Storage<M> {
                 (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
             )
             .filter_map(|((_, application_number), list)| {
-                let references = list.into_vec();
+                let references: Vec<AccountReference> = list.into();
                 match references.as_slice() {
                     [tracked_default] if tracked_default.account_number.is_none() => {
                         Some((application_number, tracked_default.last_used))
@@ -2444,11 +2441,8 @@ impl<M: Memory + Clone> Storage<M> {
         // account at an origin does not cost the identity the default it had. A
         // tombstone normalises to nothing and stays that way.
         let mut references = self.account_references(anchor_number, application_number);
-        references.push(AccountReference {
-            account_number: Some(account_number),
-            // Set when the identity signs in with the account.
-            last_used: None,
-        });
+        // `last_used` is set when the identity signs in with the account.
+        references.push(AccountReference::new(Some(account_number), None));
 
         let storable_account = StorableAccount {
             name: name.clone(),
