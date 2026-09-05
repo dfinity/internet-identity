@@ -24,6 +24,7 @@ fn should_create_a_named_account() {
     // Setup storage
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
+    storage.update_salt([17u8; 32]);
 
     // 1. Define additional account parameters
     let anchor_number: AnchorNumber = 10_000;
@@ -95,6 +96,7 @@ fn should_list_accounts() {
     // Setup storage
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
+    storage.update_salt([17u8; 32]);
 
     // 1. Define additional account parameters
     let anchor_number: AnchorNumber = 10_000;
@@ -161,6 +163,7 @@ fn should_list_all_identity_accounts() {
     // Setup storage
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
+    storage.update_salt([17u8; 32]);
 
     // 1. Define additional account parameters
     let anchor_number: AnchorNumber = 10_000;
@@ -217,6 +220,7 @@ fn should_update_default_account() {
     // Setup storage
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
+    storage.update_salt([17u8; 32]);
 
     // 1. Define parameters
     let anchor_number: AnchorNumber = 10_000;
@@ -272,6 +276,7 @@ fn should_update_additional_account() {
     // Setup storage
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
+    storage.update_salt([17u8; 32]);
 
     // 1. Define additional account parameters
     let anchor_number: AnchorNumber = 10_000;
@@ -348,6 +353,7 @@ fn should_count_accounts_different_anchors() {
     // Setup storage
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
+    storage.update_salt([17u8; 32]);
 
     // --- Anchor 1 ---
     let anchor_1 = storage.allocate_anchor(0).unwrap();
@@ -532,6 +538,7 @@ fn should_not_read_account_from_wrong_anchor() {
     // Setup storage
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
+    storage.update_salt([17u8; 32]);
 
     // 1. Define parameters for two different anchors
     let anchor_number_1: AnchorNumber = 10_000;

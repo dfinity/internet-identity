@@ -450,6 +450,7 @@ fn should_not_overwrite_device_credential_lookup() {
 fn should_record_that_a_named_account_was_used() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
+    storage.update_salt([17u8; 32]);
     let origin = "https://example.com".to_string();
 
     let anchor = storage.allocate_anchor(0).unwrap();
@@ -483,6 +484,7 @@ fn should_record_that_a_named_account_was_used() {
 fn should_track_the_default_account_on_first_use() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
+    storage.update_salt([17u8; 32]);
     let origin = "https://example.com".to_string();
 
     let anchor = storage.allocate_anchor(0).unwrap();
@@ -522,6 +524,7 @@ fn should_track_the_default_account_on_first_use() {
 fn should_record_that_a_tracked_default_was_used() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
+    storage.update_salt([17u8; 32]);
     let origin = "https://example.com".to_string();
 
     let anchor = storage.allocate_anchor(0).unwrap();
@@ -554,6 +557,8 @@ fn should_record_that_a_tracked_default_was_used() {
 fn should_refuse_to_write_an_account_no_reference_names() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
+    // Creating an account derives its principal, which needs the salt.
+    storage.update_salt([17u8; 32]);
     let origin = "https://example.com".to_string();
 
     let anchor = storage.allocate_anchor(0).unwrap();
@@ -2165,6 +2170,7 @@ mod reference_list_write_path_tests {
 
     fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
         let anchor = storage.allocate_anchor(0).unwrap();
         let anchor_number = anchor.anchor_number();
         storage.write(anchor).unwrap();
@@ -2610,6 +2616,9 @@ mod account_reference_state_tests {
 
     fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        // A write that moves an account number resyncs the principal index, which
+        // needs the salt.
+        storage.update_salt([17u8; 32]);
         let anchor = storage.allocate_anchor(0).unwrap();
         let anchor_number = anchor.anchor_number();
         storage.write(anchor).unwrap();
@@ -3120,6 +3129,7 @@ mod default_account_tracking_tests {
 
     fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
         let anchor = storage.allocate_anchor(0).unwrap();
         let anchor_number = anchor.anchor_number();
         storage.write(anchor).unwrap();
@@ -3306,6 +3316,7 @@ mod tracked_default_eviction_tests {
 
     fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
         let anchor = storage.allocate_anchor(0).unwrap();
         let anchor_number = anchor.anchor_number();
         storage.write(anchor).unwrap();
@@ -3674,6 +3685,7 @@ mod application_removal_tests {
 
     fn storage_with_anchors() -> (Storage<VectorMemory>, AnchorNumber, AnchorNumber) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
         let first = storage.allocate_anchor(0).unwrap();
         let first_number = first.anchor_number();
         storage.write(first).unwrap();
@@ -4071,6 +4083,292 @@ mod application_removal_tests {
         assert_eq!(
             storage.lookup_application_number_with_origin(&origin),
             Some(reallocated)
+        );
+    }
+}
+
+mod account_principal_index_tests {
+    use super::record_use;
+    use crate::delegation::canister_sig_principal;
+    use crate::storage::account::{Account, AccountReference};
+    use crate::storage::storable::account_key::StorableAccountKey;
+    use crate::storage::{canister_id, StorageError};
+    use crate::Storage;
+    use candid::Principal;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    const SALT: [u8; 32] = [17u8; 32];
+
+    fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt(SALT);
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        (storage, anchor_number)
+    }
+
+    fn default_account_principal(anchor_number: AnchorNumber, origin: &str) -> Principal {
+        let account = Account::new(anchor_number, origin.to_string(), None, None);
+        canister_sig_principal(
+            canister_id(),
+            account.calculate_seed_with_salt(&SALT).to_vec(),
+        )
+    }
+
+    #[test]
+    fn tracking_a_default_account_indexes_its_principal() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+
+        record_use(&mut storage, anchor_number, origin.clone(), None, 1_000).unwrap();
+
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        assert_eq!(
+            storage
+                .lookup_account_with_principal_memory
+                .get(&default_account_principal(anchor_number, &origin)),
+            Some(StorableAccountKey {
+                anchor_number,
+                application_number,
+                account_number: None,
+            })
+        );
+    }
+
+    #[test]
+    fn materializing_a_default_updates_the_locator_under_the_same_principal() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+        record_use(&mut storage, anchor_number, origin.clone(), None, 1_000).unwrap();
+        let principal = default_account_principal(anchor_number, &origin);
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+
+        let materialized = storage
+            .write_account(Account::new(
+                anchor_number,
+                origin.clone(),
+                Some("named default".to_string()),
+                None,
+            ))
+            .unwrap();
+
+        assert_eq!(
+            storage.lookup_account_with_principal_memory.get(&principal),
+            Some(StorableAccountKey {
+                anchor_number,
+                application_number,
+                account_number: materialized.account_number,
+            })
+        );
+    }
+
+    #[test]
+    fn a_named_account_gets_its_own_entry() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+
+        let named = storage
+            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .unwrap();
+
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        let named_principal = canister_sig_principal(
+            canister_id(),
+            named.calculate_seed_with_salt(&SALT).to_vec(),
+        );
+        assert_eq!(
+            storage
+                .lookup_account_with_principal_memory
+                .get(&named_principal),
+            Some(StorableAccountKey {
+                anchor_number,
+                application_number,
+                account_number: named.account_number,
+            })
+        );
+        assert!(storage
+            .lookup_account_with_principal_memory
+            .get(&default_account_principal(anchor_number, &origin))
+            .is_some());
+        assert_ne!(
+            named_principal,
+            default_account_principal(anchor_number, &origin)
+        );
+    }
+
+    #[test]
+    fn distinct_anchors_and_origins_derive_distinct_principals() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let other = storage.allocate_anchor(0).unwrap();
+        let other_anchor_number = other.anchor_number();
+        storage.write(other).unwrap();
+
+        record_use(
+            &mut storage,
+            anchor_number,
+            "https://a.com".to_string(),
+            None,
+            1,
+        )
+        .unwrap();
+        record_use(
+            &mut storage,
+            anchor_number,
+            "https://b.com".to_string(),
+            None,
+            2,
+        )
+        .unwrap();
+        record_use(
+            &mut storage,
+            other_anchor_number,
+            "https://a.com".to_string(),
+            None,
+            3,
+        )
+        .unwrap();
+
+        let same_anchor_other_origin = default_account_principal(anchor_number, "https://b.com");
+        let other_anchor_same_origin =
+            default_account_principal(other_anchor_number, "https://a.com");
+        let base = default_account_principal(anchor_number, "https://a.com");
+
+        assert_ne!(base, same_anchor_other_origin);
+        assert_ne!(base, other_anchor_same_origin);
+        assert_eq!(
+            storage
+                .lookup_account_with_principal_memory
+                .get(&other_anchor_same_origin)
+                .unwrap()
+                .anchor_number,
+            other_anchor_number
+        );
+    }
+
+    #[test]
+    fn eviction_removes_the_index_entry() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+        record_use(&mut storage, anchor_number, origin.clone(), None, 1_000).unwrap();
+        let principal = default_account_principal(anchor_number, &origin);
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+
+        storage
+            .remove_reference_list(anchor_number, application_number)
+            .unwrap();
+
+        assert_eq!(
+            storage.lookup_account_with_principal_memory.get(&principal),
+            None
+        );
+    }
+
+    #[test]
+    fn removing_an_application_leaves_no_dangling_index_entries() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        for index in 0..5 {
+            record_use(
+                &mut storage,
+                anchor_number,
+                format!("https://dapp-{index}.com"),
+                None,
+                1,
+            )
+            .unwrap();
+        }
+        let application_numbers: Vec<_> = (0..5)
+            .map(|index| {
+                storage
+                    .lookup_application_number_with_origin(&format!("https://dapp-{index}.com"))
+                    .unwrap()
+            })
+            .collect();
+
+        for application_number in &application_numbers {
+            storage
+                .remove_reference_list(anchor_number, *application_number)
+                .unwrap();
+        }
+
+        assert_eq!(storage.lookup_account_with_principal_memory.len(), 0);
+        for application_number in &application_numbers {
+            assert!(storage
+                .stable_application_memory
+                .get(application_number)
+                .is_none());
+        }
+    }
+
+    #[test]
+    fn a_write_without_a_salt_is_refused() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        let origin = "https://example.com".to_string();
+        let application_number = storage
+            .lookup_or_insert_application_number_with_origin(&origin)
+            .unwrap();
+
+        let result = storage.write_account_state(
+            anchor_number,
+            application_number,
+            vec![AccountReference {
+                account_number: None,
+                last_used: Some(1),
+            }],
+            None,
+            None,
+        );
+
+        assert!(matches!(result, Err(StorageError::SaltNotSet)));
+        assert_eq!(
+            storage.stored_account_references(anchor_number, application_number),
+            None
+        );
+    }
+
+    #[test]
+    fn removing_an_entry_owned_by_another_anchor_is_refused() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+        record_use(&mut storage, anchor_number, origin.clone(), None, 1_000).unwrap();
+        let principal = default_account_principal(anchor_number, &origin);
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        let other_anchor_number = anchor_number + 1;
+        storage.lookup_account_with_principal_memory.insert(
+            principal,
+            StorableAccountKey {
+                anchor_number: other_anchor_number,
+                application_number,
+                account_number: None,
+            },
+        );
+
+        storage
+            .remove_reference_list(anchor_number, application_number)
+            .unwrap();
+
+        assert_eq!(
+            storage
+                .lookup_account_with_principal_memory
+                .get(&principal)
+                .unwrap()
+                .anchor_number,
+            other_anchor_number
         );
     }
 }

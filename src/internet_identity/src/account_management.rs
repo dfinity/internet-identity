@@ -440,13 +440,18 @@ fn post_account_operation_bookkeeping(anchor_number: AnchorNumber, operation: Op
 #[cfg(test)]
 fn post_account_operation_bookkeeping(_anchor_number: AnchorNumber, _operation: Operation) {}
 
+#[cfg(test)]
+fn storage_with_salt() -> Storage<ic_stable_structures::VectorMemory> {
+    let mut storage = Storage::new((0, 10000), ic_stable_structures::VectorMemory::default());
+    storage.update_salt([17u8; 32]);
+    storage
+}
+
 #[test]
 fn should_create_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
@@ -467,10 +472,8 @@ fn should_create_account_for_origin() {
 #[test]
 fn should_fail_to_create_accounts_above_max() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let name = "Alice".to_string();
     for i in 0..=MAX_ANCHOR_ACCOUNTS {
@@ -488,10 +491,8 @@ fn should_fail_to_create_accounts_above_max() {
 #[test]
 fn should_fail_to_update_default_accounts_above_max() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let name = "Alice".to_string();
     for i in 0..MAX_ANCHOR_ACCOUNTS {
@@ -515,10 +516,8 @@ fn should_fail_to_update_default_accounts_above_max() {
 #[test]
 fn should_get_accounts_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
@@ -555,10 +554,8 @@ fn should_get_accounts_for_origin() {
 #[test]
 fn should_only_get_own_accounts_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let anchor_two = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let origin = "https://example.com".to_string();
@@ -604,10 +601,8 @@ fn should_only_get_own_accounts_for_origin() {
 #[test]
 fn should_update_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
@@ -686,10 +681,8 @@ fn should_update_account_for_origin() {
 #[test]
 fn should_update_default_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
@@ -777,10 +770,8 @@ fn should_update_default_account_for_origin() {
 // It should error when the counters are at or above max and argument 'first_time' is false
 fn should_fail_check_or_rebuild_when_not_first_time() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
 
     // create faulty counter entries
@@ -803,10 +794,8 @@ fn should_fail_check_or_rebuild_when_not_first_time() {
 #[test]
 fn should_properly_recalculate_faulty_account_counter() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let name = "Alice".to_string();
 
@@ -834,10 +823,8 @@ fn should_properly_recalculate_faulty_account_counter() {
 #[test]
 fn should_properly_recalculate_faulty_account_counter_when_updating() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
 
     // create faulty counter entries
@@ -863,10 +850,8 @@ fn should_properly_recalculate_faulty_account_counter_when_updating() {
 #[test]
 fn should_increment_discrepancy_counter() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
 
     // create faulty counter entries
@@ -902,10 +887,8 @@ fn should_increment_discrepancy_counter() {
 #[test]
 fn should_get_default_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let origin = "https://example.com".to_string();
     let anchor_number = anchor.anchor_number();
@@ -1061,10 +1044,8 @@ fn should_get_default_account_for_origin() {
 #[test]
 fn can_get_default_before_update_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let origin = "https://example.com".to_string();
     let anchor_number = anchor.anchor_number();
@@ -1081,10 +1062,8 @@ fn can_get_default_before_update_account_for_origin() {
 #[test]
 fn should_get_updated_default_account_after_modification() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let origin = "https://example.com".to_string();
     let anchor_number = anchor.anchor_number();
@@ -1117,10 +1096,8 @@ fn should_get_updated_default_account_after_modification() {
 #[test]
 fn should_succeed_get_default_account_for_nonexistent_anchor() {
     use crate::state::storage_replace;
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let nonexistent_anchor = 99999;
     let origin = "https://example.com".to_string();
 
@@ -1185,10 +1162,8 @@ fn should_fall_back_to_the_tracked_default_when_the_reservation_is_stale() {
 #[test]
 fn should_get_default_account_for_different_origins() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let origin1 = "https://app1.com".to_string();
     let origin2 = "https://app2.com".to_string();
