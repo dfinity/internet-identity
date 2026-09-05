@@ -751,8 +751,9 @@ fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
     assert!(devices.iter().any(|device| device.id == device_id));
 
     // The browser keeps its id, so signing in again puts a session back in the slot the
-    // revoked one occupied. The revoked chain must not reach it.
-    env.advance_time(Duration::from_secs(60));
+    // revoked one occupied. The revoked chain must not reach it — and no time is allowed
+    // to pass, because the new session is told apart from the revoked one by its id and
+    // not by anything a shared consensus round would make equal.
     prepare_account_session(
         &env,
         canister_id,
