@@ -2387,7 +2387,7 @@ mod reference_list_write_path_tests {
     }
 
     #[test]
-    fn writing_the_list_the_row_already_holds_touches_nothing() {
+    fn writing_the_list_the_list_already_holds_touches_nothing() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
         let application_number = storage
@@ -2634,7 +2634,7 @@ mod account_reference_state_tests {
     }
 
     #[test]
-    fn an_untouched_row_offers_a_reconstructible_default() {
+    fn an_untouched_list_offers_a_reconstructible_default() {
         let (storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
 
@@ -2645,7 +2645,7 @@ mod account_reference_state_tests {
     }
 
     #[test]
-    fn a_tombstoned_row_has_nothing_to_sign_in_as() {
+    fn a_tombstoned_list_has_nothing_to_sign_in_as() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         plant_tombstone(&mut storage, anchor_number);
@@ -2658,7 +2658,7 @@ mod account_reference_state_tests {
     }
 
     #[test]
-    fn a_row_that_names_no_default_has_no_default_to_read() {
+    fn a_list_that_names_no_default_has_no_default_to_read() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         let account = storage
@@ -2688,7 +2688,7 @@ mod account_reference_state_tests {
     }
 
     #[test]
-    fn a_named_account_added_to_a_tombstoned_row_does_not_revive_the_default() {
+    fn a_named_account_added_to_a_tombstoned_list_does_not_revive_the_default() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         plant_tombstone(&mut storage, anchor_number);
@@ -3202,7 +3202,7 @@ mod default_account_tracking_tests {
     }
 
     #[test]
-    fn a_config_row_implies_a_reference_list_row() {
+    fn a_config_list_implies_an_account_reference_list() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
         let application_number = storage
@@ -3278,7 +3278,7 @@ mod tracked_default_eviction_tests {
 
         let evicted = MAX_EVICTABLE_DEFAULT_ACCOUNTS - 1 - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK;
         assert_eq!(
-            storage.evictable_default_rows(anchor_number).len() as u64,
+            storage.evictable_default_lists(anchor_number).len() as u64,
             MAX_EVICTABLE_DEFAULT_ACCOUNTS - evicted
         );
 
@@ -3309,13 +3309,13 @@ mod tracked_default_eviction_tests {
         }
 
         assert!(
-            storage.evictable_default_rows(anchor_number).len() as u64
+            storage.evictable_default_lists(anchor_number).len() as u64
                 <= MAX_EVICTABLE_DEFAULT_ACCOUNTS
         );
     }
 
     #[test]
-    fn the_row_a_sign_in_just_wrote_is_never_its_own_victim() {
+    fn the_list_a_sign_in_just_wrote_is_never_its_own_victim() {
         let (mut storage, anchor_number) = storage_with_anchor();
         for index in 0..MAX_EVICTABLE_DEFAULT_ACCOUNTS - 1 {
             record_use(&mut storage, anchor_number, origin_of(index), None, 1).unwrap();
@@ -3350,7 +3350,7 @@ mod tracked_default_eviction_tests {
                 )
                 .unwrap();
         }
-        let before = storage.evictable_default_rows(anchor_number).len() as u64;
+        let before = storage.evictable_default_lists(anchor_number).len() as u64;
 
         record_use(
             &mut storage,
@@ -3362,7 +3362,7 @@ mod tracked_default_eviction_tests {
         .unwrap();
 
         assert_eq!(
-            before + 1 - storage.evictable_default_rows(anchor_number).len() as u64,
+            before + 1 - storage.evictable_default_lists(anchor_number).len() as u64,
             MAX_EVICTIONS_PER_CALL
         );
     }
@@ -3375,7 +3375,7 @@ mod tracked_default_eviction_tests {
             sign_in_at(&mut storage, anchor_number, index);
         }
 
-        let lists = storage.evictable_default_rows(anchor_number).len() as u64;
+        let lists = storage.evictable_default_lists(anchor_number).len() as u64;
         assert!(lists <= MAX_EVICTABLE_DEFAULT_ACCOUNTS);
         let newest = storage
             .lookup_application_number_with_origin(&origin_of(
@@ -3410,7 +3410,7 @@ mod tracked_default_eviction_tests {
     }
 
     #[test]
-    fn a_default_sharing_a_row_with_a_named_account_is_not_evictable() {
+    fn a_default_sharing_a_list_with_a_named_account_is_not_evictable() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let shared_origin = "https://has-a-named-account.com".to_string();
         storage
@@ -3430,7 +3430,7 @@ mod tracked_default_eviction_tests {
     }
 
     #[test]
-    fn eviction_removes_the_config_row_and_the_counters_follow() {
+    fn eviction_removes_the_config_list_and_the_counters_follow() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
         let application_number = storage
@@ -3505,7 +3505,7 @@ mod tracked_default_eviction_tests {
     }
 
     #[test]
-    fn removing_a_row_that_does_not_exist_is_a_no_op() {
+    fn removing_a_list_that_does_not_exist_is_a_no_op() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
         let application_number = storage
@@ -3525,19 +3525,19 @@ mod tracked_default_eviction_tests {
     }
 
     #[test]
-    fn eviction_never_leaves_an_empty_row_behind() {
+    fn eviction_never_leaves_an_empty_list_behind() {
         let (mut storage, anchor_number) = storage_with_anchor();
 
         for index in 0..MAX_EVICTABLE_DEFAULT_ACCOUNTS {
             sign_in_at(&mut storage, anchor_number, index);
         }
 
-        let empty_rows = storage
+        let empty_lists = storage
             .stable_account_reference_list_memory
             .range((anchor_number, 0)..=(anchor_number, u64::MAX))
             .filter(|(_, list)| list.clone().into_vec().is_empty())
             .count();
-        assert_eq!(empty_rows, 0);
+        assert_eq!(empty_lists, 0);
     }
 
     #[test]
@@ -3560,7 +3560,7 @@ mod tracked_default_eviction_tests {
             storage.tracked_default_account_upper_bound(anchor_number),
             4
         );
-        assert_eq!(storage.evictable_default_rows(anchor_number).len(), 1);
+        assert_eq!(storage.evictable_default_lists(anchor_number).len(), 1);
     }
 
     #[test]
@@ -3601,7 +3601,7 @@ mod tracked_default_eviction_tests {
             )
             .unwrap();
 
-        assert_eq!(storage.evictable_default_rows(anchor_number).len(), 0);
+        assert_eq!(storage.evictable_default_lists(anchor_number).len(), 0);
     }
 }
 
@@ -3961,7 +3961,7 @@ mod application_removal_tests {
     }
 
     #[test]
-    fn removal_leaves_no_config_row_behind() {
+    fn removal_leaves_no_config_list_behind() {
         let (mut storage, anchor_number, _) = storage_with_anchors();
         let origin = "https://example.com".to_string();
         let application_number = storage
@@ -4310,7 +4310,7 @@ mod account_principal_index_backfill_tests {
 
     const SALT: [u8; 32] = [17u8; 32];
 
-    fn storage_with_rows(lists: u64) -> (Storage<VectorMemory>, Vec<AnchorNumber>) {
+    fn storage_with_lists(lists: u64) -> (Storage<VectorMemory>, Vec<AnchorNumber>) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         storage.update_salt(SALT);
         let mut anchors = vec![];
@@ -4347,8 +4347,8 @@ mod account_principal_index_backfill_tests {
     }
 
     #[test]
-    fn a_sweep_indexes_every_pre_existing_row() {
-        let (mut storage, anchors) = storage_with_rows(5);
+    fn a_sweep_indexes_every_pre_existing_list() {
+        let (mut storage, anchors) = storage_with_lists(5);
         clear_index(&mut storage);
         assert_eq!(storage.lookup_account_with_principal_memory.len(), 0);
 
@@ -4377,7 +4377,7 @@ mod account_principal_index_backfill_tests {
 
     #[test]
     fn a_sweep_resumes_from_its_cursor() {
-        let (mut storage, _) = storage_with_rows(5);
+        let (mut storage, _) = storage_with_lists(5);
         clear_index(&mut storage);
 
         let first = storage.backfill_account_principal_index_batch(None, 2);
@@ -4396,7 +4396,7 @@ mod account_principal_index_backfill_tests {
 
     #[test]
     fn a_repeated_sweep_writes_nothing_new() {
-        let (mut storage, _) = storage_with_rows(3);
+        let (mut storage, _) = storage_with_lists(3);
 
         let outcome = storage.backfill_account_principal_index_batch(None, 100);
 
@@ -4445,7 +4445,7 @@ mod account_principal_index_backfill_tests {
     /// meaningful once the sweep says it is finished.
     #[test]
     fn an_empty_batch_size_does_not_report_completion() {
-        let (mut storage, _) = storage_with_rows(3);
+        let (mut storage, _) = storage_with_lists(3);
         clear_index(&mut storage);
 
         let outcome = storage.backfill_account_principal_index_batch(None, 0);
@@ -4458,8 +4458,8 @@ mod account_principal_index_backfill_tests {
     /// on list boundaries would derive that many principals in one message however small
     /// the batch. It stops inside the list and the cursor says where.
     #[test]
-    fn a_batch_stops_inside_a_row_too_big_to_finish() {
-        let (mut storage, anchors) = storage_with_rows(1);
+    fn a_batch_stops_inside_a_list_too_big_to_finish() {
+        let (mut storage, anchors) = storage_with_lists(1);
         let anchor_number = anchors[0];
         let origin = "https://d-0.com".to_string();
         let mut references = vec![AccountReference::new(None, Some(1))];
@@ -4630,7 +4630,7 @@ mod session_record_tests {
     /// would leave the user with access that settings cannot show them, and a session
     /// nobody can find is a session nobody can revoke.
     #[test]
-    fn a_row_holding_a_session_is_evictable_like_any_other() {
+    fn a_list_holding_a_session_is_evictable_like_any_other() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://has-a-session.com".to_string();
         let application_number = storage
@@ -4650,7 +4650,7 @@ mod session_record_tests {
             )
             .unwrap();
 
-        assert_eq!(storage.evictable_default_rows(anchor_number).len(), 1);
+        assert_eq!(storage.evictable_default_lists(anchor_number).len(), 1);
     }
 
     #[test]
