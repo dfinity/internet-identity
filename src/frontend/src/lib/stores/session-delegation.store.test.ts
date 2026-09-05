@@ -318,3 +318,130 @@ describe("mintSession — failure is swallowed", () => {
     expect(remaining).toEqual(existingRecord);
   });
 });
+
+describe("forgetIdentity", () => {
+  const BROWSER_KEY_STORE = idbCreateStore("ii-browser-keys", "keys");
+
+  const storedSessionDelegation = async () => {
+    await idbSet(
+      IDENTITY_NUMBER.toString(),
+      {
+        identityNumber: IDENTITY_NUMBER,
+        keyPair: await makeKeyPair(),
+        chainJson: await makeChainJson(),
+        expiresAtMillis: FAR_FUTURE,
+      },
+      TEST_STORE,
+    );
+  };
+
+  const storedAppSession = async () => {
+    const { storeAppSession } = await import("$lib/stores/app-session.store");
+    await storeAppSession(
+      { identityNumber: IDENTITY_NUMBER, origin: "https://app.example.com" },
+      {
+        keyPair: await makeKeyPair(),
+        chainJson: await makeChainJson(),
+        expiresAtMillis: FAR_FUTURE,
+        sessionId: BigInt(1),
+        accessLevel: "full-access",
+      },
+    );
+  };
+
+  const knownBrowser = (deviceId: number) =>
+    idbSet(
+      IDENTITY_NUMBER.toString(),
+      { keyPair: undefined, deviceId },
+      BROWSER_KEY_STORE,
+    );
+
+  beforeEach(async () => {
+    await idbDel(IDENTITY_NUMBER.toString(), BROWSER_KEY_STORE);
+    const { purgeAppSessions } = await import("$lib/stores/app-session.store");
+    await purgeAppSessions(IDENTITY_NUMBER);
+  });
+
+  /// The gap this exists to close: dropping the local records alone leaves the apps
+  /// holding chains rooted at session records the canister still has, so they stay
+  /// signed in and keep refreshing.
+  it("ends this browser's sessions for the identity it forgets", async () => {
+    const revoke = vi.fn(() => Promise.resolve({ Ok: null }));
+    const actor = {
+      revoke_device_sessions: revoke,
+    } as unknown as ActorSubclass<_SERVICE>;
+    const { authenticationStore } =
+      await import("$lib/stores/authentication.store");
+    vi.spyOn(authenticationStore, "subscribe").mockImplementation((cb) => {
+      cb({ identityNumber: IDENTITY_NUMBER, actor } as Parameters<
+        typeof cb
+      >[0]);
+      return () => {};
+    });
+    await knownBrowser(7);
+    await storedSessionDelegation();
+    await storedAppSession();
+
+    const { forgetIdentity } =
+      await import("$lib/stores/session-delegation.store");
+    await forgetIdentity(IDENTITY_NUMBER);
+
+    expect(revoke).toHaveBeenCalledWith({
+      identity_number: IDENTITY_NUMBER,
+      device_id: 7,
+    });
+    const { appSessionsForOrigin } =
+      await import("$lib/stores/app-session.store");
+    await expect(
+      appSessionsForOrigin("https://app.example.com"),
+    ).resolves.toEqual([]);
+    await expect(
+      idbGet(IDENTITY_NUMBER.toString(), TEST_STORE),
+    ).resolves.toBeUndefined();
+  });
+
+  /// The local half must not depend on the canister being reachable: keeping the records
+  /// because a call failed would leave II able to sign the user back in silently, which
+  /// is the thing they asked it to stop doing.
+  it("forgets locally even when the canister call fails", async () => {
+    const actor = {
+      revoke_device_sessions: vi.fn(() => Promise.reject(new Error("offline"))),
+    } as unknown as ActorSubclass<_SERVICE>;
+    const { authenticationStore } =
+      await import("$lib/stores/authentication.store");
+    vi.spyOn(authenticationStore, "subscribe").mockImplementation((cb) => {
+      cb({ identityNumber: IDENTITY_NUMBER, actor } as Parameters<
+        typeof cb
+      >[0]);
+      return () => {};
+    });
+    await knownBrowser(7);
+    await storedSessionDelegation();
+    await storedAppSession();
+
+    const { forgetIdentity } =
+      await import("$lib/stores/session-delegation.store");
+    await expect(forgetIdentity(IDENTITY_NUMBER)).resolves.toBeUndefined();
+
+    const { appSessionsForOrigin } =
+      await import("$lib/stores/app-session.store");
+    await expect(
+      appSessionsForOrigin("https://app.example.com"),
+    ).resolves.toEqual([]);
+  });
+
+  it("forgets locally when this browser has never signed in as the identity", async () => {
+    await storedSessionDelegation();
+    await storedAppSession();
+
+    const { forgetIdentity } =
+      await import("$lib/stores/session-delegation.store");
+    await forgetIdentity(IDENTITY_NUMBER);
+
+    const { appSessionsForOrigin } =
+      await import("$lib/stores/app-session.store");
+    await expect(
+      appSessionsForOrigin("https://app.example.com"),
+    ).resolves.toEqual([]);
+  });
+});
