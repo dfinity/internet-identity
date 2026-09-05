@@ -796,15 +796,13 @@ fn should_report_a_revoked_session_as_gone() -> Result<(), RejectResponse> {
     let identity_number = flows::register_anchor(&env, canister_id);
     let (prepared, session_principal) = create_session(&env, canister_id, identity_number);
 
-    revoke_account_session(
+    revoke_device_sessions(
         &env,
         canister_id,
         principal_1(),
-        RevokeAccountSessionRequest {
+        RevokeDeviceSessionsRequest {
             identity_number,
-            origin: ORIGIN.to_string(),
-            account_number: None,
-            created_at: prepared.created_at,
+            device_id: prepared.device_id,
         },
     )?
     .unwrap();
