@@ -71,6 +71,7 @@ fn should_create_a_named_account() {
             origin: origin.clone(),
             stored_accounts: 1,
             stored_account_references: 2,
+            tombstones: 0,
         }
     );
     assert_eq!(

@@ -299,6 +299,17 @@ const BUCKET_SIZE_IN_PAGES: u16 = 128;
 const MAX_MANAGED_MEMORY_SIZE: u64 = 256 * GB;
 const MAX_MANAGED_WASM_PAGES: u64 = MAX_MANAGED_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES;
 
+/// Per-anchor cap on reference-list rows that hold nothing but a tracked default
+/// account.
+const MAX_EVICTABLE_DEFAULT_ACCOUNTS: u64 = 500;
+
+/// Eviction target, below the cap.
+const EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK: u64 = MAX_EVICTABLE_DEFAULT_ACCOUNTS * 9 / 10;
+
+/// Bounds one message's eviction work.
+const MAX_EVICTIONS_PER_CALL: u64 =
+    MAX_EVICTABLE_DEFAULT_ACCOUNTS - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK;
+
 /// The maximum number of anchors this canister can store.
 pub const MAX_ENTRIES: u64 = (MAX_MANAGED_WASM_PAGES - BUCKET_SIZE_IN_PAGES as u64) // deduct one bucket for the archive entries buffer
     * WASM_PAGE_SIZE_IN_BYTES
@@ -1511,6 +1522,7 @@ impl<M: Memory + Clone> Storage<M> {
             origin: origin.to_string(),
             stored_accounts: 0u64,
             stored_account_references: 0u64,
+            tombstones: 0u64,
         };
 
         self.stable_application_memory
@@ -1628,6 +1640,112 @@ impl<M: Memory + Clone> Storage<M> {
             .map(Vec::<AccountReference>::from)
     }
 
+    /// Removes a reference-list row and everything derived from it.
+    fn remove_reference_list(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+    ) -> Result<(), StorageError> {
+        // A row is retired only when a live tracked default is all it holds. Nothing
+        // else may be pruned, and the rule sits here rather than only in the caller
+        // that picks victims, because this is the irreversible step:
+        //
+        // - an absent row has nothing to remove;
+        // - an empty row is a tombstone, and taking it away would make the default it
+        //   stands for reconstructible again;
+        // - a row holding named accounts, or whose default was named or moved away,
+        //   would lose references that nothing else records.
+        let previous = match self
+            .stored_account_references(anchor_number, application_number)
+            .as_deref()
+        {
+            Some([reference]) if reference.account_number.is_none() => vec![reference.clone()],
+            _ => return Ok(()),
+        };
+        let application = self
+            .stable_application_memory
+            .get(&application_number)
+            .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
+
+        // Counters first, for the reason `write_account_state` does it: it is the
+        // only fallible step, and an error after the removes would commit them
+        // without it.
+        self.apply_reference_counter_deltas(
+            anchor_number,
+            application_number,
+            application,
+            ReferenceListDeltas::removing(&previous),
+        )?;
+
+        let key = (anchor_number, application_number);
+        self.stable_account_reference_list_memory.remove(&key);
+        self.stable_anchor_application_config_memory.remove(&key);
+
+        Ok(())
+    }
+
+    /// Rows whose only reference is a tracked default.
+    fn evictable_default_rows(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> Vec<(ApplicationNumber, Option<Timestamp>)> {
+        self.stable_account_reference_list_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .filter_map(|((_, application_number), list)| {
+                let references = list.into_vec();
+                match references.as_slice() {
+                    [tracked_default] if tracked_default.account_number.is_none() => {
+                        Some((application_number, tracked_default.last_used))
+                    }
+                    _ => None,
+                }
+            })
+            .collect()
+    }
+
+    /// Upper bound on an anchor's evictable rows, from counters that already exist.
+    fn tracked_default_account_upper_bound(&self, anchor_number: AnchorNumber) -> u64 {
+        let counter = self.get_account_counter(anchor_number);
+        counter
+            .stored_account_references
+            .saturating_sub(counter.stored_accounts)
+    }
+
+    /// Drops the least recently used evictable defaults once the anchor is at the cap.
+    fn evict_idle_tracked_defaults(
+        &mut self,
+        anchor_number: AnchorNumber,
+        just_written: ApplicationNumber,
+    ) -> Result<(), StorageError> {
+        if self.tracked_default_account_upper_bound(anchor_number) < MAX_EVICTABLE_DEFAULT_ACCOUNTS
+        {
+            return Ok(());
+        }
+
+        let mut candidates: Vec<_> = self
+            .evictable_default_rows(anchor_number)
+            .into_iter()
+            .filter(|(application_number, _)| *application_number != just_written)
+            .collect();
+        if candidates.len() as u64 <= EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK {
+            return Ok(());
+        }
+
+        candidates.sort_by_key(|(application_number, last_used)| (*last_used, *application_number));
+
+        let victims = u64::min(
+            candidates.len() as u64 - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK,
+            MAX_EVICTIONS_PER_CALL,
+        );
+        for (application_number, _) in candidates.into_iter().take(victims as usize) {
+            self.remove_reference_list(anchor_number, application_number)?;
+        }
+
+        Ok(())
+    }
+
     pub fn lookup_anchor_application_config(
         &self,
         anchor_number: AnchorNumber,
@@ -1686,21 +1804,8 @@ impl<M: Memory + Clone> Storage<M> {
                 .stable_application_memory
                 .get(&application_number)
                 .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
-            // A first row holding nothing but a derived default records nothing:
-            // absence already says the identity has its default here, so storing it
-            // would keep bytes to repeat that. Only an account number is worth a row.
-            // Checked after the refusals above, so a caller still hears about a list or
-            // an application it had no business passing.
-            let records_nothing = stored_references.is_none()
-                && references
-                    .iter()
-                    .all(|reference| reference.account_number.is_none());
-
-            let deltas = ReferenceListDeltas::between(
-                stored_references.as_deref().unwrap_or_default(),
-                &references,
-            );
-            (!records_nothing).then_some((storable_references, application, deltas))
+            let deltas = ReferenceListDeltas::between(stored_references.as_deref(), &references);
+            Some((storable_references, application, deltas))
         };
 
         if let Some((storable_references, application, deltas)) = list_write {
@@ -1724,6 +1829,31 @@ impl<M: Memory + Clone> Storage<M> {
         if let Some(config) = config {
             self.stable_anchor_application_config_memory
                 .insert((anchor_number, application_number), config);
+        }
+
+        Ok(())
+    }
+
+    /// [`Self::write_account_state`] for a row the tracked default is the reason for,
+    /// reaping idle ones where this took the anchor over the cap.
+    ///
+    /// Only a row that did not exist can take it over: stamping or repointing one
+    /// leaves the count where it was, so there would be nothing to reap.
+    fn write_tracked_default(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        references: Vec<AccountReference>,
+        config: Option<AnchorApplicationConfig>,
+    ) -> Result<(), StorageError> {
+        let is_new_row = self
+            .stored_account_references(anchor_number, application_number)
+            .is_none();
+
+        self.write_account_state(anchor_number, application_number, references, None, config)?;
+
+        if is_new_row {
+            self.evict_idle_tracked_defaults(anchor_number, application_number)?;
         }
 
         Ok(())
@@ -1767,6 +1897,11 @@ impl<M: Memory + Clone> Storage<M> {
             application.stored_accounts,
             application.stored_account_references,
         )?;
+        let application_tombstones = deltas.apply_one(
+            ReferenceCounter::Application { application_number },
+            ReferenceCount::Tombstones,
+            application.tombstones,
+        )?;
 
         // The only write here that reports a failure, so it goes before the two that
         // cannot: past this line nothing can return an error and leave a partial update.
@@ -1784,17 +1919,44 @@ impl<M: Memory + Clone> Storage<M> {
                 stored_account_references: anchor_references,
             },
         );
-
-        self.stable_application_memory.insert(
-            application_number,
-            StorableApplication {
-                origin: application.origin,
-                stored_accounts: application_accounts,
-                stored_account_references: application_references,
-            },
-        );
+        // A zero here now means what it says. The delta refuses rather than clamping, so
+        // the row is only retired when no anchor references it, not when a counter that
+        // had already drifted was pulled below zero.
+        //
+        // Tombstones count too, and they are the reason references alone are not enough:
+        // a tombstone holds no reference and still has to keep this application number
+        // alive, or the identity it belongs to gets its moved-away default back.
+        if application_references == 0 && application_tombstones == 0 {
+            self.remove_unreferenced_application(application_number, &application.origin);
+        } else {
+            self.stable_application_memory.insert(
+                application_number,
+                StorableApplication {
+                    origin: application.origin,
+                    stored_accounts: application_accounts,
+                    stored_account_references: application_references,
+                    tombstones: application_tombstones,
+                },
+            );
+        }
 
         Ok(())
+    }
+
+    /// Retires an application no anchor references any more. The number is never
+    /// reissued.
+    fn remove_unreferenced_application(
+        &mut self,
+        application_number: ApplicationNumber,
+        origin: &str,
+    ) {
+        self.stable_application_memory.remove(&application_number);
+
+        let origin_key = StorableOriginSha256::from_origin(&origin.to_string());
+        if self.lookup_application_with_origin_memory.get(&origin_key) == Some(application_number) {
+            self.lookup_application_with_origin_memory
+                .remove(&origin_key);
+        }
     }
 
     /// This is for testing purposes only, DO NOT use anywhere else!
@@ -2051,31 +2213,15 @@ impl<M: Memory + Clone> Storage<M> {
             ..
         } = account;
 
-        let application_number = match (account_number, &name) {
-            // Naming the tracked default stores this identity's first account here, so
-            // the origin gets its application number now.
-            (None, Some(_)) => self.lookup_or_insert_application_number_with_origin(&origin)?,
-            // Everything else writes to a row that already exists, and an origin
+        let application_number = match account_number {
+            // The tracked default is stored the first time it is named or used, so its
+            // origin gets an application number on either.
+            None => self.lookup_or_insert_application_number_with_origin(&origin)?,
+            // A stored account writes to a row that already exists, and an origin
             // nothing has been stored under has none.
-            _ => match self.lookup_application_number_with_origin(&origin) {
-                Some(application_number) => application_number,
-                None => {
-                    return match account_number {
-                        Some(account_number) => {
-                            Err(StorageError::AccountNotFound { account_number })
-                        }
-                        // The default here is still derived rather than stored, so
-                        // there is no reference to record its use against.
-                        None => Ok(Account::new_with_last_used(
-                            anchor_number,
-                            origin,
-                            None,
-                            None,
-                            last_used,
-                        )),
-                    };
-                }
-            },
+            Some(account_number) => self
+                .lookup_application_number_with_origin(&origin)
+                .ok_or(StorageError::AccountNotFound { account_number })?,
         };
 
         let mut references = self.account_references(anchor_number, application_number);
@@ -2130,13 +2276,7 @@ impl<M: Memory + Clone> Storage<M> {
             // The tracked default, unnamed: nothing to store but the use of a
             // reference the row already holds.
             (None, None) => {
-                self.write_account_state(
-                    anchor_number,
-                    application_number,
-                    references,
-                    None,
-                    None,
-                )?;
+                self.write_tracked_default(anchor_number, application_number, references, None)?;
                 return Ok(Account::new_with_last_used(
                     anchor_number,
                     origin,
@@ -2183,11 +2323,10 @@ impl<M: Memory + Clone> Storage<M> {
         let application_number = self.lookup_or_insert_application_number_with_origin(&origin)?;
         let references = self.account_references(anchor_number, application_number);
 
-        self.write_account_state(
+        self.write_tracked_default(
             anchor_number,
             application_number,
             references,
-            None,
             Some(AnchorApplicationConfig {
                 default_account_number: account_number,
             }),
@@ -2471,6 +2610,8 @@ pub enum ReferenceCount {
     Accounts,
     /// References, named and tracked-default alike.
     References,
+    /// Rows that exist while holding no reference.
+    Tombstones,
 }
 
 impl fmt::Display for ReferenceCount {
@@ -2478,6 +2619,7 @@ impl fmt::Display for ReferenceCount {
         match self {
             Self::Accounts => write!(f, "stored accounts"),
             Self::References => write!(f, "stored account references"),
+            Self::Tombstones => write!(f, "stored tombstones"),
         }
     }
 }
@@ -2493,6 +2635,9 @@ struct ReferenceListDeltas {
     accounts: i64,
     /// Change in references, named and tracked-default alike.
     references: i64,
+    /// Change in rows that exist while holding no reference. Only ever -1, 0 or 1: one
+    /// write touches one row.
+    tombstones: i64,
 }
 
 impl ReferenceListDeltas {
@@ -2504,7 +2649,7 @@ impl ReferenceListDeltas {
     /// holding nothing, so a diff against it would report no change and leave the
     /// counters claiming references the removed row no longer has.
     fn between(
-        previous_references: &[AccountReference],
+        previous_references: Option<&[AccountReference]>,
         new_references: &[AccountReference],
     ) -> Self {
         /// Saturating rather than `as`: a list long enough to overflow `i64` cannot
@@ -2522,17 +2667,45 @@ impl ReferenceListDeltas {
             (named, total)
         }
 
-        let (previous_named, previous_total) = counts(previous_references);
+        let (previous_named, previous_total) = counts(previous_references.unwrap_or_default());
         let (new_named, new_total) = counts(new_references);
+
+        // A row that does not exist is not a tombstone — a tombstone is a row someone
+        // stored, and absence is what normalisation reads as "derive the default".
+        let was_tombstone = previous_references.is_some_and(<[_]>::is_empty);
+        let is_tombstone = new_references.is_empty();
+        let tombstones = match (was_tombstone, is_tombstone) {
+            (false, true) => 1,
+            (true, false) => -1,
+            _ => 0,
+        };
 
         Self {
             accounts: new_named.saturating_sub(previous_named),
             references: new_total.saturating_sub(previous_total),
+            tombstones,
+        }
+    }
+
+    /// What retiring a row holding `previous` does to the counters.
+    ///
+    /// Separate from [`Self::between`] rather than a write of an empty list, because
+    /// an empty list cannot be written at all: a row holding nothing is a tombstone
+    /// and stays, so only an outright removal gets to zero these out.
+    fn removing(previous: &[AccountReference]) -> Self {
+        let removed = Self::between(Some(&[]), previous);
+        Self {
+            accounts: removed.accounts.saturating_neg(),
+            references: removed.references.saturating_neg(),
+            // The row is gone, so a tombstone goes with it. Not the negation of what
+            // `between` reported: that describes writing this list, and this describes
+            // removing the row it was in.
+            tombstones: if previous.is_empty() { -1 } else { 0 },
         }
     }
 
     fn is_empty(&self) -> bool {
-        self.accounts == 0 && self.references == 0
+        self.accounts == 0 && self.references == 0 && self.tombstones == 0
     }
 
     /// Both counts of `counter`, moved by this delta.
@@ -2567,6 +2740,7 @@ impl ReferenceListDeltas {
         let delta = match count {
             ReferenceCount::Accounts => self.accounts,
             ReferenceCount::References => self.references,
+            ReferenceCount::Tombstones => self.tombstones,
         };
         stored
             .checked_add_signed(delta)
