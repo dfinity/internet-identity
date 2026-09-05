@@ -448,7 +448,7 @@ fn should_record_that_a_named_account_was_used() {
 }
 
 #[test]
-fn should_not_store_a_row_to_record_use_of_a_derived_default() {
+fn should_not_store_a_list_to_record_use_of_a_derived_default() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
     let origin = "https://example.com".to_string();
@@ -2317,7 +2317,7 @@ mod reference_list_write_path_tests {
     }
 
     #[test]
-    fn writing_the_list_the_row_already_holds_touches_nothing() {
+    fn writing_the_list_the_list_already_holds_touches_nothing() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
         let application_number = storage
@@ -2566,7 +2566,7 @@ mod account_reference_state_tests {
     }
 
     #[test]
-    fn an_untouched_row_offers_a_reconstructible_default() {
+    fn an_untouched_list_offers_a_reconstructible_default() {
         let (storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
 
@@ -2577,7 +2577,7 @@ mod account_reference_state_tests {
     }
 
     #[test]
-    fn a_tombstoned_row_has_nothing_to_sign_in_as() {
+    fn a_tombstoned_list_has_nothing_to_sign_in_as() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         plant_tombstone(&mut storage, anchor_number);
@@ -2590,7 +2590,7 @@ mod account_reference_state_tests {
     }
 
     #[test]
-    fn a_row_that_names_no_default_has_no_default_to_read() {
+    fn a_list_that_names_no_default_has_no_default_to_read() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         let account = storage
@@ -2623,7 +2623,7 @@ mod account_reference_state_tests {
     }
 
     #[test]
-    fn a_named_account_added_to_a_tombstoned_row_does_not_revive_the_default() {
+    fn a_named_account_added_to_a_tombstoned_list_does_not_revive_the_default() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         plant_tombstone(&mut storage, anchor_number);

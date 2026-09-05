@@ -2482,7 +2482,7 @@ impl fmt::Display for ReferenceCount {
     }
 }
 
-/// How one write to a reference-list list moves the counters derived from it.
+/// How one write to a account reference list moves the counters derived from it.
 ///
 /// Signed because these are differences rather than totals: a write that drops a
 /// reference has to move the counters down, and there is no unsigned way to say so.
