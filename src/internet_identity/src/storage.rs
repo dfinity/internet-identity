@@ -1765,8 +1765,7 @@ impl<M: Memory + Clone> Storage<M> {
             }
         }
         if removed > 0 {
-            self.change_session_count(anchor_number, removed as usize, 0)
-                .expect("failed to move the session count of an anchor that was just read");
+            self.change_session_count(anchor_number, removed as usize, 0)?;
         }
 
         Ok(removed)
@@ -1876,11 +1875,11 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Moves the count without considering the cap, for the paths that only remove.
     ///
-    /// Traps rather than reporting, at every caller. It runs after the row writes it
-    /// describes, and on the IC an `Err` commits those — so reporting a failure here
-    /// would leave the stored sessions and the count that gates sign-in permanently
-    /// disagreeing, while telling the caller nothing happened. A trap rolls the whole
-    /// message back.
+    /// This runs after the row writes it describes, which on the IC means an `Err` here
+    /// would commit them with the count untouched. It cannot report one: the anchor was
+    /// written by the caller that got here, so the read resolves, and writing it back
+    /// with one `u32` changed leaves every field the write validates — the email
+    /// recovery binding included — exactly as it was read.
     fn change_session_count(
         &mut self,
         anchor_number: AnchorNumber,
@@ -2025,10 +2024,10 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         let remaining = stored.saturating_sub(dropped_total as u32);
-        // Trapping for the reason `change_session_count` does: the rows above are already
-        // written, so reporting a failure here would commit them with the count untouched.
-        self.set_session_count(anchor_number, remaining)
-            .expect("failed to set the session count of an anchor that was just read");
+        // Cannot report a failure, for the reason `change_session_count` cannot: the rows
+        // above are already written, and this is the anchor they belong to, read and
+        // written back with one `u32` changed.
+        self.set_session_count(anchor_number, remaining)?;
         Ok(remaining)
     }
 
@@ -2338,8 +2337,7 @@ impl<M: Memory + Clone> Storage<M> {
                 },
             );
         }
-        self.change_session_count(anchor_number, dropped.len(), 1)
-            .expect("failed to move the session count of an anchor that was just read");
+        self.change_session_count(anchor_number, dropped.len(), 1)?;
 
         let key = SessionRecordKey {
             anchor_number,
@@ -2425,9 +2423,9 @@ impl<M: Memory + Clone> Storage<M> {
             );
         }
 
-        // Counters first, for the reason `write_account_state` does it: it is the only
-        // step left that can *report* a failure, and an error after the removes would
-        // commit them without it. What follows either cannot fail or traps.
+        // Counters first, for the reason `write_account_state` does it: an error after
+        // the removes would commit them without it. The session count below moves after
+        // this, and cannot report a failure of its own — see `change_session_count`.
         self.apply_reference_counter_deltas(
             anchor_number,
             application_number,
@@ -2435,8 +2433,7 @@ impl<M: Memory + Clone> Storage<M> {
             ReferenceListDeltas::removing(&previous),
         )?;
         if dropped > 0 {
-            self.change_session_count(anchor_number, dropped, 0)
-                .expect("failed to move the session count of an anchor that was just read");
+            self.change_session_count(anchor_number, dropped, 0)?;
         }
 
         self.sync_account_principal_index(
