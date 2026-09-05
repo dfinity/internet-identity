@@ -4387,7 +4387,31 @@ mod session_record_tests {
 
     #[test]
     fn a_reference_with_sessions_round_trips() {
-        let reference = AccountReference::new(Some(3), Some(9));
+        // Every field differs, inside a record and between the two, so a pair of fields
+        // swapped on the way through either conversion reads back as a mismatch rather
+        // than as a value that happens to match the one it was swapped with.
+        let reference = AccountReference {
+            account_number: Some(3),
+            last_used: Some(9),
+            sessions: vec![
+                SessionRecord {
+                    created_at_ns: 11,
+                    valid_till_ns: 22,
+                    max_idle_ns: 33,
+                    last_refreshed_ns: Some(44),
+                    device_id: 55,
+                    read_only: false,
+                },
+                SessionRecord {
+                    created_at_ns: 66,
+                    valid_till_ns: 77,
+                    max_idle_ns: 88,
+                    last_refreshed_ns: None,
+                    device_id: 99,
+                    read_only: true,
+                },
+            ],
+        };
 
         let stored = StorableAccountReference::from(reference.clone());
         let decoded =
@@ -4470,7 +4494,11 @@ mod session_record_tests {
             .write_account_state(
                 anchor_number,
                 application_number,
-                vec![AccountReference::new(None, Some(1))],
+                vec![AccountReference {
+                    account_number: None,
+                    last_used: Some(1),
+                    sessions: vec![session(0, u64::MAX)],
+                }],
                 None,
                 None,
             )
