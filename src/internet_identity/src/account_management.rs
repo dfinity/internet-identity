@@ -80,7 +80,7 @@ pub fn get_account_for_origin(
     account_number: Option<AccountNumber>,
 ) -> Result<Account, GetAccountError> {
     // Including the tracked default, which the storage read answers for: it is the
-    // identity's only where its row still names it, and no account at all where it was
+    // identity's only where its list still names it, and no account at all where it was
     // named or moved away.
     if let Ok(account) = try_read_account(anchor_number, &origin, account_number) {
         return Ok(account);
@@ -1150,7 +1150,7 @@ fn should_fall_back_to_the_tracked_default_when_the_reservation_is_stale() {
     use ic_stable_structures::VectorMemory;
 
     let mut storage = Storage::new((0, 10000), VectorMemory::default());
-    // A write of this row derives account principals on later branches, so the salt has
+    // A write of this list derives account principals on later branches, so the salt has
     // to be there for the same test to hold all the way up the stack.
     storage.update_salt([17u8; 32]);
     storage_replace(storage);

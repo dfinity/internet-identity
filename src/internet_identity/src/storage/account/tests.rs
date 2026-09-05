@@ -508,7 +508,7 @@ fn should_read_a_synthetic_default_account_when_no_reference_list_exists() {
 
     let anchor_number: AnchorNumber = 10_000;
     let origin: FrontendHostname = "https://some.origin".to_string();
-    // The origin is known, but this identity has no row under it.
+    // The origin is known, but this identity has no list under it.
     storage
         .lookup_or_insert_application_number_with_origin(&origin)
         .unwrap();
