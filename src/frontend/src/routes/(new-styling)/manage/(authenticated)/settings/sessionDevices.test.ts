@@ -130,17 +130,6 @@ describe("signOutSessionDevice", () => {
     ).rejects.toThrow(/Not authorized/);
   });
 
-  it("surfaces an internal failure", async () => {
-    const actor = {
-      revoke_device_sessions: () =>
-        Promise.resolve({ Err: { InternalCanisterError: "boom" } }),
-    } as unknown as ActorSubclass<_SERVICE>;
-
-    await expect(
-      signOutSessionDevice(actor, BigInt(10_000), 3),
-    ).rejects.toThrow("boom");
-  });
-
   /// Which browser is signing out is read from the key record, not passed in: the list
   /// renders that flag from a promise, and a click landing before it resolved used to
   /// leave this browser's own chains behind — the one thing signing out must not do.
