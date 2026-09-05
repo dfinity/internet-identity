@@ -28,6 +28,14 @@ export type AccountSessionError = { 'InternalCanisterError' : string } |
      * The browser's key is unusable, or its signature does not verify against it.
      */
     'InvalidDeviceKey' : null
+  } |
+  {
+    /**
+     * The browser presented a key it has already rotated away from, which happens when it
+     * never learned that its last sign-in succeeded. It holds the successor that does
+     * resolve, so the answer is to promote that one and present it.
+     */
+    'StaleDeviceKey' : null
   };
 export interface AccountUpdate { 'name' : [] | [string] }
 export type AddTentativeDeviceResponse = {
