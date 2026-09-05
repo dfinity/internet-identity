@@ -39,7 +39,7 @@ fn record_use(
 
 const HEADER_SIZE: usize = 58;
 
-/// The references a row holds, for assertions that go on to index them.
+/// The references a list holds, for assertions that go on to index them.
 fn held_references(
     storage: &Storage<VectorMemory>,
     anchor_number: AnchorNumber,
@@ -47,7 +47,7 @@ fn held_references(
 ) -> Vec<AccountReference> {
     storage
         .stored_account_references(anchor_number, application_number)
-        .expect("expected a row holding references, found none")
+        .expect("expected a list holding references, found none")
 }
 
 #[test]
@@ -503,7 +503,7 @@ fn should_track_the_default_account_on_first_use() {
     storage.write_account(account).unwrap();
 
     // Nothing was stored at this origin, so recording the use is what gives the
-    // default a row: the timestamp has nowhere else to live.
+    // default a list: the timestamp has nowhere else to live.
     assert_eq!(
         storage.read_account(&key).unwrap().last_used,
         Some(timestamp)
@@ -528,7 +528,7 @@ fn should_record_that_a_tracked_default_was_used() {
     let anchor_number = anchor.anchor_number();
     storage.write(anchor).unwrap();
 
-    // A named account gives the origin a row, which the default is tracked in.
+    // A named account gives the origin a list, which the default is tracked in.
     storage
         .create_account(anchor_number, origin.clone(), "Test Account".to_string())
         .unwrap();
@@ -2343,7 +2343,7 @@ mod reference_list_write_path_tests {
         // Refused before anything was written: the list still holds both references.
         let references = storage
             .stored_account_references(anchor_number, application_number)
-            .expect("the row written above is gone");
+            .expect("the list written above is gone");
         assert_eq!(references.len(), 2);
     }
 
@@ -2617,7 +2617,7 @@ mod reference_list_write_path_tests {
     }
 }
 
-/// A `(anchor, application)` row can be absent, empty, or hold references, and those
+/// A `(anchor, application)` list can be absent, empty, or hold references, and those
 /// mean three different things. Absence says a default account is still
 /// reconstructible; emptiness is a tombstone and says it never can be again.
 mod account_reference_state_tests {
@@ -2643,7 +2643,7 @@ mod account_reference_state_tests {
         (storage, anchor_number)
     }
 
-    /// Plants the row a future account move would leave behind. The write path cannot
+    /// Plants the list a future account move would leave behind. The write path cannot
     /// store one, which is the whole point, so a test that
     /// needs a tombstone has to write it directly.
     fn plant_tombstone(storage: &mut Storage<VectorMemory>, anchor_number: AnchorNumber) {
@@ -2655,7 +2655,7 @@ mod account_reference_state_tests {
             (anchor_number, application_number),
             StorableAccountReferenceList::tombstone_for_testing(),
         );
-        // The counter goes up with the row, as the move that will one day leave a
+        // The counter goes up with the list, as the move that will one day leave a
         // tombstone behind has to do: a stored tombstone the application does not count
         // is a divergence, and the write path refuses those rather than papering over
         // them.
@@ -2834,7 +2834,7 @@ mod account_reference_state_tests {
             .unwrap();
         let references = storage
             .stored_account_references(anchor_number, application_number)
-            .expect("naming the default should not have emptied the row");
+            .expect("naming the default should not have emptied the list");
         // Repointed where it stood, keeping the order accounts are listed in and the
         // timestamp the reference already carried.
         assert_eq!(
@@ -2861,8 +2861,8 @@ mod account_reference_state_tests {
             .stored_account_references(anchor_number, application_number)
             .unwrap();
 
-        // A skipped write is invisible in the stored bytes, since rewriting the row
-        // would store what it already holds. Retiring the application row makes it
+        // A skipped write is invisible in the stored bytes, since rewriting the list
+        // would store what it already holds. Retiring the application makes it
         // visible: `write_account_state` refuses without one, so a rename that still
         // wrote the list could not succeed here.
         storage
@@ -2900,9 +2900,9 @@ mod account_reference_state_tests {
             .create_account(owner, origin.clone(), "named".to_string())
             .unwrap();
         let account_number = account.account_number.unwrap();
-        // The other identity has a row of its own at this origin, so what refuses the
-        // attempts below is the row not naming this account rather than there being no
-        // row to look in.
+        // The other identity has a list of its own at this origin, so what refuses the
+        // attempts below is the list not naming this account rather than there being no
+        // list to look in.
         storage
             .create_account(other, origin.clone(), "mine".to_string())
             .unwrap();
@@ -3023,8 +3023,8 @@ mod application_number_allocator_tests {
                 .stable_application_memory
                 .insert(number, application(origin));
         }
-        // The rows now have a hole in them while the counter knows nothing, which is
-        // the one state a row count gets wrong: it would answer 2, the number
+        // The lists now have a hole in them while the counter knows nothing, which is
+        // the one state a list count gets wrong: it would answer 2, the number
         // `https://c.com` still holds.
         storage.stable_application_memory.remove(&0);
         storage.next_application_number_memory.set(0).unwrap();
@@ -3435,8 +3435,8 @@ mod tracked_default_eviction_tests {
             sign_in_at(&mut storage, anchor_number, index);
         }
 
-        let rows = storage.evictable_default_rows(anchor_number).len() as u64;
-        assert!(rows <= MAX_EVICTABLE_DEFAULT_ACCOUNTS);
+        let lists = storage.evictable_default_rows(anchor_number).len() as u64;
+        assert!(lists <= MAX_EVICTABLE_DEFAULT_ACCOUNTS);
         let newest = storage
             .lookup_application_number_with_origin(&origin_of(
                 MAX_EVICTABLE_DEFAULT_ACCOUNTS * 2 - 1,
@@ -3766,7 +3766,7 @@ mod application_removal_tests {
             .unwrap();
         plant_tombstone(&mut storage, anchor_number, application_number);
 
-        // The move back: the tombstoned row gains a reference again.
+        // The move back: the tombstoned list gains a reference again.
         storage
             .write_account_state(
                 anchor_number,
@@ -3793,7 +3793,7 @@ mod application_removal_tests {
             .is_none());
     }
 
-    /// Moves every account out of a row, leaving the tombstone a future account move
+    /// Moves every account out of a list, leaving the tombstone a future account move
     /// will. The write path refuses to store an empty list, which is what makes a
     /// tombstone a thing only a move can create, so it is written here directly — with
     /// the application's counters moved as that move will have to move them.
@@ -3804,7 +3804,7 @@ mod application_removal_tests {
     ) {
         let moved_away = storage
             .stored_account_references(anchor_number, application_number)
-            .expect("a row has to exist before it can be emptied");
+            .expect("a list has to exist before it can be emptied");
         let named = moved_away
             .iter()
             .filter(|reference| reference.account_number.is_some())
@@ -3974,7 +3974,7 @@ mod application_removal_tests {
     fn only_a_lone_tracked_default_may_be_pruned() {
         let (mut storage, anchor_number, _) = storage_with_anchors();
         let origin = "https://example.com".to_string();
-        // A default alongside a named account. Retiring the row would drop a reference
+        // A default alongside a named account. Retiring the list would drop a reference
         // nothing else records, so it is refused even though the caller asked.
         storage
             .create_account(anchor_number, origin.clone(), "named".to_string())
@@ -4003,7 +4003,7 @@ mod application_removal_tests {
         let application_number = storage
             .lookup_or_insert_application_number_with_origin(&origin)
             .unwrap();
-        // Taking the row away would make the moved-away default reconstructible again,
+        // Taking the list away would make the moved-away default reconstructible again,
         // which is the one thing the tombstone exists to prevent.
         storage.stable_account_reference_list_memory.insert(
             (anchor_number, application_number),
@@ -4027,8 +4027,8 @@ mod application_removal_tests {
         let application_number = storage
             .lookup_or_insert_application_number_with_origin(&origin)
             .unwrap();
-        // A lone tracked default, which is the only thing a row may be retired for,
-        // and the config row that goes with it.
+        // A lone tracked default, which is the only thing a list may be retired for,
+        // and the config list that goes with it.
         storage
             .set_default_account(anchor_number, origin.clone(), None)
             .unwrap();
@@ -4394,11 +4394,11 @@ mod account_principal_index_backfill_tests {
 
     const SALT: [u8; 32] = [17u8; 32];
 
-    fn storage_with_rows(rows: u64) -> (Storage<VectorMemory>, Vec<AnchorNumber>) {
+    fn storage_with_rows(lists: u64) -> (Storage<VectorMemory>, Vec<AnchorNumber>) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         storage.update_salt(SALT);
         let mut anchors = vec![];
-        for index in 0..rows {
+        for index in 0..lists {
             let anchor = storage.allocate_anchor(0).unwrap();
             let anchor_number = anchor.anchor_number();
             storage.write(anchor).unwrap();
@@ -4512,7 +4512,7 @@ mod account_principal_index_backfill_tests {
         assert_eq!(outcome.indexed, 0);
     }
 
-    /// A canister that has never been signed in to has no salt and no rows, and the sweep
+    /// A canister that has never been signed in to has no salt and no lists, and the sweep
     /// has to finish on the second of those. Waiting for the salt would leave its timer
     /// running for the life of the canister.
     #[test]
@@ -4538,9 +4538,9 @@ mod account_principal_index_backfill_tests {
         assert_eq!(outcome.indexed, 0);
     }
 
-    /// A row can hold up to `MAX_ANCHOR_ACCOUNTS` references, so a batch that stopped only
-    /// on row boundaries would derive that many principals in one message however small
-    /// the batch. It stops inside the row and the cursor says where.
+    /// A list can hold up to `MAX_ANCHOR_ACCOUNTS` references, so a batch that stopped only
+    /// on list boundaries would derive that many principals in one message however small
+    /// the batch. It stops inside the list and the cursor says where.
     #[test]
     fn a_batch_stops_inside_a_row_too_big_to_finish() {
         let (mut storage, anchors) = storage_with_rows(1);
@@ -4562,7 +4562,7 @@ mod account_principal_index_backfill_tests {
         assert_eq!(
             first.next_cursor.map(|cursor| cursor.references_done),
             Some(2),
-            "the cursor should point inside the row, not past it"
+            "the cursor should point inside the list, not past it"
         );
         assert_eq!(storage.lookup_account_with_principal_memory.len(), 2);
 
@@ -4715,7 +4715,7 @@ mod session_record_tests {
         assert_eq!(StorableAccountReference::from(reference).sessions, None);
     }
 
-    /// A row is evictable on its shape alone. Sparing one because it holds a live session
+    /// A list is evictable on its shape alone. Sparing one because it holds a live session
     /// would leave the user with access that settings cannot show them, and a session
     /// nobody can find is a session nobody can revoke.
     #[test]
@@ -4742,8 +4742,8 @@ mod session_record_tests {
         assert_eq!(storage.evictable_default_rows(anchor_number).len(), 1);
     }
 
-    /// Eviction orders on the row's `last_used`, which every refresh stamps, so a session
-    /// in use keeps its row at the newest end and survives the cap on its own.
+    /// Eviction orders on the list's `last_used`, which every refresh stamps, so a session
+    /// in use keeps its list at the newest end and survives the cap on its own.
     #[test]
     fn a_refreshed_session_keeps_its_row_and_a_stale_one_does_not() {
         let (mut storage, anchor_number) = storage_with_anchor();
@@ -4911,9 +4911,9 @@ mod session_creation_tests {
         }
     }
 
-    /// A row that predates the principal index, which is every row an existing user has:
-    /// the index is written only where a row's set of account numbers changes, and by the
-    /// backfill sweep. Emptied here to stand in for a row the sweep has not reached.
+    /// A list that predates the principal index, which is every list an existing user has:
+    /// the index is written only where a list's set of account numbers changes, and by the
+    /// backfill sweep. Emptied here to stand in for a list the sweep has not reached.
     fn forget_account_principals(storage: &mut Storage<VectorMemory>) {
         let principals: Vec<_> = storage
             .lookup_account_with_principal_memory
@@ -5226,7 +5226,7 @@ mod session_creation_tests {
             assert_eq!(
                 storage.read(anchor_number).unwrap().session_count as usize,
                 stored,
-                "the counter parted ways with the rows after {device_id} sign-ins"
+                "the counter parted ways with the lists after {device_id} sign-ins"
             );
         }
     }
@@ -5239,7 +5239,7 @@ mod session_creation_tests {
             .unwrap();
 
         // Nothing observes a session expiring, so the count drifts up. The cap must be
-        // enforced against what the rows hold, not against the drift.
+        // enforced against what the lists hold, not against the drift.
         let mut anchor = storage.read(anchor_number).unwrap();
         anchor.session_count = MAX_SESSIONS_PER_ANCHOR;
         storage.write(anchor).unwrap();
@@ -5252,19 +5252,19 @@ mod session_creation_tests {
         assert_eq!(storage.read(anchor_number).unwrap().session_count, 2);
     }
 
-    /// Two rows, both holding a default account, and both holding sessions for the same
+    /// Two lists, both holding a default account, and both holding sessions for the same
     /// browser ids. Reclaiming must take only the sessions it selected.
     #[test]
     fn reclaiming_takes_only_the_sessions_it_selected() {
         const OTHER_ORIGIN: &str = "https://other.example";
         let (mut storage, anchor_number) = storage_with_anchor();
 
-        // Two rows of this size put the identity two over the watermark, so the pass selects
-        // exactly two victims — one in each row.
+        // Two lists of this size put the identity two over the watermark, so the pass selects
+        // exactly two victims — one in each list.
         const PER_ROW: u32 = SESSIONS_WATERMARK_PER_ANCHOR / 2 + 1;
-        // The browser ids repeat across the rows; the session ids do not, because no two
+        // The browser ids repeat across the lists; the session ids do not, because no two
         // sessions ever share one.
-        let row = |id_base: u64, expired_device: u32| -> Vec<AccountReference> {
+        let list = |id_base: u64, expired_device: u32| -> Vec<AccountReference> {
             let sessions = (0..PER_ROW)
                 .map(|device_id| {
                     let session_id = id_base + device_id as u64;
@@ -5305,10 +5305,10 @@ mod session_creation_tests {
             .lookup_or_insert_application_number_with_origin(&OTHER_ORIGIN.to_string())
             .unwrap();
         storage
-            .write_account_state(anchor_number, first, row(1_000, 0), None, None)
+            .write_account_state(anchor_number, first, list(1_000, 0), None, None)
             .unwrap();
         storage
-            .write_account_state(anchor_number, second, row(2_000, 1), None, None)
+            .write_account_state(anchor_number, second, list(2_000, 1), None, None)
             .unwrap();
 
         let mut anchor = storage.read(anchor_number).unwrap();
@@ -5334,19 +5334,19 @@ mod session_creation_tests {
 
         assert!(
             !first_devices.contains(&0),
-            "the expired session selected in the first row should be gone"
+            "the expired session selected in the first list should be gone"
         );
         assert!(
             !second_devices.contains(&1),
-            "the expired session selected in the second row should be gone"
+            "the expired session selected in the second list should be gone"
         );
         assert!(
             first_devices.contains(&1),
-            "the first row's live session for browser 1 was not selected and must survive"
+            "the first list's live session for browser 1 was not selected and must survive"
         );
         assert!(
             second_devices.contains(&0),
-            "the second row's live session for browser 0 was not selected and must survive"
+            "the second list's live session for browser 0 was not selected and must survive"
         );
     }
 
@@ -5412,7 +5412,7 @@ mod session_creation_tests {
     }
 
     /// The flood bound, exercised through the cap rather than through the order alone: a
-    /// session the user has actually kept alive survives a row full of sign-ins nobody
+    /// session the user has actually kept alive survives a list full of sign-ins nobody
     /// came back to, even though every one of them is newer than it.
     #[test]
     fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
