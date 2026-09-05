@@ -2623,6 +2623,7 @@ mod reference_list_write_path_tests {
 mod account_reference_state_tests {
     use crate::storage::account::{Account, AccountKey, AccountReference};
     use crate::storage::storable::account_reference_list::StorableAccountReferenceList;
+    use crate::storage::storable::application::StorableApplication;
     use crate::storage::StorageError;
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
@@ -2653,6 +2654,21 @@ mod account_reference_state_tests {
         storage.stable_account_reference_list_memory.insert(
             (anchor_number, application_number),
             StorableAccountReferenceList::tombstone_for_testing(),
+        );
+        // The counter goes up with the row, as the move that will one day leave a
+        // tombstone behind has to do: a stored tombstone the application does not count
+        // is a divergence, and the write path refuses those rather than papering over
+        // them.
+        let application = storage
+            .stable_application_memory
+            .get(&application_number)
+            .expect("the origin was just interned");
+        storage.stable_application_memory.insert(
+            application_number,
+            StorableApplication {
+                tombstones: application.tombstones + 1,
+                ..application
+            },
         );
         assert_eq!(
             storage.stored_account_references(anchor_number, application_number),
@@ -2933,6 +2949,7 @@ mod application_number_allocator_tests {
             origin: origin.to_string(),
             stored_accounts: 0,
             stored_account_references: 0,
+            tombstones: 0,
         }
     }
 
@@ -3653,7 +3670,7 @@ mod application_removal_tests {
 
     use super::record_use;
     use crate::storage::account::AccountReference;
-    use crate::storage::storable::application::StorableOriginSha256;
+    use crate::storage::storable::application::{StorableApplication, StorableOriginSha256};
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
@@ -3692,6 +3709,128 @@ mod application_removal_tests {
             .get(&application_number)
             .is_none());
         assert_eq!(storage.get_total_application_count(), 0);
+    }
+
+    /// A tombstone holds no reference, so the reference count alone says this origin is
+    /// unused. Retiring it would drop the origin index entry, and the next visit would
+    /// mint a fresh application number the tombstone no longer applies to — handing the
+    /// identity back the default it moved away from, which is the one thing a tombstone
+    /// exists to prevent.
+    #[test]
+    fn an_application_another_anchor_has_tombstoned_is_kept() {
+        let (mut storage, anchor_number, other_anchor_number) = storage_with_anchors();
+        let origin = "https://example.com".to_string();
+        record_use(&mut storage, anchor_number, origin.clone(), None, 1_000).unwrap();
+        record_use(
+            &mut storage,
+            other_anchor_number,
+            origin.clone(),
+            None,
+            1_000,
+        )
+        .unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        plant_tombstone(&mut storage, other_anchor_number, application_number);
+
+        storage
+            .remove_reference_list(anchor_number, application_number)
+            .unwrap();
+
+        assert_eq!(
+            storage.lookup_application_number_with_origin(&origin),
+            Some(application_number)
+        );
+        assert_eq!(
+            storage
+                .stable_application_memory
+                .get(&application_number)
+                .map(|application| (
+                    application.stored_account_references,
+                    application.tombstones
+                )),
+            Some((0, 1))
+        );
+    }
+
+    /// The other side of the same rule: an account moved back clears the tombstone, and
+    /// with nothing left the application is retired like any other.
+    #[test]
+    fn an_application_whose_last_tombstone_is_cleared_is_retired() {
+        let (mut storage, anchor_number, _) = storage_with_anchors();
+        let origin = "https://example.com".to_string();
+        record_use(&mut storage, anchor_number, origin.clone(), None, 1_000).unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        plant_tombstone(&mut storage, anchor_number, application_number);
+
+        // The move back: the tombstoned row gains a reference again.
+        storage
+            .write_account_state(
+                anchor_number,
+                application_number,
+                vec![AccountReference {
+                    account_number: None,
+                    last_used: Some(2_000),
+                }],
+                None,
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            storage
+                .stable_application_memory
+                .get(&application_number)
+                .map(|application| application.tombstones),
+            Some(0)
+        );
+
+        storage
+            .remove_reference_list(anchor_number, application_number)
+            .unwrap();
+
+        assert!(storage
+            .lookup_application_number_with_origin(&origin)
+            .is_none());
+    }
+
+    /// Moves every account out of a row, leaving the tombstone a future account move
+    /// will. The write path refuses to store an empty list, which is what makes a
+    /// tombstone a thing only a move can create, so it is written here directly — with
+    /// the application's counters moved as that move will have to move them.
+    fn plant_tombstone(
+        storage: &mut Storage<VectorMemory>,
+        anchor_number: AnchorNumber,
+        application_number: u64,
+    ) {
+        let moved_away = storage
+            .stored_account_references(anchor_number, application_number)
+            .expect("a row has to exist before it can be emptied");
+        let named = moved_away
+            .iter()
+            .filter(|reference| reference.account_number.is_some())
+            .count() as u64;
+
+        storage.stable_account_reference_list_memory.insert(
+            (anchor_number, application_number),
+            StorableAccountReferenceList::tombstone_for_testing(),
+        );
+        let application = storage
+            .stable_application_memory
+            .get(&application_number)
+            .expect("the application should still be stored");
+        storage.stable_application_memory.insert(
+            application_number,
+            StorableApplication {
+                stored_accounts: application.stored_accounts - named,
+                stored_account_references: application.stored_account_references
+                    - moved_away.len() as u64,
+                tombstones: application.tombstones + 1,
+                ..application
+            },
+        );
     }
 
     #[test]
