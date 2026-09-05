@@ -5599,8 +5599,7 @@ mod session_refresh_stamp_tests {
                     anchor_number,
                     origin: ORIGIN.to_string(),
                     account_number: None,
-                    device_id: 1,
-                    created_at: 9_999,
+                    session_id: 9_999,
                 },
                 5_000,
             )
