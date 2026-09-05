@@ -1717,8 +1717,6 @@ impl<M: Memory + Clone> Storage<M> {
             .map(Vec::<AccountReference>::from)
     }
 
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
     /// Signs one browser out of everything, in a single message.
     pub fn revoke_device_sessions(
         &mut self,
