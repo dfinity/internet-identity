@@ -79,7 +79,7 @@
 //!
 //! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
 //! bucket of 128 pages.
-use account::{Account, AccountKey, AccountsCounter};
+use account::{Account, AccountKey, AccountsCounter, SessionRecordKey};
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use ic_stable_structures::cell::ValueError;
@@ -1795,42 +1795,22 @@ impl<M: Memory + Clone> Storage<M> {
 
     // Called by the sign-in ceremony, which lands two PRs up.
     #[allow(dead_code)]
-    /// The account a session handle names, together with its sessions.
-    pub fn account_with_sessions(
-        &self,
-        anchor_number: AnchorNumber,
-        application_number: ApplicationNumber,
-        account_number: Option<AccountNumber>,
-    ) -> Option<(Account, Vec<SessionRecord>)> {
-        let origin = self
-            .stable_application_memory
-            .get(&application_number)
-            .map(|application| application.origin)?;
-        let reference = self
-            .account_references(anchor_number, application_number)
-            .into_iter()
-            .find(|reference| reference.account_number == account_number)?;
-        let account = self.read_account(&AccountKey {
-            anchor_number,
-            origin,
-            account_number,
-        })?;
-        Some((account, reference.sessions))
-    }
+    /// The session `key` names, or `None` where the identity holds no such session.
+    ///
+    /// A key whose session was replaced reads as `None` rather than as its successor:
+    /// a browser keeps its id across sign-ins, so the creation time is what tells two
+    /// of that browser's sessions apart.
+    pub fn read_session(&self, key: &SessionRecordKey) -> Option<SessionRecord> {
+        let application_number = self.lookup_application_number_with_origin(&key.origin)?;
 
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
-    pub fn account_sessions(
-        &self,
-        anchor_number: AnchorNumber,
-        origin: &FrontendHostname,
-        account_number: Option<AccountNumber>,
-    ) -> Option<Vec<SessionRecord>> {
-        let application_number = self.lookup_application_number_with_origin(origin)?;
-        self.account_references(anchor_number, application_number)
+        self.account_references(key.anchor_number, application_number)
             .into_iter()
-            .find(|reference| reference.account_number == account_number)
-            .map(|reference| reference.sessions)
+            .find(|reference| reference.account_number == key.account_number)?
+            .sessions
+            .into_iter()
+            .find(|session| {
+                session.device_id == key.device_id && session.created_at_ns == key.created_at
+            })
     }
 
     // Called by the sign-in ceremony, which lands two PRs up.
@@ -1840,7 +1820,7 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn create_session(
         &mut self,
         params: CreateSessionParams,
-    ) -> Result<SessionRecord, StorageError> {
+    ) -> Result<(SessionRecordKey, SessionRecord), StorageError> {
         let CreateSessionParams {
             anchor_number,
             origin,
@@ -1966,7 +1946,14 @@ impl<M: Memory + Clone> Storage<M> {
         }
         self.change_session_count(anchor_number, dropped.len(), 1)?;
 
-        Ok(session)
+        let key = SessionRecordKey {
+            anchor_number,
+            origin,
+            account_number,
+            device_id,
+            created_at: session.created_at_ns,
+        };
+        Ok((key, session))
     }
 
     // Called by the sign-in ceremony, which lands two PRs up.
