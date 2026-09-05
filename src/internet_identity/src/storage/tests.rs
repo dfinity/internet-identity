@@ -4626,7 +4626,7 @@ mod session_record_tests {
         assert_eq!(StorableAccountReference::from(reference).sessions, None);
     }
 
-    /// A row is evictable on its shape alone. Sparing one because it holds a live session
+    /// A list is evictable on its shape alone. Sparing one because it holds a live session
     /// would leave the user with access that settings cannot show them, and a session
     /// nobody can find is a session nobody can revoke.
     #[test]
