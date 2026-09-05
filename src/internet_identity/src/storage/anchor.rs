@@ -6,6 +6,7 @@ use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCr
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
+use crate::storage::storable::session_device::StorableSessionDevice;
 use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
 use crate::storage::storable::verified_email::StorableVerifiedEmail;
 use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
@@ -38,9 +39,80 @@ pub struct Anchor {
     pub(crate) email_recovery: Vec<EmailRecoveryCredential>,
     /// Capped by `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
     pub(crate) verified_emails: Vec<VerifiedEmail>,
+    /// Capped by `MAX_SESSION_DEVICES`.
+    pub(crate) session_devices: Vec<SessionDevice>,
+    pub(crate) next_session_device_id: SessionDeviceId,
     pub(crate) metadata: Option<HashMap<String, MetadataEntry>>,
     pub(crate) name: Option<String>,
     pub(crate) created_at: Option<Timestamp>,
+}
+
+/// Bounds the device list, which rides on the anchor blob.
+pub const MAX_SESSION_DEVICES: usize = 20;
+
+/// Why a browser's presented keys cannot be resolved.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SessionDeviceError {
+    /// The announced successor is a key another browser of this anchor already holds.
+    ///
+    /// Presented keys are visible on the wire, so without this a caller could announce a
+    /// key another browser is about to present and take over its entry when it does.
+    SuccessorAlreadyInUse,
+    /// The announced successor is the key being presented.
+    ///
+    /// Rotation is what stops a leaked key from being useful for longer than one sign-in,
+    /// so a browser that named itself its own successor would keep the key alive for as
+    /// long as it kept asking — and whoever leaked it would too.
+    SuccessorMatchesCurrent,
+    /// The presented key is one this anchor has already retired: an entry holds it as the
+    /// key it was last proven with, and now awaits that entry's successor.
+    ///
+    /// A browser reaches this only when it never learned that its last sign-in succeeded,
+    /// so it is still proving with the key it announced a successor for. The answer is for
+    /// the browser to promote its own successor and present that — it is the only party
+    /// holding both keys. Registering it as a new browser instead would turn every dropped
+    /// response into a second row for one browser, and accepting it would leave a leaked
+    /// key useful for longer than the one sign-in rotation allows it.
+    StaleDeviceKey,
+}
+
+/// A browser this anchor has signed in from. The name is self-reported by the client.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SessionDevice {
+    pub id: SessionDeviceId,
+    /// The browser's own public key, DER-encoded. What the entry is looked up by.
+    pub current_device_key: PublicKey,
+    /// The successor the browser announced at its last sign-in, also accepted as a proof.
+    pub next_device_key: PublicKey,
+    pub name: String,
+    pub created_at: Timestamp,
+    pub last_used: Timestamp,
+}
+
+impl From<StorableSessionDevice> for SessionDevice {
+    fn from(value: StorableSessionDevice) -> Self {
+        SessionDevice {
+            id: value.id,
+            current_device_key: ByteBuf::from(value.current_device_key),
+            next_device_key: ByteBuf::from(value.next_device_key),
+            name: value.name,
+            created_at: value.created_at,
+            last_used: value.last_used,
+        }
+    }
+}
+
+impl From<SessionDevice> for StorableSessionDevice {
+    fn from(value: SessionDevice) -> Self {
+        StorableSessionDevice {
+            id: value.id,
+            current_device_key: value.current_device_key.into_vec(),
+            next_device_key: value.next_device_key.into_vec(),
+            name: value.name,
+            created_at: value.created_at,
+            last_used: value.last_used,
+        }
+    }
 }
 
 impl Device {
@@ -175,6 +247,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             openid_credentials,
             email_recovery,
             verified_emails,
+            session_devices,
+            next_session_device_id,
             metadata,
             name,
             created_at,
@@ -192,6 +266,13 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             verified_emails
                 .into_iter()
                 .map(StorableVerifiedEmail::from)
+                .collect(),
+        );
+        let next_session_device_id = Some(next_session_device_id);
+        let session_devices = Some(
+            session_devices
+                .into_iter()
+                .map(StorableSessionDevice::from)
                 .collect(),
         );
 
@@ -433,6 +514,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 recovery_keys,
                 email_recovery,
                 verified_emails,
+                session_devices,
+                next_session_device_id,
             },
         )
     }
@@ -448,6 +531,8 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             recovery_keys,
             email_recovery,
             verified_emails,
+            session_devices,
+            next_session_device_id,
         } = storable_anchor;
 
         let name = name.clone();
@@ -466,6 +551,12 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             .into_iter()
             .map(VerifiedEmail::from)
             .collect();
+        let session_devices = session_devices
+            .unwrap_or_default()
+            .into_iter()
+            .map(SessionDevice::from)
+            .collect();
+        let next_session_device_id = next_session_device_id.unwrap_or_default();
 
         let mut devices = passkey_credentials
             .unwrap_or_default()
@@ -560,6 +651,8 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             openid_credentials,
             email_recovery,
             verified_emails,
+            session_devices,
+            next_session_device_id,
             devices,
             metadata,
         }
@@ -586,6 +679,8 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
                 openid_credentials: vec![],
                 email_recovery: vec![],
                 verified_emails: vec![],
+                session_devices: vec![],
+                next_session_device_id: 0,
                 anchor_number,
                 devices,
                 metadata,
@@ -612,6 +707,12 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
             .into_iter()
             .map(VerifiedEmail::from)
             .collect();
+        let session_devices = storable_anchor
+            .session_devices
+            .unwrap_or_default()
+            .into_iter()
+            .map(SessionDevice::from)
+            .collect();
 
         Anchor {
             anchor_number,
@@ -619,6 +720,8 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
             openid_credentials,
             email_recovery,
             verified_emails,
+            session_devices,
+            next_session_device_id: storable_anchor.next_session_device_id.unwrap_or_default(),
             metadata,
             name,
             created_at,
@@ -627,6 +730,99 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
 }
 
 impl Anchor {
+    pub fn session_devices(&self) -> &[SessionDevice] {
+        &self.session_devices
+    }
+
+    /// Resolves the browser a sign-in came from by the public key it proved possession of.
+    ///
+    /// An entry is reached only by the successor it announced. Presenting it promotes that
+    /// successor, retires the key it replaces, and leaves the entry awaiting
+    /// `next_device_key` — what the browser presents at its next sign-in. A key some entry
+    /// has already retired is refused with [`SessionDeviceError::StaleDeviceKey`] rather
+    /// than accepted or registered afresh, so a key is good for exactly one sign-in and a
+    /// browser that lost a response is told to promote its own successor instead of
+    /// becoming a second row. A key no entry holds at all registers a new browser.
+    ///
+    /// At the cap the least recently used records are dropped, and their ids returned so
+    /// the caller can end their sessions too.
+    pub fn resolve_session_device(
+        &mut self,
+        current_device_key: PublicKey,
+        next_device_key: PublicKey,
+        name: String,
+        now: Timestamp,
+    ) -> Result<(SessionDeviceId, Vec<SessionDeviceId>), SessionDeviceError> {
+        if current_device_key == next_device_key {
+            return Err(SessionDeviceError::SuccessorMatchesCurrent);
+        }
+
+        // Two questions, and they are not the same one. An entry is *advanced* only by the
+        // successor it is waiting for; an entry *holds* a key in either slot, which is what
+        // a successor must not collide with.
+        let entry_awaiting = |candidate: &PublicKey| {
+            self.session_devices
+                .iter()
+                .position(|device| device.next_device_key == *candidate)
+        };
+        let entry_holding = |candidate: &PublicKey| {
+            self.session_devices.iter().position(|device| {
+                device.current_device_key == *candidate || device.next_device_key == *candidate
+            })
+        };
+
+        let advances = entry_awaiting(&current_device_key);
+        // The entry this request belongs to, which is not always one it can advance: a
+        // browser retrying a lost sign-in still belongs to the entry that retired its key,
+        // and re-announcing the successor it announced then is not stealing anyone's key.
+        let owner = entry_holding(&current_device_key);
+        let successor_holder = entry_holding(&next_device_key);
+        if successor_holder.is_some() && successor_holder != owner {
+            return Err(SessionDeviceError::SuccessorAlreadyInUse);
+        }
+
+        if let Some(index) = advances {
+            let device = &mut self.session_devices[index];
+            device.current_device_key = current_device_key;
+            device.next_device_key = next_device_key;
+            device.last_used = now;
+            return Ok((device.id, vec![]));
+        }
+
+        if owner.is_some() {
+            return Err(SessionDeviceError::StaleDeviceKey);
+        }
+
+        let id = self.next_session_device_id;
+        self.next_session_device_id = self.next_session_device_id.saturating_add(1);
+        self.session_devices.push(SessionDevice {
+            id,
+            current_device_key,
+            next_device_key,
+            name,
+            created_at: now,
+            last_used: now,
+        });
+
+        let mut dropped = vec![];
+        while self.session_devices.len() > MAX_SESSION_DEVICES {
+            let least_recently_used = self
+                .session_devices
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, device)| (device.last_used, device.id))
+                .map(|(index, _)| index);
+            match least_recently_used {
+                Some(index) => {
+                    dropped.push(self.session_devices.remove(index).id);
+                }
+                None => break,
+            }
+        }
+
+        Ok((id, dropped))
+    }
+
     /// Creation of new anchors is restricted in order to make sure that the device checks are
     /// not accidentally bypassed.
     pub fn new(anchor_number: AnchorNumber, created_at: Timestamp) -> Anchor {
@@ -637,6 +833,8 @@ impl Anchor {
             openid_credentials: vec![],
             email_recovery: vec![],
             verified_emails: vec![],
+            session_devices: vec![],
+            next_session_device_id: 0,
             metadata: None,
             name: None,
         }

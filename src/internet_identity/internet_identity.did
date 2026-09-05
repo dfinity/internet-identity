@@ -1006,6 +1006,17 @@ type IdentityAuthnInfo = record {
     recovery_authn_methods : vec AuthnMethod;
 };
 
+// A browser an anchor has signed in from. The name is self-reported by the
+// client, so it is a label for the user rather than evidence about where a
+// session came from.
+type SessionDeviceInfo = record {
+    id : nat32;
+    name : text;
+    created_at : Timestamp;
+    // Advanced by a sign-in from this browser and by every session refresh it drives.
+    last_used : Timestamp;
+};
+
 type IdentityInfo = record {
     authn_methods : vec AuthnMethodData;
     authn_method_registration : opt AuthnMethodRegistrationInfo;
@@ -1026,6 +1037,10 @@ type IdentityInfo = record {
     // shows a "limit reached" notice in the wizard when adding
     // beyond the cap.
     verified_emails : opt vec VerifiedEmail;
+    // Browsers this anchor has signed in from (absent when it has never
+    // created a session), so the Settings UI can offer "sign this browser
+    // out" without a separate call.
+    session_devices : opt vec SessionDeviceInfo;
     // The anchor's synced trusted-MCP-server config (absent when the
     // anchor never wrote one). Carried here rather than read from the
     // mcp_get_config query so the Settings UI has a certified value to

@@ -40,6 +40,7 @@ const baseIdentityInfo: IdentityInfo = {
   created_at: [],
   authn_method_registration: [],
   openid_credentials: [],
+  session_devices: [],
   mcp_config: [],
 };
 

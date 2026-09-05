@@ -223,6 +223,8 @@ fn should_allow_protection_only_on_recovery_phrases() {
 fn should_prevent_mutation_when_invariants_are_violated() {
     let mut device1 = recovery_phrase(1, DeviceProtection::Unprotected);
     let mut anchor = Anchor {
+        session_devices: vec![],
+        next_session_device_id: 0,
         anchor_number: ANCHOR_NUMBER,
         devices: vec![
             device1.clone(),
@@ -245,6 +247,8 @@ fn should_prevent_mutation_when_invariants_are_violated() {
 #[test]
 fn should_prevent_addition_when_invariants_are_violated() {
     let mut anchor = Anchor {
+        session_devices: vec![],
+        next_session_device_id: 0,
         anchor_number: ANCHOR_NUMBER,
         devices: vec![
             recovery_phrase(1, DeviceProtection::Unprotected),
@@ -267,6 +271,8 @@ fn should_prevent_addition_when_invariants_are_violated() {
 fn should_allow_removal_when_invariants_are_violated() {
     let device1 = recovery_phrase(1, DeviceProtection::Unprotected);
     let mut anchor = Anchor {
+        session_devices: vec![],
+        next_session_device_id: 0,
         anchor_number: ANCHOR_NUMBER,
         devices: vec![
             device1.clone(),
@@ -1258,5 +1264,579 @@ mod mirror_verified_email_tests {
             .verified_emails
             .iter()
             .all(|e| e.address != "new@example.com"));
+    }
+}
+
+mod session_device_tests {
+    use super::*;
+    use crate::storage::anchor::{SessionDeviceError, MAX_SESSION_DEVICES};
+    use internet_identity_interface::internet_identity::types::PublicKey;
+
+    fn anchor() -> Anchor {
+        Anchor::new(10_000, 0)
+    }
+
+    fn browser_key(seed: u8) -> PublicKey {
+        ByteBuf::from(vec![seed; 91])
+    }
+
+    /// What a browser presenting `browser_key(seed)` announces it will rotate to.
+    fn successor_key(seed: u8) -> PublicKey {
+        ByteBuf::from(vec![seed; 92])
+    }
+
+    /// One browser's keys in the order it presents them. A sign-in promotes the successor
+    /// announced last time and announces a fresh one, so no key is ever presented twice.
+    fn rotating_key(browser: u8, step: u8) -> PublicKey {
+        let mut key = vec![browser; 91];
+        key[0] = step;
+        ByteBuf::from(key)
+    }
+
+    #[test]
+    fn an_unseen_key_registers_a_new_device() {
+        let mut anchor = anchor();
+
+        let (id, _) = anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome on MacBook".to_string(),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(id, 0);
+        assert_eq!(anchor.session_devices().len(), 1);
+        assert_eq!(anchor.session_devices()[0].name, "Chrome on MacBook");
+        assert_eq!(
+            anchor.session_devices()[0].current_device_key,
+            browser_key(1)
+        );
+        assert_eq!(anchor.session_devices()[0].created_at, 1_000);
+    }
+
+    #[test]
+    fn a_browser_that_rotates_reuses_the_device_and_leaves_its_name_alone() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome on MacBook".to_string(),
+                1_000,
+            )
+            .unwrap();
+
+        let (again, _) = anchor
+            .resolve_session_device(
+                successor_key(1),
+                browser_key(2),
+                "Something else".to_string(),
+                2_000,
+            )
+            .unwrap();
+
+        assert_eq!(again, id);
+        assert_eq!(anchor.session_devices().len(), 1);
+        assert_eq!(anchor.session_devices()[0].name, "Chrome on MacBook");
+    }
+
+    #[test]
+    fn registration_stamps_both_timestamps() {
+        let mut anchor = anchor();
+
+        anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(anchor.session_devices()[0].created_at, 1_000);
+        assert_eq!(anchor.session_devices()[0].last_used, 1_000);
+    }
+
+    #[test]
+    fn reuse_advances_last_used_and_leaves_created_at_alone() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+
+        anchor
+            .resolve_session_device(
+                successor_key(1),
+                browser_key(2),
+                "Chrome".to_string(),
+                5_000,
+            )
+            .unwrap();
+
+        assert_eq!(anchor.session_devices()[0].created_at, 1_000);
+        assert_eq!(anchor.session_devices()[0].last_used, 5_000);
+    }
+
+    #[test]
+    fn a_key_this_anchor_has_not_seen_registers_a_fresh_device() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+
+        let (id, _) = anchor
+            .resolve_session_device(
+                browser_key(2),
+                successor_key(2),
+                "Firefox".to_string(),
+                2_000,
+            )
+            .unwrap();
+
+        assert_eq!(id, 1);
+        assert_eq!(anchor.session_devices().len(), 2);
+    }
+
+    #[test]
+    fn ids_are_never_reused() {
+        let mut anchor = anchor();
+        let (first, _) = anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+        anchor.session_devices.clear();
+
+        let (second, _) = anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                2_000,
+            )
+            .unwrap();
+
+        assert_ne!(second, first);
+        assert_eq!(second, 1);
+    }
+
+    #[test]
+    fn registering_past_the_cap_drops_the_least_recently_used_and_never_fails() {
+        let mut anchor = anchor();
+        for index in 0..MAX_SESSION_DEVICES {
+            anchor
+                .resolve_session_device(
+                    browser_key(index as u8),
+                    successor_key(index as u8),
+                    format!("device-{index}"),
+                    index as u64 + 1,
+                )
+                .unwrap();
+        }
+
+        let (newest, dropped) = anchor
+            .resolve_session_device(
+                browser_key(200),
+                successor_key(200),
+                "newest".to_string(),
+                10_000,
+            )
+            .unwrap();
+
+        assert_eq!(anchor.session_devices().len(), MAX_SESSION_DEVICES);
+        assert!(anchor.session_devices().iter().any(|d| d.id == newest));
+        assert!(!anchor
+            .session_devices()
+            .iter()
+            .any(|d| d.name == "device-0"));
+        assert!(anchor
+            .session_devices()
+            .iter()
+            .any(|d| d.name == "device-1"));
+        assert_eq!(dropped, vec![0]);
+    }
+
+    #[test]
+    fn the_cap_evicts_on_use_rather_than_on_enrolment() {
+        let mut anchor = anchor();
+        let (first, _) = anchor
+            .resolve_session_device(browser_key(0), successor_key(0), "oldest".to_string(), 1)
+            .unwrap();
+        for index in 1..MAX_SESSION_DEVICES {
+            anchor
+                .resolve_session_device(
+                    browser_key(index as u8),
+                    successor_key(index as u8),
+                    format!("device-{index}"),
+                    index as u64 + 1,
+                )
+                .unwrap();
+        }
+        anchor
+            .resolve_session_device(
+                successor_key(0),
+                rotating_key(0, 200),
+                "oldest".to_string(),
+                9_000,
+            )
+            .unwrap();
+
+        let (_, dropped) = anchor
+            .resolve_session_device(
+                browser_key(200),
+                successor_key(200),
+                "newest".to_string(),
+                10_000,
+            )
+            .unwrap();
+
+        assert_eq!(dropped, vec![1]);
+        assert!(anchor
+            .session_devices()
+            .iter()
+            .any(|device| device.id == first));
+    }
+
+    #[test]
+    fn a_browser_that_clears_storage_evicts_its_own_records_before_a_used_one() {
+        let mut anchor = anchor();
+        // The phone rotates on every sign-in, as a browser that kept its storage does.
+        let (kept, _) = anchor
+            .resolve_session_device(browser_key(0), rotating_key(0, 1), "phone".to_string(), 1)
+            .unwrap();
+        for wipe in 0..MAX_SESSION_DEVICES as u64 {
+            anchor
+                .resolve_session_device(
+                    rotating_key(0, wipe as u8 + 1),
+                    rotating_key(0, wipe as u8 + 2),
+                    "phone".to_string(),
+                    1_000 + wipe * 10,
+                )
+                .unwrap();
+            // A wiped browser has no key to promote, so each pass is a browser this
+            // anchor has never seen.
+            anchor
+                .resolve_session_device(
+                    browser_key(wipe as u8 + 1),
+                    successor_key(wipe as u8 + 1),
+                    format!("wiped-{wipe}"),
+                    1_001 + wipe * 10,
+                )
+                .unwrap();
+        }
+
+        assert!(anchor
+            .session_devices()
+            .iter()
+            .any(|device| device.id == kept));
+    }
+
+    #[test]
+    fn a_wiped_browser_presenting_a_fresh_key_is_a_new_device() {
+        let mut anchor = anchor();
+        let (before, _) = anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+
+        let (after, _) = anchor
+            .resolve_session_device(
+                browser_key(2),
+                successor_key(2),
+                "Chrome".to_string(),
+                2_000,
+            )
+            .unwrap();
+
+        assert_ne!(after, before);
+        assert_eq!(anchor.session_devices().len(), 2);
+    }
+
+    #[test]
+    fn a_successor_is_accepted_and_takes_over_from_the_key_it_replaces() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+
+        let (again, _) = anchor
+            .resolve_session_device(
+                successor_key(1),
+                browser_key(2),
+                "Chrome".to_string(),
+                2_000,
+            )
+            .unwrap();
+
+        assert_eq!(again, id);
+        assert_eq!(anchor.session_devices().len(), 1);
+        assert_eq!(
+            anchor.session_devices()[0].current_device_key,
+            successor_key(1)
+        );
+        assert_eq!(anchor.session_devices()[0].next_device_key, browser_key(2));
+    }
+
+    #[test]
+    fn the_key_a_successor_replaced_is_retired() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+        anchor
+            .resolve_session_device(
+                successor_key(1),
+                browser_key(2),
+                "Chrome".to_string(),
+                2_000,
+            )
+            .unwrap();
+
+        let (after, _) = anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(3),
+                "Chrome".to_string(),
+                3_000,
+            )
+            .unwrap();
+
+        assert_ne!(after, id);
+        assert_eq!(anchor.session_devices().len(), 2);
+    }
+
+    /// A response that never reached the browser leaves it proving with the key the entry
+    /// has already retired. That is refused rather than registered: a second row for one
+    /// browser is exactly what a dropped response must not cost, and the browser holds the
+    /// successor that does resolve.
+    #[test]
+    fn a_retired_key_is_refused_rather_than_registered() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+
+        // The successor it re-announces is the one this entry is already waiting for, which
+        // is the shape a retry actually takes: the browser has not moved on either.
+        let retried = anchor.resolve_session_device(
+            browser_key(1),
+            successor_key(1),
+            "Chrome".to_string(),
+            2_000,
+        );
+
+        assert_eq!(retried, Err(SessionDeviceError::StaleDeviceKey));
+        assert_eq!(anchor.session_devices().len(), 1);
+        assert_eq!(
+            anchor.session_devices()[0].next_device_key,
+            successor_key(1)
+        );
+    }
+
+    /// The other half of the same rule, from the browser's side: promoting the successor
+    /// it announced is what gets it back to its own entry.
+    #[test]
+    fn promoting_the_announced_successor_resolves_the_same_browser() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+
+        let (again, _) = anchor
+            .resolve_session_device(
+                successor_key(1),
+                successor_key(2),
+                "Chrome".to_string(),
+                2_000,
+            )
+            .unwrap();
+
+        assert_eq!(again, id);
+        assert_eq!(anchor.session_devices().len(), 1);
+        assert_eq!(
+            anchor.session_devices()[0].current_device_key,
+            successor_key(1)
+        );
+        assert_eq!(
+            anchor.session_devices()[0].next_device_key,
+            successor_key(2)
+        );
+    }
+
+    #[test]
+    fn rotating_repeatedly_keeps_the_same_browser() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_session_device(browser_key(0), browser_key(1), "Chrome".to_string(), 1)
+            .unwrap();
+
+        for step in 1..10u8 {
+            let (again, _) = anchor
+                .resolve_session_device(
+                    browser_key(step),
+                    browser_key(step + 1),
+                    "Chrome".to_string(),
+                    step as u64 * 100,
+                )
+                .unwrap();
+            assert_eq!(again, id);
+        }
+
+        assert_eq!(anchor.session_devices().len(), 1);
+    }
+
+    /// Presented keys are visible on the wire, so announcing one another browser is about to
+    /// present would otherwise take over its entry when it does.
+    #[test]
+    fn a_successor_another_browser_holds_is_refused() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+
+        let stealing_the_key = anchor.resolve_session_device(
+            browser_key(2),
+            browser_key(1),
+            "Firefox".to_string(),
+            2_000,
+        );
+        let stealing_the_successor = anchor.resolve_session_device(
+            browser_key(2),
+            successor_key(1),
+            "Firefox".to_string(),
+            2_000,
+        );
+
+        assert_eq!(
+            stealing_the_key,
+            Err(SessionDeviceError::SuccessorAlreadyInUse)
+        );
+        assert_eq!(
+            stealing_the_successor,
+            Err(SessionDeviceError::SuccessorAlreadyInUse)
+        );
+        assert_eq!(anchor.session_devices().len(), 1);
+    }
+
+    /// The browser that already holds it is re-announcing, which a retry does.
+    #[test]
+    fn a_second_sign_in_from_a_key_a_browser_never_announced_is_a_new_browser() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+
+        // Neither slot holds it, so there is nothing to say this is the same browser.
+        let (other, _) = anchor
+            .resolve_session_device(
+                browser_key(7),
+                successor_key(7),
+                "Chrome".to_string(),
+                2_000,
+            )
+            .unwrap();
+
+        assert_ne!(other, id);
+        assert_eq!(anchor.session_devices().len(), 2);
+    }
+
+    #[test]
+    fn a_browser_cannot_name_itself_its_own_successor() {
+        let mut anchor = anchor();
+
+        // Rotation is what stops a leaked key from outliving one sign-in. A browser that
+        // announced the key it is presenting would keep it alive for as long as it kept
+        // asking, and so would whoever leaked it.
+        assert_eq!(
+            anchor.resolve_session_device(
+                browser_key(1),
+                browser_key(1),
+                "Chrome".to_string(),
+                1_000
+            ),
+            Err(SessionDeviceError::SuccessorMatchesCurrent)
+        );
+        assert!(anchor.session_devices().is_empty());
+    }
+
+    #[test]
+    fn a_registered_browser_cannot_stop_rotating_either() {
+        let mut anchor = anchor();
+        anchor
+            .resolve_session_device(
+                browser_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(
+            anchor.resolve_session_device(
+                successor_key(1),
+                successor_key(1),
+                "Chrome".to_string(),
+                2_000
+            ),
+            Err(SessionDeviceError::SuccessorMatchesCurrent)
+        );
+        // The entry is left as it was, still awaiting a successor it has not seen.
+        assert_eq!(
+            anchor.session_devices()[0].current_device_key,
+            browser_key(1)
+        );
+        assert_eq!(
+            anchor.session_devices()[0].next_device_key,
+            successor_key(1)
+        );
     }
 }
