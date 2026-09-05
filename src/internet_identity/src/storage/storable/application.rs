@@ -26,9 +26,11 @@ pub struct StorableApplication {
     /// visit would mint a fresh application number the tombstone no longer applies to,
     /// handing the identity back the default it had moved away from.
     ///
-    /// A field added here decodes as absent for every application already stored, and
-    /// `0` is the truth for those: nothing can write an empty list yet.
+    /// Absent from every application stored before this field existed, and `0` is the
+    /// truth for those: nothing could write an empty reference list when they were
+    /// written. `default` is what makes that absence decode rather than trap.
     #[n(3)]
+    #[cbor(default)]
     pub tombstones: u64,
 }
 
@@ -78,4 +80,65 @@ impl Storable for StorableOriginSha256 {
         max_size: 32,
         is_fixed_size: true,
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    /// The shape every application stored before the tombstone count existed has on
+    /// disk. Decoding one has to keep working, and has to read as no tombstones: nothing
+    /// could write an empty reference list when these were written.
+    #[test]
+    fn an_application_stored_without_a_tombstone_count_decodes_as_zero() {
+        #[derive(Encode)]
+        #[cbor(map)]
+        struct BeforeTombstones {
+            #[n(0)]
+            origin: FrontendHostname,
+            #[n(1)]
+            stored_accounts: u64,
+            #[n(2)]
+            stored_account_references: u64,
+        }
+
+        let mut bytes = Vec::new();
+        minicbor::encode(
+            &BeforeTombstones {
+                origin: "https://example.com".to_string(),
+                stored_accounts: 3,
+                stored_account_references: 4,
+            },
+            &mut bytes,
+        )
+        .unwrap();
+
+        let decoded = StorableApplication::from_bytes(Cow::Owned(bytes));
+
+        assert_eq!(
+            decoded,
+            StorableApplication {
+                origin: "https://example.com".to_string(),
+                stored_accounts: 3,
+                stored_account_references: 4,
+                tombstones: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn a_tombstone_count_survives_the_round_trip() {
+        let application = StorableApplication {
+            origin: "https://example.com".to_string(),
+            stored_accounts: 1,
+            stored_account_references: 2,
+            tombstones: 5,
+        };
+
+        assert_eq!(
+            StorableApplication::from_bytes(application.to_bytes()),
+            application
+        );
+    }
 }
