@@ -391,7 +391,11 @@ describe("a session the canister no longer holds", () => {
     });
   });
 
-  it("forgets a record the canister no longer holds", async () => {
+  /// `check_session` is a query, so its reply is uncertified: anyone able to answer it
+  /// can say no. Deleting on that would let a wrong no destroy a working session's key,
+  /// which is an attacker-triggerable loss rather than a flake. The record stays, and a
+  /// later attempt asks again.
+  it("keeps the record, because a query reply is not proof", async () => {
     checkSession.mockResolvedValueOnce(false);
     await storedSession(BigInt(10_000));
     const { channel } = channelWith();
@@ -407,7 +411,33 @@ describe("a session the canister no longer holds", () => {
       params: { sessionPublicKey: await appKey() },
     });
 
-    expect(await appSessionsForOrigin(ORIGIN)).toEqual([]);
+    expect(await appSessionsForOrigin(ORIGIN)).toHaveLength(1);
+  });
+
+  /// The denial is a skip, not a verdict: the very next request finds the record still
+  /// there and can succeed on it.
+  it("serves the same record once the canister answers again", async () => {
+    checkSession.mockResolvedValueOnce(false);
+    await storedSession(BigInt(10_000));
+    (await promptStore()).set({ prompt: "none" });
+    const request = {
+      jsonrpc: "2.0" as const,
+      id: 1,
+      method: "ii_session_delegation",
+      params: { sessionPublicKey: await appKey() },
+    };
+
+    const denied = channelWith();
+    await handleSessionDelegationRequest(denied.channel, vi.fn())(request);
+
+    checkSession.mockResolvedValueOnce(true);
+    const served = channelWith();
+    await handleSessionDelegationRequest(served.channel, vi.fn())(request);
+
+    expect(denied.sent[0]).toMatchObject({
+      error: { code: INTERACTION_REQUIRED_ERROR_CODE },
+    });
+    expect(served.sent[0]).toMatchObject({ result: {} });
   });
 });
 

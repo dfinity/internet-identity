@@ -109,14 +109,6 @@ export const rememberAppAccount = async (
   }
 };
 
-export const discardAppSession = async (key: SessionKey): Promise<void> => {
-  try {
-    await idbDel(sessionKey(key), APP_SESSION_STORE);
-  } catch {
-    // A session that cannot be discarded locally is still revocable canister-side.
-  }
-};
-
 /** Every session this identity holds, for the sibling lookup and for sign-out.
  *
  *  Each carries the principal its account is known by, which lives in the other store
