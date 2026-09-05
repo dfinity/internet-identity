@@ -848,7 +848,7 @@ thread_local! {
 
 /// Returns `(indexed_entries, skipped_rows, is_done)` so monitoring can track the sweep.
 ///
-/// A non-zero skip count is not progress: it is reference-list rows whose application
+/// A non-zero skip count is not progress: it is reference-list lists whose application
 /// is gone, which the sweep cannot derive a principal for. A run that reports nothing
 /// indexed and nothing skipped had nothing to do; one that reports skips did not.
 #[query(hidden = true)]
