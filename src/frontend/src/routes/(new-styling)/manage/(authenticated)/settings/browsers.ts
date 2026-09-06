@@ -1,6 +1,6 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import { purgeAppSessions } from "$lib/stores/app-session.store";
-import { currentDeviceId } from "$lib/stores/browser-key.store";
+import { currentBrowserId } from "$lib/stores/browser-key.store";
 import type {
   _SERVICE,
   BrowserInfo,
@@ -17,23 +17,23 @@ export interface Browser {
 }
 
 export const fromCanisterBrowsers = (
-  devices: [] | [BrowserInfo[]],
-  currentDeviceId?: number,
+  browsers: [] | [BrowserInfo[]],
+  currentBrowserId?: number,
 ): Browser[] =>
-  (devices[0] ?? [])
-    .map((device) => ({
-      id: device.id,
-      name: device.name,
-      createdAtMillis: nanosToMillis(device.created_at),
-      lastUsedMillis: nanosToMillis(device.last_used),
-      isCurrent: device.id === currentDeviceId,
+  (browsers[0] ?? [])
+    .map((browser) => ({
+      id: browser.id,
+      name: browser.name,
+      createdAtMillis: nanosToMillis(browser.created_at),
+      lastUsedMillis: nanosToMillis(browser.last_used),
+      isCurrent: browser.id === currentBrowserId,
     }))
     .sort((a, b) => b.lastUsedMillis - a.lastUsedMillis);
 
 /**
  * Ends every session this browser holds, across every app it is signed into.
  *
- * The device record itself survives, so a browser that has been signed out is still one
+ * The browser record itself survives, so a browser that has been signed out is still one
  * the user recognises and signing back in from it reuses the same entry.
  *
  * Signing *this* browser out also discards the session chains it holds locally. The
@@ -48,11 +48,11 @@ export const fromCanisterBrowsers = (
 export const signOutBrowser = async (
   actor: ActorSubclass<_SERVICE>,
   identityNumber: bigint,
-  deviceId: number,
+  browserId: number,
 ): Promise<void> => {
   const result = await actor.revoke_browser_sessions({
     identity_number: identityNumber,
-    browser_id: deviceId,
+    browser_id: browserId,
   });
   if ("Err" in result) {
     throw new Error(
@@ -61,7 +61,7 @@ export const signOutBrowser = async (
         : result.Err.InternalCanisterError,
     );
   }
-  if ((await currentDeviceId(identityNumber)) === deviceId) {
+  if ((await currentBrowserId(identityNumber)) === browserId) {
     await purgeAppSessions(identityNumber);
   }
 };
