@@ -118,9 +118,9 @@ export const forgetIdentity = async (identityNumber: bigint): Promise<void> => {
     deviceId === undefined ? undefined : await actorForIdentity(identityNumber);
   if (deviceId !== undefined && actor !== undefined) {
     try {
-      await actor.revoke_device_sessions({
+      await actor.revoke_browser_sessions({
         identity_number: identityNumber,
-        device_id: deviceId,
+        browser_id: deviceId,
       });
     } catch {
       // The local records go either way. Keeping them because the canister could not be

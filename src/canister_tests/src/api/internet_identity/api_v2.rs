@@ -838,7 +838,7 @@ pub fn app_revoke_session(
     .map(|_| ())
 }
 
-pub fn revoke_device_sessions(
+pub fn revoke_browser_sessions(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
@@ -849,7 +849,7 @@ pub fn revoke_device_sessions(
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "revoke_device_sessions",
+        "revoke_browser_sessions",
         (request,),
     )
     .map(|(x,)| x)
