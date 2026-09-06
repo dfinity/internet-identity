@@ -147,8 +147,8 @@ fn should_not_allow_user_range_exceeding_capacity() {
 /// Verifies that an anchor stored before the session-device registry existed decodes
 /// after an upgrade, and reports no devices rather than failing.
 #[test]
-fn should_report_no_session_devices_for_an_anchor_from_the_previous_release(
-) -> Result<(), RejectResponse> {
+fn should_report_no_browsers_for_an_anchor_from_the_previous_release() -> Result<(), RejectResponse>
+{
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -157,7 +157,7 @@ fn should_report_no_session_devices_for_an_anchor_from_the_previous_release(
 
     let info =
         api::api_v2::identity_info(&env, canister_id, principal_1(), identity_number)?.unwrap();
-    assert_eq!(info.session_devices, None);
+    assert_eq!(info.browsers, None);
     assert_eq!(info.authn_methods.len(), 1);
 
     Ok(())
