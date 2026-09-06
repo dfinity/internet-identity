@@ -35,7 +35,7 @@ Where a scenario needs a delegation to age, the point is the boundary and not th
    Start with an identity that has never signed in at the app.  
    Sign in and use it.  
    It must work, and the app must now appear in the identity's list with a last-used time.  
-   Covers NEW-1, MINT-12, LIMIT-1.
+   Covers NEW-1, MINT-12, WRITE-9.
 2. **FIRST-2. The account stays the same for as long as the app is open.**  
    Sign in, note the account the app shows, then keep using it for longer than one delegation lasts.  
    It must show that same account throughout, with no moment where it appears to be someone else or nobody.  
@@ -137,25 +137,25 @@ Where a scenario needs a delegation to age, the point is the boundary and not th
 ## Using many apps and browsers
 
 1. **CAP-1. Using a great many apps never breaks the next sign-in.**  
-   Sign in at more apps than the identity keeps rows for, then sign in at one more.  
+   Sign in at more apps than the identity keeps entries for, then sign in at one more.  
    It must work.  
-   Covers LIMIT-2, LIMIT-3.
+   Covers LIMIT-3, LIMIT-4.
 2. **CAP-2. An app dropped for disuse is unchanged on return.**  
-   Reach the state where an idle app's row has been dropped, then sign in there again.  
+   Reach the state where an idle app's entry has been dropped, then sign in there again.  
    It must show the same account as before, and whatever it stored for that account must still be there.  
-   Covers LIMIT-7.
+   Covers LIMIT-8.
 3. **CAP-3. The app just signed into keeps working.**  
    Sign in at the limit, then keep using the app just signed into.  
    It must not be the one dropped.  
-   Covers LIMIT-6.
+   Covers LIMIT-7.
 4. **CAP-4. Signing in many times never starts failing.**  
    Sign in far more times than the identity keeps sign-ins for.  
    Every one must succeed.  
    Covers REC-6, REC-7, REC-8.
 5. **CAP-5. An app still signed in can be dropped, and asks again.**  
-   Reach the row limit with the least recently used app still signed in, sign in somewhere new, then return to that app.  
+   Reach the limit with the least recently used app still signed in, sign in somewhere new, then return to that app.  
    It must ask for a sign-in rather than half-working.  
-   Covers LIMIT-4, LIMIT-5.
+   Covers LIMIT-5, LIMIT-6.
 6. **CAP-6. Signing in from many browsers drops the oldest.**  
    Sign in from more browsers than the list holds, then use the app from the browser signed in longest ago.  
    It must ask for a sign-in, and the recent browsers must be the ones listed.  
@@ -166,7 +166,7 @@ Where a scenario needs a delegation to age, the point is the boundary and not th
 1. **SHOW-1. An app appears once it has been used.**  
    Sign in at a new app and open settings.  
    It must be listed, with when it was last used.  
-   Covers LIMIT-1, USE-5.
+   Covers WRITE-9, USE-5.
 2. **SHOW-2. A browser appears under a name that identifies it.**  
    Sign in from a browser and open settings.  
    It must be listed, named recognisably, with when it was last used.  

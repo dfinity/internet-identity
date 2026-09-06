@@ -43,7 +43,7 @@ Three nested lifetimes, and two marks near the end of a delegation.
 | ----------------------- | ----------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | Session lifetime        | 10 minutes to 30 days               | the app requests a ceiling, the user chooses at consent, an SSO cap narrows, II clamps | how long anything can be minted at all                              |
 | Requested ceiling       | 8 hours where the app asks for none | this library                                                                           | what the ceiling above is, for an app that sets nothing             |
-| Idle bound              | 10 minutes to the session's length  | the app requests it, II clamps and enforces                                            | how long a session outlives its use, before II ends it              |
+| Idle bound              | 7 days where the app asks for none  | the app may request one, II defaults, clamps and enforces                              | how long a session outlives its use, before II ends it              |
 | App delegation lifetime | `min(5 minutes, session left)`      | II, and not requestable                                                                | how long one delegation signs an app's calls                        |
 | Pre-mint threshold      | 15 seconds before expiry            | this library                                                                           | when a refresh is scheduled, and when a request mints behind itself |
 | Block margin            | 10 seconds before expiry            | this library                                                                           | below this a request waits for a mint                               |
@@ -467,26 +467,25 @@ A mint returning `NoMatchingSession` is how the library finds out, which is why 
 
 ## Implementation stages
 
-The order below is what the stack in [dfinity/icp-js-auth](https://github.com/dfinity/icp-js-auth) is built in, each stage releasable on its own. It starts at the bottom of the design rather than the top: storage is what everything else is expressed in, so the stages that only rearrange it come before the ones that change what the library does.
+The order below is what the two stacks in [dfinity/icp-js-auth](https://github.com/dfinity/icp-js-auth) are built in, each stage releasable on its own. It starts at the bottom of the design rather than the top: storage is what everything else is expressed in, so the stages that only rearrange it come before the ones that change what the library does.
 
-| Stage                                                     | Turns anything on?                            |
-| --------------------------------------------------------- | --------------------------------------------- |
-| The state as a record with a store of its own             | no — replaces a hardcoded `localStorage` key  |
-| A key and its delegation as one credential, under slots   | no                                            |
-| An identity that replaces its own delegation as it ages   | no — nothing produces a session chain yet     |
-| Minting against the II canister                           | no — nothing calls it yet                     |
-| Acquiring a session at sign-in, and revoking at sign-out  | **yes**                                       |
-| Minting when a tab comes back                             | no — changes when a mint happens, not whether |
-| The state in a cookie, shared across siblings             | **yes**                                       |
-| Acquiring without a ceremony, for a sibling that has none | **yes**                                       |
+| Stage                                                       | Turns anything on?                            |
+| ----------------------------------------------------------- | --------------------------------------------- |
+| The state as a record with a store of its own               | no — replaces a hardcoded `localStorage` key  |
+| A key and its delegation as one credential, under slots     | no                                            |
+| An identity that replaces its own delegation as it ages     | no — nothing produces a session chain yet     |
+| Minting against the II canister                             | no — nothing calls it yet                     |
+| Acquiring a session at sign-in, and revoking at sign-out    | **yes**                                       |
+| Minting when a tab comes back                               | no — changes when a mint happens, not whether |
+| An idle bound the canister keeps, and activity to drive it  | **yes**, and it retires the client's own idle timeout |
 
-Two things about the shape. Revoking rides with acquiring rather than following it, because it is a revoke call, a lock steal and an ordering rule read together with the sign-in it undoes, and there is nothing to revoke before that stage. And the cookie comes after minting on foreground rather than before, because it is the cookie that makes the second silent-acquisition path reachable: an origin with the state and no credentials only exists once the state can cross an origin.
+That is the first stack. The second builds on it:
 
-**Not built yet.** Everything above ships; the sections on a session outliving its use, on activity as a trigger, and on resumability do not. They are decided rather than delivered, and they land as one further stage:
+| Stage                                                     | Turns anything on?                                     |
+| --------------------------------------------------------- | ------------------------------------------------------ |
+| The state in a cookie, shared across siblings             | **yes**                                                |
+| Acquiring without a ceremony, for a sibling that has none | **yes**                                                |
+| The guide for sharing a sign-in across sibling subdomains | no — documents what the two stages above deliver       |
+| A shared store with no durable medium                     | **yes**, for an environment that has no durable medium |
 
-| Stage                                            | Turns anything on?                                            |
-| ------------------------------------------------ | ------------------------------------------------------------- |
-| An idle bound the canister keeps and enforces    | **yes**, and it retires the client's own idle timeout         |
-| Activity as a trigger, and resumability declared | no — changes when a mint happens, and what the provider keeps |
-
-The order within it matters in one direction only: activity has to drive minting before a bound on minting can be enforced, or a present user with a quiet application is signed out. Both halves are on the canister's side as much as this library's, so the stage depends on [revocable-app-sessions.md](revocable-app-sessions.md) shipping the session's idle bound and [silent-reauth-redirect.md](silent-reauth-redirect.md) shipping the resumability flag.
+Four things about the shape. Revoking rides with acquiring rather than following it, because it is a revoke call, a lock steal and an ordering rule read together with the sign-in it undoes, and there is nothing to revoke before that stage. Activity rides with the idle bound because it has to drive minting before a bound on minting can be enforced, or a present user with a quiet application is signed out — and that stage depends on [revocable-app-sessions.md](revocable-app-sessions.md) shipping the session's idle bound, since both halves are on the canister's side as much as this library's. The cookie comes after minting on foreground rather than before, because it is the cookie that makes the second silent-acquisition path reachable: an origin with the state and no credentials only exists once the state can cross an origin. And the shared store comes last because nothing else in the stack depends on it: it is the only shipping store that is shared and not durable, which is what makes those two flags distinguishable rather than one.
