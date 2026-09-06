@@ -6,7 +6,7 @@
   import Badge from "$lib/components/ui/Badge.svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { toaster } from "$lib/components/utils/toaster";
-  import { signOutBrowser, type Browser } from "../sessionDevices";
+  import { signOutBrowser, type Browser } from "../browsers";
 
   interface Props {
     identityNumber: bigint;
