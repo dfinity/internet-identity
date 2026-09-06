@@ -738,17 +738,15 @@ impl Anchor {
 
     /// Advances a device's `last_used`. Reports whether anything changed, so an unknown
     /// device or a repeat inside one message costs no anchor write.
-    pub fn stamp_browser_use(&mut self, browser_id: BrowserId, now: Timestamp) -> bool {
-        match self
+    pub fn stamp_browser_use(&mut self, browser_id: BrowserId, now: Timestamp) {
+        if let Some(browser) = self
             .browsers
             .iter_mut()
-            .find(|device| device.id == browser_id)
+            .find(|browser| browser.id == browser_id)
         {
-            Some(device) if device.last_used < now => {
-                device.last_used = now;
-                true
+            if browser.last_used < now {
+                browser.last_used = now;
             }
-            _ => false,
         }
     }
 
