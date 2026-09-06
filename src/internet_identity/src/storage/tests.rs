@@ -3783,16 +3783,19 @@ mod tracked_default_eviction_tests {
         // list and therefore the first thing eviction gives up.
         let doomed = origin_of(0);
         let (key, _) = storage
-            .create_session(CreateSessionParams {
+            .create_session_for_testing(
                 anchor_number,
-                origin: doomed.clone(),
-                account_number: None,
-                browser_id: 1,
-                valid_till_ns: u64::MAX,
-                max_idle_ns: None,
-                read_only: false,
-                now_ns: 1,
-            })
+                CreateSessionParams {
+                    origin: doomed.clone(),
+                    account_number: None,
+                    browser_id: 1,
+                    valid_till_ns: u64::MAX,
+                    max_idle_ns: None,
+                    read_only: false,
+                    now_ns: 1,
+                    dropped_browsers: vec![],
+                },
+            )
             .expect("signing in at a fresh origin");
         let session_principals: Vec<_> = storage
             .lookup_session_with_principal_memory
@@ -6611,16 +6614,19 @@ mod session_revocation_tests {
         now: u64,
     ) {
         storage
-            .create_session(CreateSessionParams {
+            .create_session_for_testing(
                 anchor_number,
-                origin: origin.to_string(),
-                account_number: None,
-                browser_id,
-                valid_till_ns: u64::MAX,
-                max_idle_ns: None,
-                read_only: false,
-                now_ns: now,
-            })
+                CreateSessionParams {
+                    origin: origin.to_string(),
+                    account_number: None,
+                    browser_id,
+                    valid_till_ns: u64::MAX,
+                    max_idle_ns: None,
+                    read_only: false,
+                    now_ns: now,
+                    dropped_browsers: vec![],
+                },
+            )
             .unwrap();
     }
 
@@ -6781,16 +6787,19 @@ mod write_path_property_tests {
             }
             4 => {
                 let account_number = pick_account(storage, anchor_number, &origin, rng);
-                let _ = storage.create_session(CreateSessionParams {
+                let _ = storage.create_session_for_testing(
                     anchor_number,
-                    origin,
-                    account_number,
-                    browser_id: rng.below(4) as u32,
-                    valid_till_ns: now + 1 + rng.below(20_000),
-                    max_idle_ns: None,
-                    read_only: false,
-                    now_ns: now,
-                });
+                    CreateSessionParams {
+                        origin,
+                        account_number,
+                        browser_id: rng.below(4) as u32,
+                        valid_till_ns: now + 1 + rng.below(20_000),
+                        max_idle_ns: None,
+                        read_only: false,
+                        now_ns: now,
+                        dropped_browsers: vec![],
+                    },
+                );
             }
             5 => {
                 if let Some(key) = pick_session(storage, anchor_number, &origin, rng) {
