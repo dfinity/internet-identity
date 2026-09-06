@@ -85,7 +85,6 @@ use account::{
 };
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
-use ic_stable_structures::cell::ValueError;
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
@@ -128,7 +127,7 @@ use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
 use storable::application::StorableApplication;
 use storable::credential_id::StorableCredentialId;
-use storable::discrepancy_counter::{DiscrepancyType, StorableDiscrepancyCounter};
+use storable::discrepancy_counter::StorableDiscrepancyCounter;
 use storable::email_recovery_address_hash::StorableEmailRecoveryAddressHash;
 use storable::fixed_anchor::StorableFixedAnchor;
 use storable::mcp_config::StorableMcpConfig;
@@ -1821,6 +1820,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Returns all account references associated with a single anchor number, across all applications.
+    #[cfg(test)]
     pub fn list_identity_account_references(
         &self,
         anchor_number: AnchorNumber,
@@ -1833,46 +1833,6 @@ impl<M: Memory + Clone> Storage<M> {
             .flat_map(|(_, storable_account_ref_list_val)| storable_account_ref_list_val.into_vec())
             .map(AccountReference::from)
             .collect()
-    }
-
-    /// Rebuilds the account and account reference counters for a given identity
-    pub fn rebuild_identity_account_counters(&mut self, anchor_number: AnchorNumber) {
-        // increment metrics
-        let _ = self.increment_discrepancy_counter(&DiscrepancyType::AccountRebuild);
-
-        // get actual list of stored references and accounts
-        let acc_ref_list = self.list_identity_account_references(anchor_number);
-
-        let mut stored_accounts = 0;
-        let mut stored_account_references = 0;
-
-        acc_ref_list.iter().for_each(|acc_ref| {
-            // for every reference, we increment the account references counter
-            stored_account_references += 1;
-            // if the account reference has an account number and is thus stored, also increment the stored accounts counter
-            if acc_ref.account_number.is_some() {
-                stored_accounts += 1;
-            }
-        });
-
-        self.stable_anchor_account_counter_memory.insert(
-            anchor_number,
-            StorableAccountsCounter {
-                stored_accounts,
-                stored_account_references,
-            },
-        );
-    }
-
-    /// Increments the discrepancy counter (this is so we can ascertain correctness of our counters - ideally, this is never actually called)
-    fn increment_discrepancy_counter(
-        &mut self,
-        discrepancy_type: &DiscrepancyType,
-    ) -> Result<StorableDiscrepancyCounter, ValueError> {
-        let counters = self.stable_account_counter_discrepancy_counter_memory.get();
-
-        self.stable_account_counter_discrepancy_counter_memory
-            .set(counters.increment(discrepancy_type))
     }
 
     /// Retrieves the discrepancy counter

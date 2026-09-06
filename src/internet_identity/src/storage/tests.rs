@@ -2462,10 +2462,21 @@ mod reference_list_write_path_tests {
                 .unwrap();
         }
 
+        // Counted a second way: what the write path derived, against what the account
+        // reference lists actually hold. There is no repair path any more, so this is the
+        // check that the derivation is right.
         let written = storage.get_account_counter(anchor_number);
-        storage.rebuild_identity_account_counters(anchor_number);
+        let mut accounts = 0;
+        let mut references = 0;
+        for reference in storage.list_identity_account_references(anchor_number) {
+            references += 1;
+            if reference.account_number.is_some() {
+                accounts += 1;
+            }
+        }
 
-        assert_eq!(storage.get_account_counter(anchor_number), written);
+        assert_eq!(written.stored_account_references, references);
+        assert_eq!(written.stored_accounts, accounts);
         assert_eq!(written.stored_account_references, 9);
         assert_eq!(written.stored_accounts, 6);
     }
