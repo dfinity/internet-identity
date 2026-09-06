@@ -5,7 +5,7 @@ import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import {
   fromCanisterBrowsers,
   signOutBrowser,
-} from "./sessionDevices";
+} from "./browsers";
 
 const device = (
   id: number,
