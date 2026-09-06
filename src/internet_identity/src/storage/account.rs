@@ -7,8 +7,8 @@ use crate::{
 use ic_cdk::trap;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
-    AccountInfo, AccountNameValidationError, AccountNumber, AnchorNumber, FrontendHostname,
-    BrowserId, SessionId, Timestamp, UserKey,
+    AccountInfo, AccountNameValidationError, AccountNumber, AnchorNumber, BrowserId,
+    FrontendHostname, SessionId, Timestamp, UserKey,
 };
 use serde::{Deserialize, Serialize};
 
