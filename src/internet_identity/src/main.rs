@@ -1198,20 +1198,20 @@ mod v2_api {
             Some(stored_verified_emails)
         };
 
-        let stored_session_devices: Vec<SessionDeviceInfo> = state::anchor(identity_number)
-            .session_devices()
+        let stored_browsers: Vec<BrowserInfo> = state::anchor(identity_number)
+            .browsers()
             .iter()
-            .map(|device| SessionDeviceInfo {
+            .map(|device| BrowserInfo {
                 id: device.id,
                 name: device.name.clone(),
                 created_at: device.created_at,
                 last_used: device.last_used,
             })
             .collect();
-        let session_devices = if stored_session_devices.is_empty() {
+        let browsers = if stored_browsers.is_empty() {
             None
         } else {
-            Some(stored_session_devices)
+            Some(stored_browsers)
         };
 
         let identity_info = IdentityInfo {
@@ -1229,7 +1229,7 @@ mod v2_api {
             created_at: anchor_info.created_at,
             email_recovery,
             verified_emails,
-            session_devices,
+            browsers,
             // The same config `mcp_get_config` serves, but certified: this is
             // an update call, so the Settings UI can render the trusted server
             // — and base the config it writes back — on a value no single node
