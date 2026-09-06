@@ -9,29 +9,26 @@ use crate::{
     state::{self, storage_borrow, storage_borrow_mut},
     storage::{
         account::{
-            validate_account_name, Account, AccountDelegationError, AccountKey, AccountsCounter,
+            validate_account_name, Account, AccountDelegationError, AccountKey,
             PrepareAccountDelegation,
         },
-        Storage,
+        StorageError,
     },
     update_root_hash,
 };
 use ic_canister_sig_creation::{signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN};
 use ic_cdk::{api::time, caller};
-use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity_interface::{
     archive::types::{Operation, Private},
     internet_identity::types::{
-        AccountInfo, AccountNumber, AccountUpdate, AnchorNumber, CheckMaxAccountError,
-        CreateAccountError, Delegation, FrontendHostname, GetAccountError, GetDefaultAccountError,
-        SessionKey, SetDefaultAccountError, SignedDelegation, Timestamp, UpdateAccountError,
+        AccountInfo, AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, Delegation,
+        FrontendHostname, GetAccountError, GetDefaultAccountError, SessionKey,
+        SetDefaultAccountError, SignedDelegation, Timestamp, UpdateAccountError,
     },
 };
 #[cfg(test)]
 use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
-
-const MAX_ANCHOR_ACCOUNTS: usize = 500;
 
 pub fn get_accounts_for_origin(
     anchor_number: AnchorNumber,
@@ -166,12 +163,15 @@ pub fn create_account_for_origin(
 ) -> Result<Account, CreateAccountError> {
     validate_account_name(&name).map_err(Into::<CreateAccountError>::into)?;
     let created_account = storage_borrow_mut(|storage| {
-        check_max_anchor_accounts(storage, anchor_number, MAX_ANCHOR_ACCOUNTS as u64)
-            .map_err(Into::<CreateAccountError>::into)?;
-
         storage
             .create_account(anchor_number, origin, name.clone())
-            .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))
+            .map_err(|err| match err {
+                // The cap is the write path's rule, so it says so rather than the caller
+                // asking first — and naming a tracked default reaches it the same way,
+                // because naming one is what makes it a stored account.
+                StorageError::AccountLimitReached { .. } => CreateAccountError::AccountLimitReached,
+                err => CreateAccountError::InternalCanisterError(format!("{err}")),
+            })
     })?;
 
     post_account_operation_bookkeeping(
@@ -196,14 +196,6 @@ pub fn update_account_for_origin(
             let (updated_account, old_account_name) =
                 // Type annotation was necessary for the compiler to infer the correct type
                 storage_borrow_mut(|storage| -> Result<(Account, Option<String>), UpdateAccountError> {
-                    // If the account to be updated is a default account
-                    // Check if we have reached account limit
-                    // Because editing a default account turns it into a stored account
-                    if account_number.is_none() {
-                        check_max_anchor_accounts(storage, anchor_number, MAX_ANCHOR_ACCOUNTS as u64)
-                        .map_err(Into::<UpdateAccountError>::into)?
-                    }
-
                     // A caller reaches this with nothing readable in two ways: the
                     // account belongs to another identity, or the tracked default has
                     // already been named and so is no longer numberless. Both are the
@@ -221,7 +213,12 @@ pub fn update_account_for_origin(
                     renamed_account.name = Some(new_name.clone());
                     let updated_account = storage
                         .write_account(renamed_account)
-                        .map_err(|err| UpdateAccountError::InternalCanisterError(err.to_string()))?;
+                        .map_err(|err| match err {
+                            StorageError::AccountLimitReached { .. } => {
+                                UpdateAccountError::AccountLimitReached
+                            }
+                            err => UpdateAccountError::InternalCanisterError(err.to_string()),
+                        })?;
 
                     Ok((updated_account, old_account.name))
                 })?;
@@ -390,27 +387,6 @@ pub fn get_account_delegation(
     })
 }
 
-/// Refuses where this identity already holds as many accounts as it may.
-///
-/// Counted rather than repaired. There used to be a rebuild here for a counter that could
-/// drift, because it was maintained by hand at each write site; the write path derives it
-/// now, so there is nothing to repair and no reason to look twice.
-fn check_max_anchor_accounts(
-    storage: &Storage<DefaultMemoryImpl>,
-    anchor_number: AnchorNumber,
-    max_anchor_accounts: u64,
-) -> Result<(), CheckMaxAccountError> {
-    let AccountsCounter {
-        stored_accounts,
-        stored_account_references: _,
-    } = storage.get_account_counter(anchor_number);
-
-    if stored_accounts >= max_anchor_accounts {
-        return Err(CheckMaxAccountError::AccountLimitReached);
-    }
-    Ok(())
-}
-
 #[cfg(not(test))]
 #[allow(dead_code)]
 fn post_account_operation_bookkeeping(anchor_number: AnchorNumber, operation: Operation) {
@@ -422,8 +398,9 @@ fn post_account_operation_bookkeeping(anchor_number: AnchorNumber, operation: Op
 fn post_account_operation_bookkeeping(_anchor_number: AnchorNumber, _operation: Operation) {}
 
 #[cfg(test)]
-fn storage_with_salt() -> Storage<ic_stable_structures::VectorMemory> {
-    let mut storage = Storage::new((0, 10000), ic_stable_structures::VectorMemory::default());
+fn storage_with_salt() -> crate::storage::Storage<ic_stable_structures::VectorMemory> {
+    let mut storage =
+        crate::storage::Storage::new((0, 10000), ic_stable_structures::VectorMemory::default());
     storage.update_salt([17u8; 32]);
     storage
 }
@@ -453,6 +430,7 @@ fn should_create_account_for_origin() {
 #[test]
 fn should_fail_to_create_accounts_above_max() {
     use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::MAX_ANCHOR_ACCOUNTS;
 
     storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
@@ -472,6 +450,7 @@ fn should_fail_to_create_accounts_above_max() {
 #[test]
 fn should_fail_to_update_default_accounts_above_max() {
     use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::MAX_ANCHOR_ACCOUNTS;
 
     storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
@@ -747,34 +726,41 @@ fn should_update_default_account_for_origin() {
 }
 
 #[test]
-// This test is to make sure that the check_max_anchor_accounts function correctly errors
-// It should error when the counters are at or above max and argument 'first_time' is false
-fn should_fail_check_or_rebuild_when_not_first_time() {
+fn naming_a_tracked_default_at_the_account_limit_is_refused() {
     use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::MAX_ANCHOR_ACCOUNTS;
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
+    let origin = "https://example.com".to_string();
+    create_account_for_origin(anchor.anchor_number(), origin.clone(), "first".to_string()).unwrap();
 
-    // create faulty counter entries
+    // At the limit, and naming another account is the one thing that cannot be done —
+    // said by the write itself rather than by a caller asking first.
     storage_borrow_mut(|storage| {
         storage.set_counters_for_testing(
             anchor.anchor_number(),
-            MAX_ANCHOR_ACCOUNTS as u64,
-            MAX_ANCHOR_ACCOUNTS as u64,
-        );
-        let res =
-            check_max_anchor_accounts(storage, anchor.anchor_number(), MAX_ANCHOR_ACCOUNTS as u64);
-        assert!(res.is_err())
+            MAX_ANCHOR_ACCOUNTS,
+            MAX_ANCHOR_ACCOUNTS,
+        )
     });
+
+    assert_eq!(
+        create_account_for_origin(anchor.anchor_number(), origin, "second".to_string()),
+        Err(CreateAccountError::AccountLimitReached)
+    );
 }
 
 #[test]
 fn a_drifted_account_counter_is_not_repaired_and_costs_the_identity_its_limit() {
     use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
+    use crate::storage::MAX_ANCHOR_ACCOUNTS;
 
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    storage_replace(storage_with_salt());
     let anchor = storage_borrow_mut(|storage| {
         let anchor = storage.allocate_anchor(0).unwrap();
         storage.write(anchor.clone()).unwrap();
@@ -786,8 +772,8 @@ fn a_drifted_account_counter_is_not_repaired_and_costs_the_identity_its_limit() 
     storage_borrow_mut(|storage| {
         storage.set_counters_for_testing(
             anchor.anchor_number(),
-            MAX_ANCHOR_ACCOUNTS as u64,
-            MAX_ANCHOR_ACCOUNTS as u64,
+            MAX_ANCHOR_ACCOUNTS,
+            MAX_ANCHOR_ACCOUNTS,
         )
     });
 
