@@ -25,17 +25,17 @@ const DEVICE_KEY_SIGNATURE_BYTES: usize = 64;
 pub fn verify_device_keys(
     device_key: &PublicKey,
     device_key_signature: &[u8],
-    next_device_key: &PublicKey,
-    next_device_key_signature: &[u8],
+    next_browser_key: &PublicKey,
+    next_browser_key_signature: &[u8],
     session_key: &SessionKey,
 ) -> bool {
     verify(
         device_key,
         device_key_signature,
-        &signed_message(DEVICE_KEY_SIGNATURE_DOMAIN, session_key, next_device_key),
+        &signed_message(DEVICE_KEY_SIGNATURE_DOMAIN, session_key, next_browser_key),
     ) && verify(
-        next_device_key,
-        next_device_key_signature,
+        next_browser_key,
+        next_browser_key_signature,
         &signed_message(SUCCESSOR_KEY_SIGNATURE_DOMAIN, session_key, device_key),
     )
 }
