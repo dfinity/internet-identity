@@ -138,8 +138,8 @@ No existing method changes shape or behaviour, so nothing breaks and nothing has
 ## Order of work
 
 The four designs are not independent. Account tracking has to land first: it supplies the
-row a session is stored on and the index that resolves an app's principal back to an
-account. Sessions come next, ending with the settings screen that lists browsers. Silent
+account reference a session is stored on, the one write path everything here goes through,
+and the index that resolves an app's principal back to an account. Sessions come next, ending with the settings screen that lists browsers. Silent
 re-auth is last and smallest, and only becomes reachable once sessions exist.
 
 None of it reaches an app until the client library holds a session, which is the fourth
@@ -151,12 +151,12 @@ Each design's own stages are listed in its doc.
 
 ## Read further
 
-Each feature has a design doc for what and why, and a specification for how. The last two rows are neither. One is what has to be observably true once they are built; the other is the dashboard that would watch them, panel by panel.
+Each feature has a design doc for what and why, and a specification for how. The last two entries are neither. One is what has to be observably true once they are built; the other is the dashboard that would watch them, panel by panel.
 
 | Design                                                                  | Specification                            | Covers                                                                                                                                                    |
 | ----------------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [Account tracking](tracked-default-accounts.md)                         | [spec](tracked-default-accounts-spec.md) | The storage this is built on: recording which apps an identity uses, reclaiming unused app records, and the index that resolves a principal to an account |
-| [Revocable app sessions](revocable-app-sessions.md)                     | [spec](revocable-app-sessions-spec.md)   | The session record, its identity and chain, refresh, revocation, and session devices                                                                      |
+| [Revocable app sessions](revocable-app-sessions.md)                     | [spec](revocable-app-sessions-spec.md)   | The session record, its identity and chain, refresh, revocation, and the browser registry                                                                 |
 | [Silent re-auth over the redirect transport](silent-reauth-redirect.md) | [spec](silent-reauth-redirect-spec.md)   | `prompt=none`, `hint`, and what II supplies for the sibling flow                                                                                          |
 | [App sessions in the client library](client-app-sessions.md)            | [spec](client-app-sessions-spec.md)      | What `@icp-sdk/auth` does: acquires the session, mints five-minute delegations from it, and revokes at sign-out, with none of it in its public API        |
 | [Session test scenarios](session-test-scenarios.md)                     |                                          | The states to start from, what to do, and what must then hold, each cited against the requirements it exercises                                           |
