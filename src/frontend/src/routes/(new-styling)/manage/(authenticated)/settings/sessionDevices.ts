@@ -3,11 +3,11 @@ import { purgeAppSessions } from "$lib/stores/app-session.store";
 import { currentDeviceId } from "$lib/stores/browser-key.store";
 import type {
   _SERVICE,
-  SessionDeviceInfo,
+  BrowserInfo,
 } from "$lib/generated/internet_identity_types";
 import { nanosToMillis } from "$lib/utils/time";
 
-export interface SessionDevice {
+export interface Browser {
   id: number;
   name: string;
   createdAtMillis: number;
@@ -16,10 +16,10 @@ export interface SessionDevice {
   isCurrent: boolean;
 }
 
-export const fromCanisterSessionDevices = (
-  devices: [] | [SessionDeviceInfo[]],
+export const fromCanisterBrowsers = (
+  devices: [] | [BrowserInfo[]],
   currentDeviceId?: number,
-): SessionDevice[] =>
+): Browser[] =>
   (devices[0] ?? [])
     .map((device) => ({
       id: device.id,
@@ -45,14 +45,14 @@ export const fromCanisterSessionDevices = (
  * otherwise pass `false` for the user's own browser and leave exactly those chains
  * behind.
  */
-export const signOutSessionDevice = async (
+export const signOutBrowser = async (
   actor: ActorSubclass<_SERVICE>,
   identityNumber: bigint,
   deviceId: number,
 ): Promise<void> => {
-  const result = await actor.revoke_device_sessions({
+  const result = await actor.revoke_browser_sessions({
     identity_number: identityNumber,
-    device_id: deviceId,
+    browser_id: deviceId,
   });
   if ("Err" in result) {
     throw new Error(
