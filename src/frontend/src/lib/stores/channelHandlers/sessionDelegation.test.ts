@@ -99,7 +99,7 @@ describe("ii_session_delegation", () => {
 describe("asBrowserKeyError", () => {
   it("names a retired browser key so the key store can promote its successor", () => {
     const stale = asBrowserKeyError(
-      new CanisterError({ StaleDeviceKey: null }),
+      new CanisterError({ StaleBrowserKey: null }),
     );
 
     expect(stale).toBeInstanceOf(StaleBrowserKeyError);
