@@ -74,7 +74,7 @@ pub enum BrowserError {
     /// holding both keys. Registering it as a new browser instead would turn every dropped
     /// response into a second list for one browser, and accepting it would leave a leaked
     /// key useful for longer than the one sign-in rotation allows it.
-    StaleDeviceKey,
+    StaleBrowserKey,
 }
 
 /// A browser this anchor has signed in from. The name is self-reported by the client.
@@ -741,7 +741,7 @@ impl Anchor {
     /// An entry is reached only by the successor it announced. Presenting it promotes that
     /// successor, retires the key it replaces, and leaves the entry awaiting
     /// `next_browser_key` — what the browser presents at its next sign-in. A key some entry
-    /// has already retired is refused with [`BrowserError::StaleDeviceKey`] rather
+    /// has already retired is refused with [`BrowserError::StaleBrowserKey`] rather
     /// than accepted or registered afresh, so a key is good for exactly one sign-in and a
     /// browser that lost a response is told to promote its own successor instead of
     /// becoming a second list. A key no entry holds at all registers a new browser.
@@ -765,11 +765,11 @@ impl Anchor {
         let entry_awaiting = |candidate: &PublicKey| {
             self.browsers
                 .iter()
-                .position(|device| device.next_browser_key == *candidate)
+                .position(|browser| browser.next_browser_key == *candidate)
         };
         let entry_holding = |candidate: &PublicKey| {
-            self.browsers.iter().position(|device| {
-                device.current_browser_key == *candidate || device.next_browser_key == *candidate
+            self.browsers.iter().position(|browser| {
+                browser.current_browser_key == *candidate || browser.next_browser_key == *candidate
             })
         };
 
@@ -784,15 +784,15 @@ impl Anchor {
         }
 
         if let Some(index) = advances {
-            let device = &mut self.browsers[index];
-            device.current_browser_key = current_browser_key;
-            device.next_browser_key = next_browser_key;
-            device.last_used = now;
-            return Ok((device.id, vec![]));
+            let browser = &mut self.browsers[index];
+            browser.current_browser_key = current_browser_key;
+            browser.next_browser_key = next_browser_key;
+            browser.last_used = now;
+            return Ok((browser.id, vec![]));
         }
 
         if owner.is_some() {
-            return Err(BrowserError::StaleDeviceKey);
+            return Err(BrowserError::StaleBrowserKey);
         }
 
         let id = self.next_browser_id;
@@ -812,7 +812,7 @@ impl Anchor {
                 .browsers
                 .iter()
                 .enumerate()
-                .min_by_key(|(_, device)| (device.last_used, device.id))
+                .min_by_key(|(_, browser)| (browser.last_used, browser.id))
                 .map(|(index, _)| index);
             match least_recently_used {
                 Some(index) => {
