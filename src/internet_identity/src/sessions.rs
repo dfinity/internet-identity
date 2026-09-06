@@ -2,4 +2,4 @@
 // holds only the verifier its request will be checked against.
 #![allow(dead_code)]
 
-pub mod device_key;
+pub mod browser_key;
