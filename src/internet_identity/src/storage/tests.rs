@@ -6413,13 +6413,13 @@ mod session_removal_tests {
         storage.write(anchor).unwrap();
         let keys = devices
             .iter()
-            .map(|device_id| {
+            .map(|browser_id| {
                 storage
                     .create_session(CreateSessionParams {
                         anchor_number,
                         origin: ORIGIN.to_string(),
                         account_number: None,
-                        device_id: *device_id,
+                        browser_id: *browser_id,
                         valid_till_ns: u64::MAX,
                         max_idle_ns: None,
                         read_only: false,
@@ -6445,7 +6445,7 @@ mod session_removal_tests {
             .unwrap()
             .sessions
             .into_iter()
-            .map(|session| session.device_id)
+            .map(|session| session.browser_id)
             .collect()
     }
 
