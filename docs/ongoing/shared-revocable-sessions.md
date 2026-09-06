@@ -125,7 +125,7 @@ No credential is copied between the subdomains. Each asks II for a delegation to
 | `app_revoke_session`                                    | app frontend, via `AuthClient` | New       | The app's own sign-out. Deletes its session record   |
 | `check_session`                                         | II frontend                    | New       | Whether a session is still live, for the silent path |
 | `prepare_account_session` / `get_account_session`       | II frontend                    | New       | Creates a session and signs its identity             |
-| `revoke_account_session` / `revoke_device_sessions`     | II frontend                    | New       | Ends one session, or every session a browser holds   |
+| `revoke_browser_sessions`                               | II frontend                    | New       | Ends every session one browser holds                 |
 | `prepare_account_delegation` / `get_account_delegation` | II frontend                    | Untouched | The delegation flow as it works today                |
 | `icrc34_delegation`                                     | app frontend                   | Untouched | Unchanged, and unaware of any of this                |
 
