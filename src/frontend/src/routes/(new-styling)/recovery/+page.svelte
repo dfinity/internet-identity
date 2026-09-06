@@ -38,7 +38,7 @@
   import { throwCanisterError } from "$lib/utils/utils";
   import { handleError } from "$lib/components/utils/error";
   import { authenticationStore } from "$lib/stores/authentication.store";
-  import { forgetIdentity, purgeSession } from "$lib/stores/session-delegation.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
   import { authenticateWithSession } from "$lib/utils/authentication";
   import { goto, preloadData } from "$app/navigation";
   import { page } from "$app/state";
@@ -200,7 +200,11 @@
     } catch (error) {
       showRecoveryDialog = false;
       authenticationStore.reset();
-      void forgetIdentity(identityNumber);
+      // The recovery itself succeeded; what failed is the navigation after it. Dropping
+      // this browser's session delegation is enough — signing the identity out of every
+      // app it is signed into from here, as `forgetIdentity` does, is not something a
+      // failed route change should do. Matches the email-recovery handler above.
+      void purgeSession(identityNumber);
       handleError(error);
     }
   };
