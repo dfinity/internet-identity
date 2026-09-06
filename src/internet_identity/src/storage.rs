@@ -3188,7 +3188,7 @@ impl<M: Memory + Clone> Storage<M> {
         };
 
         session.last_refreshed_ns = Some(now);
-        let device_id = session.device_id;
+        let browser_id = session.browser_id;
         write.account_reference.last_used = Some(now);
 
         // This list is being rewritten anyway, so its dead sessions go now. It costs one
@@ -3204,7 +3204,7 @@ impl<M: Memory + Clone> Storage<M> {
         // Stamped before the write rather than after: the write may move the identity's
         // session count and store the anchor for it, and this way that store carries the
         // stamp too instead of needing a second one.
-        let stamped = anchor.stamp_session_device_use(device_id, now);
+        let stamped = anchor.stamp_browser_use(browser_id, now);
         self.write_account_state(
             &mut anchor,
             BTreeMap::from([(origin.clone(), Some((account_references, config)))]),

@@ -6177,7 +6177,7 @@ mod session_refresh_stamp_tests {
                 anchor_number,
                 origin: ORIGIN.to_string(),
                 account_number: None,
-                device_id: 1,
+                browser_id: 1,
                 valid_till_ns: u64::MAX,
                 max_idle_ns: None,
                 read_only: false,
@@ -6239,7 +6239,7 @@ mod session_refresh_stamp_tests {
                 anchor_number,
                 origin: ORIGIN.to_string(),
                 account_number: None,
-                device_id: 9,
+                browser_id: 9,
                 valid_till_ns: 1_500,
                 max_idle_ns: None,
                 read_only: false,
@@ -6261,7 +6261,7 @@ mod session_refresh_stamp_tests {
 
         let sessions = reference(&storage, anchor_number).sessions;
         assert_eq!(sessions.len(), 1, "the expired sibling was left behind");
-        assert_eq!(sessions[0].device_id, 1);
+        assert_eq!(sessions[0].browser_id, 1);
         assert!(
             storage
                 .lookup_session_with_principal(dead_principal)
@@ -6298,7 +6298,7 @@ mod session_refresh_stamp_tests {
                 anchor_number,
                 origin: ORIGIN.to_string(),
                 account_number: None,
-                device_id: 2,
+                browser_id: 2,
                 valid_till_ns: u64::MAX,
                 max_idle_ns: None,
                 read_only: false,
@@ -6311,8 +6311,8 @@ mod session_refresh_stamp_tests {
 
         let sessions = reference(&storage, anchor_number).sessions;
         assert_eq!(sessions.len(), 2);
-        let stamped = sessions.iter().find(|s| s.device_id == 1).unwrap();
-        let untouched = sessions.iter().find(|s| s.device_id == 2).unwrap();
+        let stamped = sessions.iter().find(|s| s.browser_id == 1).unwrap();
+        let untouched = sessions.iter().find(|s| s.browser_id == 2).unwrap();
         assert_eq!(stamped.last_refreshed_ns, Some(now));
         assert_eq!(untouched.last_refreshed_ns, None);
     }
@@ -6323,8 +6323,8 @@ mod session_refresh_stamp_tests {
         storage.update_salt([17u8; 32]);
         let mut anchor = storage.allocate_anchor(0).unwrap();
         let anchor_number = anchor.anchor_number();
-        let (device_id, _) = anchor
-            .resolve_session_device(
+        let (browser_id, _) = anchor
+            .resolve_browser(
                 ByteBuf::from(vec![1; 91]),
                 ByteBuf::from(vec![2; 91]),
                 "Chrome".to_string(),
@@ -6337,23 +6337,23 @@ mod session_refresh_stamp_tests {
                 anchor_number,
                 origin: ORIGIN.to_string(),
                 account_number: None,
-                device_id,
+                browser_id,
                 valid_till_ns: u64::MAX,
                 max_idle_ns: None,
                 read_only: false,
                 now_ns: 1_000,
             })
             .unwrap();
-        (storage, anchor_number, key, device_id)
+        (storage, anchor_number, key, browser_id)
     }
 
     fn device_last_used(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> u64 {
-        storage.read(anchor_number).unwrap().session_devices()[0].last_used
+        storage.read(anchor_number).unwrap().browsers()[0].last_used
     }
 
     #[test]
     fn a_refresh_advances_the_device_registry() {
-        let (mut storage, anchor_number, key, _device_id) = storage_with_registered_device();
+        let (mut storage, anchor_number, key, _browser_id) = storage_with_registered_device();
 
         storage.record_session_use(&key, 9_000).unwrap();
 
@@ -6362,11 +6362,11 @@ mod session_refresh_stamp_tests {
 
     #[test]
     fn a_refresh_leaves_the_device_enrolment_timestamp_alone() {
-        let (mut storage, anchor_number, key, _device_id) = storage_with_registered_device();
+        let (mut storage, anchor_number, key, _browser_id) = storage_with_registered_device();
 
         storage.record_session_use(&key, 9_000).unwrap();
 
-        let device = storage.read(anchor_number).unwrap().session_devices()[0].clone();
+        let device = storage.read(anchor_number).unwrap().browsers()[0].clone();
         assert_eq!(device.created_at, 1_000);
         assert_eq!(device.last_used, 9_000);
     }

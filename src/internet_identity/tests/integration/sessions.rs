@@ -11,7 +11,7 @@ use canister_tests::framework::{
 use internet_identity_interface::internet_identity::types::{
     AccountSessionError, AppGetDelegationRequest, AppPrepareDelegationRequest, AppSessionError,
     GetAccountSessionRequest, Permissions, PrepareAccountSessionRequest,
-    PrepareAccountSessionResponse, SessionDeviceInfo,
+    PrepareAccountSessionResponse, BrowserInfo,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -589,11 +589,11 @@ fn should_advance_the_device_last_used_on_every_refresh() -> Result<(), RejectRe
     let identity_number = flows::register_anchor(&env, canister_id);
     let (_, session_principal) = create_session(&env, canister_id, identity_number);
 
-    let device = |env: &PocketIc| -> Result<SessionDeviceInfo, RejectResponse> {
+    let device = |env: &PocketIc| -> Result<BrowserInfo, RejectResponse> {
         Ok(
             identity_info(env, canister_id, principal_1(), identity_number)?
                 .unwrap()
-                .session_devices
+                .browsers
                 .unwrap()[0]
                 .clone(),
         )
