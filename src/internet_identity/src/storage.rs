@@ -2701,10 +2701,11 @@ impl<M: Memory + Clone> Storage<M> {
     /// whatever this browser already held at this account.
     pub fn create_session(
         &mut self,
+        anchor: &mut Anchor,
         params: CreateSessionParams,
     ) -> Result<(SessionRecordKey, SessionRecord), StorageError> {
+        let anchor_number = anchor.anchor_number();
         let CreateSessionParams {
-            anchor_number,
             origin,
             account_number,
             browser_id,
@@ -2712,6 +2713,7 @@ impl<M: Memory + Clone> Storage<M> {
             max_idle_ns,
             read_only,
             now_ns,
+            dropped_browsers,
         } = params;
 
         // Defaulted and clamped here rather than at the caller, so every path that
@@ -2732,7 +2734,6 @@ impl<M: Memory + Clone> Storage<M> {
         // account reference list, created by this write where the origin is new, the
         // session itself, and the dead sessions pruned off every reference beside it.
         // Everything that can refuse does so before any of it is stored.
-        let mut anchor = self.read(anchor_number)?;
         let stored = self
             .lookup_application_number_with_origin(&origin)
             .and_then(|application_number| {
@@ -2746,8 +2747,33 @@ impl<M: Memory + Clone> Storage<M> {
                 name: origin,
             });
         }
-        let (mut account_references, config) =
-            self.account_state_for_origin(anchor_number, &origin);
+
+        // The whole of what the identity holds, not just this origin: a browser the
+        // registry gave up to make room for this one may hold sessions anywhere, and those
+        // have to go in the same write as the browser that held them.
+        let mut state = self.account_state(anchor_number);
+        if !state.contains_key(&origin) {
+            let held = self.account_state_for_origin(anchor_number, &origin);
+            state.insert(origin.clone(), Some(held));
+        }
+        if !dropped_browsers.is_empty() {
+            for held in state.values_mut() {
+                let Some((account_references, _)) = held else {
+                    continue;
+                };
+                for write in account_references.iter_mut() {
+                    write
+                        .account_reference
+                        .sessions
+                        .retain(|session| !dropped_browsers.contains(&session.browser_id));
+                }
+            }
+        }
+
+        let (account_references, _) = state
+            .get_mut(&origin)
+            .and_then(Option::as_mut)
+            .expect("the origin was just put there");
 
         let position = account_references
             .iter()
@@ -2802,10 +2828,10 @@ impl<M: Memory + Clone> Storage<M> {
 
         // The list is the whole of it: the index entries for the session created here and
         // for the ones pruned above, and the identity's session count, all follow from it.
-        self.write_account_state(
-            &mut anchor,
-            BTreeMap::from([(origin.clone(), Some((account_references, config)))]),
-        )?;
+        // One write for all of it: the session created here, the dead ones pruned above,
+        // the sessions of every browser the registry gave up, the account reference list
+        // this origin gets if it did not have one, and the identity's session count.
+        self.write_account_state(anchor, state)?;
 
         let key = SessionRecordKey {
             anchor_number,
@@ -2818,10 +2844,24 @@ impl<M: Memory + Clone> Storage<M> {
 
     // Called by the sign-in ceremony, which lands two PRs up.
     #[allow(dead_code)]
+    /// [`Self::create_session`] for a test that has an anchor number rather than the
+    /// anchor. Production hands the anchor in, because the caller has just registered a
+    /// browser on it and that registration rides on the same write.
+    #[cfg(test)]
+    fn create_session_for_testing(
+        &mut self,
+        anchor_number: AnchorNumber,
+        params: CreateSessionParams,
+    ) -> Result<(SessionRecordKey, SessionRecord), StorageError> {
+        let mut anchor = self.read(anchor_number)?;
+        self.create_session(&mut anchor, params)
+    }
+
     /// The session `key` names, or `None` where the identity holds no such session.
     ///
     /// A key whose session was replaced reads as `None` rather than as its successor:
     /// the successor was allocated an id of its own.
+    #[allow(dead_code)] // Used by the sign-in ceremony, which lands two PRs up.
     pub fn read_session(&self, key: &SessionRecordKey) -> Option<SessionRecord> {
         let application_number = self.lookup_application_number_with_origin(&key.origin)?;
 
@@ -3554,7 +3594,6 @@ impl<M: Memory + Clone> Storage<M> {
 // Constructed by the sign-in ceremony, which lands two PRs up.
 #[allow(dead_code)]
 pub struct CreateSessionParams {
-    pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
     pub browser_id: BrowserId,
@@ -3562,6 +3601,11 @@ pub struct CreateSessionParams {
     pub max_idle_ns: Option<u64>,
     pub read_only: bool,
     pub now_ns: Timestamp,
+    /// Browsers the registry gave up to make room for this one, whose sessions go with
+    /// them. Handed in rather than swept afterwards: dropping a browser and ending its
+    /// sessions is one change, and doing it in two writes means an `Err` from the second
+    /// leaves a browser gone with its sessions still live.
+    pub dropped_browsers: Vec<BrowserId>,
 }
 
 /// How far the sweep has got: which list, and how many of that list's references are
