@@ -402,8 +402,8 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
     'NoSuchSession' : IDL.Null,
     'NoSuchAccount' : IDL.Null,
-    'InvalidDeviceKey' : IDL.Null,
-    'StaleDeviceKey' : IDL.Null,
+    'InvalidBrowserKey' : IDL.Null,
+    'StaleBrowserKey' : IDL.Null,
   });
   const GetAccountsError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
@@ -713,7 +713,7 @@ export const idlFactory = ({ IDL }) => {
     'valid_for' : IDL.Opt(IDL.Nat64),
     'origin' : FrontendHostname,
     'current_browser_key_signature' : IDL.Vec(IDL.Nat8),
-    'device_name' : IDL.Text,
+    'browser_name' : IDL.Text,
     'account_number' : IDL.Opt(AccountNumber),
     'identity_number' : UserNumber,
     'next_browser_key' : PublicKey,
