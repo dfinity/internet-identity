@@ -1,5 +1,5 @@
 /**
- * The label a browser gives itself when it registers a session device.
+ * The label a browser gives itself when it registers a browser.
  *
  * Self-reported, so it is something the user reads rather than evidence about where a
  * session came from.
