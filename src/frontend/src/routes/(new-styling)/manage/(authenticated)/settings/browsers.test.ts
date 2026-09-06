@@ -7,7 +7,7 @@ import {
   signOutBrowser,
 } from "./browsers";
 
-const device = (
+const browser = (
   id: number,
   name: string,
   createdAtNanos: bigint,
@@ -20,7 +20,7 @@ const device = (
 });
 
 describe("fromCanisterBrowsers", () => {
-  it("reports no devices for an identity that has never created a session", () => {
+  it("reports no browsers for an identity that has never created a session", () => {
     expect(fromCanisterBrowsers([])).toEqual([]);
   });
 
@@ -28,9 +28,9 @@ describe("fromCanisterBrowsers", () => {
     expect(
       fromCanisterBrowsers([
         [
-          device(1, "Firefox on Linux", BigInt(1_000_000_000)),
-          device(2, "Chrome on macOS", BigInt(3_000_000_000)),
-          device(3, "Safari on iOS", BigInt(2_000_000_000)),
+          browser(1, "Firefox on Linux", BigInt(1_000_000_000)),
+          browser(2, "Chrome on macOS", BigInt(3_000_000_000)),
+          browser(3, "Safari on iOS", BigInt(2_000_000_000)),
         ],
       ]).map((entry) => entry.name),
     ).toEqual(["Chrome on macOS", "Safari on iOS", "Firefox on Linux"]);
@@ -40,13 +40,13 @@ describe("fromCanisterBrowsers", () => {
     expect(
       fromCanisterBrowsers([
         [
-          device(
+          browser(
             1,
             "enrolled first, still in use",
             BigInt(1),
             BigInt(9_000_000_000),
           ),
-          device(2, "enrolled later, gone quiet", BigInt(5_000_000_000)),
+          browser(2, "enrolled later, gone quiet", BigInt(5_000_000_000)),
         ],
       ]).map((entry) => entry.name),
     ).toEqual(["enrolled first, still in use", "enrolled later, gone quiet"]);
@@ -55,7 +55,7 @@ describe("fromCanisterBrowsers", () => {
   it("converts both timestamps to milliseconds", () => {
     expect(
       fromCanisterBrowsers([
-        [device(1, "Chrome", BigInt(1_500_000_000), BigInt(4_200_000_000))],
+        [browser(1, "Chrome", BigInt(1_500_000_000), BigInt(4_200_000_000))],
       ]),
     ).toEqual([
       {
@@ -72,8 +72,8 @@ describe("fromCanisterBrowsers", () => {
     const marked = fromCanisterBrowsers(
       [
         [
-          device(1, "Chrome on Mac", BigInt(1_000_000_000)),
-          device(2, "Chrome on Mac", BigInt(2_000_000_000)),
+          browser(1, "Chrome on Mac", BigInt(1_000_000_000)),
+          browser(2, "Chrome on Mac", BigInt(2_000_000_000)),
         ],
       ],
       2,
@@ -88,7 +88,7 @@ describe("fromCanisterBrowsers", () => {
   it("marks nothing when this browser has never created a session", () => {
     expect(
       fromCanisterBrowsers([
-        [device(1, "Chrome on Mac", BigInt(1_000_000_000))],
+        [browser(1, "Chrome on Mac", BigInt(1_000_000_000))],
       ]).some((entry) => entry.isCurrent),
     ).toBe(false);
   });
@@ -97,7 +97,7 @@ describe("fromCanisterBrowsers", () => {
   it("marks nothing when the id is one this identity does not hold", () => {
     expect(
       fromCanisterBrowsers(
-        [[device(1, "Chrome on Mac", BigInt(1_000_000_000))]],
+        [[browser(1, "Chrome on Mac", BigInt(1_000_000_000))]],
         99,
       ).some((entry) => entry.isCurrent),
     ).toBe(false);
@@ -159,10 +159,10 @@ describe("signOutBrowser", () => {
     const actor = {
       revoke_browser_sessions: vi.fn(() => Promise.resolve({ Ok: null })),
     } as unknown as ActorSubclass<_SERVICE>;
-    // This browser is device 3.
+    // This browser is browser 3.
     await idbSet(
       BigInt(10_000).toString(),
-      { keyPair: undefined, deviceId: 3 },
+      { keyPair: undefined, browserId: 3 },
       createStore("ii-browser-keys", "keys"),
     );
 

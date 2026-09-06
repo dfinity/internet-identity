@@ -10,24 +10,24 @@
 
   interface Props {
     identityNumber: bigint;
-    devices: Browser[];
+    browsers: Browser[];
   }
 
-  const { identityNumber, devices }: Props = $props();
+  const { identityNumber, browsers }: Props = $props();
   const titleId = $props.id();
 
   let signedOut = $state<number[]>([]);
   let signingOut = $state<number | undefined>(undefined);
 
-  const handleSignOut = async (device: Browser) => {
-    signingOut = device.id;
+  const handleSignOut = async (browser: Browser) => {
+    signingOut = browser.id;
     try {
       await signOutBrowser(
         $authenticatedStore.actor,
         identityNumber,
-        device.id,
+        browser.id,
       );
-      signedOut = [...signedOut, device.id];
+      signedOut = [...signedOut, browser.id];
     } catch (error) {
       toaster.error({
         title: $t`Couldn't sign this browser out`,
@@ -55,7 +55,7 @@
         {$t`Signed-in browsers`}
       </h3>
       <p class="text-text-tertiary text-sm">
-        {#if devices.length === 0}
+        {#if browsers.length === 0}
           <Trans>
             Apps you sign in to from a browser will show up here, so you can end
             their access at any time.
@@ -69,19 +69,19 @@
       </p>
     </div>
 
-    {#if devices.length > 0}
+    {#if browsers.length > 0}
       <ul class="flex flex-col gap-2" aria-labelledby={titleId}>
-        {#each devices as device (device.id)}
-          {@const lastUsed = new Date(device.lastUsedMillis)}
+        {#each browsers as browser (browser.id)}
+          {@const lastUsed = new Date(browser.lastUsedMillis)}
           <li
             class="border-border-tertiary bg-bg-primary flex flex-row items-center gap-3 rounded-lg border p-3"
           >
             <div class="flex min-w-0 flex-1 flex-col">
               <span class="flex min-w-0 flex-row items-center gap-2">
                 <span class="text-text-primary truncate text-sm">
-                  {device.name}
+                  {browser.name}
                 </span>
-                {#if device.isCurrent}
+                {#if browser.isCurrent}
                   <Tooltip
                     label={$t`Signing out this browser ends the sessions you are using right now.`}
                     direction="up"
@@ -110,10 +110,10 @@
                   </span>
                 </Tooltip>
                 <!-- Names repeat across browsers, so the entry needs something that does not. -->
-                <span class="text-text-tertiary text-xs">#{device.id}</span>
+                <span class="text-text-tertiary text-xs">#{browser.id}</span>
               </span>
             </div>
-            {#if signedOut.includes(device.id)}
+            {#if signedOut.includes(browser.id)}
               <span class="text-text-tertiary shrink-0 text-sm">
                 {$t`Signed out`}
               </span>
@@ -121,9 +121,9 @@
               <button
                 class="btn btn-secondary btn-sm shrink-0"
                 disabled={signingOut !== undefined}
-                onclick={() => handleSignOut(device)}
+                onclick={() => handleSignOut(browser)}
               >
-                {signingOut === device.id ? $t`Signing out…` : $t`Sign out`}
+                {signingOut === browser.id ? $t`Signing out…` : $t`Sign out`}
               </button>
             {/if}
           </li>
