@@ -1009,7 +1009,7 @@ type IdentityAuthnInfo = record {
 // A browser an anchor has signed in from. The name is self-reported by the
 // client, so it is a label for the user rather than evidence about where a
 // session came from.
-type SessionDeviceInfo = record {
+type BrowserInfo = record {
     id : nat32;
     name : text;
     created_at : Timestamp;
@@ -1027,15 +1027,15 @@ type PrepareAccountSessionRequest = record {
     device_name : text;
     // The browser's own public key, DER-encoded, as the registry currently holds it. A
     // key this anchor has not seen registers a browser under it.
-    current_device_key : PublicKey;
+    current_browser_key : PublicKey;
     // What the browser rotates to once this sign-in succeeds. Must differ from
-    // current_device_key: a browser that never rotates keeps a leaked key useful.
-    next_device_key : PublicKey;
-    // Signature over session_key and next_device_key, verified with current_device_key.
-    current_device_key_signature : blob;
-    // Signature by next_device_key over session_key and current_device_key, proving the
+    // current_browser_key: a browser that never rotates keeps a leaked key useful.
+    next_browser_key : PublicKey;
+    // Signature over session_key and next_browser_key, verified with current_browser_key.
+    current_browser_key_signature : blob;
+    // Signature by next_browser_key over session_key and current_browser_key, proving the
     // browser holds the key it is announcing.
-    next_device_key_signature : blob;
+    next_browser_key_signature : blob;
     // The consented access level, fixed for the session's life.
     permissions : opt Permissions;
     // Clamped to the session maximum.
@@ -1057,7 +1057,7 @@ type PrepareAccountSessionResponse = record {
     // Which browser this sign-in was attributed to, so the settings list can mark the one
     // the user is looking at, and so the browser knows which registration its key now
     // belongs to. Not a credential: a caller never presents it.
-    device_id : nat32;
+    browser_id : nat32;
     // The principal apps see for this account, so the frontend can tell its own
     // sessions apart without minting a delegation to learn it.
     account_principal : principal;
@@ -1110,7 +1110,7 @@ type AppGetDelegationRequest = record {
 
 type RevokeDeviceSessionsRequest = record {
     identity_number : UserNumber;
-    device_id : nat32;
+    browser_id : nat32;
 };
 
 type SessionRevokeError = variant {
@@ -1151,7 +1151,7 @@ type IdentityInfo = record {
     // Browsers this anchor has signed in from (absent when it has never
     // created a session), so the Settings UI can offer "sign this browser
     // out" without a separate call.
-    session_devices : opt vec SessionDeviceInfo;
+    browsers : opt vec BrowserInfo;
     // The anchor's synced trusted-MCP-server config (absent when the
     // anchor never wrote one). Carried here rather than read from the
     // mcp_get_config query so the Settings UI has a certified value to
@@ -2000,7 +2000,7 @@ service : (opt InternetIdentityInit) -> {
     // session was already gone. An app can revoke only its own session.
     app_revoke_session : () -> ();
 
-    revoke_device_sessions : (RevokeDeviceSessionsRequest) -> (variant { Ok; Err : SessionRevokeError });
+    revoke_browser_sessions : (RevokeDeviceSessionsRequest) -> (variant { Ok; Err : SessionRevokeError });
 
     prepare_account_delegation : (
         anchor_number : UserNumber,
