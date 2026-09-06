@@ -2450,16 +2450,20 @@ impl<M: Memory + Clone> Storage<M> {
             written.insert(origin, result);
         }
 
-        // Written once for the whole call, and only where the count moved. Trapping
-        // rather than reporting: an `Err` on the IC commits everything above this line,
-        // so a count that could not be stored has to take the whole message with it. The
-        // anchor was read by the caller and comes back with one `u32` changed, so a
-        // failure here is a broken invariant rather than a case to handle.
+        // Written once for the whole call, and unconditionally. This is handed the anchor
+        // rather than its number so that it owns storing it, and a caller is free to have
+        // changed it before handing it over — registering a browser and rotating its key is
+        // exactly that. Writing only where this function's own change to it landed would
+        // discard the caller's, silently, on any write whose session count did not move.
+        //
+        // Trapping rather than reporting: an `Err` on the IC commits everything above this
+        // line, so an anchor that could not be stored has to take the whole message with
+        // it.
         if let Some(session_count) = session_count {
             anchor.session_count = session_count;
-            self.write(anchor.clone())
-                .expect("the anchor this write was handed cannot be written back");
         }
+        self.write(anchor.clone())
+            .expect("the anchor this write was handed cannot be written back");
 
         written
     }
