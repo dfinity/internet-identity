@@ -111,7 +111,7 @@ use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
     AccountReference, SessionRecord, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
-use crate::storage::anchor::Anchor;
+use crate::storage::anchor::{Anchor, BrowserError};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
@@ -1674,7 +1674,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// filled in, each list in the order it was given.
     fn write_account_state(
         &mut self,
-        anchor: &mut Anchor,
+        anchor: Anchor,
         writes: BTreeMap<FrontendHostname, AccountReferenceListWrite>,
     ) -> Result<BTreeMap<FrontendHostname, AccountReferenceListWrite>, StorageError> {
         let validated = self.validate_account_state(anchor.anchor_number(), writes)?;
@@ -1690,8 +1690,8 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: AnchorNumber,
         writes: BTreeMap<FrontendHostname, AccountReferenceListWrite>,
     ) -> Result<BTreeMap<FrontendHostname, AccountReferenceListWrite>, StorageError> {
-        let mut anchor = self.read(anchor_number)?;
-        self.write_account_state(&mut anchor, writes)
+        let anchor = self.read(anchor_number)?;
+        self.write_account_state(anchor, writes)
     }
 
     /// Everything that can refuse. Reads what is stored, works out what would be minted
@@ -2204,7 +2204,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// is a broken invariant rather than a case to report.
     fn apply_account_state(
         &mut self,
-        anchor: &mut Anchor,
+        mut anchor: Anchor,
         validated: ValidatedAccountStateWrite,
     ) -> BTreeMap<FrontendHostname, AccountReferenceListWrite> {
         let anchor_number = anchor.anchor_number();
@@ -2330,13 +2330,17 @@ impl<M: Memory + Clone> Storage<M> {
             } else {
                 anchor.session_count.saturating_add(session_delta as u32)
             };
-            // Trapping rather than reporting: an `Err` on the IC commits everything above
-            // this line, so a count that could not be stored has to take the whole message
-            // with it. The anchor was read by the caller and comes back with one `u32`
-            // changed, so this is a broken invariant rather than a case to handle.
-            self.write(anchor.clone())
-                .expect("the anchor this write was handed cannot be written back");
         }
+
+        // Taking the identity record is taking the storing of it, so it is stored whatever
+        // was changed on it — the count above, or anything a caller changed before giving
+        // it up. Storing it only where this function's own change landed would discard the
+        // caller's, silently.
+        //
+        // Trapping rather than reporting: an `Err` on the IC commits everything above this
+        // line, so a record that could not be stored has to take the whole message with it.
+        self.write(anchor)
+            .expect("the identity record this write was handed cannot be written back");
 
         written
     }
@@ -2701,20 +2705,21 @@ impl<M: Memory + Clone> Storage<M> {
     /// whatever this browser already held at this account.
     pub fn create_session(
         &mut self,
-        anchor: &mut Anchor,
         params: CreateSessionParams,
     ) -> Result<(SessionRecordKey, SessionRecord), StorageError> {
-        let anchor_number = anchor.anchor_number();
         let CreateSessionParams {
+            anchor_number,
             origin,
             account_number,
-            browser_id,
+            current_browser_key,
+            next_browser_key,
+            browser_name,
             valid_till_ns,
             max_idle_ns,
             read_only,
             now_ns,
-            dropped_browsers,
         } = params;
+        let mut anchor = self.read(anchor_number)?;
 
         // Defaulted and clamped here rather than at the caller, so every path that
         // creates a session gets the same answer whatever it asked for. The ceiling is
@@ -2747,6 +2752,17 @@ impl<M: Memory + Clone> Storage<M> {
                 name: origin,
             });
         }
+
+        // Resolved here rather than by a caller, because what follows from it is this
+        // function's to work out: the registry may be at its cap, in which case a browser
+        // is given up and every session it held has to go in the same write. A caller
+        // handed that consequence is a caller that can forget it.
+        //
+        // After the refusals above, so a ceremony that cannot happen registers nothing —
+        // the record reaches storage only through the write at the end.
+        let (browser_id, dropped_browsers) = anchor
+            .resolve_browser(current_browser_key, next_browser_key, browser_name, now_ns)
+            .map_err(StorageError::Browser)?;
 
         // The whole of what the identity holds, not just this origin: a browser the
         // registry gave up to make room for this one may hold sessions anywhere, and those
@@ -2842,21 +2858,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok((key, session))
     }
 
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
-    /// [`Self::create_session`] for a test that has an anchor number rather than the
-    /// anchor. Production hands the anchor in, because the caller has just registered a
-    /// browser on it and that registration rides on the same write.
-    #[cfg(test)]
-    fn create_session_for_testing(
-        &mut self,
-        anchor_number: AnchorNumber,
-        params: CreateSessionParams,
-    ) -> Result<(SessionRecordKey, SessionRecord), StorageError> {
-        let mut anchor = self.read(anchor_number)?;
-        self.create_session(&mut anchor, params)
-    }
-
     /// The session `key` names, or `None` where the identity holds no such session.
     ///
     /// A key whose session was replaced reads as `None` rather than as its successor:
@@ -2885,7 +2886,7 @@ impl<M: Memory + Clone> Storage<M> {
         // back. Nothing here ranges over storage itself and no application number reaches
         // this function: the sweep is one write, so an `Err` cannot sign the browser out
         // of some applications and report failure.
-        let mut anchor = self.read(anchor_number)?;
+        let anchor = self.read(anchor_number)?;
         let mut state = self.account_state(anchor_number);
 
         let mut revoked = 0u64;
@@ -2904,7 +2905,7 @@ impl<M: Memory + Clone> Storage<M> {
             }
         }
 
-        self.write_account_state(&mut anchor, state)?;
+        self.write_account_state(anchor, state)?;
 
         Ok(revoked)
     }
@@ -3170,7 +3171,7 @@ impl<M: Memory + Clone> Storage<M> {
         // stale, and an identity that does not exist has nothing to hold what is about to
         // be written — the counters, the account reference lists and the session count all
         // key on a record that would not be there.
-        let mut anchor = self.read(anchor_number)?;
+        let anchor = self.read(anchor_number)?;
         let (mut account_references, config) =
             self.account_state_for_origin(anchor_number, &origin);
         // Where the write leaves it, and so where its minted number comes back.
@@ -3186,7 +3187,7 @@ impl<M: Memory + Clone> Storage<M> {
         });
 
         let written = self.write_account_state(
-            &mut anchor,
+            anchor,
             BTreeMap::from([(origin.clone(), Some((account_references, config)))]),
         )?;
 
@@ -3237,7 +3238,7 @@ impl<M: Memory + Clone> Storage<M> {
             }
         }
 
-        let mut anchor = self.read(anchor_number)?;
+        let anchor = self.read(anchor_number)?;
         let (mut account_references, config) =
             self.account_state_for_origin(anchor_number, &origin);
         let Some(position) = account_references
@@ -3287,7 +3288,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         let written = self.write_account_state(
-            &mut anchor,
+            anchor,
             BTreeMap::from([(origin.clone(), Some((account_references, config)))]),
         )?;
         let write = &written[&origin]
@@ -3328,10 +3329,10 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Result<(), StorageError> {
         check_frontend_length(&origin);
 
-        let mut anchor = self.read(anchor_number)?;
+        let anchor = self.read(anchor_number)?;
         let (account_references, _) = self.account_state_for_origin(anchor_number, &origin);
         self.write_account_state(
-            &mut anchor,
+            anchor,
             BTreeMap::from([(
                 origin,
                 Some((
@@ -3594,18 +3595,19 @@ impl<M: Memory + Clone> Storage<M> {
 // Constructed by the sign-in ceremony, which lands two PRs up.
 #[allow(dead_code)]
 pub struct CreateSessionParams {
+    pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
-    pub browser_id: BrowserId,
+    /// What the browser proves it holds, and the successor it announces. Its registry
+    /// entry, its id, and whatever the cap gives up to make room for it are all worked out
+    /// inside the write, so no caller states any of them.
+    pub current_browser_key: PublicKey,
+    pub next_browser_key: PublicKey,
+    pub browser_name: String,
     pub valid_till_ns: Timestamp,
     pub max_idle_ns: Option<u64>,
     pub read_only: bool,
     pub now_ns: Timestamp,
-    /// Browsers the registry gave up to make room for this one, whose sessions go with
-    /// them. Handed in rather than swept afterwards: dropping a browser and ending its
-    /// sessions is one change, and doing it in two writes means an `Err` from the second
-    /// leaves a browser gone with its sessions still live.
-    pub dropped_browsers: Vec<BrowserId>,
 }
 
 /// How far the sweep has got: which list, and how many of that list's references are
@@ -3952,6 +3954,8 @@ pub enum StorageError {
     AccountLimitReached {
         anchor_number: AnchorNumber,
     },
+    /// The browser presenting itself could not be resolved to a registry entry.
+    Browser(BrowserError),
     AnchorNumberOutOfRange {
         anchor_number: AnchorNumber,
         range: (AnchorNumber, AnchorNumber),
@@ -4034,6 +4038,7 @@ impl fmt::Display for StorageError {
                 range.0, range.1
             ),
             Self::BadAnchorNumber(n) => write!(f, "bad Identity Anchor {n}"),
+            Self::Browser(err) => write!(f, "the browser could not be resolved: {err:?}"),
             Self::DeserializationError(err) => {
                 write!(f, "failed to deserialize a Candid value: {err}")
             }
