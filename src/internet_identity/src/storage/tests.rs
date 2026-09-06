@@ -2346,6 +2346,24 @@ mod reference_list_write_path_tests {
         (storage, anchor_number)
     }
 
+    /// The write path takes the identity, not its number, so there is nothing to write
+    /// against when the identity does not exist. Writing anyway would leave counters,
+    /// account reference lists and an application keyed on an owner that never existed,
+    /// and nothing would ever prune them.
+    #[test]
+    fn an_account_write_for_an_identity_that_does_not_exist_is_refused() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let never_allocated = anchor_number + 1;
+        let origin = "https://example.com".to_string();
+
+        let result = storage.create_account(never_allocated, origin.clone(), "named".to_string());
+
+        assert!(matches!(result, Err(StorageError::BadAnchorNumber(_))));
+        // Refused before anything was written, the application included.
+        assert_eq!(storage.lookup_application_number_with_origin(&origin), None);
+        assert_eq!(storage.get_total_application_count(), 0);
+    }
+
     /// Everything a write derives, rebuilt from the account reference lists alone.
     ///
     /// A gate whose job is deriving values is only as good as a check that does the
