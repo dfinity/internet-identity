@@ -294,6 +294,12 @@ const NEXT_APPLICATION_NUMBER_MEMORY_ID: MemoryId =
 // multiple virtual memories for smaller amounts of data.
 // This value results in 256 GB of total managed memory, which should be enough
 // for the foreseeable future.
+/// Named accounts one identity may hold, across every origin.
+///
+/// Each costs a stored record and a seed, so this is what bounds an identity's share of
+/// the canister.
+pub const MAX_ANCHOR_ACCOUNTS: u64 = 500;
+
 const BUCKET_SIZE_IN_PAGES: u16 = 128;
 const MAX_MANAGED_MEMORY_SIZE: u64 = 256 * GB;
 const MAX_MANAGED_WASM_PAGES: u64 = MAX_MANAGED_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES;
@@ -1679,6 +1685,14 @@ impl<M: Memory + Clone> Storage<M> {
             )?;
         }
 
+        // The account cap is a rule about the state this write leaves the identity in,
+        // not a question for a caller to ask first. Refusing here costs nothing, because
+        // nothing has been stored — which is the only reason a rule can live at the end of
+        // a write rather than in front of it.
+        if anchor_accounts > MAX_ANCHOR_ACCOUNTS {
+            return Err(StorageError::AccountLimitReached { anchor_number });
+        }
+
         Ok(ValidatedAccountStateWrite {
             writes: validated,
             anchor_counter: StorableAccountsCounter {
@@ -2253,6 +2267,9 @@ impl<M: Memory + Clone> Storage<M> {
         );
     }
 
+    // Read by tests only: the caps are the write path's rules now, so nothing in
+    // production asks a counter what it may do.
+    #[cfg(test)]
     /// Returns the account counter for a given anchor number.
     pub fn get_account_counter(&self, anchor_number: AnchorNumber) -> AccountsCounter {
         self.stable_anchor_account_counter_memory
@@ -3083,6 +3100,9 @@ impl ReferenceListDeltas {
 
 #[derive(Debug)]
 pub enum StorageError {
+    AccountLimitReached {
+        anchor_number: AnchorNumber,
+    },
     AnchorNumberOutOfRange {
         anchor_number: AnchorNumber,
         range: (AnchorNumber, AnchorNumber),
@@ -3166,6 +3186,10 @@ impl fmt::Display for StorageError {
                 f,
                 "attempted to store an entry of size {space_required} \
                  which is larger then the max allowed entry size {space_available}"
+            ),
+            Self::AccountLimitReached { anchor_number } => write!(
+                f,
+                "identity {anchor_number} already holds as many named accounts as it may"
             ),
             Self::AnchorNotFound { anchor_number } => {
                 write!(
