@@ -179,8 +179,10 @@ The write is `validate_account_state`, which reads, checks every rule for every 
 **It mints the numbers a person's names imply.**  
 An account reference carrying a record but no number is an account being named. A name is what a person gives an account and the number is what storage keys it by, so the number is minted here, in validate, and a refusal mints nothing. The call returns the input with the minted numbers filled in, each list in the order it was given, so a caller reads its new account number out of the value it wrote.
 
-**It takes the anchor, not the anchor number.**  
+**It takes the anchor, not the anchor number, and it stores it.**  
 The session count lives on the anchor and the write moves it, so a caller holding its own copy across the write could put the old count back afterwards. Taking `&mut Anchor` also means a write refuses where there is no identity to read: the counters, the lists and the count all key on a record that would not be there.
+
+Taking the anchor means owning the storing of it, unconditionally and once for the whole call. A caller is free to have changed the anchor before handing it over — registering a browser and rotating its key is exactly that ([revocable-app-sessions-spec.md](revocable-app-sessions-spec.md#registry)) — and storing it only where this function's own change to it landed would discard the caller's silently, on any write whose session count did not move. A sign-in from a browser that already holds a session at that account replaces it rather than adding one, so that is the ordinary case rather than a corner of one.
 
 The value written per origin:
 
@@ -684,20 +686,21 @@ on this distinction holding.
 
 Who may write, and what a write must keep consistent.
 
-| #        | Requirement                                                                                                                                                                                                                                        |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| WRITE-1  | Every write of an account reference list MUST go through one function, which MUST derive the per-origin counts and the principal-index entries from the difference between the previous and new state.                                             |
-| WRITE-2  | A write MUST state the state the identity is to hold afterwards, per origin. It MUST NOT accept a delta, a count or an index entry from its caller, and MUST derive every such quantity itself.                                                    |
-| WRITE-3  | A write MUST name origins. It MUST NOT require its caller to resolve, mint or retire an application, and MUST mint one for an origin nothing is stored under as part of the same write.                                                            |
-| WRITE-4  | A write spanning several origins MUST apply entirely or not at all. Every refusal MUST happen before the first store, since returning an error commits what was already written.                                                                   |
-| WRITE-5  | A write MUST mint the account number for a reference that carries a record and no number, and MUST return the minted numbers to its caller. A refusal MUST mint nothing.                                                                           |
-| WRITE-6  | Writing back what was read, unchanged, MUST change nothing — including at an origin nothing has been stored under, which MUST read as the derived default rather than as an error.                                                                 |
-| WRITE-7  | A write MUST refuse where the identity does not exist, rather than storing state nothing can hold.                                                                                                                                                 |
-| WRITE-8  | A write naming an application with no record MUST fail loudly rather than skip the count update.                                                                                                                                                   |
-| WRITE-9  | Signing in with a default account MUST record a reference with no account number and the current time.                                                                                                                                            |
-| WRITE-10 | Choosing a default account MUST record the reference without recording a use, leaving `last_used` unset, and MUST write the configuration and the list it belongs to together.                                                                     |
-| WRITE-11 | Creating a named account MUST NOT record a use of the default account.                                                                                                                                                                            |
-| WRITE-12 | An unset `last_used` MUST sort as least recently used.                                                                                                                                                                                            |
+| #        | Requirement                                                                                                                                                                                            |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| WRITE-1  | Every write of an account reference list MUST go through one function, which MUST derive the per-origin counts and the principal-index entries from the difference between the previous and new state. |
+| WRITE-2  | A write MUST state the state the identity is to hold afterwards, per origin. It MUST NOT accept a delta, a count or an index entry from its caller, and MUST derive every such quantity itself.        |
+| WRITE-3  | A write MUST name origins. It MUST NOT require its caller to resolve, mint or retire an application, and MUST mint one for an origin nothing is stored under as part of the same write.                |
+| WRITE-4  | A write spanning several origins MUST apply entirely or not at all. Every refusal MUST happen before the first store, since returning an error commits what was already written.                       |
+| WRITE-5  | A write MUST mint the account number for a reference that carries a record and no number, and MUST return the minted numbers to its caller. A refusal MUST mint nothing.                               |
+| WRITE-6  | Writing back what was read, unchanged, MUST change nothing — including at an origin nothing has been stored under, which MUST read as the derived default rather than as an error.                     |
+| WRITE-7  | A write MUST refuse where the identity does not exist, rather than storing state nothing can hold.                                                                                                     |
+| WRITE-8  | A write MUST store the identity record it was handed, whatever changed it, and MUST NOT make storing it conditional on which fields moved.                                                             |
+| WRITE-9  | A write naming an application with no record MUST fail loudly rather than skip the count update.                                                                                                       |
+| WRITE-10 | Signing in with a default account MUST record a reference with no account number and the current time.                                                                                                 |
+| WRITE-11 | Choosing a default account MUST record the reference without recording a use, leaving `last_used` unset, and MUST write the configuration and the list it belongs to together.                         |
+| WRITE-12 | Creating a named account MUST NOT record a use of the default account.                                                                                                                                 |
+| WRITE-13 | An unset `last_used` MUST sort as least recently used.                                                                                                                                                 |
 
 ### Bounding growth
 
