@@ -25,9 +25,9 @@ import {
 /// Names the same store the module under test writes to, so a test can wipe it.
 const BROWSER_KEY_STORE = createStore("ii-browser-keys", "keys");
 
-const SIGNATURE_DOMAIN = new TextEncoder().encode("ii-session-device-key");
+const SIGNATURE_DOMAIN = new TextEncoder().encode("ii-session-browser-key");
 const SUCCESSOR_SIGNATURE_DOMAIN = new TextEncoder().encode(
-  "ii-session-device-successor",
+  "ii-session-browser-successor",
 );
 
 const signedMessage = (
@@ -69,9 +69,9 @@ const sessionKey = (seed: number) => new Uint8Array(62).fill(seed);
 const IDENTITY = BigInt(10_000);
 
 /** Signs in and rotates, the way a successful ceremony does. */
-const signIn = (identityNumber: bigint, seed: number, deviceId = 1) =>
+const signIn = (identityNumber: bigint, seed: number, browserId = 1) =>
   withBrowserProof(identityNumber, sessionKey(seed), async (proof) => {
-    await proof.accept(deviceId);
+    await proof.accept(browserId);
     return proof;
   });
 
