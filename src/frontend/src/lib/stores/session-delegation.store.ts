@@ -9,7 +9,7 @@ import { Actor, ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import { authenticationStore } from "$lib/stores/authentication.store";
-import { currentDeviceId } from "$lib/stores/browser-key.store";
+import { currentBrowserId } from "$lib/stores/browser-key.store";
 import { purgeAppSessions } from "$lib/stores/app-session.store";
 import { canisterId, agentOptions } from "$lib/globals";
 import {
@@ -113,14 +113,16 @@ export const actorForIdentity = async (
  * browser, and this identity on the user's other browsers, alone.
  */
 export const forgetIdentity = async (identityNumber: bigint): Promise<void> => {
-  const deviceId = await currentDeviceId(identityNumber);
+  const browserId = await currentBrowserId(identityNumber);
   const actor =
-    deviceId === undefined ? undefined : await actorForIdentity(identityNumber);
-  if (deviceId !== undefined && actor !== undefined) {
+    browserId === undefined
+      ? undefined
+      : await actorForIdentity(identityNumber);
+  if (browserId !== undefined && actor !== undefined) {
     try {
       await actor.revoke_browser_sessions({
         identity_number: identityNumber,
-        browser_id: deviceId,
+        browser_id: browserId,
       });
     } catch {
       // The local records go either way. Keeping them because the canister could not be
