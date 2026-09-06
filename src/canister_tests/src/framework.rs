@@ -376,8 +376,8 @@ const P256_SPKI_HEADER: [u8; 26] = [
     0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00,
 ];
 
-const DEVICE_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-device-key";
-const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-device-successor";
+const BROWSER_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-key";
+const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
 
 impl BrowserKey {
     pub fn new(seed: u8) -> Self {
@@ -406,7 +406,7 @@ impl BrowserKey {
     }
 
     pub fn sign(&self, session_key: &SessionKey, next_browser_key: &PublicKey) -> ByteBuf {
-        self.sign_with(DEVICE_KEY_SIGNATURE_DOMAIN, session_key, next_browser_key)
+        self.sign_with(BROWSER_KEY_SIGNATURE_DOMAIN, session_key, next_browser_key)
     }
 
     /// The successor's own signature, proving the browser holds the key it announces.
