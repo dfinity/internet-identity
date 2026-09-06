@@ -71,11 +71,6 @@ type Operation = variant {
     add_name;
     update_name;
     remove_name;
-    // Registering the browser a session was created from. Once per browser per
-    // anchor; the self-reported name is redacted like an account name.
-    register_browser : record {
-        name : Private;
-    };
     create_account : record {
         name : Private;
     };
