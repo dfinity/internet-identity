@@ -223,8 +223,8 @@ fn should_allow_protection_only_on_recovery_phrases() {
 fn should_prevent_mutation_when_invariants_are_violated() {
     let mut device1 = recovery_phrase(1, DeviceProtection::Unprotected);
     let mut anchor = Anchor {
-        session_devices: vec![],
-        next_session_device_id: 0,
+        browsers: vec![],
+        next_browser_id: 0,
         session_count: 0,
         anchor_number: ANCHOR_NUMBER,
         devices: vec![
@@ -248,8 +248,8 @@ fn should_prevent_mutation_when_invariants_are_violated() {
 #[test]
 fn should_prevent_addition_when_invariants_are_violated() {
     let mut anchor = Anchor {
-        session_devices: vec![],
-        next_session_device_id: 0,
+        browsers: vec![],
+        next_browser_id: 0,
         session_count: 0,
         anchor_number: ANCHOR_NUMBER,
         devices: vec![
@@ -273,8 +273,8 @@ fn should_prevent_addition_when_invariants_are_violated() {
 fn should_allow_removal_when_invariants_are_violated() {
     let device1 = recovery_phrase(1, DeviceProtection::Unprotected);
     let mut anchor = Anchor {
-        session_devices: vec![],
-        next_session_device_id: 0,
+        browsers: vec![],
+        next_browser_id: 0,
         session_count: 0,
         anchor_number: ANCHOR_NUMBER,
         devices: vec![
@@ -1270,9 +1270,9 @@ mod mirror_verified_email_tests {
     }
 }
 
-mod session_device_tests {
+mod browser_tests {
     use super::*;
-    use crate::storage::anchor::{SessionDeviceError, MAX_SESSION_DEVICES};
+    use crate::storage::anchor::{BrowserError, MAX_BROWSERS};
     use internet_identity_interface::internet_identity::types::PublicKey;
 
     fn anchor() -> Anchor {
@@ -1301,7 +1301,7 @@ mod session_device_tests {
         let mut anchor = anchor();
 
         let (id, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome on MacBook".to_string(),
@@ -1310,20 +1310,20 @@ mod session_device_tests {
             .unwrap();
 
         assert_eq!(id, 0);
-        assert_eq!(anchor.session_devices().len(), 1);
-        assert_eq!(anchor.session_devices()[0].name, "Chrome on MacBook");
+        assert_eq!(anchor.browsers().len(), 1);
+        assert_eq!(anchor.browsers()[0].name, "Chrome on MacBook");
         assert_eq!(
-            anchor.session_devices()[0].current_device_key,
+            anchor.browsers()[0].current_browser_key,
             browser_key(1)
         );
-        assert_eq!(anchor.session_devices()[0].created_at, 1_000);
+        assert_eq!(anchor.browsers()[0].created_at, 1_000);
     }
 
     #[test]
     fn a_browser_that_rotates_reuses_the_device_and_leaves_its_name_alone() {
         let mut anchor = anchor();
         let (id, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome on MacBook".to_string(),
@@ -1332,7 +1332,7 @@ mod session_device_tests {
             .unwrap();
 
         let (again, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 successor_key(1),
                 browser_key(2),
                 "Something else".to_string(),
@@ -1341,8 +1341,8 @@ mod session_device_tests {
             .unwrap();
 
         assert_eq!(again, id);
-        assert_eq!(anchor.session_devices().len(), 1);
-        assert_eq!(anchor.session_devices()[0].name, "Chrome on MacBook");
+        assert_eq!(anchor.browsers().len(), 1);
+        assert_eq!(anchor.browsers()[0].name, "Chrome on MacBook");
     }
 
     #[test]
@@ -1350,7 +1350,7 @@ mod session_device_tests {
         let mut anchor = anchor();
 
         anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
@@ -1358,15 +1358,15 @@ mod session_device_tests {
             )
             .unwrap();
 
-        assert_eq!(anchor.session_devices()[0].created_at, 1_000);
-        assert_eq!(anchor.session_devices()[0].last_used, 1_000);
+        assert_eq!(anchor.browsers()[0].created_at, 1_000);
+        assert_eq!(anchor.browsers()[0].last_used, 1_000);
     }
 
     #[test]
     fn reuse_advances_last_used_and_leaves_created_at_alone() {
         let mut anchor = anchor();
         anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
@@ -1375,7 +1375,7 @@ mod session_device_tests {
             .unwrap();
 
         anchor
-            .resolve_session_device(
+            .resolve_browser(
                 successor_key(1),
                 browser_key(2),
                 "Chrome".to_string(),
@@ -1383,15 +1383,15 @@ mod session_device_tests {
             )
             .unwrap();
 
-        assert_eq!(anchor.session_devices()[0].created_at, 1_000);
-        assert_eq!(anchor.session_devices()[0].last_used, 5_000);
+        assert_eq!(anchor.browsers()[0].created_at, 1_000);
+        assert_eq!(anchor.browsers()[0].last_used, 5_000);
     }
 
     #[test]
     fn a_key_this_anchor_has_not_seen_registers_a_fresh_device() {
         let mut anchor = anchor();
         anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
@@ -1400,7 +1400,7 @@ mod session_device_tests {
             .unwrap();
 
         let (id, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(2),
                 successor_key(2),
                 "Firefox".to_string(),
@@ -1409,24 +1409,24 @@ mod session_device_tests {
             .unwrap();
 
         assert_eq!(id, 1);
-        assert_eq!(anchor.session_devices().len(), 2);
+        assert_eq!(anchor.browsers().len(), 2);
     }
 
     #[test]
     fn ids_are_never_reused() {
         let mut anchor = anchor();
         let (first, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
                 1_000,
             )
             .unwrap();
-        anchor.session_devices.clear();
+        anchor.browsers.clear();
 
         let (second, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
@@ -1441,9 +1441,9 @@ mod session_device_tests {
     #[test]
     fn registering_past_the_cap_drops_the_least_recently_used_and_never_fails() {
         let mut anchor = anchor();
-        for index in 0..MAX_SESSION_DEVICES {
+        for index in 0..MAX_BROWSERS {
             anchor
-                .resolve_session_device(
+                .resolve_browser(
                     browser_key(index as u8),
                     successor_key(index as u8),
                     format!("device-{index}"),
@@ -1453,7 +1453,7 @@ mod session_device_tests {
         }
 
         let (newest, dropped) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(200),
                 successor_key(200),
                 "newest".to_string(),
@@ -1461,14 +1461,14 @@ mod session_device_tests {
             )
             .unwrap();
 
-        assert_eq!(anchor.session_devices().len(), MAX_SESSION_DEVICES);
-        assert!(anchor.session_devices().iter().any(|d| d.id == newest));
+        assert_eq!(anchor.browsers().len(), MAX_BROWSERS);
+        assert!(anchor.browsers().iter().any(|d| d.id == newest));
         assert!(!anchor
-            .session_devices()
+            .browsers()
             .iter()
             .any(|d| d.name == "device-0"));
         assert!(anchor
-            .session_devices()
+            .browsers()
             .iter()
             .any(|d| d.name == "device-1"));
         assert_eq!(dropped, vec![0]);
@@ -1478,11 +1478,11 @@ mod session_device_tests {
     fn the_cap_evicts_on_use_rather_than_on_enrolment() {
         let mut anchor = anchor();
         let (first, _) = anchor
-            .resolve_session_device(browser_key(0), successor_key(0), "oldest".to_string(), 1)
+            .resolve_browser(browser_key(0), successor_key(0), "oldest".to_string(), 1)
             .unwrap();
-        for index in 1..MAX_SESSION_DEVICES {
+        for index in 1..MAX_BROWSERS {
             anchor
-                .resolve_session_device(
+                .resolve_browser(
                     browser_key(index as u8),
                     successor_key(index as u8),
                     format!("device-{index}"),
@@ -1491,7 +1491,7 @@ mod session_device_tests {
                 .unwrap();
         }
         anchor
-            .resolve_session_device(
+            .resolve_browser(
                 successor_key(0),
                 rotating_key(0, 200),
                 "oldest".to_string(),
@@ -1500,7 +1500,7 @@ mod session_device_tests {
             .unwrap();
 
         let (_, dropped) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(200),
                 successor_key(200),
                 "newest".to_string(),
@@ -1510,7 +1510,7 @@ mod session_device_tests {
 
         assert_eq!(dropped, vec![1]);
         assert!(anchor
-            .session_devices()
+            .browsers()
             .iter()
             .any(|device| device.id == first));
     }
@@ -1520,11 +1520,11 @@ mod session_device_tests {
         let mut anchor = anchor();
         // The phone rotates on every sign-in, as a browser that kept its storage does.
         let (kept, _) = anchor
-            .resolve_session_device(browser_key(0), rotating_key(0, 1), "phone".to_string(), 1)
+            .resolve_browser(browser_key(0), rotating_key(0, 1), "phone".to_string(), 1)
             .unwrap();
-        for wipe in 0..MAX_SESSION_DEVICES as u64 {
+        for wipe in 0..MAX_BROWSERS as u64 {
             anchor
-                .resolve_session_device(
+                .resolve_browser(
                     rotating_key(0, wipe as u8 + 1),
                     rotating_key(0, wipe as u8 + 2),
                     "phone".to_string(),
@@ -1534,7 +1534,7 @@ mod session_device_tests {
             // A wiped browser has no key to promote, so each pass is a browser this
             // anchor has never seen.
             anchor
-                .resolve_session_device(
+                .resolve_browser(
                     browser_key(wipe as u8 + 1),
                     successor_key(wipe as u8 + 1),
                     format!("wiped-{wipe}"),
@@ -1544,7 +1544,7 @@ mod session_device_tests {
         }
 
         assert!(anchor
-            .session_devices()
+            .browsers()
             .iter()
             .any(|device| device.id == kept));
     }
@@ -1553,7 +1553,7 @@ mod session_device_tests {
     fn a_wiped_browser_presenting_a_fresh_key_is_a_new_device() {
         let mut anchor = anchor();
         let (before, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
@@ -1562,7 +1562,7 @@ mod session_device_tests {
             .unwrap();
 
         let (after, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(2),
                 successor_key(2),
                 "Chrome".to_string(),
@@ -1571,14 +1571,14 @@ mod session_device_tests {
             .unwrap();
 
         assert_ne!(after, before);
-        assert_eq!(anchor.session_devices().len(), 2);
+        assert_eq!(anchor.browsers().len(), 2);
     }
 
     #[test]
     fn a_successor_is_accepted_and_takes_over_from_the_key_it_replaces() {
         let mut anchor = anchor();
         let (id, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
@@ -1587,7 +1587,7 @@ mod session_device_tests {
             .unwrap();
 
         let (again, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 successor_key(1),
                 browser_key(2),
                 "Chrome".to_string(),
@@ -1596,19 +1596,19 @@ mod session_device_tests {
             .unwrap();
 
         assert_eq!(again, id);
-        assert_eq!(anchor.session_devices().len(), 1);
+        assert_eq!(anchor.browsers().len(), 1);
         assert_eq!(
-            anchor.session_devices()[0].current_device_key,
+            anchor.browsers()[0].current_browser_key,
             successor_key(1)
         );
-        assert_eq!(anchor.session_devices()[0].next_device_key, browser_key(2));
+        assert_eq!(anchor.browsers()[0].next_browser_key, browser_key(2));
     }
 
     #[test]
     fn the_key_a_successor_replaced_is_retired() {
         let mut anchor = anchor();
         let (id, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
@@ -1616,7 +1616,7 @@ mod session_device_tests {
             )
             .unwrap();
         anchor
-            .resolve_session_device(
+            .resolve_browser(
                 successor_key(1),
                 browser_key(2),
                 "Chrome".to_string(),
@@ -1625,7 +1625,7 @@ mod session_device_tests {
             .unwrap();
 
         let (after, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(3),
                 "Chrome".to_string(),
@@ -1634,7 +1634,7 @@ mod session_device_tests {
             .unwrap();
 
         assert_ne!(after, id);
-        assert_eq!(anchor.session_devices().len(), 2);
+        assert_eq!(anchor.browsers().len(), 2);
     }
 
     /// A response that never reached the browser leaves it proving with the key the entry
@@ -1645,7 +1645,7 @@ mod session_device_tests {
     fn a_retired_key_is_refused_rather_than_registered() {
         let mut anchor = anchor();
         anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
@@ -1655,17 +1655,17 @@ mod session_device_tests {
 
         // The successor it re-announces is the one this entry is already waiting for, which
         // is the shape a retry actually takes: the browser has not moved on either.
-        let retried = anchor.resolve_session_device(
+        let retried = anchor.resolve_browser(
             browser_key(1),
             successor_key(1),
             "Chrome".to_string(),
             2_000,
         );
 
-        assert_eq!(retried, Err(SessionDeviceError::StaleDeviceKey));
-        assert_eq!(anchor.session_devices().len(), 1);
+        assert_eq!(retried, Err(BrowserError::StaleDeviceKey));
+        assert_eq!(anchor.browsers().len(), 1);
         assert_eq!(
-            anchor.session_devices()[0].next_device_key,
+            anchor.browsers()[0].next_browser_key,
             successor_key(1)
         );
     }
@@ -1676,7 +1676,7 @@ mod session_device_tests {
     fn promoting_the_announced_successor_resolves_the_same_browser() {
         let mut anchor = anchor();
         let (id, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
@@ -1685,7 +1685,7 @@ mod session_device_tests {
             .unwrap();
 
         let (again, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 successor_key(1),
                 successor_key(2),
                 "Chrome".to_string(),
@@ -1694,13 +1694,13 @@ mod session_device_tests {
             .unwrap();
 
         assert_eq!(again, id);
-        assert_eq!(anchor.session_devices().len(), 1);
+        assert_eq!(anchor.browsers().len(), 1);
         assert_eq!(
-            anchor.session_devices()[0].current_device_key,
+            anchor.browsers()[0].current_browser_key,
             successor_key(1)
         );
         assert_eq!(
-            anchor.session_devices()[0].next_device_key,
+            anchor.browsers()[0].next_browser_key,
             successor_key(2)
         );
     }
@@ -1709,12 +1709,12 @@ mod session_device_tests {
     fn rotating_repeatedly_keeps_the_same_browser() {
         let mut anchor = anchor();
         let (id, _) = anchor
-            .resolve_session_device(browser_key(0), browser_key(1), "Chrome".to_string(), 1)
+            .resolve_browser(browser_key(0), browser_key(1), "Chrome".to_string(), 1)
             .unwrap();
 
         for step in 1..10u8 {
             let (again, _) = anchor
-                .resolve_session_device(
+                .resolve_browser(
                     browser_key(step),
                     browser_key(step + 1),
                     "Chrome".to_string(),
@@ -1724,7 +1724,7 @@ mod session_device_tests {
             assert_eq!(again, id);
         }
 
-        assert_eq!(anchor.session_devices().len(), 1);
+        assert_eq!(anchor.browsers().len(), 1);
     }
 
     /// Presented keys are visible on the wire, so announcing one another browser is about to
@@ -1733,7 +1733,7 @@ mod session_device_tests {
     fn a_successor_another_browser_holds_is_refused() {
         let mut anchor = anchor();
         anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
@@ -1741,13 +1741,13 @@ mod session_device_tests {
             )
             .unwrap();
 
-        let stealing_the_key = anchor.resolve_session_device(
+        let stealing_the_key = anchor.resolve_browser(
             browser_key(2),
             browser_key(1),
             "Firefox".to_string(),
             2_000,
         );
-        let stealing_the_successor = anchor.resolve_session_device(
+        let stealing_the_successor = anchor.resolve_browser(
             browser_key(2),
             successor_key(1),
             "Firefox".to_string(),
@@ -1756,13 +1756,13 @@ mod session_device_tests {
 
         assert_eq!(
             stealing_the_key,
-            Err(SessionDeviceError::SuccessorAlreadyInUse)
+            Err(BrowserError::SuccessorAlreadyInUse)
         );
         assert_eq!(
             stealing_the_successor,
-            Err(SessionDeviceError::SuccessorAlreadyInUse)
+            Err(BrowserError::SuccessorAlreadyInUse)
         );
-        assert_eq!(anchor.session_devices().len(), 1);
+        assert_eq!(anchor.browsers().len(), 1);
     }
 
     /// The browser that already holds it is re-announcing, which a retry does.
@@ -1770,7 +1770,7 @@ mod session_device_tests {
     fn a_second_sign_in_from_a_key_a_browser_never_announced_is_a_new_browser() {
         let mut anchor = anchor();
         let (id, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
@@ -1780,7 +1780,7 @@ mod session_device_tests {
 
         // Neither slot holds it, so there is nothing to say this is the same browser.
         let (other, _) = anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(7),
                 successor_key(7),
                 "Chrome".to_string(),
@@ -1789,7 +1789,7 @@ mod session_device_tests {
             .unwrap();
 
         assert_ne!(other, id);
-        assert_eq!(anchor.session_devices().len(), 2);
+        assert_eq!(anchor.browsers().len(), 2);
     }
 
     #[test]
@@ -1800,22 +1800,22 @@ mod session_device_tests {
         // announced the key it is presenting would keep it alive for as long as it kept
         // asking, and so would whoever leaked it.
         assert_eq!(
-            anchor.resolve_session_device(
+            anchor.resolve_browser(
                 browser_key(1),
                 browser_key(1),
                 "Chrome".to_string(),
                 1_000
             ),
-            Err(SessionDeviceError::SuccessorMatchesCurrent)
+            Err(BrowserError::SuccessorMatchesCurrent)
         );
-        assert!(anchor.session_devices().is_empty());
+        assert!(anchor.browsers().is_empty());
     }
 
     #[test]
     fn a_registered_browser_cannot_stop_rotating_either() {
         let mut anchor = anchor();
         anchor
-            .resolve_session_device(
+            .resolve_browser(
                 browser_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
@@ -1824,21 +1824,21 @@ mod session_device_tests {
             .unwrap();
 
         assert_eq!(
-            anchor.resolve_session_device(
+            anchor.resolve_browser(
                 successor_key(1),
                 successor_key(1),
                 "Chrome".to_string(),
                 2_000
             ),
-            Err(SessionDeviceError::SuccessorMatchesCurrent)
+            Err(BrowserError::SuccessorMatchesCurrent)
         );
         // The entry is left as it was, still awaiting a successor it has not seen.
         assert_eq!(
-            anchor.session_devices()[0].current_device_key,
+            anchor.browsers()[0].current_browser_key,
             browser_key(1)
         );
         assert_eq!(
-            anchor.session_devices()[0].next_device_key,
+            anchor.browsers()[0].next_browser_key,
             successor_key(1)
         );
     }
