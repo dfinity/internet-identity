@@ -1312,10 +1312,7 @@ mod browser_tests {
         assert_eq!(id, 0);
         assert_eq!(anchor.browsers().len(), 1);
         assert_eq!(anchor.browsers()[0].name, "Chrome on MacBook");
-        assert_eq!(
-            anchor.browsers()[0].current_browser_key,
-            browser_key(1)
-        );
+        assert_eq!(anchor.browsers()[0].current_browser_key, browser_key(1));
         assert_eq!(anchor.browsers()[0].created_at, 1_000);
     }
 
@@ -1463,14 +1460,8 @@ mod browser_tests {
 
         assert_eq!(anchor.browsers().len(), MAX_BROWSERS);
         assert!(anchor.browsers().iter().any(|d| d.id == newest));
-        assert!(!anchor
-            .browsers()
-            .iter()
-            .any(|d| d.name == "device-0"));
-        assert!(anchor
-            .browsers()
-            .iter()
-            .any(|d| d.name == "device-1"));
+        assert!(!anchor.browsers().iter().any(|d| d.name == "device-0"));
+        assert!(anchor.browsers().iter().any(|d| d.name == "device-1"));
         assert_eq!(dropped, vec![0]);
     }
 
@@ -1509,10 +1500,7 @@ mod browser_tests {
             .unwrap();
 
         assert_eq!(dropped, vec![1]);
-        assert!(anchor
-            .browsers()
-            .iter()
-            .any(|device| device.id == first));
+        assert!(anchor.browsers().iter().any(|device| device.id == first));
     }
 
     #[test]
@@ -1543,10 +1531,7 @@ mod browser_tests {
                 .unwrap();
         }
 
-        assert!(anchor
-            .browsers()
-            .iter()
-            .any(|device| device.id == kept));
+        assert!(anchor.browsers().iter().any(|device| device.id == kept));
     }
 
     #[test]
@@ -1597,10 +1582,7 @@ mod browser_tests {
 
         assert_eq!(again, id);
         assert_eq!(anchor.browsers().len(), 1);
-        assert_eq!(
-            anchor.browsers()[0].current_browser_key,
-            successor_key(1)
-        );
+        assert_eq!(anchor.browsers()[0].current_browser_key, successor_key(1));
         assert_eq!(anchor.browsers()[0].next_browser_key, browser_key(2));
     }
 
@@ -1664,10 +1646,7 @@ mod browser_tests {
 
         assert_eq!(retried, Err(BrowserError::StaleDeviceKey));
         assert_eq!(anchor.browsers().len(), 1);
-        assert_eq!(
-            anchor.browsers()[0].next_browser_key,
-            successor_key(1)
-        );
+        assert_eq!(anchor.browsers()[0].next_browser_key, successor_key(1));
     }
 
     /// The other half of the same rule, from the browser's side: promoting the successor
@@ -1695,14 +1674,8 @@ mod browser_tests {
 
         assert_eq!(again, id);
         assert_eq!(anchor.browsers().len(), 1);
-        assert_eq!(
-            anchor.browsers()[0].current_browser_key,
-            successor_key(1)
-        );
-        assert_eq!(
-            anchor.browsers()[0].next_browser_key,
-            successor_key(2)
-        );
+        assert_eq!(anchor.browsers()[0].current_browser_key, successor_key(1));
+        assert_eq!(anchor.browsers()[0].next_browser_key, successor_key(2));
     }
 
     #[test]
@@ -1741,12 +1714,8 @@ mod browser_tests {
             )
             .unwrap();
 
-        let stealing_the_key = anchor.resolve_browser(
-            browser_key(2),
-            browser_key(1),
-            "Firefox".to_string(),
-            2_000,
-        );
+        let stealing_the_key =
+            anchor.resolve_browser(browser_key(2), browser_key(1), "Firefox".to_string(), 2_000);
         let stealing_the_successor = anchor.resolve_browser(
             browser_key(2),
             successor_key(1),
@@ -1754,10 +1723,7 @@ mod browser_tests {
             2_000,
         );
 
-        assert_eq!(
-            stealing_the_key,
-            Err(BrowserError::SuccessorAlreadyInUse)
-        );
+        assert_eq!(stealing_the_key, Err(BrowserError::SuccessorAlreadyInUse));
         assert_eq!(
             stealing_the_successor,
             Err(BrowserError::SuccessorAlreadyInUse)
@@ -1800,12 +1766,7 @@ mod browser_tests {
         // announced the key it is presenting would keep it alive for as long as it kept
         // asking, and so would whoever leaked it.
         assert_eq!(
-            anchor.resolve_browser(
-                browser_key(1),
-                browser_key(1),
-                "Chrome".to_string(),
-                1_000
-            ),
+            anchor.resolve_browser(browser_key(1), browser_key(1), "Chrome".to_string(), 1_000),
             Err(BrowserError::SuccessorMatchesCurrent)
         );
         assert!(anchor.browsers().is_empty());
@@ -1833,13 +1794,7 @@ mod browser_tests {
             Err(BrowserError::SuccessorMatchesCurrent)
         );
         // The entry is left as it was, still awaiting a successor it has not seen.
-        assert_eq!(
-            anchor.browsers()[0].current_browser_key,
-            browser_key(1)
-        );
-        assert_eq!(
-            anchor.browsers()[0].next_browser_key,
-            successor_key(1)
-        );
+        assert_eq!(anchor.browsers()[0].current_browser_key, browser_key(1));
+        assert_eq!(anchor.browsers()[0].next_browser_key, successor_key(1));
     }
 }
