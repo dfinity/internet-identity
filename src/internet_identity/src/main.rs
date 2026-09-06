@@ -509,8 +509,8 @@ fn app_prepare_delegation(
 }
 
 #[update]
-fn revoke_device_sessions(request: RevokeDeviceSessionsRequest) -> Result<(), SessionRevokeError> {
-    sessions::revoke_device_sessions(request)
+fn revoke_browser_sessions(request: RevokeDeviceSessionsRequest) -> Result<(), SessionRevokeError> {
+    sessions::revoke_browser_sessions(request)
 }
 
 #[update]

@@ -1645,7 +1645,7 @@ export type RegistrationFlowNextStep = {
   };
 export type RegistrationId = string;
 export interface RevokeDeviceSessionsRequest {
-  'device_id' : number,
+  'browser_id' : number,
   'identity_number' : UserNumber,
 }
 /**
@@ -2586,7 +2586,7 @@ export interface _SERVICE {
    * Atomically replace device matching the device key with the new device data
    */
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
-  'revoke_device_sessions' : ActorMethod<
+  'revoke_browser_sessions' : ActorMethod<
     [RevokeDeviceSessionsRequest],
     { 'Ok' : null } |
       { 'Err' : SessionRevokeError }

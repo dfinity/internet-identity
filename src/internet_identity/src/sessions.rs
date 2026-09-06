@@ -450,14 +450,14 @@ fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {
     Ok(account.calculate_seed_with_salt(&salt))
 }
 
-pub fn revoke_device_sessions(
+pub fn revoke_browser_sessions(
     request: RevokeDeviceSessionsRequest,
 ) -> Result<(), SessionRevokeError> {
     check_authorization(request.identity_number)
         .map_err(|err| SessionRevokeError::Unauthorized(err.principal))?;
 
     storage_borrow_mut(|storage| {
-        storage.revoke_device_sessions(request.identity_number, request.device_id)
+        storage.revoke_browser_sessions(request.identity_number, request.browser_id)
     })
     .map(|_| ())
     .map_err(|err| SessionRevokeError::InternalCanisterError(err.to_string()))

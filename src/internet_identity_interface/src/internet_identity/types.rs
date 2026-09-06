@@ -871,7 +871,7 @@ pub enum AppSessionError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct RevokeDeviceSessionsRequest {
     pub identity_number: IdentityNumber,
-    pub device_id: SessionDeviceId,
+    pub browser_id: BrowserId,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

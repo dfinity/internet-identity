@@ -3787,7 +3787,7 @@ mod tracked_default_eviction_tests {
                 anchor_number,
                 origin: doomed.clone(),
                 account_number: None,
-                device_id: 1,
+                browser_id: 1,
                 valid_till_ns: u64::MAX,
                 max_idle_ns: None,
                 read_only: false,
@@ -6571,7 +6571,7 @@ mod session_revocation_tests {
         storage: &mut Storage<VectorMemory>,
         anchor_number: AnchorNumber,
         origin: &str,
-        device_id: u32,
+        browser_id: u32,
         now: u64,
     ) {
         storage
@@ -6579,7 +6579,7 @@ mod session_revocation_tests {
                 anchor_number,
                 origin: origin.to_string(),
                 account_number: None,
-                device_id,
+                browser_id,
                 valid_till_ns: u64::MAX,
                 max_idle_ns: None,
                 read_only: false,
@@ -6588,7 +6588,7 @@ mod session_revocation_tests {
             .unwrap();
     }
 
-    fn device_ids(
+    fn browser_ids(
         storage: &Storage<VectorMemory>,
         anchor_number: AnchorNumber,
         origin: &str,
@@ -6602,7 +6602,7 @@ mod session_revocation_tests {
             .unwrap()
             .sessions
             .into_iter()
-            .map(|session| session.device_id)
+            .map(|session| session.browser_id)
             .collect()
     }
 
@@ -6613,15 +6613,15 @@ mod session_revocation_tests {
         create(&mut storage, anchor_number, "https://b.com", 1, 1_000);
         create(&mut storage, anchor_number, "https://a.com", 2, 1_000);
 
-        let removed = storage.revoke_device_sessions(anchor_number, 1).unwrap();
+        let removed = storage.revoke_browser_sessions(anchor_number, 1).unwrap();
 
         assert_eq!(removed, 2);
         assert_eq!(
-            device_ids(&storage, anchor_number, "https://a.com"),
+            browser_ids(&storage, anchor_number, "https://a.com"),
             vec![2]
         );
         assert_eq!(
-            device_ids(&storage, anchor_number, "https://b.com"),
+            browser_ids(&storage, anchor_number, "https://b.com"),
             Vec::<u32>::new()
         );
     }
@@ -6635,10 +6635,10 @@ mod session_revocation_tests {
         create(&mut storage, anchor_number, "https://a.com", 1, 1_000);
         create(&mut storage, other_anchor_number, "https://a.com", 1, 1_000);
 
-        storage.revoke_device_sessions(anchor_number, 1).unwrap();
+        storage.revoke_browser_sessions(anchor_number, 1).unwrap();
 
         assert_eq!(
-            device_ids(&storage, other_anchor_number, "https://a.com"),
+            browser_ids(&storage, other_anchor_number, "https://a.com"),
             vec![1]
         );
     }
@@ -6648,11 +6648,11 @@ mod session_revocation_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         create(&mut storage, anchor_number, "https://a.com", 1, 1_000);
 
-        let removed = storage.revoke_device_sessions(anchor_number, 9).unwrap();
+        let removed = storage.revoke_browser_sessions(anchor_number, 9).unwrap();
 
         assert_eq!(removed, 0);
         assert_eq!(
-            device_ids(&storage, anchor_number, "https://a.com"),
+            browser_ids(&storage, anchor_number, "https://a.com"),
             vec![1]
         );
     }
@@ -6749,7 +6749,7 @@ mod write_path_property_tests {
                     anchor_number,
                     origin,
                     account_number,
-                    device_id: rng.below(4) as u32,
+                    browser_id: rng.below(4) as u32,
                     valid_till_ns: now + 1 + rng.below(20_000),
                     max_idle_ns: None,
                     read_only: false,
@@ -6762,7 +6762,7 @@ mod write_path_property_tests {
                 }
             }
             _ => {
-                let _ = storage.revoke_device_sessions(anchor_number, rng.below(4) as u32);
+                let _ = storage.revoke_browser_sessions(anchor_number, rng.below(4) as u32);
             }
         }
     }
