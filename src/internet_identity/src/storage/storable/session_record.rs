@@ -1,6 +1,6 @@
 use crate::storage::account::SessionRecord;
-use crate::storage::storable::duration::StorableDuration;
 use crate::storage::storable::browser_id::StorableBrowserId;
+use crate::storage::storable::duration::StorableDuration;
 use crate::storage::storable::session_id::StorableSessionId;
 use crate::storage::storable::timestamp::StorableTimestamp;
 use ic_stable_structures::storable::Bound;
