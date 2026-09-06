@@ -4,7 +4,7 @@ use ic_stable_structures::Storable;
 use minicbor::{Decode, Encode};
 use std::borrow::Cow;
 
-#[derive(Encode, Decode, Default, Clone, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Encode, Decode, Default, Clone, Ord, Eq, PartialEq, PartialOrd, Debug)]
 #[cbor(map)]
 pub struct AnchorApplicationConfig {
     #[n(0)]
