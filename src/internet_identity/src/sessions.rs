@@ -131,7 +131,7 @@ pub async fn prepare_account_session(
         device.current_browser_key == current_browser_key
             || device.next_browser_key == current_browser_key
     });
-    let (browser_id, dropped_devices) = anchor
+    let (browser_id, dropped_browsers) = anchor
         .resolve_browser(current_browser_key, next_browser_key, device_name, now)
         .map_err(|error| match error {
             // Told apart from the rest because the browser can act on it: it is the only
@@ -139,8 +139,6 @@ pub async fn prepare_account_session(
             BrowserError::StaleDeviceKey => AccountSessionError::StaleDeviceKey,
             _ => AccountSessionError::InvalidDeviceKey,
         })?;
-    storage_borrow_mut(|storage| storage.write(anchor))
-        .expect("failed to write the anchor while registering a browser");
 
     if !known_device {
         post_operation_bookkeeping(
@@ -151,25 +149,27 @@ pub async fn prepare_account_session(
         );
     }
 
-    for dropped in dropped_devices {
-        storage_borrow_mut(|storage| storage.revoke_browser_sessions(identity_number, dropped))
-            .expect("failed to end the sessions of a browser the registry dropped");
-    }
-
     // The account was checked above, so anything left is a broken storage invariant
     // rather than a request this caller could have got wrong. Trapping rolls the whole
     // message back, including the browser registration.
+    // The anchor goes in rather than being written first: the browser registered above,
+    // the browsers the registry gave up to make room for it, their sessions, and the
+    // session created here are one change, so they are one write. A sign-in that is
+    // refused leaves none of it behind.
     let (_, session) = storage_borrow_mut(|storage| {
-        storage.create_session(CreateSessionParams {
-            anchor_number: identity_number,
-            origin: origin.clone(),
-            account_number,
-            browser_id,
-            valid_till_ns: valid_till,
-            max_idle_ns: max_idle,
-            read_only,
-            now_ns: now,
-        })
+        storage.create_session(
+            &mut anchor,
+            CreateSessionParams {
+                origin: origin.clone(),
+                account_number,
+                browser_id,
+                valid_till_ns: valid_till,
+                max_idle_ns: max_idle,
+                read_only,
+                now_ns: now,
+                dropped_browsers,
+            },
+        )
     })
     .expect("failed to create a session for an account that was just read");
 
