@@ -417,8 +417,8 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
     'NoSuchSession' : IDL.Null,
     'NoSuchAccount' : IDL.Null,
-    'InvalidDeviceKey' : IDL.Null,
-    'StaleDeviceKey' : IDL.Null,
+    'InvalidBrowserKey' : IDL.Null,
+    'StaleBrowserKey' : IDL.Null,
   });
   const GetAccountsError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
@@ -728,7 +728,7 @@ export const idlFactory = ({ IDL }) => {
     'valid_for' : IDL.Opt(IDL.Nat64),
     'origin' : FrontendHostname,
     'current_browser_key_signature' : IDL.Vec(IDL.Nat8),
-    'device_name' : IDL.Text,
+    'browser_name' : IDL.Text,
     'account_number' : IDL.Opt(AccountNumber),
     'identity_number' : UserNumber,
     'next_browser_key' : PublicKey,
@@ -810,7 +810,7 @@ export const idlFactory = ({ IDL }) => {
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
   });
-  const RevokeDeviceSessionsRequest = IDL.Record({
+  const RevokeBrowserSessionsRequest = IDL.Record({
     'browser_id' : IDL.Nat32,
     'identity_number' : UserNumber,
   });
@@ -1453,7 +1453,7 @@ export const idlFactory = ({ IDL }) => {
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
     'replace' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'revoke_browser_sessions' : IDL.Func(
-        [RevokeDeviceSessionsRequest],
+        [RevokeBrowserSessionsRequest],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : SessionRevokeError })],
         [],
       ),

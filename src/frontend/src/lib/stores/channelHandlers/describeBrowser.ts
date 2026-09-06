@@ -21,7 +21,7 @@ const BROWSERS: [RegExp, string][] = [
   [/Safari\//, "Safari"],
 ];
 
-const MAX_DEVICE_NAME_BYTES = 128;
+const MAX_BROWSER_NAME_BYTES = 128;
 
 const browserOf = (agent: string): string =>
   BROWSERS.find(([token]) => token.test(agent))?.[1] ?? "Browser";
@@ -40,7 +40,7 @@ const platformOf = (agent: string, touchPoints: number): string => {
 };
 
 const withinLimit = (label: string): boolean =>
-  new TextEncoder().encode(label).length <= MAX_DEVICE_NAME_BYTES;
+  new TextEncoder().encode(label).length <= MAX_BROWSER_NAME_BYTES;
 
 export const browserLabel = ({
   agent,
