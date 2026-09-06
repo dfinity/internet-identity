@@ -117,7 +117,7 @@ const runCeremony = async (
           expiration,
           session_id: BigInt(1_000),
           account_principal: Principal.fromText("2vxsx-fae"),
-          device_id: BigInt(1),
+          browser_id: BigInt(1),
         },
       })
     ),

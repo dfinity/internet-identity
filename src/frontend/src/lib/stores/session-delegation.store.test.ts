@@ -368,7 +368,7 @@ describe("forgetIdentity", () => {
   it("ends this browser's sessions for the identity it forgets", async () => {
     const revoke = vi.fn(() => Promise.resolve({ Ok: null }));
     const actor = {
-      revoke_device_sessions: revoke,
+      revoke_browser_sessions: revoke,
     } as unknown as ActorSubclass<_SERVICE>;
     const { authenticationStore } =
       await import("$lib/stores/authentication.store");
@@ -388,7 +388,7 @@ describe("forgetIdentity", () => {
 
     expect(revoke).toHaveBeenCalledWith({
       identity_number: IDENTITY_NUMBER,
-      device_id: 7,
+      browser_id: 7,
     });
     const { appSessionsForOrigin } =
       await import("$lib/stores/app-session.store");
@@ -405,7 +405,7 @@ describe("forgetIdentity", () => {
   /// is the thing they asked it to stop doing.
   it("forgets locally even when the canister call fails", async () => {
     const actor = {
-      revoke_device_sessions: vi.fn(() => Promise.reject(new Error("offline"))),
+      revoke_browser_sessions: vi.fn(() => Promise.reject(new Error("offline"))),
     } as unknown as ActorSubclass<_SERVICE>;
     const { authenticationStore } =
       await import("$lib/stores/authentication.store");
