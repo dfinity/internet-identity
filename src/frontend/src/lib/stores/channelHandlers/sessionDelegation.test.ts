@@ -645,7 +645,7 @@ describe("keeping a session for later", () => {
 describe("asBrowserKeyError", () => {
   it("names a retired browser key so the key store can promote its successor", () => {
     const stale = asBrowserKeyError(
-      new CanisterError({ StaleDeviceKey: null }),
+      new CanisterError({ StaleBrowserKey: null }),
     );
 
     expect(stale).toBeInstanceOf(StaleBrowserKeyError);
