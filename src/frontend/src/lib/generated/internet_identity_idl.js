@@ -708,21 +708,21 @@ export const idlFactory = ({ IDL }) => {
   const PrepareAccountSessionRequest = IDL.Record({
     'permissions' : IDL.Opt(Permissions),
     'max_idle' : IDL.Opt(IDL.Nat64),
-    'current_device_key' : PublicKey,
+    'current_browser_key' : PublicKey,
     'session_key' : SessionKey,
     'valid_for' : IDL.Opt(IDL.Nat64),
     'origin' : FrontendHostname,
-    'current_device_key_signature' : IDL.Vec(IDL.Nat8),
+    'current_browser_key_signature' : IDL.Vec(IDL.Nat8),
     'device_name' : IDL.Text,
     'account_number' : IDL.Opt(AccountNumber),
     'identity_number' : UserNumber,
-    'next_device_key' : PublicKey,
-    'next_device_key_signature' : IDL.Vec(IDL.Nat8),
+    'next_browser_key' : PublicKey,
+    'next_browser_key_signature' : IDL.Vec(IDL.Nat8),
   });
   const PrepareAccountSessionResponse = IDL.Record({
     'user_key' : PublicKey,
     'session_id' : IDL.Nat64,
-    'device_id' : IDL.Nat32,
+    'browser_id' : IDL.Nat32,
     'expiration' : Timestamp,
     'account_principal' : IDL.Principal,
   });
