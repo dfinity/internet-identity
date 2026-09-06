@@ -349,10 +349,10 @@ describe("forgetIdentity", () => {
     );
   };
 
-  const knownBrowser = (deviceId: number) =>
+  const knownBrowser = (browserId: number) =>
     idbSet(
       IDENTITY_NUMBER.toString(),
-      { keyPair: undefined, deviceId },
+      { keyPair: undefined, browserId },
       BROWSER_KEY_STORE,
     );
 
@@ -405,7 +405,9 @@ describe("forgetIdentity", () => {
   /// is the thing they asked it to stop doing.
   it("forgets locally even when the canister call fails", async () => {
     const actor = {
-      revoke_browser_sessions: vi.fn(() => Promise.reject(new Error("offline"))),
+      revoke_browser_sessions: vi.fn(() =>
+        Promise.reject(new Error("offline")),
+      ),
     } as unknown as ActorSubclass<_SERVICE>;
     const { authenticationStore } =
       await import("$lib/stores/authentication.store");
