@@ -6448,16 +6448,19 @@ mod session_removal_tests {
             .iter()
             .map(|browser_id| {
                 storage
-                    .create_session(CreateSessionParams {
+                    .create_session_for_testing(
                         anchor_number,
-                        origin: ORIGIN.to_string(),
-                        account_number: None,
-                        browser_id: *browser_id,
-                        valid_till_ns: u64::MAX,
-                        max_idle_ns: None,
-                        read_only: false,
-                        now_ns: 1_000,
-                    })
+                        CreateSessionParams {
+                            origin: ORIGIN.to_string(),
+                            account_number: None,
+                            browser_id: *browser_id,
+                            valid_till_ns: u64::MAX,
+                            max_idle_ns: None,
+                            read_only: false,
+                            now_ns: 1_000,
+                            dropped_browsers: vec![],
+                        },
+                    )
                     .unwrap()
                     .0
             })
