@@ -1440,8 +1440,8 @@ fn test_anchor_storage_migration_round_trip() {
             "empty anchor",
             storage.allocate_anchor(now).unwrap(),
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 0,
                 devices: vec![],
@@ -1475,8 +1475,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 1,
                 devices: vec![Device {
@@ -1521,8 +1521,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 2,
                 devices: vec![Device {
@@ -1567,8 +1567,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 3,
                 devices: vec![Device {
@@ -1613,8 +1613,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 4,
                 devices: vec![Device {
@@ -1659,8 +1659,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 5,
                 devices: vec![Device {
@@ -1705,8 +1705,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 6,
                 devices: vec![Device {
@@ -1751,8 +1751,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 7,
                 devices: vec![Device {
@@ -1811,8 +1811,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 8,
                 devices: vec![
@@ -1858,8 +1858,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 9,
                 devices: vec![],
@@ -1880,8 +1880,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 10,
                 devices: vec![],
@@ -1915,8 +1915,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 11,
                 devices: vec![Device {
@@ -1968,8 +1968,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 12,
                 devices: vec![Device {
@@ -2008,8 +2008,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 13,
                 devices: vec![],
@@ -2043,8 +2043,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 14,
                 devices: vec![Device {
@@ -2092,8 +2092,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 15,
                 devices: vec![Device {
@@ -2140,8 +2140,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 16,
                 devices: vec![Device {
@@ -2186,8 +2186,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 17,
                 devices: vec![Device {
@@ -2232,8 +2232,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 18,
                 devices: vec![Device {
@@ -2278,8 +2278,8 @@ fn test_anchor_storage_migration_round_trip() {
                 anchor
             },
             Anchor {
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 session_count: 0,
                 anchor_number: 19,
                 devices: vec![Device {
@@ -5075,7 +5075,7 @@ mod session_record_tests {
             valid_till_ns,
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: None,
-            device_id: 1,
+            browser_id: 1,
             read_only: false,
             session_id,
         }
@@ -5104,7 +5104,7 @@ mod session_record_tests {
                     valid_till_ns: 22,
                     max_idle_ns: 33,
                     last_refreshed_ns: Some(44),
-                    device_id: 55,
+                    browser_id: 55,
                     read_only: false,
                     session_id: 66,
                 },
@@ -5113,7 +5113,7 @@ mod session_record_tests {
                     valid_till_ns: 88,
                     max_idle_ns: 99,
                     last_refreshed_ns: None,
-                    device_id: 111,
+                    browser_id: 111,
                     read_only: true,
                     session_id: 122,
                 },
@@ -5309,7 +5309,7 @@ mod session_record_tests {
         // order would protect it.
         let flood: Vec<SessionRecord> = (0..500)
             .map(|index| SessionRecord {
-                device_id: index,
+                browser_id: index,
                 ..session(index as u64 + 1, now - 1, now + DAY_NS)
             })
             .collect();
@@ -5364,12 +5364,12 @@ mod session_creation_tests {
         (storage, anchor_number)
     }
 
-    fn params(anchor_number: AnchorNumber, device_id: u32, now: u64) -> CreateSessionParams {
+    fn params(anchor_number: AnchorNumber, browser_id: u32, now: u64) -> CreateSessionParams {
         CreateSessionParams {
             anchor_number,
             origin: ORIGIN.to_string(),
             account_number: None,
-            device_id,
+            browser_id,
             valid_till_ns: now + 10_000,
             max_idle_ns: None,
             read_only: false,
@@ -5541,7 +5541,7 @@ mod session_creation_tests {
         assert_eq!(session.created_at_ns, 1_000);
         assert_eq!(session.valid_till_ns, 11_000);
         assert_eq!(session.last_refreshed_ns, None);
-        assert_eq!(session.device_id, 1);
+        assert_eq!(session.browser_id, 1);
         assert_eq!(sessions_of(&storage, anchor_number), vec![session]);
     }
 
@@ -5581,9 +5581,9 @@ mod session_creation_tests {
     #[test]
     fn expired_sessions_are_pruned_when_the_list_is_written() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        for device_id in 0..3 {
+        for browser_id in 0..3 {
             storage
-                .create_session(params(anchor_number, device_id, 1_000))
+                .create_session(params(anchor_number, browser_id, 1_000))
                 .unwrap();
         }
 
@@ -5593,7 +5593,7 @@ mod session_creation_tests {
 
         let sessions = sessions_of(&storage, anchor_number);
         assert_eq!(sessions.len(), 1);
-        assert_eq!(sessions[0].device_id, 9);
+        assert_eq!(sessions[0].browser_id, 9);
     }
 
     /// There is no per-reference cap: one browser holds one session per account, so the
@@ -5601,15 +5601,15 @@ mod session_creation_tests {
     #[test]
     fn one_reference_holds_one_session_per_browser() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        for device_id in 0..12u32 {
-            let mut p = params(anchor_number, device_id, 1_000);
+        for browser_id in 0..12u32 {
+            let mut p = params(anchor_number, browser_id, 1_000);
             p.valid_till_ns = 1_000_000;
             storage.create_session(p).unwrap();
         }
 
         let sessions = sessions_of(&storage, anchor_number);
         assert_eq!(sessions.len(), 12);
-        assert!(sessions.iter().any(|s| s.device_id == 0));
+        assert!(sessions.iter().any(|s| s.browser_id == 0));
     }
 
     /// The account-principal index is keyed with one derivation and a session handle names
@@ -5636,7 +5636,7 @@ mod session_creation_tests {
 
         assert_eq!(locator.anchor_number, anchor_number);
         assert_eq!(locator.application_number, application_number);
-        assert_eq!(session.device_id, 7);
+        assert_eq!(session.browser_id, 7);
     }
 
     #[test]
@@ -5681,11 +5681,11 @@ mod session_creation_tests {
     #[test]
     fn a_session_replaced_in_the_same_round_does_not_inherit_its_identity() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        let same_round = |device_id| CreateSessionParams {
+        let same_round = |browser_id| CreateSessionParams {
             anchor_number,
             origin: ORIGIN.to_string(),
             account_number: None,
-            device_id,
+            browser_id,
             valid_till_ns: 10_000,
             max_idle_ns: None,
             read_only: false,
@@ -5697,7 +5697,7 @@ mod session_creation_tests {
         let sibling = storage.create_session(same_round(2)).unwrap().1;
 
         assert_eq!(first.created_at_ns, replacement.created_at_ns);
-        assert_eq!(first.device_id, replacement.device_id);
+        assert_eq!(first.browser_id, replacement.browser_id);
         assert_ne!(first.session_id, replacement.session_id);
         assert_ne!(replacement.session_id, sibling.session_id);
     }
@@ -5711,7 +5711,7 @@ mod session_creation_tests {
             anchor_number,
             origin: ORIGIN.to_string(),
             account_number: None,
-            device_id: 1,
+            browser_id: 1,
             valid_till_ns: u64::MAX,
             max_idle_ns: None,
             read_only,
@@ -5821,7 +5821,7 @@ mod session_consent_change_tests {
                 anchor_number,
                 origin: ORIGIN.to_string(),
                 account_number: None,
-                device_id: 1,
+                browser_id: 1,
                 valid_till_ns: u64::MAX,
                 max_idle_ns: None,
                 read_only,
@@ -5886,7 +5886,7 @@ mod session_consent_change_tests {
                 anchor_number,
                 origin: ORIGIN.to_string(),
                 account_number: None,
-                device_id: 2,
+                browser_id: 2,
                 valid_till_ns: u64::MAX,
                 max_idle_ns: None,
                 read_only: false,
