@@ -6261,16 +6261,19 @@ mod session_refresh_stamp_tests {
         let anchor_number = anchor.anchor_number();
         storage.write(anchor).unwrap();
         let (key, _) = storage
-            .create_session(CreateSessionParams {
+            .create_session_for_testing(
                 anchor_number,
-                origin: ORIGIN.to_string(),
-                account_number: None,
-                browser_id: 1,
-                valid_till_ns: u64::MAX,
-                max_idle_ns: None,
-                read_only: false,
-                now_ns: 1_000,
-            })
+                CreateSessionParams {
+                    origin: ORIGIN.to_string(),
+                    account_number: None,
+                    browser_id: 1,
+                    valid_till_ns: u64::MAX,
+                    max_idle_ns: None,
+                    read_only: false,
+                    now_ns: 1_000,
+                    dropped_browsers: vec![],
+                },
+            )
             .unwrap();
         (storage, anchor_number, key)
     }
@@ -6323,16 +6326,19 @@ mod session_refresh_stamp_tests {
         let (mut storage, anchor_number, key) = storage_with_session();
 
         let (_, dead) = storage
-            .create_session(CreateSessionParams {
+            .create_session_for_testing(
                 anchor_number,
-                origin: ORIGIN.to_string(),
-                account_number: None,
-                browser_id: 9,
-                valid_till_ns: 1_500,
-                max_idle_ns: None,
-                read_only: false,
-                now_ns: 1_000,
-            })
+                CreateSessionParams {
+                    origin: ORIGIN.to_string(),
+                    account_number: None,
+                    browser_id: 9,
+                    valid_till_ns: 1_500,
+                    max_idle_ns: None,
+                    read_only: false,
+                    now_ns: 1_000,
+                    dropped_browsers: vec![],
+                },
+            )
             .unwrap();
         let dead_principal = storage
             .lookup_session_with_principal_memory
@@ -6382,16 +6388,19 @@ mod session_refresh_stamp_tests {
     fn stamping_leaves_a_second_device_alone() {
         let (mut storage, anchor_number, key) = storage_with_session();
         storage
-            .create_session(CreateSessionParams {
+            .create_session_for_testing(
                 anchor_number,
-                origin: ORIGIN.to_string(),
-                account_number: None,
-                browser_id: 2,
-                valid_till_ns: u64::MAX,
-                max_idle_ns: None,
-                read_only: false,
-                now_ns: 1_000,
-            })
+                CreateSessionParams {
+                    origin: ORIGIN.to_string(),
+                    account_number: None,
+                    browser_id: 2,
+                    valid_till_ns: u64::MAX,
+                    max_idle_ns: None,
+                    read_only: false,
+                    now_ns: 1_000,
+                    dropped_browsers: vec![],
+                },
+            )
             .unwrap();
         let now = 2_000;
 
@@ -6421,16 +6430,19 @@ mod session_refresh_stamp_tests {
             .unwrap();
         storage.write(anchor).unwrap();
         let (key, _) = storage
-            .create_session(CreateSessionParams {
+            .create_session_for_testing(
                 anchor_number,
-                origin: ORIGIN.to_string(),
-                account_number: None,
-                browser_id,
-                valid_till_ns: u64::MAX,
-                max_idle_ns: None,
-                read_only: false,
-                now_ns: 1_000,
-            })
+                CreateSessionParams {
+                    origin: ORIGIN.to_string(),
+                    account_number: None,
+                    browser_id,
+                    valid_till_ns: u64::MAX,
+                    max_idle_ns: None,
+                    read_only: false,
+                    now_ns: 1_000,
+                    dropped_browsers: vec![],
+                },
+            )
             .unwrap();
         (storage, anchor_number, key, browser_id)
     }
@@ -6503,16 +6515,19 @@ mod session_removal_tests {
             .iter()
             .map(|browser_id| {
                 storage
-                    .create_session(CreateSessionParams {
+                    .create_session_for_testing(
                         anchor_number,
-                        origin: ORIGIN.to_string(),
-                        account_number: None,
-                        browser_id: *browser_id,
-                        valid_till_ns: u64::MAX,
-                        max_idle_ns: None,
-                        read_only: false,
-                        now_ns: 1_000,
-                    })
+                        CreateSessionParams {
+                            origin: ORIGIN.to_string(),
+                            account_number: None,
+                            browser_id: *browser_id,
+                            valid_till_ns: u64::MAX,
+                            max_idle_ns: None,
+                            read_only: false,
+                            now_ns: 1_000,
+                            dropped_browsers: vec![],
+                        },
+                    )
                     .unwrap()
                     .0
             })
