@@ -15,7 +15,7 @@ pub type FrontendHostname = String;
 pub type ApplicationNumber = u64;
 pub type Timestamp = u64; // in nanos since epoch
 /// Per-anchor label for one browser, so a browser's sessions can be revoked together.
-pub type SessionDeviceId = u32;
+pub type BrowserId = u32;
 /// Names one session for as long as the canister runs. Allocated from a single
 /// counter, so no two sessions ever share one, and a revoked session's id is never
 /// handed out again.
@@ -771,14 +771,14 @@ pub struct PrepareAccountSessionRequest {
     pub device_name: String,
     /// The browser's own public key, DER-encoded, as the registry currently holds it. A
     /// key this anchor has not seen registers a browser under it.
-    pub current_device_key: PublicKey,
+    pub current_browser_key: PublicKey,
     /// What the browser rotates to once this sign-in succeeds.
-    pub next_device_key: PublicKey,
-    /// Signature over `session_key` and `next_device_key`, verified with
-    /// `current_device_key`. A second signature by `next_device_key` proves the browser
+    pub next_browser_key: PublicKey,
+    /// Signature over `session_key` and `next_browser_key`, verified with
+    /// `current_browser_key`. A second signature by `next_browser_key` proves the browser
     /// holds the key it is announcing.
-    pub current_device_key_signature: ByteBuf,
-    pub next_device_key_signature: ByteBuf,
+    pub current_browser_key_signature: ByteBuf,
+    pub next_browser_key_signature: ByteBuf,
     /// The consented access level, fixed for the session's life.
     pub permissions: Option<Permissions>,
     /// Clamped to the session maximum.
@@ -801,7 +801,7 @@ pub struct PrepareAccountSessionResponse {
     /// Which browser this sign-in was attributed to, so the settings list can mark the one
     /// the user is looking at, and so the browser knows which registration its key now
     /// belongs to. Not a credential: a caller never presents it.
-    pub device_id: SessionDeviceId,
+    pub browser_id: BrowserId,
     /// The principal apps see for this account. The caller is the anchor that owns it
     /// and can mint a delegation for it at any time, so this reveals nothing new; it
     /// saves the II frontend from having to mint one just to learn it.

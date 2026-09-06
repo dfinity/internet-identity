@@ -1006,7 +1006,7 @@ export interface IdentityInfo {
    * created a session), so the Settings UI can offer "sign this browser
    * out" without a separate call.
    */
-  'session_devices' : [] | [Array<SessionDeviceInfo>],
+  'browsers' : [] | [Array<BrowserInfo>],
   /**
    * The anchor's synced trusted-MCP-server config (absent when the
    * anchor never wrote one). Carried here rather than read from the
@@ -1392,7 +1392,7 @@ export interface PrepareAccountSessionRequest {
    * The browser's own public key, DER-encoded, as the registry currently holds it. A
    * key this anchor has not seen registers a browser under it.
    */
-  'current_device_key' : PublicKey,
+  'current_browser_key' : PublicKey,
   /**
    * The II frontend's own key. The app never sees this chain's private key.
    */
@@ -1403,9 +1403,9 @@ export interface PrepareAccountSessionRequest {
   'valid_for' : [] | [bigint],
   'origin' : FrontendHostname,
   /**
-   * Signature over session_key and next_device_key, verified with current_device_key.
+   * Signature over session_key and next_browser_key, verified with current_browser_key.
    */
-  'current_device_key_signature' : Uint8Array | number[],
+  'current_browser_key_signature' : Uint8Array | number[],
   /**
    * Labels the browser in the user's session list, e.g. "Chrome on MacBook".
    */
@@ -1414,14 +1414,14 @@ export interface PrepareAccountSessionRequest {
   'identity_number' : UserNumber,
   /**
    * What the browser rotates to once this sign-in succeeds. Must differ from
-   * current_device_key: a browser that never rotates keeps a leaked key useful.
+   * current_browser_key: a browser that never rotates keeps a leaked key useful.
    */
-  'next_device_key' : PublicKey,
+  'next_browser_key' : PublicKey,
   /**
-   * Signature by next_device_key over session_key and current_device_key, proving the
+   * Signature by next_browser_key over session_key and current_browser_key, proving the
    * browser holds the key it is announcing.
    */
-  'next_device_key_signature' : Uint8Array | number[],
+  'next_browser_key_signature' : Uint8Array | number[],
 }
 export interface PrepareAccountSessionResponse {
   'user_key' : PublicKey,
@@ -1436,7 +1436,7 @@ export interface PrepareAccountSessionResponse {
    * the user is looking at, and so the browser knows which registration its key now
    * belongs to. Not a credential: a caller never presents it.
    */
-  'device_id' : number,
+  'browser_id' : number,
   /**
    * The session's valid_till.
    */
@@ -1672,7 +1672,7 @@ export type SessionDelegationError = { 'NoSuchDelegation' : null } |
  * client, so it is a label for the user rather than evidence about where a
  * session came from.
  */
-export interface SessionDeviceInfo {
+export interface BrowserInfo {
   'id' : number,
   'name' : string,
   'created_at' : Timestamp,

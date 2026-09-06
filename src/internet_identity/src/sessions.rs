@@ -11,7 +11,7 @@ use crate::delegation::{
 use crate::sessions::device_key::verify_device_keys;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
 use crate::storage::account::{Account, AccountKey, SessionRecord, SessionRecordKey};
-use crate::storage::anchor::SessionDeviceError;
+use crate::storage::anchor::BrowserError;
 use crate::storage::{CreateSessionParams, StorageError};
 use crate::{update_root_hash, DAY_NS, MINUTE_NS};
 use candid::Principal;
@@ -74,10 +74,10 @@ pub async fn prepare_account_session(
         account_number,
         session_key,
         device_name,
-        current_device_key,
-        next_device_key,
-        current_device_key_signature,
-        next_device_key_signature,
+        current_browser_key,
+        next_browser_key,
+        current_browser_key_signature,
+        next_browser_key_signature,
         permissions,
         valid_for,
         max_idle,
@@ -91,10 +91,10 @@ pub async fn prepare_account_session(
         ));
     }
     if !verify_device_keys(
-        &current_device_key,
-        &current_device_key_signature,
-        &next_device_key,
-        &next_device_key_signature,
+        &current_browser_key,
+        &current_browser_key_signature,
+        &next_browser_key,
+        &next_browser_key_signature,
         &session_key,
     ) {
         return Err(AccountSessionError::InvalidDeviceKey);
@@ -127,16 +127,16 @@ pub async fn prepare_account_session(
 
     let mut anchor = state::anchor(identity_number);
     // A rotating browser presents the successor it announced, so both values are known.
-    let known_device = anchor.session_devices().iter().any(|device| {
-        device.current_device_key == current_device_key
-            || device.next_device_key == current_device_key
+    let known_device = anchor.browsers().iter().any(|device| {
+        device.current_browser_key == current_browser_key
+            || device.next_browser_key == current_browser_key
     });
-    let (device_id, dropped_devices) = anchor
-        .resolve_session_device(current_device_key, next_device_key, device_name, now)
+    let (browser_id, dropped_devices) = anchor
+        .resolve_browser(current_browser_key, next_browser_key, device_name, now)
         .map_err(|error| match error {
             // Told apart from the rest because the browser can act on it: it is the only
             // party holding the successor that does resolve.
-            SessionDeviceError::StaleDeviceKey => AccountSessionError::StaleDeviceKey,
+            BrowserError::StaleDeviceKey => AccountSessionError::StaleDeviceKey,
             _ => AccountSessionError::InvalidDeviceKey,
         })?;
     storage_borrow_mut(|storage| storage.write(anchor))
@@ -145,14 +145,14 @@ pub async fn prepare_account_session(
     if !known_device {
         post_operation_bookkeeping(
             identity_number,
-            Operation::RegisterSessionDevice {
+            Operation::RegisterBrowser {
                 name: Private::Redacted,
             },
         );
     }
 
     for dropped in dropped_devices {
-        storage_borrow_mut(|storage| storage.revoke_device_sessions(identity_number, dropped))
+        storage_borrow_mut(|storage| storage.revoke_browser_sessions(identity_number, dropped))
             .expect("failed to end the sessions of a browser the registry dropped");
     }
 
@@ -164,7 +164,7 @@ pub async fn prepare_account_session(
             anchor_number: identity_number,
             origin: origin.clone(),
             account_number,
-            device_id,
+            browser_id,
             valid_till_ns: valid_till,
             max_idle_ns: max_idle,
             read_only,
@@ -193,7 +193,7 @@ pub async fn prepare_account_session(
         user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
         expiration: session.valid_till_ns,
         session_id: session.session_id,
-        device_id,
+        browser_id,
         account_principal,
     })
 }
