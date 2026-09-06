@@ -15,7 +15,7 @@ pub type FrontendHostname = String;
 pub type ApplicationNumber = u64;
 pub type Timestamp = u64; // in nanos since epoch
 /// Per-anchor label for one browser, so a browser's sessions can be revoked together.
-pub type SessionDeviceId = u32;
+pub type BrowserId = u32;
 /// Names one session for as long as the canister runs. Allocated from a single
 /// counter, so no two sessions ever share one, and a revoked session's id is never
 /// handed out again.
