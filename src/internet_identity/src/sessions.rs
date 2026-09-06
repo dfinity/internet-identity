@@ -1,6 +1,5 @@
 pub mod browser_key;
 
-use crate::anchor_management::post_operation_bookkeeping;
 use crate::authz_utils::{
     check_authorization, check_authz_and_record_activity, AuthorizationError, IdentityUpdateError,
 };
@@ -19,7 +18,6 @@ use ic_canister_sig_creation::signature_map::CanisterSigInputs;
 use ic_canister_sig_creation::DELEGATION_SIG_DOMAIN;
 use ic_cdk::api::time;
 use ic_certification::Hash;
-use internet_identity_interface::archive::types::{Operation, Private};
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountSessionError, AnchorNumber, Delegation, FrontendHostname,
     GetAccountSessionRequest, GetAccountSessionResponse, PrepareAccountSessionRequest,
@@ -122,53 +120,35 @@ pub async fn prepare_account_session(
         return Err(AccountSessionError::NoSuchAccount);
     }
 
-    let mut anchor = state::anchor(identity_number);
-    // A rotating browser presents the successor it announced, so both values are known.
-    let known_browser = anchor.browsers().iter().any(|browser| {
-        browser.current_browser_key == current_browser_key
-            || browser.next_browser_key == current_browser_key
-    });
-    let (browser_id, dropped_browsers) = anchor
-        .resolve_browser(current_browser_key, next_browser_key, browser_name, now)
-        .map_err(|error| match error {
-            // Told apart from the rest because the browser can act on it: it is the only
-            // party holding the successor that does resolve.
-            BrowserError::StaleBrowserKey => AccountSessionError::StaleBrowserKey,
-            _ => AccountSessionError::InvalidBrowserKey,
-        })?;
-
-    if !known_browser {
-        post_operation_bookkeeping(
-            identity_number,
-            Operation::RegisterBrowser {
-                name: Private::Redacted,
-            },
-        );
-    }
-
-    // The account was checked above, so anything left is a broken storage invariant
-    // rather than a request this caller could have got wrong. Trapping rolls the whole
-    // message back, including the browser registration.
-    // The anchor goes in rather than being written first: the browser registered above,
-    // the browsers the registry gave up to make room for it, their sessions, and the
-    // session created here are one change, so they are one write. A sign-in that is
-    // refused leaves none of it behind.
+    // The browser is resolved by the write, not here: registering it can put the registry
+    // over its cap, and the browser that gives way takes its sessions with it. That is one
+    // change with the session created below, so it is one write, and working any of it out
+    // here would be working out something the write has to be told.
     let (_, session) = storage_borrow_mut(|storage| {
-        storage.create_session(
-            &mut anchor,
-            CreateSessionParams {
-                origin: origin.clone(),
-                account_number,
-                browser_id,
-                valid_till_ns: valid_till,
-                max_idle_ns: max_idle,
-                read_only,
-                now_ns: now,
-                dropped_browsers,
-            },
-        )
+        storage.create_session(CreateSessionParams {
+            anchor_number: identity_number,
+            origin: origin.clone(),
+            account_number,
+            current_browser_key,
+            next_browser_key,
+            browser_name,
+            valid_till_ns: valid_till,
+            max_idle_ns: max_idle,
+            read_only,
+            now_ns: now,
+        })
     })
-    .expect("failed to create a session for an account that was just read");
+    .map_err(|err| match err {
+        // Told apart from the rest because the browser can act on it: it is the only
+        // party holding the successor that does resolve.
+        StorageError::Browser(BrowserError::StaleBrowserKey) => {
+            AccountSessionError::StaleBrowserKey
+        }
+        StorageError::Browser(_) => AccountSessionError::InvalidBrowserKey,
+        // The account was checked above, so anything left is a broken storage invariant
+        // rather than a request this caller could have got wrong.
+        err => AccountSessionError::InternalCanisterError(err.to_string()),
+    })?;
 
     let seed = session_identity(identity_number, &origin, account_number, &session)
         .expect("failed to derive the identity of a session that was just created");
@@ -190,7 +170,7 @@ pub async fn prepare_account_session(
         user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
         expiration: session.valid_till_ns,
         session_id: session.session_id,
-        browser_id,
+        browser_id: session.browser_id,
         account_principal,
     })
 }
