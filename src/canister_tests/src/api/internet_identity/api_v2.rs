@@ -842,7 +842,7 @@ pub fn revoke_browser_sessions(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    request: RevokeDeviceSessionsRequest,
+    request: RevokeBrowserSessionsRequest,
 ) -> Result<Result<(), SessionRevokeError>, RejectResponse> {
     call_candid_as(
         env,

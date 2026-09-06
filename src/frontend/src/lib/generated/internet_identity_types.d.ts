@@ -27,7 +27,7 @@ export type AccountSessionError = { 'InternalCanisterError' : string } |
     /**
      * The browser's key is unusable, or its signature does not verify against it.
      */
-    'InvalidDeviceKey' : null
+    'InvalidBrowserKey' : null
   } |
   {
     /**
@@ -35,7 +35,7 @@ export type AccountSessionError = { 'InternalCanisterError' : string } |
      * never learned that its last sign-in succeeded. It holds the successor that does
      * resolve, so the answer is to promote that one and present it.
      */
-    'StaleDeviceKey' : null
+    'StaleBrowserKey' : null
   };
 export interface AccountUpdate { 'name' : [] | [string] }
 export type AddTentativeDeviceResponse = {
@@ -1409,7 +1409,7 @@ export interface PrepareAccountSessionRequest {
   /**
    * Labels the browser in the user's session list, e.g. "Chrome on MacBook".
    */
-  'device_name' : string,
+  'browser_name' : string,
   'account_number' : [] | [AccountNumber],
   'identity_number' : UserNumber,
   /**
@@ -1644,7 +1644,7 @@ export type RegistrationFlowNextStep = {
     'Finish' : null
   };
 export type RegistrationId = string;
-export interface RevokeDeviceSessionsRequest {
+export interface RevokeBrowserSessionsRequest {
   'browser_id' : number,
   'identity_number' : UserNumber,
 }
@@ -2594,7 +2594,7 @@ export interface _SERVICE {
    */
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'revoke_browser_sessions' : ActorMethod<
-    [RevokeDeviceSessionsRequest],
+    [RevokeBrowserSessionsRequest],
     { 'Ok' : null } |
       { 'Err' : SessionRevokeError }
   >,
