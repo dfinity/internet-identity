@@ -486,7 +486,7 @@ type PrepareAccountSessionRequest = record {
     origin : FrontendHostname;
     account_number : opt AccountNumber;
     session_key : SessionKey;          // the II frontend's key, fresh for every session
-    device_name : text;                // labels the browser, e.g. "Chrome on MacBook"
+    browser_name : text;               // labels the browser, e.g. "Chrome on MacBook"
     current_browser_key : PublicKey;   // the browser's key, as the registry currently holds it
     next_browser_key : PublicKey;      // what it rotates to on success
     current_browser_key_signature : blob; // over session_key and next_browser_key
@@ -521,8 +521,8 @@ type AccountSessionError = variant {
     Unauthorized : principal;   // the caller holds no access method for this identity
     NoSuchAccount;              // the identity holds no such account
     NoSuchSession;              // nothing prepared under this session key and expiration
-    InvalidDeviceKey;           // the browser's key is unusable, or its signature does not verify
-    StaleDeviceKey;             // a key the browser has already rotated away from
+    InvalidBrowserKey;          // the browser's key is unusable, or its signature does not verify
+    StaleBrowserKey;            // a key the browser has already rotated away from
     InternalCanisterError : text;
 };
 
@@ -539,7 +539,7 @@ matching what the existing delegation path already does. Every ceremony
 creates, so it always applies: the replacement's `valid_till_ns` is measured from the ceremony
 that made it, and no session is ever renewed in place.
 
-A `device_name` over 128 bytes is refused as `InternalCanisterError`, and deliberately not
+A `browser_name` over 128 bytes is refused as `InternalCanisterError`, and deliberately not
 given a variant of its own: the II frontend generates the name, so an over-long one is a
 broken client rather than something a user can hit.
 
@@ -566,7 +566,7 @@ sequenceDiagram
     participant IIC as II canister
     App->>IIF: ii_session_delegation { sessionPublicKey }
     Note over IIF: ceremony (passkey or OpenID)
-    IIF->>IIC: prepare_account_session { .., session_key = II key,<br/>device_name, browser keys + signatures }
+    IIF->>IIC: prepare_account_session { .., session_key = II key,<br/>browser_name, browser keys + signatures }
     Note over IIC: resolve or register the browser<br/>replace this browser's session at this account,<br/>prune expired, reclaim at cap, create — one write ([the session cap](#the-session-cap))
     IIC-->>IIF: { user_key, expiration = valid_till, session_id,<br/>browser_id, account_principal }
     IIF->>IIC: get_account_session { .., expiration, session_id }
@@ -864,17 +864,17 @@ the successor it will rotate to, and a signature, and the canister resolves them
 | ---------------------------------------- | ------------------------------------------------------------------------- |
 | the entry's `key`, signature valid       | that browser; `pending` becomes the announced successor                   |
 | the entry's `pending`, signature valid   | that browser, and the successor is promoted, retiring the old key         |
-| a key no entry holds, signature valid    | register a browser under it, with `device_name`                           |
+| a key no entry holds, signature valid    | register a browser under it, with `browser_name`                           |
 | a successor another entry holds          | reject the request ([why](#a-successor-another-browser-holds-is-refused)) |
 | signature invalid, or either key missing | reject the request                                                        |
 
-`device_name` is read only when a browser is registered. A browser the registry already
+`browser_name` is read only when a browser is registered. A browser the registry already
 holds keeps the label it was first given, so a request from a known browser carries a name
 that is accepted and dropped. That is deliberate: the name is a label the user learns to
 recognise, and letting every sign-in rewrite it would let a later request rename an entry the
 user is looking at.
 
-Both keys sign. The current key signs over the `session_key` and `next_device_key`; the
+Both keys sign. The current key signs over the `session_key` and `next_browser_key`; the
 successor signs over the `session_key` and the current key, under a different domain prefix so
 neither signature can be replayed in the other's role. A key nobody holds therefore cannot be
 announced. It is verified against the presented public key with the P-256 verifier the canister
@@ -945,7 +945,7 @@ request, and the successor is useless to them because its private half never lea
 browser.
 
 What they must not be able to do is pair a captured signature with a successor of their own.
-Signing over `next_device_key` is what prevents it: the successor is bound to whoever held the
+Signing over `next_browser_key` is what prevents it: the successor is bound to whoever held the
 current key, so the only party that can advance the chain is the browser that started it.
 
 #### What rotation buys
