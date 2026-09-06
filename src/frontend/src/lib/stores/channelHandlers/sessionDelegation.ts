@@ -253,10 +253,10 @@ const createSession = async (
           account_number: accountNumber !== undefined ? [accountNumber] : [],
           session_key: iiPublicKey,
           device_name: deviceName,
-          current_device_key: browser.publicKey,
-          next_device_key: browser.nextPublicKey,
-          current_device_key_signature: browser.signature,
-          next_device_key_signature: browser.nextSignature,
+          current_browser_key: browser.publicKey,
+          next_browser_key: browser.nextPublicKey,
+          current_browser_key_signature: browser.signature,
+          next_browser_key_signature: browser.nextSignature,
           permissions: toPermissionsArg(authorized.accessLevel),
           // The duration the user chose at consent, clamped by the canister. Dropping it
           // would honour half of a consent and silently discard the other half.
@@ -272,7 +272,7 @@ const createSession = async (
         .catch((error: unknown) => {
           throw asBrowserKeyError(error);
         });
-      await browser.accept(prepared.device_id);
+      await browser.accept(prepared.browser_id);
       return prepared;
     },
   );
