@@ -30,7 +30,7 @@ Access methods is not a page. The rule that a usage number must not move when th
 | Index backfill throughput and time to finish                  | Is the sweep still moving, or stalled at 99%                  |
 | Refusals in the 6h after a release against the 6h before      | Did the release just shipped break refresh                    |
 | Apps still signing in on the old path                         | Who to call before turning it off                             |
-| App records created per hour, and identities near the row cap | Sign-in became a write path — is growth on the modelled curve |
+| App records created per hour, and identities near the cap     | Sign-in became a write path — is growth on the modelled curve |
 | The abandoned identity region against the live one            | Can the old memory and its read path be retired               |
 
 The index gate cannot be watched today: the backfill's progress lives in a `thread_local` reachable only through a hidden query, so after any upgrade the canister cannot say whether the sweep it just restarted has finished. Publish the indexed count as a gauge and gate on it equalling the reference count — an equality between two published numbers survives an upgrade; a boolean does not.
@@ -157,7 +157,7 @@ everything else loses them — the constraint is arithmetic, not habit.
 
 This matters more than it looks: `/metrics` is served from a query with no caller check, it is public, and whoever scrapes it archives it permanently. Today's canister-side `take(10)` is doing this privacy work by accident; it should be doing it on purpose.
 
-Scrape cost is not the reason. Almost every value on the endpoint is a stored counter read directly; the per-app families read rows that `event_aggregations` maintains as events arrive, and rank them at scrape rather than recomputing them. Two MCP gauges do scan their map per scrape and say so in their own help text, over 85 and 1 entries respectively. The floor is a privacy measure and stands on that alone.
+Scrape cost is not the reason. Almost every value on the endpoint is a stored counter read directly; the per-app families read lists that `event_aggregations` maintains as events arrive, and rank them at scrape rather than recomputing them. Two MCP gauges do scan their map per scrape and say so in their own help text, over 85 and 1 entries respectively. The floor is a privacy measure and stands on that alone.
 
 **Four of today's panels die with nothing replacing them.** Bounce Rate, both cumulative-session-length panels, and Registration Rates. Three more die by merging into a panel that answers the same question better.
 

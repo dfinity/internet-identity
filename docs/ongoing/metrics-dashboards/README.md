@@ -78,9 +78,9 @@ Three facts from the implementation on `feat/session-devices-settings` decide wh
 
 **A sign-in always creates a session.** `prepare_account_session` calls `create_session` unconditionally; no path finds and reuses an existing one. One ceremony is one new session, a person signing in from three browsers creates three, and there is no returning sign-in to count. What the ceremony does distinguish is the browser: it computes `known_device` and records a `RegisterSessionDevice` operation only when the browser is new to the identity.
 
-**Every use carries its own history.** `stamp_session_refresh` holds the session's `created_at`, its previous `last_refreshed` and the current time before overwriting anything, so the age of the relationship and the gap since its last use are both free at that point. `last_refreshed` is `None` until first use, making "was this ever used" an observable transition rather than an inference.
+**Every use carries its own history.** `record_session_use` holds the session's `created_at`, its previous `last_refreshed_ns` and the current time before overwriting anything, so the age of the relationship and the gap since its last use are both free at that point. `last_refreshed_ns` is `None` until first use, making "was this ever used" an observable transition rather than an inference.
 
-**An ending is mostly invisible.** Expiry writes nothing — the storage comment on the cap states that "a session can expire with no write anywhere, so the count drifts upwards". Only two things remove an expired session and neither is a sweep: `reclaim_sessions` runs once an identity holds 500 sessions, which is almost nobody, and `stamp_session_refresh` drops dead sessions from the row it was already rewriting, which only reaches apps somebody still uses.
+**An ending is mostly invisible.** Expiry writes nothing — the storage comment on the cap states that "a session can expire with no write anywhere, so the count drifts upwards". Only two things remove an expired session and neither is a sweep: `reclaim_sessions` runs once an identity holds 500 sessions, which is almost nobody, and `record_session_use` drops dead sessions from the list it was already rewriting, which only reaches apps somebody still uses.
 
 So anything observed at removal is drawn from relationships still alive, and the abandoned ones — the population most worth knowing about — are the ones missing. Every session panel here is built from creation and use, which are complete. The one counter observed at removal counts deliberate endings only, and says so in its title.
 
@@ -113,14 +113,14 @@ Cost is what it takes the canister to produce the number. Sorting this into now,
 | `internet_identity_session_gap_seconds`                | add    | histogram | one subtraction where refresh already writes     |
 | `internet_identity_sessions_revoked_total{reason}`     | add    | counter   | one increment at each of four revoke call sites  |
 | `internet_identity_identities_per_app{dapp}`           | add    | gauge     | read and sort a count already stored             |
-| `internet_identity_live_sessions`                      | add    | gauge     | needs a pass over the session rows               |
-| `internet_identity_account_counter_discrepancy_count`  | keep   | gauge     | already published, never plotted                 |
+| `internet_identity_live_sessions`                      | add    | gauge     | needs a pass over the account reference lists   |
+| `internet_identity_account_counter_discrepancy_count`  | inert  | gauge     | published, and nothing increments it any more                    |
 | `internet_identity_anchor_operations_counter`          | change | counter   | move to persistent state so it survives upgrade  |
 | `internet_identity_daily_active_anchors_by_domain`     | remove | gauge     | an access-method label on a count of people      |
 | `internet_identity_prepare_delegation_count`           | remove | gauge     | superseded by `sign_ins_total`                   |
 | `internet_identity_prepare_delegation_session_seconds` | remove | gauge     | measures requested lifetime, not time signed in  |
 | `internet_identity_delegation_counter`                 | remove | gauge     | superseded by `sign_ins_total`                   |
 
-Three panels — live sign-ins, apps per person, browsers per person — need something that walks the session rows, which nothing does today. They are on the pages because they are wanted, not because they are cheap.
+Three panels — live sign-ins, apps per person, browsers per person — need something that walks an identity's account reference lists, which nothing does today. They are on the pages because they are wanted, not because they are cheap.
 
 </details>
