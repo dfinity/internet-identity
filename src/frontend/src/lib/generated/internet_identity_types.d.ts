@@ -1644,7 +1644,7 @@ export type RegistrationFlowNextStep = {
     'Finish' : null
   };
 export type RegistrationId = string;
-export interface RevokeDeviceSessionsRequest {
+export interface RevokeBrowserSessionsRequest {
   'browser_id' : number,
   'identity_number' : UserNumber,
 }
@@ -2587,7 +2587,7 @@ export interface _SERVICE {
    */
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'revoke_browser_sessions' : ActorMethod<
-    [RevokeDeviceSessionsRequest],
+    [RevokeBrowserSessionsRequest],
     { 'Ok' : null } |
       { 'Err' : SessionRevokeError }
   >,

@@ -12,7 +12,7 @@ use canister_tests::framework::{
 use internet_identity_interface::internet_identity::types::{
     AccountSessionError, AppGetDelegationRequest, AppPrepareDelegationRequest, AppSessionError,
     BrowserInfo, GetAccountSessionRequest, Permissions, PrepareAccountSessionRequest,
-    PrepareAccountSessionResponse, RevokeDeviceSessionsRequest,
+    PrepareAccountSessionResponse, RevokeBrowserSessionsRequest,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -717,7 +717,7 @@ fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
     let second_principal = Principal::self_authenticating(&second_app.user_key);
 
     let mut other_browser = session_request_from(identity_number, &BrowserKey::new(2));
-    other_browser.device_name = "Firefox on Linux".to_string();
+    other_browser.browser_name = "Firefox on Linux".to_string();
     let untouched =
         prepare_account_session(&env, canister_id, principal_1(), other_browser)?.unwrap();
     let untouched_principal = Principal::self_authenticating(&untouched.user_key);
@@ -736,7 +736,7 @@ fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
         &env,
         canister_id,
         principal_1(),
-        RevokeDeviceSessionsRequest {
+        RevokeBrowserSessionsRequest {
             identity_number,
             browser_id,
         },

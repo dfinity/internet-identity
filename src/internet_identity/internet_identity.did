@@ -1108,7 +1108,7 @@ type AppGetDelegationRequest = record {
 };
 
 
-type RevokeDeviceSessionsRequest = record {
+type RevokeBrowserSessionsRequest = record {
     identity_number : UserNumber;
     browser_id : nat32;
 };
@@ -2000,7 +2000,7 @@ service : (opt InternetIdentityInit) -> {
     // session was already gone. An app can revoke only its own session.
     app_revoke_session : () -> ();
 
-    revoke_browser_sessions : (RevokeDeviceSessionsRequest) -> (variant { Ok; Err : SessionRevokeError });
+    revoke_browser_sessions : (RevokeBrowserSessionsRequest) -> (variant { Ok; Err : SessionRevokeError });
 
     prepare_account_delegation : (
         anchor_number : UserNumber,

@@ -810,7 +810,7 @@ export const idlFactory = ({ IDL }) => {
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
   });
-  const RevokeDeviceSessionsRequest = IDL.Record({
+  const RevokeBrowserSessionsRequest = IDL.Record({
     'browser_id' : IDL.Nat32,
     'identity_number' : UserNumber,
   });
@@ -1452,7 +1452,7 @@ export const idlFactory = ({ IDL }) => {
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
     'replace' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'revoke_browser_sessions' : IDL.Func(
-        [RevokeDeviceSessionsRequest],
+        [RevokeBrowserSessionsRequest],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : SessionRevokeError })],
         [],
       ),

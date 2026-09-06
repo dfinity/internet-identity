@@ -25,7 +25,7 @@ use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountSessionError, AnchorNumber, AppGetDelegationRequest,
     AppPrepareDelegationRequest, AppPrepareDelegationResponse, AppSessionError, Delegation,
     FrontendHostname, GetAccountSessionRequest, GetAccountSessionResponse,
-    PrepareAccountSessionRequest, PrepareAccountSessionResponse, RevokeDeviceSessionsRequest,
+    PrepareAccountSessionRequest, PrepareAccountSessionResponse, RevokeBrowserSessionsRequest,
     SessionRevokeError, SignedDelegation, Timestamp,
 };
 use serde_bytes::ByteBuf;
@@ -451,7 +451,7 @@ fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {
 }
 
 pub fn revoke_browser_sessions(
-    request: RevokeDeviceSessionsRequest,
+    request: RevokeBrowserSessionsRequest,
 ) -> Result<(), SessionRevokeError> {
     check_authorization(request.identity_number)
         .map_err(|err| SessionRevokeError::Unauthorized(err.principal))?;
