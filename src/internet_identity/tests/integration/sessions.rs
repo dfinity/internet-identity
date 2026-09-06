@@ -38,7 +38,7 @@ fn session_request_from(
         identity_number,
         origin: ORIGIN.to_string(),
         account_number: None,
-        device_name: "Chrome on MacBook".to_string(),
+        browser_name: "Chrome on MacBook".to_string(),
         current_browser_key: browser.public_key(),
         current_browser_key_signature: browser.sign(&session_key, &next_browser_key),
         next_browser_key_signature: browser
@@ -773,7 +773,7 @@ fn should_refuse_a_signature_from_another_key() -> Result<(), RejectResponse> {
         BrowserKey::new(9).sign(&request.session_key, &request.next_browser_key);
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
-    assert_eq!(result, Err(AccountSessionError::InvalidDeviceKey));
+    assert_eq!(result, Err(AccountSessionError::InvalidBrowserKey));
 
     Ok(())
 }
@@ -791,7 +791,7 @@ fn should_refuse_a_signature_over_another_session_key() -> Result<(), RejectResp
     request.session_key = ByteBuf::from(vec![2; 32]);
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
-    assert_eq!(result, Err(AccountSessionError::InvalidDeviceKey));
+    assert_eq!(result, Err(AccountSessionError::InvalidBrowserKey));
 
     Ok(())
 }
@@ -806,7 +806,7 @@ fn should_refuse_a_key_that_is_not_a_public_key() -> Result<(), RejectResponse> 
     request.current_browser_key = ByteBuf::from(vec![0; 91]);
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
-    assert_eq!(result, Err(AccountSessionError::InvalidDeviceKey));
+    assert_eq!(result, Err(AccountSessionError::InvalidBrowserKey));
 
     Ok(())
 }
@@ -854,7 +854,7 @@ fn should_register_a_second_browser_for_a_key_it_has_not_seen() -> Result<(), Re
     .unwrap();
 
     let mut second = session_request_from(identity_number, &BrowserKey::new(2));
-    second.device_name = "Firefox on Linux".to_string();
+    second.browser_name = "Firefox on Linux".to_string();
     prepare_account_session(&env, canister_id, principal_1(), second)?.unwrap();
 
     let devices = identity_info(&env, canister_id, principal_1(), identity_number)?
@@ -1017,7 +1017,7 @@ fn should_refuse_a_replayed_announcement() -> Result<(), RejectResponse> {
         session_request_from(identity_number, &browser),
     )?;
 
-    assert_eq!(replayed, Err(AccountSessionError::InvalidDeviceKey));
+    assert_eq!(replayed, Err(AccountSessionError::InvalidBrowserKey));
 
     Ok(())
 }
@@ -1048,7 +1048,7 @@ fn should_refuse_a_retired_key_and_accept_the_successor() -> Result<(), RejectRe
             principal_1(),
             session_request_from(identity_number, &browser),
         )?,
-        Err(AccountSessionError::StaleDeviceKey)
+        Err(AccountSessionError::StaleBrowserKey)
     );
 
     let retried = prepare_account_session(
@@ -1088,7 +1088,7 @@ fn should_refuse_a_successor_another_browser_holds() -> Result<(), RejectRespons
         attacker.sign(&request.session_key, &request.next_browser_key);
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
-    assert_eq!(result, Err(AccountSessionError::InvalidDeviceKey));
+    assert_eq!(result, Err(AccountSessionError::InvalidBrowserKey));
 
     Ok(())
 }
@@ -1151,7 +1151,7 @@ fn should_refuse_a_successor_the_caller_cannot_prove() -> Result<(), RejectRespo
         browser.sign_as_successor(&request.session_key, &browser.public_key());
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
-    assert_eq!(result, Err(AccountSessionError::InvalidDeviceKey));
+    assert_eq!(result, Err(AccountSessionError::InvalidBrowserKey));
 
     Ok(())
 }
@@ -1174,7 +1174,7 @@ fn should_refuse_a_successor_equal_to_the_key_presented() -> Result<(), RejectRe
         browser.sign_as_successor(&request.session_key, &browser.public_key());
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
-    assert_eq!(result, Err(AccountSessionError::InvalidDeviceKey));
+    assert_eq!(result, Err(AccountSessionError::InvalidBrowserKey));
 
     Ok(())
 }
@@ -1239,7 +1239,7 @@ fn should_refuse_a_successor_another_browser_holds_even_when_proven() -> Result<
         victim.sign_as_successor(&request.session_key, &attacker.public_key());
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
-    assert_eq!(result, Err(AccountSessionError::InvalidDeviceKey));
+    assert_eq!(result, Err(AccountSessionError::InvalidBrowserKey));
 
     Ok(())
 }
