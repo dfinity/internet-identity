@@ -3,8 +3,8 @@ import "fake-indexeddb/auto";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import {
-  fromCanisterSessionDevices,
-  signOutSessionDevice,
+  fromCanisterBrowsers,
+  signOutBrowser,
 } from "./sessionDevices";
 
 const device = (
@@ -19,14 +19,14 @@ const device = (
   last_used: lastUsedNanos,
 });
 
-describe("fromCanisterSessionDevices", () => {
+describe("fromCanisterBrowsers", () => {
   it("reports no devices for an identity that has never created a session", () => {
-    expect(fromCanisterSessionDevices([])).toEqual([]);
+    expect(fromCanisterBrowsers([])).toEqual([]);
   });
 
   it("shows the most recently used browser first", () => {
     expect(
-      fromCanisterSessionDevices([
+      fromCanisterBrowsers([
         [
           device(1, "Firefox on Linux", BigInt(1_000_000_000)),
           device(2, "Chrome on macOS", BigInt(3_000_000_000)),
@@ -38,7 +38,7 @@ describe("fromCanisterSessionDevices", () => {
 
   it("orders on use rather than on registration", () => {
     expect(
-      fromCanisterSessionDevices([
+      fromCanisterBrowsers([
         [
           device(
             1,
@@ -54,7 +54,7 @@ describe("fromCanisterSessionDevices", () => {
 
   it("converts both timestamps to milliseconds", () => {
     expect(
-      fromCanisterSessionDevices([
+      fromCanisterBrowsers([
         [device(1, "Chrome", BigInt(1_500_000_000), BigInt(4_200_000_000))],
       ]),
     ).toEqual([
@@ -69,7 +69,7 @@ describe("fromCanisterSessionDevices", () => {
   });
 
   it("marks the browser being read from, so two of one name can be told apart", () => {
-    const marked = fromCanisterSessionDevices(
+    const marked = fromCanisterBrowsers(
       [
         [
           device(1, "Chrome on Mac", BigInt(1_000_000_000)),
@@ -87,7 +87,7 @@ describe("fromCanisterSessionDevices", () => {
 
   it("marks nothing when this browser has never created a session", () => {
     expect(
-      fromCanisterSessionDevices([
+      fromCanisterBrowsers([
         [device(1, "Chrome on Mac", BigInt(1_000_000_000))],
       ]).some((entry) => entry.isCurrent),
     ).toBe(false);
@@ -96,7 +96,7 @@ describe("fromCanisterSessionDevices", () => {
   /// An id from another browser's record must not mark an entry here.
   it("marks nothing when the id is one this identity does not hold", () => {
     expect(
-      fromCanisterSessionDevices(
+      fromCanisterBrowsers(
         [[device(1, "Chrome on Mac", BigInt(1_000_000_000))]],
         99,
       ).some((entry) => entry.isCurrent),
@@ -104,40 +104,40 @@ describe("fromCanisterSessionDevices", () => {
   });
 });
 
-describe("signOutSessionDevice", () => {
+describe("signOutBrowser", () => {
   it("names the browser by id and nothing else", async () => {
-    const revoke_device_sessions = vi.fn(() => Promise.resolve({ Ok: null }));
+    const revoke_browser_sessions = vi.fn(() => Promise.resolve({ Ok: null }));
     const actor = {
-      revoke_device_sessions,
+      revoke_browser_sessions,
     } as unknown as ActorSubclass<_SERVICE>;
 
-    await signOutSessionDevice(actor, BigInt(10_000), 3);
+    await signOutBrowser(actor, BigInt(10_000), 3);
 
-    expect(revoke_device_sessions).toHaveBeenCalledWith({
+    expect(revoke_browser_sessions).toHaveBeenCalledWith({
       identity_number: BigInt(10_000),
-      device_id: 3,
+      browser_id: 3,
     });
   });
 
   it("surfaces an internal failure", async () => {
     const actor = {
-      revoke_device_sessions: () =>
+      revoke_browser_sessions: () =>
         Promise.resolve({ Err: { InternalCanisterError: "boom" } }),
     } as unknown as ActorSubclass<_SERVICE>;
 
     await expect(
-      signOutSessionDevice(actor, BigInt(10_000), 3),
+      signOutBrowser(actor, BigInt(10_000), 3),
     ).rejects.toThrow("boom");
   });
 
   it("surfaces an unauthorized refusal", async () => {
     const actor = {
-      revoke_device_sessions: () =>
+      revoke_browser_sessions: () =>
         Promise.resolve({ Err: { Unauthorized: "2vxsx-fae" } }),
     } as unknown as ActorSubclass<_SERVICE>;
 
     await expect(
-      signOutSessionDevice(actor, BigInt(10_000), 3),
+      signOutBrowser(actor, BigInt(10_000), 3),
     ).rejects.toThrow(/Not authorized/);
   });
 
@@ -157,7 +157,7 @@ describe("signOutSessionDevice", () => {
       accountPrincipal: "2vxsx-fae",
     };
     const actor = {
-      revoke_device_sessions: vi.fn(() => Promise.resolve({ Ok: null })),
+      revoke_browser_sessions: vi.fn(() => Promise.resolve({ Ok: null })),
     } as unknown as ActorSubclass<_SERVICE>;
     // This browser is device 3.
     await idbSet(
@@ -171,12 +171,12 @@ describe("signOutSessionDevice", () => {
       record,
     );
     // Signing another browser out must leave this one signed in locally.
-    await signOutSessionDevice(actor, BigInt(10_000), 9);
+    await signOutBrowser(actor, BigInt(10_000), 9);
     expect(await appSessionsForOrigin("https://app.example.com")).toHaveLength(
       1,
     );
 
-    await signOutSessionDevice(actor, BigInt(10_000), 3);
+    await signOutBrowser(actor, BigInt(10_000), 3);
     expect(await appSessionsForOrigin("https://app.example.com")).toEqual([]);
   });
 });

@@ -5,8 +5,8 @@
   import { fromCanisterMcpConfig } from "$lib/utils/mcpConfig";
   import CliAccessSection from "./components/CliAccessSection.svelte";
   import McpTrustedServersSection from "./components/McpTrustedServersSection.svelte";
-  import SessionDevicesSection from "./components/SessionDevicesSection.svelte";
-  import { fromCanisterSessionDevices } from "./sessionDevices";
+  import BrowsersSection from "./components/BrowsersSection.svelte";
+  import { fromCanisterBrowsers } from "./sessionDevices";
   import { currentDeviceId } from "$lib/stores/browser-key.store";
   import type { PageProps } from "./$types";
 
@@ -29,7 +29,7 @@
   });
 
   const sessionDevices = $derived(
-    fromCanisterSessionDevices(data.identityInfo.session_devices, thisBrowser),
+    fromCanisterBrowsers(data.identityInfo.browsers, thisBrowser),
   );
 </script>
 
@@ -48,7 +48,7 @@
     identityNumber={$authenticatedStore.identityNumber}
     {mcpConfig}
   />
-  <SessionDevicesSection
+  <BrowsersSection
     identityNumber={$authenticatedStore.identityNumber}
     devices={sessionDevices}
   />

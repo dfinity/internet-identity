@@ -6,11 +6,11 @@
   import Badge from "$lib/components/ui/Badge.svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { toaster } from "$lib/components/utils/toaster";
-  import { signOutSessionDevice, type SessionDevice } from "../sessionDevices";
+  import { signOutBrowser, type Browser } from "../sessionDevices";
 
   interface Props {
     identityNumber: bigint;
-    devices: SessionDevice[];
+    devices: Browser[];
   }
 
   const { identityNumber, devices }: Props = $props();
@@ -19,10 +19,10 @@
   let signedOut = $state<number[]>([]);
   let signingOut = $state<number | undefined>(undefined);
 
-  const handleSignOut = async (device: SessionDevice) => {
+  const handleSignOut = async (device: Browser) => {
     signingOut = device.id;
     try {
-      await signOutSessionDevice(
+      await signOutBrowser(
         $authenticatedStore.actor,
         identityNumber,
         device.id,
