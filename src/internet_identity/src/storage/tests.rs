@@ -3721,6 +3721,9 @@ mod tracked_default_eviction_tests {
     use super::remove_at;
     use super::write_at;
     use crate::storage::account::{AccountKey, AccountReference};
+    use crate::storage::storable::account_reference_list::StorableAccountReferenceList;
+    use crate::storage::storable::accounts_counter::StorableAccountsCounter;
+    use crate::storage::storable::application::StorableApplication;
     use crate::storage::{
         EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK, MAX_EVICTABLE_DEFAULT_ACCOUNTS,
         MAX_EVICTIONS_PER_CALL,
@@ -3812,21 +3815,88 @@ mod tracked_default_eviction_tests {
         );
     }
 
+    /// Puts an identity over the tracked-default cap without going through the write path,
+    /// which is the one thing that can no longer produce this state.
+    fn plant_over_the_cap(
+        storage: &mut Storage<VectorMemory>,
+        anchor_number: AnchorNumber,
+        lists: u64,
+    ) {
+        for index in 0..lists {
+            let origin = origin_of(index);
+            let application_number = index;
+            storage.lookup_application_with_origin_memory.insert(
+                crate::storage::StorableOriginSha256::from_origin(&origin),
+                application_number,
+            );
+            // Counters that match what is planted, or removing one under-runs them.
+            storage.stable_application_memory.insert(
+                application_number,
+                StorableApplication {
+                    origin,
+                    stored_accounts: 0,
+                    stored_account_references: 1,
+                    tombstones: 0,
+                },
+            );
+            storage.stable_account_reference_list_memory.insert(
+                (anchor_number, application_number),
+                StorableAccountReferenceList::try_from(vec![AccountReference::new(
+                    None,
+                    Some(index + 1),
+                )])
+                .unwrap(),
+            );
+        }
+        storage.set_counters_for_testing(anchor_number, 0, lists);
+        storage
+            .stable_account_counter_memory
+            .set(StorableAccountsCounter {
+                stored_accounts: 0,
+                stored_account_references: lists,
+            })
+            .unwrap();
+    }
+
+    /// Eviction is a consequence of the write, so it follows any write that leaves the
+    /// identity over the cap — not only the one that created a list, which is what used to
+    /// carry it.
+    #[test]
+    fn a_write_to_an_origin_that_already_has_a_list_evicts_too() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let lists = MAX_EVICTABLE_DEFAULT_ACCOUNTS + 100;
+        plant_over_the_cap(&mut storage, anchor_number, lists);
+
+        // An origin that already has a list, so this write creates nothing — which is
+        // exactly the case the old order skipped the sweep for.
+        record_use(
+            &mut storage,
+            anchor_number,
+            origin_of(lists - 1),
+            None,
+            1_000_000,
+        )
+        .unwrap();
+
+        assert_eq!(
+            lists - storage.evictable_default_lists(anchor_number).len() as u64,
+            MAX_EVICTIONS_PER_CALL,
+            "a write that created nothing still evicted"
+        );
+    }
+
     #[test]
     fn one_call_evicts_at_most_a_bounded_batch() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        for index in 0..MAX_EVICTABLE_DEFAULT_ACCOUNTS * 3 {
-            let _application_number = storage
-                .write_account_state_for_testing(
-                    anchor_number,
-                    write_at(
-                        &origin_of(index),
-                        vec![AccountReference::new(None, Some(index + 1))],
-                        None,
-                    ),
-                )
-                .unwrap();
-        }
+        // Planted rather than written. An identity can no longer *reach* far over the cap
+        // through the write path — eviction now runs on the write that would take it
+        // there — so this is the state an upgrade leaves behind from before the cap
+        // existed, which is the only way the batch bound is still the binding one.
+        plant_over_the_cap(
+            &mut storage,
+            anchor_number,
+            MAX_EVICTABLE_DEFAULT_ACCOUNTS * 3,
+        );
         let before = storage.evictable_default_lists(anchor_number).len() as u64;
 
         record_use(
@@ -4020,17 +4090,17 @@ mod tracked_default_eviction_tests {
                 .unwrap();
         }
 
-        assert_eq!(
-            storage.tracked_default_account_upper_bound(anchor_number),
-            3
-        );
+        // The bound eviction triggers on is every account reference that is not a named
+        // account, taken from counters rather than by looking at the lists.
+        let tracked_defaults = |storage: &Storage<VectorMemory>| {
+            let counter = storage.get_account_counter(anchor_number);
+            counter.stored_account_references - counter.stored_accounts
+        };
+        assert_eq!(tracked_defaults(&storage), 3);
 
         sign_in_at(&mut storage, anchor_number, 100);
 
-        assert_eq!(
-            storage.tracked_default_account_upper_bound(anchor_number),
-            4
-        );
+        assert_eq!(tracked_defaults(&storage), 4);
         assert_eq!(storage.evictable_default_lists(anchor_number).len(), 1);
     }
 
