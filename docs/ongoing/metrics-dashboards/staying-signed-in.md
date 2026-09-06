@@ -203,7 +203,7 @@ xychart-beta
 <details>
 <summary><b>Today:</b> nothing measures this, though the code already knows</summary>
 
-`prepare_account_session` computes `known_device` and records a `RegisterSessionDevice` operation only when the browser is new to the identity. The branch exists; nothing counts it.
+`prepare_account_session` computes whether the browser is known and records a `RegisterBrowser` operation only when it is new to the identity. The branch exists; nothing counts it.
 
 Note what this is not. A sign-in never reuses a session, so a repeat ceremony on a known browser does not mean a returning user — it means the previous session ended, or the person is signing in to something else. The browser is the part that carries history.
 
@@ -315,7 +315,7 @@ The registry and its cap are entirely unobserved. [Deliberate endings](#delibera
 The same walk again, bucketed per identity and app pair.
 
 ```promql
-sum by (le) (internet_identity_session_devices_per_identity_bucket)
+sum by (le) (internet_identity_browsers_per_identity_bucket)
 ```
 
 </details>

@@ -76,7 +76,7 @@ How somebody authenticated is a separate question from how much an app is used, 
 
 Three facts from the implementation on `feat/session-devices-settings` decide which session questions are answerable at all. Getting them wrong produces panels that look reasonable and are drawn from a biased sample.
 
-**A sign-in always creates a session.** `prepare_account_session` calls `create_session` unconditionally; no path finds and reuses an existing one. One ceremony is one new session, a person signing in from three browsers creates three, and there is no returning sign-in to count. What the ceremony does distinguish is the browser: it computes `known_device` and records a `RegisterSessionDevice` operation only when the browser is new to the identity.
+**A sign-in always creates a session.** `prepare_account_session` calls `create_session` unconditionally; no path finds and reuses an existing one. One ceremony is one new session, a person signing in from three browsers creates three, and there is no returning sign-in to count. What the ceremony does distinguish is the browser: it computes whether the browser is known and records a `RegisterBrowser` operation only when it is new to the identity.
 
 **Every use carries its own history.** `record_session_use` holds the session's `created_at`, its previous `last_refreshed_ns` and the current time before overwriting anything, so the age of the relationship and the gap since its last use are both free at that point. `last_refreshed_ns` is `None` until first use, making "was this ever used" an observable transition rather than an inference.
 
