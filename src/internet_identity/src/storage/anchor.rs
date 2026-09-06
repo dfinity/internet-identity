@@ -2,11 +2,11 @@ use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
+use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
-use crate::storage::storable::session_device::StorableSessionDevice;
 use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
 use crate::storage::storable::verified_email::StorableVerifiedEmail;
 use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
@@ -39,20 +39,20 @@ pub struct Anchor {
     pub(crate) email_recovery: Vec<EmailRecoveryCredential>,
     /// Capped by `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
     pub(crate) verified_emails: Vec<VerifiedEmail>,
-    /// Capped by `MAX_SESSION_DEVICES`.
-    pub(crate) session_devices: Vec<SessionDevice>,
-    pub(crate) next_session_device_id: SessionDeviceId,
+    /// Capped by `MAX_BROWSERS`.
+    pub(crate) browsers: Vec<Browser>,
+    pub(crate) next_browser_id: BrowserId,
     pub(crate) metadata: Option<HashMap<String, MetadataEntry>>,
     pub(crate) name: Option<String>,
     pub(crate) created_at: Option<Timestamp>,
 }
 
 /// Bounds the device list, which rides on the anchor blob.
-pub const MAX_SESSION_DEVICES: usize = 20;
+pub const MAX_BROWSERS: usize = 20;
 
 /// Why a browser's presented keys cannot be resolved.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SessionDeviceError {
+pub enum BrowserError {
     /// The announced successor is a key another browser of this anchor already holds.
     ///
     /// Presented keys are visible on the wire, so without this a caller could announce a
@@ -78,23 +78,23 @@ pub enum SessionDeviceError {
 
 /// A browser this anchor has signed in from. The name is self-reported by the client.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SessionDevice {
-    pub id: SessionDeviceId,
+pub struct Browser {
+    pub id: BrowserId,
     /// The browser's own public key, DER-encoded. What the entry is looked up by.
-    pub current_device_key: PublicKey,
+    pub current_browser_key: PublicKey,
     /// The successor the browser announced at its last sign-in, also accepted as a proof.
-    pub next_device_key: PublicKey,
+    pub next_browser_key: PublicKey,
     pub name: String,
     pub created_at: Timestamp,
     pub last_used: Timestamp,
 }
 
-impl From<StorableSessionDevice> for SessionDevice {
-    fn from(value: StorableSessionDevice) -> Self {
-        SessionDevice {
+impl From<StorableBrowser> for Browser {
+    fn from(value: StorableBrowser) -> Self {
+        Browser {
             id: value.id,
-            current_device_key: ByteBuf::from(value.current_device_key),
-            next_device_key: ByteBuf::from(value.next_device_key),
+            current_browser_key: ByteBuf::from(value.current_browser_key),
+            next_browser_key: ByteBuf::from(value.next_browser_key),
             name: value.name,
             created_at: value.created_at,
             last_used: value.last_used,
@@ -102,12 +102,12 @@ impl From<StorableSessionDevice> for SessionDevice {
     }
 }
 
-impl From<SessionDevice> for StorableSessionDevice {
-    fn from(value: SessionDevice) -> Self {
-        StorableSessionDevice {
+impl From<Browser> for StorableBrowser {
+    fn from(value: Browser) -> Self {
+        StorableBrowser {
             id: value.id,
-            current_device_key: value.current_device_key.into_vec(),
-            next_device_key: value.next_device_key.into_vec(),
+            current_browser_key: value.current_browser_key.into_vec(),
+            next_browser_key: value.next_browser_key.into_vec(),
             name: value.name,
             created_at: value.created_at,
             last_used: value.last_used,
@@ -247,8 +247,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             openid_credentials,
             email_recovery,
             verified_emails,
-            session_devices,
-            next_session_device_id,
+            browsers,
+            next_browser_id,
             metadata,
             name,
             created_at,
@@ -268,13 +268,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 .map(StorableVerifiedEmail::from)
                 .collect(),
         );
-        let next_session_device_id = Some(next_session_device_id);
-        let session_devices = Some(
-            session_devices
-                .into_iter()
-                .map(StorableSessionDevice::from)
-                .collect(),
-        );
+        let next_browser_id = Some(next_browser_id);
+        let browsers = Some(browsers.into_iter().map(StorableBrowser::from).collect());
 
         let (mut passkey_credentials, mut recovery_keys, mut recovery_devices) =
             (vec![], vec![], vec![]);
@@ -514,8 +509,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 recovery_keys,
                 email_recovery,
                 verified_emails,
-                session_devices,
-                next_session_device_id,
+                browsers,
+                next_browser_id,
             },
         )
     }
@@ -531,8 +526,8 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             recovery_keys,
             email_recovery,
             verified_emails,
-            session_devices,
-            next_session_device_id,
+            browsers,
+            next_browser_id,
         } = storable_anchor;
 
         let name = name.clone();
@@ -551,12 +546,12 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             .into_iter()
             .map(VerifiedEmail::from)
             .collect();
-        let session_devices = session_devices
+        let browsers = browsers
             .unwrap_or_default()
             .into_iter()
-            .map(SessionDevice::from)
+            .map(Browser::from)
             .collect();
-        let next_session_device_id = next_session_device_id.unwrap_or_default();
+        let next_browser_id = next_browser_id.unwrap_or_default();
 
         let mut devices = passkey_credentials
             .unwrap_or_default()
@@ -651,8 +646,8 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             openid_credentials,
             email_recovery,
             verified_emails,
-            session_devices,
-            next_session_device_id,
+            browsers,
+            next_browser_id,
             devices,
             metadata,
         }
@@ -679,8 +674,8 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
                 openid_credentials: vec![],
                 email_recovery: vec![],
                 verified_emails: vec![],
-                session_devices: vec![],
-                next_session_device_id: 0,
+                browsers: vec![],
+                next_browser_id: 0,
                 anchor_number,
                 devices,
                 metadata,
@@ -707,11 +702,11 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
             .into_iter()
             .map(VerifiedEmail::from)
             .collect();
-        let session_devices = storable_anchor
-            .session_devices
+        let browsers = storable_anchor
+            .browsers
             .unwrap_or_default()
             .into_iter()
-            .map(SessionDevice::from)
+            .map(Browser::from)
             .collect();
 
         Anchor {
@@ -720,8 +715,8 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
             openid_credentials,
             email_recovery,
             verified_emails,
-            session_devices,
-            next_session_device_id: storable_anchor.next_session_device_id.unwrap_or_default(),
+            browsers,
+            next_browser_id: storable_anchor.next_browser_id.unwrap_or_default(),
             metadata,
             name,
             created_at,
@@ -730,91 +725,91 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
 }
 
 impl Anchor {
-    pub fn session_devices(&self) -> &[SessionDevice] {
-        &self.session_devices
+    pub fn browsers(&self) -> &[Browser] {
+        &self.browsers
     }
 
     /// Resolves the browser a sign-in came from by the public key it proved possession of.
     ///
     /// An entry is reached only by the successor it announced. Presenting it promotes that
     /// successor, retires the key it replaces, and leaves the entry awaiting
-    /// `next_device_key` — what the browser presents at its next sign-in. A key some entry
-    /// has already retired is refused with [`SessionDeviceError::StaleDeviceKey`] rather
+    /// `next_browser_key` — what the browser presents at its next sign-in. A key some entry
+    /// has already retired is refused with [`BrowserError::StaleDeviceKey`] rather
     /// than accepted or registered afresh, so a key is good for exactly one sign-in and a
     /// browser that lost a response is told to promote its own successor instead of
     /// becoming a second list. A key no entry holds at all registers a new browser.
     ///
     /// At the cap the least recently used records are dropped, and their ids returned so
     /// the caller can end their sessions too.
-    pub fn resolve_session_device(
+    pub fn resolve_browser(
         &mut self,
-        current_device_key: PublicKey,
-        next_device_key: PublicKey,
+        current_browser_key: PublicKey,
+        next_browser_key: PublicKey,
         name: String,
         now: Timestamp,
-    ) -> Result<(SessionDeviceId, Vec<SessionDeviceId>), SessionDeviceError> {
-        if current_device_key == next_device_key {
-            return Err(SessionDeviceError::SuccessorMatchesCurrent);
+    ) -> Result<(BrowserId, Vec<BrowserId>), BrowserError> {
+        if current_browser_key == next_browser_key {
+            return Err(BrowserError::SuccessorMatchesCurrent);
         }
 
         // Two questions, and they are not the same one. An entry is *advanced* only by the
         // successor it is waiting for; an entry *holds* a key in either slot, which is what
         // a successor must not collide with.
         let entry_awaiting = |candidate: &PublicKey| {
-            self.session_devices
+            self.browsers
                 .iter()
-                .position(|device| device.next_device_key == *candidate)
+                .position(|device| device.next_browser_key == *candidate)
         };
         let entry_holding = |candidate: &PublicKey| {
-            self.session_devices.iter().position(|device| {
-                device.current_device_key == *candidate || device.next_device_key == *candidate
+            self.browsers.iter().position(|device| {
+                device.current_browser_key == *candidate || device.next_browser_key == *candidate
             })
         };
 
-        let advances = entry_awaiting(&current_device_key);
+        let advances = entry_awaiting(&current_browser_key);
         // The entry this request belongs to, which is not always one it can advance: a
         // browser retrying a lost sign-in still belongs to the entry that retired its key,
         // and re-announcing the successor it announced then is not stealing anyone's key.
-        let owner = entry_holding(&current_device_key);
-        let successor_holder = entry_holding(&next_device_key);
+        let owner = entry_holding(&current_browser_key);
+        let successor_holder = entry_holding(&next_browser_key);
         if successor_holder.is_some() && successor_holder != owner {
-            return Err(SessionDeviceError::SuccessorAlreadyInUse);
+            return Err(BrowserError::SuccessorAlreadyInUse);
         }
 
         if let Some(index) = advances {
-            let device = &mut self.session_devices[index];
-            device.current_device_key = current_device_key;
-            device.next_device_key = next_device_key;
+            let device = &mut self.browsers[index];
+            device.current_browser_key = current_browser_key;
+            device.next_browser_key = next_browser_key;
             device.last_used = now;
             return Ok((device.id, vec![]));
         }
 
         if owner.is_some() {
-            return Err(SessionDeviceError::StaleDeviceKey);
+            return Err(BrowserError::StaleDeviceKey);
         }
 
-        let id = self.next_session_device_id;
-        self.next_session_device_id = self.next_session_device_id.saturating_add(1);
-        self.session_devices.push(SessionDevice {
+        let id = self.next_browser_id;
+        self.next_browser_id = self.next_browser_id.saturating_add(1);
+        self.browsers.push(Browser {
             id,
-            current_device_key,
-            next_device_key,
+            current_browser_key,
+            next_browser_key,
             name,
             created_at: now,
             last_used: now,
         });
 
         let mut dropped = vec![];
-        while self.session_devices.len() > MAX_SESSION_DEVICES {
+        while self.browsers.len() > MAX_BROWSERS {
             let least_recently_used = self
-                .session_devices
+                .browsers
                 .iter()
                 .enumerate()
                 .min_by_key(|(_, device)| (device.last_used, device.id))
                 .map(|(index, _)| index);
             match least_recently_used {
                 Some(index) => {
-                    dropped.push(self.session_devices.remove(index).id);
+                    dropped.push(self.browsers.remove(index).id);
                 }
                 None => break,
             }
@@ -833,8 +828,8 @@ impl Anchor {
             openid_credentials: vec![],
             email_recovery: vec![],
             verified_emails: vec![],
-            session_devices: vec![],
-            next_session_device_id: 0,
+            browsers: vec![],
+            next_browser_id: 0,
             metadata: None,
             name: None,
         }

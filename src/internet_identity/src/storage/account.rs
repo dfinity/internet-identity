@@ -7,8 +7,8 @@ use crate::{
 use ic_cdk::trap;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
-    AccountInfo, AccountNameValidationError, AccountNumber, AnchorNumber, FrontendHostname,
-    SessionDeviceId, Timestamp, UserKey,
+    AccountInfo, AccountNameValidationError, AccountNumber, AnchorNumber, BrowserId,
+    FrontendHostname, Timestamp, UserKey,
 };
 use serde::{Deserialize, Serialize};
 
@@ -61,7 +61,7 @@ pub struct SessionRecord {
     pub valid_till_ns: Timestamp,
     pub max_idle_ns: u64,
     pub last_refreshed_ns: Option<Timestamp>,
-    pub device_id: SessionDeviceId,
+    pub browser_id: BrowserId,
     pub read_only: bool,
 }
 
@@ -96,13 +96,13 @@ impl SessionRecord {
     ///
     /// The extension is what separates an app in weekly use from one opened once and
     /// abandoned, which recency alone gets backwards — the abandoned one was touched more
-    /// recently. `device_id` only makes the order total.
-    pub fn reclaim_order(&self, now: Timestamp) -> (bool, Timestamp, SessionDeviceId) {
+    /// recently. `browser_id` only makes the order total.
+    pub fn reclaim_order(&self, now: Timestamp) -> (bool, Timestamp, BrowserId) {
         let last_used = self.last_refreshed_ns.unwrap_or(self.created_at_ns);
         (
             !self.is_over(now),
             last_used.saturating_add(self.demonstrated_use()),
-            self.device_id,
+            self.browser_id,
         )
     }
 }

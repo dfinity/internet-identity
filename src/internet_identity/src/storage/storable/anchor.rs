@@ -1,9 +1,9 @@
+use crate::storage::storable::browser::StorableBrowser;
+use crate::storage::storable::browser_id::StorableBrowserId;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::openid_credential::StorableOpenIdCredential;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
-use crate::storage::storable::session_device::StorableSessionDevice;
-use crate::storage::storable::session_device_id::StorableSessionDeviceId;
 use crate::storage::storable::verified_email::StorableVerifiedEmail;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
@@ -34,12 +34,12 @@ pub struct StorableAnchor {
     /// `Option` so pre-existing anchors decode cleanly.
     #[n(6)]
     pub verified_emails: Option<Vec<StorableVerifiedEmail>>,
-    /// Browsers this anchor has signed in from. Capped at `MAX_SESSION_DEVICES`.
+    /// Browsers this anchor has signed in from. Capped at `MAX_BROWSERS`.
     #[n(7)]
-    pub session_devices: Option<Vec<StorableSessionDevice>>,
-    /// Monotonic per-anchor allocator for `session_devices`. Ids are never reused.
+    pub browsers: Option<Vec<StorableBrowser>>,
+    /// Monotonic per-anchor allocator for `browsers`. Ids are never reused.
     #[n(8)]
-    pub next_session_device_id: Option<StorableSessionDeviceId>,
+    pub next_browser_id: Option<StorableBrowserId>,
 }
 
 impl Storable for StorableAnchor {
