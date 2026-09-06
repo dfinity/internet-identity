@@ -3742,6 +3742,7 @@ mod tracked_default_eviction_tests {
     use crate::storage::storable::account_reference_list::StorableAccountReferenceList;
     use crate::storage::storable::accounts_counter::StorableAccountsCounter;
     use crate::storage::storable::application::StorableApplication;
+    use crate::storage::CreateSessionParams;
     use crate::storage::{
         EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK, MAX_EVICTABLE_DEFAULT_ACCOUNTS,
         MAX_EVICTIONS_PER_CALL,
@@ -3766,6 +3767,72 @@ mod tracked_default_eviction_tests {
 
     fn sign_in_at(storage: &mut Storage<VectorMemory>, anchor_number: AnchorNumber, index: u64) {
         record_use(storage, anchor_number, origin_of(index), None, index + 1).unwrap();
+    }
+
+    /// Evicting a list takes its sessions' index entries with it, not just its accounts'.
+    ///
+    /// The property test cannot reach this: removal is only reachable through eviction, and
+    /// eviction needs five hundred origins. Without this, an index entry for a session on an
+    /// evicted list is left behind — it resolves to nothing, because the account entry does
+    /// go, so it grants nothing; but it is an orphan nothing will ever collect.
+    #[test]
+    fn evicting_a_list_takes_its_sessions_index_entries_with_it() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        // A real session, so it is really indexed. Signed in first, so it is the stalest
+        // list and therefore the first thing eviction gives up.
+        let doomed = origin_of(0);
+        let (key, _) = storage
+            .create_session(CreateSessionParams {
+                anchor_number,
+                origin: doomed.clone(),
+                account_number: None,
+                device_id: 1,
+                valid_till_ns: u64::MAX,
+                max_idle_ns: None,
+                read_only: false,
+                now_ns: 1,
+            })
+            .expect("signing in at a fresh origin");
+        let session_principals: Vec<_> = storage
+            .lookup_session_with_principal_memory
+            .iter()
+            .map(|(principal, _)| principal)
+            .collect();
+        assert_eq!(
+            session_principals.len(),
+            1,
+            "the session should be indexed to begin with"
+        );
+
+        // Everything else more recently used, so the session's list is what goes.
+        for index in 1..=MAX_EVICTABLE_DEFAULT_ACCOUNTS {
+            record_use(
+                &mut storage,
+                anchor_number,
+                origin_of(index),
+                None,
+                1_000 + index,
+            )
+            .unwrap();
+        }
+
+        assert_eq!(
+            storage.lookup_application_number_with_origin(&doomed),
+            None,
+            "the stalest list should have been evicted"
+        );
+        assert_eq!(
+            storage.lookup_session_with_principal(session_principals[0]),
+            None,
+            "its session must not still resolve"
+        );
+        assert_eq!(
+            storage.lookup_session_with_principal_memory.len(),
+            0,
+            "and must not be left behind in the index either"
+        );
+        assert!(storage.read_session(&key).is_none());
     }
 
     #[test]
