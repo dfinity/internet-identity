@@ -817,13 +817,13 @@ fn should_report_a_revoked_session_as_gone() -> Result<(), RejectResponse> {
     let identity_number = flows::register_anchor(&env, canister_id);
     let (prepared, session_principal) = create_session(&env, canister_id, identity_number);
 
-    revoke_device_sessions(
+    revoke_browser_sessions(
         &env,
         canister_id,
         principal_1(),
         RevokeDeviceSessionsRequest {
             identity_number,
-            device_id: prepared.device_id,
+            browser_id: prepared.browser_id,
         },
     )?
     .unwrap();
