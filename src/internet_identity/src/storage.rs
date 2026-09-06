@@ -3125,8 +3125,11 @@ impl<M: Memory + Clone> Storage<M> {
         // An absent list normalises to the derived default, which is how the first named
         // account at an origin does not cost the identity the default it had. A
         // tombstone normalises to nothing and stays that way.
-        // Read once and handed to the write: the gate moves this identity's session
-        // count and must not be handed a copy that has already gone stale.
+        // Read once and handed to the write, for two reasons: the gate moves this
+        // identity's session count and must not be handed a copy that has already gone
+        // stale, and an identity that does not exist has nothing to hold what is about to
+        // be written — the counters, the account reference lists and the session count all
+        // key on a record that would not be there.
         let mut anchor = self.read(anchor_number)?;
         let (mut account_references, config) =
             self.account_state_for_origin(anchor_number, &origin);
