@@ -671,7 +671,7 @@ fn should_leave_another_browsers_session_alone() -> Result<(), RejectResponse> {
     let (first, first_principal) = create_session(&env, canister_id, identity_number);
 
     let mut second_request = session_request_from(identity_number, &BrowserKey::new(2));
-    second_request.device_name = "Firefox on Linux".to_string();
+    second_request.browser_name = "Firefox on Linux".to_string();
     let second =
         prepare_account_session(&env, canister_id, principal_1(), second_request)?.unwrap();
     let second_principal = Principal::self_authenticating(&second.user_key);
