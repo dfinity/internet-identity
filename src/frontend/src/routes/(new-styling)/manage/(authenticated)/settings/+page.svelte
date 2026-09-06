@@ -7,7 +7,7 @@
   import McpTrustedServersSection from "./components/McpTrustedServersSection.svelte";
   import BrowsersSection from "./components/BrowsersSection.svelte";
   import { fromCanisterBrowsers } from "./browsers";
-  import { currentDeviceId } from "$lib/stores/browser-key.store";
+  import { currentBrowserId } from "$lib/stores/browser-key.store";
   import type { PageProps } from "./$types";
 
   const { data }: PageProps = $props();
@@ -23,7 +23,7 @@
   // way to tell which browser is asking: `identity_info` is signed by an access method.
   let thisBrowser = $state<number | undefined>(undefined);
   $effect(() => {
-    void currentDeviceId($authenticatedStore.identityNumber).then(
+    void currentBrowserId($authenticatedStore.identityNumber).then(
       (id) => (thisBrowser = id),
     );
   });
@@ -50,6 +50,6 @@
   />
   <BrowsersSection
     identityNumber={$authenticatedStore.identityNumber}
-    devices={browsers}
+    browsers={browsers}
   />
 </div>
