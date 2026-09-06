@@ -27,7 +27,9 @@ fn should_create_a_named_account() {
     storage.update_salt([17u8; 32]);
 
     // 1. Define additional account parameters
-    let anchor_number: AnchorNumber = 10_000;
+    let anchor = storage.allocate_anchor(0).unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.write(anchor).unwrap();
     let origin: FrontendHostname = "https://some.origin".to_string();
     let account_name = "account name".to_string();
 
@@ -99,7 +101,9 @@ fn should_list_accounts() {
     storage.update_salt([17u8; 32]);
 
     // 1. Define additional account parameters
-    let anchor_number: AnchorNumber = 10_000;
+    let anchor = storage.allocate_anchor(0).unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.write(anchor).unwrap();
     let origin: FrontendHostname = "https://some.origin".to_string();
     let account_name = "account name".to_string();
 
@@ -166,7 +170,9 @@ fn should_list_all_identity_accounts() {
     storage.update_salt([17u8; 32]);
 
     // 1. Define additional account parameters
-    let anchor_number: AnchorNumber = 10_000;
+    let anchor = storage.allocate_anchor(0).unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.write(anchor).unwrap();
     let account_name = "account name".to_string();
     let origin: FrontendHostname = "https://some.origin".to_string();
     let origin_2: FrontendHostname = "https://some-other.origin".to_string();
@@ -223,7 +229,9 @@ fn should_update_default_account() {
     storage.update_salt([17u8; 32]);
 
     // 1. Define parameters
-    let anchor_number: AnchorNumber = 10_000;
+    let anchor = storage.allocate_anchor(0).unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.write(anchor).unwrap();
     let origin: FrontendHostname = "https://some.origin".to_string();
     let account_name = "account name".to_string();
 
@@ -279,7 +287,9 @@ fn should_update_additional_account() {
     storage.update_salt([17u8; 32]);
 
     // 1. Define additional account parameters
-    let anchor_number: AnchorNumber = 10_000;
+    let anchor = storage.allocate_anchor(0).unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.write(anchor).unwrap();
     let origin: FrontendHostname = "https://some.origin".to_string();
     let account_name = "account name".to_string();
     let new_account_name = "new account name".to_string();
@@ -485,13 +495,13 @@ fn should_not_read_a_default_account_from_an_empty_reference_list() {
     let mut storage = Storage::new((10_000, 3_784_873), memory);
 
     // 1. Define parameters
-    let anchor_number: AnchorNumber = 10_000;
+    let anchor = storage.allocate_anchor(0).unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.write(anchor).unwrap();
     let origin: FrontendHostname = "https://some.origin".to_string();
 
     // 2. Create application but with empty account reference list
-    let app_num = storage
-        .lookup_or_insert_application_number_with_origin(&origin)
-        .unwrap();
+    let app_num = crate::storage::tests::application_number_for(&mut storage, &origin);
     storage.stable_account_reference_list_memory.insert(
         (anchor_number, app_num),
         StorableAccountReferenceList::tombstone_for_testing(),
@@ -512,12 +522,12 @@ fn should_read_a_synthetic_default_account_when_no_reference_list_exists() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
 
-    let anchor_number: AnchorNumber = 10_000;
+    let anchor = storage.allocate_anchor(0).unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.write(anchor).unwrap();
     let origin: FrontendHostname = "https://some.origin".to_string();
     // The origin is known, but this identity has no list under it.
-    storage
-        .lookup_or_insert_application_number_with_origin(&origin)
-        .unwrap();
+    crate::storage::tests::application_number_for(&mut storage, &origin);
 
     let default_account = storage
         .read_account(&AccountKey {
@@ -540,9 +550,14 @@ fn should_not_read_account_from_wrong_anchor() {
     let mut storage = Storage::new((10_000, 3_784_873), memory);
     storage.update_salt([17u8; 32]);
 
-    // 1. Define parameters for two different anchors
-    let anchor_number_1: AnchorNumber = 10_000;
-    let anchor_number_2: AnchorNumber = 10_001;
+    // 1. Two different identities. Both are allocated, because a write against an
+    //    identity that does not exist has nothing to write to.
+    let anchor_1 = storage.allocate_anchor(0).unwrap();
+    let anchor_number_1 = anchor_1.anchor_number();
+    storage.write(anchor_1).unwrap();
+    let anchor_2 = storage.allocate_anchor(0).unwrap();
+    let anchor_number_2 = anchor_2.anchor_number();
+    storage.write(anchor_2).unwrap();
     let origin: FrontendHostname = "https://some.origin".to_string();
     let account_name = "account name".to_string();
 
