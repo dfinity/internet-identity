@@ -5693,11 +5693,11 @@ mod session_creation_tests {
     #[test]
     fn the_session_cap_reclaims_to_the_watermark() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        let session = storage
+        let _session = storage
             .create_session_for_testing(anchor_number, params(7, 1_000))
             .unwrap()
             .1;
-        let application_number = storage
+        let _application_number = storage
             .lookup_application_number_with_origin(&ORIGIN.to_string())
             .unwrap();
 
