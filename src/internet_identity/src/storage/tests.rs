@@ -6590,3 +6590,318 @@ mod session_revocation_tests {
         );
     }
 }
+
+/// Everything the write path derives, checked against the account reference lists it
+/// derived them from, after an arbitrary sequence of writes.
+///
+/// This is the check that stands where the counter repair path used to. The gate's whole
+/// job is deriving values — the counters, both principal indices, the session count — from
+/// the pair of lists a write holds, and every defect the review of this stack turned up was
+/// one of those maintained by hand and forgotten at one write site. A test per operation
+/// catches the site it names; this catches the ones nobody thought to name.
+mod write_path_property_tests {
+    use super::record_use;
+    use crate::storage::account::{AccountKey, AccountReference};
+    use crate::storage::{CreateSessionParams, Storage};
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    /// Deterministic, so a failure is reproducible from the seed the loop prints.
+    struct Rng(u64);
+
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 = self
+                .0
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            self.0 >> 33
+        }
+
+        fn below(&mut self, n: u64) -> u64 {
+            self.next() % n
+        }
+    }
+
+    fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([23u8; 32]);
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        (storage, anchor_number)
+    }
+
+    fn origin_of(index: u64) -> String {
+        format!("https://app-{index}.com")
+    }
+
+    /// One write, chosen at random. Refusals are fine and are part of the point: a write
+    /// the gate turned down must leave everything it touched exactly as it was, which the
+    /// invariants below are checked against either way.
+    fn arbitrary_write(
+        storage: &mut Storage<VectorMemory>,
+        anchor_number: AnchorNumber,
+        rng: &mut Rng,
+        now: u64,
+    ) {
+        // A small set of origins, so writes collide and lists grow rather than every write
+        // landing somewhere fresh.
+        let origin = origin_of(rng.below(6));
+        match rng.below(7) {
+            0 => {
+                let _ = storage.create_account(
+                    anchor_number,
+                    origin,
+                    format!("account-{}", rng.next()),
+                );
+            }
+            1 => {
+                // Naming the tracked default, or renaming whatever is there.
+                let account_number = pick_account(storage, anchor_number, &origin, rng);
+                if let Some(mut account) = storage.read_account(&AccountKey {
+                    anchor_number,
+                    origin,
+                    account_number,
+                }) {
+                    account.name = Some(format!("renamed-{}", rng.next()));
+                    let _ = storage.write_account(account);
+                }
+            }
+            2 => {
+                let account_number = pick_account(storage, anchor_number, &origin, rng);
+                let _ = storage.set_default_account(anchor_number, origin, account_number);
+            }
+            3 => {
+                let _ = record_use(storage, anchor_number, origin, None, now);
+            }
+            4 => {
+                let account_number = pick_account(storage, anchor_number, &origin, rng);
+                let _ = storage.create_session(CreateSessionParams {
+                    anchor_number,
+                    origin,
+                    account_number,
+                    device_id: rng.below(4) as u32,
+                    valid_till_ns: now + 1 + rng.below(20_000),
+                    max_idle_ns: None,
+                    read_only: false,
+                    now_ns: now,
+                });
+            }
+            5 => {
+                if let Some(key) = pick_session(storage, anchor_number, &origin, rng) {
+                    let _ = storage.revoke_session(&key);
+                }
+            }
+            _ => {
+                let _ = storage.revoke_device_sessions(anchor_number, rng.below(4) as u32);
+            }
+        }
+    }
+
+    /// One of the accounts this identity holds at `origin`, or the tracked default.
+    fn pick_account(
+        storage: &Storage<VectorMemory>,
+        anchor_number: AnchorNumber,
+        origin: &str,
+        rng: &mut Rng,
+    ) -> Option<u64> {
+        let application_number =
+            storage.lookup_application_number_with_origin(&origin.to_string())?;
+        let references = storage
+            .stored_account_references(anchor_number, application_number)
+            .unwrap_or_default();
+        if references.is_empty() {
+            return None;
+        }
+        references[rng.below(references.len() as u64) as usize].account_number
+    }
+
+    fn pick_session(
+        storage: &Storage<VectorMemory>,
+        anchor_number: AnchorNumber,
+        origin: &str,
+        rng: &mut Rng,
+    ) -> Option<crate::storage::account::SessionRecordKey> {
+        let application_number =
+            storage.lookup_application_number_with_origin(&origin.to_string())?;
+        let references = storage.stored_account_references(anchor_number, application_number)?;
+        let sessions: Vec<_> = references
+            .iter()
+            .flat_map(|reference| {
+                reference
+                    .sessions
+                    .iter()
+                    .map(move |session| (reference.account_number, session.session_id))
+            })
+            .collect();
+        if sessions.is_empty() {
+            return None;
+        }
+        let (account_number, session_id) = sessions[rng.below(sessions.len() as u64) as usize];
+        Some(crate::storage::account::SessionRecordKey {
+            anchor_number,
+            origin: origin.to_string(),
+            account_number,
+            session_id,
+        })
+    }
+
+    /// Every derived value, rebuilt from the lists a second way.
+    fn check(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber, where_: &str) {
+        let mut accounts = 0u64;
+        let mut references = 0u64;
+        let mut sessions = 0u32;
+        let mut lists = Vec::new();
+
+        for (key, list) in storage.stable_account_reference_list_memory.iter() {
+            if key.0 != anchor_number {
+                continue;
+            }
+            let held = Vec::<AccountReference>::from(list);
+            let named = held
+                .iter()
+                .filter(|reference| reference.account_number.is_some())
+                .count() as u64;
+            accounts += named;
+            references += held.len() as u64;
+            sessions += held
+                .iter()
+                .map(|reference| reference.sessions.len() as u32)
+                .sum::<u32>();
+            lists.push((key.1, held));
+        }
+
+        // The counters say what the lists hold.
+        let anchor_counter = storage.get_account_counter(anchor_number);
+        assert_eq!(
+            (
+                anchor_counter.stored_accounts,
+                anchor_counter.stored_account_references
+            ),
+            (accounts, references),
+            "{where_}: the anchor counter and the lists disagree"
+        );
+        assert_eq!(
+            storage
+                .stable_account_counter_memory
+                .get()
+                .stored_account_references,
+            references,
+            "{where_}: the global reference count and the lists disagree"
+        );
+        assert_eq!(
+            storage.read(anchor_number).unwrap().session_count,
+            sessions,
+            "{where_}: the session count and the lists disagree"
+        );
+
+        // Each application's own totals say what its list holds, and an application with
+        // nothing holding it is retired rather than left behind.
+        for (application_number, held) in &lists {
+            let application = storage
+                .stable_application_memory
+                .get(application_number)
+                .unwrap_or_else(|| {
+                    panic!("{where_}: list {application_number} names an application that is gone")
+                });
+            let named = held
+                .iter()
+                .filter(|reference| reference.account_number.is_some())
+                .count() as u64;
+            assert_eq!(
+                (
+                    application.stored_accounts,
+                    application.stored_account_references
+                ),
+                (named, held.len() as u64),
+                "{where_}: application {application_number}'s counters and its list disagree"
+            );
+        }
+
+        // Every account this identity holds resolves from its principal, and every entry
+        // that resolves to it is one it still holds. Checked as a round trip rather than by
+        // deriving the principal again, so it catches an index the write path forgot to
+        // add to and one it forgot to remove from.
+        let mut held_accounts = std::collections::BTreeSet::new();
+        for (application_number, held) in &lists {
+            let Some(application) = storage.stable_application_memory.get(application_number)
+            else {
+                continue;
+            };
+            for reference in held {
+                // The tracked default is indexed too: it has a derived principal, which is
+                // what an identity signs in with at an origin before naming anything.
+                held_accounts.insert((application.origin.clone(), reference.account_number));
+            }
+        }
+        let mut indexed_accounts = std::collections::BTreeSet::new();
+        for (principal, _) in storage.lookup_account_with_principal_memory.iter() {
+            let Some(key) = storage.lookup_account_with_principal(principal) else {
+                panic!("{where_}: an account index entry resolves to nothing");
+            };
+            if key.anchor_number != anchor_number {
+                continue;
+            }
+            assert!(
+                held_accounts.contains(&(key.origin.clone(), key.account_number)),
+                "{where_}: the account index names an account this identity does not hold"
+            );
+            indexed_accounts.insert((key.origin, key.account_number));
+        }
+        assert_eq!(
+            held_accounts, indexed_accounts,
+            "{where_}: an account this identity holds is missing from the index"
+        );
+
+        // The same, for sessions.
+        let mut held_sessions = std::collections::BTreeSet::new();
+        for (application_number, held) in &lists {
+            let Some(application) = storage.stable_application_memory.get(application_number)
+            else {
+                continue;
+            };
+            for reference in held {
+                for session in &reference.sessions {
+                    held_sessions.insert((application.origin.clone(), session.session_id));
+                }
+            }
+        }
+        let mut indexed_sessions = std::collections::BTreeSet::new();
+        for (principal, _) in storage.lookup_session_with_principal_memory.iter() {
+            let Some(key) = storage.lookup_session_with_principal(principal) else {
+                panic!("{where_}: a session index entry resolves to nothing");
+            };
+            if key.anchor_number != anchor_number {
+                continue;
+            }
+            assert!(
+                held_sessions.contains(&(key.origin.clone(), key.session_id)),
+                "{where_}: the session index names a session this identity does not hold"
+            );
+            indexed_sessions.insert((key.origin, key.session_id));
+        }
+        assert_eq!(
+            held_sessions, indexed_sessions,
+            "{where_}: a session this identity holds is missing from the index"
+        );
+    }
+
+    #[test]
+    fn every_derivation_survives_an_arbitrary_sequence_of_writes() {
+        for seed in 0..16u64 {
+            let (mut storage, anchor_number) = storage_with_anchor();
+            let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15));
+            for step in 0..40u64 {
+                let now = 1_000 + step * 500;
+                arbitrary_write(&mut storage, anchor_number, &mut rng, now);
+                check(
+                    &storage,
+                    anchor_number,
+                    &format!("seed {seed}, step {step}"),
+                );
+            }
+        }
+    }
+}
