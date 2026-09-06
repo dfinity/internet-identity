@@ -916,8 +916,8 @@ impl<M: Memory + Clone> Storage<M> {
             created_at_ns: _,
             name: _,
             verified_emails: _,
-            session_devices: _,
-            next_session_device_id: _,
+            browsers: _,
+            next_browser_id: _,
             session_count: _,
         }) = previous_anchor_maybe
         {
@@ -2830,7 +2830,7 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number,
             origin,
             account_number,
-            device_id,
+            browser_id,
             valid_till_ns,
             max_idle_ns,
             read_only,
@@ -2903,7 +2903,7 @@ impl<M: Memory + Clone> Storage<M> {
         // at its expiry.
         let mut dropped: Vec<(Option<AccountNumber>, SessionRecord)> = vec![];
         reference.sessions.retain(|session| {
-            if session.device_id == device_id {
+            if session.browser_id == browser_id {
                 dropped.push((account_number, session.clone()));
                 return false;
             }
@@ -2920,7 +2920,7 @@ impl<M: Memory + Clone> Storage<M> {
             valid_till_ns,
             max_idle_ns,
             last_refreshed_ns: None,
-            device_id,
+            browser_id,
             read_only,
         };
         reference.sessions.push(session.clone());
@@ -2975,10 +2975,10 @@ impl<M: Memory + Clone> Storage<M> {
     // Called by the sign-in ceremony, which lands two PRs up.
     #[allow(dead_code)]
     /// Signs one browser out of everything, in a single message.
-    pub fn revoke_device_sessions(
+    pub fn revoke_browser_sessions(
         &mut self,
         anchor_number: AnchorNumber,
-        device_id: SessionDeviceId,
+        browser_id: BrowserId,
     ) -> Result<u64, StorageError> {
         // Read what the identity holds, take the browser's sessions out of it, write it
         // back. Nothing here ranges over storage itself and no application number reaches
@@ -2994,7 +2994,7 @@ impl<M: Memory + Clone> Storage<M> {
             };
             for write in account_references.iter_mut() {
                 write.account_reference.sessions.retain(|session| {
-                    let keep = session.device_id != device_id;
+                    let keep = session.browser_id != browser_id;
                     if !keep {
                         revoked += 1;
                     }
@@ -3694,7 +3694,7 @@ pub struct CreateSessionParams {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
-    pub device_id: SessionDeviceId,
+    pub browser_id: BrowserId,
     pub valid_till_ns: Timestamp,
     pub max_idle_ns: Option<u64>,
     pub read_only: bool,
