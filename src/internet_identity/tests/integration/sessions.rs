@@ -407,7 +407,7 @@ fn should_not_reuse_a_session_across_a_consent_change() -> Result<(), RejectResp
 /// settings, so it goes with the record.
 #[test]
 fn should_end_the_sessions_of_a_browser_the_registry_dropped() -> Result<(), RejectResponse> {
-    const MAX_SESSION_DEVICES: u32 = 20;
+    const MAX_BROWSERS: u32 = 20;
 
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
@@ -415,7 +415,7 @@ fn should_end_the_sessions_of_a_browser_the_registry_dropped() -> Result<(), Rej
 
     let (_, first_principal) = create_session(&env, canister_id, identity_number);
 
-    for index in 0..MAX_SESSION_DEVICES {
+    for index in 0..MAX_BROWSERS {
         let mut request = session_request_from(identity_number, &BrowserKey::new(index as u8 + 2));
         request.device_name = format!("browser-{index}");
         request.origin = format!("https://dapp-{index}.com");
@@ -961,7 +961,7 @@ fn should_keep_the_browser_entry_across_a_rotation() -> Result<(), RejectRespons
 
     // A ceremony replaces the session, so what a rotation must not cost is the browser's
     // identity: same entry, new session.
-    assert_eq!(rotated.device_id, first.device_id);
+    assert_eq!(rotated.browser_id, first.browser_id);
     assert_ne!(rotated.session_id, first.session_id);
 
     assert!(app_prepare_delegation(
