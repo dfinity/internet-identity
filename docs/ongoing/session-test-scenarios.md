@@ -170,7 +170,7 @@ Where a scenario needs a delegation to age, the point is the boundary and not th
 2. **SHOW-2. A browser appears under a name that identifies it.**  
    Sign in from a browser and open settings.  
    It must be listed, named recognisably, with when it was last used.  
-   Covers DEV-1, DEV-17, DEV-19.
+   Covers DEV-1, DEV-17.
 3. **SHOW-3. A sign-in says which browser made it.**  
    Open settings with a sign-in in place.  
    It must say which browser it came from and when, and that must not change afterwards except the last-used time.  
