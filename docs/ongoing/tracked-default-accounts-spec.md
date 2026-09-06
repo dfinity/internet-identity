@@ -179,10 +179,12 @@ The write is `validate_account_state`, which reads, checks every rule for every 
 **It mints the numbers a person's names imply.**  
 An account reference carrying a record but no number is an account being named. A name is what a person gives an account and the number is what storage keys it by, so the number is minted here, in validate, and a refusal mints nothing. The call returns the input with the minted numbers filled in, each list in the order it was given, so a caller reads its new account number out of the value it wrote.
 
-**It takes the anchor, not the anchor number, and it stores it.**  
-The session count lives on the anchor and the write moves it, so a caller holding its own copy across the write could put the old count back afterwards. Taking `&mut Anchor` also means a write refuses where there is no identity to read: the counters, the lists and the count all key on a record that would not be there.
+**It takes the identity record, and storing it is what taking it means.**  
+The write takes the `Anchor` by value rather than by reference, and stores it once for the whole call, unconditionally. Ownership is the point: `write` consumes a record anyway, so a borrow only bought a clone, and a caller that has given the record up cannot go on changing a copy of it and expect those changes to land.
 
-Taking the anchor means owning the storing of it, unconditionally and once for the whole call. A caller is free to have changed the anchor before handing it over — registering a browser and rotating its key is exactly that ([revocable-app-sessions-spec.md](revocable-app-sessions-spec.md#registry)) — and storing it only where this function's own change to it landed would discard the caller's silently, on any write whose session count did not move. A sign-in from a browser that already holds a session at that account replaces it rather than adding one, so that is the ordinary case rather than a corner of one.
+Storing it unconditionally follows from taking it. A caller may have changed the record before handing it over — a sign-in registers a browser and rotates its key on the way in — and this function cannot know what. Storing it only where its own change to it landed, the session count, would discard the caller's silently, on every write whose count did not move. A sign-in from a browser that already holds a session at that account replaces that session rather than adding one, so the count not moving is the ordinary case rather than a corner of one.
+
+Taking the record also means a write refuses where there is no identity to read: the counters, the lists and the count all key on a record that would not be there.
 
 The value written per origin:
 
@@ -695,7 +697,7 @@ Who may write, and what a write must keep consistent.
 | WRITE-5  | A write MUST mint the account number for a reference that carries a record and no number, and MUST return the minted numbers to its caller. A refusal MUST mint nothing.                               |
 | WRITE-6  | Writing back what was read, unchanged, MUST change nothing — including at an origin nothing has been stored under, which MUST read as the derived default rather than as an error.                     |
 | WRITE-7  | A write MUST refuse where the identity does not exist, rather than storing state nothing can hold.                                                                                                     |
-| WRITE-8  | A write MUST store the identity record it was handed, whatever changed it, and MUST NOT make storing it conditional on which fields moved.                                                             |
+| WRITE-8  | A write MUST take the identity record by value and store it, whatever changed it, and MUST NOT make storing it conditional on which of its fields moved.                                                             |
 | WRITE-9  | A write naming an application with no record MUST fail loudly rather than skip the count update.                                                                                                       |
 | WRITE-10 | Signing in with a default account MUST record a reference with no account number and the current time.                                                                                                 |
 | WRITE-11 | Choosing a default account MUST record the reference without recording a use, leaving `last_used` unset, and MUST write the configuration and the list it belongs to together.                         |
