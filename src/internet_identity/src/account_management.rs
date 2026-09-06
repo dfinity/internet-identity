@@ -197,13 +197,8 @@ pub fn create_account_for_origin(
 ) -> Result<Account, CreateAccountError> {
     validate_account_name(&name).map_err(Into::<CreateAccountError>::into)?;
     let created_account = storage_borrow_mut(|storage| {
-        check_or_rebuild_max_anchor_accounts(
-            storage,
-            anchor_number,
-            MAX_ANCHOR_ACCOUNTS as u64,
-            true,
-        )
-        .map_err(Into::<CreateAccountError>::into)?;
+        check_max_anchor_accounts(storage, anchor_number, MAX_ANCHOR_ACCOUNTS as u64)
+            .map_err(Into::<CreateAccountError>::into)?;
 
         storage
             .create_additional_account(CreateAccountParams {
@@ -240,12 +235,7 @@ pub fn update_account_for_origin(
                     // Check if we have reached account limit
                     // Because editing a default account turns it into a stored account
                     if account_number.is_none() {
-                        check_or_rebuild_max_anchor_accounts(
-                            storage,
-                            anchor_number,
-                            MAX_ANCHOR_ACCOUNTS as u64,
-                            true,
-                        )
+                        check_max_anchor_accounts(storage, anchor_number, MAX_ANCHOR_ACCOUNTS as u64)
                         .map_err(Into::<UpdateAccountError>::into)?
                     }
 
@@ -441,13 +431,15 @@ pub fn get_account_delegation(
     })
 }
 
-/// Checks whether the stored number of accounts as per the counter exceeds the maximum permitted number.
-/// If it does, it rebuilds the counter. If it still exceeds, it will return an error.
-fn check_or_rebuild_max_anchor_accounts(
-    storage: &mut Storage<DefaultMemoryImpl>,
+/// Refuses where this identity already holds as many accounts as it may.
+///
+/// Counted rather than repaired. There used to be a rebuild here for a counter that could
+/// drift, because it was maintained by hand at each write site; the write path derives it
+/// now, so there is nothing to repair and no reason to look twice.
+fn check_max_anchor_accounts(
+    storage: &Storage<DefaultMemoryImpl>,
     anchor_number: AnchorNumber,
     max_anchor_accounts: u64,
-    first_time: bool, // required for safe recursion
 ) -> Result<(), CheckMaxAccountError> {
     let AccountsCounter {
         stored_accounts,
@@ -455,18 +447,7 @@ fn check_or_rebuild_max_anchor_accounts(
     } = storage.get_account_counter(anchor_number);
 
     if stored_accounts >= max_anchor_accounts {
-        // check whether we actually have reached the number
-        if first_time {
-            storage.rebuild_identity_account_counters(anchor_number);
-            return check_or_rebuild_max_anchor_accounts(
-                storage,
-                anchor_number,
-                max_anchor_accounts,
-                false,
-            );
-        } else {
-            return Err(CheckMaxAccountError::AccountLimitReached);
-        }
+        return Err(CheckMaxAccountError::AccountLimitReached);
     }
     Ok(())
 }
@@ -814,7 +795,7 @@ fn should_update_default_account_for_origin() {
 }
 
 #[test]
-// This test is to make sure that the check_or_rebuild_max_anchor_accounts function correctly errors
+// This test is to make sure that the check_max_anchor_accounts function correctly errors
 // It should error when the counters are at or above max and argument 'first_time' is false
 fn should_fail_check_or_rebuild_when_not_first_time() {
     use crate::state::{storage_borrow_mut, storage_replace};
@@ -831,27 +812,27 @@ fn should_fail_check_or_rebuild_when_not_first_time() {
             MAX_ANCHOR_ACCOUNTS as u64,
             MAX_ANCHOR_ACCOUNTS as u64,
         );
-        let res = check_or_rebuild_max_anchor_accounts(
-            storage,
-            anchor.anchor_number(),
-            MAX_ANCHOR_ACCOUNTS as u64,
-            false,
-        );
+        let res =
+            check_max_anchor_accounts(storage, anchor.anchor_number(), MAX_ANCHOR_ACCOUNTS as u64);
         assert!(res.is_err())
     });
 }
 
 #[test]
-fn should_properly_recalculate_faulty_account_counter() {
+fn a_drifted_account_counter_is_not_repaired_and_costs_the_identity_its_limit() {
     use crate::state::{storage_borrow_mut, storage_replace};
     use crate::storage::Storage;
     use ic_stable_structures::VectorMemory;
 
     storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let name = "Alice".to_string();
 
-    // create faulty counter entries
+    // A counter that says this identity is at its limit when it holds nothing.
     storage_borrow_mut(|storage| {
         storage.set_counters_for_testing(
             anchor.anchor_number(),
@@ -860,84 +841,19 @@ fn should_properly_recalculate_faulty_account_counter() {
         )
     });
 
-    for i in 0..=MAX_ANCHOR_ACCOUNTS {
-        let origin = format!("https://example-{i}.com");
-        let result =
-            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
-        if i == MAX_ANCHOR_ACCOUNTS {
-            assert_eq!(result, Err(CreateAccountError::AccountLimitReached))
-        } else {
-            assert!(result.is_ok())
-        }
-    }
-}
-
-#[test]
-fn should_properly_recalculate_faulty_account_counter_when_updating() {
-    use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
-
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
-
-    // create faulty counter entries
-    storage_borrow_mut(|storage| {
-        storage.set_counters_for_testing(
+    // There used to be a rebuild here that noticed and corrected it. The write path
+    // derives the counter now, so nothing maintains it by hand and nothing can drift it —
+    // and carrying a repair path for a state that can no longer arise is not worth the one
+    // counter of four it covered. The accepted cost, written down so it is not rediscovered
+    // as a bug: an identity whose counter ever did drift high cannot name another account.
+    assert_eq!(
+        create_account_for_origin(
             anchor.anchor_number(),
-            MAX_ANCHOR_ACCOUNTS as u64,
-            MAX_ANCHOR_ACCOUNTS as u64,
-        )
-    });
-
-    let result = update_account_for_origin(
-        anchor.anchor_number(),
-        None,
-        "https://example-1.com".to_string(),
-        AccountUpdate {
-            name: Some("Gabriel".to_string()),
-        },
+            "https://example.com".to_string(),
+            name,
+        ),
+        Err(CreateAccountError::AccountLimitReached)
     );
-    assert!(result.is_ok())
-}
-
-#[test]
-fn should_increment_discrepancy_counter() {
-    use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
-
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
-
-    // create faulty counter entries
-    storage_borrow_mut(|storage| {
-        storage.set_counters_for_testing(
-            anchor.anchor_number(),
-            MAX_ANCHOR_ACCOUNTS as u64,
-            MAX_ANCHOR_ACCOUNTS as u64,
-        )
-    });
-
-    storage_borrow(|storage| {
-        let discrepancy_counter_before = storage.get_discrepancy_counter();
-        assert_eq!(discrepancy_counter_before.account_counter_rebuilds, 0);
-    });
-
-    let result = update_account_for_origin(
-        anchor.anchor_number(),
-        None,
-        "https://example-1.com".to_string(),
-        AccountUpdate {
-            name: Some("Gabriel".to_string()),
-        },
-    );
-    assert!(result.is_ok());
-
-    storage_borrow(|storage| {
-        let discrepancy_counter_after = storage.get_discrepancy_counter();
-        assert_eq!(discrepancy_counter_after.account_counter_rebuilds, 1);
-    });
 }
 
 #[test]
