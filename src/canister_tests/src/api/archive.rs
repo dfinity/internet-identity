@@ -135,7 +135,7 @@ pub mod compat {
                 | Operation::RemoveEmailRecovery
                 | Operation::AddVerifiedEmail
                 | Operation::RemoveVerifiedEmail
-                | Operation::RegisterSessionDevice { .. } => {
+                | Operation::RegisterBrowser { .. } => {
                     panic!("not available in compat type")
                 }
                 Operation::CreateAccount { name } => CompatOperation::CreateAccount { name },

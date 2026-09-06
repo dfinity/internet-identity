@@ -32,18 +32,18 @@ fn session_request_from(
     browser: &BrowserKey,
 ) -> PrepareAccountSessionRequest {
     let session_key = ByteBuf::from(vec![1; 32]);
-    let next_device_key = browser.successor().public_key();
+    let next_browser_key = browser.successor().public_key();
     PrepareAccountSessionRequest {
         identity_number,
         origin: ORIGIN.to_string(),
         account_number: None,
         device_name: "Chrome on MacBook".to_string(),
-        current_device_key: browser.public_key(),
-        current_device_key_signature: browser.sign(&session_key, &next_device_key),
-        next_device_key_signature: browser
+        current_browser_key: browser.public_key(),
+        current_browser_key_signature: browser.sign(&session_key, &next_browser_key),
+        next_browser_key_signature: browser
             .successor()
             .sign_as_successor(&session_key, &browser.public_key()),
-        next_device_key,
+        next_browser_key,
         session_key,
         permissions: None,
         valid_for: None,
@@ -407,7 +407,7 @@ fn should_not_reuse_a_session_across_a_consent_change() -> Result<(), RejectResp
 /// settings, so it goes with the record.
 #[test]
 fn should_end_the_sessions_of_a_browser_the_registry_dropped() -> Result<(), RejectResponse> {
-    const MAX_SESSION_DEVICES: u32 = 20;
+    const MAX_BROWSERS: u32 = 20;
 
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
@@ -415,7 +415,7 @@ fn should_end_the_sessions_of_a_browser_the_registry_dropped() -> Result<(), Rej
 
     let (_, first_principal) = create_session(&env, canister_id, identity_number);
 
-    for index in 0..MAX_SESSION_DEVICES {
+    for index in 0..MAX_BROWSERS {
         let mut request = session_request_from(identity_number, &BrowserKey::new(index as u8 + 2));
         request.device_name = format!("browser-{index}");
         request.origin = format!("https://dapp-{index}.com");
@@ -522,7 +522,7 @@ fn should_archive_a_browser_registration_with_the_name_redacted() -> Result<(), 
         .filter(|entry| {
             matches!(
                 entry.operation,
-                Operation::RegisterSessionDevice {
+                Operation::RegisterBrowser {
                     name: Private::Redacted
                 }
             )
@@ -682,7 +682,7 @@ fn should_refuse_an_unknown_account_without_registering_a_browser() -> Result<()
     assert_eq!(
         identity_info(&env, canister_id, principal_1(), identity_number)?
             .unwrap()
-            .session_devices,
+            .browsers,
         None
     );
 
@@ -698,8 +698,8 @@ fn should_refuse_a_signature_from_another_key() -> Result<(), RejectResponse> {
     let identity_number = flows::register_anchor(&env, canister_id);
 
     let mut request = session_request(identity_number);
-    request.current_device_key_signature =
-        BrowserKey::new(9).sign(&request.session_key, &request.next_device_key);
+    request.current_browser_key_signature =
+        BrowserKey::new(9).sign(&request.session_key, &request.next_browser_key);
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
     assert_eq!(result, Err(AccountSessionError::InvalidDeviceKey));
@@ -732,7 +732,7 @@ fn should_refuse_a_key_that_is_not_a_public_key() -> Result<(), RejectResponse> 
     let identity_number = flows::register_anchor(&env, canister_id);
 
     let mut request = session_request(identity_number);
-    request.current_device_key = ByteBuf::from(vec![0; 91]);
+    request.current_browser_key = ByteBuf::from(vec![0; 91]);
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
     assert_eq!(result, Err(AccountSessionError::InvalidDeviceKey));
@@ -751,13 +751,13 @@ fn should_register_no_browser_when_the_proof_fails() -> Result<(), RejectRespons
     let identity_number = flows::register_anchor(&env, canister_id);
 
     let mut request = session_request(identity_number);
-    request.current_device_key_signature = ByteBuf::from(vec![0; 64]);
+    request.current_browser_key_signature = ByteBuf::from(vec![0; 64]);
     prepare_account_session(&env, canister_id, principal_1(), request)?.unwrap_err();
 
     assert_eq!(
         identity_info(&env, canister_id, principal_1(), identity_number)?
             .unwrap()
-            .session_devices,
+            .browsers,
         None
     );
 
@@ -788,7 +788,7 @@ fn should_register_a_second_browser_for_a_key_it_has_not_seen() -> Result<(), Re
 
     let devices = identity_info(&env, canister_id, principal_1(), identity_number)?
         .unwrap()
-        .session_devices
+        .browsers
         .expect("the identity should hold browsers");
 
     assert_eq!(devices.len(), 2);
@@ -826,7 +826,7 @@ fn should_register_a_fresh_browser_after_a_storage_wipe() -> Result<(), RejectRe
 
     let devices = identity_info(&env, canister_id, principal_1(), identity_number)?
         .unwrap()
-        .session_devices
+        .browsers
         .expect("the identity should hold browsers");
 
     assert_eq!(devices.len(), 2);
@@ -861,11 +861,11 @@ fn should_accept_the_successor_a_browser_announced() -> Result<(), RejectRespons
     )?
     .unwrap();
 
-    assert_eq!(rotated.device_id, first.device_id);
+    assert_eq!(rotated.browser_id, first.browser_id);
     assert_eq!(
         identity_info(&env, canister_id, principal_1(), identity_number)?
             .unwrap()
-            .session_devices
+            .browsers
             .unwrap()
             .len(),
         1
@@ -903,14 +903,14 @@ fn should_treat_a_retired_key_as_a_new_browser() -> Result<(), RejectResponse> {
     // has to prove it holds it.
     let fresh = BrowserKey::new(7);
     let mut request = session_request_from(identity_number, &browser);
-    request.next_device_key = fresh.public_key();
-    request.current_device_key_signature =
-        browser.sign(&request.session_key, &request.next_device_key);
-    request.next_device_key_signature =
+    request.next_browser_key = fresh.public_key();
+    request.current_browser_key_signature =
+        browser.sign(&request.session_key, &request.next_browser_key);
+    request.next_browser_key_signature =
         fresh.sign_as_successor(&request.session_key, &browser.public_key());
     let copy = prepare_account_session(&env, canister_id, principal_1(), request)?.unwrap();
 
-    assert_ne!(copy.device_id, first.device_id);
+    assert_ne!(copy.browser_id, first.browser_id);
 
     Ok(())
 }
@@ -988,7 +988,7 @@ fn should_refuse_a_retired_key_and_accept_the_successor() -> Result<(), RejectRe
     )?
     .unwrap();
 
-    assert_eq!(retried.device_id, first.device_id);
+    assert_eq!(retried.browser_id, first.browser_id);
 
     Ok(())
 }
@@ -1012,9 +1012,9 @@ fn should_refuse_a_successor_another_browser_holds() -> Result<(), RejectRespons
 
     let attacker = BrowserKey::new(2);
     let mut request = session_request_from(identity_number, &attacker);
-    request.next_device_key = victim.successor().public_key();
-    request.current_device_key_signature =
-        attacker.sign(&request.session_key, &request.next_device_key);
+    request.next_browser_key = victim.successor().public_key();
+    request.current_browser_key_signature =
+        attacker.sign(&request.session_key, &request.next_browser_key);
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
     assert_eq!(result, Err(AccountSessionError::InvalidDeviceKey));
@@ -1049,7 +1049,7 @@ fn should_keep_the_browser_entry_across_a_rotation() -> Result<(), RejectRespons
 
     // A ceremony replaces the session, so what a rotation must not cost is the browser's
     // identity: same entry, new session.
-    assert_eq!(rotated.device_id, first.device_id);
+    assert_eq!(rotated.browser_id, first.browser_id);
     assert_ne!(rotated.session_id, first.session_id);
 
     assert!(app_prepare_delegation(
@@ -1076,7 +1076,7 @@ fn should_refuse_a_successor_the_caller_cannot_prove() -> Result<(), RejectRespo
     let browser = BrowserKey::new(1);
     let mut request = session_request_from(identity_number, &browser);
     // Everything the wire carries, but the successor's signature made by the wrong key.
-    request.next_device_key_signature =
+    request.next_browser_key_signature =
         browser.sign_as_successor(&request.session_key, &browser.public_key());
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
@@ -1096,10 +1096,10 @@ fn should_refuse_a_successor_equal_to_the_key_presented() -> Result<(), RejectRe
     let browser = BrowserKey::new(1);
     let mut request = session_request_from(identity_number, &browser);
     // Both signatures are real: the caller holds the key it is naming as its own successor.
-    request.next_device_key = browser.public_key();
-    request.current_device_key_signature =
-        browser.sign(&request.session_key, &request.next_device_key);
-    request.next_device_key_signature =
+    request.next_browser_key = browser.public_key();
+    request.current_browser_key_signature =
+        browser.sign(&request.session_key, &request.next_browser_key);
+    request.next_browser_key_signature =
         browser.sign_as_successor(&request.session_key, &browser.public_key());
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
@@ -1133,7 +1133,7 @@ fn should_store_the_requested_idle_bound() -> Result<(), RejectResponse> {
         identity_number,
     )?
     .unwrap()
-    .session_devices
+    .browsers
     .unwrap_or_default();
     assert_eq!(devices.len(), 1);
 
@@ -1161,10 +1161,10 @@ fn should_refuse_a_successor_another_browser_holds_even_when_proven() -> Result<
     // The attacker proves possession of the victim's key, as a profile copy could.
     let attacker = BrowserKey::new(2);
     let mut request = session_request_from(identity_number, &attacker);
-    request.next_device_key = victim.public_key();
-    request.current_device_key_signature =
-        attacker.sign(&request.session_key, &request.next_device_key);
-    request.next_device_key_signature =
+    request.next_browser_key = victim.public_key();
+    request.current_browser_key_signature =
+        attacker.sign(&request.session_key, &request.next_browser_key);
+    request.next_browser_key_signature =
         victim.sign_as_successor(&request.session_key, &attacker.public_key());
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
