@@ -5417,6 +5417,7 @@ mod session_creation_tests {
         AccountReference, SessionRecord, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
     };
     use crate::storage::anchor::MAX_BROWSERS;
+    use crate::storage::StorageError;
     use crate::storage::{
         CreateSessionParams, MAX_SESSIONS_PER_ANCHOR, SESSIONS_WATERMARK_PER_ANCHOR,
     };
@@ -5706,6 +5707,23 @@ mod session_creation_tests {
             .expect("the rotation from a count-neutral sign-in was not stored");
         assert_eq!(third.1.browser_id, 0, "still the one registry entry");
         assert_eq!(storage.read(anchor_number).unwrap().browsers().len(), 1);
+    }
+
+    /// A session whose life has already run out is refused rather than created, because the
+    /// sweep that prunes dead sessions runs in this same call and would take it straight
+    /// back out — leaving this returning `Ok` for a session no list holds.
+    #[test]
+    fn a_session_that_is_already_over_is_refused() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        let mut expired = params(anchor_number, 1, 5_000);
+        expired.valid_till_ns = 5_000;
+
+        assert!(matches!(
+            storage.create_session(expired),
+            Err(StorageError::SessionAlreadyOver { .. })
+        ));
+        assert_eq!(storage.read(anchor_number).unwrap().browsers().len(), 0);
     }
 
     /// A ceremony replaces the browser's session rather than reusing it, so a copy of the
