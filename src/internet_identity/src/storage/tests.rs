@@ -3776,6 +3776,7 @@ mod default_account_tracking_tests {
 mod tracked_default_eviction_tests {
     use super::application_number_for;
     use super::held_references;
+    use super::params;
     use super::record_use;
     use super::remove_at;
     use super::write_at;
@@ -3824,19 +3825,11 @@ mod tracked_default_eviction_tests {
         // list and therefore the first thing eviction gives up.
         let doomed = origin_of(0);
         let (key, _) = storage
-            .create_session_for_testing(
-                anchor_number,
-                CreateSessionParams {
-                    origin: doomed.clone(),
-                    account_number: None,
-                    browser_id: 1,
-                    valid_till_ns: u64::MAX,
-                    max_idle_ns: None,
-                    read_only: false,
-                    now_ns: 1,
-                    dropped_browsers: vec![],
-                },
-            )
+            .create_session(CreateSessionParams {
+                origin: doomed.clone(),
+                valid_till_ns: u64::MAX,
+                ..params(anchor_number, 1, 1)
+            })
             .expect("signing in at a fresh origin");
         let session_principals: Vec<_> = storage
             .lookup_session_with_principal_memory
@@ -6618,6 +6611,7 @@ mod session_removal_tests {
 
 mod session_revocation_tests {
     use super::held_references;
+    use super::params_at;
     use crate::storage::CreateSessionParams;
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
@@ -6633,27 +6627,22 @@ mod session_revocation_tests {
         (storage, anchor_number)
     }
 
+    /// A sign-in from the browser `seed` names, at `origin`. A browser that has signed in
+    /// before presents the successor it announced, so `generation` says how many times.
     fn create(
         storage: &mut Storage<VectorMemory>,
         anchor_number: AnchorNumber,
         origin: &str,
-        browser_id: u32,
+        seed: u8,
+        generation: u16,
         now: u64,
     ) {
         storage
-            .create_session_for_testing(
-                anchor_number,
-                CreateSessionParams {
-                    origin: origin.to_string(),
-                    account_number: None,
-                    browser_id,
-                    valid_till_ns: u64::MAX,
-                    max_idle_ns: None,
-                    read_only: false,
-                    now_ns: now,
-                    dropped_browsers: vec![],
-                },
-            )
+            .create_session(CreateSessionParams {
+                origin: origin.to_string(),
+                valid_till_ns: u64::MAX,
+                ..params_at(anchor_number, seed, generation, now)
+            })
             .unwrap();
     }
 
@@ -6678,16 +6667,17 @@ mod session_revocation_tests {
     #[test]
     fn signing_a_browser_out_sweeps_every_application() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        create(&mut storage, anchor_number, "https://a.com", 1, 1_000);
-        create(&mut storage, anchor_number, "https://b.com", 1, 1_000);
-        create(&mut storage, anchor_number, "https://a.com", 2, 1_000);
+        create(&mut storage, anchor_number, "https://a.com", 1, 0, 1_000);
+        create(&mut storage, anchor_number, "https://b.com", 1, 1, 1_000);
+        create(&mut storage, anchor_number, "https://a.com", 2, 0, 1_000);
 
-        let removed = storage.revoke_browser_sessions(anchor_number, 1).unwrap();
+        // The registry minted 0 for the first browser to sign in and 1 for the second.
+        let removed = storage.revoke_browser_sessions(anchor_number, 0).unwrap();
 
         assert_eq!(removed, 2);
         assert_eq!(
             browser_ids(&storage, anchor_number, "https://a.com"),
-            vec![2]
+            vec![1]
         );
         assert_eq!(
             browser_ids(&storage, anchor_number, "https://b.com"),
@@ -6701,28 +6691,36 @@ mod session_revocation_tests {
         let other = storage.allocate_anchor(0).unwrap();
         let other_anchor_number = other.anchor_number();
         storage.write(other).unwrap();
-        create(&mut storage, anchor_number, "https://a.com", 1, 1_000);
-        create(&mut storage, other_anchor_number, "https://a.com", 1, 1_000);
+        create(&mut storage, anchor_number, "https://a.com", 1, 0, 1_000);
+        create(
+            &mut storage,
+            other_anchor_number,
+            "https://a.com",
+            1,
+            0,
+            1_000,
+        );
 
-        storage.revoke_browser_sessions(anchor_number, 1).unwrap();
+        storage.revoke_browser_sessions(anchor_number, 0).unwrap();
 
         assert_eq!(
             browser_ids(&storage, other_anchor_number, "https://a.com"),
-            vec![1]
+            vec![0],
+            "each identity has a registry of its own"
         );
     }
 
     #[test]
     fn signing_out_a_browser_with_nothing_to_revoke_writes_nothing() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        create(&mut storage, anchor_number, "https://a.com", 1, 1_000);
+        create(&mut storage, anchor_number, "https://a.com", 1, 0, 1_000);
 
         let removed = storage.revoke_browser_sessions(anchor_number, 9).unwrap();
 
         assert_eq!(removed, 0);
         assert_eq!(
             browser_ids(&storage, anchor_number, "https://a.com"),
-            vec![1]
+            vec![0]
         );
     }
 }
@@ -6736,6 +6734,7 @@ mod session_revocation_tests {
 /// one of those maintained by hand and forgotten at one write site. A test per operation
 /// catches the site it names; this catches the ones nobody thought to name.
 mod write_path_property_tests {
+    use super::params_at;
     use super::record_use;
     use crate::storage::account::{AccountKey, AccountReference};
     use crate::storage::{CreateSessionParams, Storage};
@@ -6814,19 +6813,15 @@ mod write_path_property_tests {
             }
             4 => {
                 let account_number = pick_account(storage, anchor_number, &origin, rng);
-                let _ = storage.create_session_for_testing(
-                    anchor_number,
-                    CreateSessionParams {
-                        origin,
-                        account_number,
-                        browser_id: rng.below(4) as u32,
-                        valid_till_ns: now + 1 + rng.below(20_000),
-                        max_idle_ns: None,
-                        read_only: false,
-                        now_ns: now,
-                        dropped_browsers: vec![],
-                    },
-                );
+                // A browser presents keys, and a stale one is refused like any other
+                // arbitrary write here: what matters is that whatever is stored stays
+                // consistent, not that every attempt succeeds.
+                let _ = storage.create_session(CreateSessionParams {
+                    origin,
+                    account_number,
+                    valid_till_ns: now + 1 + rng.below(20_000),
+                    ..params_at(anchor_number, rng.below(4) as u8, rng.below(3) as u16, now)
+                });
             }
             5 => {
                 if let Some(key) = pick_session(storage, anchor_number, &origin, rng) {
