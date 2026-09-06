@@ -6,17 +6,18 @@
 
 ## Glossary
 
-| Term                  | Meaning                                                                                                                                                                             |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **App delegation**    | The short-lived delegation the app uses against app canisters. What is up to 30 days today.                                                                                         |
-| **Account reference** | The entry [tracked-default-accounts-spec.md](tracked-default-accounts-spec.md) keeps per (identity, app, account), recording that the account is in use. Where a session is stored. |
-| **Reference row**     | The stored blob holding every account reference for one (identity, app), which is what a read and a write of storage actually touch.                                                |
-| **Session**           | A record on that row, plus the canister-signed identity derived from it. Long-lived and revocable.                                                                                  |
-| **Session chain**     | The delegation chain rooted at the session identity. Held by the II frontend, extended to the app.                                                                                  |
-| **Refresh**           | The app calling the II canister with its session chain to mint a new app delegation. No browser involvement.                                                                        |
-| **Silent re-auth**    | The app asking II for a delegation again, answered from II's stored session with no ceremony.                                                                                       |
-| **Session device**    | A per-identity label for one browser, so a browser's sessions can be listed and revoked together.                                                                                   |
-| **Locator**           | The `(anchor, application, account)` triple that identifies one account internally. Never leaves the canister: an app is only ever told the account's principal.                    |
+| Term                       | Meaning                                                                                                                                                                             |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **App delegation**         | The short-lived delegation the app uses against app canisters. What is up to 30 days today.                                                                                         |
+| **Account reference**      | The entry [tracked-default-accounts-spec.md](tracked-default-accounts-spec.md) keeps per (identity, app, account), recording that the account is in use. Where a session is stored. |
+| **Account reference list** | The stored blob holding every account reference for one (identity, app), which is what a read and a write of storage actually touch. Shortened to "list" throughout.                |
+| **Session**                | A record on that list, plus the canister-signed identity derived from it. Long-lived and revocable.                                                                                 |
+| **Session chain**          | The delegation chain rooted at the session identity. Held by the II frontend, extended to the app.                                                                                  |
+| **Refresh**                | The app calling the II canister with its session chain to mint a new app delegation. No browser involvement.                                                                        |
+| **Silent re-auth**         | The app asking II for a delegation again, answered from II's stored session with no ceremony.                                                                                       |
+| **Browser**                | A per-identity record for one browser, so a browser's sessions can be listed and revoked together, and so a sign-in can prove it comes from a browser this identity has used.       |
+| **Session id**             | The number one session is allocated, from a monotonic canister-wide allocator that never reissues. What the session seed binds, and what names a session in every method.           |
+| **Locator**                | The `(anchor, application, account)` triple that identifies one account internally. Never leaves the canister: an app is only ever told the account's principal.                    |
 
 ---
 
@@ -32,7 +33,7 @@ flowchart LR
     DC["app canister"]
 
     App -->|"ii_session_delegation (session only)"| IIF
-    IIF -->|"prepare/get_account_session<br/>revoke_account_session / revoke_device_sessions"| IIC
+    IIF -->|"prepare/get_account_session<br/>revoke_browser_sessions / check_session"| IIC
     App -->|"app_prepare_delegation / app_get_delegation<br/>app_revoke_session"| IIC
     App -->|"app delegation"| DC
 ```
@@ -47,7 +48,7 @@ Three things deliberately never happen: the app canister never talks to II, the 
 | `app_prepare_delegation` / `app_get_delegation`    | app frontend | its session chain                | App-facing pair              |
 | `app_revoke_session`                               | app frontend | its session chain                | Two entry points             |
 | `prepare_account_session` / `get_account_session`  | II frontend  | an access method of the identity | First sign-in                |
-| `revoke_account_session`, `revoke_device_sessions` | II frontend  | an access method of the identity | Anchor-authenticated methods |
+| `revoke_browser_sessions`, `check_session`         | II frontend  | an access method of the identity | Anchor-authenticated methods |
 | `check_session`                                    | II frontend  | its session chain                | Silent re-auth               |
 
 #### No method serves both frontends
@@ -100,9 +101,9 @@ Called only by the II frontend, which ships with the canister. Changeable in the
 | --------------------------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `prepare_account_session`                                             | new update              | Create a session and sign it to the frontend's key ([first sign-in](#first-sign-in))                                                                                             |
 | `get_account_session`                                                 | new query               | Fetch the session delegation ([first sign-in](#first-sign-in))                                                                                                                   |
-| `IdentityInfo`                                                        | `session_devices` field | Devices live on the anchor, so they ride here ([the registry](#registry))                                                                                                        |
-| `revoke_account_session`                                              | new update              | Revoke the sessions created at one moment at one account ([the anchor-authenticated methods](#the-anchor-authenticated-methods))                                                 |
-| `revoke_device_sessions`                                              | new update              | Sign a browser out by sweeping its sessions ([the anchor-authenticated methods](#the-anchor-authenticated-methods), [the eager sweep](#signing-a-browser-out-is-an-eager-sweep)) |
+| `IdentityInfo`                                                        | `browsers` field        | Browsers live on the anchor, so they ride here ([the registry](#registry))                                                                                                       |
+| `revoke_browser_sessions`                                             | new update              | Sign a browser out by sweeping its sessions ([the anchor-authenticated method](#the-anchor-authenticated-method), [the eager sweep](#signing-a-browser-out-is-an-eager-sweep))   |
+| `BrowserInfo`                                                         | new type                | One browser, as the settings list renders it ([the registry](#registry))                                                                                                         |
 | `check_session`                                                       | new query               | Whether the calling session is still live, for the silent path ([one audience per method](#one-audience-per-method))                                                             |
 | `PrepareAccountSession*`, `GetAccountSession*`, `AccountSessionError` | new types               | ([first sign-in](#first-sign-in))                                                                                                                                                |
 
@@ -130,12 +131,15 @@ SessionRecord {
     valid_till_ns: Timestamp,
     max_idle_ns: u64,                      // how long it may outlive its use
     last_refreshed_ns: Option<Timestamp>,  // None until the first refresh
-    device_id: SessionDeviceId,
-    read_only: bool,                    // from the consent that created it
+    browser_id: BrowserId,
+    read_only: bool,                       // from the consent that created it
+    session_id: SessionId,
 }
 ```
 
 Nothing else. Every field except `last_refreshed_ns` is fixed for the session's life, which is also why `last_refreshed_ns` is the only one absent from the seed ([session identity](#session-identity)).
+
+`session_id` names the session. It comes from a monotonic canister-wide allocator that never reissues, and it is the only input to the seed besides the account's own, so the identity a session signs with is tied to the one record that was allocated that id ([session identity](#session-identity)).
 
 `max_idle_ns` is the one thing this record did not previously carry that an application asks for: see [a session that outlives its use](#a-session-that-outlives-its-use).
 
@@ -148,13 +152,17 @@ Whether a sign-in can be resumed without a ceremony is deliberately not here. Th
 Consequences of putting sessions on the reference rather than in their own map:
 
 - Revoking, expiring and evicting all reuse machinery that already exists.
-- The row is written on create, on remove, on every refresh ([what refresh writes](#write-it-every-time)), and on any sign-in or rename that touches it.
-- A row read yields every account of that identity at that app, with all their sessions, in
+- The list is written on create, on remove, on every refresh ([what refresh writes](#write-it-every-time)), and on any sign-in or rename that touches it.
+- A list read yields every account of that identity at that app, with all their sessions, in
   one get, and is rewritten whole on any change. So the cost of any pass over sessions tracks
   the number of apps involved, not the number of sessions.
-- The reference list is keyed `(anchor, application)`, so one identity's rows are a contiguous
+- The reference list is keyed `(anchor, application)`, so one identity's lists are a contiguous
   range. That range is what every identity-scoped operation uses: counting, pruning, and
   finding the sessions of one browser ([the session cap](#the-session-cap)).
+- Every change to a session is therefore a write of account state, and goes through the one
+  write path [tracked-default-accounts-spec.md](tracked-default-accounts-spec.md#one-write-path-for-account-state)
+  specifies. A session created, pruned, reclaimed or swept is a list this identity holds
+  afterwards, so no path here maintains a count or an index of its own.
 
 ### A session that outlives its use
 
@@ -174,23 +182,29 @@ It replaces a timeout the client used to enforce alone. A timer in a page cannot
 
 A refresh arrives with nothing but `caller()`, the principal at the root of the app's chain,
 which is the session's own principal. One index turns that into a session, a new map at
-memory index 35, alongside the application allocator at 33 and the principal index at 34
+memory index 35, alongside the application allocator at 33, the principal index at 34 and the
+session id allocator at 36
 ([what an anchor can accumulate](tracked-default-accounts-spec.md#what-an-anchor-can-accumulate)):
 
 ```rust
 StableBTreeMap<Principal, StorableSessionHandle>
 
-StorableSessionHandle { account_principal: Principal, device_id: SessionDeviceId, created_at: Timestamp }
+StorableSessionHandle { account_principal: Principal, session_id: SessionId }
 ```
 
 The account principal resolves to `(anchor, application, account)` through the
-[principal index](tracked-default-accounts-spec.md#the-principal-index), the row read follows
-from that, and the browser together with the creation time picks the record inside it.
+[principal index](tracked-default-accounts-spec.md#the-principal-index), the list read follows
+from that, and the session id picks the record inside it.
 
-The creation time is what makes that pick exact, and it is not redundant with the browser. A
-browser keeps its id across sign-ins, so on the browser alone an entry that outlived its
-session would resolve to whatever that browser created next — the holder of a revoked chain
-authenticated as a session they never had. Both fields are seed inputs, so an entry can only
+Two hops rather than one, and deliberately so. The alternative is for the handle to carry the
+locator itself and skip the principal index — but the locator holds the origin, up to 128
+bytes of it, where a principal is 29. Every session would pay that, on a map whose whole
+purpose is to be read on the hot path. The hop is a read of a map already in memory.
+
+The id is what makes the pick exact, and it is not redundant with the browser. A browser keeps
+its id across sign-ins, so on the browser alone an entry that outlived its session would
+resolve to whatever that browser created next — the holder of a revoked chain authenticated as
+a session they never had. The id is a seed input and is never reissued, so an entry can only
 ever resolve to the one session whose principal is its own key.
 
 It names the account by principal rather than by locator on purpose. Materialising a default
@@ -221,15 +235,23 @@ they were used from, live records and the expired ones nobody has come back to p
 user with fifty apps, several accounts among them, across five browsers lands in the low
 hundreds. Five hundred is above anyone real and far below anything that costs the canister.
 
-On create:
+A ceremony reads everything the identity holds, shapes it, and writes it once:
 
-1. If the browser already holds a session at this account, delete it
+1. Drop the sessions of any browser the registry gave up to make room for this one
+   ([at the cap, registration evicts](#at-the-cap-registration-evicts-the-least-recently-used)).
+   Those can be at any origin, which is why the write is over the whole account state and not
+   over one list.
+2. Prune every expired record, everywhere.
+3. If the identity is still at the cap, reclaim live sessions down to a watermark of 450.
+4. Delete whatever this browser already held at this account
    ([one browser, one session per account](#one-browser-one-session-per-account)).
-2. Prune the expired records on the row being written.
-3. If the identity is at the cap, reclaim down to a watermark of 450.
-4. Insert.
+5. Insert, and write all of it as one state.
 
-Reclaiming walks the identity's rows once and takes dead sessions before live ones. Among the
+Steps 1 to 4 shape a value; step 5 is the only thing that stores. So a ceremony that is
+refused stores none of it, and a sign-in that crosses the cap is one atomic unit rather than
+a reclaim followed by an insert that could fail after it.
+
+Reclaiming walks what the identity holds once and takes dead sessions before live ones. Among the
 live, it takes the smallest of
 
 ```
@@ -256,33 +278,47 @@ bound too weak, and it is not made here.
 Three things bound the pass. It reclaims to the watermark rather than to the cap, so it runs
 once and then not again until fifty more sessions have been created. A `session_count` on the
 anchor decides whether to run at all, so a sign-in below the cap reads nothing extra. And it
-writes at most one row per row it takes from, and takes at most fifty — the distance between
-the cap and the watermark — however many rows it read.
+gives up only the distance between the cap and the watermark, however many lists it read.
 
-It reads every row the identity has rather than a bounded prefix of them, because the number
+It reads every list the identity has rather than a bounded prefix of them, because the number
 it returns is what the cap is enforced against: a truncated scan would undercount, and the
-undercount would become the counter. Those rows are already bounded, by the row cap and the
+undercount would become the counter. Those lists are already bounded, by the list cap and the
 account cap together, and reading them sequentially costs a fraction of the writes the pass
 saves.
 
-That counter is a trigger, and the cap is not enforced against it. Every path that removes a
-session decrements it, so it should agree with the rows — but it is one number maintained by
-seven call sites, and a single missed decrement would make it disagree in the direction that
-matters. So once it reaches the cap, the reclaiming pass counts what the rows actually hold
-and returns that, and the sign-in is admitted against the count rather than the counter. A
-counter that has drifted high therefore costs one extra pass, never a refused sign-in.
+#### Counted, not accumulated
 
-Drift in the other direction is the one the recount cannot catch, because a count below the
-cap is exactly the case that skips the recount. That is why every removal path decrements,
-and why the requirement is on the writers ([REC-11](#requirements)) rather than on the
-reader: a missed decrement would let the stored set climb past the cap silently.
+That counter is a trigger, and the cap is not enforced against it. It is written in exactly
+one place — the write path, from what the write itself leaves behind — so nothing can forget
+to move it. What it still cannot follow is expiry, which removes a session with no write
+anywhere, so it drifts upward on its own.
+
+A delta over a stored count would preserve that drift forever, which is the trap here: a count
+maintained only by addition and subtraction is exact about writes and permanently wrong about
+everything else. So the stored number is the cheap way to ask, and when it says the identity
+is at the cap the write path counts every list instead — and that count is also what corrects
+the stored number. A counter that has drifted high therefore costs one extra pass, never a
+refused sign-in, and stops being wrong afterwards.
+
+#### The cap is the write path's rule, and reclaiming is policy
+
+The two are deliberately separate. Storage refuses to store a state above the cap; which live
+sessions give way to make room is a judgement, and it lives with the ceremony that is shaping
+the write rather than inside the write itself. Storage does not have an opinion about which
+session matters more, and the write path is the wrong place to acquire one.
+
+So the refusal exists and is unreachable on the ordinary path: a ceremony reclaims first, and
+a state that is still over the cap afterwards is one where every session is live, unexpired
+and within the watermark — which the arithmetic makes impossible. It stays as the backstop
+that keeps the invariant true of storage rather than true of the callers who happen to
+respect it.
 
 Reclaiming happens **before** the new session is admitted, not after. The stored set therefore
 never sits above the cap, not even for the remainder of one message.
 
-Blocking would be the wrong failure here for the same reason it is wrong at the row cap and
-the browser cap: the user is trying to sign in, and the only thing that could refuse them is
-internal bookkeeping.
+Failing a sign-in would be the wrong outcome here for the same reason it is wrong at the list
+cap and the browser cap: the user is trying to sign in, and the only thing that could refuse
+them is internal bookkeeping.
 
 ### What that bounds
 
@@ -290,35 +326,35 @@ At most 500 stored session records per identity, and no separate per-reference c
 browser holds one session per account and browsers are capped at 20, no single account
 reference can carry more than twenty regardless.
 
-A row carries no exemption for holding a live session, and that is a deliberate choice
+A list carries no exemption for holding a live session, and that is a deliberate choice
 rather than a concession to the cap.
 
-The row is what makes an app visible in settings. Sparing it would leave the user with
+The list is what makes an app visible in settings. Sparing it would leave the user with
 access they hold and cannot see, which is the one state this whole design exists to remove:
-a session nobody can find is a session nobody can revoke. So a row and its sessions live and
+a session nobody can find is a session nobody can revoke. So a list and its sessions live and
 die together, and what the user loses is a ceremony rather than an account, since a session
 is not bound to the access method that created it and the next visit is served a new one.
 
-The capacity argument points the same way. Exempting live rows would let an identity hold
-rows past its cap indefinitely, because a browser refreshing every five minutes keeps its
-row alive forever.
+The capacity argument points the same way. Exempting live lists would let an identity hold
+lists past its cap indefinitely, because a browser refreshing every five minutes keeps its
+list alive forever.
 
 ### Expired records are pruned on writes that were happening anyway
 
 **Expired entries are pruned only when the list is written for another reason**, which
-includes refresh: that call rewrites the whole row anyway ([write it every
+includes refresh: that call rewrites the whole list anyway ([write it every
 time](#write-it-every-time)), so filtering the dead siblings out costs one pass over a list
 already in memory and no write of its own.
 
 That is what keeps the design free of any sweep. What it reaches is narrower than it sounds.
 
-Refresh cleans the row for the account being used, so an app in use never accumulates dead
-records. What it cannot reach is a row for an app the user has stopped opening: that row is
+Refresh cleans the list for the account being used, so an app in use never accumulates dead
+records. What it cannot reach is a list for an app the user has stopped opening: that list is
 never refreshed, so its expired records sit there — on an identity that is otherwise perfectly
 active.
 
 Those records are reclaimed by [the session cap](#the-session-cap) instead, which is why its
-pass walks every row the identity owns rather than the one being signed in to. The identity's
+pass walks every list the identity owns rather than the one being signed in to. The identity's
 next sign-in at the cap is what spends them, and since expired records are the first thing it
 takes, they are spent before anything the user still relies on.
 
@@ -333,7 +369,7 @@ timer to find work that the identity that created it will pay for on its own ret
 ## Session identity
 
 ```
-session_seed = H(salt, "session", account_seed, created_at, device_id)
+session_seed = H(salt, "session", account_seed, session_id)
 ```
 
 with every field length-prefixed. `account_seed` is the account's own seed, the one its
@@ -346,12 +382,19 @@ deriving from the identity it was conjured from, so its principal is unchanged. 
 numbers been inputs, naming an account would have changed every session's seed and signed
 the user out of every app using it.
 
-The construction needs no allocator: no counter cell, nothing to retire. Uniqueness across
-identities and apps is inherited from the account seed, which already distinguishes them.
-Unguessability comes from the salt, which is hashed into the account seed and again here.
+`session_id` is the only other input. It comes from a monotonic allocator in a cell of its own
+at memory index 36, and is never reissued, so no two sessions can ever derive the same
+identity and a revoked session's identity can never be arrived at a second time. Uniqueness
+across identities and apps is inherited from the account seed, which already distinguishes
+them; unguessability comes from the salt, hashed into the account seed and again here.
 
-`created_at_ns` and `device_id` are inputs, so a session's attribution cannot be rewritten in
-storage without invalidating the session.
+An allocator is what the earlier draft of this design tried to avoid, by seeding from the
+record's own immutable fields — the creation time and the browser. That works only as long as
+no two records can share those, which made a collision argument about round times load-bearing
+for the security of every session's identity. An id costs one cell and removes the argument.
+
+An id is allocated after everything that can refuse the ceremony, so a refused sign-in does
+not burn one. Ids need not be contiguous, so a later failure leaving a gap is fine.
 
 Only the record's **immutable** fields feed the seed, which is why `last_refreshed_ns` is not
 one: a mutable input would change the session's principal every time it was stamped.
@@ -365,13 +408,8 @@ minting its own replacement.
 
 ### One browser, one session per account
 
-`time()` is the round time, so every message in one round sees the same value, and two
-records sharing an account, a device and a round would derive the same seed.
-
-Creating a session cannot produce that. A ceremony from a browser that already holds a
-session at this account **replaces** it: the old record is deleted and a new one minted. So
-one browser has at most one session per account, no two records can share a device and a
-round, and there is no collision to guard against.
+A ceremony from a browser that already holds a session at this account **replaces** it: the
+old record is deleted and a new one minted.
 
 Replacing rather than reusing is what bounds a stolen session's life by something the user
 does. A copy of this browser's profile holds the old session's chain; the user's next ceremony
@@ -380,9 +418,9 @@ would have left it working until the thirty days ran out. It also removes a spec
 there is no longer a consent to compare, because a change of consent and a repeat of the same
 consent take the same path.
 
-The seed relies on this property. If a browser were
-ever allowed to hold two sessions at one account, this would have to change: either the
-seed gains a discriminator, or creation has to reject the second one.
+This is a rule about what a user should hold, not a rule the seed depends on. Session ids make
+two sessions at one account from one browser perfectly representable and perfectly distinct;
+they are simply not something a ceremony should leave behind.
 
 ---
 
@@ -447,23 +485,23 @@ type PrepareAccountSessionRequest = record {
     identity_number : IdentityNumber;
     origin : FrontendHostname;
     account_number : opt AccountNumber;
-    session_key : SessionKey;        // the II frontend's key, fresh for every session
-    device_name : text;              // labels the browser, e.g. "Chrome on Mac"
-    device_key : PublicKey;          // the browser's key, as the registry currently holds it
-    next_device_key : PublicKey;     // what it rotates to on success
-    device_key_signature : blob;     // by device_key, over session_key and next_device_key
-    next_device_key_signature : blob; // by next_device_key, proving the browser holds it
-
-    permissions : opt Permissions;   // the consented access level, fixed for the session
-    valid_for : opt nat64;           // clamped to the session bounds below
+    session_key : SessionKey;          // the II frontend's key, fresh for every session
+    device_name : text;                // labels the browser, e.g. "Chrome on MacBook"
+    current_browser_key : PublicKey;   // the browser's key, as the registry currently holds it
+    next_browser_key : PublicKey;      // what it rotates to on success
+    current_browser_key_signature : blob; // over session_key and next_browser_key
+    next_browser_key_signature : blob;    // over session_key and current_browser_key
+    permissions : opt Permissions;     // the consented access level, fixed for the session
+    valid_for : opt nat64;             // clamped to the session bounds below
+    max_idle : opt nat64;              // how long it may go unminted, clamped likewise
 };
 
 type PrepareAccountSessionResponse = record {
     user_key : PublicKey;
     expiration : Timestamp;          // the session's valid_till
-    created_at : Timestamp;
+    session_id : nat64;              // names the session get_account_session collects
+    browser_id : nat32;              // which browser this is, for the settings list to mark
     account_principal : principal;   // what apps see for this account; stored with the session
-    device_id : nat32;               // which browser this is, for the settings list to mark
 };
 
 type GetAccountSessionRequest = record {
@@ -472,6 +510,7 @@ type GetAccountSessionRequest = record {
     account_number : opt AccountNumber;
     session_key : SessionKey;
     expiration : Timestamp;
+    session_id : nat64;              // named exactly rather than searched for
 };
 
 type GetAccountSessionResponse = record {
@@ -483,6 +522,7 @@ type AccountSessionError = variant {
     NoSuchAccount;              // the identity holds no such account
     NoSuchSession;              // nothing prepared under this session key and expiration
     InvalidDeviceKey;           // the browser's key is unusable, or its signature does not verify
+    StaleDeviceKey;             // a key the browser has already rotated away from
     InternalCanisterError : text;
 };
 
@@ -503,9 +543,10 @@ A `device_name` over 128 bytes is refused as `InternalCanisterError`, and delibe
 given a variant of its own: the II frontend generates the name, so an over-long one is a
 broken client rather than something a user can hit.
 
-The `expiration` a `get` carries has to equal the session's `valid_till_ns` exactly. The pair
-is one ceremony split across an update and a query, so the query witnesses what the update
-prepared rather than searching for something close to it.
+The `expiration` a `get` carries has to equal the session's `valid_till_ns` exactly, and the
+`session_id` names the record the update created. The pair is one ceremony split across an
+update and a query, so the query witnesses what the update prepared rather than searching for
+something close to it.
 
 `prepare_account_session` is gated by `check_authz_and_record_activity`, which also records the sign-in as activity; `get_account_session` by `check_authorization`. The shape follows `SsoPrepareDelegationRequest` and `SsoGetDelegationRequest`: flat records, prepare doing the work and get witnessing the signature.
 
@@ -525,10 +566,10 @@ sequenceDiagram
     participant IIC as II canister
     App->>IIF: ii_session_delegation { sessionPublicKey }
     Note over IIF: ceremony (passkey or OpenID)
-    IIF->>IIC: prepare_account_session { .., session_key = II key,<br/>device_name, device_key + signature }
-    Note over IIC: resolve or register the device<br/>replace this browser's session at this account,<br/>prune expired, reclaim at cap, create ([the session cap](#the-session-cap))
-    IIC-->>IIF: { user_key, expiration = valid_till, created_at,<br/>account_principal, device_id }
-    IIF->>IIC: get_account_session { .., expiration }
+    IIF->>IIC: prepare_account_session { .., session_key = II key,<br/>device_name, browser keys + signatures }
+    Note over IIC: resolve or register the browser<br/>replace this browser's session at this account,<br/>prune expired, reclaim at cap, create — one write ([the session cap](#the-session-cap))
+    IIC-->>IIF: { user_key, expiration = valid_till, session_id,<br/>browser_id, account_principal }
+    IIF->>IIC: get_account_session { .., expiration, session_id }
     IIC-->>IIF: session delegation
     Note over IIF: store (keypair, chain) by (anchor, account, origin)<br/>extend the chain to sessionPublicKey
     IIF-->>App: session chain
@@ -611,7 +652,7 @@ Whether a session mints queries-only delegations is decided once, by the user, a
 A call carries only its own signature. `caller()` is the session principal, the
 [session handle index](#finding-a-session-from-a-call) turns that into the account, and the
 account resolves through the
-[principal index](tracked-default-accounts-spec.md#the-principal-index) to the row. An app
+[principal index](tracked-default-accounts-spec.md#the-principal-index) to the list. An app
 therefore names nothing, attaches nothing, and can lie about nothing.
 
 Nothing signed travels with the call, so there is no artifact to issue per session, none to
@@ -629,7 +670,7 @@ because which of them it is depends on whether a prune has happened to run.
 ### Matching
 
 1. Look `caller()` up in the [session handle index](#finding-a-session-from-a-call). No entry is a caller with no session.
-2. Resolve the handle's account principal to `(anchor, application, account)` through the principal index, read that reference row, and take the record `device_id` names.
+2. Resolve the handle's account principal to `(anchor, application, account)` through the principal index, read that account reference list, and take the record its `session_id` names.
 3. Check that record's `valid_till_ns`.
 
 Three reads and no hashing. The handle's key is the derived session principal, so a hit is itself the proof that the caller is that session — there is nothing to compare and nothing to trust, because the caller cannot present a key it does not hold and no argument travels with the call.
@@ -644,7 +685,7 @@ Which of them a caller hit depends on whether a prune has happened to run, so di
 
 ### What refresh writes
 
-Refresh stamps `last_refreshed_ns`. Naively that is a stable write on every call, and since `with_account_mut` rewrites the entire `(anchor, app)` reference-list blob, it rewrites the whole row rather than one field.
+Refresh stamps `last_refreshed_ns`. Naively that is a stable write on every call, and since the account reference list for `(anchor, app)` is stored as one blob, it rewrites the whole list rather than one field.
 
 #### Write it every time
 
@@ -670,7 +711,7 @@ The two timestamps are different fields for different jobs and both are needed:
 | ------------------- | --------------------- | ------------------------------------------------------------------------------------ |
 | `last_used`         | the account reference | [account eviction](tracked-default-accounts-spec.md#bounding-growth)                 |
 | `last_refreshed_ns` | the session record    | [the session cap](#the-session-cap)'s reclaim order and the user-facing session list |
-| `last_used`         | the device record     | [the registry](#registry) cap's eviction order and the settings device list          |
+| `last_used`         | the browser record    | [the registry](#registry) cap's eviction order and the settings browser list         |
 
 ## Revocation
 
@@ -679,7 +720,7 @@ The two timestamps are different fields for different jobs and both are needed:
 | Caller          | Authenticated as                                              | May revoke                 | Names a session by                                         |
 | --------------- | ------------------------------------------------------------- | -------------------------- | ---------------------------------------------------------- |
 | The app         | its own session chain, so `caller()` is the session principal | only its own session       | nothing. The caller is the session ([matching](#matching)) |
-| The II frontend | an anchor access method, via `check_authorization`            | any session of that anchor | `(origin, account, created_at)`, or a whole `device_id`    |
+| The II frontend | an anchor access method, via `check_authorization`            | any session of that anchor | a whole `browser_id` ([revoking one session](#revoking-one-session-is-not-specified-here)) |
 
 Two sets of methods, and the split falls out of what each caller can prove and what each one knows.
 
@@ -708,19 +749,12 @@ It needs no authorization check beyond the match refresh already performs, becau
 
 The app deliberately cannot revoke anything else. "Sign out everywhere" is the II frontend's operation, not something an app can trigger.
 
-### The anchor-authenticated methods
+### The anchor-authenticated method
 
 ```candid
-revoke_account_session : (record {
+revoke_browser_sessions : (record {
     identity_number : IdentityNumber;
-    origin : text;
-    account_number : opt AccountNumber;
-    created_at : Timestamp;
-}) -> (variant { Ok; Err : SessionRevokeError });
-
-revoke_device_sessions : (record {
-    identity_number : IdentityNumber;
-    device_id : nat32;
+    browser_id : nat32;
 }) -> (variant { Ok; Err : SessionRevokeError });
 
 type SessionRevokeError = variant {
@@ -732,7 +766,17 @@ type SessionRevokeError = variant {
 Revoking something that is already gone succeeds: sign-out has to be idempotent, and a
 distinct "no such session" would tell a caller which sessions exist.
 
-They name a session by where it was created, never by principal, so neither needs the index to resolve anything. Both still write the reference row, so both read the index and depend on the salt as any write does; no entry changes value.
+It names a browser, never a principal, so it needs no index to resolve anything. It still
+writes account state, so it reads the principal index and depends on the salt as any write
+does; no entry changes value.
+
+#### Revoking one session is not specified here
+
+An anchor-authenticated method that ends a single session — naming it by
+`(origin, account, session_id)`, which is what a `SessionRecordKey` already is — is a small
+addition, and the storage operation behind it exists. It is not specified here because it has
+no caller: nothing enumerates an anchor's sessions, so nothing can name one to revoke. It
+arrives with the listing work below, which is where the shape of both is decided together.
 
 #### There is no session listing method, deliberately
 
@@ -742,8 +786,8 @@ What that leaves usable today:
 
 | Operation                | Drivable now?                                                                                                                 |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| Sign a whole browser out | Yes. `identity_info` already carries `session_devices` with their names ([the registry](#registry)), so the UI can offer them |
-| Revoke one session       | The method exists, but nothing enumerates sessions yet, so its UI arrives with the listing work                               |
+| Sign a whole browser out | Yes. `identity_info` already carries `browsers` with their names ([the registry](#registry)), so the UI can offer them        |
+| Revoke one session       | No. Neither the method nor the listing it would need exists yet, and they are specified together                             |
 
 ```mermaid
 sequenceDiagram
@@ -753,10 +797,10 @@ sequenceDiagram
     participant IIC as II canister
     User->>IIF: open settings
     IIF->>IIC: identity_info(identity_number)
-    IIC-->>IIF: session_devices with names
+    IIC-->>IIF: browsers with names
     User->>IIF: sign out "Chrome on macOS"
-    IIF->>IIC: revoke_device_sessions { identity_number, device_id }
-    Note over IIC: sweep the anchor's references for that device<br/>in one message, and the device record stays ([the eager sweep](#signing-a-browser-out-is-an-eager-sweep))
+    IIF->>IIC: revoke_browser_sessions { identity_number, browser_id }
+    Note over IIC: sweep the anchor's references for that browser<br/>in one write, and the browser record stays ([the eager sweep](#signing-a-browser-out-is-an-eager-sweep))
     IIC-->>IIF: Ok
 ```
 
@@ -773,13 +817,13 @@ Revocation stops new delegations being minted; one already issued stays valid un
 | App delegation | up to 30 days of app access, unrevocable | at most one TTL                                    |
 | Session chain  | no equivalent exists                     | can mint app delegations until the user revokes it |
 
-The honest reading of the second row: a thief holding the session chain can refresh, so `targets: [ii_canister_id]` is **not** what stops them. What changes their position is that the session is revocable at all, and that the user can see it in a list and end it.
+The honest reading of the second line: a thief holding the session chain can refresh, so `targets: [ii_canister_id]` is **not** what stops them. What changes their position is that the session is revocable at all, and that the user can see it in a list and end it.
 
 `targets` earns its place as a **developer guardrail**: it makes an app that reaches for the session chain where it meant the app delegation fail immediately and visibly, instead of appearing to work while using a long-lived credential against app canisters.
 
 ---
 
-## Session devices
+## Browsers
 
 ### Registry
 
@@ -787,9 +831,9 @@ Three new additive fields on `StorableAnchor`, following the pattern every field
 
 ```rust
 #[n(7)]
-pub session_devices: Option<Vec<StorableSessionDevice>>,
+pub browsers: Option<Vec<StorableBrowser>>,
 #[n(8)]
-pub next_session_device_id: Option<StorableSessionDeviceId>,
+pub next_browser_id: Option<StorableBrowserId>,
 #[n(9)]
 pub session_count: Option<u32>,
 ```
@@ -797,9 +841,9 @@ pub session_count: Option<u32>,
 The third is [the session cap](#the-session-cap)'s trigger. It rides here because the anchor is
 already read on the sign-in path, so consulting it costs nothing a sign-in was not paying.
 
-with `{ id, key, pending, name, created_at, last_used }` per entry, **capped at 20** because the anchor blob is read on nearly every authenticated path, so an unbounded list taxes far more than sessions do.
+with `{ id, current_browser_key, next_browser_key, name, created_at, last_used }` per entry, **capped at 20** because the anchor blob is read on nearly every authenticated path, so an unbounded list taxes far more than sessions do.
 
-`key` is the browser's current public key and `pending` the successor it last announced ([rotation](#the-key-rotates-on-every-sign-in)); the entry is found by either. The id exists for the methods that name a browser, and it never changes, which is why rotating a key costs a session nothing: sessions record the id.
+`current_browser_key` is the browser's public key and `next_browser_key` the successor it last announced ([rotation](#the-key-rotates-on-every-sign-in)); the entry is found by either. The id exists for the methods that name a browser, and it never changes, which is why rotating a key costs a session nothing: sessions record the id.
 
 #### At the cap, registration evicts the least recently used
 
@@ -809,7 +853,7 @@ Ordering on use rather than on `created_at_ns` is load-bearing, not a nicety. Cl
 
 `last_used` advances on a sign-in from that browser and on every session refresh it drives ([what refresh writes](#what-refresh-writes)). Sign-in alone would be too coarse a signal: a browser holding an app open for weeks without a fresh ceremony would read as idle and lose the cap to one that signed in once and went dark.
 
-Reading needs no method: devices live on `StorableAnchor`, so they ride on `identity_info` alongside `mcp_config`, which is carried there for exactly this reason. `last_used` rides along with them, which is what lets the settings list say when a browser was last used rather than only when it was added — the question someone deciding what to sign out is actually asking.
+Reading needs no method: browsers live on `StorableAnchor`, so they ride on `identity_info` as `browsers`, alongside `mcp_config`, which is carried there for exactly this reason. `last_used` rides along with them, which is what lets the settings list say when a browser was last used rather than only when it was added — the question someone deciding what to sign out is actually asking.
 
 ### A browser proves itself with a key of its own
 
@@ -916,7 +960,7 @@ copied key stops working once the real browser signs in again.
 
 Two things it does not do. It cannot say **which** side of a fork is the user: an attacker who
 rotates first keeps the recognised entry and pushes the legitimate browser into a new one. And
-it adds nothing against a stolen access method with no device key at all, which was already a
+it adds nothing against a stolen access method with no browser key at all, which was already a
 new entry ([what this buys](#what-this-buys)).
 
 #### Why the browser key is not the session key
@@ -942,20 +986,22 @@ name: a fallback is a way to opt out of being identified.
 #### The internal id
 
 The registry assigns a small id per browser, from a per-identity counter, monotonic and never
-reused. It is what `revoke_device_sessions` names and what `identity_info` reports, so neither
+reused. It is what `revoke_browser_sessions` names and what `identity_info` reports, so neither
 has to carry a public key. A caller never supplies it: the key it proves with is what
 identifies it, and the id is returned only so the settings list can mark which entry is the
 browser the user is looking at. It is not a credential, and presenting one buys nothing.
 
 ### Signing a browser out is an eager sweep
 
-`revoke_device_sessions` does what its name says and no more: it removes every session carrying that `device_id`, and **leaves the device record in place.** A browser that has been signed out is still a browser the user recognises, so the settings UI can show "Chrome on Mac, no active sessions", and signing back in from it reuses the same id rather than adding a second entry for the same machine.
+`revoke_browser_sessions` does what its name says and no more: it removes every session carrying that `browser_id`, and **leaves the browser record in place.** A browser that has been signed out is still a browser the user recognises, so the settings UI can show "Chrome on Mac, no active sessions", and signing back in from it reuses the same id rather than adding a second entry for the same machine.
 
-Deleting a device record is therefore a separate operation from signing one out, and it is not specified here. [the accepted limitations](#three-accepted-limitations) is where it is wanted, to clear the duplicate a storage wipe leaves behind, and it belongs with the listing work.
+A browser dropped by the cap is the other case, and it is not this one: registration evicting the least recently used takes both the record and its sessions ([at the cap](#at-the-cap-registration-evicts-the-least-recently-used)), because the record is gone and nothing could name those sessions afterwards.
 
-The sweep runs over that anchor's references in one message, the same anchor-major range scan the eviction path performs, writing only rows that actually hold that device's sessions. It takes no scan limit, unlike eviction: stopping early would leave a browser the user just signed out still holding sessions, and an identity's rows are already bounded by the row cap and the account cap. Atomic, with no partially-revoked state.
+Deleting a browser record the user still holds is therefore a separate operation from signing one out, and it is not specified here. [the accepted limitations](#three-accepted-limitations) is where it is wanted, to clear the duplicate a storage wipe leaves behind, and it belongs with the listing work.
 
-The alternative is to mark a device revoked and check the mark during refresh, which makes revocation O(1) and pushes the cost onto every refresh. The eager sweep is still the right shape, but on a stronger ground than cost: it leaves no partially-revoked state and no window in which a revoked session is merely ignored rather than gone. Revocation is rare, and paying for it once where it happens is worth an unambiguous outcome.
+The sweep runs over that anchor's account state in one write, the same anchor-major range scan the eviction path performs, changing only the lists that actually hold that browser's sessions. It takes no scan limit, unlike eviction: stopping early would leave a browser the user just signed out still holding sessions, and an identity's lists are already bounded by the list cap and the account cap. Atomic, with no partially-revoked state.
+
+The alternative is to mark a browser revoked and check the mark during refresh, which makes revocation O(1) and pushes the cost onto every refresh. The eager sweep is still the right shape, but on a stronger ground than cost: it leaves no partially-revoked state and no window in which a revoked session is merely ignored rather than gone. Revocation is rare, and paying for it once where it happens is worth an unambiguous outcome.
 
 Refresh authenticates by session chain and never runs `check_authorization`, so stamping the browser's last-used time is the only reason it touches the anchor at all — and it buys the browser list a use signal a sign-in stamp cannot give it.
 
@@ -971,7 +1017,7 @@ The frontend holds a separate browser keypair for each anchor it has signed in w
 
 Registration is archived with the name redacted, following `Operation::CreateAccount { name: Private }`. Once per browser per anchor is rare enough to archive, unlike the per-sign-in events that design keeps out of the archive.
 
-The name is self-reported by the client, so it is a label for the user rather than evidence about where a session came from. It is also coarse: the II frontend derives it from the user agent, where several distinct browsers report the same string, so "Chrome on Mac" is a common answer and two entries can carry the same name. It names the device where a device word exists, and where the platform reports a device model, as Android does, the model takes the platform's place. The settings list therefore identifies an entry by its id rather than by its name, and marks the one the user is looking at. Clearing browser storage produces a second entry for the same physical device. The [the registry](#registry) cap keeps that bounded and spends itself on the throwaway records rather than on the browsers the user recognises, so repeated wipes cost a cluttered list rather than a lost sign-in; a way to delete stale entries outright still belongs with the listing work.
+The name is self-reported by the client, so it is a label for the user rather than evidence about where a session came from. It is also coarse: the II frontend derives it from the user agent, where several distinct browsers report the same string, so "Chrome on Mac" is a common answer and two entries can carry the same name. It names the machine where a word for one exists, and where the platform reports a device model, as Android does, the model takes the platform's place. The settings list therefore identifies an entry by its id rather than by its name, and marks the one the user is looking at. Clearing browser storage produces a second entry for the same machine. The [the registry](#registry) cap keeps that bounded and spends itself on the throwaway records rather than on the browsers the user recognises, so repeated wipes cost a cluttered list rather than a lost sign-in; a way to delete stale entries outright still belongs with the listing work.
 
 ---
 
@@ -1015,14 +1061,14 @@ One thing this needs from `tracked-default-accounts-spec.md`: its
 [principal index](tracked-default-accounts-spec.md#the-principal-index) must be readable,
 because a session names its account by principal and every refresh resolves it. Its
 [eviction predicate](tracked-default-accounts-spec.md#predicate) is left alone, which ends a
-row's sessions when the row is reclaimed, for the reason
+list's sessions when the list is reclaimed, for the reason
 [the session cap](#the-session-cap) gives.
 
 That index has one rule worth restating here, because this design is its only caller: no method may accept a principal and report anything about it. A refresh does not violate it. No principal is supplied at all — the caller is resolved from its own signature — and on success it receives only a delegation it could already obtain.
 
 There is no oracle to hide either. A canister-signature principal's public key encodes the issuing canister, so anyone holding one already knows II issued it; what they cannot learn is which identity it belongs to, and no failure message tells them.
 
-Also out of scope: whether to fold MCP's grant into this mechanism. The value shapes are close, but MCP's grant is a principal-keyed row precisely because it has no account reference to hang off, and its one-session-per-anchor rule would become a special case of [the session cap](#the-session-cap)'s cap. Unifying is cleaner and touches shipped behaviour.
+Also out of scope: whether to fold MCP's grant into this mechanism. The value shapes are close, but MCP's grant is a principal-keyed record precisely because it has no account reference to hang off, and its one-session-per-anchor rule would become a special case of [the session cap](#the-session-cap)'s cap. Unifying is cleaner and touches shipped behaviour.
 
 ---
 
@@ -1045,7 +1091,9 @@ Every value the implementation fixes, in one place.
 
 Two orderings an implementer would otherwise have to invent. The session cap takes dead
 sessions before live ones, and orders the live on `last_used + (last_used − created_at)`,
-breaking ties on browser. The browser registry breaks ties on last-used, then browser id.
+breaking ties on session id. The browser registry orders on last-used, breaking ties on
+browser id. Both tie-breaks are there to make the choice total, so two records that compare
+equal on time are not separated by whichever the storage happened to yield first.
 
 ## Requirements
 
@@ -1061,23 +1109,23 @@ created, how an app uses it, how it ends, and how browsers are tracked.
 | REC-2  | Only the last-used stamp MAY change after creation. Every other field MUST be fixed for the session's life.                                                                                                                                                   |
 | REC-3  | The access level MUST be taken from the consent that created the session and MUST NOT be a per-refresh argument.                                                                                                                                              |
 | REC-4  | A session MUST live on the account reference, and MUST be findable from its own derived principal without the caller naming anything.                                                                                                                         |
-| REC-5  | An account reference holding an unexpired session MUST remain eligible for eviction, and evicting it MUST end those sessions, because a row the user cannot see is access they cannot revoke.                                                                 |
+| REC-5  | An account reference holding an unexpired session MUST remain eligible for eviction, and evicting it MUST end those sessions, because a list the user cannot see is access they cannot revoke.                                                                 |
 | REC-6  | An identity MUST be limited to 500 stored session records, expired ones included. There MUST be no separate per-reference limit, since one browser holds one session per account and browsers are already capped.                                             |
 | REC-7  | Reaching that limit MUST NOT cause a sign-in to fail: sessions MUST be reclaimed to a watermark instead, taking expired ones first and then the live ones whose use earned them the least standing.                                                           |
 | REC-7a | Reclaiming MUST happen before the new session is admitted, and admission MUST be granted against the count the reclaiming pass observed rather than against a stored counter, so the stored set never exceeds the limit.                                      |
-| REC-8  | A refresh and a ceremony MUST each prune every expired session on the row they write, and reclaiming MUST take expired sessions before live ones. Nothing MAY require a periodic sweep across identities.                                                     |
+| REC-8  | A refresh and a ceremony MUST each prune every expired session on the state they write, and reclaiming MUST take expired sessions before live ones. Nothing MAY require a periodic sweep across identities.                                                   |
 | REC-9  | A ceremony from a browser that already holds a session at that account MUST replace it rather than reuse or add one.                                                                                                                                          |
 | REC-10 | Every stored session MUST have exactly one entry in the index from its derived principal, created by the write that creates the session and destroyed by the write that destroys it. No entry MAY resolve to a session other than the one it was written for. |
-| REC-11 | Every path that removes a stored session MUST decrement the stored count by what it removed, including paths that do not own the cap: expiry pruned by a write happening anyway, a row taken by the row limit, and a browser signed out.                      |
+| REC-11 | The stored session count MUST be derived by the write path from the state it stores, never accumulated from deltas a caller supplies, and a count that has drifted above the cap MUST be corrected by counting rather than refusing a sign-in.                |
 
 ### Session identity
 
 | #    | Requirement                                                                                                                                                                       |
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ID-1 | A session's identity MUST derive from the account's own seed together with the session's creation time and browser, under a domain tag that separates it from account identities. |
+| ID-1 | A session's identity MUST derive from the account's own seed together with an id that is never reissued, under a domain tag that separates it from account identities.            |
 | ID-2 | Only immutable fields MAY feed the derivation, so stamping a session MUST NOT change its identity.                                                                                |
 | ID-3 | Naming a default account MUST NOT change the identity of its sessions, because it does not change the account's principal.                                                        |
-| ID-4 | One browser MUST hold at most one session per account, so no two sessions can share an account, a browser and a creation time.                                                    |
+| ID-4 | A session id MUST come from a monotonic allocator and MUST NOT be reused, so a revoked session's identity can never be arrived at again.                                          |
 | ID-5 | A holder of an app delegation MUST NOT be able to derive to any session, so an app delegation cannot mint its own replacement.                                                    |
 
 ### Creating a session
@@ -1086,8 +1134,9 @@ created, how an app uses it, how it ends, and how browsers are tracked.
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | NEW-1 | Creating a session MUST require an anchor access method, so a session can neither create another nor extend its own life.                                                                                                                                     |
 | NEW-2 | A request naming an account the identity does not hold MUST be refused before anything is written.                                                                                                                                                            |
-| NEW-3 | Any failure after the first write MUST trap, so a reported failure never leaves a browser registered.                                                                                                                                                         |
-| NEW-4 | A request from a browser that already holds a session at this account MUST replace it — the old record deleted, a new one minted — whether or not the consent changed. This subsumes what a separate consent-change rule would say, since both take one path. |
+| NEW-3 | A ceremony MUST be one atomic unit: the browser registration, any browser the cap drops, that browser's sessions, the pruning, the reclaiming and the new record MUST be written together, and a refusal MUST leave none of them behind.                      |
+| NEW-4 | A request from a browser that already holds a session at this account MUST replace it — the old record deleted, a new one minted — whether or not the consent changed.                                                                                        |
+| NEW-5 | A session id MUST be allocated only after everything that can refuse the ceremony, so a refused sign-in does not consume one. Ids need not be contiguous.                                                                                                     |
 | NEW-6 | The canister MUST sign the session to a key the II frontend holds and cannot export, and the frontend MUST extend the chain to the key the app supplies.                                                                                                      |
 | NEW-7 | The app's hop MUST be restricted to the II canister.                                                                                                                                                                                                          |
 | NEW-8 | The request MUST NOT name an account number, and no app-facing method MAY accept one.                                                                                                                                                                         |
@@ -1110,7 +1159,7 @@ created, how an app uses it, how it ends, and how browsers are tracked.
 | #     | Requirement                                                                                                                                                                                                                                                                   |
 | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | END-1 | An app MUST be able to end its own session and no other. The call MUST succeed whenever a session resolves, and MUST NOT report success without having removed it.                                                                                                            |
-| END-2 | The identity's owner MUST be able to end the sessions created at one moment at one account, or every session one browser holds, authenticated by an access method. Two browsers signing in during the same round share a creation time, so the first of those can match both. |
+| END-2  | The identity's owner MUST be able to end every session one browser holds, authenticated by an access method. Two browsers signed in to the same app MUST be endable separately.                                                                                              |
 | END-3 | Revocation MUST delete the record rather than mark it, leaving nothing for a later call to overlook.                                                                                                                                                                          |
 | END-4 | A call that cannot resolve a usable session MUST report one outcome, whatever the cause.                                                                                                                                                                                      |
 | END-5 | Access MUST end no later than one delegation lifetime after revocation.                                                                                                                                                                                                       |
