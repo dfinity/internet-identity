@@ -220,6 +220,6 @@ export const withBrowserProof = <T>(
   });
 
 /** Which browser the canister knows this one as, for the settings list to mark it. */
-export const currentDeviceId = async (
+export const currentBrowserId = async (
   identityNumber: bigint,
 ): Promise<number | undefined> => (await read(identityNumber))?.browserId;

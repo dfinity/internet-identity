@@ -17,7 +17,7 @@ vi.mock("idb-keyval", async (importOriginal) => {
   };
 });
 import {
-  currentDeviceId,
+  currentBrowserId,
   StaleBrowserKeyError,
   withBrowserProof,
 } from "./browser-key.store";
@@ -277,13 +277,13 @@ describe("browser key", () => {
   it("remembers which browser the canister said this is", async () => {
     await signIn(IDENTITY, 1, 7);
 
-    await expect(currentDeviceId(IDENTITY)).resolves.toBe(7);
+    await expect(currentBrowserId(IDENTITY)).resolves.toBe(7);
   });
 
   it("knows of no browser before a sign-in is accepted", async () => {
     await attempt(IDENTITY, 1);
 
-    await expect(currentDeviceId(IDENTITY)).resolves.toBeUndefined();
+    await expect(currentBrowserId(IDENTITY)).resolves.toBeUndefined();
   });
 
   it("has the successor sign for itself, so an unheld key cannot be announced", async () => {
