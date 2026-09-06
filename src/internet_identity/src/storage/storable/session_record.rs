@@ -1,6 +1,6 @@
 use crate::storage::account::SessionRecord;
+use crate::storage::storable::browser_id::StorableBrowserId;
 use crate::storage::storable::duration::StorableDuration;
-use crate::storage::storable::session_device_id::StorableSessionDeviceId;
 use crate::storage::storable::timestamp::StorableTimestamp;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
@@ -19,7 +19,7 @@ pub struct StorableSessionRecord {
     #[n(3)]
     pub last_refreshed_ns: Option<StorableTimestamp>,
     #[n(4)]
-    pub device_id: StorableSessionDeviceId,
+    pub browser_id: StorableBrowserId,
     #[n(5)]
     pub read_only: bool,
 }
@@ -45,7 +45,7 @@ impl From<StorableSessionRecord> for SessionRecord {
             valid_till_ns: value.valid_till_ns,
             last_refreshed_ns: value.last_refreshed_ns,
             max_idle_ns: value.max_idle_ns,
-            device_id: value.device_id,
+            browser_id: value.browser_id,
             read_only: value.read_only,
         }
     }
@@ -58,7 +58,7 @@ impl From<SessionRecord> for StorableSessionRecord {
             valid_till_ns: value.valid_till_ns,
             last_refreshed_ns: value.last_refreshed_ns,
             max_idle_ns: value.max_idle_ns,
-            device_id: value.device_id,
+            browser_id: value.browser_id,
             read_only: value.read_only,
         }
     }
