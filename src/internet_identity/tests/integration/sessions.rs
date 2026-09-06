@@ -821,7 +821,7 @@ fn should_report_a_revoked_session_as_gone() -> Result<(), RejectResponse> {
         &env,
         canister_id,
         principal_1(),
-        RevokeDeviceSessionsRequest {
+        RevokeBrowserSessionsRequest {
             identity_number,
             browser_id: prepared.browser_id,
         },
