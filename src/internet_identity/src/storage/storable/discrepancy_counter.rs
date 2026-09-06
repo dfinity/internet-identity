@@ -24,19 +24,4 @@ impl Storable for StorableDiscrepancyCounter {
     const BOUND: Bound = Bound::Unbounded;
 }
 
-impl StorableDiscrepancyCounter {
-    pub fn increment(&self, discrepancy_type: &DiscrepancyType) -> Self {
-        match discrepancy_type {
-            DiscrepancyType::AccountRebuild => Self {
-                account_counter_rebuilds: self
-                    .account_counter_rebuilds
-                    .checked_add(1)
-                    .expect("overflow in account_counter_rebuilds"),
-            },
-        }
-    }
-}
-
-pub enum DiscrepancyType {
-    AccountRebuild,
-}
+impl StorableDiscrepancyCounter {}
