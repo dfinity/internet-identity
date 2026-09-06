@@ -1,9 +1,9 @@
+use crate::storage::storable::browser::StorableBrowser;
+use crate::storage::storable::browser_id::StorableBrowserId;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::openid_credential::StorableOpenIdCredential;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
-use crate::storage::storable::browser::StorableBrowser;
-use crate::storage::storable::browser_id::StorableBrowserId;
 use crate::storage::storable::verified_email::StorableVerifiedEmail;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
