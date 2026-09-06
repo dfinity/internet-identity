@@ -417,7 +417,7 @@ fn should_end_the_sessions_of_a_browser_the_registry_dropped() -> Result<(), Rej
 
     for index in 0..MAX_BROWSERS {
         let mut request = session_request_from(identity_number, &BrowserKey::new(index as u8 + 2));
-        request.device_name = format!("browser-{index}");
+        request.browser_name = format!("browser-{index}");
         request.origin = format!("https://dapp-{index}.com");
         prepare_account_session(&env, canister_id, principal_1(), request)?.unwrap();
     }
