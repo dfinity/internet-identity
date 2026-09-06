@@ -5715,6 +5715,51 @@ mod session_creation_tests {
     /// The per-identity cap reclaims to a watermark rather than blocking, taking expired
     /// records first and then the least recently used.
     #[test]
+    fn an_over_counting_anchor_is_corrected_rather_than_denied() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        storage
+            .create_session_for_testing(anchor_number, params(1, 1_000))
+            .unwrap();
+
+        // Nothing observes a session expiring, so the count drifts up. The cap must be
+        // enforced against what the lists hold, not against the drift.
+        let mut anchor = storage.read(anchor_number).unwrap();
+        anchor.session_count = MAX_SESSIONS_PER_ANCHOR;
+        storage.write(anchor).unwrap();
+
+        storage
+            .create_session_for_testing(anchor_number, params(2, 2_000))
+            .unwrap();
+
+        assert_eq!(sessions_of(&storage, anchor_number).len(), 2);
+        assert_eq!(storage.read(anchor_number).unwrap().session_count, 2);
+    }
+
+    #[test]
+    fn the_cap_is_never_exceeded_however_many_sign_ins_arrive() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        for device_id in 0..(MAX_SESSIONS_PER_ANCHOR + 120) {
+            let mut params = params(device_id, 600_000 + device_id as u64);
+            params.valid_till_ns = 100_000_000;
+            storage
+                .create_session_for_testing(anchor_number, params)
+                .unwrap();
+
+            let stored = sessions_of(&storage, anchor_number).len();
+            assert!(
+                stored <= MAX_SESSIONS_PER_ANCHOR as usize,
+                "{stored} stored after {device_id} sign-ins"
+            );
+            assert_eq!(
+                storage.read(anchor_number).unwrap().session_count as usize,
+                stored,
+                "the counter parted ways with the lists after {device_id} sign-ins"
+            );
+        }
+    }
+
+    #[test]
     fn the_session_cap_reclaims_to_the_watermark() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let _session = storage
