@@ -1644,7 +1644,7 @@ mod browser_tests {
             2_000,
         );
 
-        assert_eq!(retried, Err(BrowserError::StaleDeviceKey));
+        assert_eq!(retried, Err(BrowserError::StaleBrowserKey));
         assert_eq!(anchor.browsers().len(), 1);
         assert_eq!(anchor.browsers()[0].next_browser_key, successor_key(1));
     }
