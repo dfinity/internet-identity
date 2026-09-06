@@ -2,11 +2,11 @@ use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
+use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
-use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
 use crate::storage::storable::verified_email::StorableVerifiedEmail;
 use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
@@ -271,12 +271,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 .collect(),
         );
         let next_browser_id = Some(next_browser_id);
-        let browsers = Some(
-            browsers
-                .into_iter()
-                .map(StorableBrowser::from)
-                .collect(),
-        );
+        let browsers = Some(browsers.into_iter().map(StorableBrowser::from).collect());
 
         let (mut passkey_credentials, mut recovery_keys, mut recovery_devices) =
             (vec![], vec![], vec![]);
