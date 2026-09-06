@@ -10,8 +10,8 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::{
     AccountSessionError, AppGetDelegationRequest, AppPrepareDelegationRequest, AppSessionError,
-    GetAccountSessionRequest, Permissions, PrepareAccountSessionRequest,
-    PrepareAccountSessionResponse, BrowserInfo,
+    BrowserInfo, GetAccountSessionRequest, Permissions, PrepareAccountSessionRequest,
+    PrepareAccountSessionResponse,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
