@@ -65,9 +65,9 @@ The same gap prevents a user from signing one browser out. II keeps no record th
 ## Approach
 
 1. **Store a session.**  
-   Signing in records a session against the account the user chose, on the per-account row that `tracked-default-accounts.md` introduces: when it was created, when it expires, when it was last used, which browser it came from, and the access level the user consented to.
+   Signing in records a session against the account the user chose, on the per-account entry that `tracked-default-accounts.md` introduces: when it was created, when it expires, when it was last used, which browser it came from, and the access level the user consented to.
 
-   On that row rather than in a table of its own, because the row is already the thing a settings screen lists and is already capped and swept. A separate table would need its own bound and its own cleanup, and would let a session outlive the record of the app it belongs to. The cost is that the two share a fate: evicting a row for an app the identity stopped using ends any session on it, which is the behaviour `tracked-default-accounts.md` argues for rather than an accident of layout.
+   On that entry rather than in a table of its own, because the entry is already the thing a settings screen lists and is already capped and swept. A separate table would need its own bound and its own cleanup, and would let a session outlive the record of the app it belongs to. The cost is that the two share a fate: evicting the entry for an app the identity stopped using ends any session on it, which is the behaviour `tracked-default-accounts.md` argues for rather than an accident of layout.
 
 2. **Hand the app a chain, not a credential.**  
    The canister signs the session to a key the II frontend generates and cannot export, and the frontend extends that chain to a key the app supplies. The app's hop is restricted to the II canister, so the chain can be used to ask II for delegations and for nothing else.
@@ -127,7 +127,7 @@ specification.
 | Can an app ask for a longer delegation?                    | No. Both halves of the mint derive the 5-minute ceiling themselves, and neither will witness a delegation that outlives its session.                                                                                                                                                                                                                                                                                       |
 | What does a stolen session chain get?                      | 5-minute delegations until the session is revoked, and nothing else. It cannot create a session or extend its own life. The user's lever is the browser list, which is why it carries a last-used time: a browser they do not recognise, still in use, is what tells them to act.                                                                                                                                          |
 | Can the chain be used against an app's own canister?       | No. Its final hop is restricted to the II canister, and that restriction is part of what is signed, so an app reaching for the chain where it meant its delegation fails immediately rather than appearing to work.                                                                                                                                                                                                        |
-| Can cleaning up idle records destroy a live session?       | Yes, and deliberately. The row is what makes an app visible in settings, so sparing it would leave the user holding access they cannot see or revoke. A row and its sessions therefore go together, and what is lost is a ceremony rather than an account: the next visit is served a new session, since a session is not tied to the access method that created it.                                                       |
+| Can cleaning up idle records destroy a live session?       | Yes, and deliberately. The entry is what makes an app visible in settings, so sparing it would leave the user holding access they cannot see or revoke. An entry and its sessions therefore go together, and what is lost is a ceremony rather than an account: the next visit is served a new session, since a session is not tied to the access method that created it.                                                       |
 | Can a copied browser profile stay hidden?                  | No. Copying a profile off disk copies the browser key, but the key is retired at each sign-in, so two copies cannot both keep using it: whichever authenticates second appears as a new browser. What this does not do is say which of the two entries is the user's.                                                                                                                                                      |
 
 ### The flow, end to end
@@ -155,7 +155,7 @@ nothing user-facing appears before the mechanism behind it works.
 
 ### Stage 1. Add somewhere to keep a session
 
-The record gains its place on the per-account row, with the fields listed in the approach. Nothing creates one yet, so this
+The record gains its place on the per-account entry, with the fields listed in the approach. Nothing creates one yet, so this
 changes no behaviour and can be released on its own.
 
 ### Stage 2. Add the browser registry
