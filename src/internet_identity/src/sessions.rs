@@ -1,4 +1,4 @@
-pub mod device_key;
+pub mod browser_key;
 
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::authz_utils::{
@@ -8,7 +8,7 @@ use crate::delegation::{
     add_delegation_signature, calculate_session_seed_with_salt, canister_sig_principal,
     check_frontend_length, der_encode_canister_sig_key, DelegationAccess,
 };
-use crate::sessions::device_key::verify_device_keys;
+use crate::sessions::browser_key::verify_browser_keys;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
 use crate::storage::account::{Account, AccountKey, SessionRecord, SessionRecordKey};
 use crate::storage::anchor::BrowserError;
@@ -25,7 +25,7 @@ use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountSessionError, AnchorNumber, AppGetDelegationRequest,
     AppPrepareDelegationRequest, AppPrepareDelegationResponse, AppSessionError, Delegation,
     FrontendHostname, GetAccountSessionRequest, GetAccountSessionResponse,
-    PrepareAccountSessionRequest, PrepareAccountSessionResponse, RevokeDeviceSessionsRequest,
+    PrepareAccountSessionRequest, PrepareAccountSessionResponse, RevokeBrowserSessionsRequest,
     SessionRevokeError, SignedDelegation, Timestamp,
 };
 use serde_bytes::ByteBuf;
@@ -34,8 +34,8 @@ pub const DEFAULT_SESSION_TTL_NS: u64 = 30 * DAY_NS;
 pub const MAX_SESSION_TTL_NS: u64 = 30 * DAY_NS;
 const MIN_SESSION_TTL_NS: u64 = 10 * MINUTE_NS;
 
-/// The device name is a label the user reads, never anything the canister acts on.
-const MAX_DEVICE_NAME_BYTES: usize = 128;
+/// The browser name is a label the user reads, never anything the canister acts on.
+const MAX_BROWSER_NAME_BYTES: usize = 128;
 
 impl From<AuthorizationError> for AccountSessionError {
     fn from(err: AuthorizationError) -> Self {
@@ -73,7 +73,7 @@ pub async fn prepare_account_session(
         origin,
         account_number,
         session_key,
-        device_name,
+        browser_name,
         current_browser_key,
         next_browser_key,
         current_browser_key_signature,
@@ -85,19 +85,19 @@ pub async fn prepare_account_session(
 
     check_authz_and_record_activity(identity_number)?;
     check_frontend_length(&origin);
-    if device_name.len() > MAX_DEVICE_NAME_BYTES {
+    if browser_name.len() > MAX_BROWSER_NAME_BYTES {
         return Err(AccountSessionError::InternalCanisterError(
-            "device name exceeds the limit".to_string(),
+            "browser name exceeds the limit".to_string(),
         ));
     }
-    if !verify_device_keys(
+    if !verify_browser_keys(
         &current_browser_key,
         &current_browser_key_signature,
         &next_browser_key,
         &next_browser_key_signature,
         &session_key,
     ) {
-        return Err(AccountSessionError::InvalidDeviceKey);
+        return Err(AccountSessionError::InvalidBrowserKey);
     }
     state::ensure_salt_set().await;
 
@@ -127,20 +127,20 @@ pub async fn prepare_account_session(
 
     let mut anchor = state::anchor(identity_number);
     // A rotating browser presents the successor it announced, so both values are known.
-    let known_device = anchor.browsers().iter().any(|device| {
-        device.current_browser_key == current_browser_key
-            || device.next_browser_key == current_browser_key
+    let known_browser = anchor.browsers().iter().any(|browser| {
+        browser.current_browser_key == current_browser_key
+            || browser.next_browser_key == current_browser_key
     });
     let (browser_id, dropped_browsers) = anchor
-        .resolve_browser(current_browser_key, next_browser_key, device_name, now)
+        .resolve_browser(current_browser_key, next_browser_key, browser_name, now)
         .map_err(|error| match error {
             // Told apart from the rest because the browser can act on it: it is the only
             // party holding the successor that does resolve.
-            BrowserError::StaleDeviceKey => AccountSessionError::StaleDeviceKey,
-            _ => AccountSessionError::InvalidDeviceKey,
+            BrowserError::StaleBrowserKey => AccountSessionError::StaleBrowserKey,
+            _ => AccountSessionError::InvalidBrowserKey,
         })?;
 
-    if !known_device {
+    if !known_browser {
         post_operation_bookkeeping(
             identity_number,
             Operation::RegisterBrowser {
@@ -458,7 +458,7 @@ fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {
 }
 
 pub fn revoke_browser_sessions(
-    request: RevokeDeviceSessionsRequest,
+    request: RevokeBrowserSessionsRequest,
 ) -> Result<(), SessionRevokeError> {
     check_authorization(request.identity_number)
         .map_err(|err| SessionRevokeError::Unauthorized(err.principal))?;

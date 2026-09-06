@@ -17,7 +17,7 @@ interface BrowserKeyRecord {
    *  it would leave the browser unable to prove it is itself ever again. */
   announced?: CryptoKeyPair;
   /** Absent until a sign-in has told us which browser we are. */
-  deviceId?: number;
+  browserId?: number;
 }
 
 /**
@@ -37,9 +37,9 @@ export class StaleBrowserKeyError extends Error {
 const BROWSER_KEY_STORE = createStore("ii-browser-keys", "keys");
 
 /** Must match the domains the canister verifies the two signatures under. */
-const SIGNATURE_DOMAIN = new TextEncoder().encode("ii-session-device-key");
+const SIGNATURE_DOMAIN = new TextEncoder().encode("ii-session-browser-key");
 const SUCCESSOR_SIGNATURE_DOMAIN = new TextEncoder().encode(
-  "ii-session-device-successor",
+  "ii-session-browser-successor",
 );
 
 /**
@@ -107,7 +107,7 @@ export interface BrowserProof {
   /** By the successor itself, so a key the browser does not hold cannot be announced. */
   nextSignature: Uint8Array;
   /** Rotates to the successor. Called once the canister has accepted the sign-in. */
-  accept: (deviceId: number) => Promise<void>;
+  accept: (browserId: number) => Promise<void>;
 }
 
 /** Serialises sign-ins for one identity: two at once would leave us holding a key the
@@ -175,8 +175,8 @@ const attempt = async <T>(
     nextPublicKey,
     signature,
     nextSignature,
-    accept: (deviceId) =>
-      write(identityNumber, { keyPair: successor, deviceId }),
+    accept: (browserId) =>
+      write(identityNumber, { keyPair: successor, browserId }),
   });
 };
 
@@ -220,6 +220,6 @@ export const withBrowserProof = <T>(
   });
 
 /** Which browser the canister knows this one as, for the settings list to mark it. */
-export const currentDeviceId = async (
+export const currentBrowserId = async (
   identityNumber: bigint,
-): Promise<number | undefined> => (await read(identityNumber))?.deviceId;
+): Promise<number | undefined> => (await read(identityNumber))?.browserId;
