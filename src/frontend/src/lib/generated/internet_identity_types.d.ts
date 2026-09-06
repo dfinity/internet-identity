@@ -947,7 +947,7 @@ export interface IdentityInfo {
    * created a session), so the Settings UI can offer "sign this browser
    * out" without a separate call.
    */
-  'session_devices' : [] | [Array<SessionDeviceInfo>],
+  'browsers' : [] | [Array<BrowserInfo>],
   /**
    * The anchor's synced trusted-MCP-server config (absent when the
    * anchor never wrote one). Carried here rather than read from the
@@ -1539,7 +1539,7 @@ export type SessionDelegationError = { 'NoSuchDelegation' : null } |
  * client, so it is a label for the user rather than evidence about where a
  * session came from.
  */
-export interface SessionDeviceInfo {
+export interface BrowserInfo {
   'id' : number,
   'name' : string,
   'created_at' : Timestamp,
