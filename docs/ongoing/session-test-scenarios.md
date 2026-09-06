@@ -35,7 +35,7 @@ Where a scenario needs a delegation to age, the point is the boundary and not th
    Start with an identity that has never signed in at the app.  
    Sign in and use it.  
    It must work, and the app must now appear in the identity's list with a last-used time.  
-   Covers NEW-1, MINT-12, WRITE-9.
+   Covers NEW-1, MINT-12, WRITE-10.
 2. **FIRST-2. The account stays the same for as long as the app is open.**  
    Sign in, note the account the app shows, then keep using it for longer than one delegation lasts.  
    It must show that same account throughout, with no moment where it appears to be someone else or nobody.  
@@ -166,7 +166,7 @@ Where a scenario needs a delegation to age, the point is the boundary and not th
 1. **SHOW-1. An app appears once it has been used.**  
    Sign in at a new app and open settings.  
    It must be listed, with when it was last used.  
-   Covers WRITE-9, USE-5.
+   Covers WRITE-10, USE-5.
 2. **SHOW-2. A browser appears under a name that identifies it.**  
    Sign in from a browser and open settings.  
    It must be listed, named recognisably, with when it was last used.  
