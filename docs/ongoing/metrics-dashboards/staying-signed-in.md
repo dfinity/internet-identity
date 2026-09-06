@@ -32,7 +32,7 @@ Before sessions, every visit issued a fresh delegation with no record tying it t
 <details>
 <summary><b>Sources and formula</b></summary>
 
-Add `internet_identity_session_uses_total{age}`, a counter incremented in `stamp_session_refresh` and labelled by how old the session was at that moment. The age is `now - created_at`, both already in hand.
+Add `internet_identity_session_uses_total{age}`, a counter incremented in `record_session_use` and labelled by how old the session was at that moment. The age is `now - created_at`, both already in hand.
 
 ```promql
 sum(rate(internet_identity_session_uses_total{age="7d+"}[7d]))
@@ -67,7 +67,7 @@ Nothing distinguishes a sign-in that led somewhere from one that led nowhere, so
 <details>
 <summary><b>Sources and formula</b></summary>
 
-Add `internet_identity_session_first_uses_total`, incremented where `last_refreshed` goes from `None` to `Some`.
+Add `internet_identity_session_first_uses_total`, incremented where `last_refreshed_ns` goes from `None` to `Some`.
 
 ```promql
 1 - sum(rate(internet_identity_session_first_uses_total[7d]))
@@ -102,7 +102,7 @@ An earlier draft of this dashboard proposed delegation requests per active sign-
 <details>
 <summary><b>Sources and formula</b></summary>
 
-Add `internet_identity_session_gap_seconds`, a histogram observed in `stamp_session_refresh` as `now - last_refreshed`.
+Add `internet_identity_session_gap_seconds`, a histogram observed in `record_session_use` as `now - last_refreshed`.
 
 ```promql
 histogram_quantile(0.5, sum by (le) (rate(internet_identity_session_gap_seconds_bucket[7d])))
@@ -178,13 +178,13 @@ Nothing counts revocations, so there is no way to tell whether the settings scre
 <details>
 <summary><b>Sources and formula</b></summary>
 
-Add `internet_identity_sessions_revoked_total{reason}`, incremented at each of the four call sites that delete a session on purpose: `app_revoke_session`, `revoke_account_session`, `revoke_device_sessions`, and the internal call that drops a browser when the registry passes twenty. The last two share a storage function, so the label is set by the caller that knows which happened.
+Add `internet_identity_sessions_revoked_total{reason}`, incremented at each of the three call sites that delete a session on purpose: `app_revoke_session`, `revoke_browser_sessions`, and the internal drop of a browser when the registry passes twenty. The last two share a storage function, so the label is set by the caller that knows which happened. A fourth reason joins them if an anchor-authenticated single-session revoke is ever added; nothing enumerates sessions to name one today.
 
 ```promql
 sum by (reason) (increase(internet_identity_sessions_revoked_total[30d]))
 ```
 
-**Expiry is deliberately not a slice of this.** It writes nothing, so a bar for it would show whatever the opportunistic cleanup in `stamp_session_refresh` happened to catch, which is worse than showing nothing. The title says deliberate for that reason.
+**Expiry is deliberately not a slice of this.** It writes nothing, so a bar for it would show whatever the opportunistic cleanup in `record_session_use` happened to catch, which is worse than showing nothing. The title says deliberate for that reason.
 
 </details>
 
@@ -235,7 +235,7 @@ xychart-beta
 ```
 
 <details>
-<summary><b>Today:</b> nothing measures this, and it needs a row walk</summary>
+<summary><b>Today:</b> nothing measures this, and it needs a walk over the lists</summary>
 
 Nothing on the endpoint can answer it, for the reason on the index: expiry writes nothing, so a live count cannot be maintained incrementally. It needs something that walks the session rows.
 
@@ -246,7 +246,7 @@ On the page because it is wanted, not because it is cheap.
 <details>
 <summary><b>Sources and formula</b></summary>
 
-Add `internet_identity_live_sessions`, a gauge, which needs a pass over the session rows — a timer sweep with a cursor stored across executions, or making expiry an event so a counter can follow it. That one decision also unlocks the two panels below.
+Add `internet_identity_live_sessions`, a gauge, which needs a pass over the account reference lists — a timer sweep with a cursor stored across executions, or making expiry an event so a counter can follow it. That one decision also unlocks the two panels below.
 
 ```promql
 sum(internet_identity_live_sessions)
@@ -280,7 +280,7 @@ Same prerequisite as the panel above.
 <details>
 <summary><b>Sources and formula</b></summary>
 
-A by-product of the same row walk, bucketed into `le` labels.
+A by-product of the same walk, bucketed into `le` labels.
 
 ```promql
 sum by (le) (internet_identity_live_sessions_per_identity_bucket)
@@ -312,7 +312,7 @@ The registry and its cap are entirely unobserved. [Deliberate endings](#delibera
 <details>
 <summary><b>Sources and formula</b></summary>
 
-The same row walk again, bucketed per identity and app pair.
+The same walk again, bucketed per identity and app pair.
 
 ```promql
 sum by (le) (internet_identity_session_devices_per_identity_bucket)

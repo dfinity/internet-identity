@@ -206,36 +206,45 @@ A warning belongs on it. An app delegation lives 5 minutes and is replaced while
 
 </details>
 
-## Stored counts rebuilt after drifting
+## Stored counts that have drifted
 
-The account counter exists so a limit can be checked without reading every row, and it can drift. Zero is correct; movement is a bug.
+The account counter exists so a limit can be checked without reading every list, and it can
+drift. Nothing repairs it any more.
 
-A ticket rather than a page, because the canister repairs it itself.
-
-```mermaid
-xychart-beta
-  title "Count rebuilds, expected zero"
-  x-axis "week" [w1, w2, w3, w4, w5, w6, w7, w8]
-  y-axis "rebuilds" 0 --> 10
-  line [0, 0, 0, 0, 3, 0, 0, 0]
-```
+A ticket rather than a page, and at present not even that: there is nothing to plot.
 
 <details>
-<summary><b>Today:</b> published but never plotted</summary>
+<summary><b>Today:</b> a metric that can no longer move</summary>
 
-`internet_identity_account_counter_discrepancy_count` is already on the endpoint and reads 0 live. No panel reads it, so a drift would be repaired silently and nobody would learn that it happened.
+`internet_identity_account_counter_discrepancy_count` is on the endpoint and reads 0 live. It
+counted the rebuilds of a repair path — recount an identity's references, correct the counter
+whenever it claimed the cap was hit — and that path went with the single write path, because
+the counter it insured against drift is now written by the only thing that can move it.
+
+So the family is a residue. Nothing increments it, and a panel over it would report health it
+cannot observe, which is worse than no panel. It stays on the endpoint because removing a
+stable cell is a migration, not because it says anything.
+
+What a drift costs, if one ever happens, is that the identity cannot create further named
+accounts. That is visible as a failed creation rather than as a gauge, and the case for a
+metric here is the case for making that failure countable — a family that does not exist yet.
 
 </details>
 
 <details>
 <summary><b>Sources and formula</b></summary>
 
-No source change; the family already exists.
+None. Deliberately not:
 
 ```promql
 increase(internet_identity_account_counter_discrepancy_count[1d])
 ```
 
-There is deliberately no session equivalent. Session counts drift by design, because expiry removes a session with no write to observe — see [what the canister can observe](README.md) on the index.
+which is flat by construction.
+
+There is deliberately no session equivalent either, for a different reason. Session counts
+drift by design, because expiry removes a session with no write to observe — and that one is
+self-correcting, since the count that answers the cap is also what puts the stored number
+right. See [what the canister can observe](README.md) on the index.
 
 </details>
