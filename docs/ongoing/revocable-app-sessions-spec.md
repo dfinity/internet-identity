@@ -235,21 +235,29 @@ they were used from, live records and the expired ones nobody has come back to p
 user with fifty apps, several accounts among them, across five browsers lands in the low
 hundreds. Five hundred is above anyone real and far below anything that costs the canister.
 
-A ceremony reads everything the identity holds, shapes it, and writes it once:
+A ceremony is handed the keys the browser presented and nothing else. It reads everything the
+identity holds, shapes it, and writes it once:
 
-1. Drop the sessions of any browser the registry gave up to make room for this one
+1. Resolve the browser by the key it proves, registering it where this identity has not seen
+   it, and give a browser up where that takes the registry past its cap
    ([at the cap, registration evicts](#at-the-cap-registration-evicts-the-least-recently-used)).
-   Those can be at any origin, which is why the write is over the whole account state and not
-   over one list.
-2. Prune every expired record, everywhere.
-3. If the identity is still at the cap, reclaim live sessions down to a watermark of 450.
-4. Delete whatever this browser already held at this account
+2. Drop the sessions of any browser given up in step 1. Those can be at any origin, which is
+   why the write is over the whole account state and not over one list.
+3. Prune every expired record, everywhere.
+4. If the identity is still at the cap, reclaim live sessions down to a watermark of 450.
+5. Delete whatever this browser already held at this account
    ([one browser, one session per account](#one-browser-one-session-per-account)).
-5. Insert, and write all of it as one state.
+6. Insert, and write all of it as one state.
 
-Steps 1 to 4 shape a value; step 5 is the only thing that stores. So a ceremony that is
-refused stores none of it, and a sign-in that crosses the cap is one atomic unit rather than
-a reclaim followed by an insert that could fail after it.
+Steps 1 to 5 shape a value; step 6 is the only thing that stores. So a ceremony that is
+refused stores none of it, and a sign-in that crosses either cap is one atomic unit rather
+than a reclaim followed by an insert that could fail after it.
+
+Step 1 belongs here rather than to whoever calls it, and that is the point of the shape. The
+registry giving a browser up is what step 2 acts on, so a caller that resolved the browser
+itself would be working out a consequence and handing it over — and a consequence handed over
+is one that can be forgotten, leaving sessions alive with no browser record naming them, which
+is access the user cannot revoke.
 
 Reclaiming walks what the identity holds once and takes dead sessions before live ones. Among the
 live, it takes the smallest of
@@ -1015,7 +1023,7 @@ The frontend holds a separate browser keypair for each anchor it has signed in w
 
 ### Three accepted limitations
 
-Registration is archived with the name redacted, following `Operation::CreateAccount { name: Private }`. Once per browser per anchor is rare enough to archive, unlike the per-sign-in events that design keeps out of the archive.
+Registration is not archived. It could be — once per browser per anchor is rare enough, unlike the per-sign-in events the account design keeps out of the archive — but the only party that knows a registration is new is the write that resolves the browser, and archiving is not storage's to do. Telling the caller so exists only to produce the entry, which is a poor reason for a return value to carry it, so neither exists.
 
 The name is self-reported by the client, so it is a label for the user rather than evidence about where a session came from. It is also coarse: the II frontend derives it from the user agent, where several distinct browsers report the same string, so "Chrome on Mac" is a common answer and two entries can carry the same name. It names the machine where a word for one exists, and where the platform reports a device model, as Android does, the model takes the platform's place. The settings list therefore identifies an entry by its id rather than by its name, and marks the one the user is looking at. Clearing browser storage produces a second entry for the same machine. The [the registry](#registry) cap keeps that bounded and spends itself on the throwaway records rather than on the browsers the user recognises, so repeated wipes cost a cluttered list rather than a lost sign-in; a way to delete stale entries outright still belongs with the listing work.
 
@@ -1183,8 +1191,7 @@ created, how an app uses it, how it ends, and how browsers are tracked.
 | DEV-12 | A successor another browser of the identity holds, as its current key or as its announced successor, MUST be refused, leaving no entry, name or stamp behind. A successor the resolving browser itself announced MUST be accepted, since a retry presents one. |
 | DEV-13 | A browser registering for the first time MUST persist its key before the call, since a response that never arrives may still have registered it.                                                                                                               |
 | DEV-14 | The list MUST be limited to 20 entries, and reaching the limit MUST drop the least recently used rather than refuse the sign-in.                                                                                                                               |
-| DEV-15 | Dropping an entry MUST also end that browser's sessions, since a session whose browser is not listed could not otherwise be signed out.                                                                                                                        |
+| DEV-15 | Dropping an entry MUST also end that browser's sessions, at every origin it held one, in the same write. A session whose browser is not listed could not otherwise be signed out.                                                                              |
 | DEV-16 | The internal id MUST come from a per-identity counter and MUST NOT be reissued. It is what the revocation method and `identity_info` name; a caller MUST NOT supply it.                                                                                        |
 | DEV-17 | The last-used stamp MUST advance on a sign-in from that browser and on every refresh it drives.                                                                                                                                                                |
 | DEV-18 | Signing a browser out MUST leave its entry in place, so the browser stays recognisable and signing in again reuses it.                                                                                                                                         |
-| DEV-19 | Registering a browser MUST be archived with the self-reported name redacted.                                                                                                                                                                                   |
