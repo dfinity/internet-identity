@@ -2843,6 +2843,14 @@ impl<M: Memory + Clone> Storage<M> {
             read_only,
             now_ns,
         } = params;
+
+        // A session that is over before it starts would be pruned by the sweep below, in
+        // the same call that created it, and this would return `Ok` naming a session no
+        // list holds. Refused here instead, where nothing has been read or stored yet.
+        if valid_till_ns <= now_ns {
+            return Err(StorageError::SessionAlreadyOver { anchor_number });
+        }
+
         let mut anchor = self.read(anchor_number)?;
 
         // Defaulted and clamped here rather than at the caller, so every path that
@@ -4132,6 +4140,10 @@ pub enum StorageError {
     },
     /// The browser presenting itself could not be resolved to a registry entry.
     Browser(BrowserError),
+    /// A session was asked for that is already over, which no list would hold.
+    SessionAlreadyOver {
+        anchor_number: AnchorNumber,
+    },
     AnchorNumberOutOfRange {
         anchor_number: AnchorNumber,
         range: (AnchorNumber, AnchorNumber),
@@ -4215,6 +4227,10 @@ impl fmt::Display for StorageError {
             ),
             Self::BadAnchorNumber(n) => write!(f, "bad Identity Anchor {n}"),
             Self::Browser(err) => write!(f, "the browser could not be resolved: {err:?}"),
+            Self::SessionAlreadyOver { anchor_number } => write!(
+                f,
+                "a session for Identity Anchor {anchor_number} would be over before it started"
+            ),
             Self::DeserializationError(err) => {
                 write!(f, "failed to deserialize a Candid value: {err}")
             }
