@@ -3582,7 +3582,6 @@ mod default_account_tracking_tests {
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
-    use serde_bytes::ByteBuf;
 
     fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
@@ -5493,7 +5492,11 @@ mod session_creation_tests {
         storage
             .write_account_state(
                 &mut anchor,
-                write_at(&origin, vec![AccountReference::new(None, Some(1_000))], None),
+                write_at(
+                    &origin,
+                    vec![AccountReference::new(None, Some(1_000))],
+                    None,
+                ),
             )
             .unwrap();
 
@@ -5519,7 +5522,11 @@ mod session_creation_tests {
         storage
             .write_account_state(
                 &mut anchor,
-                write_at(&origin, vec![AccountReference::new(None, Some(2_000))], None),
+                write_at(
+                    &origin,
+                    vec![AccountReference::new(None, Some(2_000))],
+                    None,
+                ),
             )
             .unwrap();
 
