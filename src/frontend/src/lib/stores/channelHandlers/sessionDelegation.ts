@@ -313,7 +313,8 @@ export const handleSessionDelegationRequest =
  * form the key store acts on, which is where the successor that does resolve is kept.
  */
 export const asBrowserKeyError = (error: unknown): unknown =>
-  isCanisterError<AccountSessionError>(error) && error.type === "StaleDeviceKey"
+  isCanisterError<AccountSessionError>(error) &&
+  error.type === "StaleBrowserKey"
     ? new StaleBrowserKeyError()
     : error;
 
@@ -346,7 +347,7 @@ const createSession = async (
   const key = { identityNumber, accountNumber, origin: effectiveOrigin };
   const iiKey = await ECDSAKeyIdentity.generate({ extractable: false });
   const iiPublicKey = new Uint8Array(iiKey.getPublicKey().toDer());
-  const deviceName = await describeBrowser();
+  const browserName = await describeBrowser();
 
   const prepared = await withBrowserProof(
     identityNumber,
@@ -358,7 +359,7 @@ const createSession = async (
           origin: effectiveOrigin,
           account_number: accountNumber !== undefined ? [accountNumber] : [],
           session_key: iiPublicKey,
-          device_name: deviceName,
+          browser_name: browserName,
           current_browser_key: browser.publicKey,
           next_browser_key: browser.nextPublicKey,
           current_browser_key_signature: browser.signature,
