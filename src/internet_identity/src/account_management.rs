@@ -452,7 +452,11 @@ fn should_create_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
 
@@ -474,7 +478,11 @@ fn should_fail_to_create_accounts_above_max() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let name = "Alice".to_string();
     for i in 0..=MAX_ANCHOR_ACCOUNTS {
         let origin = format!("https://example-{i}.com");
@@ -493,7 +501,11 @@ fn should_fail_to_update_default_accounts_above_max() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let name = "Alice".to_string();
     for i in 0..MAX_ANCHOR_ACCOUNTS {
         let origin = format!("https://example-{i}.com");
@@ -518,7 +530,11 @@ fn should_get_accounts_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
     let name_two = "Bob".to_string();
@@ -556,8 +572,16 @@ fn should_only_get_own_accounts_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
-    let anchor_two = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
+    let anchor_two = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
     let name_two = "Bob".to_string();
@@ -603,7 +627,11 @@ fn should_update_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
     let name_two = "Bob".to_string();
@@ -683,7 +711,11 @@ fn should_update_default_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let name = "Alice".to_string();
     let name_two = "Bob".to_string();
@@ -772,7 +804,11 @@ fn should_fail_check_or_rebuild_when_not_first_time() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
 
     // create faulty counter entries
     storage_borrow_mut(|storage| {
@@ -796,7 +832,11 @@ fn should_properly_recalculate_faulty_account_counter() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let name = "Alice".to_string();
 
     // create faulty counter entries
@@ -825,7 +865,11 @@ fn should_properly_recalculate_faulty_account_counter_when_updating() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
 
     // create faulty counter entries
     storage_borrow_mut(|storage| {
@@ -852,7 +896,11 @@ fn should_increment_discrepancy_counter() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
 
     // create faulty counter entries
     storage_borrow_mut(|storage| {
@@ -889,7 +937,11 @@ fn should_get_default_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let anchor_number = anchor.anchor_number();
 
@@ -1046,7 +1098,11 @@ fn can_get_default_before_update_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let anchor_number = anchor.anchor_number();
 
@@ -1064,7 +1120,11 @@ fn should_get_updated_default_account_after_modification() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin = "https://example.com".to_string();
     let anchor_number = anchor.anchor_number();
 
@@ -1131,7 +1191,11 @@ fn should_fall_back_to_the_tracked_default_when_the_reservation_is_stale() {
     // to be there for the same test to hold all the way up the stack.
     storage.update_salt([17u8; 32]);
     storage_replace(storage);
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let anchor_number = anchor.anchor_number();
     let origin = "https://example.com".to_string();
     storage_borrow_mut(|storage| storage.write(anchor)).unwrap();
@@ -1164,7 +1228,11 @@ fn should_get_default_account_for_different_origins() {
     use crate::state::{storage_borrow_mut, storage_replace};
 
     storage_replace(storage_with_salt());
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let origin1 = "https://app1.com".to_string();
     let origin2 = "https://app2.com".to_string();
     let anchor_number = anchor.anchor_number();
