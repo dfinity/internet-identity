@@ -3582,6 +3582,7 @@ mod default_account_tracking_tests {
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
+    use serde_bytes::ByteBuf;
 
     fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
@@ -5451,6 +5452,7 @@ mod session_creation_tests {
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
+    use serde_bytes::ByteBuf;
 
     const SALT: [u8; 32] = [17u8; 32];
     const ORIGIN: &str = "https://example.com";
@@ -5462,6 +5464,73 @@ mod session_creation_tests {
         let anchor_number = anchor.anchor_number();
         storage.write(anchor).unwrap();
         (storage, anchor_number)
+    }
+
+    /// The write path is handed the anchor, not its number, so that it owns storing it —
+    /// which means storing what the *caller* changed too, not only the session count it
+    /// sets itself.
+    ///
+    /// Registering a browser and rotating its key is exactly such a change, and a sign-in
+    /// from a browser that already holds a session at this account replaces that session
+    /// rather than adding one, so the count does not move. A write that stored the anchor
+    /// only when the count moved discarded the rotation on every such sign-in, leaving a
+    /// key that is meant to last one sign-in usable for good.
+    #[test]
+    fn an_anchor_the_caller_changed_is_stored_even_when_the_session_count_does_not_move() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = ORIGIN.to_string();
+
+        let mut anchor = storage.read(anchor_number).unwrap();
+        let (browser_id, _) = anchor
+            .resolve_browser(
+                ByteBuf::from(vec![1u8; 32]),
+                ByteBuf::from(vec![2u8; 32]),
+                "Chrome".to_string(),
+                1_000,
+            )
+            .unwrap();
+        // No session anywhere, so this write moves no session count.
+        storage
+            .write_account_state(
+                &mut anchor,
+                write_at(&origin, vec![AccountReference::new(None, Some(1_000))], None),
+            )
+            .unwrap();
+
+        let stored = storage.read(anchor_number).unwrap();
+        let browser = stored
+            .browsers()
+            .iter()
+            .find(|browser| browser.id == browser_id)
+            .expect("the browser the caller registered is not stored");
+        assert_eq!(browser.current_browser_key, ByteBuf::from(vec![1u8; 32]));
+        assert_eq!(browser.next_browser_key, ByteBuf::from(vec![2u8; 32]));
+
+        // And the rotation that follows it, which is the case the count never moves for.
+        let mut anchor = storage.read(anchor_number).unwrap();
+        anchor
+            .resolve_browser(
+                ByteBuf::from(vec![2u8; 32]),
+                ByteBuf::from(vec![3u8; 32]),
+                "Chrome".to_string(),
+                2_000,
+            )
+            .unwrap();
+        storage
+            .write_account_state(
+                &mut anchor,
+                write_at(&origin, vec![AccountReference::new(None, Some(2_000))], None),
+            )
+            .unwrap();
+
+        let stored = storage.read(anchor_number).unwrap();
+        let browser = &stored.browsers()[0];
+        assert_eq!(
+            browser.current_browser_key,
+            ByteBuf::from(vec![2u8; 32]),
+            "the rotated key was not stored"
+        );
+        assert_eq!(browser.next_browser_key, ByteBuf::from(vec![3u8; 32]));
     }
 
     /// A browser the registry gave up takes its sessions with it, wherever they were, in
