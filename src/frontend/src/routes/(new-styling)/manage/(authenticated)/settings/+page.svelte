@@ -6,7 +6,7 @@
   import CliAccessSection from "./components/CliAccessSection.svelte";
   import McpTrustedServersSection from "./components/McpTrustedServersSection.svelte";
   import BrowsersSection from "./components/BrowsersSection.svelte";
-  import { fromCanisterBrowsers } from "./sessionDevices";
+  import { fromCanisterBrowsers } from "./browsers";
   import { currentDeviceId } from "$lib/stores/browser-key.store";
   import type { PageProps } from "./$types";
 
@@ -28,7 +28,7 @@
     );
   });
 
-  const sessionDevices = $derived(
+  const browsers = $derived(
     fromCanisterBrowsers(data.identityInfo.browsers, thisBrowser),
   );
 </script>
@@ -50,6 +50,6 @@
   />
   <BrowsersSection
     identityNumber={$authenticatedStore.identityNumber}
-    devices={sessionDevices}
+    devices={browsers}
   />
 </div>
