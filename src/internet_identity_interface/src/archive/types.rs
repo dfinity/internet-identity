@@ -81,8 +81,8 @@ pub enum Operation {
     // Once per browser per anchor, so rare enough to archive, unlike the per-sign-in
     // events the account design keeps out of it. The name is self-reported by the
     // client, so it is redacted like an account name.
-    #[serde(rename = "register_session_device")]
-    RegisterSessionDevice { name: Private },
+    #[serde(rename = "register_browser")]
+    RegisterBrowser { name: Private },
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]

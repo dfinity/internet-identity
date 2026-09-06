@@ -405,8 +405,8 @@ impl BrowserKey {
         ByteBuf::from(der)
     }
 
-    pub fn sign(&self, session_key: &SessionKey, next_device_key: &PublicKey) -> ByteBuf {
-        self.sign_with(DEVICE_KEY_SIGNATURE_DOMAIN, session_key, next_device_key)
+    pub fn sign(&self, session_key: &SessionKey, next_browser_key: &PublicKey) -> ByteBuf {
+        self.sign_with(DEVICE_KEY_SIGNATURE_DOMAIN, session_key, next_browser_key)
     }
 
     /// The successor's own signature, proving the browser holds the key it announces.
