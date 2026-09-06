@@ -301,6 +301,12 @@ const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
 // multiple virtual memories for smaller amounts of data.
 // This value results in 256 GB of total managed memory, which should be enough
 // for the foreseeable future.
+/// Named accounts one identity may hold, across every origin.
+///
+/// Each costs a stored record and a seed, so this is what bounds an identity's share of
+/// the canister.
+pub const MAX_ANCHOR_ACCOUNTS: u64 = 500;
+
 const BUCKET_SIZE_IN_PAGES: u16 = 128;
 const MAX_MANAGED_MEMORY_SIZE: u64 = 256 * GB;
 const MAX_MANAGED_WASM_PAGES: u64 = MAX_MANAGED_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES;
@@ -1616,40 +1622,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(self.apply_account_state(anchor_number, validated))
     }
 
-    /// A write that may store this identity's first tracked default at an origin, and
-    /// evicts idle ones where it did.
-    ///
-    /// The sweep rides on the write that created the list rather than running on its own,
-    /// because the cap it enforces is a cap on stored tracked defaults and that is the
-    /// only write that can push past it.
-    fn write_tracked_default(
-        &mut self,
-        anchor_number: AnchorNumber,
-        origin: FrontendHostname,
-        account_references: Vec<AccountReferenceWrite>,
-        config: Option<AnchorApplicationConfig>,
-    ) -> Result<BTreeMap<FrontendHostname, AccountReferenceListWrite>, StorageError> {
-        let is_new_list = self
-            .lookup_application_number_with_origin(&origin)
-            .and_then(|application_number| {
-                self.stored_account_references(anchor_number, application_number)
-            })
-            .is_none();
-
-        let written = self.write_account_state(
-            anchor_number,
-            BTreeMap::from([(origin.clone(), Some((account_references, config)))]),
-        )?;
-
-        if is_new_list {
-            if let Some(application_number) = self.lookup_application_number_with_origin(&origin) {
-                self.evict_idle_tracked_defaults(anchor_number, application_number)?;
-            }
-        }
-
-        Ok(written)
-    }
-
     /// Everything that can refuse. Reads what is stored, works out what would be minted
     /// without minting it, and hands apply something that cannot fail.
     fn validate_account_state(
@@ -1662,6 +1634,7 @@ impl<M: Memory + Clone> Storage<M> {
             global: self.stable_account_counter_memory.get().clone(),
         };
 
+        let written_origins: BTreeSet<FrontendHostname> = writes.keys().cloned().collect();
         let mut validated = Vec::with_capacity(writes.len());
         for (origin, write) in writes {
             validated.push(self.validate_account_reference_list(
@@ -1672,15 +1645,32 @@ impl<M: Memory + Clone> Storage<M> {
             )?);
         }
 
+        // Evicting idle tracked defaults belongs here rather than to a caller, for the
+        // same reason the counters do: it is a consequence of the write, and a caller that
+        // has to remember it is a caller that can forget.
+        //
+        // It also has to be *this* write. Eviction used to run as a second call once the
+        // first had returned, so a write that pushed the identity over the cap was two
+        // atomic units — and an `Err` from the second committed the first.
+        let stored_anchor = self
+            .stable_anchor_account_counter_memory
+            .get(&anchor_number)
+            .unwrap_or_default();
+        for (origin, application_number) in
+            self.evictable_after(anchor_number, &stored_anchor, &validated, &written_origins)
+        {
+            validated.push(self.validate_removal(
+                anchor_number,
+                origin,
+                Some(application_number),
+            )?);
+        }
+
         // The anchor's counter and the global reference count are shared by every origin
         // in this call, so they are folded here rather than per write. Each delta
         // computed against the same stored value and applied on its own would keep only
         // the last of them, and deltas that each fit can still sum to one that does not:
         // applying them to a running total is what checks the sum rather than the parts.
-        let stored_anchor = self
-            .stable_anchor_account_counter_memory
-            .get(&anchor_number)
-            .unwrap_or_default();
         let mut anchor_accounts = stored_anchor.stored_accounts;
         let mut anchor_references = stored_anchor.stored_account_references;
         let mut global_references = minting.global.stored_account_references;
@@ -1699,6 +1689,14 @@ impl<M: Memory + Clone> Storage<M> {
             )?;
         }
 
+        // The account cap is a rule about the state this write leaves the identity in,
+        // not a question for a caller to ask first. Refusing here costs nothing, because
+        // nothing has been stored — which is the only reason a rule can live at the end of
+        // a write rather than in front of it.
+        if anchor_accounts > MAX_ANCHOR_ACCOUNTS {
+            return Err(StorageError::AccountLimitReached { anchor_number });
+        }
+
         Ok(ValidatedAccountStateWrite {
             writes: validated,
             anchor_counter: StorableAccountsCounter {
@@ -1713,6 +1711,69 @@ impl<M: Memory + Clone> Storage<M> {
             },
             next_application_number: minting.next_application_number,
         })
+    }
+
+    /// The tracked defaults this write leaves over the cap, as origins to remove.
+    ///
+    /// Selected against the state the write is about to produce rather than the state on
+    /// disk: the deltas it carries are added to the counters here, and every origin the
+    /// write touches is excluded, so a list it is in the middle of changing is never also
+    /// a victim of it.
+    fn evictable_after(
+        &self,
+        anchor_number: AnchorNumber,
+        stored_anchor: &StorableAccountsCounter,
+        validated: &[ValidatedAccountReferenceListWrite],
+        written_origins: &BTreeSet<FrontendHostname>,
+    ) -> Vec<(FrontendHostname, ApplicationNumber)> {
+        let (accounts, references) = validated.iter().fold(
+            (
+                stored_anchor.stored_accounts as i64,
+                stored_anchor.stored_account_references as i64,
+            ),
+            |(accounts, references), one| {
+                (
+                    accounts + one.deltas.accounts,
+                    references + one.deltas.references,
+                )
+            },
+        );
+        // Numberless account references, bounded from counters rather than by looking:
+        // every account reference that is not a named account is a tracked default.
+        let upper_bound = references.saturating_sub(accounts).max(0) as u64;
+        if upper_bound < MAX_EVICTABLE_DEFAULT_ACCOUNTS {
+            return Vec::new();
+        }
+
+        let mut candidates: Vec<_> = self
+            .evictable_default_lists(anchor_number)
+            .into_iter()
+            .filter_map(|(application_number, last_used)| {
+                // An origin this write is already changing is not a victim of it, and one
+                // whose application is gone would refuse the whole call — housekeeping
+                // does not get to fail the write it is riding on.
+                let application = self.stable_application_memory.get(&application_number)?;
+                (!written_origins.contains(&application.origin)).then_some((
+                    last_used,
+                    application_number,
+                    application.origin,
+                ))
+            })
+            .collect();
+        if candidates.len() as u64 <= EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK {
+            return Vec::new();
+        }
+
+        candidates.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+        let victims = u64::min(
+            candidates.len() as u64 - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK,
+            MAX_EVICTIONS_PER_CALL,
+        );
+        candidates
+            .into_iter()
+            .take(victims as usize)
+            .map(|(_, application_number, origin)| (origin, application_number))
+            .collect()
     }
 
     /// One origin's worth of validation.
@@ -2220,59 +2281,6 @@ impl<M: Memory + Clone> Storage<M> {
             .collect()
     }
 
-    /// Upper bound on an anchor's evictable lists, from counters that already exist.
-    fn tracked_default_account_upper_bound(&self, anchor_number: AnchorNumber) -> u64 {
-        let counter = self.get_account_counter(anchor_number);
-        counter
-            .stored_account_references
-            .saturating_sub(counter.stored_accounts)
-    }
-
-    /// Drops the least recently used evictable defaults once the anchor is at the cap.
-    fn evict_idle_tracked_defaults(
-        &mut self,
-        anchor_number: AnchorNumber,
-        just_written: ApplicationNumber,
-    ) -> Result<(), StorageError> {
-        if self.tracked_default_account_upper_bound(anchor_number) < MAX_EVICTABLE_DEFAULT_ACCOUNTS
-        {
-            return Ok(());
-        }
-
-        let mut candidates: Vec<_> = self
-            .evictable_default_lists(anchor_number)
-            .into_iter()
-            .filter(|(application_number, _)| *application_number != just_written)
-            .collect();
-        if candidates.len() as u64 <= EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK {
-            return Ok(());
-        }
-
-        candidates.sort_by_key(|(application_number, last_used)| (*last_used, *application_number));
-
-        let victims = u64::min(
-            candidates.len() as u64 - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK,
-            MAX_EVICTIONS_PER_CALL,
-        );
-        // One call holding every victim rather than one call each: an `Err` on the IC
-        // commits what came before it, so a sweep that wrote as it went would sign the
-        // identity out of some applications and report failure.
-        let removals: BTreeMap<FrontendHostname, AccountReferenceListWrite> = candidates
-            .into_iter()
-            .take(victims as usize)
-            .filter_map(|(application_number, _)| {
-                // A victim whose application is gone would refuse the whole call, and
-                // this runs alongside a sign-in. Housekeeping does not get to fail that.
-                let application = self.stable_application_memory.get(&application_number)?;
-                Some((application.origin, None))
-            })
-            .collect();
-
-        self.write_account_state(anchor_number, removals)?;
-
-        Ok(())
-    }
-
     pub fn lookup_anchor_application_config(
         &self,
         anchor_number: AnchorNumber,
@@ -2529,6 +2537,9 @@ impl<M: Memory + Clone> Storage<M> {
         );
     }
 
+    // Read by tests only: the caps are the write path's rules now, so nothing in
+    // production asks a counter what it may do.
+    #[cfg(test)]
     /// Returns the account counter for a given anchor number.
     pub fn get_account_counter(&self, anchor_number: AnchorNumber) -> AccountsCounter {
         self.stable_anchor_account_counter_memory
@@ -2766,14 +2777,10 @@ impl<M: Memory + Clone> Storage<M> {
             (None, None) => {}
         }
 
-        let written = if account_number.is_none() {
-            self.write_tracked_default(anchor_number, origin.clone(), account_references, config)?
-        } else {
-            self.write_account_state(
-                anchor_number,
-                BTreeMap::from([(origin.clone(), Some((account_references, config)))]),
-            )?
-        };
+        let written = self.write_account_state(
+            anchor_number,
+            BTreeMap::from([(origin.clone(), Some((account_references, config)))]),
+        )?;
         let write = &written[&origin]
             .as_ref()
             .expect("a write that holds something is handed back holding it")
@@ -2813,13 +2820,17 @@ impl<M: Memory + Clone> Storage<M> {
         check_frontend_length(&origin);
 
         let (account_references, _) = self.account_state_for_origin(anchor_number, &origin);
-        self.write_tracked_default(
+        self.write_account_state(
             anchor_number,
-            origin,
-            account_references,
-            Some(AnchorApplicationConfig {
-                default_account_number: account_number,
-            }),
+            BTreeMap::from([(
+                origin,
+                Some((
+                    account_references,
+                    Some(AnchorApplicationConfig {
+                        default_account_number: account_number,
+                    }),
+                )),
+            )]),
         )?;
         Ok(())
     }
@@ -3405,6 +3416,9 @@ impl ReferenceListDeltas {
 
 #[derive(Debug)]
 pub enum StorageError {
+    AccountLimitReached {
+        anchor_number: AnchorNumber,
+    },
     AnchorNumberOutOfRange {
         anchor_number: AnchorNumber,
         range: (AnchorNumber, AnchorNumber),
@@ -3489,6 +3503,10 @@ impl fmt::Display for StorageError {
                 f,
                 "attempted to store an entry of size {space_required} \
                  which is larger then the max allowed entry size {space_available}"
+            ),
+            Self::AccountLimitReached { anchor_number } => write!(
+                f,
+                "identity {anchor_number} already holds as many named accounts as it may"
             ),
             Self::AnchorNotFound { anchor_number } => {
                 write!(
