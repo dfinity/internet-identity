@@ -13,7 +13,7 @@
   import AccessLevelSelector from "$lib/components/ui/AccessLevelSelector.svelte";
   import type { AccessLevel } from "$lib/utils/accessLevel";
   import { accessLevelStore } from "$lib/stores/access-level.store";
-  import { ChevronDownIcon, InfoIcon } from "@lucide/svelte";
+  import { ChevronDownIcon } from "@lucide/svelte";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -21,10 +21,14 @@
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { sessionStore } from "$lib/stores/session.store";
   import { handleError } from "$lib/components/utils/error";
+  import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
 
   interface Props {
     /** Hostname of the MCP server (display, e.g. mcp.id.ai). */
     mcpServerHost: string;
+    /** Origin of the MCP server, which is where it publishes the metadata this
+     *  screen links to (its privacy policy and terms of service). */
+    mcpServerOrigin: string;
     /** Session duration the request asked for (seconds, already clamped to
      *  [10 min, 30 days]); the initial selection, which the user can change. */
     requestedTtlSeconds: number;
@@ -34,7 +38,23 @@
     onAuthorize: (ttlSeconds: number, accessLevel: AccessLevel) => void;
   }
 
-  const { mcpServerHost, requestedTtlSeconds, onAuthorize }: Props = $props();
+  const {
+    mcpServerHost,
+    mcpServerOrigin,
+    requestedTtlSeconds,
+    onAuthorize,
+  }: Props = $props();
+
+  // The legal documents the server publishes for itself, in the same
+  // permissionless well-known document apps use for their sign-in presentation.
+  // The metadata is exactly as trustworthy as the origin serving it, so the
+  // name is only ever used to say whose documents these are — next to the host
+  // the screen has verified and displays above.
+  const metadataStore = $derived(getAppMetadataStore(mcpServerOrigin));
+  const metadata = $derived($metadataStore);
+  const privacyPolicyUrl = $derived(metadata.privacyPolicyUrl);
+  const termsOfServiceUrl = $derived(metadata.termsOfServiceUrl);
+  const serverDisplayName = $derived(metadata.name ?? mcpServerHost);
 
   // Connecting authorizes this agent for the user's identity — no account is
   // chosen here (accounts are app-specific; the MCP server is the connector, not
@@ -173,25 +193,58 @@
       class="mb-5"
     />
 
-    <!-- Fine print: the connection can be revoked from Settings at any time.
-         Opens in a new tab so the connect request in this one isn't lost. -->
+    <!-- Fine print: the server's own legal documents, shown only for the ones
+         it publishes. They open in a new tab so the connect request in this one
+         isn't lost. -->
     <div
       class="border-border-tertiary bg-bg-primary sm:bg-bg-secondary sticky bottom-0 z-1 -mb-3 border-t pt-4 pb-3"
     >
-      <div class="text-text-tertiary mb-4 flex items-start gap-2 text-sm">
-        <InfoIcon class="mt-0.5 size-4 shrink-0" />
-        <span>
-          <Trans>
-            Revoke access anytime in your <a
-              href="/manage/settings"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-text-primary font-medium underline-offset-2 hover:underline"
-              >settings</a
-            >.
-          </Trans>
-        </span>
-      </div>
+      {#if privacyPolicyUrl !== undefined || termsOfServiceUrl !== undefined}
+        <div class="text-text-tertiary mb-4 text-sm text-pretty">
+          {#if privacyPolicyUrl !== undefined && termsOfServiceUrl !== undefined}
+            <Trans>
+              Review {serverDisplayName}'s
+              <a
+                href={privacyPolicyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-text-primary font-medium underline-offset-2 hover:underline"
+                >Privacy Policy</a
+              >
+              and
+              <a
+                href={termsOfServiceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-text-primary font-medium underline-offset-2 hover:underline"
+                >Terms of Service</a
+              >.
+            </Trans>
+          {:else if privacyPolicyUrl !== undefined}
+            <Trans>
+              Review {serverDisplayName}'s
+              <a
+                href={privacyPolicyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-text-primary font-medium underline-offset-2 hover:underline"
+                >Privacy Policy</a
+              >.
+            </Trans>
+          {:else}
+            <Trans>
+              Review {serverDisplayName}'s
+              <a
+                href={termsOfServiceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-text-primary font-medium underline-offset-2 hover:underline"
+                >Terms of Service</a
+              >.
+            </Trans>
+          {/if}
+        </div>
+      {/if}
       <button
         class="btn btn-primary btn-xl w-full"
         onclick={handleAllowAccess}
