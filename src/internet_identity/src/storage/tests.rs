@@ -62,7 +62,7 @@ pub(crate) fn plant_application(
             origin: origin.clone(),
             stored_accounts: 0,
             stored_account_references: 0,
-            tombstones: 0,
+            stored_tombstones: 0,
         },
     );
     storage.lookup_application_with_origin_memory.insert(
