@@ -3286,10 +3286,7 @@ mod account_reference_state_tests {
                     origin.clone(),
                     Some((
                         vec![AccountReferenceWrite {
-                            account_reference: AccountReference {
-                                account_number: None,
-                                last_used: None,
-                            },
+                            account_reference: AccountReference::new(None, None),
                             record: None,
                         }],
                         None,
