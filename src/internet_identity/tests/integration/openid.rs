@@ -1624,10 +1624,6 @@ mod sso_gating {
             .unwrap()
         })
         .expect("II-client SSO credential add failed");
-        // Initialize the salt so `prepare_icrc3_attributes`'s SSO-session seed
-        // computation has a salt to hash against; otherwise it traps with
-        // "Salt is not set".
-        api::init_salt(env, canister_id).unwrap();
         identity_number
     }
 
