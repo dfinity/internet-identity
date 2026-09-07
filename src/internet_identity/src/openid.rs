@@ -128,13 +128,11 @@ impl OpenIdCredential {
         Principal::self_authenticating(public_key)
     }
 
-    pub async fn prepare_jwt_delegation(
+    pub fn prepare_jwt_delegation(
         &self,
         session_key: SessionKey,
         anchor_number: AnchorNumber,
     ) -> (UserKey, Timestamp) {
-        state::ensure_salt_set().await;
-
         let expiration = time().saturating_add(OPENID_SESSION_DURATION_NS);
         let seed = calculate_delegation_seed(&self.key(), anchor_number);
 
