@@ -19,7 +19,6 @@ use std::time::Duration;
 fn should_register_new_anchor() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
-    api::init_salt(&env, canister_id)?;
     let user_number = flows::register_anchor(&env, canister_id);
 
     let anchor_credentials = api::get_anchor_credentials(&env, canister_id, user_number)?;
