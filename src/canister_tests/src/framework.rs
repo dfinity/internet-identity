@@ -188,6 +188,14 @@ pub fn install_ii_canister_with_arg_and_cycles(
     let canister_id = env.create_canister();
     env.add_cycles(canister_id, amount);
     env.install_canister(canister_id, wasm, bytes, None);
+    // Every seed is hashed against the salt, so a canister needs one before anything can
+    // sign in or derive a principal. Asked for here rather than in each test that happens
+    // to need it, so it is set at a fixed point in every test's timeline.
+    //
+    // Attempted rather than demanded: some tests install a canister that has no such
+    // method, or an older release that refuses a salt it already has. A test that needs a
+    // salt and did not get one fails on its own, saying so.
+    let _ = api::internet_identity::init_salt(env, canister_id);
     canister_id
 }
 
@@ -319,6 +327,12 @@ pub fn upgrade_ii_canister_with_arg(
 
     let byts = candid::encode_one(arg).expect("error encoding II upgrade arg as candid");
     env.upgrade_canister(canister_id, wasm, byts, None)?;
+    // An upgrade from a release that derived the salt lazily leaves a canister without one
+    // where it never issued a delegation, and no lifecycle hook can derive one, so the
+    // upgraded canister is asked for its salt the same way a fresh one is. Attempted
+    // rather than demanded for the same reason as at install — a rollback lands on a
+    // release that refuses a salt it already has.
+    let _ = api::internet_identity::init_salt(env, canister_id);
 
     let post_upgrade_module_hash = env
         .canister_status(canister_id, None)

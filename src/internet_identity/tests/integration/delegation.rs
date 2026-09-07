@@ -498,7 +498,6 @@ fn get_principal_should_match_prepare_delegation() -> Result<(), RejectResponse>
 fn should_return_different_principals_for_different_frontends() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
-    api::init_salt(&env, canister_id)?;
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname_1 = "https://dapp1.com";
     let frontend_hostname_2 = "https://dapp2.com";
@@ -528,7 +527,6 @@ fn should_return_different_principals_for_different_frontends() -> Result<(), Re
 fn should_return_different_principals_for_different_users() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
-    api::init_salt(&env, canister_id)?;
     let user_number_1 =
         flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
     let user_number_2 =
