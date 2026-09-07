@@ -232,7 +232,6 @@ fn should_report_active_openid_authn_methods() {
     // Create II instance that mocks Google certs
     let env = env();
     let canister_id = openid::setup_canister(&env);
-    api::init_salt(&env, canister_id).unwrap();
 
     // Using Google as OpenID provider, but we could have used any other configured OpenID provider.
     let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) =
