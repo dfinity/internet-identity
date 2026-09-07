@@ -1846,7 +1846,15 @@ impl<M: Memory + Clone> Storage<M> {
                 ))
             })
             .collect();
-        if candidates.len() as u64 <= EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK {
+        // The cap, not the watermark. The watermark is where a pass stops, and reading it
+        // as where a pass starts began evicting fifty lists early. The bound above cannot
+        // stand in for this: it comes from counters, which know how many references and
+        // accounts an identity has and nothing about how they are spread across lists, so
+        // it counts every numberless reference — including those in lists that also hold
+        // named accounts, which are never evictable. That makes it an upper bound, which is
+        // all it needs to be to keep the scan off the sign-in path, and it is why the rule
+        // itself has to be asked here, of the lists.
+        if (candidates.len() as u64) < MAX_EVICTABLE_DEFAULT_ACCOUNTS {
             return Vec::new();
         }
 
@@ -1961,11 +1969,20 @@ impl<M: Memory + Clone> Storage<M> {
         {
             config
         } else {
-            references.first().map(|reference| {
-                let mut config = config.unwrap_or(stored_config);
-                config.default_account_number = reference.account_number;
-                config
-            })
+            // The tracked default wherever it sits, and only then whatever is first.
+            // Picking by position would have taken the list's order for the rule: a write
+            // is stored in the order it was given, so a list whose numberless reference is
+            // not first would move the default onto a named account while the tracked
+            // default was still there to fall back to.
+            references
+                .iter()
+                .find(|reference| reference.account_number.is_none())
+                .or_else(|| references.first())
+                .map(|reference| {
+                    let mut config = config.unwrap_or(stored_config);
+                    config.default_account_number = reference.account_number;
+                    config
+                })
         };
 
         // Nothing changed, so nothing is written and nothing about it is checked.
@@ -1979,10 +1996,10 @@ impl<M: Memory + Clone> Storage<M> {
         // An empty list is not covered by this and must not be: it is a tombstone, the
         // opposite of absence, and nothing may create one yet. It differs from the
         // derived default, so it falls through to the refusal below.
-        let unchanged = references
-            == stored
-                .clone()
-                .unwrap_or_else(Self::derived_default_references);
+        let unchanged = match &stored {
+            Some(stored) => &references == stored,
+            None => references == Self::derived_default_references(),
+        };
         // A config names this identity's default at an origin, and a config with no
         // account reference list behind it names nothing — so setting one materialises
         // the list it implies, even where that list is only the derived default. This is
@@ -2049,7 +2066,7 @@ impl<M: Memory + Clone> Storage<M> {
                 origin: origin.clone(),
                 stored_accounts: 0,
                 stored_account_references: 0,
-                tombstones: 0,
+                stored_tombstones: 0,
             },
         };
 
@@ -2075,7 +2092,7 @@ impl<M: Memory + Clone> Storage<M> {
         // number, so a write that leaves every account number in place — a `last_used`
         // stamp, which is every sign-in — cannot have changed one. Skipping the sync
         // there keeps the hottest write in the system off a per-account hash.
-        let previous_references = stored.clone().unwrap_or_default();
+        let previous_references = stored.unwrap_or_default();
         let accounts_changed = writes_a_list
             && (previous_references.len() != references.len()
                 || previous_references
@@ -2102,7 +2119,7 @@ impl<M: Memory + Clone> Storage<M> {
         let application_tombstones = deltas.apply_one(
             ReferenceCounter::Application { application_number },
             ReferenceCount::Tombstones,
-            application.tombstones,
+            application.stored_tombstones,
         )?;
 
         Ok(ValidatedAccountReferenceListWrite {
@@ -2118,7 +2135,7 @@ impl<M: Memory + Clone> Storage<M> {
                     origin: application.origin,
                     stored_accounts: application_accounts,
                     stored_account_references: application_references,
-                    tombstones: application_tombstones,
+                    stored_tombstones: application_tombstones,
                 },
             ),
             list,
@@ -2231,7 +2248,7 @@ impl<M: Memory + Clone> Storage<M> {
         let application_tombstones = deltas.apply_one(
             ReferenceCounter::Application { application_number },
             ReferenceCount::Tombstones,
-            application.tombstones,
+            application.stored_tombstones,
         )?;
 
         Ok(ValidatedAccountReferenceListWrite {
@@ -2247,7 +2264,7 @@ impl<M: Memory + Clone> Storage<M> {
                     origin: application.origin,
                     stored_accounts: application_accounts,
                     stored_account_references: application_references,
-                    tombstones: application_tombstones,
+                    stored_tombstones: application_tombstones,
                 },
             ),
             list: ListWrite::Removed,
