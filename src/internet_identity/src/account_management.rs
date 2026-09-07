@@ -1035,10 +1035,11 @@ fn should_fall_back_to_the_tracked_default_when_the_reservation_is_stale() {
     storage_borrow_mut(|storage| storage.write(anchor)).unwrap();
     create_account_for_origin(anchor_number, origin.clone(), "Alice".to_string()).unwrap();
 
-    // A number this identity does not hold, which is the shape a stale reservation has.
-    // Written through storage rather than through `set_default_account_for_origin`,
-    // which reads the account first and so cannot produce this state — a rename or a
-    // move is what leaves it behind.
+    // A number this identity does not hold. The write does not store it: the default is
+    // related to the account reference list and moved to a reference that is there, which
+    // is the tracked default here. So this asserts the repair rather than a tolerance —
+    // the read below answers from a default that exists, because no other kind was left
+    // behind.
     storage_borrow_mut(|storage| {
         storage.set_default_account(anchor_number, origin.clone(), Some(9_999))
     })
