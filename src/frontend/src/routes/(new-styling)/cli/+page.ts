@@ -93,8 +93,6 @@ const parseLoopbackCallback = (raw: string | null): string | undefined => {
   return raw;
 };
 
-const SCHEME_PREFIX_REGEX = /^[a-z][a-z0-9+.-]*:\/\//i;
-
 const isLoopbackHostname = (hostname: string): boolean =>
   hostname === "localhost" ||
   hostname === "127.0.0.1" ||
@@ -109,9 +107,12 @@ const isLoopbackHostname = (hostname: string): boolean =>
  * userinfo — is rejected rather than silently trimmed.
  */
 const parseAppOrigin = (raw: string): string | undefined => {
+  // Parsing `raw` first and falling back on failure would not work: a bare
+  // `oisy.com:443` parses, taking `oisy.com` for the scheme and `443` for the
+  // path. So a scheme has to be spotted before parsing, not after.
   let url: URL;
   try {
-    url = new URL(SCHEME_PREFIX_REGEX.test(raw) ? raw : `https://${raw}`);
+    url = new URL(raw.includes("://") ? raw : `https://${raw}`);
   } catch {
     return undefined;
   }
