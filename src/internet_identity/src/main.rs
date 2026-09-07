@@ -14,8 +14,9 @@ use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, time, trap};
 use ic_cdk::call;
+use ic_cdk::spawn;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use ic_cdk_timers::TimerId;
+use ic_cdk_timers::{set_timer, TimerId};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
@@ -836,6 +837,13 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
     }
+
+    // A salt is derived from raw randomness, which takes an await this hook cannot make, so
+    // the derivation runs the moment the install returns instead. Doing nothing on a
+    // canister that already has one is what makes this safe from `post_upgrade` too, where
+    // the salt is already in stable memory.
+    set_timer(Duration::ZERO, || spawn(state::set_salt_if_unset()));
+
     init_account_principal_index_backfill_timer();
 }
 
