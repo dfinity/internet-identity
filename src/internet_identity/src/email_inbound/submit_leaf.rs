@@ -262,7 +262,7 @@ async fn finalize(
                 mat.registered_domain.clone(),
                 session_pk.clone(),
             );
-            match super::smtp::stamp_recovery_delegation(&smtp_snapshot, session_pk).await {
+            match super::smtp::stamp_recovery_delegation(&smtp_snapshot, session_pk) {
                 Ok(outcome) => pending::with_mut(nonce, now_secs, |c| {
                     c.recovery_outcome = Some(outcome);
                     c.status = PendingStatus::Succeeded;
@@ -609,8 +609,7 @@ fn finalize_via_doh(
                 );
                 let session_pk = session_pk.clone();
                 ic_cdk::spawn(async move {
-                    match super::smtp::stamp_recovery_delegation(&smtp_snapshot, &session_pk).await
-                    {
+                    match super::smtp::stamp_recovery_delegation(&smtp_snapshot, &session_pk) {
                         Ok(outcome) => pending::with_mut(&nonce, now_secs, |c| {
                             c.recovery_outcome = Some(outcome);
                             c.status = PendingStatus::Succeeded;
