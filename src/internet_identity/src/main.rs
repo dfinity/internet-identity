@@ -853,6 +853,11 @@ fn acknowledge_entries(sequence_number: u64) {
 fn init(maybe_arg: Option<InternetIdentityInit>) {
     state::init_new();
     initialize(maybe_arg);
+    // A salt is derived from raw randomness, which takes an await this hook cannot make, so
+    // the derivation runs the moment the install returns instead. Only a first install needs
+    // one: the salt lives in stable memory, which is what an upgrade preserves, so
+    // `post_upgrade` has nothing to do here.
+    set_timer(Duration::ZERO, || spawn(state::set_salt_if_unset()));
 }
 
 #[post_upgrade]
@@ -877,12 +882,6 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
     }
-
-    // A salt is derived from raw randomness, which takes an await this hook cannot make, so
-    // the derivation runs the moment the install returns instead. Doing nothing on a
-    // canister that already has one is what makes this safe from `post_upgrade` too, where
-    // the salt is already in stable memory.
-    set_timer(Duration::ZERO, || spawn(state::set_salt_if_unset()));
 
     init_account_principal_index_backfill_timer();
 }
