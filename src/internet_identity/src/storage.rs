@@ -1770,7 +1770,16 @@ impl<M: Memory + Clone> Storage<M> {
         // not a question for a caller to ask first. Refusing here costs nothing, because
         // nothing has been stored — which is the only reason a rule can live at the end of
         // a write rather than in front of it.
-        if anchor_accounts > MAX_ANCHOR_ACCOUNTS {
+        //
+        // A cap bounds growth, so only a write that grows the count can be refused by it.
+        // Asking about the resulting count alone would refuse a write that adds nothing —
+        // a sign-in stamp has a zero delta and goes through here — and would refuse a write
+        // that *removes* accounts while the count was still over, which is the one write
+        // that would fix being over. Nothing reaches either state while this cap is fixed,
+        // and lowering it is what would: the identities above the new cap would keep their
+        // accounts, as a lowered cap should mean, rather than lose their sign-in.
+        let accounts_delta: i64 = validated.iter().map(|one| one.deltas.accounts).sum();
+        if accounts_delta > 0 && anchor_accounts > MAX_ANCHOR_ACCOUNTS {
             return Err(StorageError::AccountLimitReached { anchor_number });
         }
 
