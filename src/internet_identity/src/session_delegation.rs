@@ -79,10 +79,10 @@ pub fn get_session_delegation(
     check_authorization(anchor_number)
         .map_err(|err| SessionDelegationError::Unauthorized(err.principal))?;
 
-    // No session could have been prepared before the canister salt was
-    // initialised (`prepare_session_delegation` awaits `ensure_salt_set`
-    // before stamping). Skip the seed derivation, which would otherwise
-    // trap on `state::salt()`, and report NoSuchDelegation instead.
+    // No session could have been prepared before the canister salt was set: a
+    // canister sets it once at deployment, and `prepare_session_delegation` reads
+    // it to stamp. Skip the seed derivation, which would otherwise trap on
+    // `state::salt()`, and report NoSuchDelegation instead.
     let salt_initialised = state::storage_borrow(|storage| storage.salt().is_some());
     if !salt_initialised {
         return Err(SessionDelegationError::NoSuchDelegation);

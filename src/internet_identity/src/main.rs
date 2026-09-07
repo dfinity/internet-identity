@@ -1537,9 +1537,8 @@ mod openid_api {
             state::storage_borrow_mut(|storage| storage.write(anchor))
                 .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
 
-            let (user_key, expiration) = openid_credential
-                .prepare_jwt_delegation(session_key, anchor_number)
-                .await;
+            let (user_key, expiration) =
+                openid_credential.prepare_jwt_delegation(session_key, anchor_number);
 
             // Checking again because the association could've changed during the .await
             let still_anchor_number = state::storage_borrow(|storage| {
@@ -1672,8 +1671,7 @@ mod openid_api {
 
             let (user_key, expiration) = identity
                 .credential
-                .prepare_jwt_delegation(session_key, anchor_number)
-                .await;
+                .prepare_jwt_delegation(session_key, anchor_number);
 
             // The session deadline is fixed here, at the ceremony, from the
             // policy captured while the discovery cache was warm. Everything
@@ -2238,9 +2236,6 @@ mod attribute_sharing {
         let account = get_account_for_origin(anchor.anchor_number(), origin, account_number)
             .map_err(PrepareAttributeError::GetAccountError)?;
 
-        // This is the only async operation, so we do it first, call operations that depend on
-        // the time. TODO: refactor to avoid asynchronicity here.
-        state::ensure_salt_set().await;
         let issued_at_timestamp_ns = ic_cdk::api::time();
 
         let attributes = anchor.prepare_attributes(attribute_keys, account, issued_at_timestamp_ns);
@@ -2315,8 +2310,6 @@ mod attribute_sharing {
         let account =
             get_account_for_origin(anchor.anchor_number(), origin.clone(), account_number)
                 .map_err(PrepareIcrc3AttributeError::GetAccountError)?;
-
-        state::ensure_salt_set().await;
 
         let issued_at_timestamp_ns = ic_cdk::api::time();
         let message = anchor.prepare_icrc3_attributes(
