@@ -1888,7 +1888,11 @@ impl<M: Memory + Clone> Storage<M> {
                 moved
             }
         });
-        if session_count.is_some_and(|after| after > MAX_SESSIONS_PER_ANCHOR) {
+        // Only a write that grows the count can be refused by a cap on it. The guard is on
+        // the refusal rather than on `session_count`, which is also the number this write
+        // stores: a revocation moves the count and has to keep storing where it moved to,
+        // it just cannot be turned away for a total it is bringing down.
+        if session_delta > 0 && session_count.is_some_and(|after| after > MAX_SESSIONS_PER_ANCHOR) {
             return Err(StorageError::SessionCapNotReclaimed { anchor_number });
         }
 
