@@ -62,7 +62,7 @@ pub(crate) fn plant_application(
             origin: origin.clone(),
             stored_accounts: 0,
             stored_account_references: 0,
-            tombstones: 0,
+            stored_tombstones: 0,
         },
     );
     storage.lookup_application_with_origin_memory.insert(
@@ -3182,7 +3182,7 @@ mod account_reference_state_tests {
         storage.stable_application_memory.insert(
             application_number,
             StorableApplication {
-                tombstones: application.tombstones + 1,
+                stored_tombstones: application.stored_tombstones + 1,
                 ..application
             },
         );
@@ -3543,7 +3543,7 @@ mod application_number_allocator_tests {
             origin: origin.to_string(),
             stored_accounts: 0,
             stored_account_references: 0,
-            tombstones: 0,
+            stored_tombstones: 0,
         }
     }
 
@@ -3956,17 +3956,19 @@ mod tracked_default_eviction_tests {
     fn evicting_drops_the_least_recently_used_down_to_the_watermark() {
         let (mut storage, anchor_number) = storage_with_anchor();
 
-        for index in 0..MAX_EVICTABLE_DEFAULT_ACCOUNTS {
+        // One sign-in past the cap. The origin a write is touching is never a candidate for
+        // its own eviction, so the pass first runs when the *other* lists reach the cap —
+        // one sign-in later than the cap itself.
+        let signed_in_at = MAX_EVICTABLE_DEFAULT_ACCOUNTS + 1;
+        for index in 0..signed_in_at {
             sign_in_at(&mut storage, anchor_number, index);
         }
 
-        // One above the watermark, not at it: the origin the triggering write touched is
-        // never a candidate for its own eviction, so it survives on top of what the pass
-        // trims the rest down to.
-        let evicted = MAX_EVICTABLE_DEFAULT_ACCOUNTS - 1 - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK;
+        // Down to the watermark, and then the origin that triggered the pass on top of it.
+        let evicted = MAX_EVICTABLE_DEFAULT_ACCOUNTS - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK;
         assert_eq!(
             storage.evictable_default_lists(anchor_number).len() as u64,
-            MAX_EVICTABLE_DEFAULT_ACCOUNTS - evicted
+            EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK + 1
         );
 
         for index in 0..evicted {
@@ -3974,7 +3976,7 @@ mod tracked_default_eviction_tests {
                 .lookup_application_number_with_origin(&origin_of(index))
                 .is_none());
         }
-        for index in evicted..MAX_EVICTABLE_DEFAULT_ACCOUNTS {
+        for index in evicted..signed_in_at {
             let application_number = storage
                 .lookup_application_number_with_origin(&origin_of(index))
                 .unwrap();
@@ -4041,7 +4043,7 @@ mod tracked_default_eviction_tests {
                     origin,
                     stored_accounts: 0,
                     stored_account_references: 1,
-                    tombstones: 0,
+                    stored_tombstones: 0,
                 },
             );
             storage.stable_account_reference_list_memory.insert(
@@ -4432,7 +4434,7 @@ mod application_removal_tests {
                 .get(&application_number)
                 .map(|application| (
                     application.stored_account_references,
-                    application.tombstones
+                    application.stored_tombstones
                 )),
             Some((0, 1))
         );
@@ -4465,7 +4467,7 @@ mod application_removal_tests {
             storage
                 .stable_application_memory
                 .get(&application_number)
-                .map(|application| application.tombstones),
+                .map(|application| application.stored_tombstones),
             Some(0)
         );
 
@@ -4509,7 +4511,7 @@ mod application_removal_tests {
                 stored_accounts: application.stored_accounts - named,
                 stored_account_references: application.stored_account_references
                     - moved_away.len() as u64,
-                tombstones: application.tombstones + 1,
+                stored_tombstones: application.stored_tombstones + 1,
                 ..application
             },
         );
