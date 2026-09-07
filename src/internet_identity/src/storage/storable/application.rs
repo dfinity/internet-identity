@@ -17,7 +17,8 @@ pub struct StorableApplication {
     pub stored_accounts: u64,
     #[n(2)]
     pub stored_account_references: u64,
-    /// Lists that exist here while holding no reference at all.
+    /// How many identities hold an emptied list here, counted separately because an
+    /// emptied list is invisible to the reference count.
     ///
     /// A list holding nothing is a tombstone: it says every account an identity had at
     /// this origin was moved away and its default must never be derived again. It
@@ -31,7 +32,7 @@ pub struct StorableApplication {
     /// written. `default` is what makes that absence decode rather than trap.
     #[n(3)]
     #[cbor(default)]
-    pub tombstones: u64,
+    pub stored_tombstones: u64,
 }
 
 impl Storable for StorableApplication {
@@ -122,7 +123,7 @@ mod tests {
                 origin: "https://example.com".to_string(),
                 stored_accounts: 3,
                 stored_account_references: 4,
-                tombstones: 0,
+                stored_tombstones: 0,
             }
         );
     }
@@ -133,7 +134,7 @@ mod tests {
             origin: "https://example.com".to_string(),
             stored_accounts: 1,
             stored_account_references: 2,
-            tombstones: 5,
+            stored_tombstones: 5,
         };
 
         assert_eq!(
