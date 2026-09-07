@@ -1771,6 +1771,14 @@ impl<M: Memory + Clone> Storage<M> {
         let stored = stored_number.and_then(|application_number| {
             self.stored_account_references(anchor_number, application_number)
         });
+        // Read because a caller changing nothing about the default passes no config, and
+        // "leave it alone" must not be allowed to mean "leave it naming an account that
+        // has gone". The repair below needs to know what is there to decide that.
+        let stored_config = stored_number
+            .map(|application_number| {
+                self.lookup_anchor_application_config(anchor_number, application_number)
+            })
+            .unwrap_or_default();
         let previous_holds_tracked_default = match &stored {
             Some(references) => references
                 .iter()
@@ -1795,6 +1803,64 @@ impl<M: Memory + Clone> Storage<M> {
             .iter()
             .map(|write| write.account_reference.clone())
             .collect();
+
+        // Naming a tracked default is what makes the named account this identity's
+        // default here: the tracked default is gone and the account that replaced it is
+        // what the identity signs in with. The caller cannot say so itself, because the
+        // number was minted above — so it is derived from the write rather than stated.
+        // Adding a named account beside a default that is still there is not this: the
+        // list still holds a numberless account reference.
+        //
+        // Mutating what is stored rather than building a config: this owns one field of
+        // it and must not decide the rest by omission.
+        let config = match config {
+            Some(config) => Some(config),
+            None if previous_holds_tracked_default
+                && minted.len() == 1
+                && !references
+                    .iter()
+                    .any(|reference| reference.account_number.is_none()) =>
+            {
+                let mut config = stored_config.clone();
+                config.default_account_number = Some(minted[0]);
+                Some(config)
+            }
+            None => None,
+        };
+
+        // A config names this identity's default here, so it can only name an account
+        // reference this write leaves behind. Repaired rather than refused: an account
+        // reference that goes takes the default with it, and the default moves to the
+        // first reference still there instead of being left naming nothing. Refusing
+        // would mean a write that drops a reference is rejected unless its caller also
+        // remembered to move the default — which is the hand-maintenance this layer
+        // exists to remove.
+        //
+        // The target is the caller's where it supplied a config and the stored one
+        // otherwise, so both directions go through the same repair: a caller changing the
+        // default, and a write that leaves the default alone while removing what it named.
+        //
+        // `first()` rather than an index, because nothing here establishes that the list
+        // is non-empty — that is settled further down, in another file. The answer for an
+        // empty list is never applied: a list that cannot be stored refuses the write, and
+        // a refusal stores nothing.
+        let target = config
+            .as_ref()
+            .map_or(stored_config.default_account_number, |config| {
+                config.default_account_number
+            });
+        let config = if references
+            .iter()
+            .any(|reference| reference.account_number == target)
+        {
+            config
+        } else {
+            references.first().map(|reference| {
+                let mut config = config.unwrap_or(stored_config);
+                config.default_account_number = reference.account_number;
+                config
+            })
+        };
 
         // Nothing changed, so nothing is written and nothing about it is checked.
         //
@@ -1827,27 +1893,6 @@ impl<M: Memory + Clone> Storage<M> {
                 Some((account_number, record))
             })
             .collect();
-
-        // Naming a tracked default is what makes the named account this identity's
-        // default here: the tracked default is gone and the account that replaced it is
-        // what the identity signs in with. The caller cannot say so itself, because the
-        // number was minted above — so it is derived from the write rather than stated.
-        // Adding a named account beside a default that is still there is not this: the
-        // list still holds a numberless account reference.
-        let config = match config {
-            Some(config) => Some(config),
-            None if previous_holds_tracked_default
-                && minted.len() == 1
-                && !references
-                    .iter()
-                    .any(|reference| reference.account_number.is_none()) =>
-            {
-                Some(AnchorApplicationConfig {
-                    default_account_number: Some(minted[0]),
-                })
-            }
-            None => None,
-        };
 
         // Only a list or a config is stored against an application: a record is keyed by
         // its account number and needs none. So a rename, which leaves every account
@@ -1991,6 +2036,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// Anything else is left alone rather than refused. Eviction is housekeeping that runs
     /// alongside a sign-in, and refusing the whole write because one victim went stale
     /// would fail the sign-in that triggered it.
+
     fn validate_removal(
         &self,
         anchor_number: AnchorNumber,
@@ -2537,8 +2583,10 @@ impl<M: Memory + Clone> Storage<M> {
     /// Points this identity's default at `origin` to `account_number`, or clears it
     /// where that is `None`.
     ///
-    /// The config and the reference list go through one write, so a config naming a
-    /// number no reference names cannot be left behind.
+    /// A number no account reference names is not stored: the write relates the config to
+    /// the list and moves the default to a reference that is there. So this cannot leave
+    /// behind a default naming nothing, and neither can a write that removes what one
+    /// named.
     pub fn set_default_account(
         &mut self,
         anchor_number: AnchorNumber,
@@ -2548,17 +2596,19 @@ impl<M: Memory + Clone> Storage<M> {
         check_frontend_length(&origin);
 
         let (account_references, _) = self.account_state_for_origin(anchor_number, &origin);
+        // The stored config with one field moved, rather than a config built here: this
+        // knows about the default account and nothing else the config may come to hold,
+        // and building one would decide those fields by leaving them out.
+        let mut config = self
+            .lookup_application_number_with_origin(&origin)
+            .map(|application_number| {
+                self.lookup_anchor_application_config(anchor_number, application_number)
+            })
+            .unwrap_or_default();
+        config.default_account_number = account_number;
         self.write_account_state(
             anchor_number,
-            BTreeMap::from([(
-                origin,
-                Some((
-                    account_references,
-                    Some(AnchorApplicationConfig {
-                        default_account_number: account_number,
-                    }),
-                )),
-            )]),
+            BTreeMap::from([(origin, Some((account_references, Some(config))))]),
         )?;
         Ok(())
     }
