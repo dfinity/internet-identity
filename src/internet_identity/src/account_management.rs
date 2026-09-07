@@ -18,7 +18,7 @@ use crate::{
     update_root_hash,
 };
 use ic_canister_sig_creation::{signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN};
-use ic_cdk::{api::time, caller};
+use ic_cdk::caller;
 use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity_interface::{
     archive::types::{Operation, Private},
@@ -294,7 +294,7 @@ pub fn update_account_for_origin(
 // and the delegation access level through to the signature; the parameter list
 // is wide but each argument is distinct and load-bearing.
 #[allow(clippy::too_many_arguments)]
-pub async fn prepare_account_delegation(
+pub fn prepare_account_delegation(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
@@ -303,8 +303,8 @@ pub async fn prepare_account_delegation(
     max_expiration: Option<Timestamp>,
     access: DelegationAccess,
     ii_domain: &Option<IIDomain>,
+    now: Timestamp,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
-    state::ensure_salt_set().await;
     check_frontend_length(&origin);
 
     let account = storage_borrow(|storage| {
@@ -318,26 +318,16 @@ pub async fn prepare_account_delegation(
             .ok_or(AccountDelegationError::Unauthorized(caller()))
     })?;
 
-    // One read, passed to everything below. `time()` is constant only within a single
-    // execution, and an `await` on an inter-canister call ends one — the continuation
-    // resumes with a later time. Reading it at each use would make "the same instant"
-    // rest on no `await` ever appearing between them, which is not a property to leave
-    // to where the calls happen to sit.
-    let now = time();
-
     let session_duration_ns = u64::min(
         max_ttl.unwrap_or(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS),
         crate::delegation::MAX_EXPIRATION_PERIOD_NS,
     );
     // `max_expiration` is an *absolute* cap (e.g. the MCP session grant's
-    // expiry): a relative TTL computed by the caller before the await above
-    // could drift past it by however much time the await spans. By the same
-    // token the cap itself can already have passed once the await resolves
-    // (the caller checked it *before* awaiting) — refuse rather than sign a
-    // delegation that is already expired on arrival, which would read as
-    // success while wasting a signature-map entry on an unusable delegation.
-    // For the MCP path this is exactly the session-over signal: the grant
-    // expired mid-call.
+    // expiry), and the caller checked it before calling. Checked again here
+    // because a cap that has passed must not be signed over: a delegation that
+    // is already expired on arrival reads as success while spending a
+    // signature-map entry on something unusable. For the MCP path this is
+    // exactly the session-over signal: the grant expired mid-call.
     if max_expiration.is_some_and(|cap| cap <= now) {
         return Err(AccountDelegationError::Unauthorized(caller()));
     }
