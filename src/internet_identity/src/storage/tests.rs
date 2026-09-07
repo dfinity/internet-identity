@@ -3141,11 +3141,12 @@ mod account_reference_state_tests {
     use crate::storage::account::{Account, AccountKey, AccountReference};
     use crate::storage::storable::account_reference_list::StorableAccountReferenceList;
     use crate::storage::storable::application::StorableApplication;
-    use crate::storage::StorageError;
+    use crate::storage::{AccountReferenceWrite, StorageError};
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::{AccountNumber, AnchorNumber};
     use pretty_assertions::assert_eq;
+    use std::collections::BTreeMap;
 
     const ORIGIN: &str = "https://example.com";
 
@@ -3318,6 +3319,85 @@ mod account_reference_state_tests {
                 .lookup_anchor_application_config(anchor_number, application_number)
                 .default_account_number,
             None
+        );
+    }
+
+    #[test]
+    fn a_default_naming_an_account_the_list_does_not_hold_moves_to_one_it_does() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = ORIGIN.to_string();
+        storage
+            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .unwrap();
+
+        // A number this identity does not hold at this origin, which is what a caller
+        // that had gone stale would ask for.
+        storage
+            .set_default_account(anchor_number, origin.clone(), Some(9_999))
+            .unwrap();
+
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        let references = storage
+            .stored_account_references(anchor_number, application_number)
+            .unwrap();
+        assert_eq!(
+            storage
+                .lookup_anchor_application_config(anchor_number, application_number)
+                .default_account_number,
+            references[0].account_number,
+            "the default should have moved to the first reference the list still holds"
+        );
+    }
+
+    #[test]
+    fn dropping_the_reference_a_default_names_moves_the_default() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = ORIGIN.to_string();
+        let named = storage
+            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .unwrap();
+        let account_number = named.account_number.unwrap();
+        storage
+            .set_default_account(anchor_number, origin.clone(), Some(account_number))
+            .unwrap();
+        let application_number = storage
+            .lookup_application_number_with_origin(&origin)
+            .unwrap();
+        assert_eq!(
+            storage
+                .lookup_anchor_application_config(anchor_number, application_number)
+                .default_account_number,
+            Some(account_number)
+        );
+
+        // The write says what the identity holds afterwards, and this one no longer holds
+        // the account the default names. No caller says anything about the default: the
+        // point is that it moves without being told to.
+        let anchor = storage.read(anchor_number).unwrap();
+        storage
+            .write_account_state(
+                anchor,
+                BTreeMap::from([(
+                    origin.clone(),
+                    Some((
+                        vec![AccountReferenceWrite {
+                            account_reference: AccountReference::new(None, None),
+                            record: None,
+                        }],
+                        None,
+                    )),
+                )]),
+            )
+            .unwrap();
+
+        assert_eq!(
+            storage
+                .lookup_anchor_application_config(anchor_number, application_number)
+                .default_account_number,
+            None,
+            "the default should have moved to the tracked default the list still holds"
         );
     }
 
@@ -3817,6 +3897,9 @@ mod tracked_default_eviction_tests {
             sign_in_at(&mut storage, anchor_number, index);
         }
 
+        // One above the watermark, not at it: the origin the triggering write touched is
+        // never a candidate for its own eviction, so it survives on top of what the pass
+        // trims the rest down to.
         let evicted = MAX_EVICTABLE_DEFAULT_ACCOUNTS - 1 - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK;
         assert_eq!(
             storage.evictable_default_lists(anchor_number).len() as u64,
