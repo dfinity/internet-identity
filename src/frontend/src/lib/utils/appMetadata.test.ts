@@ -7,6 +7,7 @@ import {
   MAX_APP_LOGO_SIZE,
   MAX_APP_METADATA_SIZE,
   MAX_APP_NAME_LENGTH,
+  appMetadataOrigins,
   fetchAppMetadata,
 } from "$lib/utils/appMetadata";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -611,10 +612,233 @@ test("should drop logos responding with a redirect", async () => {
   expect(await fetchAppMetadata(ORIGIN)).toEqual({ name: "Example App" });
 });
 
+test("should accept policy urls on any origin, unlike the logo", async () => {
+  const fetchMock = setupFetchMock(
+    Response.json({
+      name: "Example App",
+      privacyPolicyUrl: "https://legal.example.org/privacy",
+      termsOfServiceUrl: "https://legal.example.org/terms",
+    }),
+  );
+
+  // The documents are linked, never fetched, so they may live on whichever
+  // origin the app publishes them from — and nothing is requested for them.
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({
+    name: "Example App",
+    privacyPolicyUrl: "https://legal.example.org/privacy",
+    termsOfServiceUrl: "https://legal.example.org/terms",
+  });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test("should resolve relative policy urls against the app origin", async () => {
+  setupFetchMock(
+    Response.json({ privacyPolicyUrl: "/privacy", termsOfServiceUrl: "terms" }),
+  );
+
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({
+    privacyPolicyUrl: `${ORIGIN}/privacy`,
+    termsOfServiceUrl: `${ORIGIN}/terms`,
+  });
+});
+
+test("should keep a document carrying nothing but a policy url", async () => {
+  setupFetchMock(Response.json({ privacyPolicyUrl: "/privacy" }));
+
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({
+    privacyPolicyUrl: `${ORIGIN}/privacy`,
+  });
+});
+
+test("should reject the whole document when a policy url is unusable", async () => {
+  for (const url of [
+    "http://legal.example.org/privacy", // plain http on another origin
+    "http://app.example.com/privacy", // and on the app's own origin
+    "javascript:alert(1)",
+    "data:text/html,<h1>privacy</h1>",
+    "mailto:privacy@example.com",
+    // Userinfo: reads as one host, resolves to another.
+    "https://trusted.example@evil.example/privacy",
+    "https://user:pass@evil.example/privacy",
+    "https://", // unparseable
+    "", // nothing at all, and nothing but whitespace
+    "   ",
+    "\t\n",
+  ]) {
+    setupFetchMock(
+      Response.json({ name: "Example App", privacyPolicyUrl: url }),
+    );
+
+    expect(await fetchAppMetadata(ORIGIN), url).toBeUndefined();
+  }
+});
+
+test("should ignore whitespace around a policy url", async () => {
+  setupFetchMock(
+    Response.json({ privacyPolicyUrl: "  https://example.org/privacy\n" }),
+  );
+
+  expect(await fetchAppMetadata(ORIGIN)).toEqual({
+    privacyPolicyUrl: "https://example.org/privacy",
+  });
+});
+
 test("should ignore unknown fields", async () => {
   setupFetchMock(
     Response.json({ name: "Example App", futureField: { nested: true } }),
   );
 
   expect(await fetchAppMetadata(ORIGIN)).toEqual({ name: "Example App" });
+});
+
+// Gateway twin fallback: an origin the caller passes has already been remapped
+// onto `ic0.app` for principal derivation, but the canister need not be served
+// there. See `appMetadataOrigins`.
+
+const CANISTER_ID = "rdmx6-jaaaa-aaaaa-aaadq-cai";
+const LEGACY_ORIGIN = `https://${CANISTER_ID}.ic0.app`;
+const ICP0_ORIGIN = `https://${CANISTER_ID}.icp0.io`;
+const ICP_NET_ORIGIN = `https://${CANISTER_ID}.icp.net`;
+
+test("should list the gateway twins as fallbacks for a remapped origin", () => {
+  expect(appMetadataOrigins(LEGACY_ORIGIN)).toEqual([
+    LEGACY_ORIGIN,
+    ICP0_ORIGIN,
+    ICP_NET_ORIGIN,
+  ]);
+});
+
+test("should keep the `.raw` label when inverting the remap", () => {
+  expect(appMetadataOrigins(`https://${CANISTER_ID}.raw.ic0.app`)).toEqual([
+    `https://${CANISTER_ID}.raw.ic0.app`,
+    `https://${CANISTER_ID}.raw.icp0.io`,
+    `https://${CANISTER_ID}.raw.icp.net`,
+  ]);
+});
+
+test("should not invent twins for a custom domain", () => {
+  expect(appMetadataOrigins(ORIGIN)).toEqual([ORIGIN]);
+});
+
+test("should fall back to the icp0.io twin when ic0.app does not serve the canister", async () => {
+  // What the staging test app does: the metadata is on `.icp0.io`, while
+  // `.ic0.app` answers `400 client_domain_canister_mismatch`.
+  const fetchMock = setupFetchMock(
+    new Response("client_domain_canister_mismatch", { status: 400 }),
+    Response.json({ name: "Example App" }),
+  );
+
+  expect(await fetchAppMetadata(LEGACY_ORIGIN)).toEqual({
+    name: "Example App",
+  });
+  expect(fetchMock).toHaveBeenNthCalledWith(
+    1,
+    `${LEGACY_ORIGIN}${APP_METADATA_PATH}`,
+    JSON_FETCH_OPTS,
+  );
+  expect(fetchMock).toHaveBeenNthCalledWith(
+    2,
+    `${ICP0_ORIGIN}${APP_METADATA_PATH}`,
+    JSON_FETCH_OPTS,
+  );
+});
+
+test("should fall back to the icp.net twin when neither ic0.app nor icp0.io serves the canister", async () => {
+  const fetchMock = setupFetchMock(
+    new Response("", { status: 400 }),
+    new Response("", { status: 500 }),
+    Response.json({ name: "Example App" }),
+  );
+
+  expect(await fetchAppMetadata(LEGACY_ORIGIN)).toEqual({
+    name: "Example App",
+  });
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+  expect(fetchMock).toHaveBeenNthCalledWith(
+    3,
+    `${ICP_NET_ORIGIN}${APP_METADATA_PATH}`,
+    JSON_FETCH_OPTS,
+  );
+});
+
+test("should fall back to a twin when the remapped origin cannot be reached at all", async () => {
+  // A CORS rejection or a network error surfaces as a rejected promise with no
+  // status, which says nothing about whether the app publishes the document.
+  const fetchMock = setupFetchMock(
+    new TypeError("Failed to fetch"),
+    Response.json({ name: "Example App" }),
+  );
+
+  expect(await fetchAppMetadata(LEGACY_ORIGIN)).toEqual({
+    name: "Example App",
+  });
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+test("should not try the twins when the remapped origin answers 404", async () => {
+  // All three domains resolve to the same canister, so a canister that answers
+  // "no such file" has answered for every one of them. This keeps the common
+  // case of an app that publishes nothing at one request.
+  const fetchMock = setupFetchMock(new Response("", { status: 404 }));
+
+  expect(await fetchAppMetadata(LEGACY_ORIGIN)).toBeUndefined();
+  expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+    `${LEGACY_ORIGIN}${APP_METADATA_PATH}`,
+    JSON_FETCH_OPTS,
+  );
+});
+
+test("should not try the twins when the remapped origin serves an invalid document", async () => {
+  // The origin answered with a document; that it fails validation is its own
+  // answer, not a reason to go looking for a different one.
+  const fetchMock = setupFetchMock(Response.json({ name: "" }));
+
+  expect(await fetchAppMetadata(LEGACY_ORIGIN)).toBeUndefined();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test("should give up after every gateway origin has failed", async () => {
+  const fetchMock = setupFetchMock(
+    new Response("", { status: 400 }),
+    new Response("", { status: 400 }),
+    new Response("", { status: 400 }),
+  );
+
+  expect(await fetchAppMetadata(LEGACY_ORIGIN)).toBeUndefined();
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+});
+
+test("should resolve a twin's logo against that twin, not the remapped origin", async () => {
+  const fetchMock = setupFetchMock(
+    new Response("", { status: 400 }),
+    Response.json({ name: "Example App", logo: "/assets/logo.png" }),
+    imageResponse(),
+  );
+  setupImageMock();
+
+  expect(await fetchAppMetadata(LEGACY_ORIGIN)).toEqual({
+    name: "Example App",
+    logo: LOGO_OBJECT_URL,
+  });
+  expect(fetchMock).toHaveBeenNthCalledWith(
+    3,
+    `${ICP0_ORIGIN}/assets/logo.png`,
+    IMAGE_FETCH_OPTS,
+  );
+});
+
+test("should reject a twin document whose logo points at the remapped origin", async () => {
+  // The same-origin rule follows the document: the logo must live on whichever
+  // origin served it, so a cross-origin reference is rejected as it would be
+  // anywhere else.
+  const fetchMock = setupFetchMock(
+    new Response("", { status: 400 }),
+    Response.json({
+      name: "Example App",
+      logo: `${LEGACY_ORIGIN}/assets/logo.png`,
+    }),
+  );
+
+  expect(await fetchAppMetadata(LEGACY_ORIGIN)).toBeUndefined();
+  expect(fetchMock).toHaveBeenCalledTimes(2);
 });
