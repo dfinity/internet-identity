@@ -2353,8 +2353,22 @@ impl<M: Memory + Clone> Storage<M> {
         AnchorApplicationConfig::default()
     }
 
-    /// Keeps the principal index in step with one reference-list write, diffing values
-    /// rather than keys.
+    /// Keeps the principal index in step with one reference-list write, deriving only the
+    /// accounts the write moved.
+    ///
+    /// A principal comes from the salt, the origin and the account the reference names,
+    /// and never from its name or its last use, so a reference whose number is in both
+    /// lists derives the same principal against the same locator and needs nothing done
+    /// to it. The number is the whole key: `seed_from_anchor`, the only other thing a
+    /// seed is taken from, is written where a number is minted and nowhere else, so it
+    /// cannot move under a number that already exists.
+    ///
+    /// The cost of that is what this no longer does. It used to derive both lists in
+    /// full, which re-asserted the entry of every account at the origin on every write
+    /// and so repaired a drifted one for free. It does not any more, and the sweep that
+    /// runs after each upgrade is the repair — see the account-principal index backfill,
+    /// whose completion is heap state and so is forgotten at every upgrade.
+    ///
     /// Takes the salt and origin its caller already resolved, so everything that could
     /// refuse has refused before this writes anything.
     fn sync_account_principal_index(
@@ -2366,10 +2380,29 @@ impl<M: Memory + Clone> Storage<M> {
         previous: &[AccountReference],
         current: &[AccountReference],
     ) {
+        let previous_numbers: BTreeSet<_> = previous
+            .iter()
+            .map(|reference| reference.account_number)
+            .collect();
+        let current_numbers: BTreeSet<_> = current
+            .iter()
+            .map(|reference| reference.account_number)
+            .collect();
+        let gone: Vec<AccountReference> = previous
+            .iter()
+            .filter(|reference| !current_numbers.contains(&reference.account_number))
+            .cloned()
+            .collect();
+        let arrived: Vec<AccountReference> = current
+            .iter()
+            .filter(|reference| !previous_numbers.contains(&reference.account_number))
+            .cloned()
+            .collect();
+
         let previous_entries =
-            self.account_principals(anchor_number, application_number, origin, salt, previous);
+            self.account_principals(anchor_number, application_number, origin, salt, &gone);
         let current_entries =
-            self.account_principals(anchor_number, application_number, origin, salt, current);
+            self.account_principals(anchor_number, application_number, origin, salt, &arrived);
 
         for (principal, locator) in &previous_entries {
             if current_entries.contains_key(principal) {
