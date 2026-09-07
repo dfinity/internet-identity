@@ -2016,7 +2016,7 @@ impl<M: Memory + Clone> Storage<M> {
         // number, so a write that leaves every account number in place — a `last_used`
         // stamp, which is every sign-in — cannot have changed one. Skipping the sync
         // there keeps the hottest write in the system off a per-account hash.
-        let previous_references = stored.clone().unwrap_or_default();
+        let previous_references = stored.unwrap_or_default();
         let accounts_changed = writes_a_list
             && (previous_references.len() != references.len()
                 || previous_references
