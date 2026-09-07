@@ -223,7 +223,6 @@ fn should_set_last_usage_on_prepare_delegation() -> Result<(), RejectResponse> {
     let canister_id = install_ii_with_archive(&env, None, None);
     // initialize the salt otherwise prepare_delegation will take two execution rounds
     // throwing off the expected timestamp
-    api::init_salt(&env, canister_id)?;
     let user_number = flows::register_anchor(&env, canister_id);
     let pub_session_key = ByteBuf::from("session public key");
 
