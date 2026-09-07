@@ -59,7 +59,6 @@ fn should_keep_new_anchor_across_rollback() -> Result<(), RejectResponse> {
 
     // start with the previous release
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
-    api::init_salt(&env, canister_id)?;
 
     // use the new version to register an anchor
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
