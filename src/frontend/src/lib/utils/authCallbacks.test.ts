@@ -92,7 +92,7 @@ describe("matchDeclaredCallback", () => {
     const foreign = "https://evil.example.com/connect";
     stubFetch({ body: JSON.stringify({ callbacks: [foreign] }) });
     await expect(matchDeclaredCallback(ORIGIN, foreign)).rejects.toThrow(
-      /not on the server's origin/,
+      /not on the trusted server's origin/,
     );
   });
 
