@@ -1665,7 +1665,9 @@ fn should_remove_unreferenced_applications_an_anchor_stops_referencing(
 
     let evicted_origin = "https://dapp-0.com".to_string();
     let mut user_key_before_eviction = None;
-    for index in 0..EVICTABLE_DEFAULT_ACCOUNTS_CAP {
+    // One past the cap: the origin a write is touching is never a candidate for its own
+    // eviction, so the pass first runs when the *other* origins reach the cap.
+    for index in 0..=EVICTABLE_DEFAULT_ACCOUNTS_CAP {
         let params = AccountDelegationParams::new(
             &env,
             canister_id,
