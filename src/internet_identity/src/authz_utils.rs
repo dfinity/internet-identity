@@ -143,8 +143,8 @@ pub fn check_authorization(
     // and compare. See `crate::email_inbound::smtp::calculate_email_recovery_seed`.
     //
     // If the canister salt hasn't been initialised yet, no recovery
-    // delegation could have been stamped (the stamper awaits
-    // `ensure_salt_set()` before issuing). Skip the branch rather than
+    // delegation could have been stamped, because stamping reads it.
+    // Skip the branch rather than
     // calling `state::salt()`, which would trap. An unauthorized
     // caller in that state then falls through to a clean
     // `AuthorizationError` instead of a canister trap.
