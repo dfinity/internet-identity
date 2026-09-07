@@ -252,8 +252,29 @@ pub async fn init_salt() {
         }
     });
 
+    set_salt_if_unset().await;
+}
+
+/// Gives the canister a salt where it has none, and does nothing where it already has one.
+///
+/// Deriving one needs raw randomness, so it needs an await that neither `init` nor
+/// `post_upgrade` can make; a zero-delay timer installed from there calls this instead.
+/// Being a no-op on a canister that already carries a salt is what lets that timer be
+/// installed from both without asking which case it is in.
+pub async fn set_salt_if_unset() {
+    if storage_borrow(|storage| storage.salt().is_some()) {
+        return;
+    }
+
     let salt = random_salt().await;
-    storage_borrow_mut(|storage| storage.update_salt(salt)); // update_salt() traps if salt has already been set
+    storage_borrow_mut(|storage| {
+        // Re-checked after the await, which is where a second message can have gone all
+        // the way through. Both salts are random, so the loser discards its own rather
+        // than trapping a caller whose request was perfectly good.
+        if storage.salt().is_none() {
+            storage.update_salt(salt);
+        }
+    });
 }
 
 pub fn salt() -> [u8; 32] {
