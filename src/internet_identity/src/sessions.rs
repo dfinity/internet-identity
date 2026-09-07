@@ -60,7 +60,7 @@ impl From<StorageError> for AccountSessionError {
     }
 }
 
-pub async fn prepare_account_session(
+pub fn prepare_account_session(
     request: PrepareAccountSessionRequest,
 ) -> Result<PrepareAccountSessionResponse, AccountSessionError> {
     let PrepareAccountSessionRequest {
@@ -94,7 +94,6 @@ pub async fn prepare_account_session(
     ) {
         return Err(AccountSessionError::InvalidBrowserKey);
     }
-    state::ensure_salt_set().await;
 
     let now = time();
     let valid_till = now.saturating_add(
