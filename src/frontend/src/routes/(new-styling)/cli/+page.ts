@@ -105,14 +105,13 @@ const isLoopbackHostname = (hostname: string): boolean =>
  * `raw` isn't one. A bare hostname is read as `https://<hostname>`; a scheme
  * makes `raw` a full origin, so a local app served over http on a non-default
  * port derives the principal that /authorize derives for the same origin.
- * Rejects path, query, fragment and userinfo by requiring the round-trip
- * through `new URL` to leave only the origin behind.
+ * Anything carrying more than an origin — a path, query, fragment or
+ * userinfo — is rejected rather than silently trimmed.
  */
 const parseAppOrigin = (raw: string): string | undefined => {
-  const withScheme = SCHEME_PREFIX_REGEX.test(raw) ? raw : `https://${raw}`;
   let url: URL;
   try {
-    url = new URL(withScheme);
+    url = new URL(SCHEME_PREFIX_REGEX.test(raw) ? raw : `https://${raw}`);
   } catch {
     return undefined;
   }
@@ -125,8 +124,16 @@ const parseAppOrigin = (raw: string): string | undefined => {
   if (!schemeAllowed) {
     return undefined;
   }
+  // Checked on the parsed URL rather than against the input string: an
+  // explicit default port is a valid part of an origin that `url.origin`
+  // canonicalises away, so comparing the two spellings would reject it.
+  // A bare origin leaves "/" behind as the path.
   if (
-    url.origin.toLowerCase() !== withScheme.replace(/\/$/, "").toLowerCase()
+    url.username !== "" ||
+    url.password !== "" ||
+    url.pathname !== "/" ||
+    url.search !== "" ||
+    url.hash !== ""
   ) {
     return undefined;
   }

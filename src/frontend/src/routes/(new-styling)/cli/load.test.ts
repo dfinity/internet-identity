@@ -57,6 +57,12 @@ describe("/cli load: app origin parsing", () => {
     expect(appOriginOf("https://oisy.com/")).toBe("https://oisy.com");
   });
 
+  it("canonicalises an explicit default port away", () => {
+    expect(appOriginOf("https://oisy.com:443")).toBe("https://oisy.com");
+    expect(appOriginOf("oisy.com:443")).toBe("https://oisy.com");
+    expect(appOriginOf("http://localhost:80")).toBe("http://localhost");
+  });
+
   it("is generic mode when the domain is absent", () => {
     expect(appOriginOf()).toBeUndefined();
   });
