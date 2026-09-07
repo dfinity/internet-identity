@@ -95,7 +95,7 @@ const ID_AI_ORIGIN: &str = "https://id.ai";
 
 #[update]
 async fn init_salt() {
-    state::init_salt().await;
+    state::set_salt_if_unset().await;
 }
 
 #[update]
@@ -842,9 +842,12 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
     state::init_new();
     initialize(maybe_arg);
     // A salt is derived from raw randomness, which takes an await this hook cannot make, so
-    // the derivation runs the moment the install returns instead. Only a first install needs
-    // one: the salt lives in stable memory, which is what an upgrade preserves, so
-    // `post_upgrade` has nothing to do here.
+    // the derivation runs the moment the install returns instead.
+    //
+    // There is deliberately no equivalent in `post_upgrade`. An upgrade keeps the salt,
+    // because stable memory is what an upgrade keeps. The one canister that would want it
+    // there is one upgraded from a release that derived its salt on the first delegation
+    // and never issued one, which has to be asked for a salt rather than given one.
     set_timer(Duration::ZERO, || spawn(state::set_salt_if_unset()));
 }
 

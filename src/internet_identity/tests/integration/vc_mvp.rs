@@ -668,7 +668,6 @@ fn should_not_get_id_alias_for_different_user() -> Result<(), RejectResponse> {
 fn should_not_get_id_alias_if_not_prepared() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
-    api::init_salt(&env, canister_id)?;
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
