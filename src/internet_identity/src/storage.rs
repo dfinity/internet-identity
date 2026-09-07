@@ -304,8 +304,13 @@ const BUCKET_SIZE_IN_PAGES: u16 = 128;
 const MAX_MANAGED_MEMORY_SIZE: u64 = 256 * GB;
 const MAX_MANAGED_WASM_PAGES: u64 = MAX_MANAGED_MEMORY_SIZE / WASM_PAGE_SIZE_IN_BYTES;
 
-/// Per-anchor cap on account reference lists that hold nothing but a tracked default
+/// Per-anchor bound on account reference lists that hold nothing but a tracked default
 /// account.
+///
+/// Where eviction triggers, not where the count comes to rest: reaching this starts a pass
+/// that trims to the watermark below, and the origins the triggering write is touching are
+/// not candidates for it, so the count settles a little above that watermark rather than at
+/// either number.
 const MAX_EVICTABLE_DEFAULT_ACCOUNTS: u64 = 500;
 
 /// Eviction target, below the cap.
@@ -2036,7 +2041,12 @@ impl<M: Memory + Clone> Storage<M> {
     /// Anything else is left alone rather than refused. Eviction is housekeeping that runs
     /// alongside a sign-in, and refusing the whole write because one victim went stale
     /// would fail the sign-in that triggered it.
-
+    ///
+    /// Four things go, not one: the list, the config keyed beside it, the reference and
+    /// tombstone counters, and every session the list held. The last is the only one a
+    /// person can see — evicting an idle origin's list signs that origin's sessions out —
+    /// and it is the reason a list holding anything more than a tracked default is never
+    /// a candidate.
     fn validate_removal(
         &self,
         anchor_number: AnchorNumber,
@@ -2069,7 +2079,7 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&application_number)
             .ok_or(StorageError::OriginNotFoundForApplicationNumber { application_number })?;
 
-        let deltas = ReferenceListDeltas::removing(&previous);
+        let deltas = ReferenceListDeltas::retiring(&previous);
         let (application_accounts, application_references) = deltas.apply(
             ReferenceCounter::Application { application_number },
             application.stored_accounts,
@@ -3085,7 +3095,7 @@ impl ReferenceListDeltas {
     /// Separate from [`Self::between`] rather than a write of an empty list, because
     /// an empty list cannot be written at all: a list holding nothing is a tombstone
     /// and stays, so only an outright removal gets to zero these out.
-    fn removing(previous: &[AccountReference]) -> Self {
+    fn retiring(previous: &[AccountReference]) -> Self {
         let removed = Self::between(Some(&[]), previous);
         Self {
             accounts: removed.accounts.saturating_neg(),

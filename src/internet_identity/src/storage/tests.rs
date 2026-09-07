@@ -3826,6 +3826,9 @@ mod tracked_default_eviction_tests {
             sign_in_at(&mut storage, anchor_number, index);
         }
 
+        // One above the watermark, not at it: the origin the triggering write touched is
+        // never a candidate for its own eviction, so it survives on top of what the pass
+        // trims the rest down to.
         let evicted = MAX_EVICTABLE_DEFAULT_ACCOUNTS - 1 - EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK;
         assert_eq!(
             storage.evictable_default_lists(anchor_number).len() as u64,
