@@ -8,7 +8,7 @@ const DEFAULT_TTL_MINUTES = 480;
  * The `/cli` request, parsed from the URL fragment the CLI opens the page with.
  * `valid` carries the validated request — the session public key to delegate
  * to, the loopback callback to post the delegation back to, the single-use
- * nonce, the delegation TTL, and the optional delegation domain. `invalid`
+ * nonce, the delegation TTL, and the optional app origin. `invalid`
  * means the fragment was missing or malformed, and the page shows the
  * invalid-request screen.
  */
@@ -22,9 +22,9 @@ export type CliParams =
        *  this page's POST from a stray or forged local request. */
       nonce: string;
       ttlMinutes: number;
-      /** Delegation domain to get an identity for, or undefined for generic
+      /** Origin of the app to get an identity for, or undefined for generic
        *  mode (the auth page's own default, e.g. cli.id.ai). */
-      domain: string | undefined;
+      appOrigin: string | undefined;
     }
   | { kind: "invalid" };
 
@@ -93,23 +93,44 @@ const parseLoopbackCallback = (raw: string | null): string | undefined => {
   return raw;
 };
 
+const SCHEME_PREFIX_REGEX = /^[a-z][a-z0-9+.-]*:\/\//i;
+
+const isLoopbackHostname = (hostname: string): boolean =>
+  hostname === "localhost" ||
+  hostname === "127.0.0.1" ||
+  hostname.endsWith(".localhost");
+
 /**
- * Returns the normalised hostname if `raw` is a bare hostname (optionally
- * with mixed case), or undefined if it's not. Rejects port, path, query,
- * fragment, scheme prefix, and userinfo by requiring the round-trip
- * through `new URL` to leave only the hostname behind.
+ * Returns the normalised origin of the app named by `--app`, or undefined if
+ * `raw` isn't one. A bare hostname is read as `https://<hostname>`; a scheme
+ * makes `raw` a full origin, so a local app served over http on a non-default
+ * port derives the principal that /authorize derives for the same origin.
+ * Rejects path, query, fragment and userinfo by requiring the round-trip
+ * through `new URL` to leave only the origin behind.
  */
-const parseDomain = (raw: string): string | undefined => {
+const parseAppOrigin = (raw: string): string | undefined => {
+  const withScheme = SCHEME_PREFIX_REGEX.test(raw) ? raw : `https://${raw}`;
   let url: URL;
   try {
-    url = new URL(`https://${raw}`);
+    url = new URL(withScheme);
   } catch {
     return undefined;
   }
-  if (url.hostname.toLowerCase() !== raw.toLowerCase()) {
+  // http would otherwise hand out a principal for an origin any network
+  // attacker can impersonate; loopback is the local-development case, where
+  // there is no CA-trusted cert to serve the app under.
+  const schemeAllowed =
+    url.protocol === "https:" ||
+    (url.protocol === "http:" && isLoopbackHostname(url.hostname));
+  if (!schemeAllowed) {
     return undefined;
   }
-  return url.hostname;
+  if (
+    url.origin.toLowerCase() !== withScheme.replace(/\/$/, "").toLowerCase()
+  ) {
+    return undefined;
+  }
+  return url.origin;
 };
 
 const parseTtl = (raw: string | null): number | undefined => {
@@ -144,10 +165,10 @@ export const load: PageLoad = ({
 
   // `domain` is optional. Absent or empty → generic mode. Present → must parse.
   const domainRaw = params.get("domain");
-  let domain: string | undefined;
+  let appOrigin: string | undefined;
   if (domainRaw !== null && domainRaw !== "") {
-    domain = parseDomain(domainRaw);
-    if (domain === undefined) {
+    appOrigin = parseAppOrigin(domainRaw);
+    if (appOrigin === undefined) {
       return { params: { kind: "invalid" }, status };
     }
   }
@@ -161,7 +182,14 @@ export const load: PageLoad = ({
     return { params: { kind: "invalid" }, status };
   }
   return {
-    params: { kind: "valid", publicKey, callback, nonce, ttlMinutes, domain },
+    params: {
+      kind: "valid",
+      publicKey,
+      callback,
+      nonce,
+      ttlMinutes,
+      appOrigin,
+    },
     status,
   };
 };
