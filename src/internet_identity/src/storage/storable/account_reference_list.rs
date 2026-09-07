@@ -2,8 +2,10 @@ use crate::storage::account::AccountReference;
 use crate::storage::storable::account_reference::StorableAccountReference;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
+use internet_identity_interface::internet_identity::types::AccountNumber;
 use minicbor::{Decode, Encode};
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 use std::fmt;
 
 /// Vectors are not supported yet in ic-stable-structures, this file
@@ -42,6 +44,17 @@ pub enum StorableAccountReferenceListError {
     /// rather than an intent — storing it would deny an identity its default account
     /// for good.
     Empty,
+    /// One account cannot be held twice at one origin. Both references would derive the
+    /// same principal, so the index would hold one entry for two slots while the stored
+    /// account count claimed both — and nothing downstream could tell which reference a
+    /// read had answered from.
+    RepeatedAccountNumber(AccountNumber),
+    /// An identity has one tracked default at an origin. A second numberless reference
+    /// derives the same principal as the first and is counted as another default, which
+    /// inflates the identity's evictable-default count against its cap and leaves a list
+    /// no eviction can ever pick, because eviction only picks a list whose *single*
+    /// reference is a tracked default.
+    RepeatedTrackedDefault,
 }
 
 impl fmt::Display for StorableAccountReferenceListError {
@@ -50,6 +63,14 @@ impl fmt::Display for StorableAccountReferenceListError {
             Self::Empty => write!(
                 f,
                 "refusing to store an empty account reference list, which would be a tombstone"
+            ),
+            Self::RepeatedAccountNumber(account_number) => write!(
+                f,
+                "refusing to store an account reference list holding account {account_number} twice"
+            ),
+            Self::RepeatedTrackedDefault => write!(
+                f,
+                "refusing to store an account reference list holding more than one tracked default"
             ),
         }
     }
@@ -90,6 +111,21 @@ impl TryFrom<Vec<AccountReference>> for StorableAccountReferenceList {
             return Err(StorableAccountReferenceListError::Empty);
         }
 
+        // A reference is identified by the account it names, and the numberless one names
+        // the tracked default — so one pass over `Option<AccountNumber>` catches a repeated
+        // number and a second tracked default alike.
+        let mut seen = BTreeSet::new();
+        for reference in &value {
+            if !seen.insert(reference.account_number) {
+                return Err(match reference.account_number {
+                    Some(account_number) => {
+                        StorableAccountReferenceListError::RepeatedAccountNumber(account_number)
+                    }
+                    None => StorableAccountReferenceListError::RepeatedTrackedDefault,
+                });
+            }
+        }
+
         Ok(StorableAccountReferenceList(
             value
                 .iter()
@@ -124,6 +160,27 @@ mod tests {
         let stored = StorableAccountReferenceList::try_from(references.clone()).unwrap();
 
         assert_eq!(Vec::<AccountReference>::from(stored), references);
+    }
+
+    #[test]
+    fn refuses_the_same_account_twice() {
+        assert_eq!(
+            StorableAccountReferenceList::try_from(vec![
+                reference(None),
+                reference(Some(7)),
+                reference(Some(7)),
+            ])
+            .err(),
+            Some(StorableAccountReferenceListError::RepeatedAccountNumber(7))
+        );
+    }
+
+    #[test]
+    fn refuses_a_second_tracked_default() {
+        assert_eq!(
+            StorableAccountReferenceList::try_from(vec![reference(None), reference(None)]).err(),
+            Some(StorableAccountReferenceListError::RepeatedTrackedDefault)
+        );
     }
 
     #[test]
