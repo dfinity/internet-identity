@@ -1,6 +1,7 @@
 /**
- * Per-origin display metadata (name, description, logo) for apps that sign in
- * with Internet Identity, e.g. shown on the authorize flow screens.
+ * Per-origin display metadata for apps that sign in with Internet Identity:
+ * the name, description and logo shown on the authorize flow screens, and the
+ * privacy policy and terms of service linked from the MCP connect screen.
  *
  * The metadata is sourced permissionlessly from the app itself, which serves a
  * `/.well-known/ii-app-metadata` file (see {@link fetchAppMetadata}) on the
