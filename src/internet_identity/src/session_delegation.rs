@@ -5,7 +5,6 @@ use candid::Principal;
 use ic_canister_sig_creation::{
     delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
 };
-use ic_cdk::api::time;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, Delegation, PrepareSessionDelegation, SessionDelegationError, SessionKey,
@@ -43,21 +42,20 @@ pub(crate) fn expected_session_principal(anchor_number: AnchorNumber) -> Princip
     Principal::self_authenticating(der_encode_canister_sig_key(seed.to_vec()))
 }
 
-pub async fn prepare_session_delegation(
+pub fn prepare_session_delegation(
     anchor_number: AnchorNumber,
     session_key: SessionKey,
     max_ttl: Option<u64>,
+    now: Timestamp,
 ) -> Result<PrepareSessionDelegation, SessionDelegationError> {
     check_authorization(anchor_number)
         .map_err(|err| SessionDelegationError::Unauthorized(err.principal))?;
-
-    state::ensure_salt_set().await;
 
     let session_duration_ns = u64::min(
         max_ttl.unwrap_or(DEFAULT_SESSION_DELEGATION_TTL_NS),
         MAX_SESSION_DELEGATION_TTL_NS,
     );
-    let expiration = time().saturating_add(session_duration_ns);
+    let expiration = now.saturating_add(session_duration_ns);
 
     let seed = session_delegation_seed(anchor_number);
 
@@ -81,10 +79,10 @@ pub fn get_session_delegation(
     check_authorization(anchor_number)
         .map_err(|err| SessionDelegationError::Unauthorized(err.principal))?;
 
-    // No session could have been prepared before the canister salt was
-    // initialised (`prepare_session_delegation` awaits `ensure_salt_set`
-    // before stamping). Skip the seed derivation, which would otherwise
-    // trap on `state::salt()`, and report NoSuchDelegation instead.
+    // No session could have been prepared before the canister salt was set: a
+    // canister sets it once at deployment, and `prepare_session_delegation` reads
+    // it to stamp. Skip the seed derivation, which would otherwise trap on
+    // `state::salt()`, and report NoSuchDelegation instead.
     let salt_initialised = state::storage_borrow(|storage| storage.salt().is_some());
     if !salt_initialised {
         return Err(SessionDelegationError::NoSuchDelegation);
