@@ -245,22 +245,13 @@ struct State {
     event_data_uniqueness_counter: Cell<u16>,
 }
 
-pub async fn init_salt() {
-    storage_borrow(|storage| {
-        if storage.salt().is_some() {
-            trap("Salt already set");
-        }
-    });
-
-    set_salt_if_unset().await;
-}
-
 /// Gives the canister a salt where it has none, and does nothing where it already has one.
 ///
-/// Deriving one needs raw randomness, so it needs an await that neither `init` nor
-/// `post_upgrade` can make; a zero-delay timer installed from there calls this instead.
-/// Being a no-op on a canister that already carries a salt is what lets that timer be
-/// installed from both without asking which case it is in.
+/// Deriving one needs raw randomness, so it needs an await that `init` cannot make; a
+/// zero-delay timer installed from there calls this instead.
+///
+/// A canister that already has a salt is the answer this asks for, not a fault, so it says
+/// so by returning rather than by trapping a caller who wanted exactly that.
 pub async fn set_salt_if_unset() {
     if storage_borrow(|storage| storage.salt().is_some()) {
         return;
