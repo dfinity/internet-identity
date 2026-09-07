@@ -12,7 +12,7 @@ use authz_utils::{
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
-use ic_cdk::api::{caller, set_certified_data, trap};
+use ic_cdk::api::{caller, set_certified_data, time, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
@@ -337,7 +337,7 @@ fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Pri
 }
 
 #[update]
-async fn prepare_delegation(
+fn prepare_delegation(
     anchor_number: AnchorNumber,
     frontend: FrontendHostname,
     session_key: SessionKey,
@@ -356,8 +356,8 @@ async fn prepare_delegation(
         // The legacy endpoint has no read-only option.
         DelegationAccess::Unrestricted,
         &ii_domain,
+        time(),
     )
-    .await
     .map(
         |PrepareAccountDelegation {
              user_key,
@@ -484,7 +484,7 @@ fn set_default_account(
 }
 
 #[update]
-async fn prepare_account_delegation(
+fn prepare_account_delegation(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
@@ -508,8 +508,8 @@ async fn prepare_account_delegation(
                 // value (queries-only by default in the CLI and MCP flows).
                 DelegationAccess::from(permissions),
                 &ii_domain,
+                time(),
             )
-            .await
         }
         Err(err) => Err(err.into()),
     }
@@ -588,15 +588,19 @@ fn mcp_set_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), 
 /// key) and hands back the `McpSession` the operation runs on, so there is no
 /// way to reach `prepare_delegation` without it.
 #[update]
-async fn mcp_prepare_delegation(
+fn mcp_prepare_delegation(
     target_origin: FrontendHostname,
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
 ) -> Result<McpPrepareDelegation, AccountDelegationError> {
-    mcp::authorize_mcp_session_for_update()?
-        .prepare_delegation(target_origin, account_number, session_key, max_ttl)
-        .await
+    mcp::authorize_mcp_session_for_update()?.prepare_delegation(
+        target_origin,
+        account_number,
+        session_key,
+        max_ttl,
+        time(),
+    )
 }
 
 /// Fetch the delegation prepared by `mcp_prepare_delegation`. The anchor is
@@ -631,7 +635,7 @@ fn mcp_get_accounts(
 }
 
 #[update]
-async fn prepare_session_delegation(
+fn prepare_session_delegation(
     anchor_number: AnchorNumber,
     session_key: SessionKey,
     max_ttl: Option<u64>,
@@ -639,7 +643,7 @@ async fn prepare_session_delegation(
     internet_identity_interface::internet_identity::types::PrepareSessionDelegation,
     internet_identity_interface::internet_identity::types::SessionDelegationError,
 > {
-    session_delegation::prepare_session_delegation(anchor_number, session_key, max_ttl).await
+    session_delegation::prepare_session_delegation(anchor_number, session_key, max_ttl, time())
 }
 
 #[query]

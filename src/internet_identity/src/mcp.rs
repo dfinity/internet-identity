@@ -486,17 +486,17 @@ impl McpSession {
     /// default account at an origin is mutable, so if `get` re-resolved it
     /// independently and it had changed in between, it would look under a
     /// different account's seed and `NoSuchDelegation`.
-    pub async fn prepare_delegation(
+    pub fn prepare_delegation(
         self,
         target_origin: FrontendHostname,
         account_number: Option<AccountNumber>,
         session_key: SessionKey,
         max_ttl: Option<u64>,
+        now: Timestamp,
     ) -> Result<McpPrepareDelegation, AccountDelegationError> {
         let anchor_number = self.grant.anchor_number;
         // Cap at 5 minutes; the grant expiry is passed as an *absolute* cap so
-        // the delegation can't outlive the session even by the time an await
-        // spans.
+        // the delegation cannot outlive the session.
         let capped_ttl = Some(u64::min(
             max_ttl.unwrap_or(MCP_MAX_EXPIRATION_PERIOD_NS),
             MCP_MAX_EXPIRATION_PERIOD_NS,
@@ -513,8 +513,8 @@ impl McpSession {
             Some(self.grant.expires_at_ns),
             DelegationAccess::from_read_only(self.grant.read_only),
             &None,
-        )
-        .await?;
+            now,
+        )?;
         Ok(McpPrepareDelegation {
             user_key: prepared.user_key,
             expiration: prepared.expiration,
