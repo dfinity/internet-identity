@@ -2,11 +2,13 @@
   import { invalidateAll } from "$app/navigation";
   import {
     BotIcon,
+    MonitorIcon,
     RotateCcwIcon,
     SlidersHorizontalIcon,
     Trash2Icon,
   } from "@lucide/svelte";
   import McpIcon from "$lib/components/icons/McpIcon.svelte";
+  import { isLoopbackUrl } from "$lib/utils/mcpServer";
   import Badge from "$lib/components/ui/Badge.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
   import { toaster } from "$lib/components/utils/toaster";
@@ -47,7 +49,14 @@
     const url = trustedUrl(config, backendCanisterConfig);
     return url === undefined
       ? undefined
-      : { url, custom: trusted !== undefined };
+      : {
+          url,
+          custom: trusted !== undefined,
+          // A local connector is stored port-less, because the program binds a
+          // fresh port per sign-in. So it is named by what it is rather than by
+          // a host that would read like a remote one.
+          local: isLoopbackUrl(url),
+        };
   });
   // The switch reports whether a connector is actually trusted, not what the
   // stored `enabled` flag says: on a deployment without an official connector,
@@ -186,16 +195,28 @@
           class="border-border-secondary bg-bg-secondary text-fg-tertiary flex size-10 shrink-0 items-center justify-center rounded-md border"
           aria-hidden="true"
         >
-          <McpIcon class="size-4.5" />
+          {#if active.local}
+            <MonitorIcon class="size-4.5" />
+          {:else}
+            <McpIcon class="size-4.5" />
+          {/if}
         </span>
 
         <div class="flex min-w-0 flex-1 flex-col gap-1">
           <span class="text-text-primary truncate text-sm font-semibold">
-            {active.custom ? hostOf(active.url) : $t`Internet Computer MCP`}
+            {#if active.local}
+              {$t`Local server`}
+            {:else if active.custom}
+              {hostOf(active.url)}
+            {:else}
+              {$t`Internet Computer MCP`}
+            {/if}
           </span>
           <span class="text-text-secondary text-sm">
             {#if !active.custom}
               {$t`Official · Hosted by DFINITY`}
+            {:else if active.local}
+              {$t`Runs on your own computer · Any port`}
             {:else if official !== undefined}
               {$t`Added by you · Replaces the official connector`}
             {:else}
