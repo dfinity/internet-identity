@@ -9,14 +9,32 @@ use canister_tests::framework::{
     env, install_ii_with_archive, principal_1, time, verify_delegation, BrowserKey,
 };
 use internet_identity_interface::internet_identity::types::{
-    AccountSessionError, GetAccountSessionRequest, PrepareAccountSessionRequest,
-    PrepareAccountSessionResponse,
+    AccountSessionError, BrowserBrand, BrowserDescription, FormFactor, GetAccountSessionRequest,
+    OperatingSystem, PrepareAccountSessionRequest, PrepareAccountSessionResponse,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
 
 const ORIGIN: &str = "https://some-dapp.com";
+
+fn chrome_on_a_mac() -> BrowserDescription {
+    BrowserDescription {
+        brand: BrowserBrand::Chrome,
+        os: OperatingSystem::Macos,
+        form_factor: FormFactor::Desktop,
+        model: None,
+    }
+}
+
+fn firefox_on_linux() -> BrowserDescription {
+    BrowserDescription {
+        brand: BrowserBrand::Firefox,
+        os: OperatingSystem::Linux,
+        form_factor: FormFactor::Desktop,
+        model: None,
+    }
+}
 
 fn session_request(identity_number: u64) -> PrepareAccountSessionRequest {
     session_request_from(identity_number, &BrowserKey::new(1))
@@ -34,7 +52,7 @@ fn session_request_from(
         identity_number,
         origin: ORIGIN.to_string(),
         account_number: None,
-        browser_name: "Chrome on MacBook".to_string(),
+        browser_description: chrome_on_a_mac(),
         current_browser_key: browser.public_key(),
         current_browser_key_signature: browser.sign(&session_key, &next_browser_key),
         next_browser_key_signature: browser
@@ -237,7 +255,7 @@ fn should_register_a_second_browser_for_a_key_it_has_not_seen() -> Result<(), Re
     .unwrap();
 
     let mut second = session_request_from(identity_number, &BrowserKey::new(2));
-    second.browser_name = "Firefox on Linux".to_string();
+    second.browser_description = firefox_on_linux();
     prepare_account_session(&env, canister_id, principal_1(), second)?.unwrap();
 
     let devices = identity_info(&env, canister_id, principal_1(), identity_number)?
@@ -246,8 +264,8 @@ fn should_register_a_second_browser_for_a_key_it_has_not_seen() -> Result<(), Re
         .expect("the identity should hold browsers");
 
     assert_eq!(devices.len(), 2);
-    assert_eq!(devices[0].name, "Chrome on MacBook");
-    assert_eq!(devices[1].name, "Firefox on Linux");
+    assert_eq!(devices[0].description, chrome_on_a_mac());
+    assert_eq!(devices[1].description, firefox_on_linux());
     assert_ne!(devices[0].id, devices[1].id);
 
     Ok(())

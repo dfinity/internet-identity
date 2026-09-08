@@ -1055,8 +1055,11 @@ type PrepareAccountSessionRequest = record {
     account_number : opt AccountNumber;
     // The II frontend's own key. The app never sees this chain's private key.
     session_key : SessionKey;
-    // Labels the browser in the user's session list, e.g. "Chrome on MacBook".
-    browser_name : text;
+    // What this browser is, for the user's session list. Taken only where this sign-in
+    // registers a browser: an entry that is advanced keeps what it was registered with,
+    // so a browser reporting something else presents a key pair no entry holds and
+    // registers under its own.
+    browser_description : BrowserDescription;
     // The browser's own public key, DER-encoded, as the registry currently holds it. A
     // key this anchor has not seen registers a browser under it.
     current_browser_key : PublicKey;

@@ -1396,9 +1396,12 @@ export interface PrepareAccountSessionRequest {
    */
   'current_browser_key_signature' : Uint8Array | number[],
   /**
-   * Labels the browser in the user's session list, e.g. "Chrome on MacBook".
+   * What this browser is, for the user's session list. Taken only where this sign-in
+   * registers a browser: an entry that is advanced keeps what it was registered with,
+   * so a browser reporting something else presents a key pair no entry holds and
+   * registers under its own.
    */
-  'browser_name' : string,
+  'browser_description' : BrowserDescription,
   'account_number' : [] | [AccountNumber],
   'identity_number' : UserNumber,
   /**
