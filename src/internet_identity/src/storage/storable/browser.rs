@@ -1,3 +1,4 @@
+use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::browser_id::StorableBrowserId;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
@@ -10,8 +11,11 @@ use std::borrow::Cow;
 pub struct StorableBrowser {
     #[n(0)]
     pub id: StorableBrowserId,
+    /// What this browser reported about itself when it registered. Immutable: a
+    /// sign-in that reports something else is a browser this anchor has not seen, and
+    /// registers under its own entry.
     #[n(1)]
-    pub name: String,
+    pub description: StorableBrowserDescription,
     #[n(2)]
     pub created_at: Timestamp,
     #[n(3)]
