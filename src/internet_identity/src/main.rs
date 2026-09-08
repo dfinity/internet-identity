@@ -879,15 +879,12 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
         openid::setup(openid_configs);
     }
 
-    // TEMPORARY: remove once every deployment has upgraded through a build that carries
-    // this sweep. Not "once it has run" — its completion flag is heap state, so it runs
-    // again after every upgrade, and a canister that skipped this build entirely would
-    // never have indexed the accounts it already held.
-    //
-    // Taking it out also takes out the only thing that repairs a drifted index entry: the
-    // write path derives principals for the accounts a write moves and no longer
-    // re-asserts the rest, on the grounds that this sweep comes back around. Something
-    // has to replace that, or the reasoning behind it has to change.
+    // TEMPORARY: a one-time migration, to index the accounts that predate the index.
+    // Remove once every deployment has upgraded through a build that carries it — not
+    // once it has finished, because its completion flag is heap state, so an upgrade
+    // forgets it and the sweep walks every list again. That re-running is a cost, not a
+    // purpose: nothing depends on it, and the write path keeps the index in step by
+    // itself.
     init_account_principal_index_backfill_timer();
 }
 
