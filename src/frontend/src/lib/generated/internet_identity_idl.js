@@ -561,6 +561,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const BrowserInfo = IDL.Record({
     'id' : IDL.Nat32,
+    'session_count' : IDL.Nat32,
     'name' : IDL.Text,
     'created_at' : Timestamp,
     'last_used' : Timestamp,

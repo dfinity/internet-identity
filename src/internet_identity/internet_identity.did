@@ -1015,6 +1015,8 @@ type BrowserInfo = record {
     created_at : Timestamp;
     // Advanced by a sign-in from this browser and by every session refresh it drives.
     last_used : Timestamp;
+    // Sessions this browser holds. Zero means it is signed in to nothing.
+    session_count : nat32;
 };
 
 type IdentityInfo = record {

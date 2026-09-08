@@ -1541,6 +1541,10 @@ export type SessionDelegationError = { 'NoSuchDelegation' : null } |
  */
 export interface BrowserInfo {
   'id' : number,
+  /**
+   * Sessions this browser holds. Zero means it is signed in to nothing.
+   */
+  'session_count' : number,
   'name' : string,
   'created_at' : Timestamp,
   /**
