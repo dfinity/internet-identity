@@ -84,6 +84,8 @@ pub struct BrowserInfo {
     pub name: String,
     pub created_at: Timestamp,
     pub last_used: Timestamp,
+    /// Sessions this browser holds, counted from the stored records.
+    pub session_count: u32,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

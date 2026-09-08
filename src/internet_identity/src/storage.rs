@@ -2456,6 +2456,13 @@ impl<M: Memory + Clone> Storage<M> {
         self.stable_anchor_account_counter_memory
             .insert(anchor_number, anchor_counter);
 
+        // Accumulated once for the whole call rather than once per origin: a browser
+        // signed in at several origins is one entry on the identity record, and the
+        // record is stored once. Worked out here rather than by validation, which
+        // computes the identity's total because a cap refuses on it — nothing refuses on
+        // a per-browser count, so it belongs where the writing happens.
+        let mut browser_deltas: BTreeMap<BrowserId, i64> = BTreeMap::new();
+
         let mut written = BTreeMap::new();
         for one in writes {
             let ValidatedAccountReferenceListWrite {
@@ -2527,6 +2534,11 @@ impl<M: Memory + Clone> Storage<M> {
                         &previous_references,
                         &current_references,
                     );
+                    Self::accumulate_browser_deltas(
+                        &mut browser_deltas,
+                        &previous_references,
+                        &current_references,
+                    );
                 }
             }
 
@@ -2554,6 +2566,7 @@ impl<M: Memory + Clone> Storage<M> {
         if let Some(session_count) = session_count {
             anchor.session_count = session_count;
         }
+        anchor.move_browser_session_counts(&browser_deltas);
 
         // Taking the identity record is taking the storing of it, so it is stored whatever
         // was changed on it — the count above, or anything a caller changed before giving
@@ -3230,6 +3243,25 @@ impl<M: Memory + Clone> Storage<M> {
             .collect();
         ids.sort_unstable();
         ids
+    }
+
+    /// Adds what one reference-list write does to each browser's session count.
+    ///
+    /// Accumulated across the origins of a single write rather than returned per origin,
+    /// because a browser signed in at several origins is one entry on the identity
+    /// record, and the record is stored once.
+    fn accumulate_browser_deltas(
+        deltas: &mut BTreeMap<BrowserId, i64>,
+        previous: &[AccountReference],
+        current: &[AccountReference],
+    ) {
+        for (references, sign) in [(previous, -1i64), (current, 1i64)] {
+            for reference in references {
+                for session in &reference.sessions {
+                    *deltas.entry(session.browser_id).or_default() += sign;
+                }
+            }
+        }
     }
 
     /// Keeps the session index in step with one reference-list write, and reports what
