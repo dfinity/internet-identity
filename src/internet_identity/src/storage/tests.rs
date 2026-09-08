@@ -6648,3 +6648,161 @@ mod session_removal_tests {
         );
     }
 }
+
+mod browser_session_count_tests {
+    use super::{params, params_at};
+    use crate::storage::anchor::MAX_BROWSERS;
+    use crate::storage::CreateSessionParams;
+    use crate::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::{AnchorNumber, BrowserId};
+    use pretty_assertions::assert_eq;
+    use std::collections::BTreeMap;
+
+    const SALT: [u8; 32] = [17u8; 32];
+
+    fn storage_with_anchor() -> (Storage<VectorMemory>, AnchorNumber) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt(SALT);
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        (storage, anchor_number)
+    }
+
+    /// What each registered browser says it holds, and what the identity says it holds.
+    /// Asserted together throughout: the per-browser counts are the same fact as the
+    /// identity's total at a finer grain, and a test that checked one without the other
+    /// would pass while they disagreed.
+    fn counts(
+        storage: &Storage<VectorMemory>,
+        anchor_number: AnchorNumber,
+    ) -> (BTreeMap<BrowserId, u32>, u32) {
+        let anchor = storage.read(anchor_number).unwrap();
+        let per_browser = anchor
+            .browsers()
+            .iter()
+            .map(|browser| (browser.id, browser.session_count))
+            .collect();
+        (per_browser, anchor.session_count)
+    }
+
+    #[test]
+    fn a_session_counts_against_the_browser_it_came_from() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        storage
+            .create_session(params(anchor_number, 7, 1_000))
+            .unwrap();
+        assert_eq!(
+            counts(&storage, anchor_number),
+            (BTreeMap::from([(0, 1)]), 1)
+        );
+
+        // A second browser, which is a second entry rather than a second session on the
+        // first.
+        storage
+            .create_session(params(anchor_number, 9, 2_000))
+            .unwrap();
+        assert_eq!(
+            counts(&storage, anchor_number),
+            (BTreeMap::from([(0, 1), (1, 1)]), 2)
+        );
+
+        // The first browser signing in again at the same origin, presenting the successor
+        // it announced. A ceremony replaces what that browser held there rather than
+        // adding to it, so the counts stand still — which is the case a counter kept by
+        // incrementing at the call site would get wrong.
+        storage
+            .create_session(params_at(anchor_number, 7, 1, 3_000))
+            .unwrap();
+        assert_eq!(
+            counts(&storage, anchor_number),
+            (BTreeMap::from([(0, 1), (1, 1)]), 2)
+        );
+    }
+
+    #[test]
+    fn sessions_at_several_origins_add_up_on_one_browser() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        storage
+            .create_session(params(anchor_number, 7, 1_000))
+            .unwrap();
+        storage
+            .create_session(CreateSessionParams {
+                origin: "https://elsewhere.example".to_string(),
+                ..params_at(anchor_number, 7, 1, 2_000)
+            })
+            .unwrap();
+
+        // One entry, two origins: the count belongs to the browser, not to a list.
+        assert_eq!(
+            counts(&storage, anchor_number),
+            (BTreeMap::from([(0, 2)]), 2)
+        );
+    }
+
+    #[test]
+    fn revoking_a_browsers_sessions_returns_its_count_to_zero() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        storage
+            .create_session(params(anchor_number, 7, 1_000))
+            .unwrap();
+        storage
+            .create_session(CreateSessionParams {
+                origin: "https://elsewhere.example".to_string(),
+                ..params_at(anchor_number, 7, 1, 2_000)
+            })
+            .unwrap();
+        storage
+            .create_session(params(anchor_number, 9, 3_000))
+            .unwrap();
+
+        assert_eq!(
+            storage.revoke_browser_sessions(anchor_number, 0).unwrap(),
+            2
+        );
+
+        // Zero is the whole point of the counter: it is what the settings page reads to
+        // say a browser is signed in to nothing, and it survives a reload because it was
+        // stored here rather than remembered by the page.
+        assert_eq!(
+            counts(&storage, anchor_number),
+            (BTreeMap::from([(0, 0), (1, 1)]), 1)
+        );
+    }
+
+    #[test]
+    fn a_browser_the_registry_gave_up_leaves_no_count_behind() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        // Two sessions on the browser that will be given up, so a count that outlived its
+        // entry would be visible rather than indistinguishable from a fresh one.
+        storage
+            .create_session(params(anchor_number, 7, 1_000))
+            .unwrap();
+        storage
+            .create_session(params_at(anchor_number, 7, 1, 1_000))
+            .unwrap();
+
+        for index in 0..MAX_BROWSERS {
+            storage
+                .create_session(params(anchor_number, 100 + index as u8, 2_000))
+                .unwrap();
+        }
+
+        let (per_browser, total) = counts(&storage, anchor_number);
+        assert!(
+            !per_browser.contains_key(&0),
+            "the dropped browser is still counted: {per_browser:?}"
+        );
+        assert_eq!(per_browser.len(), MAX_BROWSERS);
+        assert!(
+            per_browser.values().all(|count| *count == 1),
+            "one session each for the browsers still registered: {per_browser:?}"
+        );
+        assert_eq!(total as usize, MAX_BROWSERS);
+    }
+}
