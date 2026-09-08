@@ -1273,10 +1273,23 @@ mod mirror_verified_email_tests {
 mod browser_tests {
     use super::*;
     use crate::storage::anchor::{BrowserError, MAX_BROWSERS};
-    use internet_identity_interface::internet_identity::types::PublicKey;
+    use internet_identity_interface::internet_identity::types::{
+        BrowserBrand, BrowserDescription, FormFactor, OperatingSystem, PublicKey,
+    };
 
     fn anchor() -> Anchor {
         Anchor::new(10_000, 0)
+    }
+
+    /// A description that differs by `label`, for tests that only need to tell entries
+    /// apart. The label rides in `model`, the description's one free-text field.
+    fn description(label: &str) -> BrowserDescription {
+        BrowserDescription {
+            brand: BrowserBrand::Chrome,
+            os: OperatingSystem::Macos,
+            form_factor: FormFactor::Desktop,
+            model: Some(label.to_string()),
+        }
     }
 
     fn browser_key(seed: u8) -> PublicKey {
@@ -1304,26 +1317,29 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome on MacBook".to_string(),
+                description("Chrome on MacBook"),
                 1_000,
             )
             .unwrap();
 
         assert_eq!(id, 0);
         assert_eq!(anchor.browsers().len(), 1);
-        assert_eq!(anchor.browsers()[0].name, "Chrome on MacBook");
+        assert_eq!(
+            anchor.browsers()[0].description,
+            description("Chrome on MacBook")
+        );
         assert_eq!(anchor.browsers()[0].current_browser_key, browser_key(1));
         assert_eq!(anchor.browsers()[0].created_at, 1_000);
     }
 
     #[test]
-    fn a_browser_that_rotates_reuses_the_device_and_leaves_its_name_alone() {
+    fn a_browser_that_rotates_reuses_its_entry_and_keeps_its_description() {
         let mut anchor = anchor();
         let (id, _) = anchor
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome on MacBook".to_string(),
+                description("Chrome on MacBook"),
                 1_000,
             )
             .unwrap();
@@ -1332,14 +1348,17 @@ mod browser_tests {
             .resolve_browser(
                 successor_key(1),
                 browser_key(2),
-                "Something else".to_string(),
+                description("Something else"),
                 2_000,
             )
             .unwrap();
 
         assert_eq!(again, id);
         assert_eq!(anchor.browsers().len(), 1);
-        assert_eq!(anchor.browsers()[0].name, "Chrome on MacBook");
+        assert_eq!(
+            anchor.browsers()[0].description,
+            description("Chrome on MacBook")
+        );
     }
 
     #[test]
@@ -1350,7 +1369,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 1_000,
             )
             .unwrap();
@@ -1366,7 +1385,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 1_000,
             )
             .unwrap();
@@ -1375,7 +1394,7 @@ mod browser_tests {
             .resolve_browser(
                 successor_key(1),
                 browser_key(2),
-                "Chrome".to_string(),
+                description("Chrome"),
                 5_000,
             )
             .unwrap();
@@ -1391,7 +1410,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 1_000,
             )
             .unwrap();
@@ -1400,7 +1419,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(2),
                 successor_key(2),
-                "Firefox".to_string(),
+                description("Firefox"),
                 2_000,
             )
             .unwrap();
@@ -1416,7 +1435,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 1_000,
             )
             .unwrap();
@@ -1426,7 +1445,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 2_000,
             )
             .unwrap();
@@ -1443,7 +1462,7 @@ mod browser_tests {
                 .resolve_browser(
                     browser_key(index as u8),
                     successor_key(index as u8),
-                    format!("device-{index}"),
+                    description(&format!("device-{index}")),
                     index as u64 + 1,
                 )
                 .unwrap();
@@ -1453,15 +1472,21 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(200),
                 successor_key(200),
-                "newest".to_string(),
+                description("newest"),
                 10_000,
             )
             .unwrap();
 
         assert_eq!(anchor.browsers().len(), MAX_BROWSERS);
         assert!(anchor.browsers().iter().any(|d| d.id == newest));
-        assert!(!anchor.browsers().iter().any(|d| d.name == "device-0"));
-        assert!(anchor.browsers().iter().any(|d| d.name == "device-1"));
+        assert!(!anchor
+            .browsers()
+            .iter()
+            .any(|b| b.description == description("device-0")));
+        assert!(anchor
+            .browsers()
+            .iter()
+            .any(|b| b.description == description("device-1")));
         assert_eq!(dropped, vec![0]);
     }
 
@@ -1469,14 +1494,14 @@ mod browser_tests {
     fn the_cap_evicts_on_use_rather_than_on_enrolment() {
         let mut anchor = anchor();
         let (first, _) = anchor
-            .resolve_browser(browser_key(0), successor_key(0), "oldest".to_string(), 1)
+            .resolve_browser(browser_key(0), successor_key(0), description("oldest"), 1)
             .unwrap();
         for index in 1..MAX_BROWSERS {
             anchor
                 .resolve_browser(
                     browser_key(index as u8),
                     successor_key(index as u8),
-                    format!("device-{index}"),
+                    description(&format!("device-{index}")),
                     index as u64 + 1,
                 )
                 .unwrap();
@@ -1485,7 +1510,7 @@ mod browser_tests {
             .resolve_browser(
                 successor_key(0),
                 rotating_key(0, 200),
-                "oldest".to_string(),
+                description("oldest"),
                 9_000,
             )
             .unwrap();
@@ -1494,7 +1519,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(200),
                 successor_key(200),
-                "newest".to_string(),
+                description("newest"),
                 10_000,
             )
             .unwrap();
@@ -1508,14 +1533,14 @@ mod browser_tests {
         let mut anchor = anchor();
         // The phone rotates on every sign-in, as a browser that kept its storage does.
         let (kept, _) = anchor
-            .resolve_browser(browser_key(0), rotating_key(0, 1), "phone".to_string(), 1)
+            .resolve_browser(browser_key(0), rotating_key(0, 1), description("phone"), 1)
             .unwrap();
         for wipe in 0..MAX_BROWSERS as u64 {
             anchor
                 .resolve_browser(
                     rotating_key(0, wipe as u8 + 1),
                     rotating_key(0, wipe as u8 + 2),
-                    "phone".to_string(),
+                    description("phone"),
                     1_000 + wipe * 10,
                 )
                 .unwrap();
@@ -1525,7 +1550,7 @@ mod browser_tests {
                 .resolve_browser(
                     browser_key(wipe as u8 + 1),
                     successor_key(wipe as u8 + 1),
-                    format!("wiped-{wipe}"),
+                    description(&format!("wiped-{wipe}")),
                     1_001 + wipe * 10,
                 )
                 .unwrap();
@@ -1541,7 +1566,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 1_000,
             )
             .unwrap();
@@ -1550,7 +1575,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(2),
                 successor_key(2),
-                "Chrome".to_string(),
+                description("Chrome"),
                 2_000,
             )
             .unwrap();
@@ -1566,7 +1591,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 1_000,
             )
             .unwrap();
@@ -1575,7 +1600,7 @@ mod browser_tests {
             .resolve_browser(
                 successor_key(1),
                 browser_key(2),
-                "Chrome".to_string(),
+                description("Chrome"),
                 2_000,
             )
             .unwrap();
@@ -1593,7 +1618,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 1_000,
             )
             .unwrap();
@@ -1601,7 +1626,7 @@ mod browser_tests {
             .resolve_browser(
                 successor_key(1),
                 browser_key(2),
-                "Chrome".to_string(),
+                description("Chrome"),
                 2_000,
             )
             .unwrap();
@@ -1610,7 +1635,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(3),
-                "Chrome".to_string(),
+                description("Chrome"),
                 3_000,
             )
             .unwrap();
@@ -1630,7 +1655,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 1_000,
             )
             .unwrap();
@@ -1640,7 +1665,7 @@ mod browser_tests {
         let retried = anchor.resolve_browser(
             browser_key(1),
             successor_key(1),
-            "Chrome".to_string(),
+            description("Chrome"),
             2_000,
         );
 
@@ -1658,7 +1683,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 1_000,
             )
             .unwrap();
@@ -1667,7 +1692,7 @@ mod browser_tests {
             .resolve_browser(
                 successor_key(1),
                 successor_key(2),
-                "Chrome".to_string(),
+                description("Chrome"),
                 2_000,
             )
             .unwrap();
@@ -1682,7 +1707,7 @@ mod browser_tests {
     fn rotating_repeatedly_keeps_the_same_browser() {
         let mut anchor = anchor();
         let (id, _) = anchor
-            .resolve_browser(browser_key(0), browser_key(1), "Chrome".to_string(), 1)
+            .resolve_browser(browser_key(0), browser_key(1), description("Chrome"), 1)
             .unwrap();
 
         for step in 1..10u8 {
@@ -1690,7 +1715,7 @@ mod browser_tests {
                 .resolve_browser(
                     browser_key(step),
                     browser_key(step + 1),
-                    "Chrome".to_string(),
+                    description("Chrome"),
                     step as u64 * 100,
                 )
                 .unwrap();
@@ -1709,17 +1734,21 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 1_000,
             )
             .unwrap();
 
-        let stealing_the_key =
-            anchor.resolve_browser(browser_key(2), browser_key(1), "Firefox".to_string(), 2_000);
+        let stealing_the_key = anchor.resolve_browser(
+            browser_key(2),
+            browser_key(1),
+            description("Firefox"),
+            2_000,
+        );
         let stealing_the_successor = anchor.resolve_browser(
             browser_key(2),
             successor_key(1),
-            "Firefox".to_string(),
+            description("Firefox"),
             2_000,
         );
 
@@ -1739,7 +1768,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 1_000,
             )
             .unwrap();
@@ -1749,7 +1778,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(7),
                 successor_key(7),
-                "Chrome".to_string(),
+                description("Chrome"),
                 2_000,
             )
             .unwrap();
@@ -1766,7 +1795,7 @@ mod browser_tests {
         // announced the key it is presenting would keep it alive for as long as it kept
         // asking, and so would whoever leaked it.
         assert_eq!(
-            anchor.resolve_browser(browser_key(1), browser_key(1), "Chrome".to_string(), 1_000),
+            anchor.resolve_browser(browser_key(1), browser_key(1), description("Chrome"), 1_000),
             Err(BrowserError::SuccessorMatchesCurrent)
         );
         assert!(anchor.browsers().is_empty());
@@ -1779,7 +1808,7 @@ mod browser_tests {
             .resolve_browser(
                 browser_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 1_000,
             )
             .unwrap();
@@ -1788,7 +1817,7 @@ mod browser_tests {
             anchor.resolve_browser(
                 successor_key(1),
                 successor_key(1),
-                "Chrome".to_string(),
+                description("Chrome"),
                 2_000
             ),
             Err(BrowserError::SuccessorMatchesCurrent)
