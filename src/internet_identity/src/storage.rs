@@ -420,6 +420,8 @@ pub struct Storage<M: Memory> {
         ManagedMemory<M>,
     >,
     stable_account_counter_memory: StableCell<StorableAccountsCounter, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the application-number allocator.
+    next_application_number_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_application_number_memory: StableCell<StorableApplicationNumber, ManagedMemory<M>>,
     next_session_id_memory: StableCell<StorableSessionId, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
@@ -653,6 +655,9 @@ impl<M: Memory + Clone> Storage<M> {
                 StorableAccountsCounter::default(),
             )
             .expect("stable_account_counter_memory"),
+            next_application_number_memory_wrapper: MemoryWrapper::new(
+                next_application_number_memory.clone(),
+            ),
             next_application_number_memory: StableCell::init(next_application_number_memory, 0)
                 .expect("next_application_number_memory"),
             next_session_id_memory: StableCell::init(next_session_id_memory, 0)
@@ -3677,6 +3682,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "lookup_account_with_principal".to_string(),
                 self.lookup_account_with_principal_memory_wrapper.size(),
+            ),
+            (
+                "next_application_number".to_string(),
+                self.next_application_number_memory_wrapper.size(),
             ),
             (
                 "stable_anchor_application_config".to_string(),
