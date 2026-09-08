@@ -18,7 +18,7 @@ use crate::{
     update_root_hash,
 };
 use ic_canister_sig_creation::{signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN};
-use ic_cdk::{api::time, caller};
+use ic_cdk::caller;
 use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity_interface::{
     archive::types::{Operation, Private},
@@ -196,13 +196,8 @@ pub fn create_account_for_origin(
 ) -> Result<Account, CreateAccountError> {
     validate_account_name(&name).map_err(Into::<CreateAccountError>::into)?;
     let created_account = storage_borrow_mut(|storage| {
-        check_or_rebuild_max_anchor_accounts(
-            storage,
-            anchor_number,
-            MAX_ANCHOR_ACCOUNTS as u64,
-            true,
-        )
-        .map_err(Into::<CreateAccountError>::into)?;
+        check_max_anchor_accounts(storage, anchor_number, MAX_ANCHOR_ACCOUNTS as u64)
+            .map_err(Into::<CreateAccountError>::into)?;
 
         storage
             .create_additional_account(CreateAccountParams {
@@ -239,15 +234,15 @@ pub fn update_account_for_origin(
                     // Check if we have reached account limit
                     // Because editing a default account turns it into a stored account
                     if account_number.is_none() {
-                        check_or_rebuild_max_anchor_accounts(
-                            storage,
-                            anchor_number,
-                            MAX_ANCHOR_ACCOUNTS as u64,
-                            true,
-                        )
+                        check_max_anchor_accounts(storage, anchor_number, MAX_ANCHOR_ACCOUNTS as u64)
                         .map_err(Into::<UpdateAccountError>::into)?
                     }
 
+                    // A caller reaches this with nothing readable in two ways: the
+                    // account belongs to another identity, or the tracked default has
+                    // already been named and so is no longer numberless. Both are the
+                    // caller naming an account it does not have, which is what
+                    // `prepare_account_delegation` answers for the same read.
                     let old_account = storage
                         .read_account(ReadAccountParams {
                             account_number,
@@ -255,7 +250,7 @@ pub fn update_account_for_origin(
                             origin: &origin,
                             known_app_num: None
                         })
-                        .expect("Updating an unreadable account should be impossible!");
+                        .ok_or_else(|| UpdateAccountError::Unauthorized(caller()))?;
 
                     let updated_account = storage
                         .update_account(UpdateAccountParams {
@@ -298,7 +293,7 @@ pub fn update_account_for_origin(
 // and the delegation access level through to the signature; the parameter list
 // is wide but each argument is distinct and load-bearing.
 #[allow(clippy::too_many_arguments)]
-pub async fn prepare_account_delegation(
+pub fn prepare_account_delegation(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
@@ -307,8 +302,8 @@ pub async fn prepare_account_delegation(
     max_expiration: Option<Timestamp>,
     access: DelegationAccess,
     ii_domain: &Option<IIDomain>,
+    now: Timestamp,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
-    state::ensure_salt_set().await;
     check_frontend_length(&origin);
 
     let account = storage_borrow(|storage| {
@@ -327,29 +322,36 @@ pub async fn prepare_account_delegation(
         crate::delegation::MAX_EXPIRATION_PERIOD_NS,
     );
     // `max_expiration` is an *absolute* cap (e.g. the MCP session grant's
-    // expiry): a relative TTL computed by the caller before the await above
-    // could drift past it by however much time the await spans. By the same
-    // token the cap itself can already have passed once the await resolves
-    // (the caller checked it *before* awaiting) — refuse rather than sign a
-    // delegation that is already expired on arrival, which would read as
-    // success while wasting a signature-map entry on an unusable delegation.
-    // For the MCP path this is exactly the session-over signal: the grant
-    // expired mid-call.
-    if max_expiration.is_some_and(|cap| cap <= time()) {
+    // expiry), and the caller checked it before calling. Checked again here
+    // because a cap that has passed must not be signed over: a delegation that
+    // is already expired on arrival reads as success while spending a
+    // signature-map entry on something unusable. For the MCP path this is
+    // exactly the session-over signal: the grant expired mid-call.
+    if max_expiration.is_some_and(|cap| cap <= now) {
         return Err(AccountDelegationError::Unauthorized(caller()));
     }
     let expiration = u64::min(
-        time().saturating_add(session_duration_ns),
+        now.saturating_add(session_duration_ns),
         max_expiration.unwrap_or(u64::MAX),
     );
     // The metrics duration is the delegation's *effective* lifetime: the
     // absolute `max_expiration` cap can shorten it below the requested
     // `session_duration_ns` (e.g. an MCP grant near expiry). With no cap the two
     // are equal, so this matches the regular path exactly while keeping the
-    // recorded duration honest when the cap binds. `time()` is stable here (no
-    // await since it was read for `expiration`).
-    let effective_duration_ns = expiration.saturating_sub(time());
+    // recorded duration honest when the cap binds.
+    let effective_duration_ns = expiration.saturating_sub(now);
     let seed = account.calculate_seed();
+
+    // Stamped before the delegation is signed. On the IC returning `Err` commits
+    // every write that came before it, so propagating a failure from here once the
+    // signature was in the map would report an error for a delegation that has
+    // already been issued. `Ok(None)` is not a failure: it means the list holds no
+    // reference to stamp, which is how a default account that is still derived rather
+    // than stored reads.
+    storage_borrow_mut(|storage| {
+        storage.set_account_last_used(anchor_number, origin.clone(), account_number, now)
+    })
+    .map_err(|err| AccountDelegationError::InternalCanisterError(err.to_string()))?;
 
     state::signature_map_mut(|sigs| {
         add_delegation_signature(
@@ -361,11 +363,6 @@ pub async fn prepare_account_delegation(
         );
     });
     update_root_hash();
-
-    // Update last used timestamp
-    storage_borrow_mut(|storage| {
-        storage.set_account_last_used(anchor_number, origin.clone(), account_number, time());
-    });
 
     delegation_bookkeeping(origin, ii_domain.clone(), effective_duration_ns);
 
@@ -423,13 +420,15 @@ pub fn get_account_delegation(
     })
 }
 
-/// Checks whether the stored number of accounts as per the counter exceeds the maximum permitted number.
-/// If it does, it rebuilds the counter. If it still exceeds, it will return an error.
-fn check_or_rebuild_max_anchor_accounts(
-    storage: &mut Storage<DefaultMemoryImpl>,
+/// Refuses where this identity already holds as many accounts as it may.
+///
+/// Counted rather than repaired. There used to be a rebuild here for a counter that could
+/// drift, because it was maintained by hand at each write site; the write path derives it
+/// now, so there is nothing to repair and no reason to look twice.
+fn check_max_anchor_accounts(
+    storage: &Storage<DefaultMemoryImpl>,
     anchor_number: AnchorNumber,
     max_anchor_accounts: u64,
-    first_time: bool, // required for safe recursion
 ) -> Result<(), CheckMaxAccountError> {
     let AccountsCounter {
         stored_accounts,
@@ -437,18 +436,7 @@ fn check_or_rebuild_max_anchor_accounts(
     } = storage.get_account_counter(anchor_number);
 
     if stored_accounts >= max_anchor_accounts {
-        // check whether we actually have reached the number
-        if first_time {
-            storage.rebuild_identity_account_counters(anchor_number);
-            return check_or_rebuild_max_anchor_accounts(
-                storage,
-                anchor_number,
-                max_anchor_accounts,
-                false,
-            );
-        } else {
-            return Err(CheckMaxAccountError::AccountLimitReached);
-        }
+        return Err(CheckMaxAccountError::AccountLimitReached);
     }
     Ok(())
 }
@@ -796,7 +784,7 @@ fn should_update_default_account_for_origin() {
 }
 
 #[test]
-// This test is to make sure that the check_or_rebuild_max_anchor_accounts function correctly errors
+// This test is to make sure that the check_max_anchor_accounts function correctly errors
 // It should error when the counters are at or above max and argument 'first_time' is false
 fn should_fail_check_or_rebuild_when_not_first_time() {
     use crate::state::{storage_borrow_mut, storage_replace};
@@ -813,27 +801,27 @@ fn should_fail_check_or_rebuild_when_not_first_time() {
             MAX_ANCHOR_ACCOUNTS as u64,
             MAX_ANCHOR_ACCOUNTS as u64,
         );
-        let res = check_or_rebuild_max_anchor_accounts(
-            storage,
-            anchor.anchor_number(),
-            MAX_ANCHOR_ACCOUNTS as u64,
-            false,
-        );
+        let res =
+            check_max_anchor_accounts(storage, anchor.anchor_number(), MAX_ANCHOR_ACCOUNTS as u64);
         assert!(res.is_err())
     });
 }
 
 #[test]
-fn should_properly_recalculate_faulty_account_counter() {
+fn a_drifted_account_counter_is_not_repaired_and_costs_the_identity_its_limit() {
     use crate::state::{storage_borrow_mut, storage_replace};
     use crate::storage::Storage;
     use ic_stable_structures::VectorMemory;
 
     storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let anchor = storage_borrow_mut(|storage| {
+        let anchor = storage.allocate_anchor(0).unwrap();
+        storage.write(anchor.clone()).unwrap();
+        anchor
+    });
     let name = "Alice".to_string();
 
-    // create faulty counter entries
+    // A counter that says this identity is at its limit when it holds nothing.
     storage_borrow_mut(|storage| {
         storage.set_counters_for_testing(
             anchor.anchor_number(),
@@ -842,84 +830,19 @@ fn should_properly_recalculate_faulty_account_counter() {
         )
     });
 
-    for i in 0..=MAX_ANCHOR_ACCOUNTS {
-        let origin = format!("https://example-{i}.com");
-        let result =
-            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
-        if i == MAX_ANCHOR_ACCOUNTS {
-            assert_eq!(result, Err(CreateAccountError::AccountLimitReached))
-        } else {
-            assert!(result.is_ok())
-        }
-    }
-}
-
-#[test]
-fn should_properly_recalculate_faulty_account_counter_when_updating() {
-    use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
-
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
-
-    // create faulty counter entries
-    storage_borrow_mut(|storage| {
-        storage.set_counters_for_testing(
+    // There used to be a rebuild here that noticed and corrected it. The write path
+    // derives the counter now, so nothing maintains it by hand and nothing can drift it —
+    // and carrying a repair path for a state that can no longer arise is not worth the one
+    // counter of four it covered. The accepted cost, written down so it is not rediscovered
+    // as a bug: an identity whose counter ever did drift high cannot name another account.
+    assert_eq!(
+        create_account_for_origin(
             anchor.anchor_number(),
-            MAX_ANCHOR_ACCOUNTS as u64,
-            MAX_ANCHOR_ACCOUNTS as u64,
-        )
-    });
-
-    let result = update_account_for_origin(
-        anchor.anchor_number(),
-        None,
-        "https://example-1.com".to_string(),
-        AccountUpdate {
-            name: Some("Gabriel".to_string()),
-        },
+            "https://example.com".to_string(),
+            name,
+        ),
+        Err(CreateAccountError::AccountLimitReached)
     );
-    assert!(result.is_ok())
-}
-
-#[test]
-fn should_increment_discrepancy_counter() {
-    use crate::state::{storage_borrow_mut, storage_replace};
-    use crate::storage::Storage;
-    use ic_stable_structures::VectorMemory;
-
-    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
-
-    // create faulty counter entries
-    storage_borrow_mut(|storage| {
-        storage.set_counters_for_testing(
-            anchor.anchor_number(),
-            MAX_ANCHOR_ACCOUNTS as u64,
-            MAX_ANCHOR_ACCOUNTS as u64,
-        )
-    });
-
-    storage_borrow(|storage| {
-        let discrepancy_counter_before = storage.get_discrepancy_counter();
-        assert_eq!(discrepancy_counter_before.account_counter_rebuilds, 0);
-    });
-
-    let result = update_account_for_origin(
-        anchor.anchor_number(),
-        None,
-        "https://example-1.com".to_string(),
-        AccountUpdate {
-            name: Some("Gabriel".to_string()),
-        },
-    );
-    assert!(result.is_ok());
-
-    storage_borrow(|storage| {
-        let discrepancy_counter_after = storage.get_discrepancy_counter();
-        assert_eq!(discrepancy_counter_after.account_counter_rebuilds, 1);
-    });
 }
 
 #[test]

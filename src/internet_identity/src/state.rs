@@ -245,29 +245,27 @@ struct State {
     event_data_uniqueness_counter: Cell<u16>,
 }
 
-// Checks if salt is empty and calls `init_salt` to set it.
-pub async fn ensure_salt_set() {
-    let salt = storage_borrow(|storage| storage.salt().cloned());
-    if salt.is_none() {
-        init_salt().await;
+/// Gives the canister a salt where it has none, and does nothing where it already has one.
+///
+/// Deriving one needs raw randomness, so it needs an await that `init` cannot make; a
+/// zero-delay timer installed from there calls this instead.
+///
+/// A canister that already has a salt is the answer this asks for, not a fault, so it says
+/// so by returning rather than by trapping a caller who wanted exactly that.
+pub async fn set_salt_if_unset() {
+    if storage_borrow(|storage| storage.salt().is_some()) {
+        return;
     }
 
-    storage_borrow(|storage| {
-        if storage.salt().is_none() {
-            trap("Salt is not set. Try calling init_salt() to set it");
-        }
-    });
-}
-
-pub async fn init_salt() {
-    storage_borrow(|storage| {
-        if storage.salt().is_some() {
-            trap("Salt already set");
-        }
-    });
-
     let salt = random_salt().await;
-    storage_borrow_mut(|storage| storage.update_salt(salt)); // update_salt() traps if salt has already been set
+    storage_borrow_mut(|storage| {
+        // Re-checked after the await, which is where a second message can have gone all
+        // the way through. Both salts are random, so the loser discards its own rather
+        // than trapping a caller whose request was perfectly good.
+        if storage.salt().is_none() {
+            storage.update_salt(salt);
+        }
+    });
 }
 
 pub fn salt() -> [u8; 32] {
