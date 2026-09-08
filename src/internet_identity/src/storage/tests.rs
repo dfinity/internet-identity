@@ -5062,7 +5062,7 @@ mod session_record_tests {
             valid_till_ns,
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: None,
-            device_id: 1,
+            browser_id: 1,
             read_only: false,
         }
     }
@@ -5090,7 +5090,7 @@ mod session_record_tests {
                     valid_till_ns: 22,
                     max_idle_ns: 33,
                     last_refreshed_ns: Some(44),
-                    device_id: 55,
+                    browser_id: 55,
                     read_only: false,
                 },
                 SessionRecord {
@@ -5098,7 +5098,7 @@ mod session_record_tests {
                     valid_till_ns: 77,
                     max_idle_ns: 88,
                     last_refreshed_ns: None,
-                    device_id: 99,
+                    browser_id: 99,
                     read_only: true,
                 },
             ],
@@ -5242,7 +5242,7 @@ mod session_record_tests {
         // order would protect it.
         let flood: Vec<SessionRecord> = (0..500)
             .map(|index| SessionRecord {
-                device_id: index,
+                browser_id: index,
                 ..session(now - 1, now + DAY_NS)
             })
             .collect();
