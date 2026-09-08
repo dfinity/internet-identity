@@ -35,6 +35,7 @@ const makeActor = () => {
 const authorize = (
   actor: ReturnType<typeof makeActor>,
   accessLevel: "read-only" | "full-access",
+  appOrigin?: string,
 ) =>
   cliAuthorize({
     authenticated: {
@@ -42,7 +43,7 @@ const authorize = (
       actor: actor as unknown as ActorSubclass<_SERVICE>,
     } as unknown as Authenticated,
     publicKey: toBase64URL(new Uint8Array(32).fill(4)),
-    domain: undefined,
+    appOrigin,
     ttlMinutes: TTL_MINUTES,
     callback: "http://127.0.0.1:8000/callback",
     nonce: "test-nonce",
@@ -88,5 +89,29 @@ describe("cliAuthorize access-level wiring", () => {
     expect(actor.get_account_delegation.mock.calls[0][5]).toEqual([
       { all: null },
     ]);
+  });
+});
+
+describe("cliAuthorize derivation origin", () => {
+  it("derives for the app origin as given", async () => {
+    const actor = makeActor();
+    await authorize(
+      actor,
+      "full-access",
+      "http://frontend.local.localhost:8000",
+    );
+
+    expect(actor.prepare_account_delegation.mock.calls[0][1]).toBe(
+      "http://frontend.local.localhost:8000",
+    );
+  });
+
+  it("remaps a gateway origin to the legacy domain", async () => {
+    const actor = makeActor();
+    await authorize(actor, "full-access", "https://oisy.icp0.io");
+
+    expect(actor.prepare_account_delegation.mock.calls[0][1]).toBe(
+      "https://oisy.ic0.app",
+    );
   });
 });
