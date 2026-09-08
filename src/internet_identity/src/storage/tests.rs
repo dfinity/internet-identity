@@ -5376,10 +5376,10 @@ mod session_creation_tests {
     /// A browser the registry gave up takes its sessions with it, wherever they were, in
     /// the write that made room for the browser replacing it.
     ///
-    /// It used to be a loop at the caller: register the browser, write the anchor, then one
-    /// `revoke_browser_sessions` per browser dropped. That is a browser gone in one write
-    /// and its sessions ended in others — and on the IC an `Err` from a later one commits
-    /// the earlier ones, so a browser could end up gone with its sessions still live.
+    /// One write, not a loop at the caller: registering the browser, storing the anchor,
+    /// then one `revoke_browser_sessions` per browser dropped would end a browser in one
+    /// write and its sessions in others — and on the IC an `Err` from a later one commits
+    /// the earlier ones, so a browser could be left gone with its sessions still live.
     #[test]
     fn a_dropped_browser_takes_its_sessions_with_it() {
         let (mut storage, anchor_number) = storage_with_anchor();
@@ -6617,11 +6617,10 @@ mod session_revocation_tests {
 /// Everything the write path derives, checked against the account reference lists it
 /// derived them from, after an arbitrary sequence of writes.
 ///
-/// This is the check that stands where the counter repair path used to. The gate's whole
-/// job is deriving values — the counters, both principal indices, the session count — from
-/// the pair of lists a write holds, and every defect the review of this stack turned up was
-/// one of those maintained by hand and forgotten at one write site. A test per operation
-/// catches the site it names; this catches the ones nobody thought to name.
+/// The gate's whole job is deriving values — the counters, both principal indices, the
+/// session count — from the pair of lists a write holds, and a derived value that is
+/// instead maintained by hand is one forgotten write site away from drifting. A test per
+/// operation catches the site it names; this catches the ones nobody thought to name.
 mod write_path_property_tests {
     use super::params_at;
     use super::record_use;

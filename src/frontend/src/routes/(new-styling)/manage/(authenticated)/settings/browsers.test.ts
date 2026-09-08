@@ -31,8 +31,8 @@ const browser = (
 });
 
 describe("nameOf", () => {
-  /// The names these produce are the ones the client used to compose and send. Kept the
-  /// same on purpose: the change is where the wording lives, not what it says.
+  /// Pinned, because these strings are what a user reads to recognise their own browser:
+  /// a token resolving to a different word is a row they no longer know themselves by.
   it.each([
     [describing({ Chrome: null }, { Android: null }), "Chrome on Android"],
     [describing({ Safari: null }, { Ios: null }), "Safari on iPhone"],
@@ -180,8 +180,9 @@ describe("signOutBrowser", () => {
   });
 
   /// Which browser is signing out is read from the key record, not passed in: the list
-  /// renders that flag from a promise, and a click landing before it resolved used to
-  /// leave this browser's own chains behind — the one thing signing out must not do.
+  /// renders that flag from a promise, so a click landing before it resolves would pass
+  /// `false` for the user's own browser and leave its chains behind — the one thing
+  /// signing out must not do.
   it("discards this browser's stored chains, and another browser's not", async () => {
     const { storeAppSession, appSessionsForOrigin } =
       await import("$lib/stores/app-session.store");
