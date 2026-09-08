@@ -59,7 +59,7 @@
     } else {
       cliAuthorizeFunnel.init({
         mode:
-          params.kind === "valid" && params.domain !== undefined
+          params.kind === "valid" && params.appOrigin !== undefined
             ? "app"
             : "generic",
       });
@@ -107,7 +107,7 @@
   // device; otherwise it's a generic CLI sign-in with no gate.
   const isCliAccessGated = (identityNumber: bigint | undefined): boolean =>
     params.kind === "valid" &&
-    params.domain !== undefined &&
+    params.appOrigin !== undefined &&
     identityNumber !== undefined &&
     !cliAccessStore.isEnabled(identityNumber);
 
@@ -203,7 +203,7 @@
       await cliAuthorize({
         authenticated,
         publicKey: params.publicKey,
-        domain: params.domain,
+        appOrigin: params.appOrigin,
         ttlMinutes: params.ttlMinutes,
         callback: params.callback,
         nonce: params.nonce,
@@ -287,7 +287,10 @@
     </AuthPanel>
   </div>
 {:else if phase.kind === "authorize" && params.kind === "valid"}
-  <CliAuthorizeView domain={params.domain} onAuthorize={handleAuthorize} />
+  <CliAuthorizeView
+    appOrigin={params.appOrigin}
+    onAuthorize={handleAuthorize}
+  />
 {:else if phase.kind === "cli-disabled"}
   <CliErrorView />
 {:else if phase.kind === "close"}
