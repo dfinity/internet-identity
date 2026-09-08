@@ -21,6 +21,7 @@ import {
   StaleBrowserKeyError,
   withBrowserProof,
 } from "./browser-key.store";
+import type { BrowserDescription } from "$lib/generated/internet_identity_types";
 
 /// Names the same store the module under test writes to, so a test can wipe it.
 const BROWSER_KEY_STORE = createStore("ii-browser-keys", "keys");
@@ -68,16 +69,42 @@ const sessionKey = (seed: number) => new Uint8Array(62).fill(seed);
 
 const IDENTITY = BigInt(10_000);
 
+const CHROME_ON_A_MAC: BrowserDescription = {
+  brand: { Chrome: null },
+  os: { Macos: null },
+  form_factor: { Desktop: null },
+  model: [],
+};
+
+const BRAVE_ON_A_MAC: BrowserDescription = {
+  ...CHROME_ON_A_MAC,
+  brand: { Brave: null },
+};
+
 /** Signs in and rotates, the way a successful ceremony does. */
-const signIn = (identityNumber: bigint, seed: number, browserId = 1) =>
-  withBrowserProof(identityNumber, sessionKey(seed), async (proof) => {
-    await proof.accept(browserId);
-    return proof;
-  });
+const signIn = (
+  identityNumber: bigint,
+  seed: number,
+  browserId = 1,
+  description: BrowserDescription = CHROME_ON_A_MAC,
+) =>
+  withBrowserProof(
+    identityNumber,
+    sessionKey(seed),
+    description,
+    async (proof) => {
+      await proof.accept(browserId);
+      return proof;
+    },
+  );
 
 /** Signs in without accepting, the way a call that fails or never returns leaves it. */
-const attempt = (identityNumber: bigint, seed: number) =>
-  withBrowserProof(identityNumber, sessionKey(seed), (proof) =>
+const attempt = (
+  identityNumber: bigint,
+  seed: number,
+  description: BrowserDescription = CHROME_ON_A_MAC,
+) =>
+  withBrowserProof(identityNumber, sessionKey(seed), description, (proof) =>
     Promise.resolve(proof),
   );
 
@@ -175,6 +202,7 @@ describe("browser key", () => {
     const proof = await withBrowserProof(
       IDENTITY,
       sessionKey(2),
+      CHROME_ON_A_MAC,
       (attempted) => {
         seen += 1;
         if (seen === 1) {
@@ -207,6 +235,7 @@ describe("browser key", () => {
     const proof = await withBrowserProof(
       IDENTITY,
       sessionKey(1),
+      CHROME_ON_A_MAC,
       (attempted) => {
         seen += 1;
         return seen === 1
@@ -223,12 +252,45 @@ describe("browser key", () => {
     let seen = 0;
 
     await expect(
-      withBrowserProof(IDENTITY, sessionKey(1), () => {
+      withBrowserProof(IDENTITY, sessionKey(1), CHROME_ON_A_MAC, () => {
         seen += 1;
         return Promise.reject(new Error("network"));
       }),
     ).rejects.toThrow("network");
     expect(seen).toBe(1);
+  });
+
+  /// A registered entry keeps the description it was created with, so a browser that
+  /// reports something else is one the canister has not seen. Presenting a key pair no
+  /// entry holds is what registers it under its own, and it is the client that decides
+  /// so — the canister ignores the description on a sign-in that advances an entry.
+  it("signs in with a new key pair once the description changes", async () => {
+    const first = await signIn(IDENTITY, 1, 1, CHROME_ON_A_MAC);
+
+    const second = await signIn(IDENTITY, 2, 2, BRAVE_ON_A_MAC);
+
+    expect(second.publicKey).not.toEqual(first.publicKey);
+    expect(second.publicKey).not.toEqual(first.nextPublicKey);
+  });
+
+  it("keeps rotating while the description is the one it registered with", async () => {
+    const first = await signIn(IDENTITY, 1, 1, CHROME_ON_A_MAC);
+
+    const second = await signIn(IDENTITY, 2, 1, CHROME_ON_A_MAC);
+
+    expect(second.publicKey).toEqual(first.nextPublicKey);
+  });
+
+  /// The description is stored with the key pair, so the comparison is always against
+  /// what the canister was actually sent. A browser that changed twice starts over once
+  /// per change rather than once per sign-in.
+  it("settles on the new description after it has changed", async () => {
+    await signIn(IDENTITY, 1, 1, CHROME_ON_A_MAC);
+    const forked = await signIn(IDENTITY, 2, 2, BRAVE_ON_A_MAC);
+
+    const after = await signIn(IDENTITY, 3, 2, BRAVE_ON_A_MAC);
+
+    expect(after.publicKey).toEqual(forked.nextPublicKey);
   });
 
   it("holds a separate key per identity", async () => {
