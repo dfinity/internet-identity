@@ -14,7 +14,8 @@ use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, ApplicationNumber, FrontendHostname, PublicKey, Timestamp,
+    AccountNumber, AnchorNumber, ApplicationNumber, BrowserBrand, BrowserDescription, FormFactor,
+    FrontendHostname, OperatingSystem, PublicKey, Timestamp,
 };
 use internet_identity_interface::internet_identity::types::{
     ArchiveConfig, DeviceProtection, KeyType, Purpose,
@@ -79,6 +80,17 @@ pub(crate) fn browser_key(seed: u8, generation: u16) -> PublicKey {
     ByteBuf::from(key)
 }
 
+/// What the browser `seed` names reports about itself. The seed rides in `model`, the
+/// description's one free-text field, so entries stay tellable apart.
+pub(crate) fn description(seed: u8) -> BrowserDescription {
+    BrowserDescription {
+        brand: BrowserBrand::Chrome,
+        os: OperatingSystem::Macos,
+        form_factor: FormFactor::Desktop,
+        model: Some(format!("browser {seed}")),
+    }
+}
+
 /// A first sign-in from the browser `seed` names.
 pub(crate) fn params(anchor_number: AnchorNumber, seed: u8, now: u64) -> CreateSessionParams {
     params_at(anchor_number, seed, 0, now)
@@ -98,7 +110,7 @@ pub(crate) fn params_at(
         account_number: None,
         current_browser_key: browser_key(seed, generation),
         next_browser_key: browser_key(seed, generation + 1),
-        browser_name: format!("browser {seed}"),
+        browser_description: description(seed),
         valid_till_ns: now + 10_000,
         max_idle_ns: None,
         read_only: false,
