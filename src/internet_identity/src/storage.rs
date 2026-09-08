@@ -2388,11 +2388,12 @@ impl<M: Memory + Clone> Storage<M> {
     /// seed is taken from, is written where a number is minted and nowhere else, so it
     /// cannot move under a number that already exists.
     ///
-    /// The cost of that is what this no longer does. It used to derive both lists in
-    /// full, which re-asserted the entry of every account at the origin on every write
-    /// and so repaired a drifted one for free. It does not any more, and the sweep that
-    /// runs after each upgrade is the repair — see the account-principal index backfill,
-    /// whose completion is heap state and so is forgotten at every upgrade.
+    /// What this gives up is redundancy, not repair. Deriving both lists re-asserted the
+    /// entry of every account at the origin on every write, which would have papered over
+    /// a bug here — it was never fixing a drift that something else causes, and nothing
+    /// causes one: apply cannot fail, every refusal having happened before the first
+    /// store, so an entry is written with its list or neither is. Correctness rests on
+    /// this function, which is where it rests for any index.
     ///
     /// Takes the salt and origin its caller already resolved, so everything that could
     /// refuse has refused before this writes anything.
