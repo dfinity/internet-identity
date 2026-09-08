@@ -10,14 +10,14 @@
   import { originLabel } from "$lib/utils/urlUtils";
 
   interface Props {
-    /** Hostname of the app the CLI is being authorized for, or undefined for
+    /** Origin of the app the CLI is being authorized for, or undefined for
      *  generic mode (CLI signs into II itself). */
     appOrigin?: string;
   }
 
   const { appOrigin }: Props = $props();
 
-  // The CLI flow has no separate derivation origin: `--app <domain>` is both
+  // The CLI flow has no separate derivation origin: `--app <origin>` is both
   // the origin shown here and the one the linked principal is derived for, so
   // this origin is where the app's metadata is published.
   const emptyMetadataStore = readable<AppMetadata>({});
