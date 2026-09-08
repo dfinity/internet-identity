@@ -20,6 +20,10 @@ pub struct StorableBrowser {
     pub current_browser_key: Vec<u8>,
     #[cbor(n(5), with = "minicbor::bytes")]
     pub next_browser_key: Vec<u8>,
+    /// Sessions this browser holds, counted where the reference lists holding them are
+    /// written.
+    #[n(6)]
+    pub session_count: u32,
 }
 
 impl Storable for StorableBrowser {
