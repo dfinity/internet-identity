@@ -2859,7 +2859,7 @@ impl<M: Memory + Clone> Storage<M> {
             account_number,
             current_browser_key,
             next_browser_key,
-            browser_name,
+            browser_description,
             valid_till_ns,
             max_idle_ns,
             read_only,
@@ -2915,7 +2915,12 @@ impl<M: Memory + Clone> Storage<M> {
         // After the refusals above, so a ceremony that cannot happen registers nothing —
         // the record reaches storage only through the write at the end.
         let (browser_id, dropped_browsers) = anchor
-            .resolve_browser(current_browser_key, next_browser_key, browser_name, now_ns)
+            .resolve_browser(
+                current_browser_key,
+                next_browser_key,
+                browser_description,
+                now_ns,
+            )
             .map_err(StorageError::Browser)?;
 
         // The whole of what the identity holds, not just this origin: a browser the
@@ -3904,7 +3909,9 @@ pub struct CreateSessionParams {
     /// inside the write, so no caller states any of them.
     pub current_browser_key: PublicKey,
     pub next_browser_key: PublicKey,
-    pub browser_name: String,
+    /// Taken only where this sign-in registers a browser. An entry that is advanced
+    /// keeps the description it was registered with.
+    pub browser_description: BrowserDescription,
     pub valid_till_ns: Timestamp,
     pub max_idle_ns: Option<u64>,
     pub read_only: bool,
