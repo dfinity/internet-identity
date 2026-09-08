@@ -435,7 +435,11 @@ pub struct Storage<M: Memory> {
         ManagedMemory<M>,
     >,
     stable_account_counter_memory: StableCell<StorableAccountsCounter, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the application-number allocator.
+    next_application_number_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_application_number_memory: StableCell<StorableApplicationNumber, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the session-id allocator.
+    next_session_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_session_id_memory: StableCell<StorableSessionId, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
@@ -443,6 +447,8 @@ pub struct Storage<M: Memory> {
     /// Where a session lives, keyed by the principal its chain is rooted at. An app-facing
     /// call carries nothing but that principal, so this is what turns `caller()` into a
     /// session.
+    /// Memory wrapper used to report the size of the session index.
+    lookup_session_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_session_with_principal_memory:
         StableBTreeMap<Principal, StorableSessionHandle, ManagedMemory<M>>,
     /// Counter that counts how often there was a discrepancy between the anchor accounts counter and the actual number of accounts
@@ -668,12 +674,19 @@ impl<M: Memory + Clone> Storage<M> {
                 StorableAccountsCounter::default(),
             )
             .expect("stable_account_counter_memory"),
+            next_application_number_memory_wrapper: MemoryWrapper::new(
+                next_application_number_memory.clone(),
+            ),
             next_application_number_memory: StableCell::init(next_application_number_memory, 0)
                 .expect("next_application_number_memory"),
+            next_session_id_memory_wrapper: MemoryWrapper::new(next_session_id_memory.clone()),
             next_session_id_memory: StableCell::init(next_session_id_memory, 0)
                 .expect("next_session_id_memory"),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
+            ),
+            lookup_session_with_principal_memory_wrapper: MemoryWrapper::new(
+                lookup_session_with_principal_memory.clone(),
             ),
             lookup_session_with_principal_memory: StableBTreeMap::init(
                 lookup_session_with_principal_memory,
@@ -3811,6 +3824,18 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "lookup_account_with_principal".to_string(),
                 self.lookup_account_with_principal_memory_wrapper.size(),
+            ),
+            (
+                "next_application_number".to_string(),
+                self.next_application_number_memory_wrapper.size(),
+            ),
+            (
+                "lookup_session_with_principal".to_string(),
+                self.lookup_session_with_principal_memory_wrapper.size(),
+            ),
+            (
+                "next_session_id".to_string(),
+                self.next_session_id_memory_wrapper.size(),
             ),
             (
                 "stable_anchor_application_config".to_string(),
