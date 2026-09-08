@@ -5283,10 +5283,10 @@ mod session_creation_tests {
     /// A browser the registry gave up takes its sessions with it, wherever they were, in
     /// the write that made room for the browser replacing it.
     ///
-    /// It used to be a loop at the caller: register the browser, write the anchor, then one
-    /// `revoke_browser_sessions` per browser dropped. That is a browser gone in one write
-    /// and its sessions ended in others — and on the IC an `Err` from a later one commits
-    /// the earlier ones, so a browser could end up gone with its sessions still live.
+    /// One write, not a loop at the caller: registering the browser, storing the anchor,
+    /// then one `revoke_browser_sessions` per browser dropped would end a browser in one
+    /// write and its sessions in others — and on the IC an `Err` from a later one commits
+    /// the earlier ones, so a browser could be left gone with its sessions still live.
     #[test]
     fn a_dropped_browser_takes_its_sessions_with_it() {
         let (mut storage, anchor_number) = storage_with_anchor();
