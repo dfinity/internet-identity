@@ -1006,12 +1006,42 @@ type IdentityAuthnInfo = record {
     recovery_authn_methods : vec AuthnMethod;
 };
 
-// A browser an anchor has signed in from. The name is self-reported by the
-// client, so it is a label for the user rather than evidence about where a
-// session came from.
+// Which browser a sign-in came from, as a token rather than a name to show. Products
+// get renamed — "Chrome OS" became "ChromeOS", "Mac OS X" became "macOS" — so the name
+// the user reads is derived in the frontend, where a rename reaches every stored record
+// at once. "Brand" is what the client hints call this, and BrowserInfo below is the
+// entry it describes.
+type BrowserBrand = variant {
+    Chrome; Safari; Firefox; Edge; Opera; SamsungInternet; Vivaldi; Brave;
+    // A browser this list does not name, shown as the client resolved it. Worth seeing
+    // rather than hiding behind a generic label.
+    Other : text;
+};
+
+type OperatingSystem = variant {
+    Macos; Ios; Ipados; Windows; Android; ChromeOs; Linux; Other : text;
+};
+
+// Reported where the client can state it and inferred where it cannot, so unknown is a
+// real answer: the browsers exposing no client hints are the ones this is least sure of.
+type FormFactor = variant { Desktop; Mobile; Tablet; Unknown };
+
+// What a browser reported about itself when it registered. Self-reported, so it is
+// something the user reads to recognise their own browser rather than evidence about
+// where a session came from. The canister stores these and never interprets them.
+type BrowserDescription = record {
+    brand : BrowserBrand;
+    os : OperatingSystem;
+    form_factor : FormFactor;
+    // The hardware, where the client can name it — Android is the only place that does.
+    model : opt text;
+};
+
 type BrowserInfo = record {
     id : nat32;
-    name : text;
+    // Fixed at registration. A sign-in reporting something else registers its own entry,
+    // so this describes a registration rather than the last sign-in.
+    description : BrowserDescription;
     created_at : Timestamp;
     // Advanced by a sign-in from this browser and by every session refresh it drives.
     last_used : Timestamp;
