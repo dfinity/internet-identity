@@ -3,18 +3,69 @@ import { purgeAppSessions } from "$lib/stores/app-session.store";
 import { currentBrowserId } from "$lib/stores/browser-key.store";
 import type {
   _SERVICE,
+  BrowserBrand,
+  BrowserDescription,
   BrowserInfo,
+  OperatingSystem,
 } from "$lib/generated/internet_identity_types";
 import { nanosToMillis } from "$lib/utils/time";
 
 export interface Browser {
   id: number;
+  /** Derived here rather than stored, so renaming a product renames every row at once. */
   name: string;
   createdAtMillis: number;
   lastUsedMillis: number;
   /** Several browsers report the same name, so the list marks the one being read from. */
   isCurrent: boolean;
 }
+
+const BRAND_NAMES: Record<string, string> = {
+  Chrome: "Chrome",
+  Safari: "Safari",
+  Firefox: "Firefox",
+  Edge: "Edge",
+  Opera: "Opera",
+  SamsungInternet: "Samsung Internet",
+  Vivaldi: "Vivaldi",
+  Brave: "Brave",
+};
+
+/**
+ * What the owner calls the thing, which is not the system's own name: nobody says they
+ * are on "Chrome OS" or "iPadOS".
+ */
+const PLATFORM_WORDS: Record<string, string> = {
+  Macos: "Mac",
+  Ios: "iPhone",
+  Ipados: "iPad",
+  Windows: "Windows",
+  Android: "Android",
+  ChromeOs: "Chromebook",
+  Linux: "Linux",
+};
+
+/** The token a variant carries where it names one, and its tag where it does not. */
+const named = (
+  variant: BrowserBrand | OperatingSystem,
+  names: Record<string, string>,
+): string => {
+  const [tag, value] = Object.entries(variant)[0];
+  return tag === "Other" ? String(value) : (names[tag] ?? tag);
+};
+
+/**
+ * How a browser is named in the list.
+ *
+ * The hardware wins where the client could name it, because "Chrome on Pixel 9" is what
+ * its owner recognises; the platform word stands in everywhere else. An unrecognised
+ * token is shown as it arrived rather than as a generic fallback — a browser the user
+ * does not recognise is the row this list exists for.
+ */
+export const nameOf = (description: BrowserDescription): string =>
+  `${named(description.brand, BRAND_NAMES)} on ${
+    description.model[0] ?? named(description.os, PLATFORM_WORDS)
+  }`;
 
 export const fromCanisterBrowsers = (
   browsers: [] | [BrowserInfo[]],
@@ -23,7 +74,7 @@ export const fromCanisterBrowsers = (
   (browsers[0] ?? [])
     .map((browser) => ({
       id: browser.id,
-      name: browser.name,
+      name: nameOf(browser.description),
       createdAtMillis: nanosToMillis(browser.created_at),
       lastUsedMillis: nanosToMillis(browser.last_used),
       isCurrent: browser.id === currentBrowserId,
