@@ -474,3 +474,53 @@ test("`--app` on a gateway domain links the same principal as its *.ic0.app doma
     rootPublicKey(cli.receivedDelegations[0]),
   );
 });
+
+test("`--app` on an http origin links a different principal than its https form", async ({
+  page,
+  cli,
+  isMobile,
+}) => {
+  // One identity, with device CLI access enabled so app mode isn't gated.
+  await addVirtualAuthenticator(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await enableCliAccessInSettings(page, isMobile);
+
+  // `--app http://frontend.local.localhost:8000`: a local app on http and a
+  // non-default port, used as the derivation origin as-is. The scheme and port
+  // reach the authorize screen rather than the invalid-request one.
+  await page.goto(
+    await cli.resolveAuthorizeUrl(page, {
+      domain: "http://frontend.local.localhost:8000",
+    }),
+  );
+  await expect(
+    page.getByRole("heading", { name: "Allow CLI access" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Allow access" }).click();
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toBeVisible();
+
+  // The same host and port without a scheme, which defaults to https — a
+  // different origin, so a different principal. Navigate off /cli first so the
+  // second visit is a full load (a fragment-only change wouldn't re-run `load`).
+  await page.goto(II_URL);
+  await page.goto(
+    await cli.resolveAuthorizeUrl(page, {
+      domain: "frontend.local.localhost:8000",
+    }),
+  );
+  await page.getByRole("button", { name: "Allow access" }).click();
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toBeVisible();
+
+  // http and https on the same host and port are distinct origins ⇒ distinct
+  // root principals. Neither spelling may be normalised into the other.
+  expect(cli.receivedDelegations.length).toBe(2);
+  expect(rootPublicKey(cli.receivedDelegations[1])).not.toBe(
+    rootPublicKey(cli.receivedDelegations[0]),
+  );
+});
