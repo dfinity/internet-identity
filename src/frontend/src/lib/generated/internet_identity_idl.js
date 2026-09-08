@@ -762,7 +762,7 @@ export const idlFactory = ({ IDL }) => {
     'valid_for' : IDL.Opt(IDL.Nat64),
     'origin' : FrontendHostname,
     'current_browser_key_signature' : IDL.Vec(IDL.Nat8),
-    'browser_name' : IDL.Text,
+    'browser_description' : BrowserDescription,
     'account_number' : IDL.Opt(AccountNumber),
     'identity_number' : UserNumber,
     'next_browser_key' : PublicKey,
