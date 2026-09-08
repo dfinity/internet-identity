@@ -50,6 +50,6 @@
   />
   <BrowsersSection
     identityNumber={$authenticatedStore.identityNumber}
-    browsers={browsers}
+    {browsers}
   />
 </div>
