@@ -884,6 +884,8 @@ fn should_report_registration_rates() -> Result<(), RejectResponse> {
 fn should_report_total_account_metrics() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
+    // A deployment sets the salt once; account principals cannot be derived without it.
+    api::init_salt(&env, canister_id)?;
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
     let name = "Callisto".to_string();
