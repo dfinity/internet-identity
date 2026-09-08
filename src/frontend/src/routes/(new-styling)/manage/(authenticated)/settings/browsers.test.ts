@@ -2,21 +2,68 @@ import { describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import {
-  fromCanisterBrowsers,
-  signOutBrowser,
-} from "./browsers";
+import { fromCanisterBrowsers, nameOf, signOutBrowser } from "./browsers";
+import type {
+  BrowserBrand,
+  BrowserDescription,
+  OperatingSystem,
+} from "$lib/generated/internet_identity_types";
+
+const describing = (
+  brand: BrowserBrand,
+  os: OperatingSystem,
+  model: [] | [string] = [],
+): BrowserDescription => ({ brand, os, form_factor: { Desktop: null }, model });
+
+const CHROME_ON_A_MAC = describing({ Chrome: null }, { Macos: null });
 
 const browser = (
   id: number,
-  name: string,
   createdAtNanos: bigint,
   lastUsedNanos: bigint = createdAtNanos,
+  description: BrowserDescription = CHROME_ON_A_MAC,
 ) => ({
   id,
-  name,
+  description,
+  session_count: 0,
   created_at: createdAtNanos,
   last_used: lastUsedNanos,
+});
+
+describe("nameOf", () => {
+  /// The names these produce are the ones the client used to compose and send. Kept the
+  /// same on purpose: the change is where the wording lives, not what it says.
+  it.each([
+    [describing({ Chrome: null }, { Android: null }), "Chrome on Android"],
+    [describing({ Safari: null }, { Ios: null }), "Safari on iPhone"],
+    [describing({ Safari: null }, { Ipados: null }), "Safari on iPad"],
+    [describing({ Safari: null }, { Macos: null }), "Safari on Mac"],
+    [describing({ Edge: null }, { Windows: null }), "Edge on Windows"],
+    [describing({ Vivaldi: null }, { Linux: null }), "Vivaldi on Linux"],
+    [describing({ Chrome: null }, { ChromeOs: null }), "Chrome on Chromebook"],
+    [
+      describing({ SamsungInternet: null }, { Android: null }),
+      "Samsung Internet on Android",
+    ],
+    [describing({ Brave: null }, { Macos: null }), "Brave on Mac"],
+  ])("names %o as %s", (description, expected) => {
+    expect(nameOf(description)).toBe(expected);
+  });
+
+  /// What the owner recognises. The platform word only stands in where no model came.
+  it("names the hardware where the client could name it", () => {
+    expect(
+      nameOf(describing({ Chrome: null }, { Android: null }, ["Pixel 9"])),
+    ).toBe("Chrome on Pixel 9");
+  });
+
+  /// A browser or system this frontend does not name is the row the list exists for, so
+  /// it shows the token that arrived rather than a generic word.
+  it("shows an unrecognised token as it arrived", () => {
+    expect(
+      nameOf(describing({ Other: "YaBrowser" }, { Other: "HarmonyOS" })),
+    ).toBe("YaBrowser on HarmonyOS");
+  });
 });
 
 describe("fromCanisterBrowsers", () => {
@@ -28,39 +75,36 @@ describe("fromCanisterBrowsers", () => {
     expect(
       fromCanisterBrowsers([
         [
-          browser(1, "Firefox on Linux", BigInt(1_000_000_000)),
-          browser(2, "Chrome on macOS", BigInt(3_000_000_000)),
-          browser(3, "Safari on iOS", BigInt(2_000_000_000)),
+          browser(1, BigInt(1_000_000_000)),
+          browser(2, BigInt(3_000_000_000)),
+          browser(3, BigInt(2_000_000_000)),
         ],
-      ]).map((entry) => entry.name),
-    ).toEqual(["Chrome on macOS", "Safari on iOS", "Firefox on Linux"]);
+      ]).map((entry) => entry.id),
+    ).toEqual([2, 3, 1]);
   });
 
   it("orders on use rather than on registration", () => {
     expect(
       fromCanisterBrowsers([
         [
-          browser(
-            1,
-            "enrolled first, still in use",
-            BigInt(1),
-            BigInt(9_000_000_000),
-          ),
-          browser(2, "enrolled later, gone quiet", BigInt(5_000_000_000)),
+          // Registered first and still in use.
+          browser(1, BigInt(1), BigInt(9_000_000_000)),
+          // Registered later and gone quiet since.
+          browser(2, BigInt(5_000_000_000)),
         ],
-      ]).map((entry) => entry.name),
-    ).toEqual(["enrolled first, still in use", "enrolled later, gone quiet"]);
+      ]).map((entry) => entry.id),
+    ).toEqual([1, 2]);
   });
 
   it("converts both timestamps to milliseconds", () => {
     expect(
       fromCanisterBrowsers([
-        [browser(1, "Chrome", BigInt(1_500_000_000), BigInt(4_200_000_000))],
+        [browser(1, BigInt(1_500_000_000), BigInt(4_200_000_000))],
       ]),
     ).toEqual([
       {
         id: 1,
-        name: "Chrome",
+        name: "Chrome on Mac",
         createdAtMillis: 1_500,
         lastUsedMillis: 4_200,
         isCurrent: false,
@@ -70,12 +114,7 @@ describe("fromCanisterBrowsers", () => {
 
   it("marks the browser being read from, so two of one name can be told apart", () => {
     const marked = fromCanisterBrowsers(
-      [
-        [
-          browser(1, "Chrome on Mac", BigInt(1_000_000_000)),
-          browser(2, "Chrome on Mac", BigInt(2_000_000_000)),
-        ],
-      ],
+      [[browser(1, BigInt(1_000_000_000)), browser(2, BigInt(2_000_000_000))]],
       2,
     );
 
@@ -87,19 +126,18 @@ describe("fromCanisterBrowsers", () => {
 
   it("marks nothing when this browser has never created a session", () => {
     expect(
-      fromCanisterBrowsers([
-        [browser(1, "Chrome on Mac", BigInt(1_000_000_000))],
-      ]).some((entry) => entry.isCurrent),
+      fromCanisterBrowsers([[browser(1, BigInt(1_000_000_000))]]).some(
+        (entry) => entry.isCurrent,
+      ),
     ).toBe(false);
   });
 
   /// An id from another browser's record must not mark an entry here.
   it("marks nothing when the id is one this identity does not hold", () => {
     expect(
-      fromCanisterBrowsers(
-        [[browser(1, "Chrome on Mac", BigInt(1_000_000_000))]],
-        99,
-      ).some((entry) => entry.isCurrent),
+      fromCanisterBrowsers([[browser(1, BigInt(1_000_000_000))]], 99).some(
+        (entry) => entry.isCurrent,
+      ),
     ).toBe(false);
   });
 });
@@ -125,9 +163,9 @@ describe("signOutBrowser", () => {
         Promise.resolve({ Err: { InternalCanisterError: "boom" } }),
     } as unknown as ActorSubclass<_SERVICE>;
 
-    await expect(
-      signOutBrowser(actor, BigInt(10_000), 3),
-    ).rejects.toThrow("boom");
+    await expect(signOutBrowser(actor, BigInt(10_000), 3)).rejects.toThrow(
+      "boom",
+    );
   });
 
   it("surfaces an unauthorized refusal", async () => {
@@ -136,9 +174,9 @@ describe("signOutBrowser", () => {
         Promise.resolve({ Err: { Unauthorized: "2vxsx-fae" } }),
     } as unknown as ActorSubclass<_SERVICE>;
 
-    await expect(
-      signOutBrowser(actor, BigInt(10_000), 3),
-    ).rejects.toThrow(/Not authorized/);
+    await expect(signOutBrowser(actor, BigInt(10_000), 3)).rejects.toThrow(
+      /Not authorized/,
+    );
   });
 
   /// Which browser is signing out is read from the key record, not passed in: the list

@@ -11,8 +11,9 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::{
     AccountSessionError, AppGetDelegationRequest, AppPrepareDelegationRequest, AppSessionError,
-    BrowserInfo, GetAccountSessionRequest, Permissions, PrepareAccountSessionRequest,
-    PrepareAccountSessionResponse, RevokeBrowserSessionsRequest,
+    BrowserBrand, BrowserDescription, BrowserInfo, FormFactor, GetAccountSessionRequest,
+    OperatingSystem, Permissions, PrepareAccountSessionRequest, PrepareAccountSessionResponse,
+    RevokeBrowserSessionsRequest,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -21,6 +22,24 @@ use std::time::Duration;
 
 const ORIGIN: &str = "https://some-dapp.com";
 const APP_DELEGATION_TTL_NS: u64 = 5 * 60 * 1_000_000_000;
+
+fn chrome_on_a_mac() -> BrowserDescription {
+    BrowserDescription {
+        brand: BrowserBrand::Chrome,
+        os: OperatingSystem::Macos,
+        form_factor: FormFactor::Desktop,
+        model: None,
+    }
+}
+
+fn firefox_on_linux() -> BrowserDescription {
+    BrowserDescription {
+        brand: BrowserBrand::Firefox,
+        os: OperatingSystem::Linux,
+        form_factor: FormFactor::Desktop,
+        model: None,
+    }
+}
 
 fn session_request(identity_number: u64) -> PrepareAccountSessionRequest {
     session_request_from(identity_number, &BrowserKey::new(1))
@@ -38,7 +57,7 @@ fn session_request_from(
         identity_number,
         origin: ORIGIN.to_string(),
         account_number: None,
-        browser_name: "Chrome on MacBook".to_string(),
+        browser_description: chrome_on_a_mac(),
         current_browser_key: browser.public_key(),
         current_browser_key_signature: browser.sign(&session_key, &next_browser_key),
         next_browser_key_signature: browser
@@ -418,7 +437,7 @@ fn should_end_the_sessions_of_a_browser_the_registry_dropped() -> Result<(), Rej
 
     for index in 0..MAX_BROWSERS {
         let mut request = session_request_from(identity_number, &BrowserKey::new(index as u8 + 2));
-        request.browser_name = format!("browser-{index}");
+        request.browser_description.model = Some(format!("browser-{index}"));
         request.origin = format!("https://dapp-{index}.com");
         prepare_account_session(&env, canister_id, principal_1(), request)?.unwrap();
     }
@@ -607,7 +626,7 @@ fn should_leave_another_browsers_session_alone() -> Result<(), RejectResponse> {
     let (first, first_principal) = create_session(&env, canister_id, identity_number);
 
     let mut second_request = session_request_from(identity_number, &BrowserKey::new(2));
-    second_request.browser_name = "Firefox on Linux".to_string();
+    second_request.browser_description = firefox_on_linux();
     let second =
         prepare_account_session(&env, canister_id, principal_1(), second_request)?.unwrap();
     let second_principal = Principal::self_authenticating(&second.user_key);
@@ -653,7 +672,7 @@ fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
     let second_principal = Principal::self_authenticating(&second_app.user_key);
 
     let mut other_browser = session_request_from(identity_number, &BrowserKey::new(2));
-    other_browser.browser_name = "Firefox on Linux".to_string();
+    other_browser.browser_description = firefox_on_linux();
     let untouched =
         prepare_account_session(&env, canister_id, principal_1(), other_browser)?.unwrap();
     let untouched_principal = Principal::self_authenticating(&untouched.user_key);
@@ -664,7 +683,7 @@ fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
         .browsers
         .unwrap()
         .into_iter()
-        .find(|device| device.name == "Chrome on MacBook")
+        .find(|browser| browser.description == chrome_on_a_mac())
         .expect("the browser that signed in should be listed")
         .id;
 
@@ -953,7 +972,7 @@ fn should_register_a_second_browser_for_a_key_it_has_not_seen() -> Result<(), Re
     .unwrap();
 
     let mut second = session_request_from(identity_number, &BrowserKey::new(2));
-    second.browser_name = "Firefox on Linux".to_string();
+    second.browser_description = firefox_on_linux();
     prepare_account_session(&env, canister_id, principal_1(), second)?.unwrap();
 
     let devices = identity_info(&env, canister_id, principal_1(), identity_number)?
@@ -962,8 +981,8 @@ fn should_register_a_second_browser_for_a_key_it_has_not_seen() -> Result<(), Re
         .expect("the identity should hold browsers");
 
     assert_eq!(devices.len(), 2);
-    assert_eq!(devices[0].name, "Chrome on MacBook");
-    assert_eq!(devices[1].name, "Firefox on Linux");
+    assert_eq!(devices[0].description, chrome_on_a_mac());
+    assert_eq!(devices[1].description, firefox_on_linux());
     assert_ne!(devices[0].id, devices[1].id);
 
     Ok(())

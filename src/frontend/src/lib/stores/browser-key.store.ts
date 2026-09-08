@@ -1,4 +1,5 @@
 import { createStore, get as idbGet, set as idbSet } from "idb-keyval";
+import type { BrowserDescription } from "$lib/generated/internet_identity_types";
 
 /**
  * The key this browser proves itself with when it creates a session, and the id the
@@ -18,6 +19,10 @@ interface BrowserKeyRecord {
   announced?: CryptoKeyPair;
   /** Absent until a sign-in has told us which browser we are. */
   browserId?: number;
+  /** What was reported when this browser registered, so a change can be noticed.
+   *  Written with the key pair and never on its own: compared against what the canister
+   *  stored, it has to be what we actually sent when the entry was created. */
+  description?: BrowserDescription;
 }
 
 /**
@@ -125,6 +130,47 @@ const exclusively = async <T>(
   return await locks.request(`ii-browser-key:${identityNumber}`, run);
 };
 
+/** The variant's tag and its payload, which is all a description is made of. */
+const token = (variant: object): string => Object.entries(variant)[0].join(":");
+
+const sameDescription = (
+  one: BrowserDescription,
+  other: BrowserDescription,
+): boolean =>
+  token(one.brand) === token(other.brand) &&
+  token(one.os) === token(other.os) &&
+  token(one.form_factor) === token(other.form_factor) &&
+  (one.model[0] ?? "") === (other.model[0] ?? "");
+
+/**
+ * The record to sign in with, which is a fresh one where this browser no longer matches
+ * what it registered as.
+ *
+ * A registered entry keeps the description it was created with, so a browser reporting
+ * something else is one the canister has not seen. Rather than ask for an entry to be
+ * changed, this presents a key pair no entry holds, which registers under its own — and
+ * because nothing has been sent yet, a browser that gets this far has not disturbed the
+ * entry it is leaving behind.
+ */
+const forDescription = async (
+  identityNumber: bigint,
+  description: BrowserDescription,
+): Promise<BrowserKeyRecord | undefined> => {
+  const stored = await read(identityNumber);
+  if (
+    stored?.description === undefined ||
+    sameDescription(stored.description, description)
+  ) {
+    return stored;
+  }
+  const fresh: BrowserKeyRecord = {
+    keyPair: await generate(),
+    announced: await generate(),
+  };
+  await write(identityNumber, fresh);
+  return fresh;
+};
+
 /** The record a sign-in proves with: what is stored, completed with whatever it lacks. */
 const prepared = async (
   identityNumber: bigint,
@@ -147,6 +193,7 @@ const prepared = async (
 const attempt = async <T>(
   identityNumber: bigint,
   sessionKey: Uint8Array,
+  description: BrowserDescription,
   signIn: (proof: BrowserProof) => Promise<T>,
   from?: BrowserKeyRecord,
 ): Promise<T> => {
@@ -176,7 +223,7 @@ const attempt = async <T>(
     signature,
     nextSignature,
     accept: (browserId) =>
-      write(identityNumber, { keyPair: successor, browserId }),
+      write(identityNumber, { keyPair: successor, browserId, description }),
   });
 };
 
@@ -195,11 +242,19 @@ const attempt = async <T>(
 export const withBrowserProof = <T>(
   identityNumber: bigint,
   sessionKey: Uint8Array,
+  description: BrowserDescription,
   signIn: (proof: BrowserProof) => Promise<T>,
 ): Promise<T> =>
   exclusively(identityNumber, async () => {
+    const from = await forDescription(identityNumber, description);
     try {
-      return await attempt(identityNumber, sessionKey, signIn);
+      return await attempt(
+        identityNumber,
+        sessionKey,
+        description,
+        signIn,
+        from,
+      );
     } catch (error) {
       if (!(error instanceof StaleBrowserKeyError)) {
         throw error;
@@ -215,7 +270,13 @@ export const withBrowserProof = <T>(
       // Carried into the retry rather than read back, so a storage failure costs the
       // rotation and not the sign-in.
       await write(identityNumber, promoted);
-      return await attempt(identityNumber, sessionKey, signIn, promoted);
+      return await attempt(
+        identityNumber,
+        sessionKey,
+        description,
+        signIn,
+        promoted,
+      );
     }
   });
 
