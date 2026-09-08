@@ -593,10 +593,43 @@ export const idlFactory = ({ IDL }) => {
     'address' : IDL.Text,
     'last_used' : IDL.Opt(Timestamp),
   });
+  const OperatingSystem = IDL.Variant({
+    'Ios' : IDL.Null,
+    'Linux' : IDL.Null,
+    'Android' : IDL.Null,
+    'Macos' : IDL.Null,
+    'ChromeOs' : IDL.Null,
+    'Windows' : IDL.Null,
+    'Other' : IDL.Text,
+    'Ipados' : IDL.Null,
+  });
+  const FormFactor = IDL.Variant({
+    'Unknown' : IDL.Null,
+    'Tablet' : IDL.Null,
+    'Desktop' : IDL.Null,
+    'Mobile' : IDL.Null,
+  });
+  const BrowserBrand = IDL.Variant({
+    'Vivaldi' : IDL.Null,
+    'Edge' : IDL.Null,
+    'Firefox' : IDL.Null,
+    'Brave' : IDL.Null,
+    'Safari' : IDL.Null,
+    'SamsungInternet' : IDL.Null,
+    'Opera' : IDL.Null,
+    'Other' : IDL.Text,
+    'Chrome' : IDL.Null,
+  });
+  const BrowserDescription = IDL.Record({
+    'os' : OperatingSystem,
+    'model' : IDL.Opt(IDL.Text),
+    'form_factor' : FormFactor,
+    'brand' : BrowserBrand,
+  });
   const BrowserInfo = IDL.Record({
     'id' : IDL.Nat32,
     'session_count' : IDL.Nat32,
-    'name' : IDL.Text,
+    'description' : BrowserDescription,
     'created_at' : Timestamp,
     'last_used' : Timestamp,
   });
