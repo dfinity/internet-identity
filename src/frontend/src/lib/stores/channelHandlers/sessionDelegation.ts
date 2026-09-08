@@ -241,11 +241,12 @@ const createSession = async (
   const key = { identityNumber, accountNumber, origin: effectiveOrigin };
   const iiKey = await ECDSAKeyIdentity.generate({ extractable: false });
   const iiPublicKey = new Uint8Array(iiKey.getPublicKey().toDer());
-  const browserName = await describeBrowser();
+  const browserDescription = await describeBrowser();
 
   const prepared = await withBrowserProof(
     identityNumber,
     iiPublicKey,
+    browserDescription,
     async (browser) => {
       const prepared = await actor
         .prepare_account_session({
@@ -253,7 +254,7 @@ const createSession = async (
           origin: effectiveOrigin,
           account_number: accountNumber !== undefined ? [accountNumber] : [],
           session_key: iiPublicKey,
-          browser_name: browserName,
+          browser_description: browserDescription,
           current_browser_key: browser.publicKey,
           next_browser_key: browser.nextPublicKey,
           current_browser_key_signature: browser.signature,
