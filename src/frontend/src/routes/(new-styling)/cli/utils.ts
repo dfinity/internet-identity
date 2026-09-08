@@ -17,9 +17,9 @@ interface CliAuthorizeInput {
   authenticated: Authenticated;
   /** base64url-encoded DER session pubkey supplied by the CLI. */
   publicKey: string;
-  /** Delegation domain to get an identity for, or undefined for generic mode
+  /** Origin of the app to get an identity for, or undefined for generic mode
    *  (the auth page's own default, e.g. cli.id.ai). */
-  domain?: string;
+  appOrigin?: string;
   /** Lifetime in minutes. */
   ttlMinutes: number;
   /** Loopback URL the delegation chain is form-POSTed to. */
@@ -32,13 +32,13 @@ interface CliAuthorizeInput {
   accessLevel: AccessLevel;
 }
 
-const derivationOrigin = (domain: string | undefined): string =>
-  // Remap an app domain on a gateway (*.icp0.io / *.icp.net) to *.ic0.app so
+const derivationOrigin = (appOrigin: string | undefined): string =>
+  // Remap an app origin on a gateway (*.icp0.io / *.icp.net) to *.ic0.app so
   // the principal matches the one /authorize derives for the same app. The
   // generic origin is II's own and is never a gateway domain, so it's left be.
-  domain === undefined
+  appOrigin === undefined
     ? CLI_GENERIC_DERIVATION_ORIGIN
-    : remapToLegacyDomain(`https://${domain}`);
+    : remapToLegacyDomain(appOrigin);
 
 /**
  * Builds a two-hop delegation chain rooted at the user's identity and ending
@@ -58,14 +58,14 @@ const derivationOrigin = (domain: string | undefined): string =>
 export const cliAuthorize = async ({
   authenticated,
   publicKey,
-  domain,
+  appOrigin,
   ttlMinutes,
   callback,
   nonce,
   accessLevel,
 }: CliAuthorizeInput): Promise<void> => {
   const { identityNumber, actor } = authenticated;
-  const effectiveOrigin = derivationOrigin(domain);
+  const effectiveOrigin = derivationOrigin(appOrigin);
   const maxTimeToLiveNanos = BigInt(ttlMinutes) * BigInt(60) * BigInt(1e9);
 
   const ephemeralIdentity = await ECDSAKeyIdentity.generate({
