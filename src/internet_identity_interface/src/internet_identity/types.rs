@@ -837,7 +837,7 @@ pub struct PrepareAccountSessionRequest {
     pub account_number: Option<AccountNumber>,
     pub session_key: SessionKey,
     /// Labels the browser in the user's session list, e.g. "Chrome on MacBook".
-    pub browser_name: String,
+    pub browser_description: BrowserDescription,
     /// The browser's own public key, DER-encoded, as the registry currently holds it. A
     /// key this anchor has not seen registers a browser under it.
     pub current_browser_key: PublicKey,
