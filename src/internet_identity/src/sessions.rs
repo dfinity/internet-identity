@@ -21,9 +21,10 @@ use ic_cdk::caller;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountSessionError, AnchorNumber, AppGetDelegationRequest,
-    AppPrepareDelegationRequest, AppPrepareDelegationResponse, AppSessionError, Delegation,
-    FrontendHostname, GetAccountSessionRequest, GetAccountSessionResponse,
-    PrepareAccountSessionRequest, PrepareAccountSessionResponse, SignedDelegation, Timestamp,
+    AppPrepareDelegationRequest, AppPrepareDelegationResponse, AppSessionError, BrowserBrand,
+    BrowserDescription, Delegation, FrontendHostname, GetAccountSessionRequest,
+    GetAccountSessionResponse, OperatingSystem, PrepareAccountSessionRequest,
+    PrepareAccountSessionResponse, SignedDelegation, Timestamp,
 };
 use serde_bytes::ByteBuf;
 
@@ -31,8 +32,27 @@ pub const DEFAULT_SESSION_TTL_NS: u64 = 30 * DAY_NS;
 pub const MAX_SESSION_TTL_NS: u64 = 30 * DAY_NS;
 const MIN_SESSION_TTL_NS: u64 = 10 * MINUTE_NS;
 
-/// The browser name is a label the user reads, never anything the canister acts on.
-const MAX_BROWSER_NAME_BYTES: usize = 128;
+/// A bound on each token a browser reports about itself. Refused rather than truncated:
+/// a client sending something this long is sending something wrong, and a cut-off token
+/// would put a value in the record that no parser ever produced.
+const MAX_BROWSER_TOKEN_BYTES: usize = 64;
+
+/// Whether every token in a description is short enough to store.
+///
+/// Only the tokens a client writes itself can be too long. The named variants carry no
+/// text, so a description of nothing but those is within the limit whatever it says.
+fn browser_description_within_limits(description: &BrowserDescription) -> bool {
+    let within = |token: &str| token.len() <= MAX_BROWSER_TOKEN_BYTES;
+    let brand = match &description.brand {
+        BrowserBrand::Other(token) => within(token),
+        _ => true,
+    };
+    let os = match &description.os {
+        OperatingSystem::Other(token) => within(token),
+        _ => true,
+    };
+    brand && os && description.model.as_deref().is_none_or(within)
+}
 
 impl From<AuthorizationError> for AccountSessionError {
     fn from(err: AuthorizationError) -> Self {
@@ -70,7 +90,7 @@ pub fn prepare_account_session(
         origin,
         account_number,
         session_key,
-        browser_name,
+        browser_description,
         current_browser_key,
         next_browser_key,
         current_browser_key_signature,
@@ -82,9 +102,9 @@ pub fn prepare_account_session(
 
     check_authz_and_record_activity(identity_number)?;
     check_frontend_length(&origin);
-    if browser_name.len() > MAX_BROWSER_NAME_BYTES {
+    if !browser_description_within_limits(&browser_description) {
         return Err(AccountSessionError::InternalCanisterError(
-            "browser name exceeds the limit".to_string(),
+            "browser description exceeds the limit".to_string(),
         ));
     }
     if !verify_browser_keys(
@@ -132,7 +152,7 @@ pub fn prepare_account_session(
             account_number,
             current_browser_key,
             next_browser_key,
-            browser_name,
+            browser_description,
             valid_till_ns: valid_till,
             max_idle_ns: max_idle,
             read_only,
@@ -399,4 +419,66 @@ fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {
         AppSessionError::InternalCanisterError(StorageError::SaltNotSet.to_string())
     })?;
     Ok(account.calculate_seed_with_salt(&salt))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use internet_identity_interface::internet_identity::types::FormFactor;
+
+    fn description(
+        brand: BrowserBrand,
+        os: OperatingSystem,
+        model: Option<&str>,
+    ) -> BrowserDescription {
+        BrowserDescription {
+            brand,
+            os,
+            form_factor: FormFactor::Desktop,
+            model: model.map(str::to_string),
+        }
+    }
+
+    /// The named variants carry no text of their own, so nothing about them can be too
+    /// long however many of them there are.
+    #[test]
+    fn a_description_of_named_tokens_is_always_within_the_limit() {
+        assert!(browser_description_within_limits(&description(
+            BrowserBrand::Brave,
+            OperatingSystem::Ipados,
+            None
+        )));
+    }
+
+    #[test]
+    fn each_token_a_client_writes_is_bounded() {
+        let long = "x".repeat(MAX_BROWSER_TOKEN_BYTES + 1);
+        let at_limit = "x".repeat(MAX_BROWSER_TOKEN_BYTES);
+
+        assert!(browser_description_within_limits(&description(
+            BrowserBrand::Other(at_limit.clone()),
+            OperatingSystem::Other(at_limit.clone()),
+            Some(&at_limit)
+        )));
+
+        for over in [
+            description(
+                BrowserBrand::Other(long.clone()),
+                OperatingSystem::Macos,
+                None,
+            ),
+            description(
+                BrowserBrand::Chrome,
+                OperatingSystem::Other(long.clone()),
+                None,
+            ),
+            description(BrowserBrand::Chrome, OperatingSystem::Macos, Some(&long)),
+        ] {
+            assert!(
+                !browser_description_within_limits(&over),
+                "a token of {} bytes should be refused: {over:?}",
+                long.len()
+            );
+        }
+    }
 }
