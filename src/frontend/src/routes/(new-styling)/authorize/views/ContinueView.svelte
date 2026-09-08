@@ -18,7 +18,10 @@
     authenticationStore,
     isAuthenticatedStore,
   } from "$lib/stores/authentication.store";
-  import { actorForIdentity, forgetIdentity } from "$lib/stores/session-delegation.store";
+  import {
+    actorForIdentity,
+    forgetIdentity,
+  } from "$lib/stores/session-delegation.store";
   import { throwCanisterError, isCanisterError } from "$lib/utils/utils";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
   import type {
