@@ -101,9 +101,19 @@ describe("/cli load: http app origins", () => {
     );
   });
 
-  it("accepts http on localhost and the loopback literal", () => {
+  it("accepts http on localhost and anywhere in 127.0.0.0/8", () => {
     expect(appOriginOf("http://localhost:5173")).toBe("http://localhost:5173");
     expect(appOriginOf("http://127.0.0.1:4943")).toBe("http://127.0.0.1:4943");
+    expect(appOriginOf("http://127.0.0.2:8000")).toBe("http://127.0.0.2:8000");
+  });
+
+  it("rejects http on a name that merely starts like loopback", () => {
+    expectInvalid("http://127.example.com");
+    expectInvalid("http://127.0.0.1.example.com");
+  });
+
+  it("rejects http on the IPv6 loopback", () => {
+    expectInvalid("http://[::1]:8000");
   });
 
   it("rejects http on a host that is not loopback", () => {

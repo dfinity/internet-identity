@@ -93,10 +93,16 @@ const parseLoopbackCallback = (raw: string | null): string | undefined => {
   return raw;
 };
 
+/**
+ * Whether `hostname` names this machine. IPv4 loopback only: the whole
+ * 127.0.0.0/8, matched as an IP literal rather than by prefix, because
+ * `127.example.com` is a registrable name that resolves anywhere. `::1` is
+ * deliberately absent — the CLI flow is IPv4-only.
+ */
 const isLoopbackHostname = (hostname: string): boolean =>
   hostname === "localhost" ||
-  hostname === "127.0.0.1" ||
-  hostname.endsWith(".localhost");
+  hostname.endsWith(".localhost") ||
+  /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
 
 /**
  * Returns the normalised origin of the app named by `--app`, or undefined if
