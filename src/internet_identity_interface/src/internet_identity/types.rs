@@ -16,6 +16,74 @@ pub type ApplicationNumber = u64;
 pub type Timestamp = u64; // in nanos since epoch
 /// Per-anchor label for one browser, so a browser's sessions can be revoked together.
 pub type BrowserId = u32;
+
+/// Which browser a sign-in came from, as a token rather than a name to show.
+///
+/// `Brand` because that is what the client hints call it, and because `Browser` names the
+/// registry entry these describe.
+///
+/// Tokens rather than display strings because products get renamed — "Chrome OS" became
+/// "ChromeOS", "Mac OS X" became "macOS" — and the stored record has to be able to
+/// outlive that. The name a user reads is derived in the frontend, so a rename reaches
+/// every stored record at once.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum BrowserBrand {
+    Chrome,
+    Safari,
+    Firefox,
+    Edge,
+    Opera,
+    SamsungInternet,
+    Vivaldi,
+    Brave,
+    /// Whatever the client resolved for a browser this list does not name. Shown as it
+    /// arrived: an unrecognised browser is worth seeing, not worth hiding behind a
+    /// generic label.
+    Other(String),
+}
+
+/// The operating system a sign-in came from. A token, for the same reason as
+/// [`BrowserBrand`].
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum OperatingSystem {
+    Macos,
+    Ios,
+    Ipados,
+    Windows,
+    Android,
+    ChromeOs,
+    Linux,
+    Other(String),
+}
+
+/// What shape of thing a browser is running on.
+///
+/// Reported where the client can state it and inferred where it cannot, so `Unknown` is a
+/// real answer rather than a failure: the browsers that expose no client hints are the
+/// ones this is least certain about.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum FormFactor {
+    Desktop,
+    Mobile,
+    Tablet,
+    Unknown,
+}
+
+/// What a browser reported about itself when it registered.
+///
+/// Self-reported, so it is something the user reads to recognise their own browser rather
+/// than evidence about where a session came from. Resolved by the client into the tokens
+/// above; the canister stores them and never interprets them.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct BrowserDescription {
+    pub brand: BrowserBrand,
+    pub os: OperatingSystem,
+    pub form_factor: FormFactor,
+    /// The hardware, where the client can name it — Android is the only place that does.
+    /// Free text because it is a product name reported verbatim, and unlike a brand a
+    /// shipped model never gets renamed.
+    pub model: Option<String>,
+}
 pub type Signature = ByteBuf;
 pub type DeviceConfirmationCode = String;
 pub type FailedAttemptsCounter = u8;

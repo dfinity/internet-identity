@@ -1102,11 +1102,11 @@ mod v2_api {
         let stored_browsers: Vec<BrowserInfo> = state::anchor(identity_number)
             .browsers()
             .iter()
-            .map(|device| BrowserInfo {
-                id: device.id,
-                name: device.name.clone(),
-                created_at: device.created_at,
-                last_used: device.last_used,
+            .map(|browser| BrowserInfo {
+                id: browser.id,
+                description: browser.description.clone(),
+                created_at: browser.created_at,
+                last_used: browser.last_used,
             })
             .collect();
         let browsers = if stored_browsers.is_empty() {
