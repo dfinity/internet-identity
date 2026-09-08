@@ -1,5 +1,7 @@
 use crate::internet_identity::types::openid::OpenIdCredentialData;
-use crate::internet_identity::types::{BrowserId, CredentialId, PublicKey, Timestamp};
+use crate::internet_identity::types::{
+    BrowserDescription, BrowserId, CredentialId, PublicKey, Timestamp,
+};
 use candid::{CandidType, Deserialize, Principal};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -77,11 +79,11 @@ pub struct IdentityAuthnInfo {
     pub recovery_authn_methods: Vec<AuthnMethod>,
 }
 
-/// A browser this anchor has signed in from. The name is self-reported by the client.
+/// A browser this anchor has signed in from, as it described itself when it registered.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct BrowserInfo {
     pub id: BrowserId,
-    pub name: String,
+    pub description: BrowserDescription,
     pub created_at: Timestamp,
     pub last_used: Timestamp,
     /// Sessions this browser holds, counted from the stored records.
