@@ -1118,7 +1118,7 @@ mod v2_api {
             .iter()
             .map(|browser| BrowserInfo {
                 id: browser.id,
-                name: browser.name.clone(),
+                description: browser.description.clone(),
                 created_at: browser.created_at,
                 last_used: browser.last_used,
                 session_count: browser.session_count,

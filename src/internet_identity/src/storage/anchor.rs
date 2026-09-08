@@ -3,6 +3,7 @@ use crate::ii_domain::IIDomain;
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::browser::StorableBrowser;
+use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
@@ -77,7 +78,11 @@ pub enum BrowserError {
     StaleBrowserKey,
 }
 
-/// A browser this anchor has signed in from. The name is self-reported by the client.
+/// A browser this anchor has signed in from, as it described itself when it registered.
+///
+/// The description is fixed at registration: a sign-in that reports something else is
+/// treated as a browser this anchor has not seen, and the client is the party that
+/// decides so by presenting a key pair no entry holds.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Browser {
     pub id: BrowserId,
@@ -85,7 +90,8 @@ pub struct Browser {
     pub current_browser_key: PublicKey,
     /// The successor the browser announced at its last sign-in, also accepted as a proof.
     pub next_browser_key: PublicKey,
-    pub name: String,
+    /// What this browser reported about itself when it registered.
+    pub description: BrowserDescription,
     pub created_at: Timestamp,
     pub last_used: Timestamp,
     /// Sessions this browser holds. Maintained by the write that changes the reference
@@ -99,7 +105,7 @@ impl From<StorableBrowser> for Browser {
             id: value.id,
             current_browser_key: ByteBuf::from(value.current_browser_key),
             next_browser_key: ByteBuf::from(value.next_browser_key),
-            name: value.name,
+            description: BrowserDescription::from(value.description),
             created_at: value.created_at,
             last_used: value.last_used,
             session_count: value.session_count,
@@ -113,7 +119,7 @@ impl From<Browser> for StorableBrowser {
             id: value.id,
             current_browser_key: value.current_browser_key.into_vec(),
             next_browser_key: value.next_browser_key.into_vec(),
-            name: value.name,
+            description: StorableBrowserDescription::from(value.description),
             created_at: value.created_at,
             last_used: value.last_used,
             session_count: value.session_count,
@@ -770,13 +776,17 @@ impl Anchor {
     /// browser that lost a response is told to promote its own successor instead of
     /// becoming a second list. A key no entry holds at all registers a new browser.
     ///
+    /// `description` is taken only where this registers a new browser. An entry that is
+    /// advanced keeps the description it was registered with, so what a browser reports is
+    /// a fact about a registration rather than about the last sign-in.
+    ///
     /// At the cap the least recently used records are dropped, and their ids returned so
     /// the caller can end their sessions too.
     pub fn resolve_browser(
         &mut self,
         current_browser_key: PublicKey,
         next_browser_key: PublicKey,
-        name: String,
+        description: BrowserDescription,
         now: Timestamp,
     ) -> Result<(BrowserId, Vec<BrowserId>), BrowserError> {
         if current_browser_key == next_browser_key {
@@ -825,7 +835,7 @@ impl Anchor {
             id,
             current_browser_key,
             next_browser_key,
-            name,
+            description,
             created_at: now,
             last_used: now,
             session_count: 0,
