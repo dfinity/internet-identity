@@ -46,6 +46,7 @@ vi.mock("$lib/stores/browser-key.store", async (importOriginal) => ({
   withBrowserProof: (
     _identityNumber: bigint,
     _sessionKey: Uint8Array,
+    _description: unknown,
     signIn: (proof: unknown) => Promise<unknown>,
   ) =>
     signIn({
