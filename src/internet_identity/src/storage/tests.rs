@@ -6617,11 +6617,10 @@ mod session_revocation_tests {
 /// Everything the write path derives, checked against the account reference lists it
 /// derived them from, after an arbitrary sequence of writes.
 ///
-/// This is the check that stands where the counter repair path used to. The gate's whole
-/// job is deriving values — the counters, both principal indices, the session count — from
-/// the pair of lists a write holds, and every defect the review of this stack turned up was
-/// one of those maintained by hand and forgotten at one write site. A test per operation
-/// catches the site it names; this catches the ones nobody thought to name.
+/// The gate's whole job is deriving values — the counters, both principal indices, the
+/// session count — from the pair of lists a write holds, and a derived value that is
+/// instead maintained by hand is one forgotten write site away from drifting. A test per
+/// operation catches the site it names; this catches the ones nobody thought to name.
 mod write_path_property_tests {
     use super::params_at;
     use super::record_use;
