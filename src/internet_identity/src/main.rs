@@ -886,6 +886,15 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
         openid::setup(openid_configs);
     }
 
+    // TEMPORARY: remove once every deployment has upgraded through a build that carries
+    // this sweep. Not "once it has run" — its completion flag is heap state, so it runs
+    // again after every upgrade, and a canister that skipped this build entirely would
+    // never have indexed the accounts it already held.
+    //
+    // Taking it out also takes out the only thing that repairs a drifted index entry: the
+    // write path derives principals for the accounts a write moves and no longer
+    // re-asserts the rest, on the grounds that this sweep comes back around. Something
+    // has to replace that, or the reasoning behind it has to change.
     init_account_principal_index_backfill_timer();
 }
 
@@ -917,6 +926,13 @@ fn account_principal_index_backfill_status() -> (u64, u64, bool) {
 
 fn run_account_principal_index_backfill_batch() {
     if ACCOUNT_PRINCIPAL_INDEX_BACKFILL_DONE.with_borrow(|done| *done) {
+        // Reaching this means a timer fired after the sweep finished, so the clear below
+        // did not take — an id that outlived its slot, or a second timer installed over
+        // the first. Returning alone would leave it firing every second forever, doing
+        // nothing, so the cleanup is repeated rather than assumed. It stays below as well:
+        // clearing only here would mean every completed sweep fires once more before
+        // stopping, and completion should stop it where it happens.
+        clear_account_principal_index_backfill_timer();
         return;
     }
 
@@ -938,17 +954,24 @@ fn run_account_principal_index_backfill_batch() {
 
     if outcome.is_done {
         ACCOUNT_PRINCIPAL_INDEX_BACKFILL_DONE.replace(true);
-        ACCOUNT_PRINCIPAL_INDEX_BACKFILL_TIMER_ID.with_borrow_mut(|id_slot| {
-            if let Some(timer_id) = id_slot.take() {
-                ic_cdk_timers::clear_timer(timer_id);
-            }
-        });
+        clear_account_principal_index_backfill_timer();
         let indexed = ACCOUNT_PRINCIPAL_INDEX_BACKFILL_INDEXED.with_borrow(|indexed| *indexed);
         let skipped = ACCOUNT_PRINCIPAL_INDEX_BACKFILL_SKIPPED.with_borrow(|skipped| *skipped);
         ic_cdk::println!(
             "Account principal index backfill COMPLETED ({indexed} entries, {skipped} skipped)."
         );
     }
+}
+
+/// Stops the sweep's timer and forgets its id. Does nothing where there is no id, so it
+/// is safe to call from either the completion it belongs to or a firing that should not
+/// have happened.
+fn clear_account_principal_index_backfill_timer() {
+    ACCOUNT_PRINCIPAL_INDEX_BACKFILL_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(timer_id) = id_slot.take() {
+            ic_cdk_timers::clear_timer(timer_id);
+        }
+    });
 }
 
 /// Safe to call from both `init` and `post_upgrade`: with nothing to index the
