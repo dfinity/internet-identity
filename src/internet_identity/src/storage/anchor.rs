@@ -17,7 +17,7 @@ use internet_identity_interface::internet_identity::types::openid::OpenIdCredent
 use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 
 #[cfg(test)]
@@ -88,6 +88,9 @@ pub struct Browser {
     pub name: String,
     pub created_at: Timestamp,
     pub last_used: Timestamp,
+    /// Sessions this browser holds. Maintained by the write that changes the reference
+    /// lists holding them, so it counts stored records rather than live ones.
+    pub session_count: u32,
 }
 
 impl From<StorableBrowser> for Browser {
@@ -99,6 +102,7 @@ impl From<StorableBrowser> for Browser {
             name: value.name,
             created_at: value.created_at,
             last_used: value.last_used,
+            session_count: value.session_count,
         }
     }
 }
@@ -112,6 +116,7 @@ impl From<Browser> for StorableBrowser {
             name: value.name,
             created_at: value.created_at,
             last_used: value.last_used,
+            session_count: value.session_count,
         }
     }
 }
@@ -736,6 +741,25 @@ impl Anchor {
         &self.browsers
     }
 
+    /// Moves each browser's session count by what a write added to or took from it.
+    ///
+    /// A delta against a browser no entry holds is dropped: the cap can retire an entry
+    /// while sessions it opened are still stored, and a count belongs to an entry that
+    /// exists.
+    pub fn move_browser_session_counts(&mut self, deltas: &BTreeMap<BrowserId, i64>) {
+        for browser in &mut self.browsers {
+            let Some(delta) = deltas.get(&browser.id) else {
+                continue;
+            };
+            browser.session_count = match delta {
+                0.. => browser.session_count.saturating_add(*delta as u32),
+                _ => browser
+                    .session_count
+                    .saturating_sub(delta.unsigned_abs() as u32),
+            };
+        }
+    }
+
     /// Advances a device's `last_used`. Reports whether anything changed, so an unknown
     /// device or a repeat inside one message costs no anchor write.
     pub fn stamp_browser_use(&mut self, browser_id: BrowserId, now: Timestamp) {
@@ -818,6 +842,7 @@ impl Anchor {
             name,
             created_at: now,
             last_used: now,
+            session_count: 0,
         });
 
         let mut dropped = vec![];
