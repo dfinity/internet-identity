@@ -100,9 +100,7 @@ impl From<StorableAccountReferenceList> for Vec<AccountReference> {
     }
 }
 
-/// The only way to build a list to be stored, so every write is checked. Deliberately
-/// `TryFrom` rather than `From`: an infallible conversion existed here before and the
-/// checks it lacked had to be remembered at each of the write sites instead.
+/// The only way to build a list to be stored, so every write is checked.
 impl TryFrom<Vec<AccountReference>> for StorableAccountReferenceList {
     type Error = StorableAccountReferenceListError;
 
@@ -128,8 +126,7 @@ impl TryFrom<Vec<AccountReference>> for StorableAccountReferenceList {
 
         Ok(StorableAccountReferenceList(
             value
-                .iter()
-                .cloned()
+                .into_iter()
                 .map(StorableAccountReference::from)
                 .collect(),
         ))
