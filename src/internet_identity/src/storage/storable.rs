@@ -11,7 +11,6 @@ pub mod anchor_number_list;
 pub mod application;
 pub mod application_number;
 pub mod credential_id;
-pub mod discrepancy_counter;
 pub mod email_recovery_address_hash;
 pub mod email_recovery_credential;
 pub mod fixed_anchor;
