@@ -24,7 +24,7 @@ pub struct StorableSession {
     #[n(5)]
     pub read_only: bool,
     #[n(6)]
-    pub session_id: StorableSessionId,
+    pub id: StorableSessionId,
 }
 
 impl Storable for StorableSession {
@@ -50,7 +50,7 @@ impl From<StorableSession> for Session {
             last_refreshed_ns: value.last_refreshed_ns,
             browser_id: value.browser_id,
             read_only: value.read_only,
-            session_id: value.session_id,
+            session_id: value.id,
         }
     }
 }
@@ -64,7 +64,7 @@ impl From<Session> for StorableSession {
             last_refreshed_ns: value.last_refreshed_ns,
             browser_id: value.browser_id,
             read_only: value.read_only,
-            session_id: value.session_id,
+            id: value.session_id,
         }
     }
 }

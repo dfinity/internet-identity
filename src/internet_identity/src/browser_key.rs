@@ -3,7 +3,7 @@
 //! Knows nothing of sessions or storage, so both layers may depend on it: the endpoint
 //! verifies, and storage requires the [`VerifiedBrowserKeys`] that verifying produces.
 //!
-//! Nothing calls it yet: the sign-in ceremony that does is added on top of this.
+//! `prepare_account_session`, the one caller that verifies, lands two PRs up.
 #![allow(dead_code)]
 
 use internet_identity_interface::internet_identity::types::{PublicKey, SessionKey};
@@ -35,6 +35,13 @@ pub struct VerifiedBrowserKeys {
 }
 
 impl VerifiedBrowserKeys {
+    /// Keys that were never verified, for tests about what happens *after* verification.
+    /// `#[cfg(test)]`, so no canister build can reach it and the type stays evidence.
+    #[cfg(test)]
+    pub fn unverified_for_test(current: PublicKey, next: PublicKey) -> Self {
+        Self { current, next }
+    }
+
     /// The key this sign-in was reached by.
     pub fn current(&self) -> &PublicKey {
         &self.current

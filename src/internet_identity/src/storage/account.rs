@@ -84,7 +84,7 @@ pub struct SessionLocator {
 }
 
 impl SessionLocator {
-    // Used by the app delegation path, which lands four PRs up.
+    // Used by `app_prepare_delegation`, which lands three PRs up.
     #[allow(dead_code)]
     /// The account this session is at.
     pub fn account_key(&self) -> AccountKey {

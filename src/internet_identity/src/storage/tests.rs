@@ -1,4 +1,5 @@
 use crate::archive::{ArchiveData, ArchiveState};
+use crate::browser_key::VerifiedBrowserKeys;
 use crate::openid::OpenIdCredential;
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
@@ -108,8 +109,10 @@ pub(crate) fn params_at(
         anchor_number,
         origin: SESSION_TEST_ORIGIN.to_string(),
         account_number: None,
-        current_browser_key: browser_key(seed, generation),
-        next_browser_key: browser_key(seed, generation + 1),
+        browser_keys: VerifiedBrowserKeys::unverified_for_test(
+            browser_key(seed, generation),
+            browser_key(seed, generation + 1),
+        ),
         browser_description: description(seed),
         valid_till_ns: now + 10_000,
         max_idle_ns: None,
