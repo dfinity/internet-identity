@@ -49,6 +49,7 @@ mod anchor_management;
 mod archive;
 mod assets;
 mod authz_utils;
+mod browser_key;
 
 mod attributes;
 /// Type conversions between internal and external types.
@@ -67,7 +68,6 @@ mod mcp_registration;
 
 mod openid;
 mod session_delegation;
-mod sessions;
 mod single_flight_cache;
 mod state;
 mod stats;
@@ -1099,22 +1099,7 @@ mod v2_api {
             Some(stored_verified_emails)
         };
 
-        let stored_browsers: Vec<BrowserInfo> = state::anchor(identity_number)
-            .browsers()
-            .iter()
-            .map(|browser| BrowserInfo {
-                id: browser.id,
-                description: browser.description.clone(),
-                created_at: browser.created_at,
-                last_used: browser.last_used,
-                session_count: browser.session_count,
-            })
-            .collect();
-        let browsers = if stored_browsers.is_empty() {
-            None
-        } else {
-            Some(stored_browsers)
-        };
+        let browsers = state::anchor(identity_number).browsers_info();
 
         let identity_info = IdentityInfo {
             authn_methods: anchor_info

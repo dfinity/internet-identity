@@ -40,7 +40,7 @@ pub struct AccountsCounter {
 pub struct AccountReference {
     pub account_number: Option<AccountNumber>, // None is the unreserved synthetic account
     pub last_used: Option<Timestamp>,
-    pub sessions: Vec<SessionRecord>,
+    pub sessions: Vec<Session>,
 }
 
 impl AccountReference {
@@ -76,18 +76,18 @@ pub const DEFAULT_SESSION_IDLE_NS: u64 = 7 * crate::DAY_NS;
 /// was replaced reads as `None` and revokes nothing, instead of landing on its
 /// successor.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SessionRecordKey {
+pub struct SessionLocator {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
     pub session_id: SessionId,
 }
 
-impl SessionRecordKey {
+impl SessionLocator {
     // Used by the app delegation path, which lands four PRs up.
     #[allow(dead_code)]
     /// The account this session is at.
-    pub fn account(&self) -> AccountKey {
+    pub fn account_key(&self) -> AccountKey {
         AccountKey {
             anchor_number: self.anchor_number,
             origin: self.origin.clone(),
@@ -102,7 +102,7 @@ impl SessionRecordKey {
 /// tied to the one record that was allocated that id. Every other field describes the
 /// session and can be rewritten without changing who it signs as.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct SessionRecord {
+pub struct Session {
     pub created_at_ns: Timestamp,
     pub valid_till_ns: Timestamp,
     pub max_idle_ns: u64,
@@ -112,7 +112,7 @@ pub struct SessionRecord {
     pub session_id: SessionId,
 }
 
-impl SessionRecord {
+impl Session {
     /// One question rather than two, because a caller has no use for the halves
     /// apart: a session past its lifetime and one nobody has used for longer than
     /// it was allowed are equally over. Asking separately is how a caller ends up

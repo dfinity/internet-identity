@@ -79,7 +79,7 @@
 //!
 //! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
 //! bucket of 128 pages.
-use account::{Account, AccountKey, AccountsCounter, SessionRecordKey};
+use account::{Account, AccountKey, AccountsCounter, SessionLocator};
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use std::borrow::Cow;
@@ -109,7 +109,7 @@ use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
-    AccountReference, SessionRecord, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
+    AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
 use crate::storage::anchor::{Anchor, BrowserError, MAX_BROWSERS};
 use crate::storage::memory_wrapper::MemoryWrapper;
@@ -2783,7 +2783,7 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn create_session(
         &mut self,
         params: CreateSessionParams,
-    ) -> Result<(SessionRecordKey, SessionRecord), StorageError> {
+    ) -> Result<(SessionLocator, Session), StorageError> {
         let CreateSessionParams {
             anchor_number,
             origin,
@@ -2885,7 +2885,7 @@ impl<M: Memory + Clone> Storage<M> {
         // A ceremony replaces whatever this browser held here, rather than reusing it: the
         // copy of an old session's chain stops working at the user's next sign-in instead of
         // at its expiry.
-        let mut dropped: Vec<(Option<AccountNumber>, SessionRecord)> = vec![];
+        let mut dropped: Vec<(Option<AccountNumber>, Session)> = vec![];
         reference.sessions.retain(|session| {
             if session.browser_id == browser_id {
                 dropped.push((account_number, session.clone()));
@@ -2898,7 +2898,7 @@ impl<M: Memory + Clone> Storage<M> {
         // an id. Ids need not be contiguous, so a later failure leaving a gap is fine;
         // what must never happen is one being handed out twice.
         let session_id = self.allocate_session_id()?;
-        let session = SessionRecord {
+        let session = Session {
             session_id,
             created_at_ns: now_ns,
             valid_till_ns,
@@ -2930,7 +2930,7 @@ impl<M: Memory + Clone> Storage<M> {
         // this origin gets if it did not have one, and the identity's session count.
         self.write_account_state(anchor, state)?;
 
-        let key = SessionRecordKey {
+        let key = SessionLocator {
             anchor_number,
             origin,
             account_number,
@@ -2944,7 +2944,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// A key whose session was replaced reads as `None` rather than as its successor:
     /// the successor was allocated an id of its own.
     #[allow(dead_code)] // Used by the sign-in ceremony, which lands two PRs up.
-    pub fn read_session(&self, key: &SessionRecordKey) -> Option<SessionRecord> {
+    pub fn read_session(&self, key: &SessionLocator) -> Option<Session> {
         let application_number = self.lookup_application_number_with_origin(&key.origin)?;
 
         self.account_references(key.anchor_number, application_number)

@@ -4994,10 +4994,10 @@ mod account_principal_index_tests {
     }
 }
 
-mod session_record_tests {
+mod session_tests {
     use super::record_use;
     use super::{application_number_for, write_at};
-    use crate::storage::account::{AccountReference, SessionRecord};
+    use crate::storage::account::{AccountReference, Session};
     use crate::storage::storable::account_reference::StorableAccountReference;
     use crate::storage::MAX_EVICTABLE_DEFAULT_ACCOUNTS;
     use crate::{Storage, DAY_NS, MINUTE_NS};
@@ -5009,8 +5009,8 @@ mod session_record_tests {
     /// what the tests about the absolute bound want.
     const NEVER_IDLE: u64 = u64::MAX;
 
-    fn session(session_id: u64, created_at_ns: u64, valid_till_ns: u64) -> SessionRecord {
-        SessionRecord {
+    fn session(session_id: u64, created_at_ns: u64, valid_till_ns: u64) -> Session {
+        Session {
             created_at_ns,
             valid_till_ns,
             max_idle_ns: NEVER_IDLE,
@@ -5039,7 +5039,7 @@ mod session_record_tests {
             account_number: Some(3),
             last_used: Some(9),
             sessions: vec![
-                SessionRecord {
+                Session {
                     created_at_ns: 11,
                     valid_till_ns: 22,
                     max_idle_ns: 33,
@@ -5048,7 +5048,7 @@ mod session_record_tests {
                     read_only: false,
                     session_id: 66,
                 },
-                SessionRecord {
+                Session {
                     created_at_ns: 77,
                     valid_till_ns: 88,
                     max_idle_ns: 99,
@@ -5079,7 +5079,7 @@ mod session_record_tests {
 
     #[test]
     fn a_session_is_idle_once_nothing_has_minted_for_its_bound() {
-        let record = SessionRecord {
+        let record = Session {
             max_idle_ns: 30 * MINUTE_NS,
             last_refreshed_ns: Some(10 * MINUTE_NS),
             ..session(1, 0, DAY_NS)
@@ -5092,7 +5092,7 @@ mod session_record_tests {
 
     #[test]
     fn a_session_that_never_minted_is_measured_from_its_creation() {
-        let record = SessionRecord {
+        let record = Session {
             max_idle_ns: 30 * MINUTE_NS,
             last_refreshed_ns: None,
             ..session(1, 5 * MINUTE_NS, DAY_NS)
@@ -5207,12 +5207,12 @@ mod session_record_tests {
     #[test]
     fn a_session_over_by_idleness_reclaims_like_a_dead_one() {
         let now = 100 * DAY_NS;
-        let idle = SessionRecord {
+        let idle = Session {
             max_idle_ns: DAY_NS,
             last_refreshed_ns: Some(now - 10 * DAY_NS),
             ..session(1, now - 20 * DAY_NS, now + DAY_NS)
         };
-        let live = SessionRecord {
+        let live = Session {
             last_refreshed_ns: Some(now - 1),
             ..session(2, now - 20 * DAY_NS, now + DAY_NS)
         };
@@ -5226,7 +5226,7 @@ mod session_record_tests {
     fn reclaim_order_ranks_dead_sessions_first() {
         let now = 1_000;
         let expired = session(1, 1, 500);
-        let live = SessionRecord {
+        let live = Session {
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(900),
             ..session(2, 400, 10_000)
@@ -5240,15 +5240,15 @@ mod session_record_tests {
     #[test]
     fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
         let now = 100 * DAY_NS;
-        let held = SessionRecord {
+        let held = Session {
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - DAY_NS),
             ..session(501, now - 20 * DAY_NS, now + DAY_NS)
         };
         // Created after the session it would have to outrank, which under a plain recency
         // order would protect it.
-        let flood: Vec<SessionRecord> = (0..500)
-            .map(|index| SessionRecord {
+        let flood: Vec<Session> = (0..500)
+            .map(|index| Session {
                 browser_id: index,
                 ..session(index as u64 + 1, now - 1, now + DAY_NS)
             })
@@ -5263,13 +5263,13 @@ mod session_record_tests {
     fn an_app_in_weekly_use_outranks_one_opened_once_yesterday() {
         let now = 100 * DAY_NS;
         // Signed in three months ago, still being opened every few days.
-        let weekly = SessionRecord {
+        let weekly = Session {
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - 3 * DAY_NS),
             ..session(1, now - 90 * DAY_NS, now + DAY_NS)
         };
         // Signed in yesterday, used for five minutes, never opened again.
-        let one_sitting = SessionRecord {
+        let one_sitting = Session {
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - DAY_NS + 5 * MINUTE_NS),
             ..session(2, now - DAY_NS, now + DAY_NS)
@@ -5286,7 +5286,7 @@ mod session_creation_tests {
     use super::held_references;
     use super::{params, params_at};
     use crate::delegation::calculate_session_seed_with_salt;
-    use crate::storage::account::{SessionRecord, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS};
+    use crate::storage::account::{Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS};
     use crate::storage::anchor::MAX_BROWSERS;
     use crate::storage::CreateSessionParams;
     use crate::storage::StorageError;
@@ -5452,10 +5452,7 @@ mod session_creation_tests {
         );
     }
 
-    fn sessions_of(
-        storage: &Storage<VectorMemory>,
-        anchor_number: AnchorNumber,
-    ) -> Vec<SessionRecord> {
+    fn sessions_of(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> Vec<Session> {
         let application_number = storage
             .lookup_application_number_with_origin(&ORIGIN.to_string())
             .unwrap();
