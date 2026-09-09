@@ -7,13 +7,13 @@ use canister_tests::api::internet_identity::api_v2::{
 };
 use canister_tests::flows;
 use canister_tests::framework::{
-    env, install_ii_with_archive, principal_1, time, verify_delegation, BrowserKey,
+    env, install_ii_with_archive, principal_1, principal_2, time, verify_delegation, BrowserKey,
 };
 use internet_identity_interface::internet_identity::types::{
     AccountSessionError, AppGetDelegationRequest, AppPrepareDelegationRequest, AppSessionError,
     BrowserBrand, BrowserDescription, BrowserInfo, FormFactor, GetAccountSessionRequest,
     OperatingSystem, Permissions, PrepareAccountSessionRequest, PrepareAccountSessionResponse,
-    RevokeBrowserSessionsRequest,
+    RevokeBrowserSessionsRequest, SessionRevokeError,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -741,6 +741,54 @@ fn should_leave_another_browsers_session_alone() -> Result<(), RejectResponse> {
     Ok(())
 }
 
+/// Authorization is the whole protection on this endpoint. Unlike `app_revoke_session`,
+/// which rests on a caller being unable to produce another session's principal, this one
+/// takes the identity number as an argument — so nothing but the auth check stands
+/// between a stranger and signing every browser of any identity out.
+#[test]
+fn should_refuse_to_sign_a_browser_out_for_another_principal() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::identity_info;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    let browser_id = identity_info(&env, canister_id, principal_1(), identity_number)?
+        .unwrap()
+        .browsers
+        .unwrap()[0]
+        .id;
+
+    let refused = revoke_browser_sessions(
+        &env,
+        canister_id,
+        principal_2(),
+        RevokeBrowserSessionsRequest {
+            identity_number,
+            browser_id,
+        },
+    )?;
+
+    assert!(
+        matches!(refused, Err(SessionRevokeError::Unauthorized(principal)) if principal == principal_2()),
+        "another principal must not sign this identity's browsers out, got {refused:?}"
+    );
+
+    // And the session it tried to end still mints.
+    assert!(app_prepare_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?
+    .is_ok());
+
+    Ok(())
+}
+
 #[test]
 fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
     use canister_tests::api::internet_identity::api_v2::identity_info;
@@ -806,11 +854,11 @@ fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
 
     assert_eq!(
         refresh(first_principal),
-        Err(AppSessionError::NoMatchingSession)
+        Err(AppSessionError::NoSuchSession)
     );
     assert_eq!(
         refresh(second_principal),
-        Err(AppSessionError::NoMatchingSession)
+        Err(AppSessionError::NoSuchSession)
     );
     assert!(refresh(untouched_principal).is_ok());
 
@@ -834,7 +882,7 @@ fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
 
     assert_eq!(
         refresh(first_principal),
-        Err(AppSessionError::NoMatchingSession),
+        Err(AppSessionError::NoSuchSession),
         "a revoked session came back when its browser signed in again"
     );
 

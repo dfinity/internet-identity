@@ -529,8 +529,16 @@ pub fn revoke_browser_sessions(
     request: RevokeBrowserSessionsRequest,
     now: Timestamp,
 ) -> Result<(), SessionRevokeError> {
-    check_authorization(request.identity_number)
-        .map_err(|err| SessionRevokeError::Unauthorized(err.principal))?;
+    // The recording form, as the twelve other authenticated updates in `main.rs` use:
+    // what it stamps is that the access method authenticated, which it did, and signing
+    // every browser out is exactly the kind of thing the access page's `last_used` should
+    // reflect. This path writes anyway, so the stamp costs nothing extra.
+    check_authz_and_record_activity(request.identity_number).map_err(|err| match err {
+        IdentityUpdateError::Unauthorized(principal) => SessionRevokeError::Unauthorized(principal),
+        IdentityUpdateError::StorageError(_, storage_error) => {
+            SessionRevokeError::InternalCanisterError(storage_error.to_string())
+        }
+    })?;
 
     storage_borrow_mut(|storage| {
         storage.revoke_browser_sessions(request.identity_number, request.browser_id, now)
