@@ -265,7 +265,7 @@ pub async fn prepare(
         // No queries-only restriction on the registration delegation itself: it
         // authenticates one update (mcp_register_v2). The read-only choice is
         // recorded on the index entry below, not on this signature.
-        add_delegation_signature(sigs, registration_key, &seed, expiration, None);
+        add_delegation_signature(sigs, registration_key, &seed, expiration, None, None);
     });
     update_root_hash();
 
