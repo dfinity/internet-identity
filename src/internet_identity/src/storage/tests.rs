@@ -1,4 +1,6 @@
 use crate::archive::{ArchiveData, ArchiveState};
+use crate::browser_key::VerifiedBrowserKeys;
+use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
 use crate::openid::OpenIdCredential;
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
@@ -108,8 +110,10 @@ pub(crate) fn params_at(
         anchor_number,
         origin: SESSION_TEST_ORIGIN.to_string(),
         account_number: None,
-        current_browser_key: browser_key(seed, generation),
-        next_browser_key: browser_key(seed, generation + 1),
+        browser_keys: VerifiedBrowserKeys::unverified_for_test(
+            browser_key(seed, generation),
+            browser_key(seed, generation + 1),
+        ),
         browser_description: description(seed),
         valid_till_ns: now + 10_000,
         max_idle_ns: None,
@@ -944,11 +948,19 @@ mod application_lookup_tests {
         assert_eq!(storage.lookup_application_with_origin_memory.len(), 0);
     }
 
+    /// The index is keyed by the origin's hash rather than by its bytes, so an origin at
+    /// the limit is looked up the same way a short one is and is stored whole.
     #[test]
-    fn should_handle_very_long_origins_with_sha256() {
+    fn should_handle_an_origin_at_the_limit_with_sha256() {
         let mut storage = Storage::new((10, 20), VectorMemory::default());
 
-        let long_origin = format!("https://{}.com", "a".repeat(20_000));
+        let prefix = "https://";
+        let suffix = ".com";
+        let long_origin = format!(
+            "{prefix}{}{suffix}",
+            "a".repeat(FRONTEND_HOSTNAME_LIMIT - prefix.len() - suffix.len())
+        );
+        assert_eq!(long_origin.len(), FRONTEND_HOSTNAME_LIMIT);
 
         let app_number = application_number_for(&mut storage, &long_origin);
         assert_eq!(app_number, 0);
@@ -959,6 +971,41 @@ mod application_lookup_tests {
         // Application should be stored with full origin
         let stored_app = storage.stable_application_memory.get(&0).unwrap();
         assert_eq!(stored_app.origin, long_origin);
+    }
+
+    /// Storage refuses an origin it cannot store rather than trusting the endpoint that
+    /// handed it one. Nothing reachable sends one this long — every endpoint bounds it
+    /// first — so this is about where the guarantee lives, not about a live hazard.
+    #[test]
+    fn an_origin_past_the_limit_is_refused_rather_than_stored() {
+        let mut storage = Storage::new((10, 20), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let anchor = storage
+            .allocate_anchor(0)
+            .expect("an anchor to write under");
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).expect("writing the identity");
+        let too_long = format!("https://{}.com", "a".repeat(FRONTEND_HOSTNAME_LIMIT));
+
+        // A config write, the smallest write that stores something at an origin and so
+        // the smallest one that has to mint an application for it.
+        let refused = storage.write_account_state_for_testing(
+            anchor_number,
+            BTreeMap::from([(
+                too_long.clone(),
+                Some((vec![], Some(AnchorApplicationConfig::default()))),
+            )]),
+        );
+
+        assert!(
+            matches!(refused, Err(StorageError::OriginTooLong { ref origin }) if origin == &too_long),
+            "an origin of {} bytes should be refused, got {refused:?}",
+            too_long.len()
+        );
+        assert_eq!(
+            storage.lookup_application_number_with_origin(&too_long),
+            None
+        );
     }
 
     #[test]
@@ -5091,10 +5138,10 @@ mod account_principal_index_tests {
     }
 }
 
-mod session_record_tests {
+mod session_tests {
     use super::record_use;
     use super::{application_number_for, write_at};
-    use crate::storage::account::{AccountReference, SessionRecord};
+    use crate::storage::account::{AccountReference, Session};
     use crate::storage::storable::account_reference::StorableAccountReference;
     use crate::storage::MAX_EVICTABLE_DEFAULT_ACCOUNTS;
     use crate::{Storage, DAY_NS, MINUTE_NS};
@@ -5106,8 +5153,8 @@ mod session_record_tests {
     /// what the tests about the absolute bound want.
     const NEVER_IDLE: u64 = u64::MAX;
 
-    fn session(session_id: u64, created_at_ns: u64, valid_till_ns: u64) -> SessionRecord {
-        SessionRecord {
+    fn session(session_id: u64, created_at_ns: u64, valid_till_ns: u64) -> Session {
+        Session {
             created_at_ns,
             valid_till_ns,
             max_idle_ns: NEVER_IDLE,
@@ -5136,7 +5183,7 @@ mod session_record_tests {
             account_number: Some(3),
             last_used: Some(9),
             sessions: vec![
-                SessionRecord {
+                Session {
                     created_at_ns: 11,
                     valid_till_ns: 22,
                     max_idle_ns: 33,
@@ -5145,7 +5192,7 @@ mod session_record_tests {
                     read_only: false,
                     session_id: 66,
                 },
-                SessionRecord {
+                Session {
                     created_at_ns: 77,
                     valid_till_ns: 88,
                     max_idle_ns: 99,
@@ -5176,7 +5223,7 @@ mod session_record_tests {
 
     #[test]
     fn a_session_is_idle_once_nothing_has_minted_for_its_bound() {
-        let record = SessionRecord {
+        let record = Session {
             max_idle_ns: 30 * MINUTE_NS,
             last_refreshed_ns: Some(10 * MINUTE_NS),
             ..session(1, 0, DAY_NS)
@@ -5189,7 +5236,7 @@ mod session_record_tests {
 
     #[test]
     fn a_session_that_never_minted_is_measured_from_its_creation() {
-        let record = SessionRecord {
+        let record = Session {
             max_idle_ns: 30 * MINUTE_NS,
             last_refreshed_ns: None,
             ..session(1, 5 * MINUTE_NS, DAY_NS)
@@ -5304,12 +5351,12 @@ mod session_record_tests {
     #[test]
     fn a_session_over_by_idleness_reclaims_like_a_dead_one() {
         let now = 100 * DAY_NS;
-        let idle = SessionRecord {
+        let idle = Session {
             max_idle_ns: DAY_NS,
             last_refreshed_ns: Some(now - 10 * DAY_NS),
             ..session(1, now - 20 * DAY_NS, now + DAY_NS)
         };
-        let live = SessionRecord {
+        let live = Session {
             last_refreshed_ns: Some(now - 1),
             ..session(2, now - 20 * DAY_NS, now + DAY_NS)
         };
@@ -5323,7 +5370,7 @@ mod session_record_tests {
     fn reclaim_order_ranks_dead_sessions_first() {
         let now = 1_000;
         let expired = session(1, 1, 500);
-        let live = SessionRecord {
+        let live = Session {
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(900),
             ..session(2, 400, 10_000)
@@ -5337,15 +5384,15 @@ mod session_record_tests {
     #[test]
     fn a_flood_of_unused_sessions_cannot_displace_a_used_one() {
         let now = 100 * DAY_NS;
-        let held = SessionRecord {
+        let held = Session {
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - DAY_NS),
             ..session(501, now - 20 * DAY_NS, now + DAY_NS)
         };
         // Created after the session it would have to outrank, which under a plain recency
         // order would protect it.
-        let flood: Vec<SessionRecord> = (0..500)
-            .map(|index| SessionRecord {
+        let flood: Vec<Session> = (0..500)
+            .map(|index| Session {
                 browser_id: index,
                 ..session(index as u64 + 1, now - 1, now + DAY_NS)
             })
@@ -5360,13 +5407,13 @@ mod session_record_tests {
     fn an_app_in_weekly_use_outranks_one_opened_once_yesterday() {
         let now = 100 * DAY_NS;
         // Signed in three months ago, still being opened every few days.
-        let weekly = SessionRecord {
+        let weekly = Session {
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - 3 * DAY_NS),
             ..session(1, now - 90 * DAY_NS, now + DAY_NS)
         };
         // Signed in yesterday, used for five minutes, never opened again.
-        let one_sitting = SessionRecord {
+        let one_sitting = Session {
             max_idle_ns: NEVER_IDLE,
             last_refreshed_ns: Some(now - DAY_NS + 5 * MINUTE_NS),
             ..session(2, now - DAY_NS, now + DAY_NS)
@@ -5387,7 +5434,7 @@ mod session_creation_tests {
     use super::{params, params_at};
     use crate::delegation::calculate_session_seed_with_salt;
     use crate::storage::account::{
-        AccountReference, SessionRecord, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
+        AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
     };
     use crate::storage::anchor::MAX_BROWSERS;
     use crate::storage::StorageError;
@@ -5560,7 +5607,7 @@ mod session_creation_tests {
     fn all_sessions_of(
         storage: &Storage<VectorMemory>,
         anchor_number: AnchorNumber,
-    ) -> Vec<SessionRecord> {
+    ) -> Vec<Session> {
         storage
             .account_state(anchor_number)
             .into_values()
@@ -5570,10 +5617,7 @@ mod session_creation_tests {
             .collect()
     }
 
-    fn sessions_of(
-        storage: &Storage<VectorMemory>,
-        anchor_number: AnchorNumber,
-    ) -> Vec<SessionRecord> {
+    fn sessions_of(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> Vec<Session> {
         let application_number = storage
             .lookup_application_number_with_origin(&ORIGIN.to_string())
             .unwrap();
@@ -5945,7 +5989,7 @@ mod session_creation_tests {
         let list = |id_base: u64, expired_device: u32| -> Vec<AccountReference> {
             let sessions = (0..PER_LIST)
                 .map(|browser_id| browser_id + FABRICATED)
-                .map(|browser_id| SessionRecord {
+                .map(|browser_id| Session {
                     created_at_ns: 1,
                     // The expired one, and the live ones ordered so the highest browser id
                     // is the freshest and so the last to be given up.
@@ -6033,7 +6077,7 @@ mod session_creation_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let _application_number = application_number_for(&mut storage, &ORIGIN.to_string());
 
-        let mut sessions = vec![SessionRecord {
+        let mut sessions = vec![Session {
             created_at_ns: 1_000,
             valid_till_ns: 100_000_000,
             max_idle_ns: u64::MAX,
@@ -6042,17 +6086,15 @@ mod session_creation_tests {
             read_only: false,
             session_id: 1,
         }];
-        sessions.extend(
-            (2..=MAX_SESSIONS_PER_ANCHOR).map(|browser_id| SessionRecord {
-                created_at_ns: 500_000,
-                valid_till_ns: 100_000_000,
-                max_idle_ns: u64::MAX,
-                last_refreshed_ns: None,
-                browser_id,
-                read_only: false,
-                session_id: browser_id as u64,
-            }),
-        );
+        sessions.extend((2..=MAX_SESSIONS_PER_ANCHOR).map(|browser_id| Session {
+            created_at_ns: 500_000,
+            valid_till_ns: 100_000_000,
+            max_idle_ns: u64::MAX,
+            last_refreshed_ns: None,
+            browser_id,
+            read_only: false,
+            session_id: browser_id as u64,
+        }));
         storage
             .write_account_state_for_testing(
                 anchor_number,
@@ -6341,7 +6383,7 @@ mod session_consent_change_tests {
 mod session_refresh_stamp_tests {
     use super::held_references;
     use super::params;
-    use crate::storage::account::{AccountReference, SessionRecord, SessionRecordKey};
+    use crate::storage::account::{AccountReference, Session, SessionLocator};
     use crate::storage::CreateSessionParams;
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
@@ -6350,7 +6392,7 @@ mod session_refresh_stamp_tests {
 
     const ORIGIN: &str = "https://example.com";
 
-    fn storage_with_session() -> (Storage<VectorMemory>, AnchorNumber, SessionRecordKey) {
+    fn storage_with_session() -> (Storage<VectorMemory>, AnchorNumber, SessionLocator) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         storage.update_salt([17u8; 32]);
         let anchor = storage.allocate_anchor(0).unwrap();
@@ -6375,7 +6417,7 @@ mod session_refresh_stamp_tests {
             .unwrap()
     }
 
-    fn session_of(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> SessionRecord {
+    fn session_of(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> Session {
         reference(storage, anchor_number).sessions.remove(0)
     }
 
@@ -6450,7 +6492,7 @@ mod session_refresh_stamp_tests {
 
         let wrote = storage
             .record_session_use(
-                &SessionRecordKey {
+                &SessionLocator {
                     anchor_number,
                     origin: ORIGIN.to_string(),
                     account_number: None,
@@ -6486,7 +6528,7 @@ mod session_refresh_stamp_tests {
     }
 
     fn storage_with_registered_browser(
-    ) -> (Storage<VectorMemory>, AnchorNumber, SessionRecordKey, u32) {
+    ) -> (Storage<VectorMemory>, AnchorNumber, SessionLocator, u32) {
         let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
         storage.update_salt([17u8; 32]);
         let anchor = storage.allocate_anchor(0).unwrap();
