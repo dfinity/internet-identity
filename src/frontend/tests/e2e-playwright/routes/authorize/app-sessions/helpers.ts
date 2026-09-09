@@ -48,8 +48,11 @@ export const openSettings = async (
   const settings = await context.newPage();
   await settings.goto(`${II_URL}/manage/devices`);
   await signInWithIdentity(settings, identityNumber);
+  // The page's own heading, not a section's: browsers are grouped by the machine they
+  // run on, so which group headings appear depends on what the identity has signed in
+  // from.
   await expect(
-    settings.getByRole("heading", { name: "Other devices" }),
+    settings.getByRole("heading", { name: "Devices", exact: true }),
   ).toBeVisible();
   return settings;
 };
