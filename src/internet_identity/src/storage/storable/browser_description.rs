@@ -31,10 +31,6 @@ pub enum StorableBrowserBrand {
     #[n(5)]
     SamsungInternet,
     #[n(6)]
-    Vivaldi,
-    #[n(7)]
-    Brave,
-    #[n(8)]
     Other(#[n(0)] String),
 }
 
@@ -80,8 +76,6 @@ impl From<BrowserBrand> for StorableBrowserBrand {
             BrowserBrand::Edge => Self::Edge,
             BrowserBrand::Opera => Self::Opera,
             BrowserBrand::SamsungInternet => Self::SamsungInternet,
-            BrowserBrand::Vivaldi => Self::Vivaldi,
-            BrowserBrand::Brave => Self::Brave,
             BrowserBrand::Other(token) => Self::Other(token),
         }
     }
@@ -96,8 +90,6 @@ impl From<StorableBrowserBrand> for BrowserBrand {
             StorableBrowserBrand::Edge => Self::Edge,
             StorableBrowserBrand::Opera => Self::Opera,
             StorableBrowserBrand::SamsungInternet => Self::SamsungInternet,
-            StorableBrowserBrand::Vivaldi => Self::Vivaldi,
-            StorableBrowserBrand::Brave => Self::Brave,
             StorableBrowserBrand::Other(token) => Self::Other(token),
         }
     }
@@ -194,7 +186,7 @@ mod tests {
     #[test]
     fn a_description_of_named_tokens_round_trips() {
         round_trip(StorableBrowserDescription {
-            brand: StorableBrowserBrand::Brave,
+            brand: StorableBrowserBrand::Safari,
             os: StorableOperatingSystem::Ipados,
             form_factor: StorableFormFactor::Tablet,
             model: None,
@@ -225,8 +217,6 @@ mod tests {
             BrowserBrand::Edge,
             BrowserBrand::Opera,
             BrowserBrand::SamsungInternet,
-            BrowserBrand::Vivaldi,
-            BrowserBrand::Brave,
             BrowserBrand::Other("Arc".to_string()),
         ];
         for brand in brands {
