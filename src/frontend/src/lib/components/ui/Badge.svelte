@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { HTMLAttributes } from "svelte/elements";
 
-  type Color = "surface" | "success" | "warning";
+  type Color = "surface" | "success";
   type Size = "sm" | "md" | "lg";
 
   type Props = HTMLAttributes<HTMLSpanElement> & {
@@ -30,8 +30,6 @@
         "border-border-tertiary bg-bg-primary text-text-secondary font-medium",
       success:
         "border-bg-success-secondary bg-bg-success-primary text-fg-success-primary font-semibold",
-      warning:
-        "border-bg-warning-secondary bg-bg-warning-primary text-text-warning-primary font-semibold",
     }[color],
     dot
       ? {
