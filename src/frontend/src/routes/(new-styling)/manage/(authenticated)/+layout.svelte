@@ -6,6 +6,7 @@
     HouseIcon,
     KeyRoundIcon,
     MenuIcon,
+    MonitorSmartphoneIcon,
     XIcon,
     LifeBuoyIcon,
     CodeIcon,
@@ -347,6 +348,15 @@
           >
             <BriefcaseMedicalIcon class="size-5 sm:max-md:mx-auto" />
             <span class="sm:max-md:hidden">{$t`Recovery`}</span>
+          </NavItem>
+        </li>
+        <li class="contents">
+          <NavItem
+            href="/manage/devices"
+            current={page.url.pathname === "/manage/devices"}
+          >
+            <MonitorSmartphoneIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Devices`}</span>
           </NavItem>
         </li>
         <li class="contents">
