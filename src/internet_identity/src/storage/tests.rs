@@ -5704,9 +5704,14 @@ mod session_creation_tests {
             .lookup_application_number_with_origin(&ORIGIN.to_string())
             .unwrap();
 
-        let account_principal = storage
-            .account_principal_of(anchor_number, application_number, None)
-            .expect("the account it was just created for");
+        // The principal the handle names, read back off the handle `create_session`
+        // wrote, which is the value the crossing is about.
+        let (_, handle) = storage
+            .lookup_session_with_principal_memory
+            .iter()
+            .next()
+            .expect("the session index holds the session just created");
+        let account_principal = Principal::from_slice(&handle.account_principal);
         let locator = storage
             .lookup_account_with_principal_memory
             .get(&account_principal)
