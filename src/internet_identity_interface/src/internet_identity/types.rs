@@ -901,6 +901,11 @@ pub enum AccountSessionError {
     Unauthorized(Principal),
     NoSuchAccount,
     NoSuchSession,
+    /// The session is there, but no delegation was signed for the session key and
+    /// expiration asked for. Told apart from `NoSuchSession` because the remedies differ:
+    /// this one is answered by asking with the parameters `prepare_account_session`
+    /// signed, not by signing in again.
+    NoSuchDelegation,
     /// The browser's key is unusable, or its signature does not verify against it.
     InvalidBrowserKey,
     /// The browser presented a key it has already rotated away from, which happens when

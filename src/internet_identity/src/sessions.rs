@@ -1,15 +1,13 @@
-pub mod browser_key;
-
 use crate::authz_utils::{
     check_authorization, check_authz_and_record_activity, AuthorizationError, IdentityUpdateError,
 };
+use crate::browser_key::verify_browser_keys;
 use crate::delegation::{
     add_delegation_signature, calculate_session_seed_with_salt, canister_sig_principal,
-    check_frontend_length, der_encode_canister_sig_key, DelegationAccess,
+    der_encode_canister_sig_key, frontend_length_within_limit, DelegationAccess,
 };
-use crate::sessions::browser_key::verify_browser_keys;
 use crate::state::{self, storage_borrow, storage_borrow_mut};
-use crate::storage::account::{AccountKey, SessionRecord, SessionRecordKey};
+use crate::storage::account::{AccountKey, Session, SessionLocator};
 use crate::storage::anchor::BrowserError;
 use crate::storage::{CreateSessionParams, StorageError};
 use crate::{update_root_hash, DAY_NS, MINUTE_NS};
@@ -98,34 +96,19 @@ pub fn prepare_account_session(
     } = request;
 
     check_authz_and_record_activity(identity_number)?;
-    check_frontend_length(&origin);
+    frontend_length_within_limit(&origin).map_err(AccountSessionError::InternalCanisterError)?;
     if !browser_description_within_limits(&browser_description) {
         return Err(AccountSessionError::InternalCanisterError(
             "browser description exceeds the limit".to_string(),
         ));
     }
-    if !verify_browser_keys(
-        &current_browser_key,
-        &current_browser_key_signature,
-        &next_browser_key,
-        &next_browser_key_signature,
-        &session_key,
-    ) {
-        return Err(AccountSessionError::InvalidBrowserKey);
-    }
 
-    let now = time();
-    let valid_till = now.saturating_add(
-        valid_for
-            .unwrap_or(DEFAULT_SESSION_TTL_NS)
-            .clamp(MIN_SESSION_TTL_NS, MAX_SESSION_TTL_NS),
-    );
-    let access = DelegationAccess::from(permissions);
-    let read_only = access == DelegationAccess::ReadOnly;
-
-    // Checked before anything is written. An account this identity does not hold is the
-    // one failure a caller can provoke, and returning it after the writes below would
-    // leave a browser registered for a sign-in that never happened.
+    // Everything that can refuse, before anything is stored — and among the refusals, the
+    // cheap one first. An account this identity does not hold is the likeliest legitimate
+    // failure, so a request that was never going to succeed does not pay for two P-256
+    // verifications on the way to being told so. Nothing is revealed by the order:
+    // `check_authz_and_record_activity` above is the auth guard, so only the identity's
+    // own holder gets this far.
     if storage_borrow(|storage| {
         storage.read_account(&AccountKey {
             anchor_number: identity_number,
@@ -138,6 +121,24 @@ pub fn prepare_account_session(
         return Err(AccountSessionError::NoSuchAccount);
     }
 
+    let browser_keys = verify_browser_keys(
+        &current_browser_key,
+        &current_browser_key_signature,
+        &next_browser_key,
+        &next_browser_key_signature,
+        &session_key,
+    )
+    .ok_or(AccountSessionError::InvalidBrowserKey)?;
+
+    let now = time();
+    let valid_till = now.saturating_add(
+        valid_for
+            .unwrap_or(DEFAULT_SESSION_TTL_NS)
+            .clamp(MIN_SESSION_TTL_NS, MAX_SESSION_TTL_NS),
+    );
+    let access = DelegationAccess::from(permissions);
+    let read_only = access == DelegationAccess::ReadOnly;
+
     // The browser is resolved by the write, not here: registering it can put the registry
     // over its cap, and the browser that gives way takes its sessions with it. That is one
     // change with the session created below, so it is one write, and working any of it out
@@ -147,8 +148,7 @@ pub fn prepare_account_session(
             anchor_number: identity_number,
             origin: origin.clone(),
             account_number,
-            current_browser_key,
-            next_browser_key,
+            browser_keys,
             browser_description,
             valid_till_ns: valid_till,
             max_idle_ns: max_idle,
@@ -170,8 +170,9 @@ pub fn prepare_account_session(
 
     let seed = session_identity(identity_number, &origin, account_number, &session)
         .expect("failed to derive the identity of a session that was just created");
-    let account_principal = account_principal(identity_number, &origin, account_number)
-        .expect("failed to derive the principal of an account that was just read");
+    let account_principal =
+        get_account_principal_for_origin(identity_number, &origin, account_number)
+            .expect("failed to derive the principal of an account that was just read");
 
     state::signature_map_mut(|sigs| {
         add_delegation_signature(
@@ -179,6 +180,7 @@ pub fn prepare_account_session(
             session_key,
             seed.as_ref(),
             session.valid_till_ns,
+            Some(&session_delegation_targets()),
             None,
         );
     });
@@ -206,14 +208,14 @@ pub fn get_account_session(
     } = request;
 
     check_authorization(identity_number)?;
-    check_frontend_length(&origin);
+    frontend_length_within_limit(&origin).map_err(AccountSessionError::InternalCanisterError)?;
 
     // `prepare_account_session` handed the browser this id, so the session is named
     // exactly rather than searched for. An id naming a session that was replaced since
     // finds nothing, which is the honest answer: the delegation this call is collecting
     // was signed for the session that is gone.
     let session = storage_borrow(|storage| {
-        storage.read_session(&SessionRecordKey {
+        storage.read_session(&SessionLocator {
             anchor_number: identity_number,
             origin: origin.clone(),
             account_number,
@@ -222,19 +224,47 @@ pub fn get_account_session(
     })
     .ok_or(AccountSessionError::NoSuchSession)?;
 
-    let seed = session_identity(identity_number, &origin, account_number, &session)
-        .map_err(|_| AccountSessionError::NoSuchSession)?;
-    let signed_delegation = witness_session_delegation(&seed, &session_key, expiration)
-        .ok_or(AccountSessionError::NoSuchSession)?;
+    // Not `NoSuchSession`: the session was just read. A seed that will not derive means
+    // the salt is unset, which is a canister that never initialised rather than anything
+    // this caller named.
+    let seed = session_identity(identity_number, &origin, account_number, &session)?;
+
+    // The session is there and its seed derives, so what is missing is the signature for
+    // this `(session_key, expiration)` — a delegation, not a session. Saying
+    // `NoSuchSession` sent the frontend to sign in again when the answer is to ask with
+    // the parameters `prepare_account_session` signed.
+    let signed_delegation = get_session_delegation(&seed, &session_key, expiration)
+        .ok_or(AccountSessionError::NoSuchDelegation)?;
 
     Ok(GetAccountSessionResponse { signed_delegation })
 }
 
-fn witness_session_delegation(
+/// The one canister a session credential may call.
+///
+/// It exists to mint app delegations, which is an update call on this canister and
+/// nothing else. Scoping it here rather than leaving it to the frontend to add is the
+/// difference between a restriction and a request: the party holding the session key is
+/// the party that would have to add it, and can decline to.
+///
+/// `permissions` stays absent for the same reason it is set on app delegations: minting
+/// is an update call, so a read-only session that could not make one could not sign in
+/// to an app at all. Read-only travels on the app delegation this credential mints.
+fn session_delegation_targets() -> Vec<Principal> {
+    vec![ic_cdk::id()]
+}
+
+/// The signature `prepare_account_session` added, or `None` where it never signed for
+/// this `(session_key, expiration)`.
+///
+/// The message must match the one signed byte for byte, targets included, which is why
+/// both sides take them from [`session_delegation_targets`].
+fn get_session_delegation(
     seed: &Hash,
     session_key: &[u8],
     expiration: Timestamp,
 ) -> Option<SignedDelegation> {
+    let targets = session_delegation_targets();
+    let signed_targets = crate::delegation::target_bytes(&targets);
     state::assets_and_signatures(|certified_assets, sigs| {
         let inputs = CanisterSigInputs {
             domain: DELEGATION_SIG_DOMAIN,
@@ -242,7 +272,7 @@ fn witness_session_delegation(
             message: &crate::delegation::delegation_signature_msg_with_permissions(
                 session_key,
                 expiration,
-                None,
+                Some(&signed_targets),
                 None,
             ),
         };
@@ -253,7 +283,7 @@ fn witness_session_delegation(
         delegation: Delegation {
             pubkey: ByteBuf::from(session_key.to_vec()),
             expiration,
-            targets: None,
+            targets: Some(targets),
             permissions: None,
         },
         signature: ByteBuf::from(signature),
@@ -264,7 +294,7 @@ fn session_identity(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
     account_number: Option<AccountNumber>,
-    session: &SessionRecord,
+    session: &Session,
 ) -> Result<Hash, AccountSessionError> {
     let salt = storage_borrow(|storage| storage.salt().copied()).ok_or_else(|| {
         AccountSessionError::InternalCanisterError(StorageError::SaltNotSet.to_string())
@@ -291,7 +321,7 @@ fn session_identity(
 ///
 /// The account is read rather than reconstructed: a materialized default derives from
 /// `seed_from_anchor`, which only the stored list carries.
-fn account_principal(
+fn get_account_principal_for_origin(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
     account_number: Option<AccountNumber>,
