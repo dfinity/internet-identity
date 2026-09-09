@@ -2,7 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { fromCanisterBrowsers, nameOf, signOutBrowser } from "./browsers";
+import {
+  INACTIVE_AFTER_DAYS,
+  fromCanisterBrowsers,
+  inactiveDays,
+  kindOf,
+  nameOf,
+  signOutBrowser,
+} from "./browsers";
 import type {
   BrowserBrand,
   BrowserDescription,
@@ -67,6 +74,51 @@ describe("nameOf", () => {
   });
 });
 
+describe("kindOf", () => {
+  const withFormFactor = (form_factor: BrowserDescription["form_factor"]) => ({
+    ...CHROME_ON_A_MAC,
+    form_factor,
+  });
+
+  it.each([
+    [withFormFactor({ Mobile: null }), "phone"],
+    [withFormFactor({ Tablet: null }), "tablet"],
+    [withFormFactor({ Desktop: null }), "laptop"],
+    [withFormFactor({ Other: "watch" }), "unknown"],
+  ])("draws %o as a %s", (description, kind) => {
+    expect(kindOf(description)).toBe(kind);
+  });
+});
+
+describe("inactiveDays", () => {
+  const DAY = 86_400_000;
+  const now = Date.UTC(2026, 0, 31);
+  const lastUsed = (daysAgo: number) => ({
+    ...fromCanisterBrowsers([
+      [browser(1, BigInt(now - daysAgo * DAY) * 1_000_000n)],
+    ])[0],
+  });
+
+  it("says nothing about a browser used within the window", () => {
+    expect(
+      inactiveDays(lastUsed(INACTIVE_AFTER_DAYS - 1), now),
+    ).toBeUndefined();
+  });
+
+  it("counts whole days once the window has passed", () => {
+    expect(inactiveDays(lastUsed(INACTIVE_AFTER_DAYS), now)).toBe(
+      INACTIVE_AFTER_DAYS,
+    );
+    expect(inactiveDays(lastUsed(90), now)).toBe(90);
+  });
+
+  it("rounds down, so a browser is never reported as idle for longer than it was", () => {
+    expect(
+      inactiveDays({ ...lastUsed(45), lastUsedMillis: now - 45.9 * DAY }, now),
+    ).toBe(45);
+  });
+});
+
 describe("fromCanisterBrowsers", () => {
   it("reports no browsers for an identity that has never created a session", () => {
     expect(fromCanisterBrowsers([])).toEqual([]);
@@ -106,11 +158,21 @@ describe("fromCanisterBrowsers", () => {
       {
         id: 1,
         name: "Chrome on Mac",
+        description: CHROME_ON_A_MAC,
         createdAtMillis: 1_500,
         lastUsedMillis: 4_200,
+        sessionCount: 0,
         isCurrent: false,
       },
     ]);
+  });
+
+  it("carries the session count, which is what tells a signed-out browser apart", () => {
+    const [entry] = fromCanisterBrowsers([
+      [{ ...browser(1, BigInt(1_000_000_000)), session_count: 3 }],
+    ]);
+
+    expect(entry.sessionCount).toBe(3);
   });
 
   it("marks the browser being read from, so two of one name can be told apart", () => {
