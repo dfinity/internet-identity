@@ -70,7 +70,7 @@ const formFactorOf = (
   system: OperatingSystem,
   hints: { mobile?: boolean; formFactors?: string[] },
 ): FormFactor => {
-  if (hints.formFactors?.includes("Tablet")) return { Tablet: null };
+  if (hints.formFactors?.includes("Tablet") === true) return { Tablet: null };
   if ("Ipados" in system) return { Tablet: null };
   if (hints.mobile === true) return { Mobile: null };
   if ("Ios" in system) return { Mobile: null };
