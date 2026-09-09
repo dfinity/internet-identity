@@ -597,9 +597,48 @@ fn should_end_access_when_the_app_signs_out() -> Result<(), RejectResponse> {
     };
     assert!(refresh(&env).is_ok());
 
-    app_revoke_session(&env, canister_id, session_principal)?;
+    app_revoke_session(&env, canister_id, session_principal)?
+        .expect("signing a session out succeeds, present or not");
 
     assert_eq!(refresh(&env), Err(AppSessionError::NoMatchingSession));
+
+    Ok(())
+}
+
+/// The one reason sign-out finds the session rather than authorizing it: a session past
+/// its bounds is still the caller's to sign out, and refusing would leave its record and
+/// its index entry behind. Nothing else holds that in place — swap the lookup for the
+/// authorizing one and every other test here still passes.
+#[test]
+fn should_sign_out_a_session_that_has_already_expired() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::identity_info;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let mut request = session_request(identity_number);
+    request.valid_for = Some(10 * 60 * 1_000_000_000);
+    let prepared = prepare_account_session(&env, canister_id, principal_1(), request)?.unwrap();
+    let session_principal = Principal::self_authenticating(&prepared.user_key);
+
+    let session_count = |env: &PocketIc| -> Result<u32, RejectResponse> {
+        Ok(
+            identity_info(env, canister_id, principal_1(), identity_number)?
+                .unwrap()
+                .browsers
+                .unwrap()[0]
+                .session_count,
+        )
+    };
+    assert_eq!(session_count(&env)?, 1);
+
+    env.advance_time(Duration::from_secs(11 * 60));
+
+    app_revoke_session(&env, canister_id, session_principal)?
+        .expect("an expired session is still the caller's to sign out");
+
+    // The record and its index entry are gone, not merely unusable.
+    assert_eq!(session_count(&env)?, 0);
 
     Ok(())
 }
@@ -612,7 +651,8 @@ fn should_treat_a_repeated_sign_out_as_success() -> Result<(), RejectResponse> {
     let (_, session_principal) = create_session(&env, canister_id, identity_number);
 
     for _ in 0..3 {
-        app_revoke_session(&env, canister_id, session_principal)?;
+        app_revoke_session(&env, canister_id, session_principal)?
+            .expect("signing a session out succeeds, present or not");
     }
 
     Ok(())
@@ -632,7 +672,8 @@ fn should_leave_another_browsers_session_alone() -> Result<(), RejectResponse> {
     let second_principal = Principal::self_authenticating(&second.user_key);
     assert_ne!(second.user_key, first.user_key);
 
-    app_revoke_session(&env, canister_id, first_principal)?;
+    app_revoke_session(&env, canister_id, first_principal)?
+        .expect("signing a session out succeeds, present or not");
 
     let still_works = app_prepare_delegation(
         &env,
