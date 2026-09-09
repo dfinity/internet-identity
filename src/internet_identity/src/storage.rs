@@ -3421,7 +3421,11 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// The key names one session by its id, so a key for a session that was replaced since
     /// finds nothing rather than taking its successor down with it.
-    pub fn revoke_session(&mut self, key: &SessionRecordKey) -> Result<bool, StorageError> {
+    pub fn revoke_session(
+        &mut self,
+        key: &SessionRecordKey,
+        now: Timestamp,
+    ) -> Result<bool, StorageError> {
         if self
             .lookup_application_number_with_origin(&key.origin)
             .is_none()
@@ -3453,6 +3457,7 @@ impl<M: Memory + Clone> Storage<M> {
 
         self.write_account_state(
             anchor,
+            now,
             BTreeMap::from([(key.origin.clone(), Some((account_references, config)))]),
         )?;
         Ok(true)

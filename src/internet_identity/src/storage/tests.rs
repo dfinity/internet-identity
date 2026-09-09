@@ -6544,6 +6544,7 @@ mod session_refresh_stamp_tests {
 mod session_removal_tests {
     use super::held_references;
     use super::params;
+    use super::TEST_NOW;
     use crate::storage::account::SessionRecordKey;
     use crate::storage::CreateSessionParams;
     use crate::Storage;
@@ -6604,7 +6605,7 @@ mod session_removal_tests {
     fn removing_a_session_leaves_the_others() {
         let (mut storage, anchor_number, _, keys) = storage_with_sessions(&[1, 2, 3]);
 
-        let removed = storage.revoke_session(&keys[1]).unwrap();
+        let removed = storage.revoke_session(&keys[1], TEST_NOW).unwrap();
 
         assert!(removed);
         // Ids in registration order, so the seeds 1, 2, 3 became 0, 1, 2.
@@ -6614,9 +6615,9 @@ mod session_removal_tests {
     #[test]
     fn removing_a_session_twice_reports_nothing_removed() {
         let (mut storage, anchor_number, _, keys) = storage_with_sessions(&[1]);
-        storage.revoke_session(&keys[0]).unwrap();
+        storage.revoke_session(&keys[0], TEST_NOW).unwrap();
 
-        let removed = storage.revoke_session(&keys[0]).unwrap();
+        let removed = storage.revoke_session(&keys[0], TEST_NOW).unwrap();
 
         assert!(!removed);
         assert_eq!(sessions(&storage, anchor_number), Vec::<u32>::new());
@@ -6626,7 +6627,7 @@ mod session_removal_tests {
     fn removing_the_last_session_keeps_the_reference() {
         let (mut storage, anchor_number, application_number, keys) = storage_with_sessions(&[1]);
 
-        storage.revoke_session(&keys[0]).unwrap();
+        storage.revoke_session(&keys[0], TEST_NOW).unwrap();
 
         assert_ne!(
             storage.stored_account_references(anchor_number, application_number),

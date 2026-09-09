@@ -520,7 +520,7 @@ fn app_prepare_delegation(
 
 #[update]
 fn app_revoke_session() {
-    sessions::app_revoke_session()
+    sessions::app_revoke_session(ic_cdk::api::time())
 }
 
 #[query]
