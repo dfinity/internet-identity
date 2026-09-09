@@ -3842,6 +3842,7 @@ mod default_account_tracking_tests {
 mod tracked_default_eviction_tests {
     use super::application_number_for;
     use super::held_references;
+    use super::params;
     use super::record_use;
     use super::remove_at;
     use super::write_at;
@@ -3873,6 +3874,32 @@ mod tracked_default_eviction_tests {
 
     fn sign_in_at(storage: &mut Storage<VectorMemory>, anchor_number: AnchorNumber, index: u64) {
         record_use(storage, anchor_number, origin_of(index), None, index + 1).unwrap();
+    }
+
+    /// Eviction on the sign-in path, which every other test here reaches through a
+    /// one-origin write instead. A sign-in that hands the gate every origin it holds
+    /// makes each of them a written origin, and a written origin is never a candidate for
+    /// its own eviction — so nothing is ever evicted by the one write that creates the
+    /// tracked defaults eviction exists to bound.
+    #[test]
+    fn a_sign_in_evicts_the_stale_defaults_too() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        // The cap reached by other origins, so the sign-in below is the write that has to
+        // make room rather than the list being made room for.
+        for index in 0..MAX_EVICTABLE_DEFAULT_ACCOUNTS {
+            sign_in_at(&mut storage, anchor_number, index);
+        }
+
+        let mut params = params(anchor_number, 1, 1_000);
+        params.origin = origin_of(MAX_EVICTABLE_DEFAULT_ACCOUNTS);
+        storage.create_session(params).unwrap();
+
+        // Down to the watermark, and then the origin that triggered the pass on top of it.
+        assert_eq!(
+            storage.evictable_default_lists(anchor_number).len() as u64,
+            EVICTABLE_DEFAULT_ACCOUNTS_WATERMARK + 1
+        );
     }
 
     #[test]
@@ -5270,6 +5297,7 @@ mod session_creation_tests {
         CreateSessionParams, MAX_SESSIONS_PER_ANCHOR, SESSIONS_WATERMARK_PER_ANCHOR,
     };
     use crate::{Storage, DAY_NS, MINUTE_NS};
+    use candid::Principal;
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
     use pretty_assertions::assert_eq;
@@ -5284,6 +5312,43 @@ mod session_creation_tests {
         let anchor_number = anchor.anchor_number();
         storage.write(anchor).unwrap();
         (storage, anchor_number)
+    }
+
+    /// A replaced session stops resolving, which nothing else here observes: creation
+    /// puts a principal in the index and revocation takes it out, and both are asked
+    /// about elsewhere, but a sign-in that supersedes a session removes the old principal
+    /// while inserting the new one in the same write. A superseded principal left behind
+    /// would still resolve to a record no list holds.
+    #[test]
+    fn replacing_a_session_takes_its_principal_out_of_the_index() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+
+        storage
+            .create_session(params(anchor_number, 7, 1_000))
+            .unwrap();
+        let superseded: Vec<Principal> = storage
+            .lookup_session_with_principal_memory
+            .iter()
+            .map(|(principal, _)| principal)
+            .collect();
+        assert_eq!(superseded.len(), 1);
+
+        // The same browser, the same origin, presenting the successor it announced: this
+        // replaces the session rather than adding one.
+        storage
+            .create_session(params_at(anchor_number, 7, 1, 2_000))
+            .unwrap();
+
+        let held: Vec<Principal> = storage
+            .lookup_session_with_principal_memory
+            .iter()
+            .map(|(principal, _)| principal)
+            .collect();
+        assert_eq!(held.len(), 1, "one session, so one principal: {held:?}");
+        assert!(
+            !held.contains(&superseded[0]),
+            "the superseded session's principal still resolves: {held:?}"
+        );
     }
 
     /// A browser the registry gave up takes its sessions with it, wherever they were, in
@@ -6244,13 +6309,19 @@ mod browser_session_count_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
 
         // Two sessions on the browser that will be given up, so a count that outlived its
-        // entry would be visible rather than indistinguishable from a fresh one.
+        // entry would be visible rather than indistinguishable from a fresh one. At two
+        // origins, because a second sign-in at the same one replaces the session already
+        // there and would leave this browser holding one.
         storage
             .create_session(params(anchor_number, 7, 1_000))
             .unwrap();
         storage
-            .create_session(params_at(anchor_number, 7, 1, 1_000))
+            .create_session(CreateSessionParams {
+                origin: "https://elsewhere.example".to_string(),
+                ..params_at(anchor_number, 7, 1, 1_000)
+            })
             .unwrap();
+        assert_eq!(counts(&storage, anchor_number).0.get(&0), Some(&2));
 
         for index in 0..MAX_BROWSERS {
             storage
