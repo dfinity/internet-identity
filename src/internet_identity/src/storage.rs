@@ -2945,31 +2945,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
-    /// The principal an app sees for an account, which is what a session handle names.
-    fn account_principal_of(
-        &self,
-        anchor_number: AnchorNumber,
-        application_number: ApplicationNumber,
-        account_number: Option<AccountNumber>,
-    ) -> Option<Principal> {
-        let salt = self.salt().copied()?;
-        let account = self.read_account(&AccountKey {
-            anchor_number,
-            origin: self
-                .stable_application_memory
-                .get(&application_number)?
-                .origin
-                .clone(),
-            account_number,
-        })?;
-        Some(delegation::canister_sig_principal(
-            canister_id(),
-            account.calculate_seed_with_salt(&salt).to_vec(),
-        ))
-    }
-
     /// Hands out the next session id, which no session has held before.
     ///
     /// Refuses at the ceiling rather than saturating. The id is an input to the session
