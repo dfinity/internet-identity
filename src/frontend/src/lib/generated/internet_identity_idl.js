@@ -416,6 +416,7 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
     'NoSuchSession' : IDL.Null,
+    'NoSuchDelegation' : IDL.Null,
     'NoSuchAccount' : IDL.Null,
     'InvalidBrowserKey' : IDL.Null,
     'StaleBrowserKey' : IDL.Null,
@@ -960,7 +961,11 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'app_revoke_session' : IDL.Func([], [], []),
+    'app_revoke_session' : IDL.Func(
+        [],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : AppSessionError })],
+        [],
+      ),
     'authn_method_add' : IDL.Func(
         [IdentityNumber, AuthnMethodData],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : AuthnMethodAddError })],
