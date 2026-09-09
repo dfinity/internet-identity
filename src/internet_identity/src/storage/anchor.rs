@@ -766,6 +766,31 @@ impl Anchor {
         }
     }
 
+    /// What a caller outside storage may know about this anchor's browsers: an
+    /// identifier, what the browser said it was, and when. The keys stay here — they
+    /// are how a sign-in proves which entry it is, so handing them out would let
+    /// anyone who can read an identity's browsers claim one.
+    ///
+    /// `None` rather than an empty list, because that is the shape the interface
+    /// carries and no caller wants the difference.
+    pub fn browsers_info(&self) -> Option<Vec<BrowserInfo>> {
+        if self.browsers.is_empty() {
+            return None;
+        }
+        Some(
+            self.browsers
+                .iter()
+                .map(|browser| BrowserInfo {
+                    id: browser.id,
+                    description: browser.description.clone(),
+                    created_at: browser.created_at,
+                    last_used: browser.last_used,
+                    session_count: browser.session_count,
+                })
+                .collect(),
+        )
+    }
+
     /// Resolves the browser a sign-in came from by the public key it proved possession of.
     ///
     /// An entry is reached only by the successor it announced. Presenting it promotes that

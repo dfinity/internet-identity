@@ -79,7 +79,7 @@
 //!
 //! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
 //! bucket of 128 pages.
-use account::{Account, AccountKey, AccountsCounter, SessionRecordKey};
+use account::{Account, AccountKey, AccountsCounter, SessionLocator};
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use std::borrow::Cow;
@@ -102,14 +102,16 @@ use ic_stable_structures::{
 use identity_jose::jwk::Jwk;
 use internet_identity_interface::archive::types::BufferedEntry;
 
-use crate::delegation::{self, check_frontend_length};
-use crate::delegation::{calculate_session_seed_with_salt, canister_sig_principal};
+use crate::browser_key::VerifiedBrowserKeys;
+use crate::delegation::{
+    self, calculate_session_seed_with_salt, canister_sig_principal, check_frontend_length,
+};
 use crate::openid::OpenIdCredentialKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
-    AccountReference, SessionRecord, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
+    AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
 use crate::storage::anchor::{Anchor, BrowserError, MAX_BROWSERS};
 use crate::storage::memory_wrapper::MemoryWrapper;
@@ -1629,7 +1631,7 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// Policy rather than a rule, which is why it shapes the write instead of living in
     /// the write path. Storage refuses a state over the cap; which live sessions give way
-    /// to make room is this function's opinion, and [`SessionRecord::reclaim_sort_key`] is
+    /// to make room is this function's opinion, and [`Session::reclaim_sort_key`] is
     /// where that opinion is written down. Clearing to the watermark rather than to the
     /// cap is what keeps the next few sign-ins from each sweeping again.
     ///
@@ -1641,7 +1643,7 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: AnchorNumber,
         now: Timestamp,
     ) -> BTreeSet<SessionId> {
-        let stored: Vec<SessionRecord> = self
+        let stored: Vec<Session> = self
             .stable_account_reference_list_memory
             .range(
                 (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
@@ -1652,7 +1654,7 @@ impl<M: Memory + Clone> Storage<M> {
 
         // Selected from what is stored, so the session the write is creating is never a
         // candidate for the pass that made room for it.
-        let (over, live): (Vec<SessionRecord>, Vec<SessionRecord>) = stored
+        let (over, live): (Vec<Session>, Vec<Session>) = stored
             .into_iter()
             .partition(|session| session.is_expired_or_idle(now));
 
@@ -1718,10 +1720,21 @@ impl<M: Memory + Clone> Storage<M> {
                 (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
             )
             .filter_map(|((_, application_number), list)| {
-                // An origin index that no longer resolves leaves a list naming nothing.
-                // It is not something a caller can write, so it is not something this
-                // hands back.
-                let application = self.stable_application_memory.get(&application_number)?;
+                // A reference list for an application that does not exist is illegal, and
+                // this is where it surfaces: the write gate is keyed by origin, so a list
+                // whose application number resolves to nothing cannot be handed to a
+                // caller. Skipping it is still the right answer — refusing here would
+                // block every sweep for the identity, including the origins that do
+                // resolve — but it is not something to pass over quietly.
+                let Some(application) = self.stable_application_memory.get(&application_number)
+                else {
+                    ic_cdk::println!(
+                        "ERROR: account reference list invariant violated: identity \
+                         {anchor_number} holds a list for application {application_number}, \
+                         which is not stored. Its sessions are unreachable and unrevocable."
+                    );
+                    return None;
+                };
                 let account_references = Vec::<AccountReference>::from(list)
                     .into_iter()
                     .map(AccountReferenceWrite::from)
@@ -1841,7 +1854,7 @@ impl<M: Memory + Clone> Storage<M> {
     fn without_sessions(
         &self,
         anchor_number: AnchorNumber,
-        gone: impl Fn(&SessionRecord) -> bool,
+        gone: impl Fn(&Session) -> bool,
         mut writes: BTreeMap<FrontendHostname, AccountReferenceListWrite>,
     ) -> BTreeMap<FrontendHostname, AccountReferenceListWrite> {
         let holds_one = |held: &AccountReferenceListWrite| {
@@ -2967,20 +2980,19 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(session_id)
     }
 
-    // Called by the sign-in ceremony, which lands two PRs up.
+    // Called by `prepare_account_session`, which lands two PRs up.
     #[allow(dead_code)]
     /// Creates the session `prepare_account_session` mints an identity from, replacing
     /// whatever this browser already held at this account.
     pub fn create_session(
         &mut self,
         params: CreateSessionParams,
-    ) -> Result<(SessionRecordKey, SessionRecord), StorageError> {
+    ) -> Result<(SessionLocator, Session), StorageError> {
         let CreateSessionParams {
             anchor_number,
             origin,
             account_number,
-            current_browser_key,
-            next_browser_key,
+            browser_keys,
             browser_description,
             valid_till_ns,
             max_idle_ns,
@@ -3038,8 +3050,8 @@ impl<M: Memory + Clone> Storage<M> {
         // the record reaches storage only through the write at the end.
         let (browser_id, _) = anchor
             .resolve_browser(
-                current_browser_key,
-                next_browser_key,
+                browser_keys.current().clone(),
+                browser_keys.next().clone(),
                 browser_description,
                 now_ns,
             )
@@ -3076,7 +3088,7 @@ impl<M: Memory + Clone> Storage<M> {
         // A ceremony replaces whatever this browser held here, rather than reusing it: the
         // copy of an old session's chain stops working at the user's next sign-in instead of
         // at its expiry.
-        let mut dropped: Vec<(Option<AccountNumber>, SessionRecord)> = vec![];
+        let mut dropped: Vec<(Option<AccountNumber>, Session)> = vec![];
         reference.sessions.retain(|session| {
             if session.browser_id == browser_id {
                 dropped.push((account_number, session.clone()));
@@ -3085,11 +3097,12 @@ impl<M: Memory + Clone> Storage<M> {
             true
         });
 
-        // After the checks that can refuse this ceremony, so a refused one does not burn
-        // an id. Ids need not be contiguous, so a later failure leaving a gap is fine;
-        // what must never happen is one being handed out twice.
+        // A gap costs nothing — ids need not be contiguous, and the write below can still
+        // refuse this ceremony. What must never happen is an id being handed out twice:
+        // it is an input to the session seed, so a reissued one would let a revoked
+        // session's identity be reached a second time.
         let session_id = self.allocate_session_id()?;
-        let session = SessionRecord {
+        let session = Session {
             session_id,
             created_at_ns: now_ns,
             valid_till_ns,
@@ -3121,7 +3134,7 @@ impl<M: Memory + Clone> Storage<M> {
         // this origin gets if it did not have one, and the identity's session count.
         self.write_account_state(anchor, now_ns, state)?;
 
-        let key = SessionRecordKey {
+        let key = SessionLocator {
             anchor_number,
             origin,
             account_number,
@@ -3134,8 +3147,8 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// A key whose session was replaced reads as `None` rather than as its successor:
     /// the successor was allocated an id of its own.
-    #[allow(dead_code)] // Used by the sign-in ceremony, which lands two PRs up.
-    pub fn read_session(&self, key: &SessionRecordKey) -> Option<SessionRecord> {
+    #[allow(dead_code)] // Read by `get_account_session`, which lands two PRs up.
+    pub fn read_session(&self, key: &SessionLocator) -> Option<Session> {
         let application_number = self.lookup_application_number_with_origin(&key.origin)?;
 
         self.account_references(key.anchor_number, application_number)
@@ -3146,7 +3159,7 @@ impl<M: Memory + Clone> Storage<M> {
             .find(|session| session.session_id == key.session_id)
     }
 
-    // Called by the sign-in ceremony, which lands two PRs up.
+    // Called by the `revoke_browser_sessions` endpoint, which lands six PRs up.
     #[allow(dead_code)]
     /// Signs one browser out of everything, in a single message.
     pub fn revoke_browser_sessions(
@@ -3902,17 +3915,20 @@ impl<M: Memory + Clone> Storage<M> {
     }
 }
 
-// Constructed by the sign-in ceremony, which lands two PRs up.
+// Constructed by `prepare_account_session`, which lands two PRs up.
 #[allow(dead_code)]
 pub struct CreateSessionParams {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
-    /// What the browser proves it holds, and the successor it announces. Its registry
-    /// entry, its id, and whatever the cap gives up to make room for it are all worked out
-    /// inside the write, so no caller states any of them.
-    pub current_browser_key: PublicKey,
-    pub next_browser_key: PublicKey,
+    /// The keys the browser proved it holds, and the successor it announced. Verified
+    /// rather than reported: registering an entry from keys nobody proved would let one
+    /// browser be claimed by whoever read its keys off the wire, so what this takes is
+    /// the evidence and not two byte strings.
+    ///
+    /// Its registry entry, its id, and whatever the cap gives up to make room for it are
+    /// all worked out inside the write, so no caller states any of them.
+    pub browser_keys: VerifiedBrowserKeys,
     /// Taken only where this sign-in registers a browser. An entry that is advanced
     /// keeps the description it was registered with.
     pub browser_description: BrowserDescription,
