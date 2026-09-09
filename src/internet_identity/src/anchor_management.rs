@@ -303,12 +303,12 @@ pub fn lookup_caller_identity_by_recovery_phrase(caller: Principal) -> Option<Id
     storage_borrow(|storage| storage.lookup_anchor_with_recovery_phrase_principal(caller))
 }
 
-/// Check if the given `PublicKey` is not used by any anchor.
-pub fn check_passkey_pubkey_is_not_used(pubkey: &PublicKey) -> Result<(), String> {
-    storage_borrow(|storage| storage.lookup_anchor_with_passkey_pubkey(pubkey))
+/// Check if the given `PublicKey` is not used by any anchor, as a passkey or as a recovery key.
+pub fn check_pubkey_is_not_used(pubkey: &PublicKey) -> Result<(), String> {
+    storage_borrow(|storage| storage.lookup_anchor_with_pubkey(pubkey))
         .is_none()
         .then_some(())
-        .ok_or_else(|| "passkey with this public key is already used".to_string())
+        .ok_or_else(|| "a device with this public key is already used".to_string())
 }
 
 /// Set `name` of the given anchor.

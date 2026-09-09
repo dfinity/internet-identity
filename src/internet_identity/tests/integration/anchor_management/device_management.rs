@@ -315,7 +315,7 @@ fn should_enforce_unique_passkey_pubkeys_in_legacy_flows() -> Result<(), RejectR
     expect_user_error_with_message(
         result_add_conflict,
         CanisterCalledTrap,
-        Regex::new("passkey with this public key is already used").unwrap(),
+        Regex::new("a device with this public key is already used").unwrap(),
     );
 
     // 2. Tentative device flow: adding a tentative device with pubkey P0 to B0
@@ -335,6 +335,48 @@ fn should_enforce_unique_passkey_pubkeys_in_legacy_flows() -> Result<(), RejectR
         AddTentativeDeviceResponse::PasskeyWithThisPublicKeyIsAlreadyUsed
     );
 
+    Ok(())
+}
+
+/// Verifies that a recovery key held by one anchor cannot be added to another.
+#[test]
+fn should_enforce_unique_recovery_pubkeys_across_anchors() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+
+    let user_number_a =
+        flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
+    api::add(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number_a,
+        &recovery_device_data_1(),
+    )?;
+
+    let user_number_b =
+        flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
+    let result = api::add(
+        &env,
+        canister_id,
+        principal_2(),
+        user_number_b,
+        &recovery_device_data_1(),
+    );
+
+    expect_user_error_with_message(
+        result,
+        CanisterCalledTrap,
+        Regex::new("a device with this public key is already used").unwrap(),
+    );
+
+    assert_eq!(
+        api::lookup(&env, canister_id, user_number_b)?
+            .into_iter()
+            .filter(|device| device.pubkey == recovery_device_data_1().pubkey)
+            .count(),
+        0
+    );
     Ok(())
 }
 

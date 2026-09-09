@@ -170,6 +170,8 @@ fn verify_tentative_device(
                 // AuthorizationKey; finalize re-auth remains the gate. (Eager
                 // drop is reserved for remove/replace paths — same as
                 // authn_method_add / OpenID add.)
+                anchor_management::check_pubkey_is_not_used(&confirmed_device.pubkey)
+                    .unwrap_or_else(|err| trap(&err));
                 anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
                 let operation = anchor_management::add_device(&mut anchor, confirmed_device);
                 if let Err(err) = state::storage_borrow_mut(|storage| storage.write(anchor)) {
@@ -217,7 +219,7 @@ fn register(
 #[update]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
-        anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)?;
+        anchor_management::check_pubkey_is_not_used(&device_data.pubkey)?;
 
         Ok::<_, String>(((), anchor_management::add_device(anchor, device_data)))
     })
@@ -228,7 +230,7 @@ fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         if device_key != device_data.pubkey {
-            anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)?;
+            anchor_management::check_pubkey_is_not_used(&device_data.pubkey)?;
         }
 
         Ok::<_, String>((
@@ -243,7 +245,7 @@ fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devic
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         if device_key != device_data.pubkey {
-            anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)?;
+            anchor_management::check_pubkey_is_not_used(&device_data.pubkey)?;
         }
 
         let operation =
@@ -1273,9 +1275,9 @@ mod v2_api {
                     AuthnMethodRegistrationModeExitError::InvalidMetadata(err.to_string())
                 })?;
 
-            anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey).map_err(
-                |_| AuthnMethodRegistrationModeExitError::PasskeyWithThisPublicKeyIsAlreadyUsed,
-            )?;
+            anchor_management::check_pubkey_is_not_used(&device_data.pubkey).map_err(|_| {
+                AuthnMethodRegistrationModeExitError::PasskeyWithThisPublicKeyIsAlreadyUsed
+            })?;
 
             // Add device to anchor with bookkeeping
             let mut anchor = state::anchor(identity_number);
@@ -1363,6 +1365,8 @@ mod v2_api {
             // Adding a method does not invalidate a pinned prepare-time
             // AuthorizationKey (see verify_tentative_device). No pending
             // email-challenge drop here — match authn_method_add / OpenID add.
+            anchor_management::check_pubkey_is_not_used(&confirmed_device.pubkey)
+                .map_err(AuthnMethodConfirmationError::InternalCanisterError)?;
             anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
             let operation = anchor_management::add_device(&mut anchor, confirmed_device);
             state::storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| {
