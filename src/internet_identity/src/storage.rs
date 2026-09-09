@@ -1642,7 +1642,7 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// Policy rather than a rule, which is why it shapes the write instead of living in
     /// the write path. Storage refuses a state over the cap; which live sessions give way
-    /// to make room is this function's opinion, and [`SessionRecord::reclaim_order`] is
+    /// to make room is this function's opinion, and [`SessionRecord::reclaim_sort_key`] is
     /// where that opinion is written down. Clearing to the watermark rather than to the
     /// cap is what keeps the next few sign-ins from each sweeping again.
     ///
@@ -1665,8 +1665,9 @@ impl<M: Memory + Clone> Storage<M> {
 
         // Selected from what is stored, so the session the write is creating is never a
         // candidate for the pass that made room for it.
-        let (over, live): (Vec<SessionRecord>, Vec<SessionRecord>) =
-            stored.into_iter().partition(|session| session.is_over(now));
+        let (over, live): (Vec<SessionRecord>, Vec<SessionRecord>) = stored
+            .into_iter()
+            .partition(|session| session.is_expired_or_idle(now));
 
         let mut giving_up: BTreeSet<SessionId> =
             over.into_iter().map(|session| session.session_id).collect();
@@ -1677,7 +1678,7 @@ impl<M: Memory + Clone> Storage<M> {
         // Ascending, so the least demonstrated use comes first and is given up first.
         let mut ordered: Vec<((bool, Timestamp, SessionId), SessionId)> = live
             .iter()
-            .map(|session| (session.reclaim_order(now), session.session_id))
+            .map(|session| (session.reclaim_sort_key(now), session.session_id))
             .collect();
         ordered.sort();
         let over_watermark = ordered.len() - SESSIONS_WATERMARK_PER_ANCHOR as usize;
@@ -3118,7 +3119,7 @@ impl<M: Memory + Clone> Storage<M> {
         for write in account_references.iter_mut() {
             let account_number = write.account_reference.account_number;
             write.account_reference.sessions.retain(|session| {
-                if session.is_over(now_ns) {
+                if session.is_expired_or_idle(now_ns) {
                     dropped.push((account_number, session.clone()));
                     return false;
                 }

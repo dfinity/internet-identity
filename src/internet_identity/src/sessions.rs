@@ -413,7 +413,7 @@ fn authorize_session(
     })
     .ok_or(AppSessionError::NoMatchingSession)?;
 
-    if session.is_over(now) {
+    if session.is_expired_or_idle(now) {
         return Err(AppSessionError::NoMatchingSession);
     }
     Ok((key, account, session))
