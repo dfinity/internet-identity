@@ -373,8 +373,15 @@ pub fn app_prepare_delegation(
     let seed = account_seed(&account)?;
     let access = DelegationAccess::from_read_only(session.read_only);
 
-    storage_borrow_mut(|storage| storage.record_session_use(&locator, now))
-        .map_err(|err| AppSessionError::InternalCanisterError(err.to_string()))?;
+    // A session revoked between `authorize_session` above and this stamp is a race, not
+    // an internal fault: the answer is the one the caller would have got a moment
+    // earlier.
+    storage_borrow_mut(|storage| storage.record_session_use(&locator, now)).map_err(
+        |err| match err {
+            StorageError::SessionNotFound { .. } => AppSessionError::NoSuchSession,
+            other => AppSessionError::InternalCanisterError(other.to_string()),
+        },
+    )?;
 
     state::signature_map_mut(|sigs| {
         add_delegation_signature(
@@ -404,10 +411,14 @@ pub fn app_get_delegation(
         account, session, ..
     } = authorize_session(now)?;
 
+    // An expiration this canister would never have signed, which means one the caller
+    // did not get from `app_prepare_delegation`: that returns
+    // `min(now + APP_DELEGATION_TTL_NS, session.valid_till_ns)`, and `now` has only
+    // advanced since, so the value it handed out cannot exceed either bound here.
     if request.expiration > now.saturating_add(APP_DELEGATION_TTL_NS)
         || request.expiration > session.valid_till_ns
     {
-        return Err(AppSessionError::NoMatchingSession);
+        return Err(AppSessionError::NoSuchDelegation);
     }
 
     let seed = account_seed(&account)?;
@@ -436,7 +447,9 @@ pub fn app_get_delegation(
         },
         signature: ByteBuf::from(signature),
     })
-    .map_err(|_| AppSessionError::NoMatchingSession)
+    // The session is live — `authorize_session` above said so — so a signature that is
+    // not there was never added for these parameters.
+    .map_err(|_| AppSessionError::NoSuchDelegation)
 }
 
 /// A live session the caller has been proved to be, and where it lives.
@@ -460,7 +473,7 @@ fn authorize_session(now: Timestamp) -> Result<AuthorizedSession, AppSessionErro
     // Either bound: a session past its lifetime and one nobody has used for longer
     // than it was allowed are equally gone, and a refresh is the thing that finds out.
     if session.is_expired_or_idle(now) {
-        return Err(AppSessionError::NoMatchingSession);
+        return Err(AppSessionError::NoSuchSession);
     }
     Ok(AuthorizedSession {
         locator,
@@ -499,7 +512,7 @@ pub fn app_revoke_session(now: Timestamp) -> Result<(), AppSessionError> {
 /// The caller's session as stored, without asking whether it is still live.
 fn find_caller_session() -> Result<(SessionLocator, Account, Session), AppSessionError> {
     let locator = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
-        .ok_or(AppSessionError::NoMatchingSession)?;
+        .ok_or(AppSessionError::NoSuchSession)?;
 
     let (account, session) = storage_borrow(|storage| {
         Some((
@@ -507,7 +520,7 @@ fn find_caller_session() -> Result<(SessionLocator, Account, Session), AppSessio
             storage.read_session(&locator)?,
         ))
     })
-    .ok_or(AppSessionError::NoMatchingSession)?;
+    .ok_or(AppSessionError::NoSuchSession)?;
 
     Ok((locator, account, session))
 }
@@ -523,8 +536,16 @@ pub fn revoke_browser_sessions(
     request: RevokeBrowserSessionsRequest,
     now: Timestamp,
 ) -> Result<(), SessionRevokeError> {
-    check_authorization(request.identity_number)
-        .map_err(|err| SessionRevokeError::Unauthorized(err.principal))?;
+    // The recording form, as the twelve other authenticated updates in `main.rs` use:
+    // what it stamps is that the access method authenticated, which it did, and signing
+    // every browser out is exactly the kind of thing the access page's `last_used` should
+    // reflect. This path writes anyway, so the stamp costs nothing extra.
+    check_authz_and_record_activity(request.identity_number).map_err(|err| match err {
+        IdentityUpdateError::Unauthorized(principal) => SessionRevokeError::Unauthorized(principal),
+        IdentityUpdateError::StorageError(_, storage_error) => {
+            SessionRevokeError::InternalCanisterError(storage_error.to_string())
+        }
+    })?;
 
     storage_borrow_mut(|storage| {
         storage.revoke_browser_sessions(request.identity_number, request.browser_id, now)
