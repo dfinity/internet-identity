@@ -1,41 +1,32 @@
 <script lang="ts">
-  import {
-    CircleAlertIcon,
-    LaptopIcon,
-    MonitorSmartphoneIcon,
-    SmartphoneIcon,
-    TabletIcon,
-  } from "@lucide/svelte";
   import type { BrowserDescription } from "$lib/generated/internet_identity_types";
   import Badge from "$lib/components/ui/Badge.svelte";
   import { t } from "$lib/stores/locale.store";
-  import { brandIconOf, kindOf } from "../browsers";
+  import { brandIconOf, brandNameOf } from "../browsers";
 
   type Action = "sign-out" | "signing-out" | "signed-out" | "none";
 
   interface Props {
     description: BrowserDescription;
-    name: string;
     /** Already formatted: a relative time, or "Never" for a browser with no record. */
     lastUsed: string;
     /** Already formatted: a short date, or "Now" for a browser with no record. */
     firstSeen: string;
-    inactiveDays?: number;
+    /** Marks the browser this page is being read from, wherever it falls in the list. */
+    isCurrent?: boolean;
     action: Action;
     onSignOut?: () => void;
   }
 
   const {
     description,
-    name,
     lastUsed,
     firstSeen,
-    inactiveDays,
+    isCurrent = false,
     action,
     onSignOut,
   }: Props = $props();
 
-  const kind = $derived(kindOf(description));
   const brandIcon = $derived(brandIconOf(description));
   const dimmed = $derived(action === "signed-out");
 </script>
@@ -43,28 +34,9 @@
 <div
   class="flex flex-row items-start gap-3 py-3 pr-5 pl-4 sm:items-center sm:gap-3"
 >
-  <span
-    class="border-border-secondary bg-bg-secondary relative flex size-10 shrink-0 items-center justify-center rounded-md border {dimmed
-      ? 'text-fg-disabled'
-      : 'text-fg-tertiary'}"
-    aria-hidden="true"
-  >
-    {#if kind === "laptop"}
-      <LaptopIcon class="size-5" />
-    {:else if kind === "phone"}
-      <SmartphoneIcon class="size-5" />
-    {:else if kind === "tablet"}
-      <TabletIcon class="size-5" />
-    {:else}
-      <MonitorSmartphoneIcon class="size-5" />
-    {/if}
+  <span class="flex size-5 shrink-0 items-center justify-center">
     {#if brandIcon !== undefined}
-      <!-- The ring is the card's own colour, so the mark reads as sitting on the tile. -->
-      <span
-        class="bg-bg-primary ring-bg-primary absolute -right-1 -bottom-1 flex size-3.5 rounded-full ring-2"
-      >
-        <img src={brandIcon} alt="" class="size-3.5" />
-      </span>
+      <img src={brandIcon} alt="" class="size-5 {dimmed ? 'opacity-50' : ''}" />
     {/if}
   </span>
 
@@ -78,15 +50,12 @@
             ? 'text-text-tertiary'
             : 'text-text-primary'}"
         >
-          {name}
+          {brandNameOf(description)}
         </span>
-        {#if inactiveDays !== undefined}
-          <Badge color="warning" size="sm" class="flex-none gap-1">
-            <span class="flex items-center gap-1">
-              <CircleAlertIcon class="size-3" />
-              {$t`Inactive for ${inactiveDays} days`}
-            </span>
-          </Badge>
+        {#if isCurrent}
+          <Badge color="success" size="sm" dot class="flex-none"
+            >{$t`This browser`}</Badge
+          >
         {/if}
       </span>
 
