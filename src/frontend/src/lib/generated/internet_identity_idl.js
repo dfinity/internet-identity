@@ -610,10 +610,8 @@ export const idlFactory = ({ IDL }) => {
     'Mobile' : IDL.Null,
   });
   const BrowserBrand = IDL.Variant({
-    'Vivaldi' : IDL.Null,
     'Edge' : IDL.Null,
     'Firefox' : IDL.Null,
-    'Brave' : IDL.Null,
     'Safari' : IDL.Null,
     'SamsungInternet' : IDL.Null,
     'Opera' : IDL.Null,
