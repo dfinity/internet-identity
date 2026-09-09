@@ -7,13 +7,13 @@ use canister_tests::api::internet_identity::api_v2::{
 };
 use canister_tests::flows;
 use canister_tests::framework::{
-    env, install_ii_with_archive, principal_1, time, verify_delegation, BrowserKey,
+    env, install_ii_with_archive, principal_1, principal_2, time, verify_delegation, BrowserKey,
 };
 use internet_identity_interface::internet_identity::types::{
     AccountSessionError, AppGetDelegationRequest, AppPrepareDelegationRequest, AppSessionError,
     BrowserBrand, BrowserDescription, BrowserInfo, FormFactor, GetAccountSessionRequest,
     OperatingSystem, Permissions, PrepareAccountSessionRequest, PrepareAccountSessionResponse,
-    RevokeBrowserSessionsRequest,
+    RevokeBrowserSessionsRequest, SessionRevokeError,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -162,7 +162,7 @@ fn should_replace_the_session_of_a_browser_signing_in_again() -> Result<(), Reje
                 session_key: ByteBuf::from(vec![7; 32]),
             },
         )?,
-        Err(AppSessionError::NoMatchingSession)
+        Err(AppSessionError::NoSuchSession)
     );
 
     Ok(())
@@ -283,7 +283,7 @@ fn should_refuse_a_caller_that_is_not_the_session() -> Result<(), RejectResponse
         },
     )?;
 
-    assert_eq!(result, Err(AppSessionError::NoMatchingSession));
+    assert_eq!(result, Err(AppSessionError::NoSuchSession));
 
     Ok(())
 }
@@ -309,7 +309,7 @@ fn should_refuse_a_refresh_once_the_session_has_expired() -> Result<(), RejectRe
         },
     )?;
 
-    assert_eq!(result, Err(AppSessionError::NoMatchingSession));
+    assert_eq!(result, Err(AppSessionError::NoSuchSession));
 
     Ok(())
 }
@@ -355,7 +355,60 @@ fn should_refuse_an_app_delegation_longer_than_the_ttl() -> Result<(), RejectRes
         },
     )?;
 
-    assert!(matches!(result, Err(AppSessionError::NoMatchingSession)));
+    // `NoSuchDelegation`, not `NoSuchSession`: the session is live and it is the
+    // expiration that is wrong.
+    assert!(matches!(result, Err(AppSessionError::NoSuchDelegation)));
+
+    Ok(())
+}
+
+/// The other way to arrive at an expiration nothing was signed for: one inside the
+/// ceiling, so the guard above lets it through, and simply never prepared. The session is
+/// live throughout, which is what makes this a missing delegation rather than a missing
+/// session — the app prepares again instead of signing in afresh.
+#[test]
+fn should_refuse_an_app_delegation_that_was_never_prepared() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let app_key = ByteBuf::from(vec![7; 32]);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    let prepared = app_prepare_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareDelegationRequest {
+            session_key: app_key.clone(),
+        },
+    )?
+    .unwrap();
+
+    // A minute earlier than what `prepare` returned: within the ceiling, never signed.
+    let never_prepared = prepared.expiration - 60 * 1_000_000_000;
+    let result = app_get_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppGetDelegationRequest {
+            session_key: app_key.clone(),
+            expiration: never_prepared,
+        },
+    )?;
+
+    assert!(matches!(result, Err(AppSessionError::NoSuchDelegation)));
+
+    // The one that was prepared still works, so the session itself is untouched.
+    assert!(app_get_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppGetDelegationRequest {
+            session_key: app_key,
+            expiration: prepared.expiration,
+        },
+    )?
+    .is_ok());
 
     Ok(())
 }
@@ -418,7 +471,7 @@ fn should_not_reuse_a_session_across_a_consent_change() -> Result<(), RejectResp
             session_key: ByteBuf::from(vec![7; 32]),
         },
     )?;
-    assert_eq!(refreshed_old, Err(AppSessionError::NoMatchingSession));
+    assert_eq!(refreshed_old, Err(AppSessionError::NoSuchSession));
 
     Ok(())
 }
@@ -450,7 +503,7 @@ fn should_end_the_sessions_of_a_browser_the_registry_dropped() -> Result<(), Rej
             session_key: ByteBuf::from(vec![7; 32]),
         },
     )?;
-    assert_eq!(refreshed, Err(AppSessionError::NoMatchingSession));
+    assert_eq!(refreshed, Err(AppSessionError::NoSuchSession));
 
     Ok(())
 }
@@ -484,7 +537,7 @@ fn should_refuse_an_app_delegation_renewing_itself() -> Result<(), RejectRespons
         },
     )?;
 
-    assert_eq!(result, Err(AppSessionError::NoMatchingSession));
+    assert_eq!(result, Err(AppSessionError::NoSuchSession));
 
     Ok(())
 }
@@ -600,7 +653,7 @@ fn should_end_access_when_the_app_signs_out() -> Result<(), RejectResponse> {
     app_revoke_session(&env, canister_id, session_principal)?
         .expect("signing a session out succeeds, present or not");
 
-    assert_eq!(refresh(&env), Err(AppSessionError::NoMatchingSession));
+    assert_eq!(refresh(&env), Err(AppSessionError::NoSuchSession));
 
     Ok(())
 }
@@ -688,6 +741,54 @@ fn should_leave_another_browsers_session_alone() -> Result<(), RejectResponse> {
     Ok(())
 }
 
+/// Authorization is the whole protection on this endpoint. Unlike `app_revoke_session`,
+/// which rests on a caller being unable to produce another session's principal, this one
+/// takes the identity number as an argument — so nothing but the auth check stands
+/// between a stranger and signing every browser of any identity out.
+#[test]
+fn should_refuse_to_sign_a_browser_out_for_another_principal() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::identity_info;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    let browser_id = identity_info(&env, canister_id, principal_1(), identity_number)?
+        .unwrap()
+        .browsers
+        .unwrap()[0]
+        .id;
+
+    let refused = revoke_browser_sessions(
+        &env,
+        canister_id,
+        principal_2(),
+        RevokeBrowserSessionsRequest {
+            identity_number,
+            browser_id,
+        },
+    )?;
+
+    assert!(
+        matches!(refused, Err(SessionRevokeError::Unauthorized(principal)) if principal == principal_2()),
+        "another principal must not sign this identity's browsers out, got {refused:?}"
+    );
+
+    // And the session it tried to end still mints.
+    assert!(app_prepare_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?
+    .is_ok());
+
+    Ok(())
+}
+
 #[test]
 fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
     use canister_tests::api::internet_identity::api_v2::identity_info;
@@ -753,11 +854,11 @@ fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
 
     assert_eq!(
         refresh(first_principal),
-        Err(AppSessionError::NoMatchingSession)
+        Err(AppSessionError::NoSuchSession)
     );
     assert_eq!(
         refresh(second_principal),
-        Err(AppSessionError::NoMatchingSession)
+        Err(AppSessionError::NoSuchSession)
     );
     assert!(refresh(untouched_principal).is_ok());
 
@@ -781,7 +882,7 @@ fn should_sign_a_whole_browser_out() -> Result<(), RejectResponse> {
 
     assert_eq!(
         refresh(first_principal),
-        Err(AppSessionError::NoMatchingSession),
+        Err(AppSessionError::NoSuchSession),
         "a revoked session came back when its browser signed in again"
     );
 
@@ -1438,7 +1539,7 @@ fn should_mint_for_the_calling_session_and_nobody_else() -> Result<(), RejectRes
                 session_key: ByteBuf::from(vec![7; 32]),
             },
         )?,
-        Err(AppSessionError::NoMatchingSession)
+        Err(AppSessionError::NoSuchSession)
     );
 
     Ok(())
