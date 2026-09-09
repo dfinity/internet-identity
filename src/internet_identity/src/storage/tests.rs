@@ -9,7 +9,7 @@ use crate::storage::anchor::{Anchor, Device};
 use crate::storage::storable::account::StorableAccount;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::{AccountReferenceListWrite, AccountReferenceWrite};
-use crate::storage::{CreateSessionParams, Header, StorageError, MAX_ENTRIES};
+use crate::storage::{CreateSessionParams, Header, StorageError, MAX_ENTRIES, TEST_NOW};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
@@ -42,7 +42,7 @@ fn record_use(
         return Ok(None);
     };
     account.last_used = Some(now);
-    storage.write_account(account).map(Some)
+    storage.write_account(account, TEST_NOW).map(Some)
 }
 
 const HEADER_SIZE: usize = 58;
@@ -604,7 +604,12 @@ fn should_record_that_a_named_account_was_used() {
     storage.write(anchor).unwrap();
 
     let account = storage
-        .create_account(anchor_number, origin.clone(), "Test Account".to_string())
+        .create_account(
+            anchor_number,
+            origin.clone(),
+            "Test Account".to_string(),
+            TEST_NOW,
+        )
         .unwrap();
     let key = AccountKey {
         anchor_number,
@@ -617,7 +622,7 @@ fn should_record_that_a_named_account_was_used() {
     for timestamp in [123456789u64, 987654321u64] {
         let mut account = storage.read_account(&key).unwrap();
         account.last_used = Some(timestamp);
-        storage.write_account(account).unwrap();
+        storage.write_account(account, TEST_NOW).unwrap();
 
         assert_eq!(
             storage.read_account(&key).unwrap().last_used,
@@ -646,7 +651,7 @@ fn should_track_the_default_account_on_first_use() {
 
     let mut account = storage.read_account(&key).unwrap();
     account.last_used = Some(timestamp);
-    storage.write_account(account).unwrap();
+    storage.write_account(account, TEST_NOW).unwrap();
 
     // Nothing was stored at this origin, so recording the use is what gives the
     // default a list: the timestamp has nowhere else to live.
@@ -676,7 +681,12 @@ fn should_record_that_a_tracked_default_was_used() {
 
     // A named account gives the origin a list, which the default is tracked in.
     storage
-        .create_account(anchor_number, origin.clone(), "Test Account".to_string())
+        .create_account(
+            anchor_number,
+            origin.clone(),
+            "Test Account".to_string(),
+            TEST_NOW,
+        )
         .unwrap();
 
     let key = AccountKey {
@@ -688,7 +698,7 @@ fn should_record_that_a_tracked_default_was_used() {
 
     let mut account = storage.read_account(&key).unwrap();
     account.last_used = Some(timestamp);
-    storage.write_account(account).unwrap();
+    storage.write_account(account, TEST_NOW).unwrap();
 
     assert_eq!(
         storage.read_account(&key).unwrap().last_used,
@@ -709,7 +719,12 @@ fn should_refuse_to_write_an_account_no_reference_names() {
     storage.write(anchor).unwrap();
 
     storage
-        .create_account(anchor_number, origin.clone(), "Test Account".to_string())
+        .create_account(
+            anchor_number,
+            origin.clone(),
+            "Test Account".to_string(),
+            TEST_NOW,
+        )
         .unwrap();
 
     let unheld_account_number = 99_999u64;
@@ -730,7 +745,8 @@ fn should_refuse_to_write_an_account_no_reference_names() {
             None,
             Some(unheld_account_number),
             Some(123_456u64),
-        )),
+        ),
+            TEST_NOW),
         Err(StorageError::AccountNotFound { account_number })
             if account_number == unheld_account_number
     ));
@@ -748,13 +764,16 @@ fn should_refuse_to_write_an_account_at_an_unknown_origin() {
     let unknown_origin = "https://nonexistent.com".to_string();
 
     assert!(matches!(
-        storage.write_account(Account::new_with_last_used(
-            anchor_number,
-            unknown_origin,
-            None,
-            Some(99_999u64),
-            Some(123_456u64),
-        )),
+        storage.write_account(
+            Account::new_with_last_used(
+                anchor_number,
+                unknown_origin,
+                None,
+                Some(99_999u64),
+                Some(123_456u64),
+            ),
+            TEST_NOW
+        ),
         Err(StorageError::AccountNotFound { .. })
     ));
 }
@@ -2350,6 +2369,7 @@ fn test_anchor_storage_migration_round_trip() {
 
 mod reference_list_write_path_tests {
     use super::application_number_for;
+    use super::TEST_NOW;
     use super::{write_at, write_at_with_record};
     use crate::storage::account::Account;
     use crate::storage::account::AccountReference;
@@ -2383,7 +2403,12 @@ mod reference_list_write_path_tests {
         let never_allocated = anchor_number + 1;
         let origin = "https://example.com".to_string();
 
-        let result = storage.create_account(never_allocated, origin.clone(), "named".to_string());
+        let result = storage.create_account(
+            never_allocated,
+            origin.clone(),
+            "named".to_string(),
+            TEST_NOW,
+        );
 
         assert!(matches!(result, Err(StorageError::BadAnchorNumber(_))));
         // Refused before anything was written, the application included.
@@ -2415,7 +2440,7 @@ mod reference_list_write_path_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
         storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
         let before = storage
             .stable_anchor_account_counter_memory
@@ -2467,7 +2492,7 @@ mod reference_list_write_path_tests {
         let origin = "https://example.com".to_string();
 
         storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
 
         let application_number = storage
@@ -2581,7 +2606,7 @@ mod reference_list_write_path_tests {
         // Also a mint, but the tracked default is still there afterwards, so this is a
         // new account rather than the default being named.
         storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
 
         let application_number = storage
@@ -2701,7 +2726,7 @@ mod reference_list_write_path_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = "https://example.com".to_string();
         storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
         // Force the divergence: the stored list holds references the counter no longer
         // knows about, so dropping one under-runs it.
@@ -2752,6 +2777,7 @@ mod reference_list_write_path_tests {
                 anchor_number,
                 "https://named.com".to_string(),
                 "named".to_string(),
+                TEST_NOW,
             )
             .unwrap();
 
@@ -2787,6 +2813,7 @@ mod reference_list_write_path_tests {
             anchor_number,
             "https://example.com".to_string(),
             "named".to_string(),
+            TEST_NOW,
         );
 
         assert!(matches!(result, Err(StorageError::AccountsCounterOverflow)));
@@ -2809,12 +2836,15 @@ mod reference_list_write_path_tests {
         let config_before =
             storage.lookup_anchor_application_config(anchor_number, application_number);
 
-        let result = storage.write_account(Account::new(
-            anchor_number,
-            origin.clone(),
-            Some("named".to_string()),
-            None,
-        ));
+        let result = storage.write_account(
+            Account::new(
+                anchor_number,
+                origin.clone(),
+                Some("named".to_string()),
+                None,
+            ),
+            TEST_NOW,
+        );
 
         assert!(matches!(result, Err(StorageError::MissingAccount { .. })));
         // No account number burned, no account stored, no config rewritten.
@@ -3091,10 +3121,20 @@ mod reference_list_write_path_tests {
         for origin in ["https://a.com", "https://b.com", "https://c.com"] {
             let origin = origin.to_string();
             storage
-                .create_account(anchor_number, origin.clone(), "account".to_string())
+                .create_account(
+                    anchor_number,
+                    origin.clone(),
+                    "account".to_string(),
+                    TEST_NOW,
+                )
                 .unwrap();
             storage
-                .create_account(anchor_number, origin, "another account".to_string())
+                .create_account(
+                    anchor_number,
+                    origin,
+                    "another account".to_string(),
+                    TEST_NOW,
+                )
                 .unwrap();
         }
 
@@ -3124,6 +3164,7 @@ mod reference_list_write_path_tests {
 mod account_reference_state_tests {
     use super::application_number_for;
     use super::write_at;
+    use super::TEST_NOW;
     use crate::storage::account::{Account, AccountKey, AccountReference};
     use crate::storage::storable::account_reference_list::StorableAccountReferenceList;
     use crate::storage::storable::application::StorableApplication;
@@ -3224,7 +3265,7 @@ mod account_reference_state_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         let account = storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
         let account_number = account.account_number.unwrap();
 
@@ -3254,7 +3295,7 @@ mod account_reference_state_tests {
         plant_tombstone(&mut storage, anchor_number);
 
         let account = storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
 
         let application_number = storage
@@ -3279,12 +3320,15 @@ mod account_reference_state_tests {
         plant_tombstone(&mut storage, anchor_number);
         let counter_before = storage.get_total_accounts_counter().clone();
 
-        let result = storage.write_account(Account::new(
-            anchor_number,
-            origin.clone(),
-            Some("named default".to_string()),
-            None,
-        ));
+        let result = storage.write_account(
+            Account::new(
+                anchor_number,
+                origin.clone(),
+                Some("named default".to_string()),
+                None,
+            ),
+            TEST_NOW,
+        );
 
         assert!(matches!(result, Err(StorageError::MissingAccount { .. })));
         // Refused before the allocation, so no account number was spent on a record
@@ -3313,13 +3357,13 @@ mod account_reference_state_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
 
         // A number this identity does not hold at this origin, which is what a caller
         // that had gone stale would ask for.
         storage
-            .set_default_account(anchor_number, origin.clone(), Some(9_999))
+            .set_default_account(anchor_number, origin.clone(), Some(9_999), TEST_NOW)
             .unwrap();
 
         let application_number = storage
@@ -3342,11 +3386,16 @@ mod account_reference_state_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         let named = storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
         let account_number = named.account_number.unwrap();
         storage
-            .set_default_account(anchor_number, origin.clone(), Some(account_number))
+            .set_default_account(
+                anchor_number,
+                origin.clone(),
+                Some(account_number),
+                TEST_NOW,
+            )
             .unwrap();
         let application_number = storage
             .lookup_application_number_with_origin(&origin)
@@ -3365,6 +3414,7 @@ mod account_reference_state_tests {
         storage
             .write_account_state(
                 anchor,
+                TEST_NOW,
                 BTreeMap::from([(
                     origin.clone(),
                     Some((
@@ -3392,7 +3442,7 @@ mod account_reference_state_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         let named = storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
         let stamped_at = 123456u64;
         let default_key = AccountKey {
@@ -3402,11 +3452,11 @@ mod account_reference_state_tests {
         };
         let mut used_default = storage.read_account(&default_key).unwrap();
         used_default.last_used = Some(stamped_at);
-        storage.write_account(used_default).unwrap();
+        storage.write_account(used_default, TEST_NOW).unwrap();
 
         let mut default_to_name = storage.read_account(&default_key).unwrap();
         default_to_name.name = Some("named default".to_string());
-        let default = storage.write_account(default_to_name).unwrap();
+        let default = storage.write_account(default_to_name, TEST_NOW).unwrap();
 
         let application_number = storage
             .lookup_application_number_with_origin(&origin)
@@ -3430,7 +3480,7 @@ mod account_reference_state_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let origin = ORIGIN.to_string();
         let account = storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
         let account_number = account.account_number.unwrap();
         let application_number = storage
@@ -3456,7 +3506,7 @@ mod account_reference_state_tests {
             })
             .unwrap();
         account_to_rename.name = Some("renamed".to_string());
-        let renamed = storage.write_account(account_to_rename).unwrap();
+        let renamed = storage.write_account(account_to_rename, TEST_NOW).unwrap();
 
         assert_eq!(renamed.name, Some("renamed".to_string()));
         assert_eq!(
@@ -3476,31 +3526,37 @@ mod account_reference_state_tests {
         };
         let origin = ORIGIN.to_string();
         let account = storage
-            .create_account(owner, origin.clone(), "named".to_string())
+            .create_account(owner, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
         let account_number = account.account_number.unwrap();
         // The other identity has a list of its own at this origin, so what refuses the
         // attempts below is the list not naming this account rather than there being no
         // list to look in.
         storage
-            .create_account(other, origin.clone(), "mine".to_string())
+            .create_account(other, origin.clone(), "mine".to_string(), TEST_NOW)
             .unwrap();
 
-        let rename = storage.write_account(Account::new(
-            other,
-            origin.clone(),
-            Some("stolen".to_string()),
-            Some(account_number),
-        ));
+        let rename = storage.write_account(
+            Account::new(
+                other,
+                origin.clone(),
+                Some("stolen".to_string()),
+                Some(account_number),
+            ),
+            TEST_NOW,
+        );
         assert!(matches!(rename, Err(StorageError::AccountNotFound { .. })));
 
-        let stamp = storage.write_account(Account::new_with_last_used(
-            other,
-            origin.clone(),
-            None,
-            Some(account_number),
-            Some(123456),
-        ));
+        let stamp = storage.write_account(
+            Account::new_with_last_used(
+                other,
+                origin.clone(),
+                None,
+                Some(account_number),
+                Some(123456),
+            ),
+            TEST_NOW,
+        );
         assert!(matches!(stamp, Err(StorageError::AccountNotFound { .. })));
 
         // The owner's record and reference are untouched by either attempt: recording
@@ -3684,6 +3740,7 @@ mod default_account_tracking_tests {
     use super::held_references;
     use super::record_use;
     use super::write_at;
+    use super::TEST_NOW;
     use crate::storage::account::{AccountKey, AccountReference};
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
@@ -3793,7 +3850,7 @@ mod default_account_tracking_tests {
         let origin = "https://example.com".to_string();
 
         storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
 
         let default_account = storage
@@ -3813,7 +3870,7 @@ mod default_account_tracking_tests {
         let application_number = application_number_for(&mut storage, &origin);
 
         storage
-            .set_default_account(anchor_number, origin.clone(), None)
+            .set_default_account(anchor_number, origin.clone(), None, TEST_NOW)
             .unwrap();
 
         assert_eq!(
@@ -3830,7 +3887,7 @@ mod default_account_tracking_tests {
         record_use(&mut storage, anchor_number, origin.clone(), None, 7_000).unwrap();
 
         storage
-            .set_default_account(anchor_number, origin.clone(), None)
+            .set_default_account(anchor_number, origin.clone(), None, TEST_NOW)
             .unwrap();
 
         let references = held_references(&storage, anchor_number, application_number);
@@ -3846,6 +3903,7 @@ mod tracked_default_eviction_tests {
     use super::record_use;
     use super::remove_at;
     use super::write_at;
+    use super::TEST_NOW;
     use crate::storage::account::{AccountKey, AccountReference};
     use crate::storage::storable::account_reference_list::StorableAccountReferenceList;
     use crate::storage::storable::accounts_counter::StorableAccountsCounter;
@@ -3943,7 +4001,7 @@ mod tracked_default_eviction_tests {
 
         for index in 0..MAX_EVICTABLE_DEFAULT_ACCOUNTS * 2 {
             storage
-                .set_default_account(anchor_number, origin_of(index), None)
+                .set_default_account(anchor_number, origin_of(index), None, TEST_NOW)
                 .unwrap();
         }
 
@@ -4098,7 +4156,7 @@ mod tracked_default_eviction_tests {
         let never_used_origin = "https://never-used.com".to_string();
         let never_used_application = application_number_for(&mut storage, &never_used_origin);
         storage
-            .set_default_account(anchor_number, never_used_origin.clone(), None)
+            .set_default_account(anchor_number, never_used_origin.clone(), None, TEST_NOW)
             .unwrap();
 
         for index in 0..MAX_EVICTABLE_DEFAULT_ACCOUNTS {
@@ -4116,7 +4174,12 @@ mod tracked_default_eviction_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         let shared_origin = "https://has-a-named-account.com".to_string();
         storage
-            .create_account(anchor_number, shared_origin.clone(), "named".to_string())
+            .create_account(
+                anchor_number,
+                shared_origin.clone(),
+                "named".to_string(),
+                TEST_NOW,
+            )
             .unwrap();
         let shared_application = storage
             .lookup_application_number_with_origin(&shared_origin)
@@ -4137,7 +4200,7 @@ mod tracked_default_eviction_tests {
         let origin = "https://example.com".to_string();
         record_use(&mut storage, anchor_number, origin.clone(), None, 1_000).unwrap();
         storage
-            .set_default_account(anchor_number, origin.clone(), None)
+            .set_default_account(anchor_number, origin.clone(), None, TEST_NOW)
             .unwrap();
         let application_number = storage
             .lookup_application_number_with_origin(&origin)
@@ -4243,7 +4306,12 @@ mod tracked_default_eviction_tests {
         let (mut storage, anchor_number) = storage_with_anchor();
         for index in 0..3 {
             storage
-                .create_account(anchor_number, origin_of(index), format!("named-{index}"))
+                .create_account(
+                    anchor_number,
+                    origin_of(index),
+                    format!("named-{index}"),
+                    TEST_NOW,
+                )
                 .unwrap();
         }
 
@@ -4302,6 +4370,7 @@ mod application_removal_tests {
     use super::application_number_for;
     use super::remove_at;
     use super::write_at;
+    use super::TEST_NOW;
     use crate::storage::storable::account_reference_list::StorableAccountReferenceList;
 
     use super::record_use;
@@ -4582,7 +4651,7 @@ mod application_removal_tests {
         let (mut storage, anchor_number, other_anchor_number) = storage_with_anchors();
         let origin = "https://example.com".to_string();
         storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
         let application_number = storage
             .lookup_application_number_with_origin(&origin)
@@ -4615,7 +4684,7 @@ mod application_removal_tests {
         // A default alongside a named account. Retiring the list would drop a reference
         // nothing else records, so it is refused even though the caller asked.
         storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
         let application_number = storage
             .lookup_application_number_with_origin(&origin)
@@ -4664,7 +4733,7 @@ mod application_removal_tests {
         // the config that goes with it. Nobody else holds this application, so retiring
         // the list retires it too.
         storage
-            .set_default_account(anchor_number, origin.clone(), None)
+            .set_default_account(anchor_number, origin.clone(), None, TEST_NOW)
             .unwrap();
         let application_number = storage
             .lookup_application_number_with_origin(&origin)
@@ -4715,6 +4784,7 @@ mod account_principal_index_tests {
     use super::record_use;
     use super::remove_at;
     use super::write_at;
+    use super::TEST_NOW;
     use crate::delegation::canister_sig_principal;
     use crate::storage::account::{Account, AccountReference};
     use crate::storage::storable::account_key::StorableAccountKey;
@@ -4777,12 +4847,15 @@ mod account_principal_index_tests {
             .unwrap();
 
         let materialized = storage
-            .write_account(Account::new(
-                anchor_number,
-                origin.clone(),
-                Some("named default".to_string()),
-                None,
-            ))
+            .write_account(
+                Account::new(
+                    anchor_number,
+                    origin.clone(),
+                    Some("named default".to_string()),
+                    None,
+                ),
+                TEST_NOW,
+            )
             .unwrap();
 
         assert_eq!(
@@ -4801,7 +4874,7 @@ mod account_principal_index_tests {
         let origin = "https://example.com".to_string();
 
         let named = storage
-            .create_account(anchor_number, origin.clone(), "named".to_string())
+            .create_account(anchor_number, origin.clone(), "named".to_string(), TEST_NOW)
             .unwrap();
 
         let application_number = storage
@@ -5286,6 +5359,7 @@ mod session_creation_tests {
     use super::application_number_for;
     use super::held_references;
     use super::write_at;
+    use super::TEST_NOW;
     use super::{params, params_at};
     use crate::delegation::calculate_session_seed_with_salt;
     use crate::storage::account::{
@@ -5710,8 +5784,8 @@ mod session_creation_tests {
         assert!(sessions.iter().any(|s| s.browser_id == 0));
     }
 
-    /// The per-identity cap reclaims to a watermark rather than blocking, taking expired
-    /// records first and then the least recently used.
+    /// A counter that says the identity is at the cap when the lists say otherwise is
+    /// answered by counting, and the count is what gets stored.
     #[test]
     fn an_over_counting_anchor_is_corrected_rather_than_denied() {
         let (mut storage, anchor_number) = storage_with_anchor();
@@ -5759,29 +5833,75 @@ mod session_creation_tests {
         }
     }
 
+    /// The per-identity cap reclaims to the watermark rather than blocking, and stops
+    /// there: clearing all the way to the cap would have the next few sign-ins each
+    /// sweep again, and clearing less would.
     #[test]
     fn the_session_cap_reclaims_to_the_watermark() {
         let (mut storage, anchor_number) = storage_with_anchor();
-        let _session = storage
-            .create_session(params(anchor_number, 7, 1_000))
-            .unwrap()
-            .1;
-        let _application_number = storage
-            .lookup_application_number_with_origin(&ORIGIN.to_string())
-            .unwrap();
 
-        // Nothing observes a session expiring, so the count drifts up. The cap must be
-        // enforced against what the lists hold, not against the drift.
+        // Sign-ins at fresh origins until the identity is exactly at the cap, so the next
+        // one is the write that has to make room. Every session is live and none has ever
+        // been used, so the pass has nothing expired to take and reclaims on order alone.
+        for sign_in in 0..MAX_SESSIONS_PER_ANCHOR {
+            let mut params = params_at(anchor_number, 1, sign_in as u16, 600_000 + sign_in as u64);
+            params.origin = format!("https://app-{sign_in}.example.com");
+            params.valid_till_ns = 100_000_000;
+            storage.create_session(params).unwrap();
+        }
+        assert_eq!(
+            all_sessions_of(&storage, anchor_number).len() as u32,
+            MAX_SESSIONS_PER_ANCHOR
+        );
+
+        let mut params = params_at(anchor_number, 1, MAX_SESSIONS_PER_ANCHOR as u16, 700_000);
+        params.origin = "https://one-more.example.com".to_string();
+        params.valid_till_ns = 100_000_000;
+        storage.create_session(params).unwrap();
+
+        // The watermark, and then the session that triggered the pass on top of it.
+        assert_eq!(
+            all_sessions_of(&storage, anchor_number).len() as u32,
+            SESSIONS_WATERMARK_PER_ANCHOR + 1
+        );
+        assert_eq!(
+            storage.read(anchor_number).unwrap().session_count,
+            SESSIONS_WATERMARK_PER_ANCHOR + 1
+        );
+    }
+
+    /// The counter drifting the other way — below what the lists hold — is corrected by
+    /// the same count. Left to a saturating subtraction it would clamp to zero, and a
+    /// counter under the truth is the one that lets the lists past the cap.
+    #[test]
+    fn an_under_counting_anchor_is_corrected_rather_than_clamped() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        storage
+            .create_session(params(anchor_number, 1, 1_000))
+            .unwrap();
+        storage
+            .create_session(CreateSessionParams {
+                origin: "https://elsewhere.example".to_string(),
+                ..params(anchor_number, 2, 2_000)
+            })
+            .unwrap();
+        assert_eq!(storage.read(anchor_number).unwrap().session_count, 2);
+
         let mut anchor = storage.read(anchor_number).unwrap();
-        anchor.session_count = MAX_SESSIONS_PER_ANCHOR;
+        anchor.session_count = 0;
         storage.write(anchor).unwrap();
 
-        storage
-            .create_session(params(anchor_number, 2, 2_000))
-            .unwrap();
+        // A write that removes one session while the counter says the identity holds
+        // none: the second browser is the one that signed in at the other origin.
+        assert_eq!(
+            storage
+                .revoke_browser_sessions(anchor_number, 1, TEST_NOW)
+                .unwrap(),
+            1
+        );
 
-        assert_eq!(sessions_of(&storage, anchor_number).len(), 2);
-        assert_eq!(storage.read(anchor_number).unwrap().session_count, 2);
+        assert_eq!(all_sessions_of(&storage, anchor_number).len(), 1);
+        assert_eq!(storage.read(anchor_number).unwrap().session_count, 1);
     }
 
     /// Two lists, both holding a default account, and both holding sessions for the same
@@ -5836,7 +5956,12 @@ mod session_creation_tests {
                 .unwrap();
         }
 
+        // At a third origin, so the sign-in genuinely adds a session: one at either list
+        // above would prune that list's expired record on the way past and leave the
+        // identity holding what it started with, which is not a write the cap has
+        // anything to say about.
         let mut params = params(anchor_number, 199, 600_000);
+        params.origin = "https://third.example".to_string();
         params.valid_till_ns = 100_000_000;
         storage.create_session(params).unwrap();
 
@@ -5869,8 +5994,13 @@ mod session_creation_tests {
         assert!(second_devices.contains(&(FABRICATED + PER_LIST - 1)));
         assert_eq!(
             first_devices.len() + second_devices.len(),
+            SESSIONS_WATERMARK_PER_ANCHOR as usize,
+            "cleared to the watermark across both lists"
+        );
+        assert_eq!(
+            all_sessions_of(&storage, anchor_number).len(),
             SESSIONS_WATERMARK_PER_ANCHOR as usize + 1,
-            "cleared to the watermark across both lists, then the session it made room for"
+            "and the session the pass made room for"
         );
     }
 
@@ -5936,7 +6066,12 @@ mod session_creation_tests {
     fn a_named_account_can_hold_its_own_sessions() {
         let (mut storage, anchor_number) = storage_with_anchor();
         let named = storage
-            .create_account(anchor_number, ORIGIN.to_string(), "named".to_string())
+            .create_account(
+                anchor_number,
+                ORIGIN.to_string(),
+                "named".to_string(),
+                TEST_NOW,
+            )
             .unwrap();
         let mut p = params(anchor_number, 1, 1_000);
         p.account_number = named.account_number;
@@ -6180,6 +6315,7 @@ mod session_consent_change_tests {
 }
 
 mod browser_session_count_tests {
+    use super::TEST_NOW;
     use super::{params, params_at};
     use crate::storage::anchor::MAX_BROWSERS;
     use crate::storage::CreateSessionParams;
@@ -6291,7 +6427,9 @@ mod browser_session_count_tests {
             .unwrap();
 
         assert_eq!(
-            storage.revoke_browser_sessions(anchor_number, 0).unwrap(),
+            storage
+                .revoke_browser_sessions(anchor_number, 0, TEST_NOW)
+                .unwrap(),
             2
         );
 
