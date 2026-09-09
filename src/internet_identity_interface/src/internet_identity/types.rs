@@ -23,6 +23,10 @@ pub type SessionId = u64;
 
 /// Which browser a sign-in came from, as a token rather than a name to show.
 ///
+/// Named for the six that hold 97% of the web between them; everything else arrives as
+/// `Other`, which still names it. A variant is what earns an icon, and an icon nobody
+/// recognises is worse than the name written out.
+///
 /// `Brand` because that is what the client hints call it, and because `Browser` names the
 /// registry entry these describe.
 ///
@@ -38,8 +42,6 @@ pub enum BrowserBrand {
     Edge,
     Opera,
     SamsungInternet,
-    Vivaldi,
-    Brave,
     /// Whatever the client resolved for a browser this list does not name. Shown as it
     /// arrived: an unrecognised browser is worth seeing, not worth hiding behind a
     /// generic label.
