@@ -408,7 +408,7 @@ fn authorize_session(now: Timestamp) -> Result<(Account, SessionRecord), AppSess
     })
     .ok_or(AppSessionError::NoMatchingSession)?;
 
-    if session.is_over(now) {
+    if session.is_expired_or_idle(now) {
         return Err(AppSessionError::NoMatchingSession);
     }
     Ok((account, session))
