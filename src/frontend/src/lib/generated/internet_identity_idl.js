@@ -154,8 +154,9 @@ export const idlFactory = ({ IDL }) => {
     'delegation' : Delegation,
   });
   const AppSessionError = IDL.Variant({
-    'NoMatchingSession' : IDL.Null,
+    'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
+    'NoSuchSession' : IDL.Null,
   });
   const AppPrepareDelegationRequest = IDL.Record({
     'session_key' : SessionKey,
