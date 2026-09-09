@@ -54,8 +54,11 @@ pub fn create_identity_with_authn_method_and_name(
     authn_method: &AuthnMethodData,
     name: Option<String>,
 ) -> Result<IdentityNumber, String> {
-    // unique flow principal as the time changes every round
-    let flow_principal = test_principal(time(env));
+    let flow_principal = match authn_method.authn_method {
+        AuthnMethod::PubKey(_) => authn_method.principal(),
+        // unique flow principal as the time changes every round
+        AuthnMethod::WebAuthn(_) => test_principal(time(env)),
+    };
     let result = api_v2::identity_registration_start(env, canister_id, flow_principal)
         .expect("API call failed")
         .expect("registration start failed");
