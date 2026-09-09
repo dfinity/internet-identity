@@ -354,7 +354,9 @@ pub fn app_prepare_delegation(
     request: AppPrepareDelegationRequest,
 ) -> Result<AppPrepareDelegationResponse, AppSessionError> {
     let now = time();
-    let (account, session) = authorize_session(now)?;
+    let AuthorizedSession {
+        account, session, ..
+    } = authorize_session(now)?;
 
     let expiration = u64::min(
         now.saturating_add(APP_DELEGATION_TTL_NS),
@@ -369,6 +371,8 @@ pub fn app_prepare_delegation(
             request.session_key,
             seed.as_ref(),
             expiration,
+            // Unscoped on purpose: an app calls whatever canisters it likes. The session
+            // credential this was minted from is the scoped one.
             None,
             access.permissions(),
         );
@@ -385,7 +389,9 @@ pub fn app_get_delegation(
     request: AppGetDelegationRequest,
 ) -> Result<SignedDelegation, AppSessionError> {
     let now = time();
-    let (account, session) = authorize_session(now)?;
+    let AuthorizedSession {
+        account, session, ..
+    } = authorize_session(now)?;
 
     if request.expiration > now.saturating_add(APP_DELEGATION_TTL_NS)
         || request.expiration > session.valid_till_ns
@@ -422,19 +428,32 @@ pub fn app_get_delegation(
     .map_err(|_| AppSessionError::NoMatchingSession)
 }
 
+/// A live session the caller has been proved to be, and where it lives.
+///
+/// Only [`authorize_session`] constructs one, so holding it is the evidence rather than
+/// three values a caller gathered: the principal lookup and the liveness check have both
+/// happened, and no field can be here without them.
+struct AuthorizedSession {
+    // Read by the refresh stamp, which lands one PR up.
+    #[allow(dead_code)]
+    locator: SessionLocator,
+    account: Account,
+    session: Session,
+}
+
 /// Authenticates a refresh from `caller()` alone.
 ///
 /// The session index is keyed by the principal a session's chain is rooted at, so a hit is
 /// itself the proof that the caller is that session: nothing is named in the request and
 /// nothing is attached to it.
-fn authorize_session(now: Timestamp) -> Result<(Account, Session), AppSessionError> {
-    let key = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
+fn authorize_session(now: Timestamp) -> Result<AuthorizedSession, AppSessionError> {
+    let locator = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
         .ok_or(AppSessionError::NoMatchingSession)?;
 
     let (account, session) = storage_borrow(|storage| {
         Some((
-            storage.read_account(&key.account_key())?,
-            storage.read_session(&key)?,
+            storage.read_account(&locator.account_key())?,
+            storage.read_session(&locator)?,
         ))
     })
     .ok_or(AppSessionError::NoMatchingSession)?;
@@ -442,7 +461,11 @@ fn authorize_session(now: Timestamp) -> Result<(Account, Session), AppSessionErr
     if session.is_expired_or_idle(now) {
         return Err(AppSessionError::NoMatchingSession);
     }
-    Ok((account, session))
+    Ok(AuthorizedSession {
+        locator,
+        account,
+        session,
+    })
 }
 
 fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {

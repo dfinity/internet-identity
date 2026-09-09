@@ -3325,7 +3325,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// session is ever allocated that id.
     pub fn lookup_session_with_principal(&self, principal: Principal) -> Option<SessionLocator> {
         let handle = self.lookup_session_with_principal_memory.get(&principal)?;
-        let account = self.lookup_account_with_principal(handle.account())?;
+        let account = self.lookup_account_with_principal(handle.account_principal())?;
 
         Some(SessionLocator {
             anchor_number: account.anchor_number,
