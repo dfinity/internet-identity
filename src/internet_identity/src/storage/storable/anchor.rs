@@ -40,9 +40,8 @@ pub struct StorableAnchor {
     /// Monotonic per-anchor allocator for `browsers`. Ids are never reused.
     #[n(8)]
     pub next_browser_id: Option<StorableBrowserId>,
-    /// Stored sessions this anchor holds, as a trigger for the session cap rather than a
-    /// source of truth: expiry removes a session with no write to observe, so this can
-    /// over-count until a reclaim pass prunes and corrects it.
+    /// Stored sessions this anchor holds. Expiry removes a session with no write to
+    /// observe, so this can read higher than what is live until a write prunes them.
     #[n(9)]
     pub session_count: Option<u32>,
 }
