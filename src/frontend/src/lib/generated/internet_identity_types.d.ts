@@ -22,6 +22,14 @@ export type AccountNumber = bigint;
 export type AccountSessionError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
   { 'NoSuchSession' : null } |
+  {
+    /**
+     * The session is there, but no delegation was signed for the session_key and
+     * expiration asked for. Ask again with the ones prepare_account_session returned;
+     * signing in afresh is not the remedy.
+     */
+    'NoSuchDelegation' : null
+  } |
   { 'NoSuchAccount' : null } |
   {
     /**
@@ -743,7 +751,7 @@ export type GetAccountError = {
   };
 export interface GetAccountSessionRequest {
   /**
-   * The session prepare_account_session created, named exactly rather than searched for.
+   * The session prepare_account_session created.
    */
   'session_id' : bigint,
   'session_key' : SessionKey,
@@ -1410,7 +1418,7 @@ export interface PrepareAccountSessionRequest {
    */
   'current_browser_key' : PublicKey,
   /**
-   * The II frontend's own key. The app never sees this chain's private key.
+   * The II frontend's own public key.
    */
   'session_key' : SessionKey,
   /**
@@ -1423,10 +1431,7 @@ export interface PrepareAccountSessionRequest {
    */
   'current_browser_key_signature' : Uint8Array | number[],
   /**
-   * What this browser is, for the user's session list. Taken only where this sign-in
-   * registers a browser: an entry that is advanced keeps what it was registered with,
-   * so a browser reporting something else presents a key pair no entry holds and
-   * registers under its own.
+   * What this browser is, for the user's session list.
    */
   'browser_description' : BrowserDescription,
   'account_number' : [] | [AccountNumber],

@@ -1054,12 +1054,9 @@ type PrepareAccountSessionRequest = record {
     identity_number : UserNumber;
     origin : FrontendHostname;
     account_number : opt AccountNumber;
-    // The II frontend's own key. The app never sees this chain's private key.
+    // The II frontend's own public key.
     session_key : SessionKey;
-    // What this browser is, for the user's session list. Taken only where this sign-in
-    // registers a browser: an entry that is advanced keeps what it was registered with,
-    // so a browser reporting something else presents a key pair no entry holds and
-    // registers under its own.
+    // What this browser is, for the user's session list.
     browser_description : BrowserDescription;
     // The browser's own public key, DER-encoded, as the registry currently holds it. A
     // key this anchor has not seen registers a browser under it.
@@ -1105,7 +1102,7 @@ type GetAccountSessionRequest = record {
     account_number : opt AccountNumber;
     session_key : SessionKey;
     expiration : Timestamp;
-    // The session prepare_account_session created, named exactly rather than searched for.
+    // The session prepare_account_session created.
     session_id : nat64;
 };
 
@@ -1117,6 +1114,10 @@ type AccountSessionError = variant {
     Unauthorized : principal;
     NoSuchAccount;
     NoSuchSession;
+    // The session is there, but no delegation was signed for the session_key and
+    // expiration asked for. Ask again with the ones prepare_account_session returned;
+    // signing in afresh is not the remedy.
+    NoSuchDelegation;
     // The browser's key is unusable, or its signature does not verify against it.
     InvalidBrowserKey;
     // The browser presented a key it has already rotated away from, which happens when it

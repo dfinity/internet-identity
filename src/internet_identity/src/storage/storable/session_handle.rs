@@ -27,7 +27,10 @@ pub struct StorableSessionHandle {
 }
 
 impl StorableSessionHandle {
-    pub fn account(&self) -> Principal {
+    /// The account this session is at, as the principal the field holds. Named for what
+    /// it returns, because the sibling on [`crate::storage::account::SessionLocator`]
+    /// answers with an account key.
+    pub fn account_principal(&self) -> Principal {
         Principal::from_slice(&self.account_principal)
     }
 }

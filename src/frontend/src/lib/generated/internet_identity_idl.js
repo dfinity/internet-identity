@@ -416,6 +416,7 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
     'NoSuchSession' : IDL.Null,
+    'NoSuchDelegation' : IDL.Null,
     'NoSuchAccount' : IDL.Null,
     'InvalidBrowserKey' : IDL.Null,
     'StaleBrowserKey' : IDL.Null,
