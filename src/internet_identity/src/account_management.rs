@@ -2,8 +2,9 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::{
     delegation::{
-        add_delegation_signature, check_frontend_length, delegation_bookkeeping,
-        delegation_signature_msg_with_permissions, der_encode_canister_sig_key, DelegationAccess,
+        add_delegation_signature, delegation_bookkeeping,
+        delegation_signature_msg_with_permissions, der_encode_canister_sig_key,
+        frontend_length_within_limit, DelegationAccess,
     },
     ii_domain::IIDomain,
     state::{self, storage_borrow, storage_borrow_mut},
@@ -266,7 +267,7 @@ pub fn prepare_account_delegation(
     ii_domain: &Option<IIDomain>,
     now: Timestamp,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
-    check_frontend_length(&origin);
+    frontend_length_within_limit(&origin).map_err(AccountDelegationError::InternalCanisterError)?;
 
     let account = storage_borrow(|storage| {
         storage
@@ -320,6 +321,7 @@ pub fn prepare_account_delegation(
             session_key,
             seed.as_ref(),
             expiration,
+            None,
             access.permissions(),
         );
     });
@@ -341,7 +343,7 @@ pub fn get_account_delegation(
     expiration: Timestamp,
     access: DelegationAccess,
 ) -> Result<SignedDelegation, AccountDelegationError> {
-    check_frontend_length(origin);
+    frontend_length_within_limit(origin).map_err(AccountDelegationError::InternalCanisterError)?;
 
     storage_borrow(|storage| {
         let account = storage
