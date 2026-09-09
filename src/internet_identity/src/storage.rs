@@ -111,7 +111,7 @@ use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::{
     AccountReference, SessionRecord, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
 };
-use crate::storage::anchor::{Anchor, BrowserError};
+use crate::storage::anchor::{Anchor, BrowserError, MAX_BROWSERS};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
@@ -1695,8 +1695,32 @@ impl<M: Memory + Clone> Storage<M> {
         anchor: Anchor,
         writes: BTreeMap<FrontendHostname, AccountReferenceListWrite>,
     ) -> Result<BTreeMap<FrontendHostname, AccountReferenceListWrite>, StorageError> {
-        let validated = self.validate_account_state(anchor.anchor_number(), writes)?;
+        let given_up = self.browsers_given_up(&anchor)?;
+        let validated = self.validate_account_state(anchor.anchor_number(), &given_up, writes)?;
         Ok(self.apply_account_state(anchor, validated))
+    }
+
+    /// Browsers this write gives up, whose sessions have to go with them.
+    ///
+    /// Derived from the registry the write carries rather than stated by a caller: a
+    /// caller that has to say so is a caller that can forget to, and every path that
+    /// changes the registry passes through here.
+    ///
+    /// Only a full registry gives a browser up, so a smaller one answers without reading
+    /// the stored anchor — which keeps the anchor off the path of every write that cannot
+    /// have dropped anything, delegation refreshes included.
+    fn browsers_given_up(&self, anchor: &Anchor) -> Result<BTreeSet<BrowserId>, StorageError> {
+        if anchor.browsers().len() < MAX_BROWSERS {
+            return Ok(BTreeSet::new());
+        }
+        let held: BTreeSet<BrowserId> = anchor.browsers().iter().map(|one| one.id).collect();
+        Ok(self
+            .read(anchor.anchor_number())?
+            .browsers()
+            .iter()
+            .map(|one| one.id)
+            .filter(|id| !held.contains(id))
+            .collect())
     }
 
     /// [`Self::write_account_state`] for a test that has an anchor number rather than the
@@ -1712,11 +1736,63 @@ impl<M: Memory + Clone> Storage<M> {
         self.write_account_state(anchor, writes)
     }
 
+    /// `writes`, less every session held by a browser this write gives up.
+    ///
+    /// The sessions of a browser that is gone are gone with it, wherever they are, and in
+    /// the same write — a browser retired while its sessions still minted delegations
+    /// would go on being signed in from a list nothing shows.
+    ///
+    /// Only the origins that hold such a session are added. Adding the rest would cost
+    /// nothing to store and everything to the eviction rule, which spares an origin the
+    /// write is already changing; and the scan itself only happens when a browser was
+    /// actually given up, so an ordinary sign-in still reads the one origin it names.
+    fn without_sessions_of(
+        &self,
+        anchor_number: AnchorNumber,
+        browsers_given_up: &BTreeSet<BrowserId>,
+        mut writes: BTreeMap<FrontendHostname, AccountReferenceListWrite>,
+    ) -> BTreeMap<FrontendHostname, AccountReferenceListWrite> {
+        if browsers_given_up.is_empty() {
+            return writes;
+        }
+
+        let holds_one = |held: &AccountReferenceListWrite| {
+            held.as_ref().is_some_and(|(account_references, _)| {
+                account_references.iter().any(|write| {
+                    write
+                        .account_reference
+                        .sessions
+                        .iter()
+                        .any(|session| browsers_given_up.contains(&session.browser_id))
+                })
+            })
+        };
+        for (origin, held) in self.account_state(anchor_number) {
+            if holds_one(&held) {
+                writes.entry(origin).or_insert(held);
+            }
+        }
+
+        for held in writes.values_mut() {
+            let Some((account_references, _)) = held else {
+                continue;
+            };
+            for write in account_references.iter_mut() {
+                write
+                    .account_reference
+                    .sessions
+                    .retain(|session| !browsers_given_up.contains(&session.browser_id));
+            }
+        }
+        writes
+    }
+
     /// Everything that can refuse. Reads what is stored, works out what would be minted
     /// without minting it, and hands apply something that cannot fail.
     fn validate_account_state(
         &self,
         anchor_number: AnchorNumber,
+        browsers_given_up: &BTreeSet<BrowserId>,
         writes: BTreeMap<FrontendHostname, AccountReferenceListWrite>,
     ) -> Result<ValidatedAccountStateWrite, StorageError> {
         let mut minting = MintingState {
@@ -1724,6 +1800,7 @@ impl<M: Memory + Clone> Storage<M> {
             global: self.stable_account_counter_memory.get().clone(),
         };
 
+        let writes = self.without_sessions_of(anchor_number, browsers_given_up, writes);
         let written_origins: BTreeSet<FrontendHostname> = writes.keys().cloned().collect();
         let mut validated = Vec::with_capacity(writes.len());
         for (origin, write) in writes {
@@ -2781,7 +2858,7 @@ impl<M: Memory + Clone> Storage<M> {
         //
         // After the refusals above, so a ceremony that cannot happen registers nothing —
         // the record reaches storage only through the write at the end.
-        let (browser_id, dropped_browsers) = anchor
+        let (browser_id, _) = anchor
             .resolve_browser(
                 current_browser_key,
                 next_browser_key,
@@ -2790,27 +2867,18 @@ impl<M: Memory + Clone> Storage<M> {
             )
             .map_err(StorageError::Browser)?;
 
-        // The whole of what the identity holds, not just this origin: a browser the
-        // registry gave up to make room for this one may hold sessions anywhere, and those
-        // have to go in the same write as the browser that held them.
-        let mut state = self.account_state(anchor_number);
-        if !state.contains_key(&origin) {
-            let held = self.account_state_for_origin(anchor_number, &origin);
-            state.insert(origin.clone(), Some(held));
-        }
-        if !dropped_browsers.is_empty() {
-            for held in state.values_mut() {
-                let Some((account_references, _)) = held else {
-                    continue;
-                };
-                for write in account_references.iter_mut() {
-                    write
-                        .account_reference
-                        .sessions
-                        .retain(|session| !dropped_browsers.contains(&session.browser_id));
-                }
-            }
-        }
+        // This origin, and only this one. A browser the registry gave up to make room for
+        // this one may hold sessions anywhere, but that is a consequence of the write
+        // rather than something this function reaches across the identity to do: the gate
+        // derives it from the registry this write carries and sweeps them in the same
+        // write. Handing the gate every origin instead would make each of them an origin
+        // this write is changing, and an origin a write is changing is never a candidate
+        // for its own eviction — so the one write that creates tracked defaults would be
+        // the one write that can never evict them.
+        let mut state = BTreeMap::from([(
+            origin.clone(),
+            Some(self.account_state_for_origin(anchor_number, &origin)),
+        )]);
 
         let (account_references, _) = state
             .get_mut(&origin)
