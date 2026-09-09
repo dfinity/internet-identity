@@ -1012,9 +1012,10 @@ type IdentityAuthnInfo = record {
 // at once. "Brand" is what the client hints call this, and BrowserInfo below is the
 // entry it describes.
 type BrowserBrand = variant {
-    Chrome; Safari; Firefox; Edge; Opera; SamsungInternet; Vivaldi; Brave;
+    Chrome; Safari; Firefox; Edge; Opera; SamsungInternet;
     // A browser this list does not name, shown as the client resolved it. Worth seeing
-    // rather than hiding behind a generic label.
+    // rather than hiding behind a generic label. Named variants are the six that hold
+    // 97% of the web between them, because a variant is what earns an icon.
     Other : text;
 };
 
