@@ -172,23 +172,44 @@ pub(crate) fn canister_sig_principal(canister_id: Principal, seed: Vec<u8>) -> P
     Principal::self_authenticating(der_encode_canister_sig_key_for(canister_id, seed))
 }
 
-/// Adds a delegation signature for `pk` to the signature map. `permissions`
-/// is the delegation's optional `permissions` field (folded into the signed
-/// message when present) — pass `access.permissions()` of a
-/// [`DelegationAccess`], or `None` for flows that never restrict.
+/// Adds a delegation signature for `pk` to the signature map.
+///
+/// `targets` is the delegation's optional `targets` field and `permissions` its optional
+/// `permissions` field, both folded into the signed message when present — pass
+/// `access.permissions()` of a [`DelegationAccess`], and `None` for flows that never
+/// restrict. Whatever is passed here has to be passed again when the signature is
+/// fetched: the two messages must match byte for byte or the lookup finds nothing.
 pub fn add_delegation_signature(
     sigs: &mut SignatureMap,
     pk: PublicKey,
     seed: &[u8],
     expiration: Timestamp,
+    targets: Option<&[Principal]>,
     permissions: Option<&str>,
 ) {
+    let targets = targets.map(target_bytes);
     let inputs = CanisterSigInputs {
         domain: DELEGATION_SIG_DOMAIN,
         seed,
-        message: &delegation_signature_msg_with_permissions(&pk, expiration, None, permissions),
+        message: &delegation_signature_msg_with_permissions(
+            &pk,
+            expiration,
+            targets.as_ref(),
+            permissions,
+        ),
     };
     sigs.add_signature(&inputs);
+}
+
+/// The `targets` field as the signed message carries it: each principal as raw bytes.
+///
+/// The side that adds a signature and the side that fetches it both convert through
+/// here, because the two messages have to be identical or the lookup finds nothing.
+pub fn target_bytes(targets: &[Principal]) -> Vec<Vec<u8>> {
+    targets
+        .iter()
+        .map(|target| target.as_slice().to_vec())
+        .collect()
 }
 
 /// The value of a delegation's `permissions` field that restricts the
@@ -275,15 +296,31 @@ pub fn delegation_signature_msg_with_permissions(
     representation_independent_hash(m.as_slice()).to_vec()
 }
 
-pub(crate) fn check_frontend_length(frontend: &FrontendHostname) {
-    const FRONTEND_HOSTNAME_LIMIT: usize = 255;
+pub(crate) const FRONTEND_HOSTNAME_LIMIT: usize = 255;
 
+pub(crate) fn check_frontend_length(frontend: &FrontendHostname) {
     let n = frontend.len();
     if frontend.len() > FRONTEND_HOSTNAME_LIMIT {
         trap(&format!(
             "frontend hostname {n} exceeds the limit of {FRONTEND_HOSTNAME_LIMIT} bytes",
         ));
     }
+}
+
+/// The same bound as [`check_frontend_length`], answered rather than trapped.
+///
+/// A hostname this long is not reachable through any client, so what comes back says
+/// only that it was refused — for callers whose response already carries a variant for
+/// the unreachable edges, which is a better answer than a rejected message the caller
+/// cannot read as one.
+pub(crate) fn frontend_length_within_limit(frontend: &FrontendHostname) -> Result<(), String> {
+    if frontend.len() > FRONTEND_HOSTNAME_LIMIT {
+        return Err(format!(
+            "frontend hostname {} exceeds the limit of {FRONTEND_HOSTNAME_LIMIT} bytes",
+            frontend.len()
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
