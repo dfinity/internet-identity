@@ -508,6 +508,7 @@ dependencies = [
  "identity_jose",
  "internet_identity_interface",
  "lazy_static",
+ "p256",
  "pocket-ic",
  "regex",
  "serde",

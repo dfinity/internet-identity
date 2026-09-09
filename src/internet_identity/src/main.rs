@@ -49,6 +49,7 @@ mod anchor_management;
 mod archive;
 mod assets;
 mod authz_utils;
+mod browser_key;
 
 mod attributes;
 /// Type conversions between internal and external types.
