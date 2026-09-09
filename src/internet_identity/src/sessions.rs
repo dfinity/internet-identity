@@ -405,7 +405,7 @@ fn authorize_session(
     let matched = match_session()?;
     // Either bound: a session past its lifetime and one nobody has used for longer
     // than it was allowed are equally gone, and a refresh is the thing that finds out.
-    if matched.2.is_over(now) {
+    if matched.2.is_expired_or_idle(now) {
         return Err(AppSessionError::NoMatchingSession);
     }
     Ok(matched)
