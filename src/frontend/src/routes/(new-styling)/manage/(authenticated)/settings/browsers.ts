@@ -27,8 +27,6 @@ const BRAND_NAMES: Record<string, string> = {
   Edge: "Edge",
   Opera: "Opera",
   SamsungInternet: "Samsung Internet",
-  Vivaldi: "Vivaldi",
-  Brave: "Brave",
 };
 
 /**
