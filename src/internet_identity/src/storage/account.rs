@@ -40,7 +40,7 @@ pub struct AccountsCounter {
 pub struct AccountReference {
     pub account_number: Option<AccountNumber>, // None is the unreserved synthetic account
     pub last_used: Option<Timestamp>,
-    pub sessions: Vec<SessionRecord>,
+    pub sessions: Vec<Session>,
 }
 
 impl AccountReference {
@@ -56,7 +56,7 @@ impl AccountReference {
 /// A revocable session at one account. Only `last_refreshed` is mutable, which is why
 /// it is the one field absent from the seed.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct SessionRecord {
+pub struct Session {
     pub created_at_ns: Timestamp,
     pub valid_till_ns: Timestamp,
     pub max_idle_ns: u64,
@@ -65,7 +65,7 @@ pub struct SessionRecord {
     pub read_only: bool,
 }
 
-impl SessionRecord {
+impl Session {
     /// One question rather than two, because a caller has no use for the halves
     /// apart: a session past its lifetime and one nobody has used for longer than
     /// it was allowed are equally over. Asking separately is how a caller ends up
