@@ -17,8 +17,8 @@ export interface Browser {
   description: BrowserDescription;
   createdAtMillis: number;
   lastUsedMillis: number;
-  /** Counts stored records, so a browser long gone still reads as signed in until some
-   *  write prunes its expired sessions. That is what the inactive badge explains. */
+  /** Counts stored records, so a browser long gone can still read above zero until some
+   *  write prunes its expired sessions. [`isSignedOut`] is what the page asks instead. */
   sessionCount: number;
   /** Several browsers report the same name, so the list marks the one being read from. */
   isCurrent: boolean;
@@ -72,21 +72,28 @@ export const brandIconOf = (
   return file === undefined ? undefined : iconFor(file);
 };
 
-/** A browser this identity has not been near in this long is worth a second look. */
-export const INACTIVE_AFTER_DAYS = 30;
+const DAY_MILLIS = 86_400_000;
 
 /**
- * Whole days since a browser last did anything, or `undefined` where that is not long
- * enough to say. `last_used` advances on every session refresh, so this measures the
- * browser rather than any one session.
+ * A browser idle this long holds nothing that can still be minted from: the canister's
+ * `MAX_SESSION_TTL_NS` is 30 days, `last_used` advances on every refresh, so every
+ * session such a browser opened is past its absolute bound.
+ *
+ * Asked instead of `sessionCount` alone, which counts stored records and can read above
+ * zero until some write prunes the expired ones.
  */
-export const inactiveDays = (
-  browser: Browser,
-  now: number,
-): number | undefined => {
-  const days = Math.floor((now - browser.lastUsedMillis) / 86_400_000);
-  return days >= INACTIVE_AFTER_DAYS ? days : undefined;
-};
+export const SIGNED_OUT_AFTER_DAYS = 30;
+
+/** Idle this long and the browser is not shown at all. */
+export const HIDDEN_AFTER_DAYS = 90;
+
+/** Whole days since a browser last did anything, rounded down. */
+export const daysIdle = (browser: Browser, now: number): number =>
+  Math.floor((now - browser.lastUsedMillis) / DAY_MILLIS);
+
+/** Whether this browser can still reach an app, as far as the page can tell. */
+export const isSignedOut = (browser: Browser, now: number): boolean =>
+  browser.sessionCount === 0 || daysIdle(browser, now) >= SIGNED_OUT_AFTER_DAYS;
 
 const BRAND_NAMES: Record<string, string> = {
   Chrome: "Chrome",
@@ -121,17 +128,74 @@ const named = (
 };
 
 /**
- * How a browser is named in the list.
+ * What a row is labelled: the brand alone, because the platform is on the heading of the
+ * group the row sits in.
+ *
+ * An unrecognised token is shown as it arrived rather than as a generic word — a browser
+ * the user does not recognise is the row this list exists for.
+ */
+export const brandNameOf = (description: BrowserDescription): string =>
+  named(description.brand, BRAND_NAMES);
+
+/**
+ * What the group is keyed and headed by. The model is deliberately not part of it: two
+ * machines of the same make report the same thing, which is why the heading says
+ * "device(s)" rather than counting them.
+ */
+export const platformWordOf = (description: BrowserDescription): string =>
+  named(description.os, PLATFORM_WORDS);
+
+/**
+ * How a browser is named in prose — the sign-out dialog and its toast — where it is the
+ * only thing named and the brand alone would not say which machine.
  *
  * The hardware wins where the client could name it, because "Chrome on Pixel 9" is what
- * its owner recognises; the platform word stands in everywhere else. An unrecognised
- * token is shown as it arrived rather than as a generic fallback — a browser the user
- * does not recognise is the row this list exists for.
+ * its owner recognises; the platform word stands in everywhere else.
  */
 export const nameOf = (description: BrowserDescription): string =>
-  `${named(description.brand, BRAND_NAMES)} on ${
-    description.model[0] ?? named(description.os, PLATFORM_WORDS)
+  `${brandNameOf(description)} on ${
+    description.model[0] ?? platformWordOf(description)
   }`;
+
+/** Browsers on one platform, in the order the page renders them. */
+export interface BrowserGroup {
+  /** The platform word, which is also what the group is keyed by. */
+  platform: string;
+  /** Which glyph heads the group, taken from its most recently used browser. */
+  kind: DeviceKind;
+  browsers: Browser[];
+}
+
+/**
+ * Browsers grouped by the platform they run on, most recently used group first and most
+ * recently used browser first within each.
+ *
+ * Browsers idle beyond [`HIDDEN_AFTER_DAYS`] are left out entirely: nothing can be
+ * signed out there, and a list that keeps them buries the rows that matter.
+ */
+export const groupBrowsers = (
+  browsers: Browser[],
+  now: number,
+): BrowserGroup[] => {
+  const groups = new Map<string, BrowserGroup>();
+  for (const browser of browsers) {
+    if (daysIdle(browser, now) >= HIDDEN_AFTER_DAYS) {
+      continue;
+    }
+    const platform = platformWordOf(browser.description);
+    const group = groups.get(platform);
+    if (group === undefined) {
+      groups.set(platform, {
+        platform,
+        kind: kindOf(browser.description),
+        browsers: [browser],
+      });
+    } else {
+      group.browsers.push(browser);
+    }
+  }
+  return [...groups.values()];
+};
 
 export const fromCanisterBrowsers = (
   browsers: [] | [BrowserInfo[]],
