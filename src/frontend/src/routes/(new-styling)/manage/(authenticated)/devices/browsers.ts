@@ -14,11 +14,79 @@ export interface Browser {
   id: number;
   /** Derived here rather than stored, so renaming a product renames every row at once. */
   name: string;
+  description: BrowserDescription;
   createdAtMillis: number;
   lastUsedMillis: number;
+  /** Counts stored records, so a browser long gone still reads as signed in until some
+   *  write prunes its expired sessions. That is what the inactive badge explains. */
+  sessionCount: number;
   /** Several browsers report the same name, so the list marks the one being read from. */
   isCurrent: boolean;
 }
+
+/** Which glyph stands for the machine. Four, because that is what the data can tell. */
+export type DeviceKind = "laptop" | "phone" | "tablet" | "unknown";
+
+/**
+ * `Desktop` draws a laptop: nothing reported separates a laptop from a tower, and of the
+ * two a laptop is the likelier machine to be reading this page.
+ */
+export const kindOf = (description: BrowserDescription): DeviceKind =>
+  "Mobile" in description.form_factor
+    ? "phone"
+    : "Tablet" in description.form_factor
+      ? "tablet"
+      : "Desktop" in description.form_factor
+        ? "laptop"
+        : "unknown";
+
+const BRAND_ICONS = import.meta.glob("./icons/*.svg", {
+  eager: true,
+  query: "?url",
+  import: "default",
+}) as Record<string, string>;
+
+const iconFor = (file: string): string | undefined =>
+  Object.entries(BRAND_ICONS).find(([path]) => path.endsWith(`/${file}`))?.[1];
+
+const BRAND_ICON_FILES: Record<string, string> = {
+  Chrome: "chrome.svg",
+  Safari: "safari.svg",
+  Firefox: "firefox.svg",
+  Edge: "edge.svg",
+  Opera: "opera.svg",
+  SamsungInternet: "samsung-internet.svg",
+};
+
+/**
+ * The brand mark for the badge, where the brand is one of the six that has one.
+ *
+ * A browser resolved to `Other` has a name but no icon, which is the point of the bar for
+ * a named variant: an icon nobody recognises says less than the name written out.
+ */
+export const brandIconOf = (
+  description: BrowserDescription,
+): string | undefined => {
+  const [tag] = Object.entries(description.brand)[0];
+  const file = BRAND_ICON_FILES[tag];
+  return file === undefined ? undefined : iconFor(file);
+};
+
+/** A browser this identity has not been near in this long is worth a second look. */
+export const INACTIVE_AFTER_DAYS = 30;
+
+/**
+ * Whole days since a browser last did anything, or `undefined` where that is not long
+ * enough to say. `last_used` advances on every session refresh, so this measures the
+ * browser rather than any one session.
+ */
+export const inactiveDays = (
+  browser: Browser,
+  now: number,
+): number | undefined => {
+  const days = Math.floor((now - browser.lastUsedMillis) / 86_400_000);
+  return days >= INACTIVE_AFTER_DAYS ? days : undefined;
+};
 
 const BRAND_NAMES: Record<string, string> = {
   Chrome: "Chrome",
@@ -73,8 +141,10 @@ export const fromCanisterBrowsers = (
     .map((browser) => ({
       id: browser.id,
       name: nameOf(browser.description),
+      description: browser.description,
       createdAtMillis: nanosToMillis(browser.created_at),
       lastUsedMillis: nanosToMillis(browser.last_used),
+      sessionCount: browser.session_count,
       isCurrent: browser.id === currentBrowserId,
     }))
     .sort((a, b) => b.lastUsedMillis - a.lastUsedMillis);
