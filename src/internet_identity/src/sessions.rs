@@ -403,10 +403,14 @@ pub fn app_get_delegation(
         account, session, ..
     } = authorize_session(now)?;
 
+    // An expiration this canister would never have signed, which means one the caller
+    // did not get from `app_prepare_delegation`: that returns
+    // `min(now + APP_DELEGATION_TTL_NS, session.valid_till_ns)`, and `now` has only
+    // advanced since, so the value it handed out cannot exceed either bound here.
     if request.expiration > now.saturating_add(APP_DELEGATION_TTL_NS)
         || request.expiration > session.valid_till_ns
     {
-        return Err(AppSessionError::NoMatchingSession);
+        return Err(AppSessionError::NoSuchDelegation);
     }
 
     let seed = account_seed(&account)?;
@@ -435,7 +439,9 @@ pub fn app_get_delegation(
         },
         signature: ByteBuf::from(signature),
     })
-    .map_err(|_| AppSessionError::NoMatchingSession)
+    // The session is live — `authorize_session` above said so — so a signature that is
+    // not there was never added for these parameters.
+    .map_err(|_| AppSessionError::NoSuchDelegation)
 }
 
 /// A live session the caller has been proved to be, and where it lives.
@@ -456,7 +462,7 @@ struct AuthorizedSession {
 /// nothing is attached to it.
 fn authorize_session(now: Timestamp) -> Result<AuthorizedSession, AppSessionError> {
     let locator = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
-        .ok_or(AppSessionError::NoMatchingSession)?;
+        .ok_or(AppSessionError::NoSuchSession)?;
 
     let (account, session) = storage_borrow(|storage| {
         Some((
@@ -464,10 +470,10 @@ fn authorize_session(now: Timestamp) -> Result<AuthorizedSession, AppSessionErro
             storage.read_session(&locator)?,
         ))
     })
-    .ok_or(AppSessionError::NoMatchingSession)?;
+    .ok_or(AppSessionError::NoSuchSession)?;
 
     if session.is_expired_or_idle(now) {
-        return Err(AppSessionError::NoMatchingSession);
+        return Err(AppSessionError::NoSuchSession);
     }
     Ok(AuthorizedSession {
         locator,
