@@ -939,6 +939,10 @@ pub enum AppSessionError {
     /// No usable session behind this caller: revoked, expired, pruned, or never one at
     /// all. One outcome, because which of those it is depends on whether a prune has run
     /// yet, and because an app can act on none of them differently.
-    NoMatchingSession,
+    ///
+    /// The same fact its counterpart on [`AccountSessionError`] names, and named the
+    /// same: the only difference is that this side matches the caller rather than being
+    /// handed a session id.
+    NoSuchSession,
     InternalCanisterError(String),
 }
