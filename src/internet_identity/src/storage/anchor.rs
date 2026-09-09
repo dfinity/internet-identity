@@ -766,8 +766,9 @@ impl Anchor {
         }
     }
 
-    /// Advances a device's `last_used`. Reports whether anything changed, so an unknown
-    /// device or a repeat inside one message costs no anchor write.
+    /// Advances a browser's `last_used`, where the anchor holds that browser and the
+    /// stamp moves it forward. A browser no entry names, or a repeat inside one message,
+    /// leaves the registry as it is.
     pub fn stamp_browser_use(&mut self, browser_id: BrowserId, now: Timestamp) {
         if let Some(browser) = self
             .browsers

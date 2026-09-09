@@ -360,15 +360,20 @@ pub fn app_prepare_delegation(
         session,
     } = authorize_session(now)?;
 
-    storage_borrow_mut(|storage| storage.record_session_use(&locator, now))
-        .map_err(|err| AppSessionError::InternalCanisterError(err.to_string()))?;
-
+    // Everything that can refuse, before the stamp. Returning `Err` on the IC commits
+    // whatever was written before it — only a trap rolls back — so a stamp above this
+    // would leave the session recorded as used while the caller is told the call failed.
+    // All three depend on values already in hand, so there is nothing to gain by
+    // computing them later.
     let expiration = u64::min(
         now.saturating_add(APP_DELEGATION_TTL_NS),
         session.valid_till_ns,
     );
     let seed = account_seed(&account)?;
     let access = DelegationAccess::from_read_only(session.read_only);
+
+    storage_borrow_mut(|storage| storage.record_session_use(&locator, now))
+        .map_err(|err| AppSessionError::InternalCanisterError(err.to_string()))?;
 
     state::signature_map_mut(|sigs| {
         add_delegation_signature(

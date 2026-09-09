@@ -6384,7 +6384,7 @@ mod session_refresh_stamp_tests {
     use super::held_references;
     use super::params;
     use crate::storage::account::{AccountReference, Session, SessionLocator};
-    use crate::storage::CreateSessionParams;
+    use crate::storage::{CreateSessionParams, StorageError};
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
@@ -6425,9 +6425,8 @@ mod session_refresh_stamp_tests {
     fn a_refresh_stamps_the_session_and_the_reference() {
         let (mut storage, anchor_number, key) = storage_with_session();
 
-        let stamped = storage.record_session_use(&key, 2_000).unwrap();
+        storage.record_session_use(&key, 2_000).unwrap();
 
-        assert!(stamped);
         assert_eq!(
             session_of(&storage, anchor_number).last_refreshed_ns,
             Some(2_000)
@@ -6440,7 +6439,7 @@ mod session_refresh_stamp_tests {
         let (mut storage, anchor_number, key) = storage_with_session();
 
         for now in [1_001, 1_002, 1_003] {
-            assert!(storage.record_session_use(&key, now).unwrap());
+            storage.record_session_use(&key, now).unwrap();
             assert_eq!(
                 session_of(&storage, anchor_number).last_refreshed_ns,
                 Some(now)
@@ -6471,7 +6470,7 @@ mod session_refresh_stamp_tests {
             .is_some());
         assert_eq!(storage.read(anchor_number).unwrap().session_count, 2);
 
-        assert!(storage.record_session_use(&key, 2_000).unwrap());
+        storage.record_session_use(&key, 2_000).unwrap();
 
         let sessions = reference(&storage, anchor_number).sessions;
         assert_eq!(sessions.len(), 1, "the expired sibling was left behind");
@@ -6486,23 +6485,33 @@ mod session_refresh_stamp_tests {
         assert_eq!(storage.read(anchor_number).unwrap().session_count, 1);
     }
 
+    /// A locator naming nothing is refused rather than reported as a quiet non-event.
+    /// The caller that would have ignored a `false` here goes on to mint a delegation,
+    /// which is the one thing a session no list holds must not get.
     #[test]
-    fn a_stamp_for_a_session_that_is_gone_writes_nothing() {
+    fn a_stamp_for_a_session_that_is_gone_is_refused() {
         let (mut storage, anchor_number, _key) = storage_with_session();
 
-        let wrote = storage
-            .record_session_use(
-                &SessionLocator {
-                    anchor_number,
-                    origin: ORIGIN.to_string(),
-                    account_number: None,
-                    session_id: 9_999,
-                },
-                5_000,
-            )
-            .unwrap();
+        let refused = storage.record_session_use(
+            &SessionLocator {
+                anchor_number,
+                origin: ORIGIN.to_string(),
+                account_number: None,
+                session_id: 9_999,
+            },
+            5_000,
+        );
 
-        assert!(!wrote);
+        assert!(
+            matches!(
+                refused,
+                Err(StorageError::SessionNotFound {
+                    anchor_number: refused_anchor,
+                    session_id: 9_999
+                }) if refused_anchor == anchor_number
+            ),
+            "a locator naming no session should be refused, got {refused:?}"
+        );
     }
 
     #[test]
@@ -6573,9 +6582,8 @@ mod session_refresh_stamp_tests {
     fn a_refresh_for_a_device_the_anchor_never_registered_still_stamps_the_session() {
         let (mut storage, anchor_number, key) = storage_with_session();
 
-        let stamped = storage.record_session_use(&key, 9_000).unwrap();
+        storage.record_session_use(&key, 9_000).unwrap();
 
-        assert!(stamped);
         assert_eq!(
             session_of(&storage, anchor_number).last_refreshed_ns,
             Some(9_000)

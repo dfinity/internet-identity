@@ -3362,13 +3362,14 @@ impl<M: Memory + Clone> Storage<M> {
     /// Records that a session was used: its own stamp, its account reference's, and the
     /// browser's in the device registry.
     ///
-    /// `false` where the identity holds no such session, which is not a failure — a
-    /// session can be revoked between one call and the next.
+    /// A locator naming nothing is [`StorageError::SessionNotFound`] rather than a
+    /// quiet non-event. Nobody makes a decision from it, and the one caller that could
+    /// have ignored it went on to mint a delegation for a session no list holds.
     pub fn record_session_use(
         &mut self,
         key: &SessionLocator,
         now: Timestamp,
-    ) -> Result<bool, StorageError> {
+    ) -> Result<(), StorageError> {
         let SessionLocator {
             anchor_number,
             origin,
@@ -3377,27 +3378,27 @@ impl<M: Memory + Clone> Storage<M> {
         } = key;
         let (anchor_number, account_number, session_id) =
             (*anchor_number, *account_number, *session_id);
+        let not_found = || StorageError::SessionNotFound {
+            anchor_number,
+            session_id,
+        };
 
         if self.lookup_application_number_with_origin(origin).is_none() {
-            return Ok(false);
+            return Err(not_found());
         }
         let mut anchor = self.read(anchor_number)?;
         let (mut account_references, config) = self.account_state_for_origin(anchor_number, origin);
 
-        let Some(write) = account_references
+        let write = account_references
             .iter_mut()
             .find(|write| write.account_reference.account_number == account_number)
-        else {
-            return Ok(false);
-        };
-        let Some(session) = write
+            .ok_or_else(not_found)?;
+        let session = write
             .account_reference
             .sessions
             .iter_mut()
             .find(|session| session.session_id == session_id)
-        else {
-            return Ok(false);
-        };
+            .ok_or_else(not_found)?;
 
         session.last_refreshed_ns = Some(now);
         let browser_id = session.browser_id;
@@ -3422,7 +3423,7 @@ impl<M: Memory + Clone> Storage<M> {
             now,
             BTreeMap::from([(origin.clone(), Some((account_references, config)))]),
         )?;
-        Ok(true)
+        Ok(())
     }
 
     /// Retires an application no anchor references any more. The number is never
@@ -4370,6 +4371,13 @@ pub enum StorageError {
     SessionAlreadyOver {
         anchor_number: AnchorNumber,
     },
+    /// The session a caller named is not among the identity's — whether it never was, or
+    /// has since been revoked, replaced or pruned. Those are one observation rather than
+    /// three: a session that is not there cannot be told apart from one that never was.
+    SessionNotFound {
+        anchor_number: AnchorNumber,
+        session_id: SessionId,
+    },
     AnchorNumberOutOfRange {
         anchor_number: AnchorNumber,
         range: (AnchorNumber, AnchorNumber),
@@ -4461,6 +4469,13 @@ impl fmt::Display for StorageError {
             Self::SessionAlreadyOver { anchor_number } => write!(
                 f,
                 "a session for Identity Anchor {anchor_number} would be over before it started"
+            ),
+            Self::SessionNotFound {
+                anchor_number,
+                session_id,
+            } => write!(
+                f,
+                "Identity Anchor {anchor_number} holds no session {session_id}"
             ),
             Self::DeserializationError(err) => {
                 write!(f, "failed to deserialize a Candid value: {err}")
