@@ -140,6 +140,7 @@ pub fn set_default_account_for_origin(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
+    now: Timestamp,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
     let account = try_read_account_info(anchor_number, &origin, account_number).map_err(|_| {
         SetDefaultAccountError::NoSuchAccount {
@@ -149,7 +150,7 @@ pub fn set_default_account_for_origin(
     })?;
 
     storage_borrow_mut(|storage| {
-        storage.set_default_account(anchor_number, origin, account_number)
+        storage.set_default_account(anchor_number, origin, account_number, now)
     })
     .map_err(|err| SetDefaultAccountError::InternalCanisterError(err.to_string()))?;
 
@@ -160,11 +161,12 @@ pub fn create_account_for_origin(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     name: String,
+    now: Timestamp,
 ) -> Result<Account, CreateAccountError> {
     validate_account_name(&name).map_err(Into::<CreateAccountError>::into)?;
     let created_account = storage_borrow_mut(|storage| {
         storage
-            .create_account(anchor_number, origin, name.clone())
+            .create_account(anchor_number, origin, name.clone(), now)
             .map_err(|err| match err {
                 // The cap is the write path's rule, so it says so rather than the caller
                 // asking first — and naming a tracked default reaches it the same way,
@@ -189,6 +191,7 @@ pub fn update_account_for_origin(
     account_number: Option<AccountNumber>,
     origin: FrontendHostname,
     update: AccountUpdate,
+    now: Timestamp,
 ) -> Result<Account, UpdateAccountError> {
     match update.name {
         Some(new_name) => {
@@ -212,7 +215,7 @@ pub fn update_account_for_origin(
                     let mut renamed_account = old_account.clone();
                     renamed_account.name = Some(new_name.clone());
                     let updated_account = storage
-                        .write_account(renamed_account)
+                        .write_account(renamed_account, now)
                         .map_err(|err| match err {
                             StorageError::AccountLimitReached { .. } => {
                                 UpdateAccountError::AccountLimitReached
@@ -307,7 +310,7 @@ pub fn prepare_account_delegation(
     storage_borrow_mut(|storage| {
         let mut used_account = account;
         used_account.last_used = Some(now);
-        storage.write_account(used_account)
+        storage.write_account(used_account, now)
     })
     .map_err(|err| AccountDelegationError::InternalCanisterError(err.to_string()))?;
 
@@ -409,7 +412,12 @@ fn should_create_account_for_origin() {
     let name = "Alice".to_string();
 
     assert_eq!(
-        create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone()),
+        create_account_for_origin(
+            anchor.anchor_number(),
+            origin.clone(),
+            name.clone(),
+            crate::storage::TEST_NOW
+        ),
         Ok(Account::new_full(
             anchor.anchor_number(),
             origin,
@@ -435,8 +443,12 @@ fn should_fail_to_create_accounts_above_max() {
     let name = "Alice".to_string();
     for i in 0..=MAX_ANCHOR_ACCOUNTS {
         let origin = format!("https://example-{i}.com");
-        let result =
-            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+        let result = create_account_for_origin(
+            anchor.anchor_number(),
+            origin.clone(),
+            name.clone(),
+            crate::storage::TEST_NOW,
+        );
         if i == MAX_ANCHOR_ACCOUNTS {
             assert_eq!(result, Err(CreateAccountError::AccountLimitReached))
         } else {
@@ -459,8 +471,12 @@ fn should_fail_to_update_default_accounts_above_max() {
     let name = "Alice".to_string();
     for i in 0..MAX_ANCHOR_ACCOUNTS {
         let origin = format!("https://example-{i}.com");
-        let create_result =
-            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+        let create_result = create_account_for_origin(
+            anchor.anchor_number(),
+            origin.clone(),
+            name.clone(),
+            crate::storage::TEST_NOW,
+        );
 
         assert!(create_result.is_ok())
     }
@@ -471,6 +487,7 @@ fn should_fail_to_update_default_accounts_above_max() {
         AccountUpdate {
             name: Some("Gabriel".to_string()),
         },
+        crate::storage::TEST_NOW,
     );
     assert_eq!(result, Err(UpdateAccountError::AccountLimitReached))
 }
@@ -490,8 +507,18 @@ fn should_get_accounts_for_origin() {
     let name_two = "Bob".to_string();
     let anchor_number = anchor.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone());
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name.clone(),
+        crate::storage::TEST_NOW,
+    );
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name_two.clone(),
+        crate::storage::TEST_NOW,
+    );
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -538,8 +565,18 @@ fn should_only_get_own_accounts_for_origin() {
     let anchor_number = anchor.anchor_number();
     let anchor_number_two = anchor_two.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone());
-    let _ = create_account_for_origin(anchor_number_two, origin.clone(), name_two.clone());
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name.clone(),
+        crate::storage::TEST_NOW,
+    );
+    let _ = create_account_for_origin(
+        anchor_number_two,
+        origin.clone(),
+        name_two.clone(),
+        crate::storage::TEST_NOW,
+    );
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -587,8 +624,18 @@ fn should_update_account_for_origin() {
     let name_two = "Bob".to_string();
     let anchor_number = anchor.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone());
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name.clone(),
+        crate::storage::TEST_NOW,
+    );
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name_two.clone(),
+        crate::storage::TEST_NOW,
+    );
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -620,7 +667,8 @@ fn should_update_account_for_origin() {
             origin.clone(),
             AccountUpdate {
                 name: Some("Becky".to_string())
-            }
+            },
+            crate::storage::TEST_NOW
         ),
         Ok(Account::new_full(
             anchor_number,
@@ -671,8 +719,18 @@ fn should_update_default_account_for_origin() {
     let name_two = "Bob".to_string();
     let anchor_number = anchor.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone());
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name.clone(),
+        crate::storage::TEST_NOW,
+    );
+    let _ = create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        name_two.clone(),
+        crate::storage::TEST_NOW,
+    );
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -704,7 +762,8 @@ fn should_update_default_account_for_origin() {
             origin.clone(),
             AccountUpdate {
                 name: Some("Becky".to_string())
-            }
+            },
+            crate::storage::TEST_NOW
         ),
         Ok(Account::new_full(
             anchor_number,
@@ -759,7 +818,13 @@ fn naming_a_tracked_default_at_the_account_limit_is_refused() {
         anchor
     });
     let origin = "https://example.com".to_string();
-    create_account_for_origin(anchor.anchor_number(), origin.clone(), "first".to_string()).unwrap();
+    create_account_for_origin(
+        anchor.anchor_number(),
+        origin.clone(),
+        "first".to_string(),
+        crate::storage::TEST_NOW,
+    )
+    .unwrap();
 
     // At the limit, and naming another account is the one thing that cannot be done —
     // said by the write itself rather than by a caller asking first.
@@ -772,7 +837,12 @@ fn naming_a_tracked_default_at_the_account_limit_is_refused() {
     });
 
     assert_eq!(
-        create_account_for_origin(anchor.anchor_number(), origin, "second".to_string()),
+        create_account_for_origin(
+            anchor.anchor_number(),
+            origin,
+            "second".to_string(),
+            crate::storage::TEST_NOW
+        ),
         Err(CreateAccountError::AccountLimitReached)
     );
 }
@@ -804,6 +874,7 @@ fn a_drifted_account_counter_is_not_repaired_and_costs_the_identity_its_limit() 
             anchor.anchor_number(),
             "https://example.com".to_string(),
             name,
+            crate::storage::TEST_NOW,
         ),
         Err(CreateAccountError::AccountLimitReached)
     );
@@ -822,8 +893,20 @@ fn should_get_default_account_for_origin() {
     let origin = "https://example.com".to_string();
     let anchor_number = anchor.anchor_number();
 
-    create_account_for_origin(anchor_number, origin.clone(), "Alice".to_string()).unwrap();
-    create_account_for_origin(anchor_number, origin.clone(), "Bob".to_string()).unwrap();
+    create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        "Alice".to_string(),
+        crate::storage::TEST_NOW,
+    )
+    .unwrap();
+    create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        "Bob".to_string(),
+        crate::storage::TEST_NOW,
+    )
+    .unwrap();
 
     // Smoke test
     assert_eq!(
@@ -953,6 +1036,7 @@ fn should_get_default_account_for_origin() {
                 anchor_number,
                 origin.clone(),
                 default_account_number,
+                crate::storage::TEST_NOW,
             );
 
             assert_eq!(
@@ -1013,6 +1097,7 @@ fn should_get_updated_default_account_after_modification() {
         AccountUpdate {
             name: Some("Default Account".to_string()),
         },
+        crate::storage::TEST_NOW,
     )
     .unwrap();
 
@@ -1076,7 +1161,13 @@ fn should_fall_back_to_the_tracked_default_when_the_reservation_is_stale() {
     let anchor_number = anchor.anchor_number();
     let origin = "https://example.com".to_string();
     storage_borrow_mut(|storage| storage.write(anchor)).unwrap();
-    create_account_for_origin(anchor_number, origin.clone(), "Alice".to_string()).unwrap();
+    create_account_for_origin(
+        anchor_number,
+        origin.clone(),
+        "Alice".to_string(),
+        crate::storage::TEST_NOW,
+    )
+    .unwrap();
 
     // A number this identity does not hold. The write does not store it: the default is
     // related to the account reference list and moved to a reference that is there, which
@@ -1084,7 +1175,12 @@ fn should_fall_back_to_the_tracked_default_when_the_reservation_is_stale() {
     // the read below answers from a default that exists, because no other kind was left
     // behind.
     storage_borrow_mut(|storage| {
-        storage.set_default_account(anchor_number, origin.clone(), Some(9_999))
+        storage.set_default_account(
+            anchor_number,
+            origin.clone(),
+            Some(9_999),
+            crate::storage::TEST_NOW,
+        )
     })
     .unwrap();
 
@@ -1116,8 +1212,20 @@ fn should_get_default_account_for_different_origins() {
     let anchor_number = anchor.anchor_number();
 
     // Create accounts for both origins
-    create_account_for_origin(anchor_number, origin1.clone(), "Alice".to_string()).unwrap();
-    create_account_for_origin(anchor_number, origin2.clone(), "Bob".to_string()).unwrap();
+    create_account_for_origin(
+        anchor_number,
+        origin1.clone(),
+        "Alice".to_string(),
+        crate::storage::TEST_NOW,
+    )
+    .unwrap();
+    create_account_for_origin(
+        anchor_number,
+        origin2.clone(),
+        "Bob".to_string(),
+        crate::storage::TEST_NOW,
+    )
+    .unwrap();
 
     // Run code under test
     let result1 = get_default_account_for_origin(anchor_number, origin1.clone());

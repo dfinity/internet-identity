@@ -419,8 +419,13 @@ fn create_account(
     match check_authorization(anchor_number) {
         Ok(_) => {
             // check if this anchor and acc are actually linked
-            account_management::create_account_for_origin(anchor_number, origin, name)
-                .map(|acc| acc.to_info())
+            account_management::create_account_for_origin(
+                anchor_number,
+                origin,
+                name,
+                ic_cdk::api::time(),
+            )
+            .map(|acc| acc.to_info())
         }
         Err(err) => Err(CreateAccountError::Unauthorized(err.principal)),
     }
@@ -439,6 +444,7 @@ fn update_account(
             account_number,
             origin,
             update,
+            ic_cdk::api::time(),
         )
         .map(|acc| acc.to_info()),
         Err(err) => Err(UpdateAccountError::Unauthorized(err.principal)),
@@ -481,8 +487,12 @@ fn set_default_account(
 ) -> Result<AccountInfo, SetDefaultAccountError> {
     check_authz_and_record_activity(anchor_number).map_err(SetDefaultAccountError::from)?;
 
-    let result =
-        account_management::set_default_account_for_origin(anchor_number, origin, account_number)?;
+    let result = account_management::set_default_account_for_origin(
+        anchor_number,
+        origin,
+        account_number,
+        ic_cdk::api::time(),
+    )?;
     anchor_management::post_operation_bookkeeping(anchor_number, Operation::SetDefaultAccount);
     Ok(result)
 }
