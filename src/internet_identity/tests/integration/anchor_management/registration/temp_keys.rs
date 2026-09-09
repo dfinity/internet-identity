@@ -201,6 +201,58 @@ fn should_provide_temp_keys_metric() -> Result<(), RejectResponse> {
     Ok(())
 }
 
+#[test]
+fn should_not_register_a_credential_less_device_with_a_temp_key() {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let temp_key = test_principal(0);
+    let credential_less_device = DeviceData {
+        credential_id: None,
+        ..device(7)
+    };
+    assert_ne!(temp_key, credential_less_device.principal());
+
+    let challenge = api::create_challenge(&env, canister_id).unwrap();
+    let result = api::register(
+        &env,
+        canister_id,
+        temp_key,
+        &credential_less_device,
+        &challenge_solution(challenge),
+        Some(temp_key),
+    );
+
+    expect_user_error_with_message(
+        result,
+        ErrorCode::CanisterCalledTrap,
+        Regex::new("could not be authenticated against device pubkey").unwrap(),
+    );
+}
+
+#[test]
+fn should_not_register_a_pubkey_another_anchor_already_uses() {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let existing = device(3);
+    flows::register_anchor_with_device(&env, canister_id, &existing);
+
+    let challenge = api::create_challenge(&env, canister_id).unwrap();
+    let result = api::register(
+        &env,
+        canister_id,
+        existing.principal(),
+        &existing,
+        &challenge_solution(challenge),
+        None,
+    );
+
+    expect_user_error_with_message(
+        result,
+        ErrorCode::CanisterCalledTrap,
+        Regex::new("a device with this public key is already used").unwrap(),
+    );
+}
+
 fn register_with_temp_key(
     env: &PocketIc,
     canister_id: CanisterId,
