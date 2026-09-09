@@ -2987,8 +2987,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(session_id)
     }
 
-    // Called by `prepare_account_session`, which lands two PRs up.
-    #[allow(dead_code)]
     /// Creates the session `prepare_account_session` mints an identity from, replacing
     /// whatever this browser already held at this account.
     pub fn create_session(
@@ -3154,7 +3152,6 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// A key whose session was replaced reads as `None` rather than as its successor:
     /// the successor was allocated an id of its own.
-    #[allow(dead_code)] // Read by `get_account_session`, which lands two PRs up.
     pub fn read_session(&self, key: &SessionLocator) -> Option<Session> {
         let application_number = self.lookup_application_number_with_origin(&key.origin)?;
 
