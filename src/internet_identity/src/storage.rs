@@ -103,9 +103,7 @@ use identity_jose::jwk::Jwk;
 use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::browser_key::VerifiedBrowserKeys;
-use crate::delegation::{
-    self, calculate_session_seed_with_salt, canister_sig_principal, check_frontend_length,
-};
+use crate::delegation::{self, calculate_session_seed_with_salt, check_frontend_length};
 use crate::openid::OpenIdCredentialKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
@@ -2936,31 +2934,6 @@ impl<M: Memory + Clone> Storage<M> {
                 ))
             }
         }
-    }
-
-    // Called by the sign-in ceremony, which lands two PRs up.
-    #[allow(dead_code)]
-    /// The principal an app sees for an account, which is what a session handle names.
-    fn account_principal_of(
-        &self,
-        anchor_number: AnchorNumber,
-        application_number: ApplicationNumber,
-        account_number: Option<AccountNumber>,
-    ) -> Option<Principal> {
-        let salt = self.salt().copied()?;
-        let account = self.read_account(&AccountKey {
-            anchor_number,
-            origin: self
-                .stable_application_memory
-                .get(&application_number)?
-                .origin
-                .clone(),
-            account_number,
-        })?;
-        Some(canister_sig_principal(
-            canister_id(),
-            account.calculate_seed_with_salt(&salt).to_vec(),
-        ))
     }
 
     /// Hands out the next session id, which no session has held before.
