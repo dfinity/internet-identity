@@ -3411,6 +3411,7 @@ impl<M: Memory + Clone> Storage<M> {
         anchor.stamp_browser_use(browser_id, now);
         self.write_account_state(
             anchor,
+            now,
             BTreeMap::from([(origin.clone(), Some((account_references, config)))]),
         )?;
         Ok(true)
