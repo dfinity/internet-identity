@@ -1085,6 +1085,22 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
     }
 
     #[test]
+    fn lookup_anchor_with_pubkey_resolves_recovery_keys() {
+        let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
+        let anchor_number = 1;
+        let recovery_key = device_to_recovery_key(&seed_phrase_device(pubkey(42)));
+
+        assert_eq!(storage.lookup_anchor_with_pubkey(&pubkey(42)), None);
+
+        pre_populate_index(&mut storage, anchor_number, &[recovery_key]);
+
+        assert_eq!(
+            storage.lookup_anchor_with_pubkey(&pubkey(42)),
+            Some(anchor_number)
+        );
+    }
+
+    #[test]
     fn adds_new_seed_phrase_principals() {
         let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
         let anchor_number = 1;
