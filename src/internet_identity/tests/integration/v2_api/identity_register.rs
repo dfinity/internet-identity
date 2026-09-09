@@ -13,13 +13,15 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::IdentityInfoError::Unauthorized;
 use internet_identity_interface::internet_identity::types::{
-    CaptchaConfig, CaptchaTrigger, CheckCaptchaError, IdRegFinishError, IdRegStartError,
-    InternetIdentityInit, MetadataEntryV2, RateLimitConfig, RegistrationFlowNextStep,
-    StaticCaptchaTrigger,
+    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
+    AuthnMethodSecuritySettings, CaptchaConfig, CaptchaTrigger, CheckCaptchaError,
+    IdRegFinishError, IdRegStartError, InternetIdentityInit, MetadataEntryV2, PublicKeyAuthn,
+    RateLimitConfig, RegistrationFlowNextStep, StaticCaptchaTrigger,
 };
 use pocket_ic::RejectResponse;
 use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
+use std::collections::HashMap;
 use std::time::Duration;
 
 #[test]
@@ -257,6 +259,72 @@ fn should_fail_on_invalid_metadata() {
         result,
         Err(IdRegFinishError::InvalidAuthnMethod(_))
     ));
+}
+
+#[test]
+fn should_fail_on_plain_public_key_the_caller_does_not_hold() {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let authn_method = AuthnMethodData {
+        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+            pubkey: ByteBuf::from(vec![7; 32]),
+        }),
+        metadata: HashMap::default(),
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Authentication,
+        },
+        last_authentication: None,
+    };
+
+    let flow_principal = test_principal(0);
+    assert_ne!(flow_principal, authn_method.principal());
+
+    api_v2::identity_registration_start(&env, canister_id, flow_principal)
+        .expect("API call failed")
+        .expect("registration start failed");
+
+    let result = api_v2::identity_registration_finish(
+        &env,
+        canister_id,
+        flow_principal,
+        &authn_method,
+        None,
+    )
+    .expect("API call failed");
+
+    assert!(matches!(
+        result,
+        Err(IdRegFinishError::InvalidAuthnMethod(_))
+    ));
+    assert_metric(
+        &get_metrics(&env, canister_id),
+        "internet_identity_user_count",
+        0f64,
+    );
+}
+
+#[test]
+fn should_register_a_plain_public_key_for_its_own_principal() {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let authn_method = AuthnMethodData {
+        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+            pubkey: ByteBuf::from(vec![7; 32]),
+        }),
+        metadata: HashMap::default(),
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Authentication,
+        },
+        last_authentication: None,
+    };
+
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+
+    api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)
+        .expect("API call failed")
+        .expect("identity info failed");
 }
 
 #[test]
