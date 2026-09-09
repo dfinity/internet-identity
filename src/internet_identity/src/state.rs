@@ -8,7 +8,7 @@ use crate::stats::activity_stats::activity_counter::domain_active_anchor_counter
 use crate::stats::activity_stats::ActivityStats;
 use crate::stats::event_stats::EventKey;
 use crate::storage::anchor::Anchor;
-use crate::storage::MAX_ENTRIES;
+use crate::storage::{RecoveryPhraseIndexSweep, MAX_ENTRIES};
 use crate::{random_salt, Storage};
 use asset_util::CertifiedAssets;
 use candid::{CandidType, Deserialize, Principal};
@@ -109,6 +109,7 @@ pub struct PersistentState {
     pub active_authn_method_stats: ActivityStats<AuthnMethodCounter>,
     // Configuration of the captcha challenge during registration flow
     pub captcha_config: CaptchaConfig,
+    pub recovery_phrase_index_sweep: Option<RecoveryPhraseIndexSweep>,
     // Configuration for Related Origins Requests
     pub related_origins: Option<Vec<String>>,
     // Origin of the II backend canister (e.g. "https://backend.id.ai", no
@@ -165,6 +166,7 @@ impl Default for PersistentState {
             domain_active_anchor_stats: ActivityStats::new(time),
             active_authn_method_stats: ActivityStats::new(time),
             captcha_config: DEFAULT_CAPTCHA_CONFIG,
+            recovery_phrase_index_sweep: None,
             related_origins: None,
             backend_origin: None,
             new_flow_origins: None,

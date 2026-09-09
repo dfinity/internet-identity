@@ -854,6 +854,12 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     // purpose: nothing depends on it, and the write path keeps the index in step by
     // itself.
     init_account_principal_index_backfill_timer();
+
+    // TEMPORARY: a one-time sweep, to index the recovery keys that predate the
+    // recovery-phrase principal index. Remove once every deployment has upgraded through a
+    // build that carries it and the sweep reports done — its progress is stable state, so
+    // an upgrade resumes it rather than starting over.
+    init_recovery_phrase_index_sweep_timer();
 }
 
 const ACCOUNT_PRINCIPAL_INDEX_BACKFILL_BACKOFF: Duration = Duration::from_secs(1);
@@ -941,6 +947,88 @@ fn init_account_principal_index_backfill_timer() {
         run_account_principal_index_backfill_batch,
     );
     ACCOUNT_PRINCIPAL_INDEX_BACKFILL_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(old_id) = id_slot.replace(timer_id) {
+            ic_cdk_timers::clear_timer(old_id);
+        }
+    });
+}
+
+const RECOVERY_PHRASE_INDEX_SWEEP_BACKOFF: Duration = Duration::from_secs(1);
+
+const RECOVERY_PHRASE_INDEX_SWEEP_BATCH_SIZE: u64 = 500;
+
+thread_local! {
+    static RECOVERY_PHRASE_INDEX_SWEEP_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
+}
+
+/// Returns `(indexed_entries, collisions, is_done)` so monitoring can track the sweep.
+///
+/// A non-zero collision count is what the sweep is worth reading for: those are recovery
+/// principals the index already maps to a different anchor than the one holding the key,
+/// which is either a duplicated phrase or a claim by an anchor that does not own it.
+#[query(hidden = true)]
+fn recovery_phrase_index_sweep_status() -> (u64, u64, bool) {
+    let sweep = state::persistent_state(|persistent_state| {
+        persistent_state
+            .recovery_phrase_index_sweep
+            .unwrap_or_default()
+    });
+    (sweep.indexed, sweep.collisions, sweep.is_done)
+}
+
+fn run_recovery_phrase_index_sweep_batch() {
+    let sweep = state::persistent_state(|persistent_state| {
+        persistent_state
+            .recovery_phrase_index_sweep
+            .unwrap_or_default()
+    });
+    if sweep.is_done {
+        // A timer fired after the sweep finished, so the clear below did not take. Repeated
+        // rather than assumed, or it fires every second for the life of the canister.
+        clear_recovery_phrase_index_sweep_timer();
+        return;
+    }
+
+    let swept = state::storage_borrow_mut(|storage| {
+        storage.sweep_recovery_phrase_principal_index_batch(
+            sweep,
+            RECOVERY_PHRASE_INDEX_SWEEP_BATCH_SIZE,
+        )
+    });
+    state::persistent_state_mut(|persistent_state| {
+        persistent_state.recovery_phrase_index_sweep = Some(swept);
+    });
+
+    if swept.is_done {
+        clear_recovery_phrase_index_sweep_timer();
+        ic_cdk::println!(
+            "Recovery phrase principal index sweep COMPLETED ({indexed} entries, {collisions} collisions).",
+            indexed = swept.indexed,
+            collisions = swept.collisions,
+        );
+    }
+}
+
+/// Stops the sweep's timer and forgets its id. Does nothing where there is no id, so it is
+/// safe to call from either the completion it belongs to or a firing that should not have
+/// happened.
+fn clear_recovery_phrase_index_sweep_timer() {
+    RECOVERY_PHRASE_INDEX_SWEEP_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(timer_id) = id_slot.take() {
+            ic_cdk_timers::clear_timer(timer_id);
+        }
+    });
+}
+
+/// Safe to call from both `init` and `post_upgrade`: with nothing to index the first batch
+/// immediately reports completion, and a sweep already finished before this upgrade stops
+/// on its first firing.
+fn init_recovery_phrase_index_sweep_timer() {
+    let timer_id = ic_cdk_timers::set_timer_interval(
+        RECOVERY_PHRASE_INDEX_SWEEP_BACKOFF,
+        run_recovery_phrase_index_sweep_batch,
+    );
+    RECOVERY_PHRASE_INDEX_SWEEP_TIMER_ID.with_borrow_mut(|id_slot| {
         if let Some(old_id) = id_slot.replace(timer_id) {
             ic_cdk_timers::clear_timer(old_id);
         }

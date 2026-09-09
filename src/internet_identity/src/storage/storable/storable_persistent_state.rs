@@ -5,6 +5,7 @@ use crate::stats::activity_stats::activity_counter::authn_method_counter::AuthnM
 use crate::stats::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
 use crate::stats::activity_stats::ActivityStats;
 use crate::stats::event_stats::EventKey;
+use crate::storage::RecoveryPhraseIndexSweep;
 use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
@@ -47,6 +48,7 @@ pub struct StorablePersistentState {
     dnssec_config: Option<DnssecConfig>,
     doh_config: Option<DohConfig>,
     mcp_official_url: Option<String>,
+    recovery_phrase_index_sweep: Option<RecoveryPhraseIndexSweep>,
 }
 
 impl Storable for StorablePersistentState {
@@ -98,6 +100,7 @@ impl From<PersistentState> for StorablePersistentState {
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
             mcp_official_url: s.mcp_official_url,
+            recovery_phrase_index_sweep: s.recovery_phrase_index_sweep,
         }
     }
 }
@@ -127,6 +130,7 @@ impl From<StorablePersistentState> for PersistentState {
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
             mcp_official_url: s.mcp_official_url,
+            recovery_phrase_index_sweep: s.recovery_phrase_index_sweep,
         }
     }
 }
@@ -184,6 +188,7 @@ mod tests {
             dnssec_config: None,
             doh_config: None,
             mcp_official_url: None,
+            recovery_phrase_index_sweep: None,
         };
 
         pretty_assertions::assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -217,6 +222,7 @@ mod tests {
             dnssec_config: None,
             doh_config: None,
             mcp_official_url: None,
+            recovery_phrase_index_sweep: None,
         };
         pretty_assertions::assert_eq!(PersistentState::default(), expected_defaults);
     }

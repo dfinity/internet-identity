@@ -3218,6 +3218,103 @@ impl<M: Memory + Clone> Storage<M> {
             ),
         ])
     }
+
+    /// Indexes one batch of the recovery keys that predate the recovery-phrase principal
+    /// index. An entry is written only where the principal is unclaimed, so a batch that
+    /// runs twice writes the same values and a claim is never taken from its owner.
+    ///
+    /// `batch_size` bounds anchors, which bounds work: the devices per anchor are capped,
+    /// so the recovery keys behind one anchor cost a bounded number of principal
+    /// derivations and stable writes.
+    pub fn sweep_recovery_phrase_principal_index_batch(
+        &mut self,
+        sweep: RecoveryPhraseIndexSweep,
+        batch_size: u64,
+    ) -> RecoveryPhraseIndexSweep {
+        let mut sweep = sweep;
+
+        // Examining nothing is not finishing. Reporting completion here would stop a sweep
+        // that has not read a single anchor, and a lookup miss would then be taken as proof
+        // no anchor holds that recovery principal.
+        if sweep.is_done || batch_size == 0 {
+            return sweep;
+        }
+
+        use std::ops::Bound as RangeBound;
+        let range = match sweep.resume_from {
+            Some(anchor_number) => (RangeBound::Included(anchor_number), RangeBound::Unbounded),
+            None => (RangeBound::Unbounded, RangeBound::Unbounded),
+        };
+
+        // Collected so the read borrow ends before the writes below, and capped so the
+        // anchors behind this batch are never materialised.
+        let wanted = usize::try_from(batch_size).unwrap_or(usize::MAX);
+        let batch: Vec<(AnchorNumber, Vec<StorableRecoveryKey>)> = self
+            .stable_anchor_memory
+            .range(range)
+            .take(wanted)
+            .map(|(anchor_number, anchor)| {
+                (anchor_number, anchor.recovery_keys.unwrap_or_default())
+            })
+            .collect();
+
+        let Some((last_anchor_number, _)) = batch.last() else {
+            sweep.is_done = true;
+            sweep.resume_from = None;
+            return sweep;
+        };
+        let resume_from = last_anchor_number.saturating_add(1);
+        let read_to_the_end = batch.len() < wanted;
+
+        for (anchor_number, recovery_keys) in batch {
+            for recovery_key in recovery_keys {
+                let principal = Principal::self_authenticating(&recovery_key.pubkey);
+                match self
+                    .lookup_anchor_with_recovery_phrase_principal_memory
+                    .get(&principal)
+                {
+                    Some(indexed_anchor_number) if indexed_anchor_number != anchor_number => {
+                        sweep.collisions = sweep.collisions.saturating_add(1);
+                        ic_cdk::println!(
+                            "WARNING: recovery principal {:?} held by anchor {} is indexed for \
+                             anchor {}; leaving the index unchanged",
+                            principal,
+                            anchor_number,
+                            indexed_anchor_number,
+                        );
+                    }
+                    Some(_) => {}
+                    None => {
+                        self.lookup_anchor_with_recovery_phrase_principal_memory
+                            .insert(principal, anchor_number);
+                        sweep.indexed = sweep.indexed.saturating_add(1);
+                    }
+                }
+            }
+        }
+
+        sweep.is_done = read_to_the_end;
+        sweep.resume_from = (!read_to_the_end).then_some(resume_from);
+        sweep
+    }
+}
+
+/// How far the recovery-phrase principal index sweep has got, and what it found.
+///
+/// Persisted in [`crate::state::PersistentState`] rather than the heap, so an upgrade
+/// resumes the sweep instead of restarting it. The counters are the point of the sweep as
+/// much as the writes are: `indexed` is how many recovery principals predated the index,
+/// and `collisions` is how many were already claimed by a different anchor.
+#[derive(Clone, Copy, CandidType, Deserialize, Debug, Default, Eq, PartialEq)]
+pub struct RecoveryPhraseIndexSweep {
+    /// The next anchor to examine. `None` before the first batch and once finished.
+    pub resume_from: Option<AnchorNumber>,
+    pub is_done: bool,
+    pub indexed: u64,
+    /// Recovery principals the index already maps to a different anchor. The sweep cannot
+    /// tell a duplicated phrase from a claim made by an anchor that does not own it, so it
+    /// reports them and changes nothing.
+    pub collisions: u64,
 }
 
 /// How far the sweep has got: which list, and how many of that list's references are
