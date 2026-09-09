@@ -18,8 +18,8 @@ use std::borrow::Cow;
 // An array rather than a map: a map's integer keys buy the ability to add a field and still
 // decode records written before it, which is what authoritative state needs. This is a
 // derived index — every entry is reconstructible from the account reference lists that hold
-// the truth, and the backfill sweep does exactly that — so a shape change here is a rebuild,
-// and the three key bytes are not worth paying for.
+// the truth — so a shape change here means writing a rebuild, and the three key bytes are
+// not worth paying for.
 #[cbor(array)]
 pub struct StorableAccountKey {
     #[n(0)]
