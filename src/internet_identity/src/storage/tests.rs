@@ -6596,7 +6596,7 @@ mod session_removal_tests {
     use super::params;
     use super::TEST_NOW;
     use crate::storage::account::SessionLocator;
-    use crate::storage::CreateSessionParams;
+    use crate::storage::{CreateSessionParams, StorageError};
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
     use internet_identity_interface::internet_identity::types::AnchorNumber;
@@ -6655,21 +6655,23 @@ mod session_removal_tests {
     fn removing_a_session_leaves_the_others() {
         let (mut storage, anchor_number, _, keys) = storage_with_sessions(&[1, 2, 3]);
 
-        let removed = storage.revoke_session(&keys[1], TEST_NOW).unwrap();
+        storage.revoke_session(&keys[1], TEST_NOW).unwrap();
 
-        assert!(removed);
         // Ids in registration order, so the seeds 1, 2, 3 became 0, 1, 2.
         assert_eq!(sessions(&storage, anchor_number), vec![0, 2]);
     }
 
     #[test]
-    fn removing_a_session_twice_reports_nothing_removed() {
+    fn removing_a_session_twice_is_refused_the_second_time() {
         let (mut storage, anchor_number, _, keys) = storage_with_sessions(&[1]);
         storage.revoke_session(&keys[0], TEST_NOW).unwrap();
 
-        let removed = storage.revoke_session(&keys[0], TEST_NOW).unwrap();
+        let refused = storage.revoke_session(&keys[0], TEST_NOW);
 
-        assert!(!removed);
+        assert!(
+            matches!(refused, Err(StorageError::SessionNotFound { .. })),
+            "a session already gone should be refused, got {refused:?}"
+        );
         assert_eq!(sessions(&storage, anchor_number), Vec::<u32>::new());
     }
 

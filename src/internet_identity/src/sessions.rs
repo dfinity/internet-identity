@@ -469,18 +469,23 @@ fn authorize_session(now: Timestamp) -> Result<AuthorizedSession, AppSessionErro
 }
 
 /// Signs the caller's own session out. A caller cannot produce another session's
-/// principal, so the seed match is the whole authorization. Always succeeds.
-pub fn app_revoke_session(now: Timestamp) {
-    // Matched rather than authorized: a session past its bounds is still the caller's to
-    // sign out, and refusing here would leave its record and index entry behind.
-    let Ok((key, _, _)) = find_caller_session() else {
-        return;
+/// principal, so the seed match is the whole authorization.
+///
+/// Idempotent: a session that is not there is `Ok`, because the caller wanted it gone and
+/// it is gone, and they could not tell a pruned session from one that never existed
+/// anyway. Only a storage failure comes back as an error — an app is never handed a
+/// refusal whose only sane response is to do nothing.
+pub fn app_revoke_session(now: Timestamp) -> Result<(), AppSessionError> {
+    // Found rather than authorized, so a session that is present and past its bounds is
+    // not refused: it is still the caller's to sign out, and refusing would leave its
+    // record and index entry behind.
+    let Ok((locator, _, _)) = find_caller_session() else {
+        return Ok(());
     };
-    // Trapping rather than reporting success: the caller is told nothing either way, so a
-    // storage failure that left the session live would end as a silent no-op. A trap rolls
-    // the message back and reaches the caller as a reject.
-    storage_borrow_mut(|storage| storage.revoke_session(&key, now))
-        .expect("failed to revoke a session that was just matched");
+    match storage_borrow_mut(|storage| storage.revoke_session(&locator, now)) {
+        Ok(()) | Err(StorageError::SessionNotFound { .. }) => Ok(()),
+        Err(err) => Err(AppSessionError::InternalCanisterError(err.to_string())),
+    }
 }
 
 /// The caller's session as stored, without asking whether it is still live.

@@ -803,12 +803,14 @@ pub fn app_revoke_session(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-) -> Result<(), RejectResponse> {
-    env.update_call(
+) -> Result<Result<(), AppSessionError>, RejectResponse> {
+    call_candid_as(
+        env,
         canister_id,
+        RawEffectivePrincipal::None,
         sender,
         "app_revoke_session",
-        candid::encode_args(()).expect("encode app_revoke_session args"),
+        (),
     )
-    .map(|_| ())
+    .map(|(x,)| x)
 }

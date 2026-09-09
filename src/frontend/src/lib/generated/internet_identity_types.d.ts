@@ -2004,7 +2004,11 @@ export interface _SERVICE {
    * that retries, or that signs out twice, does not have to reason about whether its
    * session was already gone. An app can revoke only its own session.
    */
-  'app_revoke_session' : ActorMethod<[], undefined>,
+  'app_revoke_session' : ActorMethod<
+    [],
+    { 'Ok' : null } |
+      { 'Err' : AppSessionError }
+  >,
   /**
    * Adds a new authentication method to the identity.
    * Requires authentication.
