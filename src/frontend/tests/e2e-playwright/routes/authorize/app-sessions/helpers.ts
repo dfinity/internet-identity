@@ -39,24 +39,24 @@ export const signInAsFirstIdentity = async ({
   )(authorizePage.page);
 };
 
-/** The identity's settings, signed in, with the browser list on screen. */
+/** The identity's devices page, signed in, with the browser list on screen. */
 export const openSettings = async (
   context: { newPage: () => Promise<Page> },
   identityNumber: bigint,
   signInWithIdentity: (page: Page, identityNumber: bigint) => Promise<void>,
 ): Promise<Page> => {
   const settings = await context.newPage();
-  await settings.goto(`${II_URL}/manage/settings`);
+  await settings.goto(`${II_URL}/manage/devices`);
   await signInWithIdentity(settings, identityNumber);
   await expect(
-    settings.getByRole("heading", { name: "Signed-in browsers" }),
+    settings.getByRole("heading", { name: "Other devices" }),
   ).toBeVisible();
   return settings;
 };
 
 /** One row per browser the identity is signed in from. */
 export const listedBrowsers = (settings: Page): Locator =>
-  settings.getByRole("button", { name: "Sign out" });
+  settings.getByRole("button", { name: "Sign out", exact: true });
 
 /** Fails unless the identity's settings list at least one browser. */
 export const expectBrowserListed = async (settings: Page): Promise<void> => {
@@ -71,9 +71,17 @@ export const expectBrowserListed = async (settings: Page): Promise<void> => {
  */
 export const signOutFirstBrowser = async (settings: Page): Promise<void> => {
   await listedBrowsers(settings).first().click();
+  await confirmSignOut(settings);
   await expect(settings.getByText("Signed out")).toBeVisible({
     timeout: 30_000,
   });
+};
+
+/** Answers the dialog that a row's sign-out opens. */
+export const confirmSignOut = async (settings: Page): Promise<void> => {
+  await settings
+    .getByRole("button", { name: "Sign out of all apps", exact: true })
+    .click();
 };
 
 /** The domain whose subdomains share a session in the sibling scenarios. */
