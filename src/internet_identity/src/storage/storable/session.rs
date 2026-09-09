@@ -1,6 +1,7 @@
 use crate::storage::account::Session;
 use crate::storage::storable::browser_id::StorableBrowserId;
 use crate::storage::storable::duration::StorableDuration;
+use crate::storage::storable::session_id::StorableSessionId;
 use crate::storage::storable::timestamp::StorableTimestamp;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
@@ -22,6 +23,8 @@ pub struct StorableSession {
     pub browser_id: StorableBrowserId,
     #[n(5)]
     pub read_only: bool,
+    #[n(6)]
+    pub id: StorableSessionId,
 }
 
 impl Storable for StorableSession {
@@ -43,10 +46,11 @@ impl From<StorableSession> for Session {
         Session {
             created_at_ns: value.created_at_ns,
             valid_till_ns: value.valid_till_ns,
-            last_refreshed_ns: value.last_refreshed_ns,
             max_idle_ns: value.max_idle_ns,
+            last_refreshed_ns: value.last_refreshed_ns,
             browser_id: value.browser_id,
             read_only: value.read_only,
+            session_id: value.id,
         }
     }
 }
@@ -56,10 +60,11 @@ impl From<Session> for StorableSession {
         StorableSession {
             created_at_ns: value.created_at_ns,
             valid_till_ns: value.valid_till_ns,
-            last_refreshed_ns: value.last_refreshed_ns,
             max_idle_ns: value.max_idle_ns,
+            last_refreshed_ns: value.last_refreshed_ns,
             browser_id: value.browser_id,
             read_only: value.read_only,
+            id: value.session_id,
         }
     }
 }

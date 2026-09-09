@@ -18,7 +18,7 @@ use internet_identity_interface::internet_identity::types::openid::OpenIdCredent
 use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 
 #[cfg(test)]
@@ -43,6 +43,7 @@ pub struct Anchor {
     /// Capped by `MAX_BROWSERS`.
     pub(crate) browsers: Vec<Browser>,
     pub(crate) next_browser_id: BrowserId,
+    pub(crate) session_count: u32,
     pub(crate) metadata: Option<HashMap<String, MetadataEntry>>,
     pub(crate) name: Option<String>,
     pub(crate) created_at: Option<Timestamp>,
@@ -93,6 +94,9 @@ pub struct Browser {
     pub description: BrowserDescription,
     pub created_at: Timestamp,
     pub last_used: Timestamp,
+    /// Sessions this browser holds. Maintained by the write that changes the reference
+    /// lists holding them, so it counts stored records rather than live ones.
+    pub session_count: u32,
 }
 
 impl From<StorableBrowser> for Browser {
@@ -104,6 +108,7 @@ impl From<StorableBrowser> for Browser {
             description: BrowserDescription::from(value.description),
             created_at: value.created_at,
             last_used: value.last_used,
+            session_count: value.session_count,
         }
     }
 }
@@ -117,6 +122,7 @@ impl From<Browser> for StorableBrowser {
             description: StorableBrowserDescription::from(value.description),
             created_at: value.created_at,
             last_used: value.last_used,
+            session_count: value.session_count,
         }
     }
 }
@@ -255,6 +261,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             verified_emails,
             browsers,
             next_browser_id,
+            session_count,
             metadata,
             name,
             created_at,
@@ -517,6 +524,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 verified_emails,
                 browsers,
                 next_browser_id,
+                session_count: Some(session_count),
             },
         )
     }
@@ -534,6 +542,7 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             verified_emails,
             browsers,
             next_browser_id,
+            session_count,
         } = storable_anchor;
 
         let name = name.clone();
@@ -654,6 +663,7 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             verified_emails,
             browsers,
             next_browser_id,
+            session_count: session_count.unwrap_or_default(),
             devices,
             metadata,
         }
@@ -677,6 +687,7 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
         let Some(storable_anchor) = storable_anchor else {
             return Anchor {
                 name: None,
+                session_count: 0,
                 openid_credentials: vec![],
                 email_recovery: vec![],
                 verified_emails: vec![],
@@ -723,6 +734,7 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
             verified_emails,
             browsers,
             next_browser_id: storable_anchor.next_browser_id.unwrap_or_default(),
+            session_count: storable_anchor.session_count.unwrap_or_default(),
             metadata,
             name,
             created_at,
@@ -733,6 +745,25 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
 impl Anchor {
     pub fn browsers(&self) -> &[Browser] {
         &self.browsers
+    }
+
+    /// Moves each browser's session count by what a write added to or took from it.
+    ///
+    /// A delta against a browser no entry holds is dropped: the cap can retire an entry
+    /// while sessions it opened are still stored, and a count belongs to an entry that
+    /// exists.
+    pub fn move_browser_session_counts(&mut self, deltas: &BTreeMap<BrowserId, i64>) {
+        for browser in &mut self.browsers {
+            let Some(delta) = deltas.get(&browser.id) else {
+                continue;
+            };
+            browser.session_count = match delta {
+                0.. => browser.session_count.saturating_add(*delta as u32),
+                _ => browser
+                    .session_count
+                    .saturating_sub(delta.unsigned_abs() as u32),
+            };
+        }
     }
 
     /// What a caller outside storage may know about this anchor's browsers: an
@@ -754,6 +785,7 @@ impl Anchor {
                     description: browser.description.clone(),
                     created_at: browser.created_at,
                     last_used: browser.last_used,
+                    session_count: browser.session_count,
                 })
                 .collect(),
         )
@@ -831,6 +863,7 @@ impl Anchor {
             description,
             created_at: now,
             last_used: now,
+            session_count: 0,
         });
 
         let mut dropped = vec![];
@@ -858,6 +891,7 @@ impl Anchor {
         Self {
             anchor_number,
             created_at: Some(created_at),
+            session_count: 0,
             devices: vec![],
             openid_credentials: vec![],
             email_recovery: vec![],

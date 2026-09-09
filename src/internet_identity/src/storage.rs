@@ -79,7 +79,7 @@
 //!
 //! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
 //! bucket of 128 pages.
-use account::{Account, AccountKey, AccountsCounter};
+use account::{Account, AccountKey, AccountsCounter, SessionLocator};
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use std::borrow::Cow;
@@ -102,13 +102,16 @@ use ic_stable_structures::{
 use identity_jose::jwk::Jwk;
 use internet_identity_interface::archive::types::BufferedEntry;
 
-use crate::delegation::{self, check_frontend_length};
+use crate::browser_key::VerifiedBrowserKeys;
+use crate::delegation::{self, calculate_session_seed_with_salt, check_frontend_length};
 use crate::openid::OpenIdCredentialKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
-use crate::storage::account::AccountReference;
-use crate::storage::anchor::Anchor;
+use crate::storage::account::{
+    AccountReference, Session, DEFAULT_SESSION_IDLE_NS, MIN_SESSION_IDLE_NS,
+};
+use crate::storage::anchor::{Anchor, BrowserError, MAX_BROWSERS};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
@@ -120,6 +123,8 @@ use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
+use crate::storage::storable::session_handle::StorableSessionHandle;
+use crate::storage::storable::session_id::StorableSessionId;
 use internet_identity_interface::internet_identity::types::*;
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
@@ -208,6 +213,8 @@ const MCP_REGISTRATION_MEMORY_INDEX: u8 = 31u8;
 const SSO_STABLE_ID_INDEX_MEMORY_INDEX: u8 = 32u8;
 const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
+const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
+const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -291,8 +298,14 @@ const NEXT_APPLICATION_NUMBER_MEMORY_ID: MemoryId =
 
 /// Reverse index from the principal a dapp sees to the account that produced it:
 /// `self_authenticating(der_encode_canister_sig_key(seed)) -> (anchor, application, account)`.
+const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX);
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX);
+
+/// Monotonic [`SessionId`] allocator. A revoked session's id is retired, never reissued,
+/// which is what makes the revocation final: the id is an input to the session seed.
+const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -407,9 +420,19 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the application-number allocator.
     next_application_number_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_application_number_memory: StableCell<StorableApplicationNumber, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the session-id allocator.
+    next_session_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    next_session_id_memory: StableCell<StorableSessionId, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
+    /// Where a session lives, keyed by the principal its chain is rooted at. An app-facing
+    /// call carries nothing but that principal, so this is what turns `caller()` into a
+    /// session.
+    /// Memory wrapper used to report the size of the session index.
+    lookup_session_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    lookup_session_with_principal_memory:
+        StableBTreeMap<Principal, StorableSessionHandle, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the lookup anchor with OpenID credential memory.
     lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchor_with_openid_credential_memory:
@@ -543,8 +566,11 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(STABLE_DEFAULT_ACCOUNT_REFERENCE_MEMORY_ID);
         let stable_account_counter_memory = memory_manager.get(STABLE_ACCOUNT_COUNTER_MEMORY_ID);
         let next_application_number_memory = memory_manager.get(NEXT_APPLICATION_NUMBER_MEMORY_ID);
+        let next_session_id_memory = memory_manager.get(NEXT_SESSION_ID_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
+        let lookup_session_with_principal_memory =
+            memory_manager.get(LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_anchor_with_openid_credential_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID);
         let lookup_anchor_with_passkey_credential_memory =
@@ -630,8 +656,17 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             next_application_number_memory: StableCell::init(next_application_number_memory, 0)
                 .expect("next_application_number_memory"),
+            next_session_id_memory_wrapper: MemoryWrapper::new(next_session_id_memory.clone()),
+            next_session_id_memory: StableCell::init(next_session_id_memory, 0)
+                .expect("next_session_id_memory"),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
+            ),
+            lookup_session_with_principal_memory_wrapper: MemoryWrapper::new(
+                lookup_session_with_principal_memory.clone(),
+            ),
+            lookup_session_with_principal_memory: StableBTreeMap::init(
+                lookup_session_with_principal_memory,
             ),
             lookup_account_with_principal_memory: StableBTreeMap::init(
                 lookup_account_with_principal_memory,
@@ -873,6 +908,7 @@ impl<M: Memory + Clone> Storage<M> {
             verified_emails: _,
             browsers: _,
             next_browser_id: _,
+            session_count: _,
         }) = previous_anchor_maybe
         {
             (
@@ -1567,6 +1603,48 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
+    /// Everything this identity has stored, keyed the way a write takes it.
+    ///
+    /// The symmetry is the point: an operation that touches many origins reads this,
+    /// changes what it means to change, and writes it back. Nothing has to range over
+    /// storage itself, and no application number reaches the caller.
+    ///
+    /// Stored entries only. An origin nothing has been stored under is not in the map —
+    /// there are unboundedly many of those — so a caller that means to write at one
+    /// reaches for [`Self::account_state_for_origin`] and puts it there.
+    fn account_state(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> BTreeMap<FrontendHostname, AccountReferenceListWrite> {
+        self.stable_account_reference_list_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .filter_map(|((_, application_number), list)| {
+                // A reference list for an application that does not exist is illegal, and
+                // this is where it surfaces: the write gate is keyed by origin, so a list
+                // whose application number resolves to nothing cannot be handed to a
+                // caller. Skipping it is still the right answer — refusing here would
+                // block every sweep for the identity, including the origins that do
+                // resolve — but it is not something to pass over quietly.
+                let Some(application) = self.stable_application_memory.get(&application_number)
+                else {
+                    ic_cdk::println!(
+                        "ERROR: account reference list invariant violated: identity \
+                         {anchor_number} holds a list for application {application_number}, \
+                         which is not stored. Its sessions are unreachable and unrevocable."
+                    );
+                    return None;
+                };
+                let account_references = Vec::<AccountReference>::from(list)
+                    .into_iter()
+                    .map(AccountReferenceWrite::from)
+                    .collect();
+                Some((application.origin, Some((account_references, None))))
+            })
+            .collect()
+    }
+
     /// This identity's account state at one origin, in the shape a write takes it.
     ///
     /// An origin nothing has been stored under normalises to the derived default, so no
@@ -1612,11 +1690,99 @@ impl<M: Memory + Clone> Storage<M> {
     /// filled in, each list in the order it was given.
     fn write_account_state(
         &mut self,
+        anchor: Anchor,
+        writes: BTreeMap<FrontendHostname, AccountReferenceListWrite>,
+    ) -> Result<BTreeMap<FrontendHostname, AccountReferenceListWrite>, StorageError> {
+        let given_up = self.browsers_given_up(&anchor)?;
+        let validated = self.validate_account_state(anchor.anchor_number(), &given_up, writes)?;
+        Ok(self.apply_account_state(anchor, validated))
+    }
+
+    /// Browsers this write gives up, whose sessions have to go with them.
+    ///
+    /// Derived from the registry the write carries rather than stated by a caller: a
+    /// caller that has to say so is a caller that can forget to, and every path that
+    /// changes the registry passes through here.
+    ///
+    /// Only a full registry gives a browser up, so a smaller one answers without reading
+    /// the stored anchor — which keeps the anchor off the path of every write that cannot
+    /// have dropped anything, delegation refreshes included.
+    fn browsers_given_up(&self, anchor: &Anchor) -> Result<BTreeSet<BrowserId>, StorageError> {
+        if anchor.browsers().len() < MAX_BROWSERS {
+            return Ok(BTreeSet::new());
+        }
+        let held: BTreeSet<BrowserId> = anchor.browsers().iter().map(|one| one.id).collect();
+        Ok(self
+            .read(anchor.anchor_number())?
+            .browsers()
+            .iter()
+            .map(|one| one.id)
+            .filter(|id| !held.contains(id))
+            .collect())
+    }
+
+    /// [`Self::write_account_state`] for a test that has an anchor number rather than the
+    /// anchor. Production takes the anchor itself, so that a caller cannot hold a copy
+    /// across the write and put the session count back afterwards.
+    #[cfg(test)]
+    fn write_account_state_for_testing(
+        &mut self,
         anchor_number: AnchorNumber,
         writes: BTreeMap<FrontendHostname, AccountReferenceListWrite>,
     ) -> Result<BTreeMap<FrontendHostname, AccountReferenceListWrite>, StorageError> {
-        let validated = self.validate_account_state(anchor_number, writes)?;
-        Ok(self.apply_account_state(anchor_number, validated))
+        let anchor = self.read(anchor_number)?;
+        self.write_account_state(anchor, writes)
+    }
+
+    /// `writes`, less every session held by a browser this write gives up.
+    ///
+    /// The sessions of a browser that is gone are gone with it, wherever they are, and in
+    /// the same write — a browser retired while its sessions still minted delegations
+    /// would go on being signed in from a list nothing shows.
+    ///
+    /// Only the origins that hold such a session are added. Adding the rest would cost
+    /// nothing to store and everything to the eviction rule, which spares an origin the
+    /// write is already changing; and the scan itself only happens when a browser was
+    /// actually given up, so an ordinary sign-in still reads the one origin it names.
+    fn without_sessions_of(
+        &self,
+        anchor_number: AnchorNumber,
+        browsers_given_up: &BTreeSet<BrowserId>,
+        mut writes: BTreeMap<FrontendHostname, AccountReferenceListWrite>,
+    ) -> BTreeMap<FrontendHostname, AccountReferenceListWrite> {
+        if browsers_given_up.is_empty() {
+            return writes;
+        }
+
+        let holds_one = |held: &AccountReferenceListWrite| {
+            held.as_ref().is_some_and(|(account_references, _)| {
+                account_references.iter().any(|write| {
+                    write
+                        .account_reference
+                        .sessions
+                        .iter()
+                        .any(|session| browsers_given_up.contains(&session.browser_id))
+                })
+            })
+        };
+        for (origin, held) in self.account_state(anchor_number) {
+            if holds_one(&held) {
+                writes.entry(origin).or_insert(held);
+            }
+        }
+
+        for held in writes.values_mut() {
+            let Some((account_references, _)) = held else {
+                continue;
+            };
+            for write in account_references.iter_mut() {
+                write
+                    .account_reference
+                    .sessions
+                    .retain(|session| !browsers_given_up.contains(&session.browser_id));
+            }
+        }
+        writes
     }
 
     /// Everything that can refuse. Reads what is stored, works out what would be minted
@@ -1624,6 +1790,7 @@ impl<M: Memory + Clone> Storage<M> {
     fn validate_account_state(
         &self,
         anchor_number: AnchorNumber,
+        browsers_given_up: &BTreeSet<BrowserId>,
         writes: BTreeMap<FrontendHostname, AccountReferenceListWrite>,
     ) -> Result<ValidatedAccountStateWrite, StorageError> {
         let mut minting = MintingState {
@@ -1631,6 +1798,7 @@ impl<M: Memory + Clone> Storage<M> {
             global: self.stable_account_counter_memory.get().clone(),
         };
 
+        let writes = self.without_sessions_of(anchor_number, browsers_given_up, writes);
         let written_origins: BTreeSet<FrontendHostname> = writes.keys().cloned().collect();
         let mut validated = Vec::with_capacity(writes.len());
         for (origin, write) in writes {
@@ -1956,6 +2124,8 @@ impl<M: Memory + Clone> Storage<M> {
                 config: None,
                 deltas: ReferenceListDeltas::default(),
                 principal_salt: None,
+                accounts_changed: false,
+                sessions_changed: false,
                 previous_references: Vec::new(),
                 current_references: Vec::new(),
             });
@@ -2019,7 +2189,11 @@ impl<M: Memory + Clone> Storage<M> {
                     .any(|(previous, new)| previous.account_number != new.account_number));
         // Resolved here, so a missing salt refuses with nothing written rather than
         // half-way through.
-        let principal_salt = if accounts_changed {
+        // Sessions are held on the account references too, and their index and the
+        // identity's session count both follow from the same pair of lists.
+        let sessions_changed = writes_a_list
+            && Self::session_ids_of(&previous_references) != Self::session_ids_of(&references);
+        let principal_salt = if accounts_changed || sessions_changed {
             Some(*self.salt().ok_or(StorageError::SaltNotSet)?)
         } else {
             None
@@ -2057,6 +2231,8 @@ impl<M: Memory + Clone> Storage<M> {
             config,
             deltas,
             principal_salt,
+            accounts_changed,
+            sessions_changed,
             previous_references,
             current_references: references,
         })
@@ -2126,6 +2302,8 @@ impl<M: Memory + Clone> Storage<M> {
             config: None,
             deltas: ReferenceListDeltas::default(),
             principal_salt: None,
+            accounts_changed: false,
+            sessions_changed: false,
             previous_references: Vec::new(),
             current_references: Vec::new(),
         };
@@ -2182,6 +2360,8 @@ impl<M: Memory + Clone> Storage<M> {
             config: None,
             deltas,
             principal_salt,
+            accounts_changed: true,
+            sessions_changed: true,
             previous_references: previous,
             current_references: Vec::new(),
         })
@@ -2194,9 +2374,10 @@ impl<M: Memory + Clone> Storage<M> {
     /// is a broken invariant rather than a case to report.
     fn apply_account_state(
         &mut self,
-        anchor_number: AnchorNumber,
+        mut anchor: Anchor,
         validated: ValidatedAccountStateWrite,
     ) -> BTreeMap<FrontendHostname, AccountReferenceListWrite> {
+        let anchor_number = anchor.anchor_number();
         let ValidatedAccountStateWrite {
             writes,
             anchor_counter,
@@ -2213,6 +2394,13 @@ impl<M: Memory + Clone> Storage<M> {
         self.stable_anchor_account_counter_memory
             .insert(anchor_number, anchor_counter);
 
+        // Moved once for the whole call rather than once per origin: the count lives on
+        // the anchor, and an operation spanning several origins would otherwise read,
+        // change and write the same record several times over. The same is true of the
+        // per-browser counts, which live on the browser entries of that same record.
+        let mut session_delta = 0i64;
+        let mut browser_deltas: BTreeMap<BrowserId, i64> = BTreeMap::new();
+
         let mut written = BTreeMap::new();
         for one in writes {
             let ValidatedAccountReferenceListWrite {
@@ -2223,6 +2411,8 @@ impl<M: Memory + Clone> Storage<M> {
                 records,
                 config,
                 principal_salt,
+                accounts_changed,
+                sessions_changed,
                 previous_references,
                 current_references,
                 written: result,
@@ -2263,14 +2453,31 @@ impl<M: Memory + Clone> Storage<M> {
             // derived from an account's stored record, so one that is not in yet derives
             // nothing and a newly named account would get no entry.
             if let Some(salt) = principal_salt {
-                self.sync_account_principal_index(
-                    anchor_number,
-                    application_number,
-                    &origin,
-                    &salt,
-                    &previous_references,
-                    &current_references,
-                );
+                if accounts_changed {
+                    self.sync_account_principal_index(
+                        anchor_number,
+                        application_number,
+                        &origin,
+                        &salt,
+                        &previous_references,
+                        &current_references,
+                    );
+                }
+                if sessions_changed {
+                    session_delta += self.sync_session_index(
+                        anchor_number,
+                        application_number,
+                        &origin,
+                        &salt,
+                        &previous_references,
+                        &current_references,
+                    );
+                    Self::accumulate_browser_deltas(
+                        &mut browser_deltas,
+                        &previous_references,
+                        &current_references,
+                    );
+                }
             }
 
             match list {
@@ -2291,6 +2498,27 @@ impl<M: Memory + Clone> Storage<M> {
 
             written.insert(origin, result);
         }
+
+        if session_delta != 0 {
+            anchor.session_count = if session_delta < 0 {
+                anchor
+                    .session_count
+                    .saturating_sub(session_delta.unsigned_abs() as u32)
+            } else {
+                anchor.session_count.saturating_add(session_delta as u32)
+            };
+        }
+        anchor.move_browser_session_counts(&browser_deltas);
+
+        // Taking the identity record is taking the storing of it, so it is stored whatever
+        // was changed on it — the count above, or anything a caller changed before giving
+        // it up. Storing it only where this function's own change landed would discard the
+        // caller's, silently.
+        //
+        // Trapping rather than reporting: an `Err` on the IC commits everything above this
+        // line, so a record that could not be stored has to take the whole message with it.
+        self.write(anchor)
+            .expect("the identity record this write was handed cannot be written back");
 
         written
     }
@@ -2487,6 +2715,383 @@ impl<M: Memory + Clone> Storage<M> {
             .collect()
     }
 
+    /// The principals a set of references derives to. A reference whose account list is
+    /// gone derives nothing and is skipped.
+    /// The account one reference names, built from the reference and the record it
+    /// points at.
+    ///
+    /// Not [`Self::read_account`], which reads the stored list and so answers `None` for
+    /// a reference that is being removed. This derives from the list it is handed, which
+    /// is what lets the index be diffed across a write.
+    fn account_of_reference(
+        &self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+        reference: &AccountReference,
+    ) -> Option<Account> {
+        match reference.account_number {
+            None => Some(Account::new(anchor_number, origin.clone(), None, None)),
+            Some(account_number) => {
+                let stored = self.stable_account_memory.get(&account_number)?;
+                Some(Account::new_full(
+                    anchor_number,
+                    origin.clone(),
+                    Some(stored.name),
+                    Some(account_number),
+                    reference.last_used,
+                    stored.seed_from_anchor,
+                ))
+            }
+        }
+    }
+
+    /// Hands out the next session id, which no session has held before.
+    ///
+    /// Refuses at the ceiling rather than saturating. The id is an input to the session
+    /// seed, so reissuing one would let a revoked session's identity be arrived at a
+    /// second time — the thing this counter exists to prevent.
+    fn allocate_session_id(&mut self) -> Result<SessionId, StorageError> {
+        let session_id = *self.next_session_id_memory.get();
+        self.next_session_id_memory
+            .set(
+                session_id
+                    .checked_add(1)
+                    .ok_or(StorageError::SessionIdOverflow)?,
+            )
+            .map_err(|_| StorageError::ErrorUpdatingSessionIdAllocator)?;
+        Ok(session_id)
+    }
+
+    // Called by `prepare_account_session`, which lands two PRs up.
+    #[allow(dead_code)]
+    /// Creates the session `prepare_account_session` mints an identity from, replacing
+    /// whatever this browser already held at this account.
+    pub fn create_session(
+        &mut self,
+        params: CreateSessionParams,
+    ) -> Result<(SessionLocator, Session), StorageError> {
+        let CreateSessionParams {
+            anchor_number,
+            origin,
+            account_number,
+            browser_keys,
+            browser_description,
+            valid_till_ns,
+            max_idle_ns,
+            read_only,
+            now_ns,
+        } = params;
+
+        // A session that is over before it starts would be pruned by the sweep below, in
+        // the same call that created it, and this would return `Ok` naming a session no
+        // list holds. Refused here instead, where nothing has been read or stored yet.
+        if valid_till_ns <= now_ns {
+            return Err(StorageError::SessionAlreadyOver { anchor_number });
+        }
+
+        let mut anchor = self.read(anchor_number)?;
+
+        // Defaulted and clamped here rather than at the caller, so every path that
+        // creates a session gets the same answer whatever it asked for. The ceiling is
+        // the life this session was actually granted: a bound longer than that could
+        // never be reached, and storing one would say something untrue about it.
+        //
+        // Raised then lowered rather than clamped in one call: `clamp` panics when its
+        // floor exceeds its ceiling, which a session granted less than the floor would
+        // do, and a trap is a poor answer to a short session.
+        let granted = valid_till_ns.saturating_sub(now_ns);
+        let max_idle_ns = max_idle_ns
+            .unwrap_or(DEFAULT_SESSION_IDLE_NS)
+            .max(MIN_SESSION_IDLE_NS)
+            .min(granted);
+
+        // One write, not three. What the identity holds at this origin afterwards: the
+        // account reference list, created by this write where the origin is new, the
+        // session itself, and the dead sessions pruned off every reference beside it.
+        // Everything that can refuse does so before any of it is stored.
+        let stored = self
+            .lookup_application_number_with_origin(&origin)
+            .and_then(|application_number| {
+                self.stored_account_references(anchor_number, application_number)
+            });
+        // A named account lives in a list that already exists, and an origin nothing has
+        // been stored under has none.
+        if stored.is_none() && account_number.is_some() {
+            return Err(StorageError::MissingAccount {
+                anchor_number,
+                name: origin,
+            });
+        }
+
+        // Resolved here rather than by a caller, because what follows from it is this
+        // function's to work out: the registry may be at its cap, in which case a browser
+        // is given up and every session it held has to go in the same write. A caller
+        // handed that consequence is a caller that can forget it.
+        //
+        // After the refusals above, so a ceremony that cannot happen registers nothing —
+        // the record reaches storage only through the write at the end.
+        let (browser_id, _) = anchor
+            .resolve_browser(
+                browser_keys.current().clone(),
+                browser_keys.next().clone(),
+                browser_description,
+                now_ns,
+            )
+            .map_err(StorageError::Browser)?;
+
+        // This origin, and only this one. A browser the registry gave up to make room for
+        // this one may hold sessions anywhere, but that is a consequence of the write
+        // rather than something this function reaches across the identity to do: the gate
+        // derives it from the registry this write carries and sweeps them in the same
+        // write. Handing the gate every origin instead would make each of them an origin
+        // this write is changing, and an origin a write is changing is never a candidate
+        // for its own eviction — so the one write that creates tracked defaults would be
+        // the one write that can never evict them.
+        let mut state = BTreeMap::from([(
+            origin.clone(),
+            Some(self.account_state_for_origin(anchor_number, &origin)),
+        )]);
+
+        let (account_references, _) = state
+            .get_mut(&origin)
+            .and_then(Option::as_mut)
+            .expect("the origin was just put there");
+
+        let position = account_references
+            .iter()
+            .position(|write| write.account_reference.account_number == account_number)
+            .ok_or(StorageError::MissingAccount {
+                anchor_number,
+                name: String::new(),
+            })?;
+        let reference = &mut account_references[position].account_reference;
+        reference.last_used = Some(now_ns);
+
+        // A ceremony replaces whatever this browser held here, rather than reusing it: the
+        // copy of an old session's chain stops working at the user's next sign-in instead of
+        // at its expiry.
+        let mut dropped: Vec<(Option<AccountNumber>, Session)> = vec![];
+        reference.sessions.retain(|session| {
+            if session.browser_id == browser_id {
+                dropped.push((account_number, session.clone()));
+                return false;
+            }
+            true
+        });
+
+        // A gap costs nothing — ids need not be contiguous, and the write below can still
+        // refuse this ceremony. What must never happen is an id being handed out twice:
+        // it is an input to the session seed, so a reissued one would let a revoked
+        // session's identity be reached a second time.
+        let session_id = self.allocate_session_id()?;
+        let session = Session {
+            session_id,
+            created_at_ns: now_ns,
+            valid_till_ns,
+            max_idle_ns,
+            last_refreshed_ns: None,
+            browser_id,
+            read_only,
+        };
+        reference.sessions.push(session.clone());
+
+        // The whole list, not just the reference being written: this list is about to be
+        // rewritten anyway, and a dead session on a sibling reference has nothing else
+        // coming for it.
+        for write in account_references.iter_mut() {
+            let account_number = write.account_reference.account_number;
+            write.account_reference.sessions.retain(|session| {
+                if session.is_expired_or_idle(now_ns) {
+                    dropped.push((account_number, session.clone()));
+                    return false;
+                }
+                true
+            });
+        }
+
+        // The list is the whole of it: the index entries for the session created here and
+        // for the ones pruned above, and the identity's session count, all follow from it.
+        // One write for all of it: the session created here, the dead ones pruned above,
+        // the sessions of every browser the registry gave up, the account reference list
+        // this origin gets if it did not have one, and the identity's session count.
+        self.write_account_state(anchor, state)?;
+
+        let key = SessionLocator {
+            anchor_number,
+            origin,
+            account_number,
+            session_id,
+        };
+        Ok((key, session))
+    }
+
+    /// The session `key` names, or `None` where the identity holds no such session.
+    ///
+    /// A key whose session was replaced reads as `None` rather than as its successor:
+    /// the successor was allocated an id of its own.
+    #[allow(dead_code)] // Read by `get_account_session`, which lands two PRs up.
+    pub fn read_session(&self, key: &SessionLocator) -> Option<Session> {
+        let application_number = self.lookup_application_number_with_origin(&key.origin)?;
+
+        self.account_references(key.anchor_number, application_number)
+            .into_iter()
+            .find(|reference| reference.account_number == key.account_number)?
+            .sessions
+            .into_iter()
+            .find(|session| session.session_id == key.session_id)
+    }
+
+    // Called by the `revoke_browser_sessions` endpoint, which lands six PRs up.
+    #[allow(dead_code)]
+    /// Signs one browser out of everything, in a single message.
+    pub fn revoke_browser_sessions(
+        &mut self,
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+    ) -> Result<u64, StorageError> {
+        // Read what the identity holds, take the browser's sessions out of it, write it
+        // back. Nothing here ranges over storage itself and no application number reaches
+        // this function: the sweep is one write, so an `Err` cannot sign the browser out
+        // of some applications and report failure.
+        let anchor = self.read(anchor_number)?;
+        let mut state = self.account_state(anchor_number);
+
+        let mut revoked = 0u64;
+        for held in state.values_mut() {
+            let Some((account_references, _)) = held else {
+                continue;
+            };
+            for write in account_references.iter_mut() {
+                write.account_reference.sessions.retain(|session| {
+                    let keep = session.browser_id != browser_id;
+                    if !keep {
+                        revoked += 1;
+                    }
+                    keep
+                });
+            }
+        }
+
+        self.write_account_state(anchor, state)?;
+
+        Ok(revoked)
+    }
+
+    /// The session index entries a reference list implies: one per session it holds,
+    /// each with the account entry its handle needs in order to resolve.
+    fn session_entries(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        origin: &FrontendHostname,
+        salt: &[u8; 32],
+        references: &[AccountReference],
+    ) -> BTreeMap<Principal, (StorableSessionHandle, StorableAccountKey)> {
+        let mut entries = BTreeMap::new();
+        for reference in references {
+            let Some(account) = self.account_of_reference(anchor_number, origin, reference) else {
+                continue;
+            };
+            let account_seed = account.calculate_seed_with_salt(salt);
+            let account_principal =
+                delegation::canister_sig_principal(canister_id(), account_seed.to_vec());
+            for session in &reference.sessions {
+                let seed =
+                    calculate_session_seed_with_salt(salt, &account_seed, session.session_id);
+                entries.insert(
+                    delegation::canister_sig_principal(canister_id(), seed.to_vec()),
+                    (
+                        StorableSessionHandle {
+                            account_principal: account_principal.as_slice().to_vec(),
+                            session_id: session.session_id,
+                        },
+                        StorableAccountKey {
+                            anchor_number,
+                            application_number,
+                            account_number: reference.account_number,
+                        },
+                    ),
+                );
+            }
+        }
+        entries
+    }
+
+    /// The ids of every session a reference list holds, sorted, for comparing two
+    /// versions of a list.
+    fn session_ids_of(references: &[AccountReference]) -> Vec<SessionId> {
+        let mut ids: Vec<SessionId> = references
+            .iter()
+            .flat_map(|reference| reference.sessions.iter().map(|session| session.session_id))
+            .collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    /// Adds what one reference-list write does to each browser's session count.
+    ///
+    /// Accumulated across the origins of a single write rather than returned per origin,
+    /// because a browser signed in at several origins is one entry on the identity
+    /// record, and the record is stored once.
+    fn accumulate_browser_deltas(
+        deltas: &mut BTreeMap<BrowserId, i64>,
+        previous: &[AccountReference],
+        current: &[AccountReference],
+    ) {
+        for (references, sign) in [(previous, -1i64), (current, 1i64)] {
+            for reference in references {
+                for session in &reference.sessions {
+                    *deltas.entry(session.browser_id).or_default() += sign;
+                }
+            }
+        }
+    }
+
+    /// Keeps the session index in step with one reference-list write, and reports what
+    /// the write does to the identity's session count.
+    ///
+    /// Sessions live on the reference, so a reference that goes takes its sessions with
+    /// it and this sees them as removed without any caller saying so. That is the point:
+    /// the list and everything derived from it move together, in the one place holding
+    /// both versions of it.
+    fn sync_session_index(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        origin: &FrontendHostname,
+        salt: &[u8; 32],
+        previous: &[AccountReference],
+        current: &[AccountReference],
+    ) -> i64 {
+        let before =
+            self.session_entries(anchor_number, application_number, origin, salt, previous);
+        let after = self.session_entries(anchor_number, application_number, origin, salt, current);
+
+        for principal in before.keys() {
+            if !after.contains_key(principal) {
+                self.lookup_session_with_principal_memory.remove(principal);
+            }
+        }
+        for (principal, (handle, account)) in &after {
+            if before.contains_key(principal) {
+                continue;
+            }
+            // The account's entry goes in with the session's. A handle names its account
+            // by principal, and that index gains entries only where a list's set of
+            // account numbers changes, which a sign-in does not. Without this a session at
+            // a list that predates the index resolves to nothing, and nothing else would
+            // put it right.
+            self.lookup_account_with_principal_memory.insert(
+                Principal::from_slice(&handle.account_principal),
+                account.clone(),
+            );
+            self.lookup_session_with_principal_memory
+                .insert(*principal, handle.clone());
+        }
+
+        after.len() as i64 - before.len() as i64
+    }
+
     /// Retires an application no anchor references any more. The number is never
     /// reissued.
     fn remove_unreferenced_application(
@@ -2642,6 +3247,12 @@ impl<M: Memory + Clone> Storage<M> {
         // An absent list normalises to the derived default, which is how the first named
         // account at an origin does not cost the identity the default it had. A
         // tombstone normalises to nothing and stays that way.
+        // Read once and handed to the write, for two reasons: the gate moves this
+        // identity's session count and must not be handed a copy that has already gone
+        // stale, and an identity that does not exist has nothing to hold what is about to
+        // be written — the counters, the account reference lists and the session count all
+        // key on a record that would not be there.
+        let anchor = self.read(anchor_number)?;
         let (mut account_references, config) =
             self.account_state_for_origin(anchor_number, &origin);
         // Where the write leaves it, and so where its minted number comes back.
@@ -2657,7 +3268,7 @@ impl<M: Memory + Clone> Storage<M> {
         });
 
         let written = self.write_account_state(
-            anchor_number,
+            anchor,
             BTreeMap::from([(origin.clone(), Some((account_references, config)))]),
         )?;
 
@@ -2708,6 +3319,7 @@ impl<M: Memory + Clone> Storage<M> {
             }
         }
 
+        let anchor = self.read(anchor_number)?;
         let (mut account_references, config) =
             self.account_state_for_origin(anchor_number, &origin);
         let Some(position) = account_references
@@ -2757,7 +3369,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         let written = self.write_account_state(
-            anchor_number,
+            anchor,
             BTreeMap::from([(origin.clone(), Some((account_references, config)))]),
         )?;
         let write = &written[&origin]
@@ -2800,6 +3412,7 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Result<(), StorageError> {
         check_frontend_length(&origin);
 
+        let anchor = self.read(anchor_number)?;
         let (account_references, _) = self.account_state_for_origin(anchor_number, &origin);
         // The stored config with one field moved, rather than a config built here: this
         // knows about the default account and nothing else the config may come to hold,
@@ -2812,7 +3425,7 @@ impl<M: Memory + Clone> Storage<M> {
             .unwrap_or_default();
         config.default_account_number = account_number;
         self.write_account_state(
-            anchor_number,
+            anchor,
             BTreeMap::from([(origin, Some((account_references, Some(config))))]),
         )?;
         Ok(())
@@ -3027,6 +3640,14 @@ impl<M: Memory + Clone> Storage<M> {
                 self.next_application_number_memory_wrapper.size(),
             ),
             (
+                "lookup_session_with_principal".to_string(),
+                self.lookup_session_with_principal_memory_wrapper.size(),
+            ),
+            (
+                "next_session_id".to_string(),
+                self.next_session_id_memory_wrapper.size(),
+            ),
+            (
                 "stable_anchor_application_config".to_string(),
                 self.stable_anchor_application_config_memory_wrapper.size(),
             ),
@@ -3066,6 +3687,29 @@ impl<M: Memory + Clone> Storage<M> {
             ),
         ])
     }
+}
+
+// Constructed by `prepare_account_session`, which lands two PRs up.
+#[allow(dead_code)]
+pub struct CreateSessionParams {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    /// The keys the browser proved it holds, and the successor it announced. Verified
+    /// rather than reported: registering an entry from keys nobody proved would let one
+    /// browser be claimed by whoever read its keys off the wire, so what this takes is
+    /// the evidence and not two byte strings.
+    ///
+    /// Its registry entry, its id, and whatever the cap gives up to make room for it are
+    /// all worked out inside the write, so no caller states any of them.
+    pub browser_keys: VerifiedBrowserKeys,
+    /// Taken only where this sign-in registers a browser. An entry that is advanced
+    /// keeps the description it was registered with.
+    pub browser_description: BrowserDescription,
+    pub valid_till_ns: Timestamp,
+    pub max_idle_ns: Option<u64>,
+    pub read_only: bool,
+    pub now_ns: Timestamp,
 }
 
 #[cfg(not(test))]
@@ -3218,6 +3862,12 @@ struct ValidatedAccountReferenceListWrite {
     /// nothing written; the index itself is synced in apply, after the records, because a
     /// principal is derived from an account's stored record.
     principal_salt: Option<[u8; 32]>,
+    /// Whether the set of account numbers moved, and whether the set of sessions did.
+    /// They are tracked apart because a sign-in changes only the second, and recomputing
+    /// account principals it did not touch would put the hottest write in the system
+    /// through a per-account hash for nothing.
+    accounts_changed: bool,
+    sessions_changed: bool,
     previous_references: Vec<AccountReference>,
     current_references: Vec<AccountReference>,
     /// What this origin holds afterwards, handed back to the caller.
@@ -3379,6 +4029,12 @@ pub enum StorageError {
     AccountLimitReached {
         anchor_number: AnchorNumber,
     },
+    /// The browser presenting itself could not be resolved to a registry entry.
+    Browser(BrowserError),
+    /// A session was asked for that is already over, which no list would hold.
+    SessionAlreadyOver {
+        anchor_number: AnchorNumber,
+    },
     AnchorNumberOutOfRange {
         anchor_number: AnchorNumber,
         range: (AnchorNumber, AnchorNumber),
@@ -3415,6 +4071,11 @@ pub enum StorageError {
     /// put two origins on a single list.
     ApplicationsCounterOverflow,
     ErrorUpdatingApplicationNumberAllocator,
+    /// No session ids left to hand out. Refused rather than saturated: the id is an
+    /// input to the session seed, so reissuing one would resurrect a revoked session's
+    /// identity.
+    SessionIdOverflow,
+    ErrorUpdatingSessionIdAllocator,
     /// The references a write assembled cannot be stored as they stand.
     UnstorableAccountReferenceList {
         anchor_number: AnchorNumber,
@@ -3428,6 +4089,12 @@ pub enum StorageError {
         count: ReferenceCount,
         stored: u64,
         delta: i64,
+    },
+    /// Reclaiming ran and the identity is still at the session cap. Unreachable unless
+    /// reclaiming stopped honouring its contract, which is why it is an error rather than a
+    /// refused sign-in: the sign-in is the thing this cap must never fail.
+    SessionCapNotReclaimed {
+        anchor_number: AnchorNumber,
     },
     /// Tried to bind a recovery email that's already on a different
     /// anchor. The "one anchor per address" invariant from design
@@ -3450,6 +4117,11 @@ impl fmt::Display for StorageError {
                 range.0, range.1
             ),
             Self::BadAnchorNumber(n) => write!(f, "bad Identity Anchor {n}"),
+            Self::Browser(err) => write!(f, "the browser could not be resolved: {err:?}"),
+            Self::SessionAlreadyOver { anchor_number } => write!(
+                f,
+                "a session for Identity Anchor {anchor_number} would be over before it started"
+            ),
             Self::DeserializationError(err) => {
                 write!(f, "failed to deserialize a Candid value: {err}")
             }
@@ -3506,6 +4178,10 @@ impl fmt::Display for StorageError {
             Self::ErrorUpdatingApplicationNumberAllocator => {
                 write!(f, "Error updating the application number allocator")
             }
+            Self::SessionIdOverflow => write!(f, "No session ids left to allocate"),
+            Self::ErrorUpdatingSessionIdAllocator => {
+                write!(f, "Error updating the session id allocator")
+            }
             Self::UnstorableAccountReferenceList {
                 anchor_number,
                 application_number,
@@ -3528,6 +4204,10 @@ impl fmt::Display for StorageError {
             Self::EmailRecoveryAddressAlreadyBound { existing_anchor } => write!(
                 f,
                 "recovery email is already bound to a different anchor ({existing_anchor})",
+            ),
+            Self::SessionCapNotReclaimed { anchor_number } => write!(
+                f,
+                "anchor {anchor_number} is at the session cap and reclaiming freed nothing"
             ),
         }
     }

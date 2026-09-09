@@ -1588,6 +1588,10 @@ export interface BrowserDescription {
 export interface BrowserInfo {
   'id' : number,
   /**
+   * Sessions this browser holds. Zero means it is signed in to nothing.
+   */
+  'session_count' : number,
+  /**
    * Fixed at registration. A sign-in reporting something else registers its own entry,
    * so this describes a registration rather than the last sign-in.
    */
