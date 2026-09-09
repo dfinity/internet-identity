@@ -171,7 +171,7 @@ pub fn identity_registration_finish(
 
     let now = time();
 
-    let identity_number = create_identity(&arg, now, verified_openid)?;
+    let identity_number = create_identity(&arg, caller, now, verified_openid)?;
 
     // flow completed --> remove flow state
     state::with_flow_states_mut(|flow_states| flow_states.remove_registration_flow(&caller));
@@ -179,13 +179,18 @@ pub fn identity_registration_finish(
     match arg {
         CreateIdentityData::PubkeyAuthn(id_reg_finish_arg) => {
             // add temp key so the user can keep using the identity used for the registration flow
-            state::with_temp_keys_mut(|temp_keys| {
-                temp_keys.add_temp_key(
-                    &id_reg_finish_arg.authn_method.public_key(),
-                    identity_number,
-                    caller,
-                )
-            });
+            if matches!(
+                id_reg_finish_arg.authn_method.authn_method,
+                AuthnMethod::WebAuthn(_)
+            ) {
+                state::with_temp_keys_mut(|temp_keys| {
+                    temp_keys.add_temp_key(
+                        &id_reg_finish_arg.authn_method.public_key(),
+                        identity_number,
+                        caller,
+                    )
+                });
+            }
         }
         // we don't need temp keys for OpenId
         // temp keys are only needed because we cannot create an identity out of the
@@ -332,6 +337,7 @@ fn apply_identity_data(
 
 fn create_identity(
     arg: &CreateIdentityData,
+    caller: Principal,
     now: u64,
     verified_openid: Option<(openid::OpenIdCredential, String)>,
 ) -> Result<IdentityNumber, IdRegFinishError> {
@@ -347,6 +353,23 @@ fn create_identity(
     {
         anchor_management::check_passkey_pubkey_is_not_used(&webauthn.pubkey)
             .map_err(IdRegFinishError::InvalidAuthnMethod)?;
+    }
+
+    // Require the caller to hold the plain public key it registers.
+    if let CreateIdentityData::PubkeyAuthn(IdRegFinishArg {
+        authn_method:
+            AuthnMethodData {
+                authn_method: AuthnMethod::PubKey(pubkey_authn),
+                ..
+            },
+        ..
+    }) = &arg
+    {
+        if caller != Principal::self_authenticating(&pubkey_authn.pubkey) {
+            return Err(IdRegFinishError::InvalidAuthnMethod(
+                "the caller must be the principal of the public key it registers".to_string(),
+            ));
+        }
     }
 
     let (identity_number, operation) = state::storage_borrow_mut(|storage| {
@@ -408,7 +431,12 @@ mod create_identity_tests {
         );
 
         // Attempt to create identity - this should fail
-        let result = create_identity(&create_identity_data, 111, None);
+        let result = create_identity(
+            &create_identity_data,
+            Principal::self_authenticating([1, 2, 3]),
+            111,
+            None,
+        );
 
         // Verify that the creation failed
         assert!(result.is_err());
