@@ -2,6 +2,7 @@ use crate::storage::account::Account;
 use crate::storage::account::AccountKey;
 use crate::storage::storable::account_reference_list::StorableAccountReferenceList;
 use crate::storage::storable::application::StorableApplication;
+use crate::storage::TEST_NOW;
 use crate::Storage;
 use ic_stable_structures::VectorMemory;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, FrontendHostname};
@@ -54,7 +55,12 @@ fn should_create_a_named_account() {
 
     // 3. Create additional account
     storage
-        .create_account(anchor_number, origin.clone(), account_name.clone())
+        .create_account(
+            anchor_number,
+            origin.clone(),
+            account_name.clone(),
+            TEST_NOW,
+        )
         .unwrap();
 
     // 5. Check that read_account returns additional account, creates application and updates counters.
@@ -126,7 +132,12 @@ fn should_list_accounts() {
     );
     let expected_default_account = Account::synthetic(anchor_number, origin.clone());
     storage
-        .create_account(anchor_number, origin.clone(), account_name.clone())
+        .create_account(
+            anchor_number,
+            origin.clone(),
+            account_name.clone(),
+            TEST_NOW,
+        )
         .unwrap();
 
     // 5. List accounts returns default account
@@ -187,7 +198,12 @@ fn should_list_all_identity_accounts() {
 
     // 4. Create additional account
     storage
-        .create_account(anchor_number, origin.clone(), account_name.clone())
+        .create_account(
+            anchor_number,
+            origin.clone(),
+            account_name.clone(),
+            TEST_NOW,
+        )
         .unwrap();
 
     // 5. List accounts returns default account
@@ -197,7 +213,12 @@ fn should_list_all_identity_accounts() {
 
     // 6. Create additional account
     storage
-        .create_account(anchor_number, origin_2.clone(), account_name.clone())
+        .create_account(
+            anchor_number,
+            origin_2.clone(),
+            account_name.clone(),
+            TEST_NOW,
+        )
         .unwrap();
 
     // 7. List accounts returns default account
@@ -249,7 +270,7 @@ fn should_update_default_account() {
         })
         .unwrap();
     account_to_update.name = Some(account_name.clone());
-    let new_account = storage.write_account(account_to_update).unwrap();
+    let new_account = storage.write_account(account_to_update, TEST_NOW).unwrap();
 
     // 4. Check that the default account has been created with the updated values.
     assert_eq!(
@@ -315,7 +336,12 @@ fn should_update_additional_account() {
 
     // 3. Create additional account
     storage
-        .create_account(anchor_number, origin.clone(), account_name.clone())
+        .create_account(
+            anchor_number,
+            origin.clone(),
+            account_name.clone(),
+            TEST_NOW,
+        )
         .unwrap();
     assert!(storage.read_account(&read_params).is_some());
 
@@ -328,7 +354,7 @@ fn should_update_additional_account() {
         })
         .unwrap();
     account_to_update.name = Some(new_account_name.clone());
-    let updated_account = storage.write_account(account_to_update).unwrap();
+    let updated_account = storage.write_account(account_to_update, TEST_NOW).unwrap();
 
     // 5. Check that the additional account has been created with the updated values.
     assert_eq!(
@@ -399,7 +425,12 @@ fn should_count_accounts_different_anchors() {
 
     // Create an additional account for anchor 1
     storage
-        .create_account(anchor_number_1, origin_1.clone(), account_name_1.clone())
+        .create_account(
+            anchor_number_1,
+            origin_1.clone(),
+            account_name_1.clone(),
+            TEST_NOW,
+        )
         .unwrap();
 
     // List accounts for anchor 1 - should return 2
@@ -454,7 +485,12 @@ fn should_count_accounts_different_anchors() {
 
     // Create an additional account for anchor 2
     storage
-        .create_account(anchor_number_2, origin_2.clone(), account_name_2.clone())
+        .create_account(
+            anchor_number_2,
+            origin_2.clone(),
+            account_name_2.clone(),
+            TEST_NOW,
+        )
         .unwrap();
 
     // List accounts for anchor 2 - should return 2
@@ -563,7 +599,7 @@ fn should_not_read_account_from_wrong_anchor() {
 
     // 2. Create account for first anchor
     storage
-        .create_account(anchor_number_1, origin.clone(), account_name)
+        .create_account(anchor_number_1, origin.clone(), account_name, TEST_NOW)
         .unwrap();
 
     // 3. Try to read the account with second anchor
