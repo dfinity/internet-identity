@@ -130,7 +130,6 @@ use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
 use storable::application::StorableApplication;
 use storable::credential_id::StorableCredentialId;
-use storable::discrepancy_counter::StorableDiscrepancyCounter;
 use storable::email_recovery_address_hash::StorableEmailRecoveryAddressHash;
 use storable::fixed_anchor::StorableFixedAnchor;
 use storable::mcp_config::StorableMcpConfig;
@@ -185,7 +184,7 @@ const STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_INDEX: u8 = 14u8;
 const STABLE_ACCOUNT_COUNTER_MEMORY_INDEX: u8 = 15u8;
 const STABLE_ANCHOR_MEMORY_INDEX: u8 = 16u8;
 const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 17u8;
-const STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_INDEX: u8 = 18u8;
+// const DEPRECATED_STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_INDEX: u8 = 18u8;
 const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 19u8;
 const STABLE_ANCHOR_APPLICATION_CONFIG_MEMORY_INDEX: u8 = 20u8;
 const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX: u8 = 21u8;
@@ -233,8 +232,6 @@ const STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_ID: MemoryId =
     MemoryId::new(STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_INDEX);
 const STABLE_DEFAULT_ACCOUNT_REFERENCE_MEMORY_ID: MemoryId =
     MemoryId::new(STABLE_ANCHOR_APPLICATION_CONFIG_MEMORY_INDEX);
-const STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_ID: MemoryId =
-    MemoryId::new(STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_INDEX);
 const STABLE_ACCOUNT_COUNTER_MEMORY_ID: MemoryId =
     MemoryId::new(STABLE_ACCOUNT_COUNTER_MEMORY_INDEX);
 const STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_ID: MemoryId =
@@ -456,9 +453,6 @@ pub struct Storage<M: Memory> {
     lookup_session_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_session_with_principal_memory:
         StableBTreeMap<Principal, StorableSessionHandle, ManagedMemory<M>>,
-    /// Counter that counts how often there was a discrepancy between the anchor accounts counter and the actual number of accounts
-    stable_account_counter_discrepancy_counter_memory:
-        StableCell<StorableDiscrepancyCounter, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the lookup anchor with OpenID credential memory.
     lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchor_with_openid_credential_memory:
@@ -597,8 +591,6 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
             memory_manager.get(LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_ID);
-        let stable_account_counter_discrepancy_counter_memory =
-            memory_manager.get(STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_ID);
         let lookup_anchor_with_openid_credential_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID);
         let lookup_anchor_with_passkey_credential_memory =
@@ -699,11 +691,6 @@ impl<M: Memory + Clone> Storage<M> {
             lookup_account_with_principal_memory: StableBTreeMap::init(
                 lookup_account_with_principal_memory,
             ),
-            stable_account_counter_discrepancy_counter_memory: StableCell::init(
-                stable_account_counter_discrepancy_counter_memory,
-                StorableDiscrepancyCounter::default(),
-            )
-            .expect("failed to initialize discrepancy counter"),
             lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper::new(
                 lookup_anchor_with_openid_credential_memory.clone(),
             ),
@@ -3536,11 +3523,6 @@ impl<M: Memory + Clone> Storage<M> {
             .flat_map(|(_, storable_account_ref_list_val)| storable_account_ref_list_val.into_vec())
             .map(AccountReference::from)
             .collect()
-    }
-
-    /// Retrieves the discrepancy counter
-    pub fn get_discrepancy_counter(&self) -> &StorableDiscrepancyCounter {
-        self.stable_account_counter_discrepancy_counter_memory.get()
     }
 
     /// One account this identity holds at `key.origin`, or `None` where it holds none.
