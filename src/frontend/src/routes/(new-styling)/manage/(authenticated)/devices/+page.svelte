@@ -10,9 +10,12 @@
   import { TriangleAlertIcon } from "@lucide/svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import DeviceRow from "./components/DeviceRow.svelte";
+  import GroupHeading from "./components/GroupHeading.svelte";
   import {
+    NO_RECORD_ID,
     fromCanisterBrowsers,
-    inactiveDays,
+    groupBrowsers,
+    isSignedOut,
     nameOf,
     signOutBrowser,
     type Browser,
@@ -38,37 +41,61 @@
     void describeBrowser().then((d) => (thisDescription = d));
   });
 
-  const browsers = $derived(
+  const now = Date.now();
+
+  const stored = $derived(
     fromCanisterBrowsers(data.identityInfo.browsers, thisBrowserId),
   );
-  const thisBrowser = $derived(browsers.find((browser) => browser.isCurrent));
-  const otherBrowsers = $derived(
-    browsers.filter((browser) => !browser.isCurrent),
+
+  // The browser being read from is always on this page, whether or not the canister
+  // holds a record for it: it has signed in to Internet Identity, which is how this page
+  // is on screen, and it just has not signed in to an app yet. It reads as signed out,
+  // because it is, and describing it takes no canister data.
+  const unrecorded = $derived<Browser | undefined>(
+    stored.some((browser) => browser.isCurrent) || thisDescription === undefined
+      ? undefined
+      : {
+          id: NO_RECORD_ID,
+          name: nameOf(thisDescription),
+          description: thisDescription,
+          createdAtMillis: now,
+          lastUsedMillis: now,
+          sessionCount: 0,
+          isCurrent: true,
+        },
+  );
+
+  const groups = $derived(
+    groupBrowsers(
+      unrecorded === undefined ? stored : [unrecorded, ...stored],
+      now,
+    ),
   );
 
   let signedOut = $state<number[]>([]);
   let signingOut = $state<number | undefined>(undefined);
   let confirming = $state<Browser | undefined>(undefined);
 
-  const now = Date.now();
-
-  const isSignedOut = (browser: Browser): boolean =>
-    signedOut.includes(browser.id) || browser.sessionCount === 0;
-
   const actionFor = (browser: Browser) =>
     signingOut === browser.id
       ? "signing-out"
-      : isSignedOut(browser)
+      : signedOut.includes(browser.id) || isSignedOut(browser, now)
         ? "signed-out"
         : "sign-out";
 
+  // A browser with no record has no timestamps to format: it has never signed in to an
+  // app, and it arrived just now as far as this page can tell.
   const lastUsedOf = (browser: Browser): string =>
-    $formatRelative(new Date(browser.lastUsedMillis), { style: "long" });
+    browser.id === NO_RECORD_ID
+      ? $t`Never`
+      : $formatRelative(new Date(browser.lastUsedMillis), { style: "long" });
   const firstSeenOf = (browser: Browser): string =>
-    $formatDate(new Date(browser.createdAtMillis), {
-      month: "short",
-      day: "numeric",
-    });
+    browser.id === NO_RECORD_ID
+      ? $t`Now`
+      : $formatDate(new Date(browser.createdAtMillis), {
+          month: "short",
+          day: "numeric",
+        });
 
   const confirmSignOut = async () => {
     const browser = confirming;
@@ -92,7 +119,7 @@
       });
     } catch (error) {
       toaster.error({
-        title: $t`Couldn't sign this device out`,
+        title: $t`Couldn't sign this browser out`,
         description: error instanceof Error ? error.message : undefined,
       });
     } finally {
@@ -108,70 +135,48 @@
   </p>
 </header>
 
-<div class="mt-10 flex max-w-3xl flex-col gap-10">
-  <section class="flex flex-col gap-3.5">
-    <h2 class="text-text-primary text-base font-medium">{$t`This device`}</h2>
+<div class="mt-10 flex max-w-3xl flex-col gap-6">
+  <!-- No empty state: this browser is always one of the rows, so the only moment there
+       is nothing to draw is before it has described itself. -->
+  {#if groups.length > 0}
     <div
-      class="border-border-secondary bg-bg-primary flex flex-col rounded-xl border"
+      class="border-border-secondary bg-bg-primary flex flex-col overflow-hidden rounded-xl border"
     >
-      {#if thisBrowser !== undefined}
-        <DeviceRow
-          description={thisBrowser.description}
-          name={thisBrowser.name}
-          lastUsed={lastUsedOf(thisBrowser)}
-          firstSeen={firstSeenOf(thisBrowser)}
-          action={actionFor(thisBrowser)}
-          onSignOut={() => (confirming = thisBrowser)}
-        />
-      {:else if thisDescription !== undefined}
-        <!-- No record yet: this browser has never signed in to an app from this
-             identity. It still describes itself, which beats an empty section. -->
-        <DeviceRow
-          description={thisDescription}
-          name={nameOf(thisDescription)}
-          lastUsed={$t`Never`}
-          firstSeen={$t`Now`}
-          action="none"
-        />
-      {/if}
-    </div>
-  </section>
-
-  <section class="flex flex-col gap-3.5">
-    <h2 class="text-text-primary text-base font-medium">{$t`Other devices`}</h2>
-    {#if otherBrowsers.length > 0}
-      <ul
-        class="border-border-secondary bg-bg-primary flex flex-col overflow-hidden rounded-xl border"
-      >
-        {#each otherBrowsers as browser, index (browser.id)}
-          <li class={index > 0 ? "border-border-tertiary border-t" : ""}>
-            <DeviceRow
-              description={browser.description}
-              name={browser.name}
-              lastUsed={lastUsedOf(browser)}
-              firstSeen={firstSeenOf(browser)}
-              inactiveDays={isSignedOut(browser)
-                ? undefined
-                : inactiveDays(browser, now)}
-              action={actionFor(browser)}
-              onSignOut={() => (confirming = browser)}
-            />
-          </li>
-        {/each}
-      </ul>
-    {:else}
-      <div
-        class="border-border-secondary text-text-tertiary rounded-xl border border-dashed p-6 text-center text-sm"
-      >
-        <Trans>No other devices are signed in to apps with this identity.</Trans
+      {#each groups as group, groupIndex (group.platform)}
+        <section
+          class={groupIndex > 0 ? "border-border-tertiary border-t" : ""}
         >
-      </div>
-    {/if}
-  </section>
+          <GroupHeading
+            kind={group.kind}
+            platform={group.platform}
+            count={group.browsers.length}
+          />
+          <ul class="flex flex-col">
+            {#each group.browsers as browser, index (browser.id)}
+              <!-- Inset rule between rows of one group, so it reads as a divided group
+                   rather than as the boundary between two. -->
+              <li
+                class={index > 0 ? "border-border-tertiary ml-4 border-t" : ""}
+              >
+                <DeviceRow
+                  description={browser.description}
+                  lastUsed={lastUsedOf(browser)}
+                  firstSeen={firstSeenOf(browser)}
+                  isCurrent={browser.isCurrent}
+                  action={actionFor(browser)}
+                  onSignOut={() => (confirming = browser)}
+                />
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/each}
+    </div>
+  {/if}
 
   <p class="text-text-tertiary text-sm">
     <Trans>
-      Don't recognize a device? Sign it out, then
+      Don't recognize a browser? Sign it out, then
       <a
         href="/manage/access"
         class="text-text-primary font-semibold hover:underline focus-visible:underline"
@@ -196,8 +201,8 @@
       <p class="text-text-tertiary text-base text-pretty">
         {#if target.isCurrent}
           <Trans>
-            Every app you opened from this device will ask you to sign in again.
-            You'll stay signed in to Internet Identity here.
+            Every app you opened from this browser will ask you to sign in
+            again. You'll stay signed in to Internet Identity here.
           </Trans>
         {:else}
           {$t`${target.name} will lose access to all apps signed in with this identity.`}
