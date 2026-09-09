@@ -1108,10 +1108,15 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&key)
     }
 
-    pub fn lookup_anchor_with_passkey_pubkey(&self, pubkey: &PublicKey) -> Option<AnchorNumber> {
+    /// Look up the anchor holding `pubkey` in any device role, passkey or recovery key.
+    pub fn lookup_anchor_with_pubkey(&self, pubkey: &PublicKey) -> Option<AnchorNumber> {
         let principal = Principal::self_authenticating(pubkey);
         self.lookup_anchor_with_passkey_pubkey_hash_memory
             .get(&principal)
+            .or_else(|| {
+                self.lookup_anchor_with_recovery_phrase_principal_memory
+                    .get(&principal)
+            })
     }
 
     /// Look up the MCP session grant registered for `principal` (the caller

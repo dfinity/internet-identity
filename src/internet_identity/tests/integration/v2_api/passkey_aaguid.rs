@@ -451,7 +451,7 @@ fn should_enforce_unique_passkey_pubkeys_and_free_them_on_change_and_remove(
         );
     assert_eq!(
         result_a1,
-        Err("InvalidAuthnMethod(\"passkey with this public key is already used\")".to_string())
+        Err("InvalidAuthnMethod(\"a device with this public key is already used\")".to_string())
     );
 
     // 3. This anchor's passkey can be updated to have a different pubkey (P1).
@@ -526,7 +526,7 @@ fn should_enforce_unique_passkey_pubkeys_and_free_them_on_change_and_remove(
         );
     assert_eq!(
         result_c0,
-        Err("InvalidAuthnMethod(\"passkey with this public key is already used\")".to_string())
+        Err("InvalidAuthnMethod(\"a device with this public key is already used\")".to_string())
     );
 
     // Remove Q0 from B0 using the secondary device Q1 for authorization.

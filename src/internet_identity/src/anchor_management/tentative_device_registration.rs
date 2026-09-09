@@ -101,8 +101,9 @@ pub async fn add_tentative_device(
                     state: DeviceRegistrationModeActive,
                     ..
                 } => {
-                    anchor_management::check_passkey_pubkey_is_not_used(&tentative_device.pubkey)
-                        .map_err(|_| AuthnMethodRegisterError::PasskeyWithThisPublicKeyIsAlreadyUsed)?;
+                    anchor_management::check_pubkey_is_not_used(&tentative_device.pubkey).map_err(
+                        |_| AuthnMethodRegisterError::PasskeyWithThisPublicKeyIsAlreadyUsed,
+                    )?;
 
                     registration.state = DeviceTentativelyAdded {
                         tentative_device,

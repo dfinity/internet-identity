@@ -17,10 +17,10 @@ use ic_cdk::caller;
 use ic_stable_structures::Memory;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethod, AuthnMethodData, AuthorizationKey, CaptchaTrigger, CheckCaptchaArg,
-    CheckCaptchaError, CreateIdentityData, DeviceData, DeviceWithUsage, IdRegFinishArg,
-    IdRegFinishError, IdRegFinishResult, IdRegNextStepResult, IdRegStartError, IdentityNumber,
-    OpenIDRegFinishArg, RegistrationFlowNextStep, StaticCaptchaTrigger,
+    AuthnMethod, AuthorizationKey, CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError,
+    CreateIdentityData, DeviceData, DeviceWithUsage, IdRegFinishArg, IdRegFinishError,
+    IdRegFinishResult, IdRegNextStepResult, IdRegStartError, IdentityNumber, OpenIDRegFinishArg,
+    RegistrationFlowNextStep, StaticCaptchaTrigger,
 };
 
 impl RegistrationFlowState {
@@ -341,34 +341,18 @@ fn create_identity(
     now: u64,
     verified_openid: Option<(openid::OpenIdCredential, String)>,
 ) -> Result<IdentityNumber, IdRegFinishError> {
-    // Enforce global uniqueness of passkey pubkeys across all anchors.
-    if let CreateIdentityData::PubkeyAuthn(IdRegFinishArg {
-        authn_method:
-            AuthnMethodData {
-                authn_method: AuthnMethod::WebAuthn(webauthn),
-                ..
-            },
-        ..
-    }) = &arg
-    {
-        anchor_management::check_passkey_pubkey_is_not_used(&webauthn.pubkey)
+    if let CreateIdentityData::PubkeyAuthn(IdRegFinishArg { authn_method, .. }) = &arg {
+        // Enforce global uniqueness of device pubkeys across all anchors.
+        anchor_management::check_pubkey_is_not_used(&authn_method.public_key())
             .map_err(IdRegFinishError::InvalidAuthnMethod)?;
-    }
 
-    // Require the caller to hold the plain public key it registers.
-    if let CreateIdentityData::PubkeyAuthn(IdRegFinishArg {
-        authn_method:
-            AuthnMethodData {
-                authn_method: AuthnMethod::PubKey(pubkey_authn),
-                ..
-            },
-        ..
-    }) = &arg
-    {
-        if caller != Principal::self_authenticating(&pubkey_authn.pubkey) {
-            return Err(IdRegFinishError::InvalidAuthnMethod(
-                "the caller must be the principal of the public key it registers".to_string(),
-            ));
+        // Require the caller to hold the plain public key it registers.
+        if let AuthnMethod::PubKey(pubkey_authn) = &authn_method.authn_method {
+            if caller != Principal::self_authenticating(&pubkey_authn.pubkey) {
+                return Err(IdRegFinishError::InvalidAuthnMethod(
+                    "the caller must be the principal of the public key it registers".to_string(),
+                ));
+            }
         }
     }
 
