@@ -492,7 +492,7 @@ mod tests {
     #[test]
     fn a_description_of_named_tokens_is_always_within_the_limit() {
         assert!(browser_description_within_limits(&description(
-            BrowserBrand::Brave,
+            BrowserBrand::Safari,
             OperatingSystem::Ipados,
             None
         )));
