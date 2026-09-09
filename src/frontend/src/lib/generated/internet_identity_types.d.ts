@@ -109,13 +109,21 @@ export interface AppPrepareDelegationResponse {
 }
 export type AppSessionError = {
     /**
+     * The session is live, but nothing was signed for the session_key and expiration
+     * asked for — so the expiration is one app_prepare_delegation never returned. Prepare
+     * again and use what comes back; signing in afresh is not the remedy.
+     */
+    'NoSuchDelegation' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
      * No usable session behind this caller: revoked, expired, pruned, or never one at
      * all. One outcome, because which of those it is depends on whether a prune has run
      * yet, and because an app can act on none of them differently.
      */
-    'NoMatchingSession' : null
-  } |
-  { 'InternalCanisterError' : string };
+    'NoSuchSession' : null
+  };
 /**
  * Configuration parameters related to the archive.
  */
