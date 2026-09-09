@@ -372,8 +372,15 @@ pub fn app_prepare_delegation(
     let seed = account_seed(&account)?;
     let access = DelegationAccess::from_read_only(session.read_only);
 
-    storage_borrow_mut(|storage| storage.record_session_use(&locator, now))
-        .map_err(|err| AppSessionError::InternalCanisterError(err.to_string()))?;
+    // A session revoked between `authorize_session` above and this stamp is a race, not
+    // an internal fault: the answer is the one the caller would have got a moment
+    // earlier.
+    storage_borrow_mut(|storage| storage.record_session_use(&locator, now)).map_err(
+        |err| match err {
+            StorageError::SessionNotFound { .. } => AppSessionError::NoSuchSession,
+            other => AppSessionError::InternalCanisterError(other.to_string()),
+        },
+    )?;
 
     state::signature_map_mut(|sigs| {
         add_delegation_signature(
