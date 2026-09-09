@@ -5230,10 +5230,10 @@ mod session_record_tests {
     fn a_bound_further_out_than_the_session_never_bites() {
         let record = session(1, 0, DAY_NS);
 
-        assert!(!record.is_over(0));
+        assert!(!record.is_expired_or_idle(0));
         // Past its own lifetime, so over on the other bound — which is the point:
         // one question, answered by whichever bound is reached first.
-        assert!(record.is_over(DAY_NS));
+        assert!(record.is_expired_or_idle(DAY_NS));
     }
 
     #[test]
@@ -5244,9 +5244,9 @@ mod session_record_tests {
             ..session(1, 0, DAY_NS)
         };
 
-        assert!(!record.is_over(39 * MINUTE_NS));
+        assert!(!record.is_expired_or_idle(39 * MINUTE_NS));
         // Still inside its absolute lifetime, and over anyway: either bound ends it.
-        assert!(record.is_over(40 * MINUTE_NS));
+        assert!(record.is_expired_or_idle(40 * MINUTE_NS));
     }
 
     #[test]
@@ -5259,8 +5259,8 @@ mod session_record_tests {
 
         // Otherwise a session abandoned straight after sign-in would sit unbounded
         // until its lifetime ran out, which is the case the bound exists for.
-        assert!(!record.is_over(34 * MINUTE_NS));
-        assert!(record.is_over(35 * MINUTE_NS));
+        assert!(!record.is_expired_or_idle(34 * MINUTE_NS));
+        assert!(record.is_expired_or_idle(35 * MINUTE_NS));
     }
 
     #[test]
@@ -5378,7 +5378,7 @@ mod session_record_tests {
 
         // Both are inside their lifetime, so ranking on that alone would have them
         // compete for a slot. One of them is finished.
-        assert!(idle.reclaim_order(now) < live.reclaim_order(now));
+        assert!(idle.reclaim_sort_key(now) < live.reclaim_sort_key(now));
     }
 
     #[test]
@@ -5392,8 +5392,8 @@ mod session_record_tests {
         };
         let live_untouched = session(3, 400, 10_000);
 
-        assert!(expired.reclaim_order(now) < live.reclaim_order(now));
-        assert!(expired.reclaim_order(now) < live_untouched.reclaim_order(now));
+        assert!(expired.reclaim_sort_key(now) < live.reclaim_sort_key(now));
+        assert!(expired.reclaim_sort_key(now) < live_untouched.reclaim_sort_key(now));
     }
 
     #[test]
@@ -5415,7 +5415,7 @@ mod session_record_tests {
 
         assert!(flood
             .iter()
-            .all(|session| session.reclaim_order(now) < held.reclaim_order(now)));
+            .all(|session| session.reclaim_sort_key(now) < held.reclaim_sort_key(now)));
     }
 
     #[test]
@@ -5435,7 +5435,7 @@ mod session_record_tests {
         };
 
         assert!(
-            one_sitting.reclaim_order(now) < weekly.reclaim_order(now),
+            one_sitting.reclaim_sort_key(now) < weekly.reclaim_sort_key(now),
             "the more recently touched session goes first, having stayed in service for minutes"
         );
     }
@@ -5714,8 +5714,8 @@ mod session_creation_tests {
         // Every session gets a bound now. A week of nobody touching the application
         // ends the sign-in, well inside the thirty days it could otherwise live.
         assert_eq!(session.max_idle_ns, DEFAULT_SESSION_IDLE_NS);
-        assert!(!session.is_over(6 * DAY_NS));
-        assert!(session.is_over(7 * DAY_NS));
+        assert!(!session.is_expired_or_idle(6 * DAY_NS));
+        assert!(session.is_expired_or_idle(7 * DAY_NS));
     }
 
     #[test]
