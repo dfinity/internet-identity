@@ -1,6 +1,6 @@
 use crate::storage::account::AccountReference;
 use crate::storage::storable::account_number::StorableAccountNumber;
-use crate::storage::storable::session_record::StorableSessionRecord;
+use crate::storage::storable::session::StorableSession;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::Timestamp;
@@ -17,7 +17,7 @@ pub struct StorableAccountReference {
     #[n(1)]
     pub last_used: Option<Timestamp>,
     #[n(2)]
-    pub sessions: Option<Vec<StorableSessionRecord>>,
+    pub sessions: Option<Vec<StorableSession>>,
 }
 
 impl Storable for StorableAccountReference {
