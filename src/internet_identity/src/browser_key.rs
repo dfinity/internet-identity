@@ -2,9 +2,6 @@
 //!
 //! Knows nothing of sessions or storage, so both layers may depend on it: the endpoint
 //! verifies, and storage requires the [`VerifiedBrowserKeys`] that verifying produces.
-//!
-//! `prepare_account_session`, the one caller that verifies, lands two PRs up.
-#![allow(dead_code)]
 
 use internet_identity_interface::internet_identity::types::{PublicKey, SessionKey};
 use p256::ecdsa::signature::Verifier;
