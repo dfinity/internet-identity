@@ -26,11 +26,17 @@
 
   // Read from this browser's own key record rather than from the canister, which has no
   // way to tell which browser is asking: `identity_info` is signed by an access method.
+  // `thisBrowserId` stays `undefined` both before the read finishes and when there is no
+  // record, so the two are tracked apart: without that, a browser that does have a record
+  // renders twice for as long as the read takes — once as the synthetic row below, once
+  // as its own.
   let thisBrowserId = $state<number | undefined>(undefined);
+  let browserIdRead = $state(false);
   $effect(() => {
-    void currentBrowserId($authenticatedStore.identityNumber).then(
-      (id) => (thisBrowserId = id),
-    );
+    void currentBrowserId($authenticatedStore.identityNumber).then((id) => {
+      thisBrowserId = id;
+      browserIdRead = true;
+    });
   });
 
   // What this browser is, resolved locally. Needed even when the canister holds no record
@@ -52,7 +58,9 @@
   // is on screen, and it just has not signed in to an app yet. It reads as signed out,
   // because it is, and describing it takes no canister data.
   const unrecorded = $derived<Browser | undefined>(
-    stored.some((browser) => browser.isCurrent) || thisDescription === undefined
+    !browserIdRead ||
+      stored.some((browser) => browser.isCurrent) ||
+      thisDescription === undefined
       ? undefined
       : {
           id: NO_RECORD_ID,
