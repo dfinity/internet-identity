@@ -3,11 +3,15 @@ import "fake-indexeddb/auto";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import {
-  INACTIVE_AFTER_DAYS,
+  HIDDEN_AFTER_DAYS,
+  SIGNED_OUT_AFTER_DAYS,
+  brandNameOf,
   fromCanisterBrowsers,
-  inactiveDays,
+  groupBrowsers,
+  isSignedOut,
   kindOf,
   nameOf,
+  platformWordOf,
   signOutBrowser,
 } from "./browsers";
 import type {
@@ -37,43 +41,6 @@ const browser = (
   last_used: lastUsedNanos,
 });
 
-describe("nameOf", () => {
-  /// Pinned, because these strings are what a user reads to recognise their own browser:
-  /// a token resolving to a different word is a row they no longer know themselves by.
-  it.each([
-    [describing({ Chrome: null }, { Android: null }), "Chrome on Android"],
-    [describing({ Safari: null }, { Ios: null }), "Safari on iPhone"],
-    [describing({ Safari: null }, { Ipados: null }), "Safari on iPad"],
-    [describing({ Safari: null }, { Macos: null }), "Safari on Mac"],
-    [describing({ Edge: null }, { Windows: null }), "Edge on Windows"],
-    [describing({ Chrome: null }, { ChromeOs: null }), "Chrome on Chromebook"],
-    [
-      describing({ SamsungInternet: null }, { Android: null }),
-      "Samsung Internet on Android",
-    ],
-  ])("names %o as %s", (description, expected) => {
-    expect(nameOf(description)).toBe(expected);
-  });
-
-  /// What the owner recognises. The platform word only stands in where no model came.
-  it("names the hardware where the client could name it", () => {
-    expect(
-      nameOf(describing({ Chrome: null }, { Android: null }, ["Pixel 9"])),
-    ).toBe("Chrome on Pixel 9");
-  });
-
-  /// A browser or system this frontend does not name is the row the list exists for, so
-  /// it shows the token that arrived rather than a generic word.
-  it("shows an unrecognised token as it arrived", () => {
-    expect(
-      nameOf(describing({ Other: "YaBrowser" }, { Other: "HarmonyOS" })),
-    ).toBe("YaBrowser on HarmonyOS");
-    expect(nameOf(describing({ Other: "Vivaldi" }, { Linux: null }))).toBe(
-      "Vivaldi on Linux",
-    );
-  });
-});
-
 describe("kindOf", () => {
   const withFormFactor = (form_factor: BrowserDescription["form_factor"]) => ({
     ...CHROME_ON_A_MAC,
@@ -90,31 +57,158 @@ describe("kindOf", () => {
   });
 });
 
-describe("inactiveDays", () => {
+describe("brandNameOf and platformWordOf", () => {
+  /// Pinned, because these strings are what a user reads to recognise their own browser:
+  /// a token resolving to a different word is a row they no longer know themselves by.
+  /// The row carries the brand, the group heading the platform.
+  it.each([
+    [describing({ Chrome: null }, { Android: null }), "Chrome", "Android"],
+    [describing({ Safari: null }, { Ios: null }), "Safari", "iPhone"],
+    [describing({ Safari: null }, { Ipados: null }), "Safari", "iPad"],
+    [describing({ Safari: null }, { Macos: null }), "Safari", "Mac"],
+    [describing({ Edge: null }, { Windows: null }), "Edge", "Windows"],
+    [describing({ Chrome: null }, { ChromeOs: null }), "Chrome", "Chromebook"],
+    [
+      describing({ SamsungInternet: null }, { Android: null }),
+      "Samsung Internet",
+      "Android",
+    ],
+  ])("splits %o into %s and %s", (description, brand, platform) => {
+    expect(brandNameOf(description)).toBe(brand);
+    expect(platformWordOf(description)).toBe(platform);
+  });
+
+  /// A browser or system this frontend does not name is the row the list exists for, so
+  /// it shows the token that arrived rather than a generic word.
+  it("shows an unrecognised token as it arrived", () => {
+    const unknown = describing({ Other: "YaBrowser" }, { Other: "HarmonyOS" });
+    expect(brandNameOf(unknown)).toBe("YaBrowser");
+    expect(platformWordOf(unknown)).toBe("HarmonyOS");
+  });
+
+  /// The model names the machine in prose, but never the group: two machines of one make
+  /// report the same thing, which is why the heading hedges with "device(s)" instead.
+  it("keeps the model out of the platform word", () => {
+    const pixel = describing({ Chrome: null }, { Android: null }, ["Pixel 9"]);
+    expect(platformWordOf(pixel)).toBe("Android");
+    expect(nameOf(pixel)).toBe("Chrome on Pixel 9");
+  });
+});
+
+describe("isSignedOut", () => {
   const DAY = 86_400_000;
   const now = Date.UTC(2026, 0, 31);
-  const lastUsed = (daysAgo: number) =>
+  const idle = (daysAgo: number, sessionCount: number) =>
     fromCanisterBrowsers([
-      [browser(1, BigInt(now - daysAgo * DAY) * BigInt(1_000_000))],
+      [
+        {
+          ...browser(1, BigInt(now - daysAgo * DAY) * BigInt(1_000_000)),
+          session_count: sessionCount,
+        },
+      ],
     ])[0];
 
-  it("says nothing about a browser used within the window", () => {
-    expect(
-      inactiveDays(lastUsed(INACTIVE_AFTER_DAYS - 1), now),
-    ).toBeUndefined();
+  it("holds a browser with a live session signed in", () => {
+    expect(isSignedOut(idle(SIGNED_OUT_AFTER_DAYS - 1, 2), now)).toBe(false);
   });
 
-  it("counts whole days once the window has passed", () => {
-    expect(inactiveDays(lastUsed(INACTIVE_AFTER_DAYS), now)).toBe(
-      INACTIVE_AFTER_DAYS,
+  it("counts a browser with no stored session as signed out", () => {
+    expect(isSignedOut(idle(0, 0), now)).toBe(true);
+  });
+
+  /// Every session such a browser opened is past MAX_SESSION_TTL_NS, so a count above
+  /// zero here only means no write has pruned them yet.
+  it("counts a browser idle past the window as signed out whatever the count says", () => {
+    expect(isSignedOut(idle(SIGNED_OUT_AFTER_DAYS, 5), now)).toBe(true);
+  });
+});
+
+describe("groupBrowsers", () => {
+  const DAY = 86_400_000;
+  const now = Date.UTC(2026, 0, 31);
+  const at = (
+    id: number,
+    daysAgo: number,
+    description: BrowserDescription,
+  ) => ({
+    ...browser(id, BigInt(now - daysAgo * DAY) * BigInt(1_000_000)),
+    description,
+    session_count: 1,
+  });
+  const CHROME_ON_WINDOWS = describing({ Chrome: null }, { Windows: null });
+  const SAFARI_ON_IPHONE = describing({ Safari: null }, { Ios: null });
+
+  it("groups browsers by the platform they run on", () => {
+    const groups = groupBrowsers(
+      fromCanisterBrowsers([
+        [
+          at(1, 5, CHROME_ON_A_MAC),
+          at(2, 1, CHROME_ON_WINDOWS),
+          at(3, 3, describing({ Safari: null }, { Macos: null })),
+        ],
+      ]),
+      now,
     );
-    expect(inactiveDays(lastUsed(90), now)).toBe(90);
+
+    expect(
+      groups.map((group) => [
+        group.platform,
+        group.browsers.map((entry) => entry.id),
+      ]),
+    ).toEqual([
+      ["Windows", [2]],
+      ["Mac", [3, 1]],
+    ]);
   });
 
-  it("rounds down, so a browser is never reported as idle for longer than it was", () => {
-    expect(
-      inactiveDays({ ...lastUsed(45), lastUsedMillis: now - 45.9 * DAY }, now),
-    ).toBe(45);
+  /// The group the user is looking at comes first, and so does the row they are on.
+  it("orders groups and rows by most recent use", () => {
+    const groups = groupBrowsers(
+      fromCanisterBrowsers([
+        [at(1, 10, CHROME_ON_A_MAC), at(2, 2, SAFARI_ON_IPHONE)],
+      ]),
+      now,
+    );
+
+    expect(groups.map((group) => group.platform)).toEqual(["iPhone", "Mac"]);
+  });
+
+  it("heads the group with the glyph of its platform", () => {
+    const [group] = groupBrowsers(
+      fromCanisterBrowsers([
+        [
+          {
+            ...at(1, 1, SAFARI_ON_IPHONE),
+            description: { ...SAFARI_ON_IPHONE, form_factor: { Mobile: null } },
+          },
+        ],
+      ]),
+      now,
+    );
+
+    expect(group.kind).toBe("phone");
+  });
+
+  /// Nothing can be signed out on a browser this idle, and keeping it buries the rows
+  /// that can.
+  it("leaves out a browser idle past the hiding window", () => {
+    const groups = groupBrowsers(
+      fromCanisterBrowsers([
+        [at(1, HIDDEN_AFTER_DAYS, CHROME_ON_A_MAC), at(2, 1, SAFARI_ON_IPHONE)],
+      ]),
+      now,
+    );
+
+    expect(groups.map((group) => group.platform)).toEqual(["iPhone"]);
+  });
+
+  it("keeps a browser one day short of it", () => {
+    const groups = groupBrowsers(
+      fromCanisterBrowsers([[at(1, HIDDEN_AFTER_DAYS - 1, CHROME_ON_A_MAC)]]),
+      now,
+    );
+
+    expect(groups.map((group) => group.platform)).toEqual(["Mac"]);
   });
 });
 
