@@ -39,13 +39,11 @@ describe("nameOf", () => {
     [describing({ Safari: null }, { Ipados: null }), "Safari on iPad"],
     [describing({ Safari: null }, { Macos: null }), "Safari on Mac"],
     [describing({ Edge: null }, { Windows: null }), "Edge on Windows"],
-    [describing({ Vivaldi: null }, { Linux: null }), "Vivaldi on Linux"],
     [describing({ Chrome: null }, { ChromeOs: null }), "Chrome on Chromebook"],
     [
       describing({ SamsungInternet: null }, { Android: null }),
       "Samsung Internet on Android",
     ],
-    [describing({ Brave: null }, { Macos: null }), "Brave on Mac"],
   ])("names %o as %s", (description, expected) => {
     expect(nameOf(description)).toBe(expected);
   });
@@ -63,6 +61,9 @@ describe("nameOf", () => {
     expect(
       nameOf(describing({ Other: "YaBrowser" }, { Other: "HarmonyOS" })),
     ).toBe("YaBrowser on HarmonyOS");
+    expect(nameOf(describing({ Other: "Vivaldi" }, { Linux: null }))).toBe(
+      "Vivaldi on Linux",
+    );
   });
 });
 
