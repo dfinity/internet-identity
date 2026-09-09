@@ -166,7 +166,7 @@ const AGENTS: [
     "Vivaldi on Linux",
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Vivaldi/6.7.3329.41",
     0,
-    { Vivaldi: null },
+    { Other: "Vivaldi" },
     { Linux: null },
     { Desktop: null },
   ],
@@ -196,7 +196,7 @@ const stub = (props: Record<string, unknown>): void => {
 
 describe("describeBrowser", () => {
   afterEach(() => {
-    stub({ userAgentData: undefined, brave: undefined });
+    stub({ userAgentData: undefined });
   });
 
   it.each(AGENTS)(
@@ -281,36 +281,6 @@ describe("describeBrowser", () => {
         form_factor: { Tablet: null },
       });
     }
-  });
-
-  /// Brave sends a plain Chrome agent and strips the hints that would give it away, so
-  /// without asking it directly its owner sees a row that says Chrome.
-  it("names Brave, which its agent does not", async () => {
-    stub({
-      userAgent:
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-      maxTouchPoints: 0,
-      brave: { isBrave: () => Promise.resolve(true) },
-    });
-
-    await expect(describeBrowser()).resolves.toMatchObject({
-      brand: { Brave: null },
-      os: { Macos: null },
-    });
-  });
-
-  it("reads a browser that refuses the Brave question as its agent says", async () => {
-    stub({
-      userAgent: FIREFOX_MAC,
-      maxTouchPoints: 0,
-      brave: {
-        isBrave: () => Promise.reject(new Error("no")),
-      },
-    });
-
-    await expect(describeBrowser()).resolves.toMatchObject({
-      brand: { Firefox: null },
-    });
   });
 
   /// The canister refuses a token over its cap, so a resolver must never offer one.

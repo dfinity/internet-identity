@@ -31,8 +31,8 @@ const BRANDS: [RegExp, BrowserBrand][] = [
   [/EdgA\/|Edg\//, { Edge: null }],
   [/OPR\//, { Opera: null }],
   [/SamsungBrowser\//, { SamsungInternet: null }],
-  [/Vivaldi\//, { Vivaldi: null }],
   // Names itself but has no variant of its own, so it travels as the token it gave.
+  [/Vivaldi\//, { Other: "Vivaldi" }],
   [/DuckDuckGo\//, { Other: "DuckDuckGo" }],
   [/Chrome\//, { Chrome: null }],
   [/Safari\//, { Safari: null }],
@@ -48,30 +48,8 @@ const capped = (token: string): string => {
   return capped;
 };
 
-/**
- * Brave ships a plain Chrome agent on purpose and strips the hints that would give it
- * away, so its own check is the only thing that names it. A browser that hides is worth
- * asking directly, because otherwise its owner sees a row that says Chrome.
- */
-const isBrave = async (): Promise<boolean> => {
-  const brave = (
-    navigator as Navigator & { brave?: { isBrave?: () => Promise<boolean> } }
-  ).brave;
-  try {
-    return (await brave?.isBrave?.()) === true;
-  } catch {
-    return false;
-  }
-};
-
-const brandOf = async (agent: string): Promise<BrowserBrand> => {
-  if (await isBrave()) {
-    return { Brave: null };
-  }
-  return (
-    BRANDS.find(([token]) => token.test(agent))?.[1] ?? { Other: capped(agent) }
-  );
-};
+const brandOf = (agent: string): BrowserBrand =>
+  BRANDS.find(([token]) => token.test(agent))?.[1] ?? { Other: capped(agent) };
 
 const systemOf = (agent: string, touchPoints: number): OperatingSystem => {
   if (/CrOS/.test(agent)) return { ChromeOs: null };
@@ -154,7 +132,7 @@ export const describeBrowser = async (): Promise<BrowserDescription> => {
   const hints = await highEntropyHints();
   const os = systemOf(agent, navigator.maxTouchPoints);
   return {
-    brand: await brandOf(agent),
+    brand: brandOf(agent),
     os,
     form_factor: formFactorOf(agent, os, hints),
     model: hints.model === undefined ? [] : [capped(hints.model)],
