@@ -2,6 +2,7 @@ import { expect } from "@playwright/test";
 import { test } from "../../../fixtures";
 import { TEST_APP_CANONICAL_URL } from "../../../utils";
 import {
+  confirmSignOut,
   continueAs,
   listedBrowsers,
   openSettings,
@@ -60,10 +61,8 @@ test.describe("ending a session", () => {
           identities[0].identityNumber,
           signInWithIdentity,
         );
-        await settings
-          .getByRole("button", { name: "Sign out" })
-          .first()
-          .click();
+        await listedBrowsers(settings).first().click();
+        await confirmSignOut(settings);
         await expect(settings.getByText("Signed out")).toBeVisible();
         await settings.close();
 
