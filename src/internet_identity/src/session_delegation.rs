@@ -61,7 +61,7 @@ pub fn prepare_session_delegation(
 
     state::signature_map_mut(|sigs| {
         // Unrestricted: session delegations have no read-only option.
-        add_delegation_signature(sigs, session_key, &seed, expiration, None);
+        add_delegation_signature(sigs, session_key, &seed, expiration, None, None);
     });
     update_root_hash();
 
