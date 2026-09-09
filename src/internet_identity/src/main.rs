@@ -1098,21 +1098,7 @@ mod v2_api {
             Some(stored_verified_emails)
         };
 
-        let stored_browsers: Vec<BrowserInfo> = state::anchor(identity_number)
-            .browsers()
-            .iter()
-            .map(|browser| BrowserInfo {
-                id: browser.id,
-                description: browser.description.clone(),
-                created_at: browser.created_at,
-                last_used: browser.last_used,
-            })
-            .collect();
-        let browsers = if stored_browsers.is_empty() {
-            None
-        } else {
-            Some(stored_browsers)
-        };
+        let browsers = state::anchor(identity_number).browsers_info();
 
         let identity_info = IdentityInfo {
             authn_methods: anchor_info
