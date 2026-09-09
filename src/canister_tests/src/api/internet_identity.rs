@@ -142,6 +142,22 @@ pub fn lookup(
     query_candid(env, canister_id, "lookup", (anchor_number,)).map(|(x,)| x)
 }
 
+pub fn lookup_caller_identity_by_recovery_phrase(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<Option<types::IdentityNumber>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "lookup_caller_identity_by_recovery_phrase",
+        (),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn get_anchor_credentials(
     env: &PocketIc,
     canister_id: CanisterId,

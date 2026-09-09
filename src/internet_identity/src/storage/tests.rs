@@ -5196,3 +5196,151 @@ mod account_principal_index_backfill_tests {
         );
     }
 }
+
+mod recovery_phrase_index_sweep_tests {
+    use super::*;
+    use crate::storage::anchor::Device;
+    use crate::storage::RecoveryPhraseIndexSweep;
+    use candid::Principal;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::{AnchorNumber, KeyType, PublicKey};
+    use pretty_assertions::assert_eq;
+
+    fn pubkey(n: u8) -> PublicKey {
+        vec![n; 32].into()
+    }
+
+    fn seed_phrase_device(pubkey: PublicKey) -> Device {
+        Device {
+            pubkey,
+            alias: "seed".to_string(),
+            credential_id: None,
+            aaguid: None,
+            purpose: Purpose::Recovery,
+            key_type: KeyType::SeedPhrase,
+            protection: DeviceProtection::Unprotected,
+            origin: None,
+            metadata: None,
+            last_usage_timestamp: None,
+        }
+    }
+
+    /// Anchors holding a recovery key with no index entry, which is the state of every
+    /// anchor not written since the index was introduced.
+    fn storage_with_unindexed_anchors(count: u8) -> (Storage<VectorMemory>, Vec<AnchorNumber>) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        let mut anchor_numbers = vec![];
+        for index in 0..count {
+            let mut anchor = storage.allocate_anchor(0).unwrap();
+            anchor
+                .add_device(seed_phrase_device(pubkey(index)))
+                .unwrap();
+            anchor_numbers.push(anchor.anchor_number());
+            storage.write(anchor).unwrap();
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .remove(&Principal::self_authenticating(pubkey(index)));
+        }
+        (storage, anchor_numbers)
+    }
+
+    #[test]
+    fn indexes_recovery_keys_that_predate_the_index() {
+        let (mut storage, anchor_numbers) = storage_with_unindexed_anchors(3);
+
+        let sweep = storage.sweep_recovery_phrase_principal_index_batch(Default::default(), 100);
+
+        assert_eq!(sweep.indexed, 3);
+        assert_eq!(sweep.collisions, 0);
+        assert!(sweep.is_done);
+        for (index, anchor_number) in anchor_numbers.into_iter().enumerate() {
+            assert_eq!(
+                storage.lookup_anchor_with_pubkey(&pubkey(index as u8)),
+                Some(anchor_number)
+            );
+        }
+    }
+
+    #[test]
+    fn resumes_where_the_previous_batch_stopped() {
+        let (mut storage, anchor_numbers) = storage_with_unindexed_anchors(3);
+
+        let first = storage.sweep_recovery_phrase_principal_index_batch(Default::default(), 2);
+        assert_eq!(first.indexed, 2);
+        assert!(!first.is_done);
+        assert_eq!(first.resume_from, Some(anchor_numbers[1] + 1));
+
+        let second = storage.sweep_recovery_phrase_principal_index_batch(first, 2);
+        assert_eq!(second.indexed, 3);
+        assert!(second.is_done);
+        assert_eq!(second.resume_from, None);
+    }
+
+    #[test]
+    fn leaves_a_principal_claimed_by_another_anchor_alone() {
+        let (mut storage, anchor_numbers) = storage_with_unindexed_anchors(1);
+        let squatter = anchor_numbers[0] + 7;
+        storage
+            .lookup_anchor_with_recovery_phrase_principal_memory
+            .insert(Principal::self_authenticating(pubkey(0)), squatter);
+
+        let sweep = storage.sweep_recovery_phrase_principal_index_batch(Default::default(), 100);
+
+        assert_eq!(sweep.indexed, 0);
+        assert_eq!(sweep.collisions, 1);
+        assert!(sweep.is_done);
+        assert_eq!(
+            storage.lookup_anchor_with_pubkey(&pubkey(0)),
+            Some(squatter)
+        );
+    }
+
+    #[test]
+    fn running_again_writes_the_same_entries() {
+        let (mut storage, _) = storage_with_unindexed_anchors(3);
+
+        let first = storage.sweep_recovery_phrase_principal_index_batch(Default::default(), 100);
+        let second = storage
+            .sweep_recovery_phrase_principal_index_batch(RecoveryPhraseIndexSweep::default(), 100);
+
+        assert_eq!(first.indexed, 3);
+        assert_eq!(second.indexed, 0);
+        assert_eq!(second.collisions, 0);
+        assert!(second.is_done);
+    }
+
+    #[test]
+    fn a_batch_that_examines_nothing_is_not_done() {
+        let (mut storage, _) = storage_with_unindexed_anchors(3);
+
+        let sweep = storage.sweep_recovery_phrase_principal_index_batch(Default::default(), 0);
+
+        assert_eq!(sweep.indexed, 0);
+        assert!(!sweep.is_done);
+        assert_eq!(sweep.resume_from, None);
+    }
+
+    #[test]
+    fn a_canister_with_no_anchors_finishes_immediately() {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+
+        let sweep = storage.sweep_recovery_phrase_principal_index_batch(Default::default(), 100);
+
+        assert_eq!(sweep.indexed, 0);
+        assert!(sweep.is_done);
+    }
+
+    #[test]
+    fn a_finished_sweep_does_no_further_work() {
+        let (mut storage, _) = storage_with_unindexed_anchors(3);
+        let done = RecoveryPhraseIndexSweep {
+            is_done: true,
+            ..Default::default()
+        };
+
+        let sweep = storage.sweep_recovery_phrase_principal_index_batch(done, 100);
+
+        assert_eq!(sweep.indexed, 0);
+        assert_eq!(storage.lookup_anchor_with_pubkey(&pubkey(0)), None);
+    }
+}
