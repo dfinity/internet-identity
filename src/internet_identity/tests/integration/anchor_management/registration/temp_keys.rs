@@ -201,6 +201,33 @@ fn should_provide_temp_keys_metric() -> Result<(), RejectResponse> {
     Ok(())
 }
 
+#[test]
+fn should_not_register_a_pubkey_another_identity_already_uses() {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let existing = DeviceData {
+        credential_id: None,
+        ..device(3)
+    };
+    flows::register_anchor_with_device(&env, canister_id, &existing);
+
+    let challenge = api::create_challenge(&env, canister_id).unwrap();
+    let result = api::register(
+        &env,
+        canister_id,
+        existing.principal(),
+        &existing,
+        &challenge_solution(challenge),
+        None,
+    );
+
+    expect_user_error_with_message(
+        result,
+        ErrorCode::CanisterCalledTrap,
+        Regex::new("a device with this public key is already used").unwrap(),
+    );
+}
+
 fn register_with_temp_key(
     env: &PocketIc,
     canister_id: CanisterId,
