@@ -49,6 +49,7 @@ mod anchor_management;
 mod archive;
 mod assets;
 mod authz_utils;
+mod browser_key;
 
 mod attributes;
 /// Type conversions between internal and external types.
@@ -67,7 +68,6 @@ mod mcp_registration;
 
 mod openid;
 mod session_delegation;
-mod sessions;
 mod single_flight_cache;
 mod state;
 mod stats;
