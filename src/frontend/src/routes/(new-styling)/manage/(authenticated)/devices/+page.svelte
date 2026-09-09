@@ -12,6 +12,7 @@
   import DeviceRow from "./components/DeviceRow.svelte";
   import GroupHeading from "./components/GroupHeading.svelte";
   import {
+    NO_RECORD_ID,
     fromCanisterBrowsers,
     groupBrowsers,
     isSignedOut,
@@ -46,14 +47,15 @@
     fromCanisterBrowsers(data.identityInfo.browsers, thisBrowserId),
   );
 
-  // A browser with no record still gets a row, so the page never renders empty for
-  // someone reading it from a browser it would otherwise not know about. Given the
-  // timestamps of a browser that has just arrived, so it heads its own group.
+  // The browser being read from is always on this page, whether or not the canister
+  // holds a record for it: it has signed in to Internet Identity, which is how this page
+  // is on screen, and it just has not signed in to an app yet. It reads as signed out,
+  // because it is, and describing it takes no canister data.
   const unrecorded = $derived<Browser | undefined>(
     stored.some((browser) => browser.isCurrent) || thisDescription === undefined
       ? undefined
       : {
-          id: -1,
+          id: NO_RECORD_ID,
           name: nameOf(thisDescription),
           description: thisDescription,
           createdAtMillis: now,
@@ -75,20 +77,20 @@
   let confirming = $state<Browser | undefined>(undefined);
 
   const actionFor = (browser: Browser) =>
-    browser.id === -1
-      ? "none"
-      : signingOut === browser.id
-        ? "signing-out"
-        : signedOut.includes(browser.id) || isSignedOut(browser, now)
-          ? "signed-out"
-          : "sign-out";
+    signingOut === browser.id
+      ? "signing-out"
+      : signedOut.includes(browser.id) || isSignedOut(browser, now)
+        ? "signed-out"
+        : "sign-out";
 
+  // A browser with no record has no timestamps to format: it has never signed in to an
+  // app, and it arrived just now as far as this page can tell.
   const lastUsedOf = (browser: Browser): string =>
-    browser.id === -1
+    browser.id === NO_RECORD_ID
       ? $t`Never`
       : $formatRelative(new Date(browser.lastUsedMillis), { style: "long" });
   const firstSeenOf = (browser: Browser): string =>
-    browser.id === -1
+    browser.id === NO_RECORD_ID
       ? $t`Now`
       : $formatDate(new Date(browser.createdAtMillis), {
           month: "short",
@@ -134,6 +136,8 @@
 </header>
 
 <div class="mt-10 flex max-w-3xl flex-col gap-6">
+  <!-- No empty state: this browser is always one of the rows, so the only moment there
+       is nothing to draw is before it has described itself. -->
   {#if groups.length > 0}
     <div
       class="border-border-secondary bg-bg-primary flex flex-col overflow-hidden rounded-xl border"
@@ -167,12 +171,6 @@
           </ul>
         </section>
       {/each}
-    </div>
-  {:else}
-    <div
-      class="border-border-secondary text-text-tertiary rounded-xl border border-dashed p-6 text-center text-sm"
-    >
-      <Trans>No browsers are signed in to apps with this identity.</Trans>
     </div>
   {/if}
 

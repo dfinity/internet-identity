@@ -72,6 +72,13 @@ export const brandIconOf = (
   return file === undefined ? undefined : iconFor(file);
 };
 
+/**
+ * The id of the row for a browser the canister holds no record of — the one being read
+ * from, before it has signed in to an app. Outside `nat32`, so it cannot collide with a
+ * registered browser's id.
+ */
+export const NO_RECORD_ID = -1;
+
 const DAY_MILLIS = 86_400_000;
 
 /**
