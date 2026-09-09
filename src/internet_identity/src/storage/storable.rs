@@ -12,7 +12,6 @@ pub mod application;
 pub mod application_number;
 pub mod browser_id;
 pub mod credential_id;
-pub mod discrepancy_counter;
 pub mod duration;
 pub mod email_recovery_address_hash;
 pub mod email_recovery_credential;
