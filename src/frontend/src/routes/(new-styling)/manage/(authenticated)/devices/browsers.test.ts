@@ -84,7 +84,7 @@ describe("kindOf", () => {
     [withFormFactor({ Mobile: null }), "phone"],
     [withFormFactor({ Tablet: null }), "tablet"],
     [withFormFactor({ Desktop: null }), "laptop"],
-    [withFormFactor({ Other: "watch" }), "unknown"],
+    [withFormFactor({ Unknown: null }), "unknown"],
   ])("draws %o as a %s", (description, kind) => {
     expect(kindOf(description)).toBe(kind);
   });
@@ -93,11 +93,10 @@ describe("kindOf", () => {
 describe("inactiveDays", () => {
   const DAY = 86_400_000;
   const now = Date.UTC(2026, 0, 31);
-  const lastUsed = (daysAgo: number) => ({
-    ...fromCanisterBrowsers([
-      [browser(1, BigInt(now - daysAgo * DAY) * 1_000_000n)],
-    ])[0],
-  });
+  const lastUsed = (daysAgo: number) =>
+    fromCanisterBrowsers([
+      [browser(1, BigInt(now - daysAgo * DAY) * BigInt(1_000_000))],
+    ])[0];
 
   it("says nothing about a browser used within the window", () => {
     expect(
