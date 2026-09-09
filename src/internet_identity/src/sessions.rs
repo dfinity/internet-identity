@@ -421,7 +421,7 @@ pub fn check_session() -> bool {
 
 /// Signs the caller's own session out. A caller cannot produce another session's
 /// principal, so the seed match is the whole authorization. Always succeeds.
-pub fn app_revoke_session() {
+pub fn app_revoke_session(now: Timestamp) {
     // Matched rather than authorized: a session past its bounds is still the caller's to
     // sign out, and refusing here would leave its record and index entry behind.
     let Ok((key, _, _)) = match_session() else {
@@ -430,7 +430,7 @@ pub fn app_revoke_session() {
     // Trapping rather than reporting success: the caller is told nothing either way, so a
     // storage failure that left the session live would end as a silent no-op. A trap rolls
     // the message back and reaches the caller as a reject.
-    storage_borrow_mut(|storage| storage.revoke_session(&key))
+    storage_borrow_mut(|storage| storage.revoke_session(&key, now))
         .expect("failed to revoke a session that was just matched");
 }
 
@@ -458,12 +458,13 @@ fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {
 
 pub fn revoke_browser_sessions(
     request: RevokeBrowserSessionsRequest,
+    now: Timestamp,
 ) -> Result<(), SessionRevokeError> {
     check_authorization(request.identity_number)
         .map_err(|err| SessionRevokeError::Unauthorized(err.principal))?;
 
     storage_borrow_mut(|storage| {
-        storage.revoke_browser_sessions(request.identity_number, request.browser_id)
+        storage.revoke_browser_sessions(request.identity_number, request.browser_id, now)
     })
     .map(|_| ())
     .map_err(|err| SessionRevokeError::InternalCanisterError(err.to_string()))
