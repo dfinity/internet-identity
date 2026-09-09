@@ -1,4 +1,4 @@
-use crate::storage::account::SessionRecord;
+use crate::storage::account::Session;
 use crate::storage::storable::browser_id::StorableBrowserId;
 use crate::storage::storable::duration::StorableDuration;
 use crate::storage::storable::timestamp::StorableTimestamp;
@@ -9,7 +9,7 @@ use std::borrow::Cow;
 
 #[derive(Encode, Decode, Clone, Debug, Ord, Eq, PartialEq, PartialOrd)]
 #[cbor(map)]
-pub struct StorableSessionRecord {
+pub struct StorableSession {
     #[n(0)]
     pub created_at_ns: StorableTimestamp,
     #[n(1)]
@@ -24,23 +24,23 @@ pub struct StorableSessionRecord {
     pub read_only: bool,
 }
 
-impl Storable for StorableSessionRecord {
+impl Storable for StorableSession {
     fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buffer = Vec::new();
-        minicbor::encode(self, &mut buffer).expect("failed to encode StorableSessionRecord");
+        minicbor::encode(self, &mut buffer).expect("failed to encode StorableSession");
         Cow::Owned(buffer)
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        minicbor::decode(&bytes).expect("failed to decode StorableSessionRecord")
+        minicbor::decode(&bytes).expect("failed to decode StorableSession")
     }
 
     const BOUND: Bound = Bound::Unbounded;
 }
 
-impl From<StorableSessionRecord> for SessionRecord {
-    fn from(value: StorableSessionRecord) -> Self {
-        SessionRecord {
+impl From<StorableSession> for Session {
+    fn from(value: StorableSession) -> Self {
+        Session {
             created_at_ns: value.created_at_ns,
             valid_till_ns: value.valid_till_ns,
             last_refreshed_ns: value.last_refreshed_ns,
@@ -51,9 +51,9 @@ impl From<StorableSessionRecord> for SessionRecord {
     }
 }
 
-impl From<SessionRecord> for StorableSessionRecord {
-    fn from(value: SessionRecord) -> Self {
-        StorableSessionRecord {
+impl From<Session> for StorableSession {
+    fn from(value: Session) -> Self {
+        StorableSession {
             created_at_ns: value.created_at_ns,
             valid_till_ns: value.valid_till_ns,
             last_refreshed_ns: value.last_refreshed_ns,
