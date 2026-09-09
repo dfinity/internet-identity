@@ -76,9 +76,9 @@ const CHROME_ON_A_MAC: BrowserDescription = {
   model: [],
 };
 
-const BRAVE_ON_A_MAC: BrowserDescription = {
+const FIREFOX_ON_A_MAC: BrowserDescription = {
   ...CHROME_ON_A_MAC,
-  brand: { Brave: null },
+  brand: { Firefox: null },
 };
 
 /** Signs in and rotates, the way a successful ceremony does. */
@@ -267,7 +267,7 @@ describe("browser key", () => {
   it("signs in with a new key pair once the description changes", async () => {
     const first = await signIn(IDENTITY, 1, 1, CHROME_ON_A_MAC);
 
-    const second = await signIn(IDENTITY, 2, 2, BRAVE_ON_A_MAC);
+    const second = await signIn(IDENTITY, 2, 2, FIREFOX_ON_A_MAC);
 
     expect(second.publicKey).not.toEqual(first.publicKey);
     expect(second.publicKey).not.toEqual(first.nextPublicKey);
@@ -286,9 +286,9 @@ describe("browser key", () => {
   /// per change rather than once per sign-in.
   it("settles on the new description after it has changed", async () => {
     await signIn(IDENTITY, 1, 1, CHROME_ON_A_MAC);
-    const forked = await signIn(IDENTITY, 2, 2, BRAVE_ON_A_MAC);
+    const forked = await signIn(IDENTITY, 2, 2, FIREFOX_ON_A_MAC);
 
-    const after = await signIn(IDENTITY, 3, 2, BRAVE_ON_A_MAC);
+    const after = await signIn(IDENTITY, 3, 2, FIREFOX_ON_A_MAC);
 
     expect(after.publicKey).toEqual(forked.nextPublicKey);
   });
