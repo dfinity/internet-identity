@@ -869,11 +869,6 @@ fn a_drifted_account_counter_is_not_repaired_and_costs_the_identity_its_limit() 
         )
     });
 
-    // There used to be a rebuild here that noticed and corrected it. The write path
-    // derives the counter now, so nothing maintains it by hand and nothing can drift it —
-    // and carrying a repair path for a state that can no longer arise is not worth the one
-    // counter of four it covered. The accepted cost, written down so it is not rediscovered
-    // as a bug: an identity whose counter ever did drift high cannot name another account.
     assert_eq!(
         create_account_for_origin(
             anchor.anchor_number(),
