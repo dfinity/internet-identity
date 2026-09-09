@@ -559,6 +559,43 @@ export const idlFactory = ({ IDL }) => {
     'address' : IDL.Text,
     'last_used' : IDL.Opt(Timestamp),
   });
+  const OperatingSystem = IDL.Variant({
+    'Ios' : IDL.Null,
+    'Linux' : IDL.Null,
+    'Android' : IDL.Null,
+    'Macos' : IDL.Null,
+    'ChromeOs' : IDL.Null,
+    'Windows' : IDL.Null,
+    'Other' : IDL.Text,
+    'Ipados' : IDL.Null,
+  });
+  const FormFactor = IDL.Variant({
+    'Unknown' : IDL.Null,
+    'Tablet' : IDL.Null,
+    'Desktop' : IDL.Null,
+    'Mobile' : IDL.Null,
+  });
+  const BrowserBrand = IDL.Variant({
+    'Edge' : IDL.Null,
+    'Firefox' : IDL.Null,
+    'Safari' : IDL.Null,
+    'SamsungInternet' : IDL.Null,
+    'Opera' : IDL.Null,
+    'Other' : IDL.Text,
+    'Chrome' : IDL.Null,
+  });
+  const BrowserDescription = IDL.Record({
+    'os' : OperatingSystem,
+    'model' : IDL.Opt(IDL.Text),
+    'form_factor' : FormFactor,
+    'brand' : BrowserBrand,
+  });
+  const BrowserInfo = IDL.Record({
+    'id' : IDL.Nat32,
+    'description' : BrowserDescription,
+    'created_at' : Timestamp,
+    'last_used' : Timestamp,
+  });
   const McpConfig = IDL.Record({
     'url' : IDL.Opt(IDL.Text),
     'enabled' : IDL.Bool,
@@ -575,6 +612,7 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Opt(IDL.Text),
     'email_recovery' : IDL.Opt(IDL.Vec(EmailRecoveryCredential)),
     'created_at' : IDL.Opt(Timestamp),
+    'browsers' : IDL.Opt(IDL.Vec(BrowserInfo)),
     'mcp_config' : IDL.Opt(McpConfig),
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),

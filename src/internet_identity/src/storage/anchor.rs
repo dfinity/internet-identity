@@ -2,6 +2,8 @@ use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
+use crate::storage::storable::browser::StorableBrowser;
+use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
@@ -38,9 +40,85 @@ pub struct Anchor {
     pub(crate) email_recovery: Vec<EmailRecoveryCredential>,
     /// Capped by `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
     pub(crate) verified_emails: Vec<VerifiedEmail>,
+    /// Capped by `MAX_BROWSERS`.
+    pub(crate) browsers: Vec<Browser>,
+    pub(crate) next_browser_id: BrowserId,
     pub(crate) metadata: Option<HashMap<String, MetadataEntry>>,
     pub(crate) name: Option<String>,
     pub(crate) created_at: Option<Timestamp>,
+}
+
+/// Bounds the device list, which rides on the anchor blob.
+pub const MAX_BROWSERS: usize = 20;
+
+/// Why a browser's presented keys cannot be resolved.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BrowserError {
+    /// The announced successor is a key another browser of this anchor already holds.
+    ///
+    /// Presented keys are visible on the wire, so without this a caller could announce a
+    /// key another browser is about to present and take over its entry when it does.
+    SuccessorAlreadyInUse,
+    /// The announced successor is the key being presented.
+    ///
+    /// Rotation is what stops a leaked key from being useful for longer than one sign-in,
+    /// so a browser that named itself its own successor would keep the key alive for as
+    /// long as it kept asking — and whoever leaked it would too.
+    SuccessorMatchesCurrent,
+    /// The presented key is one this anchor has already retired: an entry holds it as the
+    /// key it was last proven with, and now awaits that entry's successor.
+    ///
+    /// A browser reaches this only when it never learned that its last sign-in succeeded,
+    /// so it is still proving with the key it announced a successor for. The answer is for
+    /// the browser to promote its own successor and present that — it is the only party
+    /// holding both keys. Registering it as a new browser instead would turn every dropped
+    /// response into a second list for one browser, and accepting it would leave a leaked
+    /// key useful for longer than the one sign-in rotation allows it.
+    StaleBrowserKey,
+}
+
+/// A browser this anchor has signed in from, as it described itself when it registered.
+///
+/// The description is fixed at registration: a sign-in that reports something else is
+/// treated as a browser this anchor has not seen, and the client is the party that
+/// decides so by presenting a key pair no entry holds.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Browser {
+    pub id: BrowserId,
+    /// The browser's own public key, DER-encoded. What the entry is looked up by.
+    pub current_browser_key: PublicKey,
+    /// The successor the browser announced at its last sign-in, also accepted as a proof.
+    pub next_browser_key: PublicKey,
+    /// What this browser reported about itself when it registered.
+    pub description: BrowserDescription,
+    pub created_at: Timestamp,
+    pub last_used: Timestamp,
+}
+
+impl From<StorableBrowser> for Browser {
+    fn from(value: StorableBrowser) -> Self {
+        Browser {
+            id: value.id,
+            current_browser_key: ByteBuf::from(value.current_browser_key),
+            next_browser_key: ByteBuf::from(value.next_browser_key),
+            description: BrowserDescription::from(value.description),
+            created_at: value.created_at,
+            last_used: value.last_used,
+        }
+    }
+}
+
+impl From<Browser> for StorableBrowser {
+    fn from(value: Browser) -> Self {
+        StorableBrowser {
+            id: value.id,
+            current_browser_key: value.current_browser_key.into_vec(),
+            next_browser_key: value.next_browser_key.into_vec(),
+            description: StorableBrowserDescription::from(value.description),
+            created_at: value.created_at,
+            last_used: value.last_used,
+        }
+    }
 }
 
 impl Device {
@@ -175,6 +253,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             openid_credentials,
             email_recovery,
             verified_emails,
+            browsers,
+            next_browser_id,
             metadata,
             name,
             created_at,
@@ -194,6 +274,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 .map(StorableVerifiedEmail::from)
                 .collect(),
         );
+        let next_browser_id = Some(next_browser_id);
+        let browsers = Some(browsers.into_iter().map(StorableBrowser::from).collect());
 
         let (mut passkey_credentials, mut recovery_keys, mut recovery_devices) =
             (vec![], vec![], vec![]);
@@ -433,6 +515,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 recovery_keys,
                 email_recovery,
                 verified_emails,
+                browsers,
+                next_browser_id,
             },
         )
     }
@@ -448,6 +532,8 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             recovery_keys,
             email_recovery,
             verified_emails,
+            browsers,
+            next_browser_id,
         } = storable_anchor;
 
         let name = name.clone();
@@ -466,6 +552,12 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             .into_iter()
             .map(VerifiedEmail::from)
             .collect();
+        let browsers = browsers
+            .unwrap_or_default()
+            .into_iter()
+            .map(Browser::from)
+            .collect();
+        let next_browser_id = next_browser_id.unwrap_or_default();
 
         let mut devices = passkey_credentials
             .unwrap_or_default()
@@ -560,6 +652,8 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             openid_credentials,
             email_recovery,
             verified_emails,
+            browsers,
+            next_browser_id,
             devices,
             metadata,
         }
@@ -586,6 +680,8 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
                 openid_credentials: vec![],
                 email_recovery: vec![],
                 verified_emails: vec![],
+                browsers: vec![],
+                next_browser_id: 0,
                 anchor_number,
                 devices,
                 metadata,
@@ -612,6 +708,12 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
             .into_iter()
             .map(VerifiedEmail::from)
             .collect();
+        let browsers = storable_anchor
+            .browsers
+            .unwrap_or_default()
+            .into_iter()
+            .map(Browser::from)
+            .collect();
 
         Anchor {
             anchor_number,
@@ -619,6 +721,8 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
             openid_credentials,
             email_recovery,
             verified_emails,
+            browsers,
+            next_browser_id: storable_anchor.next_browser_id.unwrap_or_default(),
             metadata,
             name,
             created_at,
@@ -627,6 +731,127 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
 }
 
 impl Anchor {
+    pub fn browsers(&self) -> &[Browser] {
+        &self.browsers
+    }
+
+    /// What a caller outside storage may know about this anchor's browsers: an
+    /// identifier, what the browser said it was, and when. The keys stay here — they
+    /// are how a sign-in proves which entry it is, so handing them out would let
+    /// anyone who can read an identity's browsers claim one.
+    ///
+    /// `None` rather than an empty list, because that is the shape the interface
+    /// carries and no caller wants the difference.
+    pub fn browsers_info(&self) -> Option<Vec<BrowserInfo>> {
+        if self.browsers.is_empty() {
+            return None;
+        }
+        Some(
+            self.browsers
+                .iter()
+                .map(|browser| BrowserInfo {
+                    id: browser.id,
+                    description: browser.description.clone(),
+                    created_at: browser.created_at,
+                    last_used: browser.last_used,
+                })
+                .collect(),
+        )
+    }
+
+    /// Resolves the browser a sign-in came from by the public key it proved possession of.
+    ///
+    /// An entry is reached only by the successor it announced. Presenting it promotes that
+    /// successor, retires the key it replaces, and leaves the entry awaiting
+    /// `next_browser_key` — what the browser presents at its next sign-in. A key some entry
+    /// has already retired is refused with [`BrowserError::StaleBrowserKey`] rather
+    /// than accepted or registered afresh, so a key is good for exactly one sign-in and a
+    /// browser that lost a response is told to promote its own successor instead of
+    /// becoming a second list. A key no entry holds at all registers a new browser.
+    ///
+    /// `description` is taken only where this registers a new browser. An entry that is
+    /// advanced keeps the description it was registered with, so what a browser reports is
+    /// a fact about a registration rather than about the last sign-in.
+    ///
+    /// At the cap the least recently used records are dropped, and their ids returned so
+    /// the caller can end their sessions too.
+    pub fn resolve_browser(
+        &mut self,
+        current_browser_key: PublicKey,
+        next_browser_key: PublicKey,
+        description: BrowserDescription,
+        now: Timestamp,
+    ) -> Result<(BrowserId, Vec<BrowserId>), BrowserError> {
+        if current_browser_key == next_browser_key {
+            return Err(BrowserError::SuccessorMatchesCurrent);
+        }
+
+        // Two questions, and they are not the same one. An entry is *advanced* only by the
+        // successor it is waiting for; an entry *holds* a key in either slot, which is what
+        // a successor must not collide with.
+        let entry_awaiting = |candidate: &PublicKey| {
+            self.browsers
+                .iter()
+                .position(|browser| browser.next_browser_key == *candidate)
+        };
+        let entry_holding = |candidate: &PublicKey| {
+            self.browsers.iter().position(|browser| {
+                browser.current_browser_key == *candidate || browser.next_browser_key == *candidate
+            })
+        };
+
+        let advances = entry_awaiting(&current_browser_key);
+        // The entry this request belongs to, which is not always one it can advance: a
+        // browser retrying a lost sign-in still belongs to the entry that retired its key,
+        // and re-announcing the successor it announced then is not stealing anyone's key.
+        let owner = entry_holding(&current_browser_key);
+        let successor_holder = entry_holding(&next_browser_key);
+        if successor_holder.is_some() && successor_holder != owner {
+            return Err(BrowserError::SuccessorAlreadyInUse);
+        }
+
+        if let Some(index) = advances {
+            let browser = &mut self.browsers[index];
+            browser.current_browser_key = current_browser_key;
+            browser.next_browser_key = next_browser_key;
+            browser.last_used = now;
+            return Ok((browser.id, vec![]));
+        }
+
+        if owner.is_some() {
+            return Err(BrowserError::StaleBrowserKey);
+        }
+
+        let id = self.next_browser_id;
+        self.next_browser_id = self.next_browser_id.saturating_add(1);
+        self.browsers.push(Browser {
+            id,
+            current_browser_key,
+            next_browser_key,
+            description,
+            created_at: now,
+            last_used: now,
+        });
+
+        let mut dropped = vec![];
+        while self.browsers.len() > MAX_BROWSERS {
+            let least_recently_used = self
+                .browsers
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, browser)| (browser.last_used, browser.id))
+                .map(|(index, _)| index);
+            match least_recently_used {
+                Some(index) => {
+                    dropped.push(self.browsers.remove(index).id);
+                }
+                None => break,
+            }
+        }
+
+        Ok((id, dropped))
+    }
+
     /// Creation of new anchors is restricted in order to make sure that the device checks are
     /// not accidentally bypassed.
     pub fn new(anchor_number: AnchorNumber, created_at: Timestamp) -> Anchor {
@@ -637,6 +862,8 @@ impl Anchor {
             openid_credentials: vec![],
             email_recovery: vec![],
             verified_emails: vec![],
+            browsers: vec![],
+            next_browser_id: 0,
             metadata: None,
             name: None,
         }

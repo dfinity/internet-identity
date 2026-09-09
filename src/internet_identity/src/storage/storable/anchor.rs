@@ -1,3 +1,5 @@
+use crate::storage::storable::browser::StorableBrowser;
+use crate::storage::storable::browser_id::StorableBrowserId;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::openid_credential::StorableOpenIdCredential;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
@@ -32,6 +34,12 @@ pub struct StorableAnchor {
     /// `Option` so pre-existing anchors decode cleanly.
     #[n(6)]
     pub verified_emails: Option<Vec<StorableVerifiedEmail>>,
+    /// Browsers this anchor has signed in from. Capped at `MAX_BROWSERS`.
+    #[n(7)]
+    pub browsers: Option<Vec<StorableBrowser>>,
+    /// Monotonic per-anchor allocator for `browsers`. Ids are never reused.
+    #[n(8)]
+    pub next_browser_id: Option<StorableBrowserId>,
 }
 
 impl Storable for StorableAnchor {

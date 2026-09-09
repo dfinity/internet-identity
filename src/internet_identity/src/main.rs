@@ -1098,6 +1098,8 @@ mod v2_api {
             Some(stored_verified_emails)
         };
 
+        let browsers = state::anchor(identity_number).browsers_info();
+
         let identity_info = IdentityInfo {
             authn_methods: anchor_info
                 .devices
@@ -1113,6 +1115,7 @@ mod v2_api {
             created_at: anchor_info.created_at,
             email_recovery,
             verified_emails,
+            browsers,
             // The same config `mcp_get_config` serves, but certified: this is
             // an update call, so the Settings UI can render the trusted server
             // — and base the config it writes back — on a value no single node

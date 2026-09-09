@@ -678,6 +678,14 @@ export interface EmailRecoveryGetDelegationArgs {
   'expiration' : Timestamp,
   'nonce' : string,
 }
+/**
+ * Reported where the client can state it and inferred where it cannot, so unknown is a
+ * real answer: the browsers exposing no client hints are the ones this is least sure of.
+ */
+export type FormFactor = { 'Unknown' : null } |
+  { 'Tablet' : null } |
+  { 'Desktop' : null } |
+  { 'Mobile' : null };
 export type FrontendHostname = string;
 export type GetAccountError = {
     'NoSuchOrigin' : { 'anchor_number' : UserNumber }
@@ -942,6 +950,12 @@ export interface IdentityInfo {
    * The timestamp at which the anchor was created
    */
   'created_at' : [] | [Timestamp],
+  /**
+   * Browsers this anchor has signed in from (absent when it has never
+   * created a session), so the Settings UI can offer "sign this browser
+   * out" without a separate call.
+   */
+  'browsers' : [] | [Array<BrowserInfo>],
   /**
    * The anchor's synced trusted-MCP-server config (absent when the
    * anchor never wrote one). Carried here rather than read from the
@@ -1297,6 +1311,14 @@ export interface OpenIdPrepareDelegationResponse {
   'expiration' : Timestamp,
   'anchor_number' : UserNumber,
 }
+export type OperatingSystem = { 'Ios' : null } |
+  { 'Linux' : null } |
+  { 'Android' : null } |
+  { 'Macos' : null } |
+  { 'ChromeOs' : null } |
+  { 'Windows' : null } |
+  { 'Other' : string } |
+  { 'Ipados' : null };
 /**
  * The delegation permissions a caller requests, mirroring the ICP protocol's
  * request-delegation `permissions` values. `queries` yields a queries-only
@@ -1528,6 +1550,54 @@ export type Salt = Uint8Array | number[];
 export type SessionDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
+/**
+ * Which browser a sign-in came from, as a token rather than a name to show. Products
+ * get renamed — "Chrome OS" became "ChromeOS", "Mac OS X" became "macOS" — so the name
+ * the user reads is derived in the frontend, where a rename reaches every stored record
+ * at once. "Brand" is what the client hints call this, and BrowserInfo below is the
+ * entry it describes.
+ */
+export type BrowserBrand = { 'Edge' : null } |
+  { 'Firefox' : null } |
+  { 'Safari' : null } |
+  { 'SamsungInternet' : null } |
+  { 'Opera' : null } |
+  {
+    /**
+     * A browser this list does not name, shown as the client resolved it. Worth seeing
+     * rather than hiding behind a generic label. Named variants are the six that hold
+     * 97% of the web between them, because a variant is what earns an icon.
+     */
+    'Other' : string
+  } |
+  { 'Chrome' : null };
+/**
+ * What a browser reported about itself when it registered. Self-reported, so it is
+ * something the user reads to recognise their own browser rather than evidence about
+ * where a session came from. The canister stores these and never interprets them.
+ */
+export interface BrowserDescription {
+  'os' : OperatingSystem,
+  /**
+   * The hardware, where the client can name it — Android is the only place that does.
+   */
+  'model' : [] | [string],
+  'form_factor' : FormFactor,
+  'brand' : BrowserBrand,
+}
+export interface BrowserInfo {
+  'id' : number,
+  /**
+   * Fixed at registration. A sign-in reporting something else registers its own entry,
+   * so this describes a registration rather than the last sign-in.
+   */
+  'description' : BrowserDescription,
+  'created_at' : Timestamp,
+  /**
+   * Advanced by a sign-in from this browser and by every session refresh it drives.
+   */
+  'last_used' : Timestamp,
+}
 export type SessionKey = PublicKey;
 export type SetDefaultAccountError = {
     'NoSuchOrigin' : { 'anchor_number' : UserNumber }

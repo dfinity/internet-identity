@@ -10,6 +10,8 @@ pub mod anchor_number;
 pub mod anchor_number_list;
 pub mod application;
 pub mod application_number;
+pub mod browser;
+pub mod browser_description;
 pub mod browser_id;
 pub mod credential_id;
 pub mod duration;
