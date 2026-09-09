@@ -113,8 +113,6 @@ pub struct SessionRecord {
 }
 
 impl SessionRecord {
-    /// Whether this session is finished, on either bound.
-    ///
     /// One question rather than two, because a caller has no use for the halves
     /// apart: a session past its lifetime and one nobody has used for longer than
     /// it was allowed are equally over. Asking separately is how a caller ends up
@@ -123,7 +121,7 @@ impl SessionRecord {
     /// Idleness is measured from the last mint, or from creation where nothing has
     /// minted yet, so a session abandoned immediately after sign-in is bounded like
     /// any other.
-    pub fn is_over(&self, now: Timestamp) -> bool {
+    pub fn is_expired_or_idle(&self, now: Timestamp) -> bool {
         if self.valid_till_ns <= now {
             return true;
         }
@@ -133,7 +131,7 @@ impl SessionRecord {
 
     /// How long this session stayed in service: the span from its creation to the last time
     /// its app asked for a delegation. Bounded by the session's own lifetime.
-    pub fn demonstrated_use(&self) -> u64 {
+    pub fn time_in_service_ns(&self) -> u64 {
         self.last_refreshed_ns
             .map_or(0, |refreshed| refreshed.saturating_sub(self.created_at_ns))
     }
@@ -145,11 +143,11 @@ impl SessionRecord {
     /// abandoned, which recency alone gets backwards — the abandoned one was touched more
     /// recently. `session_id` only makes the order total, which it can because no two
     /// sessions share one.
-    pub fn reclaim_order(&self, now: Timestamp) -> (bool, Timestamp, SessionId) {
+    pub fn reclaim_sort_key(&self, now: Timestamp) -> (bool, Timestamp, SessionId) {
         let last_used = self.last_refreshed_ns.unwrap_or(self.created_at_ns);
         (
-            !self.is_over(now),
-            last_used.saturating_add(self.demonstrated_use()),
+            !self.is_expired_or_idle(now),
+            last_used.saturating_add(self.time_in_service_ns()),
             self.session_id,
         )
     }

@@ -3118,7 +3118,7 @@ impl<M: Memory + Clone> Storage<M> {
         for write in account_references.iter_mut() {
             let account_number = write.account_reference.account_number;
             write.account_reference.sessions.retain(|session| {
-                if session.is_over(now_ns) {
+                if session.is_expired_or_idle(now_ns) {
                     dropped.push((account_number, session.clone()));
                     return false;
                 }
