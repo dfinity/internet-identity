@@ -1,4 +1,6 @@
-use crate::anchor_management::{activity_bookkeeping, post_operation_bookkeeping};
+use crate::anchor_management::{
+    activity_bookkeeping, check_pubkey_is_not_used, post_operation_bookkeeping,
+};
 use crate::state;
 use crate::state::ChallengeInfo;
 use crate::storage::anchor::Device;
@@ -85,6 +87,16 @@ pub fn register(
 
     // sanity check
     verify_caller_is_device_or_temp_key(&temp_key, &device_principal);
+
+    check_pubkey_is_not_used(&device.pubkey).unwrap_or_else(|err| trap(&err));
+
+    // A device without a credential id signs for itself, so no temp key stands in for it.
+    if device.credential_id.is_none() && caller() != device_principal {
+        trap(&format!(
+            "caller {caller} could not be authenticated against device pubkey {device_principal}",
+            caller = caller()
+        ));
+    }
 
     let now = time();
     let allocation = state::storage_borrow_mut(|storage| storage.allocate_anchor(now));
