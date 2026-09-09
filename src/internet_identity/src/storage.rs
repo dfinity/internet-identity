@@ -3403,7 +3403,7 @@ impl<M: Memory + Clone> Storage<M> {
             write
                 .account_reference
                 .sessions
-                .retain(|session| !session.is_over(now));
+                .retain(|session| !session.is_expired_or_idle(now));
         }
 
         // Stamped before the write rather than after, because the write is what stores the
