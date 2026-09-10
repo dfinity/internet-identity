@@ -23,7 +23,10 @@ const supportedStandards = [
   },
 ];
 
-const scopes = [{ method: "icrc34_delegation" }];
+const scopes = [
+  { method: "icrc34_delegation" },
+  { method: "ii_session_delegation" },
+];
 
 /** ICRC-25: respond with the list of supported standards. */
 export const handleSupportedStandards =

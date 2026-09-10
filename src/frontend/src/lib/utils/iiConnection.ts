@@ -63,10 +63,11 @@ import {
 } from "./analytics/webauthnAuthenticationFunnel";
 import { HARDWARE_KEY_TEST } from "$lib/state/featureFlags";
 import { frontendCanisterConfig } from "$lib/globals";
-import {
-  GATEWAY_ORIGIN_REGEX,
-  LEGACY_GATEWAY_DOMAIN,
-} from "$lib/utils/urlUtils";
+// Re-exported so the callers in this file, and anything importing it from here, are
+// untouched by the move. It lives in `urlUtils` because that is where its two constants
+// already were, and because it is string work with nothing to do with a connection.
+export { remapToLegacyDomain } from "$lib/utils/urlUtils";
+import { remapToLegacyDomain } from "$lib/utils/urlUtils";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -993,17 +994,6 @@ export const creationOptions = (
       displayName: "Internet Identity",
     },
   };
-};
-
-// In order to give dapps a stable principal regardless whether they use the legacy (ic0.app) or
-// any of the newer canister gateway domains (icp0.io, icp.net) we map back the derivation origin
-// to the ic0.app domain.
-export const remapToLegacyDomain = (origin: string): string => {
-  const groups = origin.match(GATEWAY_ORIGIN_REGEX)?.groups;
-  if (groups === undefined || groups.domain === LEGACY_GATEWAY_DOMAIN) {
-    return origin;
-  }
-  return `https://${groups.subdomain}.${LEGACY_GATEWAY_DOMAIN}`;
 };
 
 export const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
