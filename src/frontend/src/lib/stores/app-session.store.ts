@@ -53,10 +53,6 @@ interface SessionKey {
   origin: string;
 }
 
-/** Returns a copy, so a caller mutating the record cannot write back into the store
- *  through the object IndexedDB handed us. */
-const normalize = <T extends object>(record: T): T => ({ ...record });
-
 const sessionKey = ({
   identityNumber,
   accountNumber,
@@ -133,10 +129,22 @@ export const appSessionsForOrigin = async (
   return (await readAll<AppSessionRecord>(APP_SESSION_STORE)).flatMap(
     ([key, record]) => {
       const parsed = parseKey(key);
-      if (parsed?.origin !== origin) {
+      // A key `sessionKey` could not have produced — an older format, most likely. No
+      // reader reaches it and `purgeSessionsOf` matches on a parsed identity, so it
+      // would sit here forever.
+      if (parsed === undefined) {
+        void idbDel(key, APP_SESSION_STORE).catch(() => {});
         return [];
       }
+      // Before the origin filter, and so for every key rather than this origin's: the
+      // whole store is already in memory, and an origin the user never returns to would
+      // otherwise keep its dead record for the life of the profile. Not awaited, the way
+      // every other delete here is, so a read costs no write.
       if (record.expiresAtMillis - EXPIRY_MARGIN_MS <= now) {
+        void idbDel(key, APP_SESSION_STORE).catch(() => {});
+        return [];
+      }
+      if (parsed.origin !== origin) {
         return [];
       }
       return [
@@ -144,7 +152,7 @@ export const appSessionsForOrigin = async (
           identityNumber: parsed.identityNumber,
           accountNumber: parsed.accountNumber,
           accountPrincipal: accounts.get(key),
-          record: normalize(record),
+          record,
         },
       ];
     },
@@ -166,28 +174,37 @@ export const appAccountsForOrigin = async (
             {
               identityNumber: parsed.identityNumber,
               accountNumber: parsed.accountNumber,
-              record: normalize(record),
+              record,
             },
           ]
         : [];
     },
   );
 
+/** Every session this identity holds here, whatever origin it is at. */
+const purgeSessionsOf = async (identityNumber: bigint): Promise<void> => {
+  const keys = (await readAll<unknown>(APP_SESSION_STORE))
+    .map(([key]) => key)
+    .filter((key) => parseKey(key)?.identityNumber === identityNumber);
+  await Promise.all(
+    keys.map((key) => idbDel(key, APP_SESSION_STORE).catch(() => {})),
+  );
+};
+
+/** The account mappings for the same identity, which are keyed the same way today but
+ *  are not the same data — so re-keying one store cannot quietly re-key the other. */
+const purgeAccountsOf = async (identityNumber: bigint): Promise<void> => {
+  const keys = (await readAll<unknown>(APP_ACCOUNT_STORE))
+    .map(([key]) => key)
+    .filter((key) => parseKey(key)?.identityNumber === identityNumber);
+  await Promise.all(
+    keys.map((key) => idbDel(key, APP_ACCOUNT_STORE).catch(() => {})),
+  );
+};
+
 export const purgeAppSessions = async (
   identityNumber: bigint,
 ): Promise<void> => {
-  const prefix = `${identityNumber.toString()}:`;
-  await Promise.all(
-    [APP_SESSION_STORE, APP_ACCOUNT_STORE].map(async (store) =>
-      Promise.all(
-        (await readAll<unknown>(store))
-          .map(([key]) => key)
-          .filter(
-            (key): key is string =>
-              typeof key === "string" && key.startsWith(prefix),
-          )
-          .map((key) => idbDel(key, store).catch(() => {})),
-      ),
-    ),
-  );
+  await purgeSessionsOf(identityNumber);
+  await purgeAccountsOf(identityNumber);
 };

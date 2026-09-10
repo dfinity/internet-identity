@@ -5,14 +5,29 @@
   import { LogOutIcon } from "@lucide/svelte";
   import FeaturedIcon from "./FeaturedIcon.svelte";
   import IdentityListItem from "./IdentityListItem.svelte";
+  import ProgressRing from "./ProgressRing.svelte";
 
   type Props = {
     identity: LastUsedIdentity;
     onSignOut: () => void;
-    onSignOutAndRemove: () => void;
+    /** Ends this browser's sessions canister-side before the page goes, so it is an
+     *  update call away — hence the pending state, and hence both buttons locked while
+     *  it runs: leaving by the other one would navigate out from under the revoke. */
+    onSignOutAndRemove: () => Promise<void>;
   };
 
   let { identity, onSignOut, onSignOutAndRemove }: Props = $props();
+
+  let isRemoving = $state(false);
+
+  const handleSignOutAndRemove = async () => {
+    isRemoving = true;
+    try {
+      await onSignOutAndRemove();
+    } finally {
+      isRemoving = false;
+    }
+  };
 </script>
 
 <div class="flex flex-col gap-8">
@@ -38,11 +53,20 @@
   </div>
 
   <div class="flex flex-col gap-3">
-    <button onclick={onSignOut} class="btn w-full">
+    <button onclick={onSignOut} class="btn w-full" disabled={isRemoving}>
       {$t`Sign out and keep identity`}
     </button>
-    <button onclick={onSignOutAndRemove} class="btn btn-tertiary w-full">
-      {$t`Sign out and remove from device`}
+    <button
+      onclick={handleSignOutAndRemove}
+      class="btn btn-tertiary w-full"
+      disabled={isRemoving}
+    >
+      {#if isRemoving}
+        <ProgressRing />
+        <span>{$t`Signing out...`}</span>
+      {:else}
+        <span>{$t`Sign out and remove from device`}</span>
+      {/if}
     </button>
   </div>
 </div>

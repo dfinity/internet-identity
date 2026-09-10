@@ -19,9 +19,6 @@ vi.mock("$lib/globals", async () => {
 vi.mock("$lib/utils/validateDerivationOrigin", () => ({
   validateDerivationOrigin: vi.fn(() => Promise.resolve({ result: "valid" })),
 }));
-vi.mock("$lib/utils/iiConnection", () => ({
-  remapToLegacyDomain: (origin: string) => origin,
-}));
 
 const checkSession = vi.fn(() => Promise.resolve(true));
 vi.mock("@icp-sdk/core/agent", async () => {
@@ -247,6 +244,30 @@ describe("ii_session_delegation", () => {
       id: 1,
       method: "ii_session_delegation",
       params: {},
+    });
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ id: 1, error: { code: -32602 } });
+    expect(onError).toHaveBeenCalledWith("invalid-request");
+  });
+
+  /// A duration `BigInt` cannot read used to throw straight out of `safeParse`, which
+  /// runs above the handler's `try`, so the app was told nothing at all.
+  it("rejects a duration that is not a number", async () => {
+    const { channel, sent } = channelWith();
+    const onError = vi.fn();
+
+    await handleSessionDelegationRequest(
+      channel,
+      onError,
+    )({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "ii_session_delegation",
+      params: {
+        sessionPublicKey: btoa("an app key"),
+        maxTimeToLive: "not a number",
+      },
     });
 
     expect(sent).toHaveLength(1);
