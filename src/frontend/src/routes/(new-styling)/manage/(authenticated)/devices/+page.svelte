@@ -1,5 +1,6 @@
 <script lang="ts">
   import { authenticatedStore } from "$lib/stores/authentication.store";
+  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { Trans } from "$lib/components/locale";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
   import { currentBrowserId } from "$lib/stores/browser-key.store";
@@ -57,6 +58,16 @@
   // holds a record for it: it has signed in to Internet Identity, which is how this page
   // is on screen, and it just has not signed in to an app yet. It reads as signed out,
   // because it is, and describing it takes no canister data.
+  // When this browser first saw the identity, kept locally because the canister cannot
+  // know it: its own record only begins at the first app sign-in. Where it does hold a
+  // record, that wins — so the date jumps forward once, which is the compromise taken
+  // over showing nothing at all until then.
+  const firstSeenHere = $derived(
+    $lastUsedIdentitiesStore.identities[
+      $authenticatedStore.identityNumber.toString()
+    ]?.firstSeenTimestampMillis ?? now,
+  );
+
   const unrecorded = $derived<Browser | undefined>(
     !browserIdRead ||
       stored.some((browser) => browser.isCurrent) ||
@@ -66,7 +77,7 @@
           id: NO_RECORD_ID,
           name: nameOf(thisDescription),
           description: thisDescription,
-          createdAtMillis: now,
+          createdAtMillis: firstSeenHere,
           lastUsedMillis: now,
           sessionCount: 0,
           isCurrent: true,
@@ -84,26 +95,27 @@
   let signingOut = $state<number | undefined>(undefined);
   let confirming = $state<Browser | undefined>(undefined);
 
+  // Nothing to offer on the browser being read from: signing it out here would end the
+  // sessions of the page you are looking at, and calling it "Signed out" would be a
+  // claim about the one browser this page cannot make one about — it is in use.
   const actionFor = (browser: Browser) =>
-    signingOut === browser.id
-      ? "signing-out"
-      : signedOut.includes(browser.id) || isSignedOut(browser, now)
-        ? "signed-out"
-        : "sign-out";
+    browser.isCurrent
+      ? "none"
+      : signingOut === browser.id
+        ? "signing-out"
+        : signedOut.includes(browser.id) || isSignedOut(browser, now)
+          ? "signed-out"
+          : "sign-out";
 
-  // A browser with no record has no timestamps to format: it has never signed in to an
-  // app, and it arrived just now as far as this page can tell.
   const lastUsedOf = (browser: Browser): string =>
-    browser.id === NO_RECORD_ID
-      ? $t`Never`
+    browser.isCurrent
+      ? $t`Now`
       : $formatRelative(new Date(browser.lastUsedMillis), { style: "long" });
   const firstSeenOf = (browser: Browser): string =>
-    browser.id === NO_RECORD_ID
-      ? $t`Now`
-      : $formatDate(new Date(browser.createdAtMillis), {
-          month: "short",
-          day: "numeric",
-        });
+    $formatDate(new Date(browser.createdAtMillis), {
+      month: "short",
+      day: "numeric",
+    });
 
   const confirmSignOut = async () => {
     const browser = confirming;
