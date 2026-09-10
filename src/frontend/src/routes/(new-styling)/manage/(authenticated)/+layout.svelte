@@ -116,10 +116,15 @@
     window.location.replace("/");
   };
 
-  const handleConfirmSignOutAndRemove = () => {
+  const handleConfirmSignOutAndRemove = async () => {
     const identityNumber = $authenticatedStore.identityNumber;
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void forgetIdentity(identityNumber);
+    // Awaited: this ends the browser's sessions canister-side, and replacing the page
+    // while that update call is in flight leaves the apps refreshing against session
+    // records that still exist — which is the one thing "remove" is meant to stop.
+    // `forgetIdentity` swallows a canister failure and clears the local records either
+    // way, so waiting cannot strand the user here.
+    await forgetIdentity(identityNumber);
     sessionStore.reset();
     window.location.replace("/");
   };
