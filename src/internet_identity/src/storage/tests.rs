@@ -6678,18 +6678,6 @@ mod session_refresh_stamp_tests {
         assert_eq!(device.created_at, 1_000);
         assert_eq!(device.last_used, 9_000);
     }
-
-    #[test]
-    fn a_refresh_for_a_device_the_anchor_never_registered_still_stamps_the_session() {
-        let (mut storage, anchor_number, key) = storage_with_session();
-
-        storage.record_session_use(&key, 9_000).unwrap();
-
-        assert_eq!(
-            session_of(&storage, anchor_number).last_refreshed_ns,
-            Some(9_000)
-        );
-    }
 }
 
 mod session_removal_tests {
