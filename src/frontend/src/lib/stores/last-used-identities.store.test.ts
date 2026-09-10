@@ -62,6 +62,7 @@ describe("lastUsedIdentitiesStore", () => {
         name: name1,
         authMethod: { passkey: { credentialId: credId1 } },
         lastUsedTimestampMillis: mockTimestamp1,
+        firstSeenTimestampMillis: mockTimestamp1,
         createdAtMillis,
       },
     };
@@ -90,12 +91,14 @@ describe("lastUsedIdentitiesStore", () => {
         name: name1,
         authMethod: { passkey: { credentialId: credId1 } },
         lastUsedTimestampMillis: mockTimestamp1,
+        firstSeenTimestampMillis: mockTimestamp1,
       },
       [identity2.toString()]: {
         identityNumber: identity2,
         name: name2,
         authMethod: { passkey: { credentialId: credId2 } },
         lastUsedTimestampMillis: mockTimestamp2,
+        firstSeenTimestampMillis: mockTimestamp2,
       },
     };
     expect(get(lastUsedIdentitiesStore).identities).toEqual(expected);
@@ -127,6 +130,9 @@ describe("lastUsedIdentitiesStore", () => {
         name: name1, // Name should remain the same from the *last* call
         authMethod: { passkey: { credentialId: credId1 } },
         lastUsedTimestampMillis: mockTimestamp3,
+        // Not advanced: it records when this browser first saw the identity, which the
+        // first call set and no later one moves.
+        firstSeenTimestampMillis: mockTimestamp1,
       },
     };
     expect(get(lastUsedIdentitiesStore).identities).toEqual(expected);
@@ -208,6 +214,7 @@ describe("lastUsedIdentitiesStore", () => {
         name: name1,
         authMethod: { passkey: { credentialId: credId1 } },
         lastUsedTimestampMillis: mockTimestamp1,
+        firstSeenTimestampMillis: mockTimestamp1,
         accounts: undefined,
       });
     });
@@ -285,6 +292,7 @@ describe("lastUsedIdentityStore (derived store)", () => {
       name: name1,
       authMethod: { passkey: { credentialId: credId1 } },
       lastUsedTimestampMillis: mockTimestamp1,
+      firstSeenTimestampMillis: mockTimestamp1,
       createdAtMillis,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expected);
@@ -310,6 +318,7 @@ describe("lastUsedIdentityStore (derived store)", () => {
       name: name1,
       authMethod: { passkey: { credentialId: credId1 } },
       lastUsedTimestampMillis: mockTimestamp2,
+      firstSeenTimestampMillis: mockTimestamp2,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expectedLatest);
 
@@ -325,6 +334,7 @@ describe("lastUsedIdentityStore (derived store)", () => {
       name: name3,
       authMethod: { passkey: { credentialId: credId3 } },
       lastUsedTimestampMillis: mockTimestamp3,
+      firstSeenTimestampMillis: mockTimestamp3,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expectedNewest);
   });
@@ -359,6 +369,7 @@ describe("lastUsedIdentityStore (derived store)", () => {
       name: name1,
       authMethod: { passkey: { credentialId: credId1 } },
       lastUsedTimestampMillis: mockTimestamp3,
+      firstSeenTimestampMillis: mockTimestamp1,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expected);
   });
