@@ -45,11 +45,22 @@
 
 {#snippet meta(label: string, value: string)}
   <!-- Dissolved when the row is a line, so the label and value become a column of the
-       list's own grid. A two-cell block on its own line when the row is a block. -->
+       list's own grid. A two-cell block on its own line when the row is a block.
+
+       A signed-out row dims here, on the text itself, rather than on a wrapper: one or
+       other of the wrappers is `display: contents` at any width, and an element that
+       generates no box paints no opacity, so the dimming would silently do nothing in
+       one of the two layouts. -->
   <div class="contents @2xl/list:flex @2xl/list:flex-col @2xl/list:gap-1">
-    <span class="text-text-tertiary text-xs font-semibold">{label}</span>
-    <span class="text-text-primary text-xs @2xl/list:whitespace-nowrap"
-      >{value}</span
+    <span
+      class="text-text-tertiary text-xs font-semibold {dimmed
+        ? 'opacity-70'
+        : ''}">{label}</span
+    >
+    <span
+      class="text-text-primary text-xs @2xl/list:whitespace-nowrap {dimmed
+        ? 'opacity-70'
+        : ''}">{value}</span
     >
   </div>
 {/snippet}
@@ -105,9 +116,7 @@
   <!-- A line of its own below the identity when the row is a block; dissolved into the
        row's own line above the breakpoint, where each pair takes a column. -->
   <div
-    class="col-span-3 row-start-2 grid grid-cols-[auto_auto] items-baseline justify-start gap-x-1.5 gap-y-2 @2xl/list:contents {dimmed
-      ? 'opacity-70'
-      : ''}"
+    class="col-span-3 row-start-2 grid grid-cols-[auto_auto] items-baseline justify-start gap-x-1.5 gap-y-2 @2xl/list:contents"
   >
     {@render meta($t`Last used`, lastUsed)}
     {@render meta($t`First seen`, firstSeen)}

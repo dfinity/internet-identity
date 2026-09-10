@@ -156,29 +156,40 @@
   <!-- No empty state: this browser is always one of the rows, so the only moment there
        is nothing to draw is before it has described itself. -->
   {#if groups.length > 0}
+    <!-- The column tracks live on the card, and every section and row below takes them
+         with `grid-cols-subgrid`. So a column is as wide as the widest content in any
+         row of the whole card, in any language, rather than a number chosen for the
+         English strings — and the platform groups line up with each other, which they
+         would not if each owned its own tracks.
+
+         The card is also the container the rows query. That works because it defines
+         tracks rather than inheriting them: `container-type` imposes size containment,
+         which forbids an element from being a *subgrid*, so no element below may be
+         both. -->
     <div
-      class="border-border-secondary bg-bg-primary @container/list flex flex-col overflow-hidden rounded-xl border"
+      class="border-border-secondary bg-bg-primary @container/list grid grid-cols-[1fr_auto_auto_auto] gap-x-10 overflow-hidden rounded-xl border px-4"
     >
       {#each groups as group, groupIndex (group.platform)}
-        <section
-          class={groupIndex > 0 ? "border-border-tertiary border-t" : ""}
-        >
-          <GroupHeading
-            kind={group.kind}
-            platform={group.platform}
-            count={group.browsers.length}
-          />
-          <!-- The column tracks live here, not on the rows: an action column that is
-               the same width in every row is a fact about the list, and each row takes
-               the tracks with `grid-cols-subgrid`. So the widths come from the widest
-               content in any row, in any language, instead of from numbers chosen for
-               the English strings.
-
-               The container the rows query is the card, above this: `container-type`
-               imposes size containment, which forbids an element from also being a
-               subgrid, so the two cannot be the same box. Every row is the card's width
-               anyway. -->
-          <ul class="grid grid-cols-[1fr_auto_auto_auto] gap-x-10 px-4">
+        {#if groupIndex > 0}
+          <!-- Full width rather than inset, unlike the rule between rows of one group:
+               this is the boundary between two groups. The card's own padding is undone
+               for it. -->
+          <div
+            aria-hidden="true"
+            class="border-border-tertiary col-span-4 -mx-4 border-t"
+          ></div>
+        {/if}
+        <section class="col-span-4 grid grid-cols-subgrid">
+          <!-- Outdented so the heading's own padding places it, rather than adding to
+               the card's. -->
+          <div class="col-span-4 -mx-4">
+            <GroupHeading
+              kind={group.kind}
+              platform={group.platform}
+              count={group.browsers.length}
+            />
+          </div>
+          <ul class="col-span-4 grid grid-cols-subgrid">
             {#each group.browsers as browser, index (browser.id)}
               <!-- Inset rule between rows of one group, so it reads as a divided group
                    rather than as the boundary between two. Drawn as its own element:
