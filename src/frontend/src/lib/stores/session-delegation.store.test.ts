@@ -349,7 +349,7 @@ describe("mintSession — failure is swallowed", () => {
   });
 });
 
-describe("forgetIdentity", () => {
+describe("forgetIdentity and revokeIdentity", () => {
   const BROWSER_KEY_STORE = idbCreateStore("ii-browser-keys", "keys");
 
   const storedSessionDelegation = async () => {
@@ -392,10 +392,48 @@ describe("forgetIdentity", () => {
     await purgeAppSessions(IDENTITY_NUMBER);
   });
 
-  /// The gap this exists to close: dropping the local records alone leaves the apps
-  /// holding chains rooted at session records the canister still has, so they stay
-  /// signed in and keep refreshing.
-  it("ends this browser's sessions for the identity it forgets", async () => {
+  /// The gap `revokeIdentity` exists to close: dropping the local records alone leaves
+  /// the apps holding chains rooted at session records the canister still has, so they
+  /// stay signed in and keep refreshing.
+  it("revoking ends this browser's sessions, then forgets it locally", async () => {
+    const revoke = vi.fn(() => Promise.resolve({ Ok: null }));
+    const actor = {
+      revoke_browser_sessions: revoke,
+    } as unknown as ActorSubclass<_SERVICE>;
+    const { authenticationStore } =
+      await import("$lib/stores/authentication.store");
+    vi.spyOn(authenticationStore, "subscribe").mockImplementation((cb) => {
+      cb({ identityNumber: IDENTITY_NUMBER, actor } as Parameters<
+        typeof cb
+      >[0]);
+      return () => {};
+    });
+    await knownBrowser(7);
+    await storedSessionDelegation();
+    await storedAppSession();
+
+    const { revokeIdentity } =
+      await import("$lib/stores/session-delegation.store");
+    await revokeIdentity(IDENTITY_NUMBER);
+
+    expect(revoke).toHaveBeenCalledWith({
+      identity_number: IDENTITY_NUMBER,
+      browser_id: 7,
+    });
+    const { appSessionsForOrigin } =
+      await import("$lib/stores/app-session.store");
+    await expect(
+      appSessionsForOrigin("https://app.example.com"),
+    ).resolves.toEqual([]);
+    await expect(
+      idbGet(IDENTITY_NUMBER.toString(), TEST_STORE),
+    ).resolves.toBeUndefined();
+  });
+
+  /// Removing an identity from a list reaches this, and it holds no full authorization
+  /// for the identity — `revoke_browser_sessions` would answer `Unauthorized`. So it does
+  /// not ask, rather than paying for a request that cannot succeed.
+  it("forgetting makes no canister call", async () => {
     const revoke = vi.fn(() => Promise.resolve({ Ok: null }));
     const actor = {
       revoke_browser_sessions: revoke,
@@ -416,10 +454,7 @@ describe("forgetIdentity", () => {
       await import("$lib/stores/session-delegation.store");
     await forgetIdentity(IDENTITY_NUMBER);
 
-    expect(revoke).toHaveBeenCalledWith({
-      identity_number: IDENTITY_NUMBER,
-      browser_id: 7,
-    });
+    expect(revoke).not.toHaveBeenCalled();
     const { appSessionsForOrigin } =
       await import("$lib/stores/app-session.store");
     await expect(
@@ -433,7 +468,7 @@ describe("forgetIdentity", () => {
   /// The local half must not depend on the canister being reachable: keeping the records
   /// because a call failed would leave II able to sign the user back in silently, which
   /// is the thing they asked it to stop doing.
-  it("forgets locally even when the canister call fails", async () => {
+  it("revoking forgets locally even when the canister call fails", async () => {
     const actor = {
       revoke_browser_sessions: vi.fn(() =>
         Promise.reject(new Error("offline")),
@@ -451,9 +486,9 @@ describe("forgetIdentity", () => {
     await storedSessionDelegation();
     await storedAppSession();
 
-    const { forgetIdentity } =
+    const { revokeIdentity } =
       await import("$lib/stores/session-delegation.store");
-    await expect(forgetIdentity(IDENTITY_NUMBER)).resolves.toBeUndefined();
+    await expect(revokeIdentity(IDENTITY_NUMBER)).resolves.toBeUndefined();
 
     const { appSessionsForOrigin } =
       await import("$lib/stores/app-session.store");
