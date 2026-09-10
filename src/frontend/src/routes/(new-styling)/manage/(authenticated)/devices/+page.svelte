@@ -7,8 +7,6 @@
   import { describeBrowser } from "$lib/utils/describeBrowser";
   import type { BrowserDescription } from "$lib/generated/internet_identity_types";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import { TriangleAlertIcon } from "@lucide/svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import DeviceRow from "./components/DeviceRow.svelte";
   import GroupHeading from "./components/GroupHeading.svelte";
@@ -133,9 +131,7 @@
       signedOut = [...signedOut, browser.id];
       toaster.success({
         title: $t`Signed out of all apps`,
-        description: browser.isCurrent
-          ? $t`This browser no longer has access to your apps.`
-          : $t`${browser.name} no longer has access to your apps.`,
+        description: $t`${browser.name} no longer has access to your apps.`,
       });
     } catch (error) {
       toaster.error({
@@ -174,10 +170,15 @@
           <ul class="flex flex-col">
             {#each group.browsers as browser, index (browser.id)}
               <!-- Inset rule between rows of one group, so it reads as a divided group
-                   rather than as the boundary between two. -->
-              <li
-                class={index > 0 ? "border-border-tertiary ml-4 border-t" : ""}
-              >
+                   rather than as the boundary between two. Drawn as its own element:
+                   indenting the row to inset the rule moved the row with it. -->
+              {#if index > 0}
+                <li
+                  aria-hidden="true"
+                  class="border-border-tertiary ml-4 border-t"
+                ></li>
+              {/if}
+              <li>
                 <DeviceRow
                   description={browser.description}
                   lastUsed={lastUsedOf(browser)}
@@ -209,29 +210,29 @@
 {#if confirming !== undefined}
   {@const target = confirming}
   <Dialog onClose={() => (confirming = undefined)} width="wider">
+    <!-- The title names which browser, the button what happens to it: "Sign out" alone
+         is the ambiguity this dialog exists to resolve, and repeating the scope in both
+         would leave neither saying which row was clicked. -->
     <div class="flex flex-col gap-5 p-1">
-      <FeaturedIcon size="lg" variant="warning" class="self-start">
-        <TriangleAlertIcon class="size-6" />
-      </FeaturedIcon>
-
       <h2 class="text-text-primary text-2xl font-medium">
-        {$t`Sign out of all apps?`}
+        {$t`Sign out ${target.name}?`}
       </h2>
 
       <p class="text-text-tertiary text-base text-pretty">
-        {#if target.isCurrent}
-          <Trans>
-            Every app you opened from this browser will ask you to sign in
-            again. You'll stay signed in to Internet Identity here.
-          </Trans>
-        {:else}
-          {$t`${target.name} will lose access to all apps signed in with this identity.`}
-        {/if}
+        {$t`You can sign in again from ${target.name} at any time.`}
       </p>
 
-      <button class="btn btn-primary btn-lg w-full" onclick={confirmSignOut}>
-        {$t`Sign out of all apps`}
-      </button>
+      <div class="flex flex-col gap-3">
+        <button class="btn btn-primary btn-lg w-full" onclick={confirmSignOut}>
+          {$t`Sign out of all apps`}
+        </button>
+        <button
+          class="btn btn-tertiary btn-lg w-full"
+          onclick={() => (confirming = undefined)}
+        >
+          {$t`Cancel`}
+        </button>
+      </div>
     </div>
   </Dialog>
 {/if}

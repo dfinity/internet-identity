@@ -251,29 +251,35 @@ describe("ii_session_delegation", () => {
     expect(onError).toHaveBeenCalledWith("invalid-request");
   });
 
-  /// A duration `BigInt` cannot read used to throw straight out of `safeParse`, which
-  /// runs above the handler's `try`, so the app was told nothing at all.
-  it("rejects a duration that is not a number", async () => {
-    const { channel, sent } = channelWith();
-    const onError = vi.fn();
+  /// A duration `BigInt` cannot read throws out of `safeParse`, which sits above the
+  /// handler's `try`, so the app would be told nothing at all. The rest `BigInt` reads
+  /// happily as something else: `""` and `" "` are `0n`, `"+1"` is `1n`, `"0x10"` is
+  /// `16n`, and the nat64 bounds reject none of them — so the canister would clamp a
+  /// number the app never meant to send.
+  it.each(["not a number", "", " ", "+1", "0x10", "-1"])(
+    "rejects %o as a duration",
+    async (maxTimeToLive) => {
+      const { channel, sent } = channelWith();
+      const onError = vi.fn();
 
-    await handleSessionDelegationRequest(
-      channel,
-      onError,
-    )({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "ii_session_delegation",
-      params: {
-        sessionPublicKey: btoa("an app key"),
-        maxTimeToLive: "not a number",
-      },
-    });
+      await handleSessionDelegationRequest(
+        channel,
+        onError,
+      )({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "ii_session_delegation",
+        params: {
+          sessionPublicKey: btoa("an app key"),
+          maxTimeToLive,
+        },
+      });
 
-    expect(sent).toHaveLength(1);
-    expect(sent[0]).toMatchObject({ id: 1, error: { code: -32602 } });
-    expect(onError).toHaveBeenCalledWith("invalid-request");
-  });
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({ id: 1, error: { code: -32602 } });
+      expect(onError).toHaveBeenCalledWith("invalid-request");
+    },
+  );
 
   it("answers a malformed silent request without rendering anything", async () => {
     const { authorizationPromptStore } =

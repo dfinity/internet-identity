@@ -20,7 +20,7 @@
   } from "$lib/stores/authentication.store";
   import {
     actorForIdentity,
-    forgetIdentity,
+    purgeSession,
   } from "$lib/stores/session-delegation.store";
   import { throwCanisterError, isCanisterError } from "$lib/utils/utils";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
@@ -262,7 +262,7 @@
               isCanisterError<SessionDelegationError>(err) &&
               err.type === "Unauthorized"
             ) {
-              void forgetIdentity(selectedIdentityNumber);
+              void purgeSession(selectedIdentityNumber);
             } else {
               throw err;
             }
@@ -350,7 +350,7 @@
             isCanisterError<SessionDelegationError>(err) &&
             err.type === "Unauthorized"
           ) {
-            void forgetIdentity(selectedIdentityNumber);
+            void purgeSession(selectedIdentityNumber);
           } else {
             throw err;
           }
@@ -481,7 +481,7 @@
               isCanisterError<SessionDelegationError>(err) &&
               err.type === "Unauthorized"
             ) {
-              void forgetIdentity(selectedIdentityNumber);
+              void purgeSession(selectedIdentityNumber);
             } else {
               throw err;
             }
