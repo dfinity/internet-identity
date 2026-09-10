@@ -52,6 +52,11 @@ export type LastUsedIdentity = {
   accounts?: LastUsedAccounts;
   lastUsedTimestampMillis: number;
   createdAtMillis?: number;
+  /** When this browser first saw this identity, which is not when the identity was
+   *  created and not when the canister first registered a browser for it. The devices
+   *  page shows it for a browser the canister holds no record of yet — one signed in to
+   *  Internet Identity but to no app. Written once and left alone afterwards. */
+  firstSeenTimestampMillis?: number;
 };
 export type LastUsedIdentities = {
   [identityNumber: string]: LastUsedIdentity;
@@ -121,6 +126,10 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
           accounts: identity?.accounts,
           ...params,
           lastUsedTimestampMillis: Date.now(),
+          // Kept from the first time this browser saw the identity, so it does not
+          // advance every time the identity is used.
+          firstSeenTimestampMillis:
+            identity?.firstSeenTimestampMillis ?? Date.now(),
         };
         return lastUsedIdentities;
       });
@@ -135,6 +144,7 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
           accounts: undefined,
           ...params,
           lastUsedTimestampMillis: Date.now(),
+          firstSeenTimestampMillis: Date.now(),
         };
         return lastUsedIdentities;
       });
