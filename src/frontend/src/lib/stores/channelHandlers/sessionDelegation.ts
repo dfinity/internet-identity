@@ -419,6 +419,10 @@ const createSession = async (
         delegation: new Delegation(
           new Uint8Array(fetched.signed_delegation.delegation.pubkey),
           fetched.signed_delegation.delegation.expiration,
+          // Carried, not dropped: `targets` is part of the message the canister signed,
+          // so a delegation rebuilt without them hashes to something no signature in the
+          // tree covers, and every call the app makes with this chain is refused.
+          fetched.signed_delegation.delegation.targets[0],
         ),
         signature: new Uint8Array(
           fetched.signed_delegation.signature,
