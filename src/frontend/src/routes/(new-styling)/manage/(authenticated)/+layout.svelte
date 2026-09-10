@@ -6,6 +6,7 @@
     HouseIcon,
     KeyRoundIcon,
     MenuIcon,
+    MonitorSmartphoneIcon,
     XIcon,
     LifeBuoyIcon,
     CodeIcon,
@@ -359,6 +360,15 @@
         </li>
         <li class="contents">
           <NavItem
+            href="/manage/devices"
+            current={page.url.pathname === "/manage/devices"}
+          >
+            <MonitorSmartphoneIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Devices`}</span>
+          </NavItem>
+        </li>
+        <li class="contents">
+          <NavItem
             href="/manage/settings"
             current={page.url.pathname === "/manage/settings"}
           >
@@ -537,19 +547,15 @@
 {/if}
 
 {#if isSignOutDialogOpen}
-  {@const currentIdentity =
-    $lastUsedIdentitiesStore.identities[
-      $authenticatedStore.identityNumber.toString()
-    ]}
-  {#if currentIdentity !== undefined}
-    <Dialog onClose={() => (isSignOutDialogOpen = false)}>
-      <SignOutConfirmation
-        identity={currentIdentity}
-        onSignOut={handleConfirmSignOut}
-        onSignOutAndRemove={handleConfirmSignOutAndRemove}
-      />
-    </Dialog>
-  {/if}
+  <!-- No longer gated on the identity being in the picker: the dialog asks about this
+       browser rather than describing the identity, and an identity missing from the
+       picker is exactly one a user might still want to sign out of. -->
+  <Dialog onClose={() => (isSignOutDialogOpen = false)}>
+    <SignOutConfirmation
+      onRemember={handleConfirmSignOut}
+      onForget={handleConfirmSignOutAndRemove}
+    />
+  </Dialog>
 {/if}
 
 {#if isReauthDialogOpen}

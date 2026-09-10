@@ -1,31 +1,30 @@
 <script lang="ts">
-  import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import { LogOutIcon } from "@lucide/svelte";
   import FeaturedIcon from "./FeaturedIcon.svelte";
-  import IdentityListItem from "./IdentityListItem.svelte";
   import ProgressRing from "./ProgressRing.svelte";
 
   type Props = {
-    identity: LastUsedIdentity;
-    onSignOut: () => void;
-    /** Ends this browser's sessions canister-side before the page goes, so it is an
-     *  update call away — hence the pending state, and hence both buttons locked while
-     *  it runs: leaving by the other one would navigate out from under the revoke. */
-    onSignOutAndRemove: () => Promise<void>;
+    /** Signs out and leaves the identity here, so coming back is one tap. */
+    onRemember: () => void;
+    /** Signs out and takes this browser's local state with it, including the app
+     *  sessions it holds — which is a canister call, hence the pending state and hence
+     *  both buttons locked while it runs: leaving by the other one would navigate out
+     *  from under the revoke. */
+    onForget: () => Promise<void>;
   };
 
-  let { identity, onSignOut, onSignOutAndRemove }: Props = $props();
+  let { onRemember, onForget }: Props = $props();
 
-  let isRemoving = $state(false);
+  let isForgetting = $state(false);
 
-  const handleSignOutAndRemove = async () => {
-    isRemoving = true;
+  const handleForget = async () => {
+    isForgetting = true;
     try {
-      await onSignOutAndRemove();
+      await onForget();
     } finally {
-      isRemoving = false;
+      isForgetting = false;
     }
   };
 </script>
@@ -37,35 +36,31 @@
     </FeaturedIcon>
     <div class="flex flex-col gap-3">
       <h2 class="text-text-primary text-2xl font-medium">
-        {$t`Sign out from this device`}
+        {$t`Remember this browser?`}
       </h2>
       <p class="text-text-tertiary text-base">
         <Trans>
-          You can either sign out and keep your identity saved for a faster
-          login next time, or remove it entirely from this device.
+          Your apps stay signed in and your identity is ready the next time you
+          come back.
         </Trans>
       </p>
     </div>
   </div>
 
-  <div class="bg-bg-primary_hover flex items-center gap-3 rounded-md p-3">
-    <IdentityListItem {identity} />
-  </div>
-
   <div class="flex flex-col gap-3">
-    <button onclick={onSignOut} class="btn w-full" disabled={isRemoving}>
-      {$t`Sign out and keep identity`}
+    <button onclick={onRemember} class="btn w-full" disabled={isForgetting}>
+      {$t`Remember`}
     </button>
     <button
-      onclick={handleSignOutAndRemove}
+      onclick={handleForget}
       class="btn btn-tertiary w-full"
-      disabled={isRemoving}
+      disabled={isForgetting}
     >
-      {#if isRemoving}
+      {#if isForgetting}
         <ProgressRing />
-        <span>{$t`Signing out...`}</span>
+        <span>{$t`Forgetting...`}</span>
       {:else}
-        <span>{$t`Sign out and remove from device`}</span>
+        <span>{$t`Forget`}</span>
       {/if}
     </button>
   </div>
