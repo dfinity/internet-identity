@@ -142,11 +142,15 @@ export const StringToBigIntCodec = z.codec(z.string(), z.bigint(), {
 /**
  * A `nat64` as the decimal string JSON-RPC carries it.
  *
- * `BigInt` decides what is numeric — a second grammar beside it would be free to drift —
- * but it throws on anything else, and a throw inside a codec escapes `safeParse` rather
- * than becoming a validation issue, so a caller sending nonsense would get no error at
- * all. Reported instead, and bounded: `BigInt` alone accepts `"-1"` and `""`.
+ * `BigInt` reads more than that — `""` and `" "` are `0n`, `"+1"` is `1n`, `"0x10"` is
+ * `16n` — and the bounds below reject none of them, so a malformed duration would arrive
+ * as a number the canister silently clamps rather than as an error the app can act on.
+ * Digits only, therefore, checked before converting. What is left is reported rather than
+ * thrown: a throw inside a codec escapes `safeParse` instead of becoming a validation
+ * issue, and a caller sending nonsense would get no answer at all.
  */
+const DECIMAL_DIGITS = /^\d+$/;
+
 export const Nat64StringCodec = z.codec(
   z.string(),
   z
@@ -155,9 +159,7 @@ export const Nat64StringCodec = z.codec(
     .max(BigInt(2) ** BigInt(64) - BigInt(1)),
   {
     decode: (value, ctx) => {
-      try {
-        return BigInt(value);
-      } catch {
+      if (!DECIMAL_DIGITS.test(value)) {
         ctx.issues.push({
           code: "invalid_format",
           format: "nat64",
@@ -166,6 +168,7 @@ export const Nat64StringCodec = z.codec(
         });
         return z.NEVER;
       }
+      return BigInt(value);
     },
     encode: (value) => value.toString(),
   },

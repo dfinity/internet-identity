@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
+import { createStore, set as idbSet } from "idb-keyval";
 import {
   appAccountsForOrigin,
   appSessionsForOrigin,
@@ -147,6 +148,27 @@ describe("app session store", () => {
     await expect(
       appSessionsForOrigin("https://other.example.com"),
     ).resolves.toEqual([]);
+  });
+
+  /// `BigInt` throws on a segment that is not a number. Every purge and the expiry sweep
+  /// run the key parser over every key in the store, so one key it cannot read must cost
+  /// that key and nothing else.
+  it("reads and purges around a key it cannot parse", async () => {
+    const sessions = createStore("ii-app-sessions", "sessions");
+    await idbSet(
+      "not-a-number:default:" + ORIGIN,
+      record(anHourFromNow()),
+      sessions,
+    );
+    await storeAppSession(
+      { identityNumber: BigInt(10_000), origin: ORIGIN },
+      record(anHourFromNow()),
+    );
+
+    await expect(appSessionsForOrigin(ORIGIN)).resolves.toMatchObject([
+      { identityNumber: BigInt(10_000) },
+    ]);
+    await expect(purgeAppSessions(BigInt(10_000))).resolves.toBeUndefined();
   });
 
   it("purges the account mappings of one identity too", async () => {
