@@ -2008,6 +2008,16 @@ export interface _SERVICE {
       { 'Err' : AppSessionError }
   >,
   /**
+   * Signs the calling session out. Returns nothing and always succeeds, so a client
+   * that retries, or that signs out twice, does not have to reason about whether its
+   * session was already gone. An app can revoke only its own session.
+   */
+  'app_revoke_session' : ActorMethod<
+    [],
+    { 'Ok' : null } |
+      { 'Err' : AppSessionError }
+  >,
+  /**
    * Adds a new authentication method to the identity.
    * Requires authentication.
    */

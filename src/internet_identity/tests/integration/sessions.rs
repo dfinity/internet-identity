@@ -2,7 +2,8 @@
 
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2::{
-    app_get_delegation, app_prepare_delegation, get_account_session, prepare_account_session,
+    app_get_delegation, app_prepare_delegation, app_revoke_session, get_account_session,
+    prepare_account_session,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
@@ -10,8 +11,8 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::{
     AccountSessionError, AppGetDelegationRequest, AppPrepareDelegationRequest, AppSessionError,
-    BrowserBrand, BrowserDescription, FormFactor, GetAccountSessionRequest, OperatingSystem,
-    Permissions, PrepareAccountSessionRequest, PrepareAccountSessionResponse,
+    BrowserBrand, BrowserDescription, BrowserInfo, FormFactor, GetAccountSessionRequest,
+    OperatingSystem, Permissions, PrepareAccountSessionRequest, PrepareAccountSessionResponse,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -551,6 +552,247 @@ fn should_refuse_an_app_delegation_renewing_itself() -> Result<(), RejectRespons
     )?;
 
     assert_eq!(result, Err(AppSessionError::NoSuchSession));
+
+    Ok(())
+}
+
+#[test]
+fn should_stamp_every_refresh() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::get_accounts;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    let refresh = |env: &PocketIc| {
+        app_prepare_delegation(
+            env,
+            canister_id,
+            session_principal,
+            AppPrepareDelegationRequest {
+                session_key: ByteBuf::from(vec![7; 32]),
+            },
+        )
+        .unwrap()
+        .unwrap()
+    };
+    let last_used = |env: &PocketIc| -> Result<Option<u64>, RejectResponse> {
+        Ok(get_accounts(
+            env,
+            canister_id,
+            principal_1(),
+            identity_number,
+            ORIGIN.to_string(),
+        )?
+        .unwrap()[0]
+            .last_used)
+    };
+
+    let before = last_used(&env)?;
+
+    env.advance_time(Duration::from_secs(60));
+    refresh(&env);
+    let after_a_minute = last_used(&env)?;
+    assert!(after_a_minute > before);
+
+    env.advance_time(Duration::from_secs(60));
+    refresh(&env);
+    assert!(last_used(&env)? > after_a_minute);
+
+    Ok(())
+}
+
+#[test]
+fn should_advance_the_device_last_used_on_every_refresh() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::identity_info;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    let device = |env: &PocketIc| -> Result<BrowserInfo, RejectResponse> {
+        Ok(
+            identity_info(env, canister_id, principal_1(), identity_number)?
+                .unwrap()
+                .browsers
+                .unwrap()[0]
+                .clone(),
+        )
+    };
+
+    let enrolled = device(&env)?;
+    assert_eq!(enrolled.created_at, enrolled.last_used);
+
+    env.advance_time(Duration::from_secs(300));
+    app_prepare_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )
+    .unwrap()
+    .unwrap();
+
+    let refreshed = device(&env)?;
+    assert!(refreshed.last_used > enrolled.last_used);
+    assert_eq!(refreshed.created_at, enrolled.created_at);
+
+    Ok(())
+}
+
+#[test]
+fn should_end_access_when_the_app_signs_out() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    let refresh = |env: &PocketIc| {
+        app_prepare_delegation(
+            env,
+            canister_id,
+            session_principal,
+            AppPrepareDelegationRequest {
+                session_key: ByteBuf::from(vec![7; 32]),
+            },
+        )
+        .unwrap()
+    };
+    assert!(refresh(&env).is_ok());
+
+    app_revoke_session(&env, canister_id, session_principal)?
+        .expect("signing a session out succeeds, present or not");
+
+    assert_eq!(refresh(&env), Err(AppSessionError::NoSuchSession));
+
+    Ok(())
+}
+
+/// The one reason sign-out finds the session rather than authorizing it: a session past
+/// its bounds is still the caller's to sign out, and refusing would leave its record and
+/// its index entry behind. Nothing else holds that in place — swap the lookup for the
+/// authorizing one and every other test here still passes.
+#[test]
+fn should_sign_out_a_session_that_has_already_expired() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::identity_info;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let mut request = session_request(identity_number);
+    request.valid_for = Some(10 * 60 * 1_000_000_000);
+    let prepared = prepare_account_session(&env, canister_id, principal_1(), request)?.unwrap();
+    let session_principal = Principal::self_authenticating(&prepared.user_key);
+
+    let session_count = |env: &PocketIc| -> Result<u32, RejectResponse> {
+        Ok(
+            identity_info(env, canister_id, principal_1(), identity_number)?
+                .unwrap()
+                .browsers
+                .unwrap()[0]
+                .session_count,
+        )
+    };
+    assert_eq!(session_count(&env)?, 1);
+
+    env.advance_time(Duration::from_secs(11 * 60));
+
+    app_revoke_session(&env, canister_id, session_principal)?
+        .expect("an expired session is still the caller's to sign out");
+
+    // The record and its index entry are gone, not merely unusable.
+    assert_eq!(session_count(&env)?, 0);
+
+    Ok(())
+}
+
+#[test]
+fn should_treat_a_repeated_sign_out_as_success() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    for _ in 0..3 {
+        app_revoke_session(&env, canister_id, session_principal)?
+            .expect("signing a session out succeeds, present or not");
+    }
+
+    Ok(())
+}
+
+#[test]
+fn should_leave_another_browsers_session_alone() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (first, first_principal) = create_session(&env, canister_id, identity_number);
+
+    let mut second_request = session_request_from(identity_number, &BrowserKey::new(2));
+    second_request.browser_description = firefox_on_linux();
+    let second =
+        prepare_account_session(&env, canister_id, principal_1(), second_request)?.unwrap();
+    let second_principal = Principal::self_authenticating(&second.user_key);
+    assert_ne!(second.user_key, first.user_key);
+
+    app_revoke_session(&env, canister_id, first_principal)?
+        .expect("signing a session out succeeds, present or not");
+
+    let still_works = app_prepare_delegation(
+        &env,
+        canister_id,
+        second_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?;
+    assert!(still_works.is_ok());
+
+    Ok(())
+}
+
+/// Naming a default account keeps its principal, so it must keep its sessions. Before the
+/// session seed was built on the account seed, naming it signed the user out of every app
+/// using that account.
+#[test]
+fn should_keep_a_session_alive_when_the_default_account_is_named() -> Result<(), RejectResponse> {
+    use canister_tests::api::internet_identity::api_v2::update_account;
+    use internet_identity_interface::internet_identity::types::AccountUpdate;
+
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (_, session_principal) = create_session(&env, canister_id, identity_number);
+
+    // Naming the default account materializes it: the reference keeps its sessions and
+    // gains an account number.
+    update_account(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        ORIGIN.to_string(),
+        None,
+        AccountUpdate {
+            name: Some("work".to_string()),
+        },
+    )?
+    .unwrap();
+
+    let refreshed = app_prepare_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareDelegationRequest {
+            session_key: ByteBuf::from(vec![7; 32]),
+        },
+    )?;
+
+    assert!(refreshed.is_ok(), "naming an account ended its sessions");
 
     Ok(())
 }

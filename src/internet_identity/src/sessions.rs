@@ -468,6 +468,41 @@ struct AuthorizedSession {
 /// itself the proof that the caller is that session: nothing is named in the request and
 /// nothing is attached to it.
 fn authorize_session(now: Timestamp) -> Result<AuthorizedSession, AppSessionError> {
+    let (locator, account, session) = find_caller_session()?;
+    // Either bound: a session past its lifetime and one nobody has used for longer
+    // than it was allowed are equally gone, and a refresh is the thing that finds out.
+    if session.is_expired_or_idle(now) {
+        return Err(AppSessionError::NoSuchSession);
+    }
+    Ok(AuthorizedSession {
+        locator,
+        account,
+        session,
+    })
+}
+
+/// Signs the caller's own session out. A caller cannot produce another session's
+/// principal, so the seed match is the whole authorization.
+///
+/// Idempotent: a session that is not there is `Ok`, because the caller wanted it gone and
+/// it is gone, and they could not tell a pruned session from one that never existed
+/// anyway. Only a storage failure comes back as an error — an app is never handed a
+/// refusal whose only sane response is to do nothing.
+pub fn app_revoke_session(now: Timestamp) -> Result<(), AppSessionError> {
+    // Found rather than authorized, so a session that is present and past its bounds is
+    // not refused: it is still the caller's to sign out, and refusing would leave its
+    // record and index entry behind.
+    let Ok((locator, _, _)) = find_caller_session() else {
+        return Ok(());
+    };
+    match storage_borrow_mut(|storage| storage.revoke_session(&locator, now)) {
+        Ok(()) | Err(StorageError::SessionNotFound { .. }) => Ok(()),
+        Err(err) => Err(AppSessionError::InternalCanisterError(err.to_string())),
+    }
+}
+
+/// The caller's session as stored, without asking whether it is still live.
+fn find_caller_session() -> Result<(SessionLocator, Account, Session), AppSessionError> {
     let locator = storage_borrow(|storage| storage.lookup_session_with_principal(caller()))
         .ok_or(AppSessionError::NoSuchSession)?;
 
@@ -479,14 +514,7 @@ fn authorize_session(now: Timestamp) -> Result<AuthorizedSession, AppSessionErro
     })
     .ok_or(AppSessionError::NoSuchSession)?;
 
-    if session.is_expired_or_idle(now) {
-        return Err(AppSessionError::NoSuchSession);
-    }
-    Ok(AuthorizedSession {
-        locator,
-        account,
-        session,
-    })
+    Ok((locator, account, session))
 }
 
 fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {

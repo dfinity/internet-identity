@@ -798,3 +798,19 @@ pub fn app_get_delegation(
 ) -> Result<Result<SignedDelegation, AppSessionError>, RejectResponse> {
     query_candid_as(env, canister_id, sender, "app_get_delegation", (request,)).map(|(x,)| x)
 }
+
+pub fn app_revoke_session(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+) -> Result<Result<(), AppSessionError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_revoke_session",
+        (),
+    )
+    .map(|(x,)| x)
+}

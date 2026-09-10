@@ -6618,6 +6618,103 @@ mod session_refresh_stamp_tests {
     }
 }
 
+mod session_removal_tests {
+    use super::held_references;
+    use super::params;
+    use super::TEST_NOW;
+    use crate::storage::account::SessionLocator;
+    use crate::storage::{CreateSessionParams, StorageError};
+    use crate::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    const ORIGIN: &str = "https://example.com";
+
+    /// The keys come back with the storage: a session is named by the id it was
+    /// allocated, which only the ceremony that created it knows.
+    fn storage_with_sessions(
+        browsers: &[u8],
+    ) -> (
+        Storage<VectorMemory>,
+        AnchorNumber,
+        u64,
+        Vec<SessionLocator>,
+    ) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        let keys = browsers
+            .iter()
+            .map(|seed| {
+                storage
+                    .create_session(CreateSessionParams {
+                        valid_till_ns: u64::MAX,
+                        ..params(anchor_number, *seed, 1_000)
+                    })
+                    .unwrap()
+                    .0
+            })
+            .collect();
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        (storage, anchor_number, application_number, keys)
+    }
+
+    fn sessions(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> Vec<u32> {
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        held_references(storage, anchor_number, application_number)
+            .into_iter()
+            .find(|reference| reference.account_number.is_none())
+            .unwrap()
+            .sessions
+            .into_iter()
+            .map(|session| session.browser_id)
+            .collect()
+    }
+
+    #[test]
+    fn removing_a_session_leaves_the_others() {
+        let (mut storage, anchor_number, _, keys) = storage_with_sessions(&[1, 2, 3]);
+
+        storage.revoke_session(&keys[1], TEST_NOW).unwrap();
+
+        // Ids in registration order, so the seeds 1, 2, 3 became 0, 1, 2.
+        assert_eq!(sessions(&storage, anchor_number), vec![0, 2]);
+    }
+
+    #[test]
+    fn removing_a_session_twice_is_refused_the_second_time() {
+        let (mut storage, anchor_number, _, keys) = storage_with_sessions(&[1]);
+        storage.revoke_session(&keys[0], TEST_NOW).unwrap();
+
+        let refused = storage.revoke_session(&keys[0], TEST_NOW);
+
+        assert!(
+            matches!(refused, Err(StorageError::SessionNotFound { .. })),
+            "a session already gone should be refused, got {refused:?}"
+        );
+        assert_eq!(sessions(&storage, anchor_number), Vec::<u32>::new());
+    }
+
+    #[test]
+    fn removing_the_last_session_keeps_the_reference() {
+        let (mut storage, anchor_number, application_number, keys) = storage_with_sessions(&[1]);
+
+        storage.revoke_session(&keys[0], TEST_NOW).unwrap();
+
+        assert_ne!(
+            storage.stored_account_references(anchor_number, application_number),
+            None
+        );
+    }
+}
+
 mod browser_session_count_tests {
     use super::TEST_NOW;
     use super::{params, params_at};

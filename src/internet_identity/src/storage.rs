@@ -3398,6 +3398,51 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
+    /// Ends one session, index entry and count included.
+    ///
+    /// The key names one session by its id, so a key for a session that was replaced since
+    /// is [`StorageError::SessionNotFound`] rather than taking its successor down with it.
+    /// One pass removes it and says whether there was anything to remove, so the walk that
+    /// checked and the walk that removed are the same walk.
+    pub fn revoke_session(
+        &mut self,
+        key: &SessionLocator,
+        now: Timestamp,
+    ) -> Result<(), StorageError> {
+        let not_found = || StorageError::SessionNotFound {
+            anchor_number: key.anchor_number,
+            session_id: key.session_id,
+        };
+
+        if self
+            .lookup_application_number_with_origin(&key.origin)
+            .is_none()
+        {
+            return Err(not_found());
+        }
+        let anchor = self.read(key.anchor_number)?;
+        let (mut account_references, config) =
+            self.account_state_for_origin(key.anchor_number, &key.origin);
+
+        let write = account_references
+            .iter_mut()
+            .find(|write| write.account_reference.account_number == key.account_number)
+            .ok_or_else(not_found)?;
+        let sessions = &mut write.account_reference.sessions;
+        let held = sessions.len();
+        sessions.retain(|session| session.session_id != key.session_id);
+        if sessions.len() == held {
+            return Err(not_found());
+        }
+
+        self.write_account_state(
+            anchor,
+            now,
+            BTreeMap::from([(key.origin.clone(), Some((account_references, config)))]),
+        )?;
+        Ok(())
+    }
+
     /// Retires an application no anchor references any more. The number is never
     /// reissued.
     fn remove_unreferenced_application(
