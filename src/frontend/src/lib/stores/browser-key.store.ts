@@ -111,8 +111,6 @@ export interface BrowserProof {
   signature: Uint8Array;
   /** By the successor itself, so a key the browser does not hold cannot be announced. */
   nextSignature: Uint8Array;
-  /** Rotates to the successor. Called once the canister has accepted the sign-in. */
-  accept: (browserId: number) => Promise<void>;
 }
 
 /** Serialises sign-ins for one identity: two at once would leave us holding a key the
@@ -195,6 +193,7 @@ const attempt = async <T>(
   sessionKey: Uint8Array,
   description: BrowserDescription,
   signIn: (proof: BrowserProof) => Promise<T>,
+  browserIdOf: (value: T) => number,
   from?: BrowserKeyRecord,
 ): Promise<T> => {
   const { keyPair, announced: successor } = await prepared(
@@ -217,21 +216,32 @@ const attempt = async <T>(
     ),
   ]);
 
-  return signIn({
+  const value = await signIn({
     publicKey,
     nextPublicKey,
     signature,
     nextSignature,
-    accept: (browserId) =>
-      write(identityNumber, { keyPair: successor, browserId, description }),
   });
+
+  // The canister accepted, so this browser is now the successor it announced. Done here
+  // rather than handed back as something to call: a caller that forgot would keep
+  // proving with the key the canister has just retired, and pay a recovery round-trip at
+  // every later sign-in with nothing to say why.
+  await write(identityNumber, {
+    keyPair: successor,
+    browserId: browserIdOf(value),
+    description,
+  });
+  return value;
 };
 
 /**
  * Proves possession of this browser's key and announces the successor it rotates to.
  *
  * The proof covers the session key, which is fresh for every session, so it is good for
- * exactly one sign-in. `accept` is what advances this browser to the successor.
+ * exactly one sign-in. Advancing to the successor is this function's own job, done once
+ * the canister has answered — which is why the id is asked for as `browserIdOf` rather
+ * than left to the caller to hand back.
  *
  * The canister accepts only the successor an entry is waiting for, so a sign-in whose
  * response was lost leaves this browser proving with a key that has since been retired.
@@ -244,6 +254,10 @@ export const withBrowserProof = <T>(
   sessionKey: Uint8Array,
   description: BrowserDescription,
   signIn: (proof: BrowserProof) => Promise<T>,
+  /** Which browser the canister said this is, read off whatever `signIn` returned. A
+   *  required argument rather than a callback to remember: the id and the rotation are
+   *  written together, and `tsc` refuses a caller that offers neither. */
+  browserIdOf: (value: T) => number,
 ): Promise<T> =>
   exclusively(identityNumber, async () => {
     const from = await forDescription(identityNumber, description);
@@ -253,6 +267,7 @@ export const withBrowserProof = <T>(
         sessionKey,
         description,
         signIn,
+        browserIdOf,
         from,
       );
     } catch (error) {
@@ -275,6 +290,7 @@ export const withBrowserProof = <T>(
         sessionKey,
         description,
         signIn,
+        browserIdOf,
         promoted,
       );
     }
