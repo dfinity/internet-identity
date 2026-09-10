@@ -5151,6 +5151,30 @@ mod account_principal_index_tests {
             other_anchor_number
         );
     }
+
+    #[test]
+    fn a_principal_resolves_to_the_account_it_was_derived_for() {
+        let (mut storage, anchor_number) = storage_with_anchor();
+        let origin = "https://example.com".to_string();
+        record_use(&mut storage, anchor_number, origin.clone(), None, 1_000).unwrap();
+        let principal = default_account_principal(anchor_number, &origin);
+
+        let key = storage.lookup_account_with_principal(principal).unwrap();
+
+        assert_eq!(key.anchor_number, anchor_number);
+        assert_eq!(key.origin, origin);
+        assert_eq!(key.account_number, None);
+    }
+
+    #[test]
+    fn a_principal_that_was_never_derived_resolves_to_nothing() {
+        let (storage, _) = storage_with_anchor();
+
+        assert_eq!(
+            storage.lookup_account_with_principal(Principal::anonymous()),
+            None
+        );
+    }
 }
 
 mod session_tests {

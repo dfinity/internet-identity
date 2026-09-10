@@ -944,5 +944,10 @@ pub enum AppSessionError {
     /// same: the only difference is that this side matches the caller rather than being
     /// handed a session id.
     NoSuchSession,
+    /// The session is live, but nothing was signed for the `(session_key, expiration)`
+    /// asked for — so the expiration is one `app_prepare_delegation` never returned.
+    /// Told apart from `NoSuchSession` because the remedy differs: prepare again and use
+    /// what comes back, rather than sign in again.
+    NoSuchDelegation,
     InternalCanisterError(String),
 }

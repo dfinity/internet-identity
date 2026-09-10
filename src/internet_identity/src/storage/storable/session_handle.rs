@@ -1,4 +1,5 @@
 use crate::storage::storable::session_id::StorableSessionId;
+use candid::Principal;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use minicbor::{Decode, Encode};
@@ -23,6 +24,15 @@ pub struct StorableSessionHandle {
     pub account_principal: Vec<u8>,
     #[n(1)]
     pub session_id: StorableSessionId,
+}
+
+impl StorableSessionHandle {
+    /// The account this session is at, as the principal the field holds. Named for what
+    /// it returns, because the sibling on [`crate::storage::account::SessionLocator`]
+    /// answers with an account key.
+    pub fn account_principal(&self) -> Principal {
+        Principal::from_slice(&self.account_principal)
+    }
 }
 
 impl Storable for StorableSessionHandle {
