@@ -13,7 +13,8 @@
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
   import { beforeNavigate, preloadData } from "$app/navigation";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { forgetIdentity } from "$lib/stores/session-delegation.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { purgeAppSessions } from "$lib/stores/app-session.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import {
@@ -91,26 +92,17 @@
       duration: 2000,
     });
   };
+  // Local only. `ManageIdentities` disables the remove button on the selected identity,
+  // so the identity removed here is never the one signed in — and revoking a browser's
+  // sessions needs full authorization, which a stored session delegation does not carry.
+  // Dropping the records is therefore the whole of it, which is what makes Undo worth
+  // offering: the identity comes back, and nothing was signed out to restore.
   const handleRemoveIdentity = (identityNumber: bigint) => {
-    // If the removed identity is currently selected,
-    // switch to the next available one in the list.
-    //
-    // The last identity cannot be removed, so there will
-    // always be at least one next identity available.
-    const isCurrent = selectedIdentity?.identityNumber === identityNumber;
-    if (isCurrent) {
-      const nextIdentity = lastUsedIdentities.find(
-        (identity) => identity.identityNumber !== identityNumber,
-      );
-      if (nextIdentity !== undefined) {
-        lastUsedIdentitiesStore.selectIdentity(nextIdentity.identityNumber);
-      }
-    }
-
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void forgetIdentity(identityNumber);
+    void purgeSession(identityNumber);
+    void purgeAppSessions(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
@@ -118,18 +110,13 @@
         removedIdentity.name ?? `${removedIdentity.identityNumber}`;
       toaster.create({
         title: $t`Identity removed`,
-        description: $t`${identityName} has been removed from this device. Apps you were signed into here have been signed out.`,
+        description: $t`${identityName} has been removed from this device.`,
         closable: true,
         duration: 5000,
         action: {
           label: $t`Undo`,
           onClick: () => {
             lastUsedIdentitiesStore.restoreIdentity(removedIdentity);
-            if (isCurrent) {
-              lastUsedIdentitiesStore.selectIdentity(
-                removedIdentity.identityNumber,
-              );
-            }
           },
         },
       });
