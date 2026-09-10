@@ -103,7 +103,7 @@ use identity_jose::jwk::Jwk;
 use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::browser_key::VerifiedBrowserKeys;
-use crate::delegation::{self, calculate_session_seed_with_salt, check_frontend_length};
+use crate::delegation::{self, calculate_session_seed_with_salt, frontend_length_within_limit};
 use crate::openid::OpenIdCredentialKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
@@ -2325,9 +2325,18 @@ impl<M: Memory + Clone> Storage<M> {
         // write that left nothing behind would leave an application no counter will ever
         // retire, since retirement only ever runs off a write to its account state —
         // which is why this sits after the check above rather than before it.
+        //
+        // It is also the only place an origin becomes a stored one, so it is where the
+        // length bound belongs: storage does not trust its callers to have checked, and
+        // an already-stored origin passed through here when it was minted.
         let application_number = match stored_number {
             Some(application_number) => application_number,
-            None => minting.allocate_application_number()?,
+            None => {
+                frontend_length_within_limit(&origin).map_err(|_| StorageError::OriginTooLong {
+                    origin: origin.clone(),
+                })?;
+                minting.allocate_application_number()?
+            }
         };
 
         // An origin index pointing at an application that is gone is a broken invariant
@@ -2953,8 +2962,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(session_id)
     }
 
-    // Called by `prepare_account_session`, which lands two PRs up.
-    #[allow(dead_code)]
     /// Creates the session `prepare_account_session` mints an identity from, replacing
     /// whatever this browser already held at this account.
     pub fn create_session(
@@ -3120,7 +3127,6 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// A key whose session was replaced reads as `None` rather than as its successor:
     /// the successor was allocated an id of its own.
-    #[allow(dead_code)] // Read by `get_account_session`, which lands two PRs up.
     pub fn read_session(&self, key: &SessionLocator) -> Option<Session> {
         let application_number = self.lookup_application_number_with_origin(&key.origin)?;
 
@@ -3366,8 +3372,13 @@ impl<M: Memory + Clone> Storage<M> {
     /// The `Account` returned carries the seed the account signs with, so this is also
     /// the only place that capability is handed out — a caller that holds one has been
     /// through the check above.
+    ///
+    /// An origin too long to store has nothing stored under it, so it answers `None`
+    /// rather than deriving a default. Absence normally means "derive the default", and
+    /// without this a caller could be handed the seed of an account at an origin the
+    /// write path would refuse.
     pub fn read_account(&self, key: &AccountKey) -> Option<Account> {
-        check_frontend_length(&key.origin);
+        frontend_length_within_limit(&key.origin).ok()?;
 
         let reference = self
             .account_references_for_origin(key.anchor_number, &key.origin)
@@ -3377,13 +3388,16 @@ impl<M: Memory + Clone> Storage<M> {
         self.account_for_reference(key.anchor_number, &key.origin, &reference)
     }
 
-    /// Every account this identity holds at `origin`.
+    /// Every account this identity holds at `origin`, which is none where the origin is
+    /// too long to have been stored — see [`Self::read_account`].
     pub fn list_accounts(
         &self,
         anchor_number: AnchorNumber,
         origin: &FrontendHostname,
     ) -> Vec<Account> {
-        check_frontend_length(origin);
+        if frontend_length_within_limit(origin).is_err() {
+            return vec![];
+        }
 
         self.account_references_for_origin(anchor_number, origin)
             .iter()
@@ -3433,8 +3447,6 @@ impl<M: Memory + Clone> Storage<M> {
         name: String,
         now: Timestamp,
     ) -> Result<Account, StorageError> {
-        check_frontend_length(&origin);
-
         // An absent list normalises to the derived default, which is how the first named
         // account at an origin does not cost the identity the default it had. A
         // tombstone normalises to nothing and stays that way.
@@ -3492,8 +3504,6 @@ impl<M: Memory + Clone> Storage<M> {
         account: Account,
         now: Timestamp,
     ) -> Result<Account, StorageError> {
-        check_frontend_length(&account.origin);
-
         let Account {
             account_number,
             anchor_number,
@@ -3608,8 +3618,6 @@ impl<M: Memory + Clone> Storage<M> {
         account_number: Option<AccountNumber>,
         now: Timestamp,
     ) -> Result<(), StorageError> {
-        check_frontend_length(&origin);
-
         let anchor = self.read(anchor_number)?;
         let (account_references, _) = self.account_state_for_origin(anchor_number, &origin);
         // The stored config with one field moved, rather than a config built here: this
@@ -3888,8 +3896,6 @@ impl<M: Memory + Clone> Storage<M> {
     }
 }
 
-// Constructed by `prepare_account_session`, which lands two PRs up.
-#[allow(dead_code)]
 pub struct CreateSessionParams {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
@@ -4267,6 +4273,11 @@ pub enum StorageError {
     OriginNotFoundForApplicationNumber {
         application_number: ApplicationNumber,
     },
+    /// An origin too long to store. Refused here rather than at an endpoint, so the
+    /// bound holds for every caller instead of for the ones that remembered to check.
+    OriginTooLong {
+        origin: FrontendHostname,
+    },
     ErrorUpdatingAccountCounter,
     SaltNotSet,
     AccountsCounterOverflow,
@@ -4370,6 +4381,9 @@ impl fmt::Display for StorageError {
                 f,
                 "Origin not found for application number {application_number}",
             ),
+            Self::OriginTooLong { origin } => {
+                write!(f, "the origin exceeds the limit at {} bytes", origin.len())
+            }
             Self::ErrorUpdatingAccountCounter => write!(f, "Error updating account counter"),
             Self::SaltNotSet => write!(
                 f,

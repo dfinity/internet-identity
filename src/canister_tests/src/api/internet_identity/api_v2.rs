@@ -746,3 +746,29 @@ pub fn get_account_delegation_with_read_only(
     )
     .map(|(x,)| x)
 }
+
+pub fn prepare_account_session(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: PrepareAccountSessionRequest,
+) -> Result<Result<PrepareAccountSessionResponse, AccountSessionError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "prepare_account_session",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_account_session(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: GetAccountSessionRequest,
+) -> Result<Result<GetAccountSessionResponse, AccountSessionError>, RejectResponse> {
+    query_candid_as(env, canister_id, sender, "get_account_session", (request,)).map(|(x,)| x)
+}

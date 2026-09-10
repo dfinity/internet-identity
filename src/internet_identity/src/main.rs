@@ -68,6 +68,7 @@ mod mcp_registration;
 
 mod openid;
 mod session_delegation;
+mod sessions;
 mod single_flight_cache;
 mod state;
 mod stats;
@@ -495,6 +496,20 @@ fn set_default_account(
     )?;
     anchor_management::post_operation_bookkeeping(anchor_number, Operation::SetDefaultAccount);
     Ok(result)
+}
+
+#[update]
+fn prepare_account_session(
+    request: PrepareAccountSessionRequest,
+) -> Result<PrepareAccountSessionResponse, AccountSessionError> {
+    sessions::prepare_account_session(request)
+}
+
+#[query]
+fn get_account_session(
+    request: GetAccountSessionRequest,
+) -> Result<GetAccountSessionResponse, AccountSessionError> {
+    sessions::get_account_session(request)
 }
 
 #[update]

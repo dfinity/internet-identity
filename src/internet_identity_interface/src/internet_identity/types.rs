@@ -829,3 +829,120 @@ pub enum SetDefaultAccountError {
         origin: FrontendHostname,
     },
 }
+
+/// Creates or reuses a revocable session at one account and signs its identity to the
+/// II frontend's own key.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareAccountSessionRequest {
+    pub identity_number: IdentityNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub session_key: SessionKey,
+    /// Labels the browser in the user's session list, e.g. "Chrome on MacBook".
+    pub browser_description: BrowserDescription,
+    /// The browser's own public key, DER-encoded, as the registry currently holds it. A
+    /// key this anchor has not seen registers a browser under it.
+    pub current_browser_key: PublicKey,
+    /// What the browser rotates to once this sign-in succeeds.
+    pub next_browser_key: PublicKey,
+    /// Signature over `session_key` and `next_browser_key`, verified with
+    /// `current_browser_key`. A second signature by `next_browser_key` proves the browser
+    /// holds the key it is announcing.
+    pub current_browser_key_signature: ByteBuf,
+    pub next_browser_key_signature: ByteBuf,
+    /// The consented access level, fixed for the session's life.
+    pub permissions: Option<Permissions>,
+    /// Clamped to the session maximum.
+    pub valid_for: Option<u64>,
+    /// How long the session may go unminted before it is over. Clamped to between
+    /// 10 minutes and the session's own granted length; absent leaves the
+    /// canister's own default.
+    pub max_idle: Option<u64>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareAccountSessionResponse {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+    /// Names the session this ceremony created, and is what `get_account_session` is
+    /// given to collect the delegation signed for it. Not a credential: it names a
+    /// session, it does not authorise one, and the caller has just proved it owns this
+    /// one anyway.
+    pub session_id: SessionId,
+    /// Which browser this sign-in was attributed to, so the settings list can mark the one
+    /// the user is looking at, and so the browser knows which registration its key now
+    /// belongs to. Not a credential: a caller never presents it.
+    pub browser_id: BrowserId,
+    /// The principal apps see for this account. The caller is the anchor that owns it
+    /// and can mint a delegation for it at any time, so this reveals nothing new; it
+    /// saves the II frontend from having to mint one just to learn it.
+    pub account_principal: Principal,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetAccountSessionRequest {
+    pub identity_number: IdentityNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub session_key: SessionKey,
+    pub expiration: Timestamp,
+    /// The session `prepare_account_session` created, named exactly rather than
+    /// searched for.
+    pub session_id: SessionId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct GetAccountSessionResponse {
+    pub signed_delegation: SignedDelegation,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AccountSessionError {
+    Unauthorized(Principal),
+    NoSuchAccount,
+    NoSuchSession,
+    /// The session is there, but no delegation was signed for the session key and
+    /// expiration asked for. Told apart from `NoSuchSession` because the remedies differ:
+    /// this one is answered by asking with the parameters `prepare_account_session`
+    /// signed, not by signing in again.
+    NoSuchDelegation,
+    /// The browser's key is unusable, or its signature does not verify against it.
+    InvalidBrowserKey,
+    /// The browser presented a key it has already rotated away from, which happens when
+    /// it never learned that its last sign-in succeeded. It holds the successor that does
+    /// resolve, so the answer is to promote that one and present it.
+    StaleBrowserKey,
+    InternalCanisterError(String),
+}
+
+/// Mints an app delegation from a live session. The session is proven by the caller's
+/// own chain, so nothing about the account is named in the request.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppPrepareDelegationRequest {
+    pub session_key: SessionKey,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppPrepareDelegationResponse {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppGetDelegationRequest {
+    pub session_key: SessionKey,
+    pub expiration: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AppSessionError {
+    /// No usable session behind this caller: revoked, expired, pruned, or never one at
+    /// all. One outcome, because which of those it is depends on whether a prune has run
+    /// yet, and because an app can act on none of them differently.
+    ///
+    /// The same fact its counterpart on [`AccountSessionError`] names, and named the
+    /// same: the only difference is that this side matches the caller rather than being
+    /// handed a session id.
+    NoSuchSession,
+    InternalCanisterError(String),
+}

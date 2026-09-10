@@ -19,6 +19,32 @@ export interface AccountInfo {
   'last_used' : [] | [Timestamp],
 }
 export type AccountNumber = bigint;
+export type AccountSessionError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal } |
+  { 'NoSuchSession' : null } |
+  {
+    /**
+     * The session is there, but no delegation was signed for the session_key and
+     * expiration asked for. Ask again with the ones prepare_account_session returned;
+     * signing in afresh is not the remedy.
+     */
+    'NoSuchDelegation' : null
+  } |
+  { 'NoSuchAccount' : null } |
+  {
+    /**
+     * The browser's key is unusable, or its signature does not verify against it.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  {
+    /**
+     * The browser presented a key it has already rotated away from, which happens when it
+     * never learned that its last sign-in succeeded. It holds the successor that does
+     * resolve, so the answer is to promote that one and present it.
+     */
+    'StaleBrowserKey' : null
+  };
 export interface AccountUpdate { 'name' : [] | [string] }
 export type AddTentativeDeviceResponse = {
     /**
@@ -696,6 +722,20 @@ export type GetAccountError = {
       'anchor_number' : UserNumber,
     }
   };
+export interface GetAccountSessionRequest {
+  /**
+   * The session prepare_account_session created.
+   */
+  'session_id' : bigint,
+  'session_key' : SessionKey,
+  'origin' : FrontendHostname,
+  'account_number' : [] | [AccountNumber],
+  'expiration' : Timestamp,
+  'identity_number' : UserNumber,
+}
+export interface GetAccountSessionResponse {
+  'signed_delegation' : SignedDelegation,
+}
 export type GetAccountsError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export type GetAttributesError = { 'AuthorizationError' : Principal } |
@@ -1333,6 +1373,76 @@ export type Permissions = { 'all' : null } |
 export interface PrepareAccountDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
+}
+export interface PrepareAccountSessionRequest {
+  /**
+   * The consented access level, fixed for the session's life.
+   */
+  'permissions' : [] | [Permissions],
+  /**
+   * How long the session may go unminted before it is over, clamped to between
+   * 10 minutes and the session's own granted length. Absent leaves the
+   * canister's own default.
+   */
+  'max_idle' : [] | [bigint],
+  /**
+   * The browser's own public key, DER-encoded, as the registry currently holds it. A
+   * key this anchor has not seen registers a browser under it.
+   */
+  'current_browser_key' : PublicKey,
+  /**
+   * The II frontend's own public key.
+   */
+  'session_key' : SessionKey,
+  /**
+   * Clamped to the session maximum.
+   */
+  'valid_for' : [] | [bigint],
+  'origin' : FrontendHostname,
+  /**
+   * Signature over session_key and next_browser_key, verified with current_browser_key.
+   */
+  'current_browser_key_signature' : Uint8Array | number[],
+  /**
+   * What this browser is, for the user's session list.
+   */
+  'browser_description' : BrowserDescription,
+  'account_number' : [] | [AccountNumber],
+  'identity_number' : UserNumber,
+  /**
+   * What the browser rotates to once this sign-in succeeds. Must differ from
+   * current_browser_key: a browser that never rotates keeps a leaked key useful.
+   */
+  'next_browser_key' : PublicKey,
+  /**
+   * Signature by next_browser_key over session_key and current_browser_key, proving the
+   * browser holds the key it is announcing.
+   */
+  'next_browser_key_signature' : Uint8Array | number[],
+}
+export interface PrepareAccountSessionResponse {
+  'user_key' : PublicKey,
+  /**
+   * Names the session this ceremony created, and is what get_account_session is given
+   * to collect the delegation signed for it. Not a credential: it names a session, it
+   * does not authorise one.
+   */
+  'session_id' : bigint,
+  /**
+   * Which browser this sign-in was attributed to, so the settings list can mark the one
+   * the user is looking at, and so the browser knows which registration its key now
+   * belongs to. Not a credential: a caller never presents it.
+   */
+  'browser_id' : number,
+  /**
+   * The session's valid_till.
+   */
+  'expiration' : Timestamp,
+  /**
+   * The principal apps see for this account, so the frontend can tell its own
+   * sessions apart without minting a delegation to learn it.
+   */
+  'account_principal' : Principal,
 }
 export type PrepareAttributeError = { 'AuthorizationError' : Principal } |
   { 'ValidationError' : { 'problems' : Array<string> } } |
@@ -2103,6 +2213,11 @@ export interface _SERVICE {
     { 'Ok' : SignedDelegation } |
       { 'Err' : AccountDelegationError }
   >,
+  'get_account_session' : ActorMethod<
+    [GetAccountSessionRequest],
+    { 'Ok' : GetAccountSessionResponse } |
+      { 'Err' : AccountSessionError }
+  >,
   /**
    * Multiple accounts
    */
@@ -2394,6 +2509,17 @@ export interface _SERVICE {
     ],
     { 'Ok' : PrepareAccountDelegation } |
       { 'Err' : AccountDelegationError }
+  >,
+  /**
+   * Creates or reuses a revocable session at one account and signs its identity to
+   * the II frontend's own key. Called only by the II frontend, which ships with the
+   * canister; requires an anchor access method, so a session can neither spawn nor
+   * extend itself.
+   */
+  'prepare_account_session' : ActorMethod<
+    [PrepareAccountSessionRequest],
+    { 'Ok' : PrepareAccountSessionResponse } |
+      { 'Err' : AccountSessionError }
   >,
   /**
    * Attribute sharing protocol

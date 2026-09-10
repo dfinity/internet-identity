@@ -19,6 +19,7 @@ mod mcp;
 mod openid;
 mod rollback;
 mod session_delegation;
+mod sessions;
 mod stable_memory;
 mod upgrade;
 mod v2_api;

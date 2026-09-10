@@ -1,5 +1,6 @@
 use crate::archive::{ArchiveData, ArchiveState};
 use crate::browser_key::VerifiedBrowserKeys;
+use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
 use crate::openid::OpenIdCredential;
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
@@ -947,11 +948,19 @@ mod application_lookup_tests {
         assert_eq!(storage.lookup_application_with_origin_memory.len(), 0);
     }
 
+    /// The index is keyed by the origin's hash rather than by its bytes, so an origin at
+    /// the limit is looked up the same way a short one is and is stored whole.
     #[test]
-    fn should_handle_very_long_origins_with_sha256() {
+    fn should_handle_an_origin_at_the_limit_with_sha256() {
         let mut storage = Storage::new((10, 20), VectorMemory::default());
 
-        let long_origin = format!("https://{}.com", "a".repeat(20_000));
+        let prefix = "https://";
+        let suffix = ".com";
+        let long_origin = format!(
+            "{prefix}{}{suffix}",
+            "a".repeat(FRONTEND_HOSTNAME_LIMIT - prefix.len() - suffix.len())
+        );
+        assert_eq!(long_origin.len(), FRONTEND_HOSTNAME_LIMIT);
 
         let app_number = application_number_for(&mut storage, &long_origin);
         assert_eq!(app_number, 0);
@@ -962,6 +971,80 @@ mod application_lookup_tests {
         // Application should be stored with full origin
         let stored_app = storage.stable_application_memory.get(&0).unwrap();
         assert_eq!(stored_app.origin, long_origin);
+    }
+
+    /// Storage refuses an origin it cannot store rather than trusting the endpoint that
+    /// handed it one. Nothing reachable sends one this long — every endpoint bounds it
+    /// first — so this is about where the guarantee lives, not about a live hazard.
+    /// Reads answer for the same bound the writes enforce. Without this, absence
+    /// normalises to the derived default and a caller is handed the seed of an account at
+    /// an origin nothing could ever store — the read endpoints do no length check of
+    /// their own.
+    #[test]
+    fn an_origin_past_the_limit_holds_nothing_to_read() {
+        let mut storage = Storage::new((10, 20), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let anchor = storage.allocate_anchor(0).expect("an anchor to read as");
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).expect("writing the identity");
+        let too_long = format!("https://{}.com", "a".repeat(FRONTEND_HOSTNAME_LIMIT));
+
+        assert_eq!(
+            storage.read_account(&AccountKey {
+                anchor_number,
+                origin: too_long.clone(),
+                account_number: None,
+            }),
+            None,
+            "an unstorable origin must not derive a default account"
+        );
+        assert_eq!(storage.list_accounts(anchor_number, &too_long), vec![]);
+
+        // An origin at the limit still reads the derived default, so the bound is what
+        // separates them rather than the read path having stopped working.
+        let at_limit = format!(
+            "https://{}.com",
+            "a".repeat(FRONTEND_HOSTNAME_LIMIT - "https://".len() - ".com".len())
+        );
+        assert!(storage
+            .read_account(&AccountKey {
+                anchor_number,
+                origin: at_limit,
+                account_number: None,
+            })
+            .is_some());
+    }
+
+    #[test]
+    fn an_origin_past_the_limit_is_refused_rather_than_stored() {
+        let mut storage = Storage::new((10, 20), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let anchor = storage
+            .allocate_anchor(0)
+            .expect("an anchor to write under");
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).expect("writing the identity");
+        let too_long = format!("https://{}.com", "a".repeat(FRONTEND_HOSTNAME_LIMIT));
+
+        // A config write, the smallest write that stores something at an origin and so
+        // the smallest one that has to mint an application for it.
+        let refused = storage.write_account_state_for_testing(
+            anchor_number,
+            BTreeMap::from([(
+                too_long.clone(),
+                Some((vec![], Some(AnchorApplicationConfig::default()))),
+            )]),
+        );
+
+        assert!(
+            matches!(refused, Err(StorageError::OriginTooLong { ref origin }) if origin == &too_long),
+            "an origin of {} bytes should be refused, got {refused:?}",
+            too_long.len()
+        );
+        assert_eq!(
+            storage.lookup_application_number_with_origin(&too_long),
+            None
+        );
     }
 
     #[test]
