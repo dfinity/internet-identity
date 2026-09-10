@@ -65,7 +65,7 @@
   column too small for it, truncating the name and printing the meta over the badge.
 -->
 <div
-  class="col-span-4 grid grid-cols-subgrid gap-y-4 py-3 @xl/list:items-center @xl/list:gap-y-0"
+  class="col-span-4 grid grid-cols-subgrid gap-y-1.5 py-2.5 @xl/list:items-center @xl/list:gap-y-0"
 >
   <div
     class="col-span-3 flex min-w-0 flex-row items-center gap-3 @xl/list:col-span-1"
@@ -98,7 +98,7 @@
   <!-- A line of its own below the identity when the row is a block; dissolved into the
        row's own line above the breakpoint, where each pair takes a column. -->
   <div
-    class="col-span-3 row-start-2 grid grid-cols-[auto_1fr] items-baseline gap-x-2 gap-y-3 @xl/list:contents {dimmed
+    class="col-span-3 row-start-2 grid grid-cols-[auto_auto] items-baseline justify-start gap-x-3 gap-y-[3px] @xl/list:contents {dimmed
       ? 'opacity-70'
       : ''}"
   >
@@ -106,12 +106,12 @@
     {@render meta($t`First seen`, firstSeen)}
   </div>
 
-  <!-- Beside both lines when the row is a block, so it centres on them; its own column
-       when the row is a line. Rendered even when empty, so the column keeps its width
-       and a row without an action stays aligned with the rows that have one. -->
-  <span
-    class="col-start-4 row-span-2 row-start-1 flex items-center justify-center @xl/list:row-span-1"
-  >
+  <!-- On the name's line and centred on it, because the browser is what it acts on.
+       `h-9` is the button's own height, held whatever the slot contains: without it a
+       row showing "Signed out" would stand shorter than one offering a button, and the
+       list would breathe unevenly. Rendered even when empty for the same reason, and so
+       the column keeps its width. -->
+  <span class="col-start-4 row-start-1 flex h-9 items-center justify-center">
     {@render actionControl()}
   </span>
 </div>
