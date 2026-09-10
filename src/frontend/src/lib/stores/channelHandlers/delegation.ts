@@ -26,17 +26,7 @@ import {
   attributeConsentStore,
 } from "$lib/stores/attributeConsent.store";
 import { get } from "svelte/store";
-
-/** Serialize delegation requests so a malicious dapp sending several in
- *  parallel can't race the authorization state (effective origin, auth
- *  flow, authorized account) against itself. */
-let delegationQueueTail: Promise<unknown> = Promise.resolve();
-const serializeDelegationRequest = <T>(fn: () => Promise<T>): Promise<T> => {
-  const prev = delegationQueueTail;
-  const next = prev.then(fn);
-  delegationQueueTail = next.catch(() => {});
-  return next;
-};
+import { serializeAuthorizationRequest } from "$lib/stores/channelHandlers/serialize";
 
 /**
  * ICRC-34: handle a delegation request from the relying party.
@@ -66,7 +56,7 @@ export const handleDelegationRequest =
       return;
     }
 
-    await serializeDelegationRequest(async () => {
+    await serializeAuthorizationRequest(async () => {
       try {
         const params = result.data;
 
