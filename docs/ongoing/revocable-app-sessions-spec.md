@@ -4,6 +4,99 @@
 
 **Depends on:** [tracked-default-accounts-spec.md](tracked-default-accounts-spec.md) for the account reference a session is stored on and the principal index the refresh path resolves through.
 
+## The records after this change
+
+[tracked-default-accounts-spec.md](tracked-default-accounts-spec.md#the-records-ii-keeps-today) draws what storage holds once accounts are tracked. This is that picture with sessions and browsers in it. Everything marked *new* is what this feature adds; the rest is already there.
+
+```mermaid
+erDiagram
+    ANCHOR {
+        u64 anchor_number PK
+        vec browsers "new, max 20"
+        u32 next_browser_id "new, allocator"
+        u32 session_count "new, stored sessions"
+    }
+    BROWSER {
+        u32 id PK "new, unique per identity"
+        blob current_browser_key "new, the key it proves with"
+        blob next_browser_key "new, the successor it announced"
+        browser_description description "new, brand, os, form factor, model"
+        u64 created_at "new"
+        u64 last_used "new, what eviction orders on"
+        u32 session_count "new, stored sessions"
+    }
+    APPLICATION {
+        u64 application_number PK
+        string origin
+        u64 stored_accounts
+        u64 stored_account_references
+        u64 stored_tombstones
+    }
+    REFERENCE_LIST {
+        u64 anchor_number PK
+        u64 application_number PK
+    }
+    ACCOUNT_REFERENCE {
+        opt_u64 account_number "None = default account"
+        opt_u64 last_used
+        vec sessions "new"
+    }
+    SESSION {
+        u64 session_id PK "new, monotonic, never reissued"
+        u64 created_at_ns "new"
+        u64 valid_till_ns "new, absolute bound"
+        u64 max_idle_ns "new, relative bound"
+        opt_u64 last_refreshed_ns "new, None until the first mint"
+        u32 browser_id FK "new"
+        bool read_only "new, from the consent"
+    }
+    ACCOUNT {
+        u64 account_number PK
+        string name
+        opt_u64 seed_from_anchor
+    }
+    APP_CONFIG {
+        u64 anchor_number PK
+        u64 application_number PK
+        opt_u64 default_account_number
+    }
+    ACCOUNT_PRINCIPAL_INDEX {
+        principal account_principal PK
+        u64 anchor_number
+        u64 application_number
+        opt_u64 account_number
+    }
+    SESSION_PRINCIPAL_INDEX {
+        principal session_principal PK "new"
+        principal account_principal "new"
+        u64 session_id "new"
+    }
+    ANCHOR ||--o{ BROWSER : "holds"
+    ANCHOR ||--o{ REFERENCE_LIST : "keyed by"
+    APPLICATION ||--o{ REFERENCE_LIST : "keyed by"
+    APPLICATION ||--o{ APP_CONFIG : "keyed by"
+    REFERENCE_LIST ||--|{ ACCOUNT_REFERENCE : contains
+    ACCOUNT_REFERENCE |o--o| ACCOUNT : "materialized when Some"
+    ACCOUNT_REFERENCE ||--o{ SESSION : contains
+    BROWSER ||--o{ SESSION : "groups, by browser_id"
+    ACCOUNT_REFERENCE ||--|| ACCOUNT_PRINCIPAL_INDEX : "derived, one per reference"
+    SESSION ||--|| SESSION_PRINCIPAL_INDEX : "derived, one per session"
+```
+
+Five things in that picture carry the design, and each has a section of its own below.
+
+A session is a record **inside the account reference** rather than a map of its own, so every session change is a write of account state and goes through the one write path the reference list already goes through ([the session record](#the-session-record)).
+
+A browser is a record **on the anchor**, beside the passkeys and OpenID credentials already stored there. That is what makes a browser's sessions across every app one identity's own list, listable and sweepable together ([the registry](#registry)).
+
+Two allocators, on different scopes. `browser_id` comes from a counter on the anchor, so it is unique per identity and means nothing outside it. `session_id` comes from a canister-wide monotonic cell that never reissues, because it is a seed input and a reissued one would let a revoked session's identity be arrived at a second time ([session identity](#session-identity)).
+
+Two caps, and neither refuses a sign-in: 20 browsers per identity ([at the cap, registration evicts](#at-the-cap-registration-evicts-the-least-recently-used)) and 500 stored sessions per identity ([the session cap](#the-session-cap)). Both reclaim instead. `session_count` on the anchor is what a sign-in reads to know the session cap is reached; the per-browser one is what rides out to the settings list on `identity_info`, which never sees a browser's keys.
+
+Two indexes, both **derived**: every entry is reconstructible from the reference lists, and both are maintained from the same reference-list write. The account principal index is [tracked-default-accounts-spec.md](tracked-default-accounts-spec.md#the-principal-index)'s; the session principal index is what turns a refresh's `caller()` into the record it names, through the account principal the handle carries ([finding a session from a call](#finding-a-session-from-a-call)).
+
+---
+
 ## Glossary
 
 | Term                       | Meaning                                                                                                                                                                             |
