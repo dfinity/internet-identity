@@ -114,6 +114,21 @@ fn should_create_a_session_and_witness_its_delegation() -> Result<(), RejectResp
         &fetched.signed_delegation,
         &env.root_key().unwrap(),
     );
+
+    // Asserted rather than left to `verify_delegation`, which builds the message it
+    // checks from whatever the reply carries: drop the targets on both the signing and
+    // the witnessing side and the signature still verifies. These two fields are what
+    // separate a session credential from an unrestricted delegation.
+    assert_eq!(
+        fetched.signed_delegation.delegation.targets,
+        Some(vec![canister_id]),
+        "the session credential must be usable only against Internet Identity"
+    );
+    assert!(
+        fetched.signed_delegation.delegation.permissions.is_none(),
+        "it mints app delegations, which is an update call"
+    );
+
     Ok(())
 }
 
@@ -465,8 +480,10 @@ fn should_refuse_a_retired_key_and_accept_the_successor() -> Result<(), RejectRe
     Ok(())
 }
 
-/// Presented keys are visible on the wire, so announcing a key another browser is about to
-/// present would otherwise take over its entry when it does.
+/// A key another entry already holds cannot be announced as a successor even by a caller
+/// who can prove it — two browsers would then race for one entry. The caller who *cannot*
+/// prove it is refused a step earlier, which is
+/// `should_refuse_a_successor_the_caller_cannot_prove`.
 #[test]
 fn should_refuse_a_successor_another_browser_holds() -> Result<(), RejectResponse> {
     let env = env();
@@ -487,6 +504,12 @@ fn should_refuse_a_successor_another_browser_holds() -> Result<(), RejectRespons
     request.next_browser_key = victim.successor().public_key();
     request.current_browser_key_signature =
         attacker.sign(&request.session_key, &request.next_browser_key);
+    // Signed by the successor being announced, which a test can do and an attacker
+    // cannot. Without it the key proof fails first and the registry check below is never
+    // reached.
+    request.next_browser_key_signature = victim
+        .successor()
+        .sign_as_successor(&request.session_key, &request.current_browser_key);
     let result = prepare_account_session(&env, canister_id, principal_1(), request)?;
 
     assert_eq!(result, Err(AccountSessionError::InvalidBrowserKey));
