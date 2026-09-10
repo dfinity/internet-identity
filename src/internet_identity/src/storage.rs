@@ -3415,7 +3415,14 @@ impl<M: Memory + Clone> Storage<M> {
     /// The `Account` returned carries the seed the account signs with, so this is also
     /// the only place that capability is handed out — a caller that holds one has been
     /// through the check above.
+    ///
+    /// An origin too long to store has nothing stored under it, so it answers `None`
+    /// rather than deriving a default. Absence normally means "derive the default", and
+    /// without this a caller could be handed the seed of an account at an origin the
+    /// write path would refuse.
     pub fn read_account(&self, key: &AccountKey) -> Option<Account> {
+        frontend_length_within_limit(&key.origin).ok()?;
+
         let reference = self
             .account_references_for_origin(key.anchor_number, &key.origin)
             .into_iter()
@@ -3424,12 +3431,17 @@ impl<M: Memory + Clone> Storage<M> {
         self.account_for_reference(key.anchor_number, &key.origin, &reference)
     }
 
-    /// Every account this identity holds at `origin`.
+    /// Every account this identity holds at `origin`, which is none where the origin is
+    /// too long to have been stored — see [`Self::read_account`].
     pub fn list_accounts(
         &self,
         anchor_number: AnchorNumber,
         origin: &FrontendHostname,
     ) -> Vec<Account> {
+        if frontend_length_within_limit(origin).is_err() {
+            return vec![];
+        }
+
         self.account_references_for_origin(anchor_number, origin)
             .iter()
             .filter_map(|reference| self.account_for_reference(anchor_number, origin, reference))

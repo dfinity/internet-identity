@@ -976,6 +976,45 @@ mod application_lookup_tests {
     /// Storage refuses an origin it cannot store rather than trusting the endpoint that
     /// handed it one. Nothing reachable sends one this long — every endpoint bounds it
     /// first — so this is about where the guarantee lives, not about a live hazard.
+    /// Reads answer for the same bound the writes enforce. Without this, absence
+    /// normalises to the derived default and a caller is handed the seed of an account at
+    /// an origin nothing could ever store — the read endpoints do no length check of
+    /// their own.
+    #[test]
+    fn an_origin_past_the_limit_holds_nothing_to_read() {
+        let mut storage = Storage::new((10, 20), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let anchor = storage.allocate_anchor(0).expect("an anchor to read as");
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).expect("writing the identity");
+        let too_long = format!("https://{}.com", "a".repeat(FRONTEND_HOSTNAME_LIMIT));
+
+        assert_eq!(
+            storage.read_account(&AccountKey {
+                anchor_number,
+                origin: too_long.clone(),
+                account_number: None,
+            }),
+            None,
+            "an unstorable origin must not derive a default account"
+        );
+        assert_eq!(storage.list_accounts(anchor_number, &too_long), vec![]);
+
+        // An origin at the limit still reads the derived default, so the bound is what
+        // separates them rather than the read path having stopped working.
+        let at_limit = format!(
+            "https://{}.com",
+            "a".repeat(FRONTEND_HOSTNAME_LIMIT - "https://".len() - ".com".len())
+        );
+        assert!(storage
+            .read_account(&AccountKey {
+                anchor_number,
+                origin: at_limit,
+                account_number: None,
+            })
+            .is_some());
+    }
+
     #[test]
     fn an_origin_past_the_limit_is_refused_rather_than_stored() {
         let mut storage = Storage::new((10, 20), VectorMemory::default());
