@@ -24,17 +24,21 @@ class SignOutConfirmation {
     this.#page = page;
   }
 
+  /** Signs out and keeps the identity on this device: the dialog's "Remember". */
   async keepIdentity(): Promise<void> {
-    await this.#page
-      .getByRole("button", { name: "Sign out and keep identity" })
-      .click();
+    await this.#page.getByRole("button", { name: "Remember" }).click();
     await this.#page.waitForURL(II_URL);
   }
 
+  /** Signs out and drops the identity: the dialog's "Forget". */
   async removeFromDevice(): Promise<void> {
+    // Exact, so it does not also match the in-flight "Forgetting..." label this button
+    // takes on while the sessions are being revoked.
     await this.#page
-      .getByRole("button", { name: "Sign out and remove from device" })
+      .getByRole("button", { name: "Forget", exact: true })
       .click();
+    // Forgetting revokes this browser's sessions before navigating, so the wait covers a
+    // canister round trip rather than a redirect.
     await this.#page.waitForURL(II_URL);
   }
 }
@@ -96,7 +100,7 @@ class IdentitySwitcherPopover {
       .click();
     await expect(
       this.#page.getByRole("heading", {
-        name: "Sign out from this device",
+        name: "Remember this browser?",
       }),
     ).toBeVisible();
     const confirmation = new SignOutConfirmation(this.#page);
