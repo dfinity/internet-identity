@@ -13,8 +13,7 @@
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
   import { beforeNavigate, preloadData } from "$app/navigation";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { purgeSession } from "$lib/stores/session-delegation.store";
-  import { purgeAppSessions } from "$lib/stores/app-session.store";
+  import { forgetIdentity } from "$lib/stores/session-delegation.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import {
@@ -92,17 +91,27 @@
       duration: 2000,
     });
   };
-  // Local only. `ManageIdentities` disables the remove button on the selected identity,
-  // so the identity removed here is never the one signed in — and revoking a browser's
-  // sessions needs full authorization, which a stored session delegation does not carry.
-  // Dropping the records is therefore the whole of it, which is what makes Undo worth
-  // offering: the identity comes back, and nothing was signed out to restore.
+  // Every identity here is removable, the selected one included: this page passes no
+  // `selected` to `ManageIdentities`, because nobody is signed in on it. Only
+  // `manage/(authenticated)` passes one, where the identity in use cannot be removed.
   const handleRemoveIdentity = (identityNumber: bigint) => {
+    // Removing the selected identity would leave the selection naming an entry that is
+    // gone, which renders as signed out with other identities still present. Moved on
+    // before the delete, and moved back by Undo.
+    const isCurrent = selectedIdentity?.identityNumber === identityNumber;
+    if (isCurrent) {
+      const nextIdentity = lastUsedIdentities.find(
+        (identity) => identity.identityNumber !== identityNumber,
+      );
+      if (nextIdentity !== undefined) {
+        lastUsedIdentitiesStore.selectIdentity(nextIdentity.identityNumber);
+      }
+    }
+
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void purgeSession(identityNumber);
-    void purgeAppSessions(identityNumber);
+    void forgetIdentity(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
@@ -117,6 +126,11 @@
           label: $t`Undo`,
           onClick: () => {
             lastUsedIdentitiesStore.restoreIdentity(removedIdentity);
+            if (isCurrent) {
+              lastUsedIdentitiesStore.selectIdentity(
+                removedIdentity.identityNumber,
+              );
+            }
           },
         },
       });
