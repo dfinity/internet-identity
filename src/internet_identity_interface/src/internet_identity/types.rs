@@ -951,3 +951,16 @@ pub enum AppSessionError {
     NoSuchDelegation,
     InternalCanisterError(String),
 }
+
+/// Signs one browser out of every app it is signed into.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RevokeBrowserSessionsRequest {
+    pub identity_number: IdentityNumber,
+    pub browser_id: BrowserId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SessionRevokeError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}

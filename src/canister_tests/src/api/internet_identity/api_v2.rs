@@ -814,3 +814,20 @@ pub fn app_revoke_session(
     )
     .map(|(x,)| x)
 }
+
+pub fn revoke_browser_sessions(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: RevokeBrowserSessionsRequest,
+) -> Result<Result<(), SessionRevokeError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "revoke_browser_sessions",
+        (request,),
+    )
+    .map(|(x,)| x)
+}

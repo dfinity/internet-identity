@@ -520,6 +520,13 @@ fn app_prepare_delegation(
 }
 
 #[update]
+fn revoke_browser_sessions(
+    request: RevokeBrowserSessionsRequest,
+) -> Result<(), SessionRevokeError> {
+    sessions::revoke_browser_sessions(request, ic_cdk::api::time())
+}
+
+#[update]
 fn app_revoke_session() -> Result<(), AppSessionError> {
     sessions::app_revoke_session(ic_cdk::api::time())
 }

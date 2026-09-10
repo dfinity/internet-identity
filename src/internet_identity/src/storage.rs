@@ -3138,8 +3138,6 @@ impl<M: Memory + Clone> Storage<M> {
             .find(|session| session.session_id == key.session_id)
     }
 
-    // Called by the `revoke_browser_sessions` endpoint, which lands six PRs up.
-    #[allow(dead_code)]
     /// Signs one browser out of everything, in a single message.
     pub fn revoke_browser_sessions(
         &mut self,

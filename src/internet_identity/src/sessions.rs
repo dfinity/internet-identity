@@ -22,7 +22,8 @@ use internet_identity_interface::internet_identity::types::{
     AppPrepareDelegationRequest, AppPrepareDelegationResponse, AppSessionError, BrowserBrand,
     BrowserDescription, Delegation, FrontendHostname, GetAccountSessionRequest,
     GetAccountSessionResponse, OperatingSystem, PrepareAccountSessionRequest,
-    PrepareAccountSessionResponse, SignedDelegation, Timestamp,
+    PrepareAccountSessionResponse, RevokeBrowserSessionsRequest, SessionRevokeError,
+    SignedDelegation, Timestamp,
 };
 use serde_bytes::ByteBuf;
 
@@ -522,6 +523,28 @@ fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {
         AppSessionError::InternalCanisterError(StorageError::SaltNotSet.to_string())
     })?;
     Ok(account.calculate_seed_with_salt(&salt))
+}
+
+pub fn revoke_browser_sessions(
+    request: RevokeBrowserSessionsRequest,
+    now: Timestamp,
+) -> Result<(), SessionRevokeError> {
+    // The recording form, as the twelve other authenticated updates in `main.rs` use:
+    // what it stamps is that the access method authenticated, which it did, and signing
+    // every browser out is exactly the kind of thing the access page's `last_used` should
+    // reflect. This path writes anyway, so the stamp costs nothing extra.
+    check_authz_and_record_activity(request.identity_number).map_err(|err| match err {
+        IdentityUpdateError::Unauthorized(principal) => SessionRevokeError::Unauthorized(principal),
+        IdentityUpdateError::StorageError(_, storage_error) => {
+            SessionRevokeError::InternalCanisterError(storage_error.to_string())
+        }
+    })?;
+
+    storage_borrow_mut(|storage| {
+        storage.revoke_browser_sessions(request.identity_number, request.browser_id, now)
+    })
+    .map(|_| ())
+    .map_err(|err| SessionRevokeError::InternalCanisterError(err.to_string()))
 }
 
 #[cfg(test)]
