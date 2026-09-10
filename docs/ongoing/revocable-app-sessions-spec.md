@@ -547,7 +547,7 @@ flowchart LR
 The app talks to the II frontend over the existing authorize transport. One new II-specific method, `ii_session_delegation`:
 
 ```
-params:  { sessionPublicKey, icrc95DerivationOrigin? }
+params:  { sessionPublicKey, icrc95DerivationOrigin?, maxTimeToLive?, maxTimeToIdle? }
 result:  { publicKey, signerDelegation }
 ```
 
@@ -560,6 +560,22 @@ It is namespaced `ii_` rather than extending `icrc34_delegation`, for the same r
 #### No account number
 
 Which account a session is for is decided during the ceremony, by the user, in II's own UI. The app has no way to enumerate an anchor's accounts and no business naming one, exactly as it cannot today with `icrc34_delegation`.
+
+#### The durations only narrow
+
+`maxTimeToLive` and `maxTimeToIdle` are nat64 nanosecond values, carried as decimal strings
+because JSON has no 64-bit integer. `maxTimeToLive` maps to the canister's `valid_for`,
+`maxTimeToIdle` to its `max_idle` ([first sign-in](#first-sign-in)).
+
+Both are ceilings. What the user picks at consent wins over what the app asked for, an SSO
+organization's cap narrows that further, and the canister clamps the result: `valid_for` to
+between 10 minutes and 30 days, `max_idle` to between 10 minutes and the session's own
+granted length. Every step in that order can only take time away.
+
+So an app still cannot obtain a longer-lived session than the user and their organization
+allow, which is the property this contract protects. What it can do is ask for less: a flow
+that wants an hour rather than a month says so, rather than holding a session it has no use
+for.
 
 #### It returns the session and nothing else
 
@@ -636,9 +652,12 @@ get_account_session : (GetAccountSessionRequest)
 `valid_for` is nanoseconds, clamped to between 10 minutes and 30 days. An SSO organization
 also caps how long its own sign-ins stay valid, and a session must not outlive that, so the
 frontend sends that ceiling for an SSO identity even when the user picked no duration —
-matching what the existing delegation path already does. Every ceremony
-creates, so it always applies: the replacement's `valid_till_ns` is measured from the ceremony
-that made it, and no session is ever renewed in place.
+matching what the existing delegation path already does. The app can supply a ceiling of its
+own ([the durations only narrow](#the-durations-only-narrow)), so the `valid_for` and
+`max_idle` that arrive here are already the smallest of what the app asked for, what the user
+picked, and what the organization allows. Every ceremony creates, so it always applies: the
+replacement's `valid_till_ns` is measured from the ceremony that made it, and no session is
+ever renewed in place.
 
 A `browser_name` over 128 bytes is refused as `InternalCanisterError`, and deliberately not
 given a variant of its own: the II frontend generates the name, so an over-long one is a
