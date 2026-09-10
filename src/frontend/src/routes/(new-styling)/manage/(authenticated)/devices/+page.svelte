@@ -197,7 +197,7 @@
               {#if index > 0}
                 <li
                   aria-hidden="true"
-                  class="border-border-tertiary col-span-4 border-t"
+                  class="border-border-tertiary col-span-4 ms-6 border-t"
                 ></li>
               {/if}
               <li class="col-span-4 grid grid-cols-subgrid">
