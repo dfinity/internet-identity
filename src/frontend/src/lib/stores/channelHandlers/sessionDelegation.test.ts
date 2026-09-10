@@ -671,6 +671,31 @@ describe("keeping a session for later", () => {
     );
   });
 
+  /// What the ceremony sends and what it keeps, neither of which the tests around this
+  /// one reach: they locate the request by its TTL and then read only `max_idle`, and
+  /// they check that a record exists without looking at what is in it.
+  ///
+  /// `session_id` earns its own assertion because nothing downstream would catch a wrong
+  /// one here: `get_account_session` names the session by that id, so a record holding
+  /// the wrong one is a session that cannot be resumed, and every other test in this
+  /// file would still pass.
+  it("asks for this identity at this origin, and keeps the session it is given", async () => {
+    const { sent, prepared } = await runCeremony(true, {
+      maxTimeToLive: "5400000000000",
+    });
+
+    expect(sent).toHaveLength(1);
+    expect(ourRequest(prepared, BigInt(5_400_000_000_000))).toMatchObject({
+      identity_number: BigInt(10_000),
+      origin: ORIGIN,
+      // The default account, which the consent resolved to no account number.
+      account_number: [],
+    });
+    await expect(appSessionsForOrigin(ORIGIN)).resolves.toMatchObject([
+      { identityNumber: BigInt(10_000), record: { sessionId: BigInt(1_000) } },
+    ]);
+  });
+
   it("keeps a session the app asked to be resumable", async () => {
     const { sent } = await runCeremony(true);
 
