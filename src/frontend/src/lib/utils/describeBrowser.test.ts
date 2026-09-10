@@ -269,16 +269,34 @@ describe("client hints", () => {
     });
   });
 
-  /// The current spec says `formFactors`; the versions that shipped it first said
-  /// `formFactor`. A tablet has to read as one on both.
-  it.each([
-    {
-      name: "the plural the spec settled on",
-      high: { formFactors: ["Tablet"] },
+  it("takes a stated form factor", async () => {
+    await expect(withHints({ formFactors: ["Tablet"] })).resolves.toMatchObject(
+      {
+        form_factor: { Tablet: null },
+      },
+    );
+  });
+
+  /// The canister names desktops, mobiles and tablets. A device stating anything else is
+  /// none of the three, and saying so beats what `mobile` alone would have guessed: a
+  /// watch reports `mobile: true` and would read as a phone, an e-reader reports
+  /// `mobile: false` and would read as a desktop.
+  it.each(["Watch", "XR", "Automotive", "EInk"])(
+    "leaves a %s unnamed rather than guessing from `mobile`",
+    async (factor) => {
+      await expect(
+        withHints({ formFactors: [factor] }),
+      ).resolves.toMatchObject({
+        form_factor: { Unknown: null },
+      });
     },
-    { name: "the singular that shipped first", high: { formFactor: "Tablet" } },
-  ])("takes a stated form factor in $name", async ({ high }) => {
-    await expect(withHints(high)).resolves.toMatchObject({
+  );
+
+  /// Both stated, so the one the canister can name wins over the one it cannot.
+  it("prefers a tablet to an unnameable factor stated beside it", async () => {
+    await expect(
+      withHints({ formFactors: ["EInk", "Tablet"] }),
+    ).resolves.toMatchObject({
       form_factor: { Tablet: null },
     });
   });
