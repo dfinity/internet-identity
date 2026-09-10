@@ -173,6 +173,20 @@ describe("groupBrowsers", () => {
     expect(groups.map((group) => group.platform)).toEqual(["iPhone", "Mac"]);
   });
 
+  /// The one row the user can place without reading it. The canister returns records in
+  /// registration order, which says nothing about which browser is asking.
+  it("leads the group with the browser being read from", () => {
+    const [group] = groupBrowsers(
+      fromCanisterBrowsers(
+        [[at(1, 5, CHROME_ON_A_MAC), at(2, 1, CHROME_ON_A_MAC)]],
+        1,
+      ),
+      now,
+    );
+
+    expect(group.browsers.map((entry) => entry.id)).toEqual([1, 2]);
+  });
+
   it("heads the group with the glyph of its platform", () => {
     const [group] = groupBrowsers(
       fromCanisterBrowsers([

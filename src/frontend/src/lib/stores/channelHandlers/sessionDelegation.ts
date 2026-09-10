@@ -45,7 +45,7 @@ import { get } from "svelte/store";
 import {
   chooseSilentSession,
   type SilentDenial,
-} from "../../../routes/(new-styling)/authorize/silentReauth";
+} from "$lib/stores/channelHandlers/silentReauth";
 import type { AccountSessionError } from "$lib/generated/internet_identity_types";
 import { serializeAuthorizationRequest } from "$lib/stores/channelHandlers/serialize";
 import {
@@ -248,17 +248,22 @@ export const handleSessionDelegationRequest =
         // Silence is something an app asks for. Anything else, an absent `prompt` included,
         // runs the ceremony, so a held session is never handed over without the user
         // seeing a screen they did not request.
-        const held =
+        const stored =
           prompt === "none" ? await appSessionsForOrigin(effectiveOrigin) : [];
+        // Liveness before the choice, not after it: choosing among the stored records
+        // counts a session the user ended elsewhere, so one live record beside one
+        // revoked record read as two candidates and were refused as an ambiguity.
+        //
+        // The records stay either way. A session that is really gone leaves a record
+        // that is filtered out on read once it expires, and removing it would need a
+        // certified answer — an update call, made by the app, not by this.
+        const alive = await Promise.all(
+          stored.map((entry) => sessionIsLive(entry.record)),
+        );
+        const held = stored.filter((_, index) => alive[index]);
         const chosen = chooseSilentSession({ held, hint });
 
-        let usable = "session" in chosen ? chosen.session : undefined;
-        if (usable && !(await sessionIsLive(usable.record))) {
-          // The record stays. A session that is really gone leaves a record that is
-          // filtered out on read once it expires, and removing it would need a certified
-          // answer — which is an update call, made by the app, not by this.
-          usable = undefined;
-        }
+        const usable = "session" in chosen ? chosen.session : undefined;
 
         if (usable) {
           const chain = await extendToApp(
