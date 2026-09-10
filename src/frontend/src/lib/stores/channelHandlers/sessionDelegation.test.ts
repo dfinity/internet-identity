@@ -14,16 +14,47 @@ vi.mock("$lib/globals", async () => {
 vi.mock("$lib/utils/validateDerivationOrigin", () => ({
   validateDerivationOrigin: vi.fn(() => Promise.resolve({ result: "valid" })),
 }));
-vi.mock("$lib/utils/iiConnection", () => ({
-  remapToLegacyDomain: (origin: string) => origin,
-}));
 
 const setRequestContext = vi.fn();
+
+const IDENTITY = BigInt(10_000);
+const prepareAccountSession = vi.fn();
+const getAccountSession = vi.fn();
+
 vi.mock("$lib/stores/authorization.store", () => ({
   authorizationStore: {
     setRequestContext: (...args: unknown[]) => setRequestContext(...args),
   },
-  authorizedStore: { subscribe: () => () => {} },
+  // A store that already holds its value, which is what `waitForStore` waits for.
+  // Inlined rather than shared, because `vi.mock` is hoisted above anything declared
+  // here.
+  authorizedStore: {
+    subscribe: (run: (value: unknown) => void) => {
+      run({
+        accessLevel: "full-access",
+        maxTimeToLive: undefined,
+        accountNumberPromise: Promise.resolve(undefined),
+      });
+      return () => {};
+    },
+  },
+}));
+vi.mock("$lib/stores/authentication.store", () => ({
+  authenticationStore: {
+    subscribe: (run: (value: unknown) => void) => {
+      run({
+        identityNumber: BigInt(10_000),
+        authMethod: { passkey: {} },
+        actor: {
+          prepare_account_session: (...args: unknown[]) =>
+            prepareAccountSession(...args),
+          get_account_session: (...args: unknown[]) =>
+            getAccountSession(...args),
+        },
+      });
+      return () => {};
+    },
+  },
 }));
 
 import {
@@ -32,7 +63,13 @@ import {
 } from "./sessionDelegation";
 import { StaleBrowserKeyError } from "$lib/stores/browser-key.store";
 import { CanisterError } from "$lib/utils/utils";
-import { purgeAppSessions } from "$lib/stores/app-session.store";
+import {
+  appSessionsForOrigin,
+  purgeAppSessions,
+} from "$lib/stores/app-session.store";
+import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
+import { Principal } from "@icp-sdk/core/principal";
+import { Base64ToBytesCodec } from "$lib/utils/transport/utils";
 
 const channelWith = () => {
   const sent: unknown[] = [];
@@ -93,6 +130,94 @@ describe("ii_session_delegation", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ id: 1, error: { code: -32602 } });
     expect(onError).toHaveBeenCalledWith("invalid-request");
+  });
+
+  /// A duration `BigInt` cannot read used to throw out of `safeParse`, which sits above
+  /// the handler's `try`, so the app was told nothing at all.
+  it("rejects a duration that is not a number", async () => {
+    const { channel, sent } = channelWith();
+    const onError = vi.fn();
+
+    await handleSessionDelegationRequest(
+      channel,
+      onError,
+    )({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "ii_session_delegation",
+      params: {
+        sessionPublicKey: btoa("an app key"),
+        maxTimeToLive: "not a number",
+      },
+    });
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ id: 1, error: { code: -32602 } });
+    expect(onError).toHaveBeenCalledWith("invalid-request");
+  });
+
+  /// The whole ceremony, which nothing else here reaches: what the canister is asked
+  /// for, what is kept, and what the app is handed back.
+  it("mints a session and answers with a chain the app can use", async () => {
+    const { channel, sent } = channelWith();
+    const appKey = await ECDSAKeyIdentity.generate({ extractable: false });
+    const appPublicKey = new Uint8Array(appKey.getPublicKey().toDer());
+    const expiration = BigInt(Date.now() + 60 * 60 * 1000) * BigInt(1_000_000);
+
+    prepareAccountSession.mockImplementation(({ session_key }) =>
+      Promise.resolve({
+        Ok: {
+          user_key: session_key,
+          expiration,
+          session_id: BigInt(77),
+          browser_id: 3,
+          account_principal: Principal.anonymous(),
+        },
+      }),
+    );
+    getAccountSession.mockImplementation(({ session_key }) =>
+      Promise.resolve({
+        Ok: {
+          signed_delegation: {
+            delegation: { pubkey: session_key, expiration, targets: [] },
+            // At least 32 bytes: the chain's own parser refuses anything shorter.
+            signature: new Uint8Array(64).fill(7),
+          },
+        },
+      }),
+    );
+
+    await handleSessionDelegationRequest(
+      channel,
+      vi.fn(),
+    )({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "ii_session_delegation",
+      params: { sessionPublicKey: Base64ToBytesCodec.encode(appPublicKey) },
+    });
+
+    // Asked for what the request and the consent said, at this origin.
+    expect(prepareAccountSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity_number: IDENTITY,
+        origin: ORIGIN,
+        account_number: [],
+      }),
+    );
+
+    // Kept, so a later silent re-auth resumes rather than signing in again — and kept
+    // against II's own key, never the app's.
+    const [stored] = await appSessionsForOrigin(ORIGIN);
+    expect(stored.record.sessionId).toBe(BigInt(77));
+    expect(stored.identityNumber).toBe(IDENTITY);
+
+    // Answered, and the chain ends at the app's key rather than at what the canister
+    // signed: the hop only II can make is what makes the on-chain half unusable alone.
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ id: 1 });
+    const result = (sent[0] as { result: { publicKey: string } }).result;
+    expect(result.publicKey).toEqual(expect.any(String));
   });
 });
 
