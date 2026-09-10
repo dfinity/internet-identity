@@ -201,6 +201,14 @@ export const groupBrowsers = (
       group.browsers.push(browser);
     }
   }
+  // The browser reading the page leads its group: it is the one row the user can place
+  // without reading it, and the canister returns records in registration order, which
+  // says nothing about that.
+  for (const group of groups.values()) {
+    group.browsers.sort(
+      (one, other) => Number(other.isCurrent) - Number(one.isCurrent),
+    );
+  }
   return [...groups.values()];
 };
 
