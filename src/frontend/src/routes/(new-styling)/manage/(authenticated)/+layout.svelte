@@ -25,7 +25,10 @@
   } from "$lib/stores/authentication.store";
   import { DelegationIdentity } from "@icp-sdk/core/identity";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { purgeSession } from "$lib/stores/session-delegation.store";
+  import {
+    forgetIdentity,
+    revokeIdentity,
+  } from "$lib/stores/session-delegation.store";
   import { sessionStore } from "$lib/stores/session.store";
   import { locales, localeStore, t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -115,10 +118,15 @@
     window.location.replace("/");
   };
 
-  const handleConfirmSignOutAndRemove = () => {
+  const handleConfirmSignOutAndRemove = async () => {
     const identityNumber = $authenticatedStore.identityNumber;
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void purgeSession(identityNumber);
+    // Awaited: this ends the browser's sessions canister-side, and replacing the page
+    // while that update call is in flight leaves the apps refreshing against session
+    // records that still exist — which is the one thing "remove" is meant to stop.
+    // `revokeIdentity` swallows a canister failure and clears the local records either
+    // way, so waiting cannot strand the user here.
+    await revokeIdentity(identityNumber);
     sessionStore.reset();
     window.location.replace("/");
   };
@@ -129,7 +137,7 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void purgeSession(identityNumber);
+    void forgetIdentity(identityNumber);
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
       const identityName =

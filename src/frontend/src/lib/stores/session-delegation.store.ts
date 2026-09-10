@@ -10,12 +10,15 @@ import { Actor, ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import { authenticationStore } from "$lib/stores/authentication.store";
+import { currentBrowserId } from "$lib/stores/browser-key.store";
+import { purgeAppSessions } from "$lib/stores/app-session.store";
 import { canisterId, agentOptions } from "$lib/globals";
 import {
   mintSessionDelegation,
   sessionDelegationIdentity,
   type SessionDelegationRecord,
 } from "$lib/utils/authentication/sessionDelegation";
+import { throwCanisterError } from "$lib/utils/utils";
 
 const SESSION_DELEGATION_STORE = createStore("ii-session-delegations", "keys");
 
@@ -115,4 +118,58 @@ export const actorForIdentity = async (
     void purgeSession(identityNumber);
     return undefined;
   }
+};
+
+/**
+ * Drops what this device remembers of an identity: its II session, and the app sessions
+ * held under it.
+ *
+ * Local only, and named for what it does. Apps keep the delegation chains they already
+ * hold and go on refreshing against the canister's session records until those expire —
+ * ending those is {@link revokeIdentity}, which requires being authenticated as this
+ * identity and so is not something every caller can do.
+ *
+ * Records are per identity, so this leaves the user's other identities on this browser
+ * alone.
+ */
+export const forgetIdentity = async (identityNumber: bigint): Promise<void> => {
+  await purgeSession(identityNumber);
+  await purgeAppSessions(identityNumber);
+};
+
+/**
+ * Signs this browser out of every app it reached with an identity, then forgets it here.
+ *
+ * Only callable while authenticated as this identity: `revoke_browser_sessions` is
+ * gated on full authorization, which a stored session delegation does not carry, so a
+ * caller that merely holds records for the identity gets `Unauthorized` and revokes
+ * nothing. Removing an identity from a list is that caller — it uses
+ * {@link forgetIdentity} instead, rather than paying for a request that cannot succeed.
+ *
+ * Sessions are per browser and per identity, so this leaves other identities on this
+ * browser, and this identity on the user's other browsers, alone.
+ */
+export const revokeIdentity = async (identityNumber: bigint): Promise<void> => {
+  const browserId = await currentBrowserId(identityNumber);
+  const actor =
+    browserId === undefined
+      ? undefined
+      : await actorForIdentity(identityNumber);
+  if (browserId !== undefined && actor !== undefined) {
+    try {
+      // `throwCanisterError`, because the method answers a result variant: an `Err` would
+      // otherwise resolve like a success and a refusal would read as a sign-out.
+      await actor
+        .revoke_browser_sessions({
+          identity_number: identityNumber,
+          browser_id: browserId,
+        })
+        .then(throwCanisterError);
+    } catch {
+      // The local records go either way. Keeping them because the canister refused or
+      // could not be reached would leave II able to sign the user back in silently,
+      // which is the thing the user asked it to stop doing.
+    }
+  }
+  await forgetIdentity(identityNumber);
 };

@@ -200,6 +200,10 @@
     } catch (error) {
       showRecoveryDialog = false;
       authenticationStore.reset();
+      // The recovery itself succeeded; what failed is the navigation after it. Dropping
+      // this browser's session delegation is enough — signing the identity out of every
+      // app it is signed into from here, as `forgetIdentity` does, is not something a
+      // failed route change should do. Matches the email-recovery handler above.
       void purgeSession(identityNumber);
       handleError(error);
     }
