@@ -393,7 +393,9 @@ describe("a session the canister no longer holds", () => {
 
   beforeEach(async () => {
     checkSession.mockClear();
+    checkSession.mockResolvedValue(true);
     await purgeAppSessions(BigInt(10_000));
+    await purgeAppSessions(BigInt(10_001));
     (await promptStore()).set({});
   });
 
@@ -440,6 +442,30 @@ describe("a session the canister no longer holds", () => {
     });
 
     expect(await appSessionsForOrigin(ORIGIN)).toHaveLength(1);
+  });
+
+  /// Two records, one of them ended from another browser. Counting the records rather
+  /// than the live sessions made that an ambiguity and refused a request there was only
+  /// one answer to.
+  it("serves the one live session beside a record that was revoked elsewhere", async () => {
+    await storedSession(BigInt(10_000));
+    await storedSession(BigInt(10_001));
+    // `appSessionsForOrigin` lists them in key order, so the first is 10_000's.
+    checkSession.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    (await promptStore()).set({ prompt: "none" });
+
+    const { channel, sent } = channelWith();
+    await handleSessionDelegationRequest(
+      channel,
+      vi.fn(),
+    )({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "ii_session_delegation",
+      params: { sessionPublicKey: await appKey() },
+    });
+
+    expect(sent[0]).toMatchObject({ result: {} });
   });
 
   /// The denial is a skip, not a verdict: the very next request finds the record still
