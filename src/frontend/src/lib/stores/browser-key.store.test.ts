@@ -17,6 +17,7 @@ vi.mock("idb-keyval", async (importOriginal) => {
   };
 });
 import {
+  type BrowserProof,
   currentBrowserId,
   StaleBrowserKeyError,
   withBrowserProof,
@@ -92,21 +93,34 @@ const signIn = (
     identityNumber,
     sessionKey(seed),
     description,
-    async (proof) => {
-      await proof.accept(browserId);
-      return proof;
-    },
+    (proof) => Promise.resolve(proof),
+    () => browserId,
   );
 
-/** Signs in without accepting, the way a call that fails or never returns leaves it. */
-const attempt = (
+/** Signs in without the canister answering, the way a call that fails leaves it: the
+ *  rotation belongs to a sign-in that came back, so nothing advances here. The proof is
+ *  captured on the way past, since there is no value to return. */
+const attempt = async (
   identityNumber: bigint,
   seed: number,
   description: BrowserDescription = CHROME_ON_A_MAC,
-) =>
-  withBrowserProof(identityNumber, sessionKey(seed), description, (proof) =>
-    Promise.resolve(proof),
-  );
+): Promise<BrowserProof> => {
+  let attempted: BrowserProof | undefined;
+  await withBrowserProof(
+    identityNumber,
+    sessionKey(seed),
+    description,
+    (proof) => {
+      attempted = proof;
+      return Promise.reject(new Error("no answer"));
+    },
+    () => 1,
+  ).catch(() => undefined);
+  if (attempted === undefined) {
+    throw new Error("the proof was never built");
+  }
+  return attempted;
+};
 
 /** jsdom has no Web Locks, so this is what serialisation is tested against. */
 const stubLockApi = (): void => {
@@ -210,6 +224,7 @@ describe("browser key", () => {
         }
         return Promise.resolve(attempted);
       },
+      () => 1,
     );
 
     expect(seen).toBe(2);
@@ -242,6 +257,7 @@ describe("browser key", () => {
           ? Promise.reject(new StaleBrowserKeyError())
           : Promise.resolve(attempted);
       },
+      () => 1,
     );
 
     expect(seen).toBe(2);
@@ -252,10 +268,16 @@ describe("browser key", () => {
     let seen = 0;
 
     await expect(
-      withBrowserProof(IDENTITY, sessionKey(1), CHROME_ON_A_MAC, () => {
-        seen += 1;
-        return Promise.reject(new Error("network"));
-      }),
+      withBrowserProof(
+        IDENTITY,
+        sessionKey(1),
+        CHROME_ON_A_MAC,
+        () => {
+          seen += 1;
+          return Promise.reject(new Error("network"));
+        },
+        () => 1,
+      ),
     ).rejects.toThrow("network");
     expect(seen).toBe(1);
   });
