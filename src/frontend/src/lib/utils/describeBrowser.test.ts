@@ -284,11 +284,11 @@ describe("client hints", () => {
   it.each(["Watch", "XR", "Automotive", "EInk"])(
     "leaves a %s unnamed rather than guessing from `mobile`",
     async (factor) => {
-      await expect(
-        withHints({ formFactors: [factor] }),
-      ).resolves.toMatchObject({
-        form_factor: { Unknown: null },
-      });
+      await expect(withHints({ formFactors: [factor] })).resolves.toMatchObject(
+        {
+          form_factor: { Unknown: null },
+        },
+      );
     },
   );
 
