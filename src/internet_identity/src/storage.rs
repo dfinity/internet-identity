@@ -1395,17 +1395,23 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         for principal in principals_to_be_added {
-            if self
+            if let Some(existing_anchor_number) = self
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .contains_key(principal)
+                .get(principal)
             {
-                // This principal is already occupied; do not overwrite it.
-                ic_cdk::println!(
-                    "WARNING: Principal {:?} derived from a passkey credential pubkey is already \
-                     indexed for another anchor; skipping indexing for anchor number {}",
-                    principal,
-                    anchor_number,
-                );
+                if existing_anchor_number != anchor_number {
+                    // The registration paths reject a pubkey another anchor already holds, so
+                    // reaching here means the index and the anchors disagree. Keep the existing
+                    // owner and make the disagreement visible instead of trapping, which would
+                    // lock every write on both anchors.
+                    ic_cdk::println!(
+                        "WARNING: Principal {:?} derived from a passkey credential pubkey is already \
+                         indexed for anchor number {}; skipping indexing for anchor number {}",
+                        principal,
+                        existing_anchor_number,
+                        anchor_number,
+                    );
+                }
                 continue;
             };
 
@@ -1448,11 +1454,21 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         for recovery_principal in current_recovery_principals {
-            if self
+            if let Some(existing_anchor_number) = self
                 .lookup_anchor_with_recovery_phrase_principal_memory
-                .contains_key(&recovery_principal)
+                .get(&recovery_principal)
             {
-                // This principal is already occupied; do not overwrite it.
+                if existing_anchor_number != anchor_number {
+                    // Same invariant as the passkey index: the owner stays, and the disagreement
+                    // is logged rather than trapped.
+                    ic_cdk::println!(
+                        "WARNING: Principal {:?} derived from a recovery phrase pubkey is already \
+                         indexed for anchor number {}; skipping indexing for anchor number {}",
+                        recovery_principal,
+                        existing_anchor_number,
+                        anchor_number,
+                    );
+                }
                 continue;
             };
 
