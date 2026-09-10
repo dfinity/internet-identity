@@ -179,7 +179,14 @@ describe("ii_session_delegation", () => {
       Promise.resolve({
         Ok: {
           signed_delegation: {
-            delegation: { pubkey: session_key, expiration, targets: [] },
+            // As the canister answers since the session credential was scoped: the
+            // targets are part of what it signed, so a chain rebuilt without them is
+            // refused by the replica.
+            delegation: {
+              pubkey: session_key,
+              expiration,
+              targets: [[Principal.fromText("rwlgt-iiaaa-aaaaa-aaaaa-cai")]],
+            },
             // At least 32 bytes: the chain's own parser refuses anything shorter.
             signature: new Uint8Array(64).fill(7),
           },
@@ -216,8 +223,22 @@ describe("ii_session_delegation", () => {
     // signed: the hop only II can make is what makes the on-chain half unusable alone.
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ id: 1 });
-    const result = (sent[0] as { result: { publicKey: string } }).result;
+    const result = (
+      sent[0] as {
+        result: {
+          publicKey: string;
+          signerDelegation: { delegation: { targets?: string[] } }[];
+        };
+      }
+    ).result;
     expect(result.publicKey).toEqual(expect.any(String));
+
+    // The hop the canister signed keeps its targets. Dropping them leaves a delegation
+    // that hashes to nothing in the signature tree, and every call the app makes with
+    // this chain comes back "Invalid canister signature".
+    expect(result.signerDelegation[0].delegation.targets).toEqual([
+      "rwlgt-iiaaa-aaaaa-aaaaa-cai",
+    ]);
   });
 });
 
