@@ -15,6 +15,7 @@
     fromCanisterBrowsers,
     groupBrowsers,
     isSignedOut,
+    brandNameOf,
     nameOf,
     signOutBrowser,
     type Browser,
@@ -156,7 +157,7 @@
        is nothing to draw is before it has described itself. -->
   {#if groups.length > 0}
     <div
-      class="border-border-secondary bg-bg-primary flex flex-col overflow-hidden rounded-xl border"
+      class="border-border-secondary bg-bg-primary @container/list flex flex-col overflow-hidden rounded-xl border"
     >
       {#each groups as group, groupIndex (group.platform)}
         <section
@@ -167,7 +168,17 @@
             platform={group.platform}
             count={group.browsers.length}
           />
-          <ul class="flex flex-col">
+          <!-- The column tracks live here, not on the rows: an action column that is
+               the same width in every row is a fact about the list, and each row takes
+               the tracks with `grid-cols-subgrid`. So the widths come from the widest
+               content in any row, in any language, instead of from numbers chosen for
+               the English strings.
+
+               The container the rows query is the card, above this: `container-type`
+               imposes size containment, which forbids an element from also being a
+               subgrid, so the two cannot be the same box. Every row is the card's width
+               anyway. -->
+          <ul class="grid grid-cols-[1fr_auto_auto_auto] gap-x-10 px-4">
             {#each group.browsers as browser, index (browser.id)}
               <!-- Inset rule between rows of one group, so it reads as a divided group
                    rather than as the boundary between two. Drawn as its own element:
@@ -175,10 +186,10 @@
               {#if index > 0}
                 <li
                   aria-hidden="true"
-                  class="border-border-tertiary ml-4 border-t"
+                  class="border-border-tertiary col-span-4 border-t"
                 ></li>
               {/if}
-              <li>
+              <li class="col-span-4 grid grid-cols-subgrid">
                 <DeviceRow
                   description={browser.description}
                   lastUsed={lastUsedOf(browser)}
@@ -215,11 +226,11 @@
          would leave neither saying which row was clicked. -->
     <div class="flex flex-col gap-5 p-1">
       <h2 class="text-text-primary text-2xl font-medium">
-        {$t`Sign out ${target.name}?`}
+        {$t`Sign out ${brandNameOf(target.description)}?`}
       </h2>
 
       <p class="text-text-tertiary text-base text-pretty">
-        {$t`You can sign in again from ${target.name} at any time.`}
+        {$t`You can sign in again at any time.`}
       </p>
 
       <div class="flex flex-col gap-3">

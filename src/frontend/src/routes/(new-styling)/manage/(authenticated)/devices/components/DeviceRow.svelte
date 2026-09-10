@@ -31,8 +31,6 @@
   const dimmed = $derived(action === "signed-out");
 </script>
 
-<!-- Rendered in both layouts, which place it differently: beside the name when the row
-     is a block, at the end of the line when it is a line. -->
 {#snippet actionControl()}
   {#if action === "sign-out"}
     <button class="btn btn-secondary btn-sm" onclick={onSignOut}>
@@ -45,27 +43,39 @@
   {/if}
 {/snippet}
 
-<!--
-  Two layouts rather than one that bends, and they switch on the card's width rather than
-  the page's: this list sits in a settings pane that is narrow at any viewport, so a page
-  breakpoint left the wide layout in a column too small for it, truncating the name and
-  printing the meta over the badge.
+{#snippet meta(label: string, value: string)}
+  <!-- Dissolved when the row is a line, so the label and value become a column of the
+       list's own grid. A two-cell block on its own line when the row is a block. -->
+  <div class="contents @xl/list:flex @xl/list:flex-col @xl/list:gap-1">
+    <span class="text-text-tertiary text-xs font-semibold">{label}</span>
+    <span class="text-text-primary text-xs @xl/list:whitespace-nowrap"
+      >{value}</span
+    >
+  </div>
+{/snippet}
 
-  Wide, the row is a line: identity, two fixed meta columns, then the action. Narrow,
-  those columns have nowhere to go, so the row becomes a block — identity and action on
-  the first line, the meta beneath them.
+<!--
+  One grid at both widths, taking its columns from the list so that every row's meta and
+  action line up whatever they contain. What the breakpoint changes is where the pieces
+  sit in it: on one line when the row is a line, and identity above meta with the action
+  beside both when the row is a block.
+
+  It switches on the card's width rather than the page's: this list sits in a settings
+  pane that is narrow at any viewport, so a page breakpoint left the wide layout in a
+  column too small for it, truncating the name and printing the meta over the badge.
 -->
 <div
-  class="@container/row flex flex-col gap-2 px-4 py-3 @md/row:flex-row @md/row:items-center @md/row:gap-3"
+  class="col-span-4 grid grid-cols-subgrid gap-y-4 py-3 @xl/list:items-center @xl/list:gap-y-0"
 >
-  <div class="flex flex-row items-center gap-3">
+  <div
+    class="col-span-3 flex min-w-0 flex-row items-center gap-3 @xl/list:col-span-1"
+  >
     <span class="flex size-5 shrink-0 items-center justify-center">
       {#if brandIcon !== undefined}
-        <img
-          src={brandIcon}
-          alt=""
-          class="size-5 {dimmed ? 'opacity-50' : ''}"
-        />
+        <!-- Not dimmed with the rest of a signed-out row: a brand mark is what the
+             browser is, not what state it is in, and fading it reads as an image that
+             failed to load. The name and the "Signed out" label carry the state. -->
+        <img src={brandIcon} alt="" class="size-5" />
       {/if}
     </span>
 
@@ -83,48 +93,24 @@
         >
       {/if}
     </span>
-
-    <!-- Narrow, the action sits up here beside the name rather than taking a line of its
-         own below the meta, which is what made the row five lines tall. Wide, it moves
-         to the end of the line and this copy is gone. -->
-    <span
-      class="ms-auto flex shrink-0 items-center @md/row:hidden {action ===
-      'none'
-        ? 'hidden'
-        : ''}"
-    >
-      {@render actionControl()}
-    </span>
   </div>
 
-  <!-- Two columns narrow, so the labels and their values line up down the list whatever
-       their length; fixed columns wide, where the row has room for them. Indented to the
-       brand name, past the icon. -->
+  <!-- A line of its own below the identity when the row is a block; dissolved into the
+       row's own line above the breakpoint, where each pair takes a column. -->
   <div
-    class="ms-8 grid grid-cols-2 gap-4 @md/row:ms-0 @md/row:flex @md/row:shrink-0 @md/row:flex-row"
+    class="col-span-3 row-start-2 grid grid-cols-[auto_1fr] items-baseline gap-x-2 gap-y-3 @xl/list:contents {dimmed
+      ? 'opacity-70'
+      : ''}"
   >
-    <span
-      class="flex flex-col gap-1 @md/row:w-26 @md/row:shrink-0 @md/row:whitespace-nowrap"
-    >
-      <span class="text-text-tertiary text-xs font-semibold"
-        >{$t`Last used`}</span
-      >
-      <span class="text-text-primary text-xs">{lastUsed}</span>
-    </span>
-    <span
-      class="flex flex-col gap-1 @md/row:w-18 @md/row:shrink-0 @md/row:whitespace-nowrap"
-    >
-      <span class="text-text-tertiary text-xs font-semibold"
-        >{$t`First seen`}</span
-      >
-      <span class="text-text-primary text-xs">{firstSeen}</span>
-    </span>
+    {@render meta($t`Last used`, lastUsed)}
+    {@render meta($t`First seen`, firstSeen)}
   </div>
 
-  <!-- Wide only. Kept as an empty column even with nothing in it, so the meta of a row
-       without a button stays aligned with the rows that have one. -->
+  <!-- Beside both lines when the row is a block, so it centres on them; its own column
+       when the row is a line. Rendered even when empty, so the column keeps its width
+       and a row without an action stays aligned with the rows that have one. -->
   <span
-    class="hidden @md/row:flex @md/row:w-21 @md/row:shrink-0 @md/row:items-center @md/row:justify-end"
+    class="col-start-4 row-span-2 row-start-1 flex items-center justify-center @xl/list:row-span-1"
   >
     {@render actionControl()}
   </span>
