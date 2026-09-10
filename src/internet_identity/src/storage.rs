@@ -3331,6 +3331,73 @@ impl<M: Memory + Clone> Storage<M> {
         })
     }
 
+    /// Records that a session was used: its own stamp, its account reference's, and the
+    /// browser's in the device registry.
+    ///
+    /// A locator naming nothing is [`StorageError::SessionNotFound`] rather than a
+    /// quiet non-event. Nobody makes a decision from it, and the one caller that could
+    /// have ignored it went on to mint a delegation for a session no list holds.
+    pub fn record_session_use(
+        &mut self,
+        key: &SessionLocator,
+        now: Timestamp,
+    ) -> Result<(), StorageError> {
+        let SessionLocator {
+            anchor_number,
+            origin,
+            account_number,
+            session_id,
+        } = key;
+        let (anchor_number, account_number, session_id) =
+            (*anchor_number, *account_number, *session_id);
+        let not_found = || StorageError::SessionNotFound {
+            anchor_number,
+            session_id,
+        };
+
+        if self.lookup_application_number_with_origin(origin).is_none() {
+            return Err(not_found());
+        }
+        let mut anchor = self.read(anchor_number)?;
+        let (mut account_references, config) = self.account_state_for_origin(anchor_number, origin);
+
+        let write = account_references
+            .iter_mut()
+            .find(|write| write.account_reference.account_number == account_number)
+            .ok_or_else(not_found)?;
+        let session = write
+            .account_reference
+            .sessions
+            .iter_mut()
+            .find(|session| session.session_id == session_id)
+            .ok_or_else(not_found)?;
+
+        session.last_refreshed_ns = Some(now);
+        let browser_id = session.browser_id;
+        write.account_reference.last_used = Some(now);
+
+        // This list is being rewritten anyway, so its dead sessions go now. It costs one
+        // pass over a list already in memory and no write of its own, and it means every
+        // list anyone still uses stays clean without anything having to sweep for it.
+        for write in account_references.iter_mut() {
+            write
+                .account_reference
+                .sessions
+                .retain(|session| !session.is_expired_or_idle(now));
+        }
+
+        // Stamped before the write rather than after, because the write is what stores the
+        // record. There is no second store: handing it over is handing over the storing of
+        // it, whatever was changed on it.
+        anchor.stamp_browser_use(browser_id, now);
+        self.write_account_state(
+            anchor,
+            now,
+            BTreeMap::from([(origin.clone(), Some((account_references, config)))]),
+        )?;
+        Ok(())
+    }
+
     /// Retires an application no anchor references any more. The number is never
     /// reissued.
     fn remove_unreferenced_application(
@@ -4288,6 +4355,13 @@ pub enum StorageError {
     SessionAlreadyOver {
         anchor_number: AnchorNumber,
     },
+    /// The session a caller named is not among the identity's — whether it never was, or
+    /// has since been revoked, replaced or pruned. Those are one observation rather than
+    /// three: a session that is not there cannot be told apart from one that never was.
+    SessionNotFound {
+        anchor_number: AnchorNumber,
+        session_id: SessionId,
+    },
     AnchorNumberOutOfRange {
         anchor_number: AnchorNumber,
         range: (AnchorNumber, AnchorNumber),
@@ -4379,6 +4453,13 @@ impl fmt::Display for StorageError {
             Self::SessionAlreadyOver { anchor_number } => write!(
                 f,
                 "a session for Identity Anchor {anchor_number} would be over before it started"
+            ),
+            Self::SessionNotFound {
+                anchor_number,
+                session_id,
+            } => write!(
+                f,
+                "Identity Anchor {anchor_number} holds no session {session_id}"
             ),
             Self::DeserializationError(err) => {
                 write!(f, "failed to deserialize a Candid value: {err}")

@@ -766,6 +766,21 @@ impl Anchor {
         }
     }
 
+    /// Advances a browser's `last_used`, where the anchor holds that browser and the
+    /// stamp moves it forward. A browser no entry names, or a repeat inside one message,
+    /// leaves the registry as it is.
+    pub fn stamp_browser_use(&mut self, browser_id: BrowserId, now: Timestamp) {
+        if let Some(browser) = self
+            .browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+        {
+            if browser.last_used < now {
+                browser.last_used = now;
+            }
+        }
+    }
+
     /// What a caller outside storage may know about this anchor's browsers: an
     /// identifier, what the browser said it was, and when. The keys stay here — they
     /// are how a sign-in proves which entry it is, so handing them out would let

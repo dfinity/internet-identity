@@ -355,15 +355,32 @@ pub fn app_prepare_delegation(
 ) -> Result<AppPrepareDelegationResponse, AppSessionError> {
     let now = time();
     let AuthorizedSession {
-        account, session, ..
+        locator,
+        account,
+        session,
     } = authorize_session(now)?;
 
+    // Everything that can refuse, before the stamp. Returning `Err` on the IC commits
+    // whatever was written before it — only a trap rolls back — so a stamp above this
+    // would leave the session recorded as used while the caller is told the call failed.
+    // All three depend on values already in hand, so there is nothing to gain by
+    // computing them later.
     let expiration = u64::min(
         now.saturating_add(APP_DELEGATION_TTL_NS),
         session.valid_till_ns,
     );
     let seed = account_seed(&account)?;
     let access = DelegationAccess::from_read_only(session.read_only);
+
+    // A session revoked between `authorize_session` above and this stamp is a race, not
+    // an internal fault: the answer is the one the caller would have got a moment
+    // earlier.
+    storage_borrow_mut(|storage| storage.record_session_use(&locator, now)).map_err(
+        |err| match err {
+            StorageError::SessionNotFound { .. } => AppSessionError::NoSuchSession,
+            other => AppSessionError::InternalCanisterError(other.to_string()),
+        },
+    )?;
 
     state::signature_map_mut(|sigs| {
         add_delegation_signature(
@@ -440,8 +457,6 @@ pub fn app_get_delegation(
 /// three values a caller gathered: the principal lookup and the liveness check have both
 /// happened, and no field can be here without them.
 struct AuthorizedSession {
-    // Read by the refresh stamp, which lands one PR up.
-    #[allow(dead_code)]
     locator: SessionLocator,
     account: Account,
     session: Session,

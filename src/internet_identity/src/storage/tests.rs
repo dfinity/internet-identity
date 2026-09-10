@@ -6419,6 +6419,205 @@ mod session_consent_change_tests {
     }
 }
 
+mod session_refresh_stamp_tests {
+    use super::held_references;
+    use super::params;
+    use crate::storage::account::{AccountReference, Session, SessionLocator};
+    use crate::storage::{CreateSessionParams, StorageError};
+    use crate::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    const ORIGIN: &str = "https://example.com";
+
+    fn storage_with_session() -> (Storage<VectorMemory>, AnchorNumber, SessionLocator) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        let (key, _) = storage
+            .create_session(CreateSessionParams {
+                valid_till_ns: u64::MAX,
+                ..params(anchor_number, 1, 1_000)
+            })
+            .unwrap();
+        (storage, anchor_number, key)
+    }
+
+    fn reference(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> AccountReference {
+        let application_number = storage
+            .lookup_application_number_with_origin(&ORIGIN.to_string())
+            .unwrap();
+        held_references(storage, anchor_number, application_number)
+            .into_iter()
+            .find(|reference| reference.account_number.is_none())
+            .unwrap()
+    }
+
+    fn session_of(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> Session {
+        reference(storage, anchor_number).sessions.remove(0)
+    }
+
+    #[test]
+    fn a_refresh_stamps_the_session_and_the_reference() {
+        let (mut storage, anchor_number, key) = storage_with_session();
+
+        storage.record_session_use(&key, 2_000).unwrap();
+
+        assert_eq!(
+            session_of(&storage, anchor_number).last_refreshed_ns,
+            Some(2_000)
+        );
+        assert_eq!(reference(&storage, anchor_number).last_used, Some(2_000));
+    }
+
+    #[test]
+    fn every_refresh_advances_the_stamp() {
+        let (mut storage, anchor_number, key) = storage_with_session();
+
+        for now in [1_001, 1_002, 1_003] {
+            storage.record_session_use(&key, now).unwrap();
+            assert_eq!(
+                session_of(&storage, anchor_number).last_refreshed_ns,
+                Some(now)
+            );
+        }
+    }
+
+    /// The list is rewritten anyway, so the refresh is where a dead sibling is collected —
+    /// index entry and session count included, since nothing else will come for them.
+    #[test]
+    fn a_refresh_collects_the_dead_sessions_beside_it() {
+        let (mut storage, anchor_number, key) = storage_with_session();
+
+        let (_, dead) = storage
+            .create_session(CreateSessionParams {
+                valid_till_ns: 1_500,
+                ..params(anchor_number, 9, 1_000)
+            })
+            .unwrap();
+        let dead_principal = storage
+            .lookup_session_with_principal_memory
+            .iter()
+            .find(|(_, handle)| handle.session_id == dead.session_id)
+            .map(|(principal, _)| principal)
+            .expect("the session should be indexed");
+        assert!(storage
+            .lookup_session_with_principal(dead_principal)
+            .is_some());
+        assert_eq!(storage.read(anchor_number).unwrap().session_count, 2);
+
+        storage.record_session_use(&key, 2_000).unwrap();
+
+        let sessions = reference(&storage, anchor_number).sessions;
+        assert_eq!(sessions.len(), 1, "the expired sibling was left behind");
+        // The first browser to sign in, so the first id the registry minted.
+        assert_eq!(sessions[0].browser_id, 0);
+        assert!(
+            storage
+                .lookup_session_with_principal(dead_principal)
+                .is_none(),
+            "the expired sibling's index entry outlived it"
+        );
+        assert_eq!(storage.read(anchor_number).unwrap().session_count, 1);
+    }
+
+    /// A locator naming nothing is refused rather than reported as a quiet non-event.
+    /// The caller that would have ignored a `false` here goes on to mint a delegation,
+    /// which is the one thing a session no list holds must not get.
+    #[test]
+    fn a_stamp_for_a_session_that_is_gone_is_refused() {
+        let (mut storage, anchor_number, _key) = storage_with_session();
+
+        let refused = storage.record_session_use(
+            &SessionLocator {
+                anchor_number,
+                origin: ORIGIN.to_string(),
+                account_number: None,
+                session_id: 9_999,
+            },
+            5_000,
+        );
+
+        assert!(
+            matches!(
+                refused,
+                Err(StorageError::SessionNotFound {
+                    anchor_number: refused_anchor,
+                    session_id: 9_999
+                }) if refused_anchor == anchor_number
+            ),
+            "a locator naming no session should be refused, got {refused:?}"
+        );
+    }
+
+    #[test]
+    fn stamping_leaves_a_second_device_alone() {
+        let (mut storage, anchor_number, key) = storage_with_session();
+        storage
+            .create_session(CreateSessionParams {
+                valid_till_ns: u64::MAX,
+                ..params(anchor_number, 2, 1_000)
+            })
+            .unwrap();
+        let now = 2_000;
+
+        storage.record_session_use(&key, now).unwrap();
+
+        let sessions = reference(&storage, anchor_number).sessions;
+        assert_eq!(sessions.len(), 2);
+        // The registry mints the ids, in the order the browsers first signed in.
+        let stamped = sessions.iter().find(|s| s.browser_id == 0).unwrap();
+        let untouched = sessions.iter().find(|s| s.browser_id == 1).unwrap();
+        assert_eq!(stamped.last_refreshed_ns, Some(now));
+        assert_eq!(untouched.last_refreshed_ns, None);
+    }
+
+    fn storage_with_registered_browser(
+    ) -> (Storage<VectorMemory>, AnchorNumber, SessionLocator, u32) {
+        let mut storage = Storage::new((10_000, 3_784_873), VectorMemory::default());
+        storage.update_salt([17u8; 32]);
+        let anchor = storage.allocate_anchor(0).unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        // The sign-in registers the browser, so nothing here puts one on the record by
+        // hand and then claims its id.
+        let (key, session) = storage
+            .create_session(CreateSessionParams {
+                valid_till_ns: u64::MAX,
+                ..params(anchor_number, 1, 1_000)
+            })
+            .unwrap();
+        (storage, anchor_number, key, session.browser_id)
+    }
+
+    fn browser_last_used(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) -> u64 {
+        storage.read(anchor_number).unwrap().browsers()[0].last_used
+    }
+
+    #[test]
+    fn a_refresh_advances_the_device_registry() {
+        let (mut storage, anchor_number, key, _browser_id) = storage_with_registered_browser();
+
+        storage.record_session_use(&key, 9_000).unwrap();
+
+        assert_eq!(browser_last_used(&storage, anchor_number), 9_000);
+    }
+
+    #[test]
+    fn a_refresh_leaves_the_device_enrolment_timestamp_alone() {
+        let (mut storage, anchor_number, key, _browser_id) = storage_with_registered_browser();
+
+        storage.record_session_use(&key, 9_000).unwrap();
+
+        let device = storage.read(anchor_number).unwrap().browsers()[0].clone();
+        assert_eq!(device.created_at, 1_000);
+        assert_eq!(device.last_used, 9_000);
+    }
+}
+
 mod browser_session_count_tests {
     use super::TEST_NOW;
     use super::{params, params_at};
