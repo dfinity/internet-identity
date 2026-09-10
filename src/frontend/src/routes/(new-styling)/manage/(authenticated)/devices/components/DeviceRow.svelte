@@ -67,8 +67,15 @@
 <div
   class="col-span-4 grid grid-cols-subgrid gap-y-1.5 py-2.5 @2xl/list:items-center @2xl/list:gap-y-0"
 >
+  <!-- Takes the action's column too when there is no action, which is every row that
+       carries the badge: a row shows one of the badge, the button or the label, never a
+       combination. Without that the name gives up the action column's width to hold
+       nothing, and its badge wraps under it on a narrow card. The column keeps its width
+       either way, because the rows that do have an action size it. -->
   <div
-    class="col-span-3 flex min-w-0 flex-row items-center gap-3 @2xl/list:col-span-1"
+    class="{action === 'none'
+      ? 'col-span-4'
+      : 'col-span-3'} flex min-w-0 flex-row items-center gap-3 @2xl/list:col-span-1"
   >
     <span class="flex size-5 shrink-0 items-center justify-center">
       {#if brandIcon !== undefined}
@@ -111,7 +118,9 @@
        row showing "Signed out" would stand shorter than one offering a button, and the
        list would breathe unevenly. Rendered even when empty for the same reason, and so
        the column keeps its width. -->
-  <span class="col-start-4 row-start-1 flex h-9 items-center justify-center">
-    {@render actionControl()}
-  </span>
+  {#if action !== "none"}
+    <span class="col-start-4 row-start-1 flex h-9 items-center justify-center">
+      {@render actionControl()}
+    </span>
+  {/if}
 </div>
