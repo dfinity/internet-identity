@@ -16,7 +16,7 @@ interface BrowserKeyRecord {
    *  sign-in is known to have been accepted. The canister reaches this browser's entry
    *  only through the successor it announced, so losing this key while the canister kept
    *  it would leave the browser unable to prove it is itself ever again. */
-  announced?: CryptoKeyPair;
+  announcedSuccessor?: CryptoKeyPair;
   /** Absent until a sign-in has told us which browser we are. */
   browserId?: number;
   /** What was reported when this browser registered, so a change can be noticed.
@@ -141,8 +141,8 @@ const sameDescription = (
   (one.model[0] ?? "") === (other.model[0] ?? "");
 
 /**
- * The record to sign in with, which is a fresh one where this browser no longer matches
- * what it registered as.
+ * Returns the stored record unless the browser description changed; in that case, rotates
+ * to a fresh record so this sign-in registers as a new browser.
  *
  * A registered entry keeps the description it was created with, so a browser reporting
  * something else is one the canister has not seen. Rather than ask for an entry to be
@@ -163,7 +163,7 @@ const forDescription = async (
   }
   const fresh: BrowserKeyRecord = {
     keyPair: await generate(),
-    announced: await generate(),
+    announcedSuccessor: await generate(),
   };
   await write(identityNumber, fresh);
   return fresh;
@@ -173,21 +173,26 @@ const forDescription = async (
 const prepared = async (
   identityNumber: bigint,
   from?: BrowserKeyRecord,
-): Promise<Required<Pick<BrowserKeyRecord, "keyPair" | "announced">>> => {
+): Promise<
+  Required<Pick<BrowserKeyRecord, "keyPair" | "announcedSuccessor">>
+> => {
   const stored = from ?? (await read(identityNumber));
   const keyPair = stored?.keyPair ?? (await generate());
   // Both halves go on disk before the call. The canister may accept this sign-in and
   // never tell us, and from that moment the only key that reaches our entry is the
   // successor we announced — a successor generated and discarded per attempt would be
   // gone with the response that carried it.
-  const announced = stored?.announced ?? (await generate());
-  if (stored?.keyPair !== keyPair || stored?.announced !== announced) {
-    await write(identityNumber, { ...stored, keyPair, announced });
+  const announcedSuccessor = stored?.announcedSuccessor ?? (await generate());
+  if (
+    stored?.keyPair !== keyPair ||
+    stored?.announcedSuccessor !== announcedSuccessor
+  ) {
+    await write(identityNumber, { ...stored, keyPair, announcedSuccessor });
   }
-  return { keyPair, announced };
+  return { keyPair, announcedSuccessor };
 };
 
-/** One attempt, proving `keyPair` and announcing `announced`. */
+/** One attempt, proving `keyPair` and announcing `announcedSuccessor`. */
 const attempt = async <T>(
   identityNumber: bigint,
   sessionKey: Uint8Array,
@@ -196,7 +201,7 @@ const attempt = async <T>(
   browserIdOf: (value: T) => number,
   from?: BrowserKeyRecord,
 ): Promise<T> => {
-  const { keyPair, announced: successor } = await prepared(
+  const { keyPair, announcedSuccessor: successor } = await prepared(
     identityNumber,
     from,
   );
@@ -280,7 +285,7 @@ export const withBrowserProof = <T>(
       // it is announced. Starting over costs a second row in the user's list, which beats
       // a browser that can never sign in again.
       const promoted: BrowserKeyRecord = {
-        keyPair: stored?.announced ?? (await generate()),
+        keyPair: stored?.announcedSuccessor ?? (await generate()),
       };
       // Carried into the retry rather than read back, so a storage failure costs the
       // rotation and not the sign-in.
