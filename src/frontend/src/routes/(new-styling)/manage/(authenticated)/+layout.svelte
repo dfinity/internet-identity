@@ -25,7 +25,10 @@
   } from "$lib/stores/authentication.store";
   import { DelegationIdentity } from "@icp-sdk/core/identity";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { forgetIdentity } from "$lib/stores/session-delegation.store";
+  import {
+    forgetIdentity,
+    revokeIdentity,
+  } from "$lib/stores/session-delegation.store";
   import { sessionStore } from "$lib/stores/session.store";
   import { locales, localeStore, t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -121,9 +124,9 @@
     // Awaited: this ends the browser's sessions canister-side, and replacing the page
     // while that update call is in flight leaves the apps refreshing against session
     // records that still exist — which is the one thing "remove" is meant to stop.
-    // `forgetIdentity` swallows a canister failure and clears the local records either
+    // `revokeIdentity` swallows a canister failure and clears the local records either
     // way, so waiting cannot strand the user here.
-    await forgetIdentity(identityNumber);
+    await revokeIdentity(identityNumber);
     sessionStore.reset();
     window.location.replace("/");
   };
@@ -141,7 +144,7 @@
         removedIdentity.name ?? `${removedIdentity.identityNumber}`;
       toaster.create({
         title: $t`Identity removed`,
-        description: $t`${identityName} has been removed from this device. Apps you were signed into here have been signed out.`,
+        description: $t`${identityName} has been removed from this device.`,
         closable: true,
         duration: 5000,
         action: {
