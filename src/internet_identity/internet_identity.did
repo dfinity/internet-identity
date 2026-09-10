@@ -2040,6 +2040,11 @@ service : (opt InternetIdentityInit) -> {
     // client that retries, or that signs out twice, does not have to reason about whether
     // its session was still there. An app can revoke only its own session.
     app_revoke_session : () -> (variant { Ok; Err : AppSessionError });
+    // Whether the calling session is still usable. For the II frontend's silent
+    // re-auth path, which must decide whether it can answer without rendering
+    // anything. Advisory: a query reply is not certified, and every mint enforces
+    // the same conditions regardless of the answer here.
+    check_session : () -> (bool) query;
 
     revoke_browser_sessions : (RevokeBrowserSessionsRequest) -> (variant { Ok; Err : SessionRevokeError });
 
