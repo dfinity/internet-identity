@@ -70,11 +70,21 @@ const parseKey = (key: IDBValidKey): SessionKey | undefined => {
     return undefined;
   }
   const accountPart = key.slice(separator + 1, accountSeparator);
-  return {
-    identityNumber: BigInt(key.slice(0, separator)),
-    accountNumber: accountPart === "default" ? undefined : BigInt(accountPart),
-    origin: key.slice(accountSeparator + 1),
-  };
+  try {
+    return {
+      identityNumber: BigInt(key.slice(0, separator)),
+      accountNumber:
+        accountPart === "default" ? undefined : BigInt(accountPart),
+      origin: key.slice(accountSeparator + 1),
+    };
+  } catch {
+    // `BigInt` throws on a segment that is not a number, and this is documented to
+    // answer `undefined` for a key it cannot read. Letting it throw would take out the
+    // caller instead: every purge and the expiry sweep run this over every key in the
+    // store, so one unreadable key would stop them all — including the sweep that
+    // deletes it.
+    return undefined;
+  }
 };
 
 const readAll = async <T>(
