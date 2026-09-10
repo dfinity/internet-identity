@@ -5,6 +5,7 @@ import {
   INTERACTION_REQUIRED_ERROR_CODE,
   INVALID_PARAMS_ERROR_CODE,
   OriginSchema,
+  Nat64StringCodec,
   StringToBigIntCodec,
 } from "$lib/utils/transport/utils";
 import {
@@ -20,7 +21,7 @@ import {
   type AppSessionRecord,
 } from "$lib/stores/app-session.store";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
-import { remapToLegacyDomain } from "$lib/utils/iiConnection";
+import { remapToLegacyDomain } from "$lib/utils/urlUtils";
 import { toPermissionsArg } from "$lib/utils/accessLevel";
 import {
   isCanisterError,
@@ -51,7 +52,7 @@ import {
   StaleBrowserKeyError,
   withBrowserProof,
 } from "$lib/stores/browser-key.store";
-import { describeBrowser } from "$lib/stores/channelHandlers/describeBrowser";
+import { describeBrowser } from "$lib/utils/describeBrowser";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 
@@ -62,11 +63,11 @@ const SessionParamsCodec = z.object({
   // How long the app is willing for the session to last. A ceiling rather than a
   // request: what the user picks at consent wins, an SSO organization's cap
   // narrows it further, and the canister clamps the result.
-  maxTimeToLive: z.optional(StringToBigIntCodec),
+  maxTimeToLive: z.optional(Nat64StringCodec),
   // How long the session may go unminted before the canister ends it. A ceiling
   // like `maxTimeToLive`: the canister clamps it to between 10 minutes and the
   // session's own granted length, and applies its own default where absent.
-  maxTimeToIdle: z.optional(StringToBigIntCodec),
+  maxTimeToIdle: z.optional(Nat64StringCodec),
   icrc95DerivationOrigin: z.optional(OriginSchema),
 });
 
@@ -344,14 +345,28 @@ const createSession = async (
       ? ssoSessionMaxAgeNs
       : requested;
 
-  const key = { identityNumber, accountNumber, origin: effectiveOrigin };
-  const iiKey = await ECDSAKeyIdentity.generate({ extractable: false });
-  const iiPublicKey = new Uint8Array(iiKey.getPublicKey().toDer());
+  const recordKey = { identityNumber, accountNumber, origin: effectiveOrigin };
+
+  // The canister never certifies a delegation toward a key the request supplied. Over a
+  // redirect no browser-verified origin identifies the requester, so a malicious page
+  // could otherwise have II authenticate for another domain's derivation origin toward
+  // the attacker's own key and then read the finished delegation out of certified chain
+  // state. Signing to a key held only here makes what is on chain inert: the usable
+  // chain is completed below by a second hop this key makes. Same reason `url.ts` gives
+  // for its intermediate-key middleware, which covers `icrc34_delegation` and passes
+  // this method through. Keeping the pair in the session record is also what lets a
+  // later silent re-auth resume the session — a consequence, not the reason.
+  const iiSessionIdentity = await ECDSAKeyIdentity.generate({
+    extractable: false,
+  });
+  const iiSessionPublicKey = new Uint8Array(
+    iiSessionIdentity.getPublicKey().toDer(),
+  );
   const browserDescription = await describeBrowser();
 
   const prepared = await withBrowserProof(
     identityNumber,
-    iiPublicKey,
+    iiSessionPublicKey,
     browserDescription,
     async (browser) => {
       const prepared = await actor
@@ -359,7 +374,7 @@ const createSession = async (
           identity_number: identityNumber,
           origin: effectiveOrigin,
           account_number: accountNumber !== undefined ? [accountNumber] : [],
-          session_key: iiPublicKey,
+          session_key: iiSessionPublicKey,
           browser_description: browserDescription,
           current_browser_key: browser.publicKey,
           next_browser_key: browser.nextPublicKey,
@@ -380,9 +395,9 @@ const createSession = async (
         .catch((error: unknown) => {
           throw asBrowserKeyError(error);
         });
-      await browser.accept(prepared.browser_id);
       return prepared;
     },
+    (prepared) => prepared.browser_id,
   );
 
   const fetched = await retryFor(5, () =>
@@ -391,7 +406,7 @@ const createSession = async (
         identity_number: identityNumber,
         origin: effectiveOrigin,
         account_number: accountNumber !== undefined ? [accountNumber] : [],
-        session_key: iiPublicKey,
+        session_key: iiSessionPublicKey,
         session_id: prepared.session_id,
         expiration: prepared.expiration,
       })
@@ -414,7 +429,7 @@ const createSession = async (
   );
 
   const record: AppSessionRecord = {
-    keyPair: iiKey.getKeyPair(),
+    keyPair: iiSessionIdentity.getKeyPair(),
     chainJson: JSON.stringify(canisterChain.toJSON()),
     expiresAtMillis: Number(prepared.expiration / BigInt(1_000_000)),
     sessionId: prepared.session_id,
@@ -422,11 +437,11 @@ const createSession = async (
   };
   // The mapping is not a credential and is kept either way, so a later hint still names
   // an account this browser has seen. The session is what an app has to ask to have kept.
-  await rememberAppAccount(key, {
+  await rememberAppAccount(recordKey, {
     accountPrincipal: prepared.account_principal.toText(),
   });
   if (resumable) {
-    await storeAppSession(key, record);
+    await storeAppSession(recordKey, record);
   }
   return { record };
 };

@@ -31,12 +31,56 @@ const BRANDS: [RegExp, BrowserBrand][] = [
   [/EdgA\/|Edg\//, { Edge: null }],
   [/OPR\//, { Opera: null }],
   [/SamsungBrowser\//, { SamsungInternet: null }],
-  // Names itself but has no variant of its own, so it travels as the token it gave.
-  [/Vivaldi\//, { Other: "Vivaldi" }],
-  [/DuckDuckGo\//, { Other: "DuckDuckGo" }],
+];
+
+/**
+ * The two every Chromium and WebKit browser carries, whoever built it. Consulted last,
+ * because matching one says only which engine is underneath — a fork that names itself
+ * is named by its own token instead.
+ */
+const ENGINE_BRANDS: [RegExp, BrowserBrand][] = [
   [/Chrome\//, { Chrome: null }],
   [/Safari\//, { Safari: null }],
 ];
+
+/// Tokens every agent carries whoever built the browser: the engine chain, the platform
+/// marker, and the two Chromium ships. A browser that names itself does so with a token
+/// that is none of these.
+const SHARED_TOKENS = new Set([
+  "Mozilla",
+  "AppleWebKit",
+  "KHTML",
+  "Gecko",
+  "Chrome",
+  "Chromium",
+  "Safari",
+  "Version",
+  "Mobile",
+]);
+
+/**
+ * The product a browser names itself by, where it names one at all.
+ *
+ * An agent is a chain of `product/version` tokens and whether the browser's own is among
+ * them is the vendor's choice: Vivaldi, Opera, Yandex and DuckDuckGo append theirs, while
+ * Brave and Arc ship Chrome's agent unchanged and cannot be told from it. Read here
+ * rather than listed, so a browser this frontend has never heard of still arrives under
+ * its own name instead of under the one it borrowed.
+ *
+ * The version is dropped: the canister fixes a description at registration, so a version
+ * captured here would sit frozen at whichever build first signed in.
+ */
+const productToken = (agent: string): string | undefined => {
+  // `product/version` pairs only. Bare words are not products — an agent carries several
+  // in its parenthesised block, and `(KHTML, like Gecko)` alone would otherwise offer
+  // "like" as a browser name.
+  const products = [...agent.matchAll(/([A-Za-z][\w.-]*)\/[\w.]+/g)].map(
+    ([, name]) => name,
+  );
+  // The last one, because a browser that names itself appends its token after the
+  // engine's and Chromium's.
+  return products.filter((name) => !SHARED_TOKENS.has(name)).pop();
+};
 
 /** Truncated on a character boundary, because the cap the canister enforces is in bytes. */
 const capped = (token: string): string => {
@@ -48,8 +92,29 @@ const capped = (token: string): string => {
   return capped;
 };
 
-const brandOf = (agent: string): BrowserBrand =>
-  BRANDS.find(([token]) => token.test(agent))?.[1] ?? { Other: capped(agent) };
+/**
+ * A named variant where this frontend has one, otherwise the browser's own token.
+ *
+ * Three passes, in this order. A specific token wins outright — `CriOS/` is Chrome on
+ * iOS, and no fork borrows it. Failing that, a token the browser named itself by, so a
+ * Chromium fork reads as itself rather than as Chrome. Only then the engine tokens every
+ * one of them carries.
+ */
+const brandOf = (agent: string): BrowserBrand => {
+  const named = BRANDS.find(([token]) => token.test(agent))?.[1];
+  if (named !== undefined) {
+    return named;
+  }
+  const own = productToken(agent);
+  if (own !== undefined) {
+    return { Other: capped(own) };
+  }
+  return (
+    ENGINE_BRANDS.find(([token]) => token.test(agent))?.[1] ?? {
+      Other: capped(agent),
+    }
+  );
+};
 
 const systemOf = (agent: string, touchPoints: number): OperatingSystem => {
   if (/CrOS/.test(agent)) return { ChromeOs: null };
@@ -62,7 +127,23 @@ const systemOf = (agent: string, touchPoints: number): OperatingSystem => {
     return touchPoints > 0 ? { Ipados: null } : { Macos: null };
   if (/Windows/.test(agent)) return { Windows: null };
   if (/Linux|X11/.test(agent)) return { Linux: null };
-  return { Other: capped(agent) };
+  return { Other: capped(platformToken(agent) ?? agent) };
+};
+
+/**
+ * The platform a user agent names, for the systems above that none of the known ones
+ * matched: it is the first segment of the first parenthesised block.
+ *
+ * Barely reachable — `X11` and `Linux` sweep up almost everything the seven above miss,
+ * and this code only ever runs inside a browser — but where it is reached the block
+ * still names the system, and the whole agent is not a system.
+ */
+const platformToken = (agent: string): string | undefined => {
+  const named = agent
+    .match(/\(([^)]*)\)/)?.[1]
+    .split(";")[0]
+    .trim();
+  return named === undefined || named.length === 0 ? undefined : named;
 };
 
 const formFactorOf = (
