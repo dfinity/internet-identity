@@ -3,7 +3,7 @@
   import { Trans } from "$lib/components/locale";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
   import { currentBrowserId } from "$lib/stores/browser-key.store";
-  import { describeBrowser } from "$lib/stores/channelHandlers/describeBrowser";
+  import { describeBrowser } from "$lib/utils/describeBrowser";
   import type { BrowserDescription } from "$lib/generated/internet_identity_types";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
