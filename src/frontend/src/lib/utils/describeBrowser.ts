@@ -146,12 +146,26 @@ const platformToken = (agent: string): string | undefined => {
   return named === undefined || named.length === 0 ? undefined : named;
 };
 
+/**
+ * Stated form factors the canister has no variant for. A device reporting one of these is
+ * neither a desktop, a mobile nor a tablet, so it is named as none of them: left to fall
+ * through, `mobile` alone would call a watch a phone and an e-reader a desktop.
+ */
+const UNNAMEABLE_FORM_FACTORS = ["Watch", "XR", "Automotive", "EInk"];
+
 const formFactorOf = (
   agent: string,
   system: OperatingSystem,
   hints: { mobile?: boolean; formFactors?: string[] },
 ): FormFactor => {
+  // Before the unnameable check, so a device stating both keeps the variant that exists.
   if (hints.formFactors?.includes("Tablet") === true) return { Tablet: null };
+  if (
+    hints.formFactors?.some((factor) =>
+      UNNAMEABLE_FORM_FACTORS.includes(factor),
+    ) === true
+  )
+    return { Unknown: null };
   if ("Ipados" in system) return { Tablet: null };
   if (hints.mobile === true) return { Mobile: null };
   if ("Ios" in system) return { Mobile: null };
@@ -184,7 +198,6 @@ const highEntropyHints = async (): Promise<{
         getHighEntropyValues?: (hints: string[]) => Promise<{
           model?: string;
           formFactors?: string[];
-          formFactor?: string;
         }>;
       };
     }
@@ -196,10 +209,7 @@ const highEntropyHints = async (): Promise<{
     const high = await data.getHighEntropyValues?.(["model", "formFactors"]);
     return {
       mobile: data.mobile,
-      // Plural in the current spec, singular in the versions that shipped it first.
-      formFactors:
-        high?.formFactors ??
-        (high?.formFactor === undefined ? undefined : [high.formFactor]),
+      formFactors: high?.formFactors,
       // Empty off Android, which reports the field but has no model to put in it.
       model: high?.model === "" ? undefined : high?.model,
     };
