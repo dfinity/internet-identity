@@ -1,6 +1,10 @@
 import { expect } from "@playwright/test";
 import { test } from "../../../fixtures";
-import { openSettings, signInAsFirstIdentity } from "./helpers";
+import {
+  listedBrowserRows,
+  openSettings,
+  signInAsFirstIdentity,
+} from "./helpers";
 
 /**
  * Ending access is only useful if the owner can see what there is to end, so a
@@ -26,9 +30,20 @@ test.describe("what the owner sees", () => {
           identities[0].identityNumber,
           signInWithIdentity,
         );
-        await expect(
-          settings.getByRole("button", { name: "Sign out" }).first(),
-        ).toBeVisible();
+
+        // SHOW-2 promises a name that identifies the browser and when it was
+        // last used, so both are read. A visible button would pass for a row
+        // that named nothing.
+        const row = listedBrowserRows(settings).first();
+        await expect(row).toBeVisible();
+        // Chromium is what Playwright drives, and the list names a browser by
+        // its brand: anything else means the description never reached the
+        // canister, or came back unrecognised.
+        await expect(settings.getByText(/Chrom(e|ium)/).first()).toBeVisible();
+        // "Right now" is what a browser in use reads as — the stamp is only
+        // five-minute precise, so a browser that just signed in is inside the
+        // first grain.
+        await expect(settings.getByText("Right now").first()).toBeVisible();
         await settings.close();
       },
     );
