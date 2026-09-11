@@ -40,6 +40,11 @@ test.describe("staying signed in", () => {
       await signedInApp.page.waitForTimeout(1000);
 
       await signedInApp.expectNoDelegationReplacements();
+
+      // The rest of HOLD-2: it must work when used. Spending nothing while idle
+      // is only half the claim, and a tab that came back unusable would satisfy
+      // the half above.
+      await signedInApp.whoAmI();
     });
 
     test("picks an identity and continues", signInAsFirstIdentity);
