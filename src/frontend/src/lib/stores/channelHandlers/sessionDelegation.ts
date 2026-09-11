@@ -336,12 +336,8 @@ const createSession = async (
 ): Promise<{ record: AppSessionRecord }> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
   let authorized = await waitForStore(authorizedStore);
-  // A consent screen is a place the user can change their mind about who they
-  // are: switching identity there authorizes again, and the first value is then
-  // the identity they left rather than the one they settled on. Waited out, as
-  // `delegation.ts` waits it out for a delegation request — without this the
-  // session is minted for the identity that was authorized first, while the
-  // screen the user answered belongs to the other one.
+  // Switching identity on a consent screen authorizes again; mint for the
+  // identity the user ends on, as `delegation.ts` does.
   while (
     get(attributeConsentStore) !== undefined &&
     get(attributeConsentResultStore) === undefined
@@ -357,8 +353,6 @@ const createSession = async (
     }
     authorized = await waitForStore(authorizedStore);
   }
-  // Read after authorization settled, so the identity is whichever one the user
-  // ended on.
   const [accountNumber, { identityNumber, actor, authMethod }] =
     await Promise.all([
       authorized.accountNumberPromise,
