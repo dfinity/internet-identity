@@ -11,7 +11,12 @@ import {
   SSO_ENTRA_OPENID_PORT,
   SSO_ENTRA_NAME,
 } from "../../fixtures/sso";
-import { fromBase64, II_URL, TEST_APP_URL } from "../../utils";
+import {
+  fromBase64,
+  II_URL,
+  setTestAppProtocol,
+  TEST_APP_URL,
+} from "../../utils";
 
 // Attribute scope keys for SSO-sourced credentials are
 // `sso:<domain>:<name>`, distinct from the `openid:<issuer>:<name>` form
@@ -578,9 +583,7 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       await page
         .getByRole("textbox", { name: "Identity Provider" })
         .fill(ssoUrl);
-      await page
-        .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
-        .setChecked(true);
+      await setTestAppProtocol(page, true);
       await page
         .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
         .setChecked(true);
@@ -685,9 +688,7 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       await page
         .getByRole("textbox", { name: "Identity Provider" })
         .fill(ssoUrl);
-      await page
-        .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
-        .setChecked(true);
+      await setTestAppProtocol(page, true);
       await page
         .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
         .setChecked(true);
@@ -782,9 +783,7 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       await page
         .getByRole("textbox", { name: "Identity Provider" })
         .fill(ssoUrl);
-      await page
-        .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
-        .setChecked(true);
+      await setTestAppProtocol(page, true);
       await expect(page.locator("#principal")).toBeHidden();
       const popupPromise = page.context().waitForEvent("page");
       await page.getByRole("button", { name: "Sign In" }).click();
@@ -967,9 +966,7 @@ test.describe("Continue as a last-used SSO identity", () => {
     await page
       .getByRole("textbox", { name: "Identity Provider" })
       .fill(II_URL + "/authorize");
-    await page
-      .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
-      .setChecked(true);
+    await setTestAppProtocol(page, true);
     await page
       .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
       .setChecked(true);
@@ -1055,9 +1052,7 @@ test.describe("Authorize with gated non-sub (Entra) SSO", () => {
   ): Promise<Page> => {
     await page.goto(GATED_ORIGIN);
     await page.getByRole("textbox", { name: "Identity Provider" }).fill(ssoUrl);
-    await page
-      .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
-      .setChecked(true);
+    await setTestAppProtocol(page, true);
     await expect(page.locator("#principal")).toBeHidden();
     const popupPromise = page.context().waitForEvent("page");
     await page.getByRole("button", { name: "Sign In" }).click();
@@ -1148,9 +1143,7 @@ test.describe("Authorize with gated non-sub (Entra) SSO", () => {
     // never show.
     await page.goto(GATED_ORIGIN);
     await page.getByRole("textbox", { name: "Identity Provider" }).fill(ssoUrl);
-    await page
-      .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
-      .setChecked(true);
+    await setTestAppProtocol(page, true);
     await expect(page.locator("#principal")).toBeHidden();
     const popup2Promise = page.context().waitForEvent("page");
     await page.getByRole("button", { name: "Sign In" }).click();
