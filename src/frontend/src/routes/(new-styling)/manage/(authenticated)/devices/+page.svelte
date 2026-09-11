@@ -106,9 +106,12 @@
           ? "signed-out"
           : "sign-out";
 
+  // "Right now" rather than a time, and worded as the access methods and recovery
+  // pages word theirs: this is the browser reading the page, so it is in use by
+  // definition and no stored stamp is as current as that.
   const lastUsedOf = (browser: Browser): string =>
     browser.isCurrent
-      ? $t`Now`
+      ? $t`Right now`
       : $formatRelative(new Date(browser.lastUsedMillis), { style: "long" });
   const firstSeenOf = (browser: Browser): string =>
     $formatDate(new Date(browser.createdAtMillis), {

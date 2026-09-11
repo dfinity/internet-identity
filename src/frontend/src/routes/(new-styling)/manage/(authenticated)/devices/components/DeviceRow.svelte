@@ -8,7 +8,8 @@
 
   interface Props {
     description: BrowserDescription;
-    /** Already formatted: a relative time, or "Now" for the browser reading the page. */
+    /** Already formatted: a relative time, or "Right now" for the browser reading the
+     *  page. */
     lastUsed: string;
     /** Already formatted: a short date. */
     firstSeen: string;
