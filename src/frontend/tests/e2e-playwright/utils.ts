@@ -109,6 +109,29 @@ export const reportPageError = (message: ConsoleMessage): void => {
 };
 
 /**
+ * States which identity provider the test app signs in with.
+ *
+ * The canister id is filled in beside the URL, because a session chain names
+ * the provider that signed it and the client refuses one naming any other —
+ * and the field defaults to the mainnet canister. A page that sets only the URL
+ * is handed a chain it discards without a word: nothing is rendered, no error
+ * is raised, and the app simply never signs in.
+ * @param page The test app's page.
+ * @param authorizeUrl The provider's authorize URL.
+ */
+export const setTestAppProvider = async (
+  page: Page,
+  authorizeUrl: string,
+): Promise<void> => {
+  await page
+    .getByRole("textbox", { name: "Identity Provider" })
+    .fill(authorizeUrl);
+  await page
+    .getByRole("textbox", { name: "II canister id:" })
+    .fill(readCanisterId({ canisterName: "internet_identity" }));
+};
+
+/**
  * States which protocol the test app signs in with.
  *
  * Two boxes rather than one: the app carries the request over ICRC-25, and a
