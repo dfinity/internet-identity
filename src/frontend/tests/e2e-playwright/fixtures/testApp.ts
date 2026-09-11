@@ -5,7 +5,12 @@ import {
   type Page,
 } from "@playwright/test";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
-import { II_URL, installTestAppClock, TEST_APP_URL } from "../utils";
+import {
+  II_URL,
+  installTestAppClock,
+  reportPageError,
+  TEST_APP_URL,
+} from "../utils";
 
 /**
  * The test app, addressed by what it does rather than by which element does it.
@@ -100,6 +105,7 @@ export class TestApp {
       console.error(`test app alert: ${dialog.message()}`);
       void dialog.dismiss();
     });
+    this.page.on("console", reportPageError);
     await installTestAppClock(this.page);
 
     await this.page.goto(options.url ?? TEST_APP_URL);
@@ -187,8 +193,6 @@ export class TestApp {
     await expect(this.account).not.toHaveText(principal);
     await expect(this.account).not.toHaveText(NO_ACCOUNT);
   }
-
-  /** The key II resolves the session from, once the app has one. */
 
   /** Fails unless the app has a delegation it could sign a request with. */
   async expectHoldsDelegation(): Promise<void> {
@@ -340,6 +344,20 @@ export class TestApp {
    */
   async ageDelegation(duration = "05:30"): Promise<void> {
     await this.page.clock.fastForward(duration);
+  }
+
+  /**
+   * Puts the page's clock back to now.
+   *
+   * Only the page's clock moves when a delegation is aged; the replica's does
+   * not. A page ahead of the replica signs `ingress_expiry` five minutes past
+   * its own time, which is past the ceiling the replica accepts, so every
+   * update call the page makes is refused for an invalid expiry. Minting is
+   * unaffected — those calls are made by the identity provider's page, whose
+   * clock is real.
+   */
+  async restoreClock(): Promise<void> {
+    await this.page.clock.setSystemTime(new Date());
   }
 
   /**
