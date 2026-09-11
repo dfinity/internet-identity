@@ -1,6 +1,12 @@
+import { expect } from "@playwright/test";
 import { test } from "../../../fixtures";
 import { TEST_APP_CANONICAL_URL } from "../../../utils";
-import { continueAs, signInAsFirstIdentity } from "./helpers";
+import {
+  continueAs,
+  listedBrowsers,
+  openSettings,
+  signInAsFirstIdentity,
+} from "./helpers";
 
 /**
  * What a sign-in leaves behind: an account the app acts as, a delegation to act
@@ -24,8 +30,9 @@ test.describe("signing in", () => {
     test("picks an identity and continues", signInAsFirstIdentity);
   });
 
-  test("signing in twice from one browser replaces the session rather than adding one", async ({
+  test("signing in twice from one browser leaves one sign-in, not two", async ({
     testApp,
+    browser,
     identities,
     signInWithIdentity,
   }) => {
@@ -35,11 +42,31 @@ test.describe("signing in", () => {
     );
     await testApp.open();
     await testApp.signIn(authenticate);
-    const before = await testApp.sessionKeyPrincipal();
+    await testApp.waitUntilSignedIn();
 
     await testApp.signIn(authenticate);
+    await testApp.waitUntilSignedIn();
 
-    await testApp.expectSessionKeyOtherThan(before);
+    // FIRST-3 is about the browser entry rather than the session key: a key that
+    // rotated proves only that, and a second ceremony that had registered a
+    // second browser would rotate one too. The count is what says the browser
+    // was recognised as itself.
+    //
+    // Read from another browser, because a browser reading its own list sees
+    // itself as the one it cannot sign out — the row for the browser being
+    // looked at carries no button, by design.
+    const onlooker = await browser.newContext({ ignoreHTTPSErrors: true });
+    try {
+      const settings = await openSettings(
+        onlooker,
+        identities[0].identityNumber,
+        signInWithIdentity,
+      );
+      await expect(listedBrowsers(settings)).toHaveCount(1);
+      await settings.close();
+    } finally {
+      await onlooker.close();
+    }
   });
 
   test("one identity is a different account at each app", async ({
