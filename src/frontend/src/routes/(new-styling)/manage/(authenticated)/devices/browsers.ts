@@ -94,14 +94,19 @@ const MINUTE_MILLIS = 60_000;
 export const LAST_USED_GRAIN_MILLIS = 5 * MINUTE_MILLIS;
 
 /**
- * The age to show for a browser, rounded up to the grain, or `undefined` for one used
- * within a single grain.
+ * The age to show for a browser, in whole grains, or `undefined` for one used within a
+ * single grain.
  *
- * Up rather than down: the stamp is already behind by up to one grain, so rounding up
- * lands inside the interval the true figure is in, and the page never says a browser
- * was used more recently than it was. `undefined` is the first interval, where the
- * record cannot tell a browser still in use from one idle four minutes — so the page
- * says what both have in common instead of picking a number.
+ * `undefined` is that first grain, where the record cannot tell a browser still in use
+ * from one idle four minutes — so the page says what both have in common instead of
+ * picking a number.
+ *
+ * Past it, the age is rounded up to a grain *counting from the end of that first one*.
+ * Rounding up rather than down keeps the page from ever saying a browser was used more
+ * recently than it was: the stamp is behind by up to a grain, so the figure has to land
+ * at or above the true age. Counting from the end of the first grain is what makes one
+ * grain the smallest figure shown — measuring from zero would round anything past the
+ * threshold to two grains and leave the first number unreachable.
  */
 export const lastUsedAgeMillis = (
   browser: Browser,
@@ -109,7 +114,10 @@ export const lastUsedAgeMillis = (
 ): number | undefined => {
   const age = now - browser.lastUsedMillis;
   if (age < LAST_USED_GRAIN_MILLIS) return undefined;
-  return Math.ceil(age / LAST_USED_GRAIN_MILLIS) * LAST_USED_GRAIN_MILLIS;
+  const grains = Math.ceil(
+    (age - LAST_USED_GRAIN_MILLIS) / LAST_USED_GRAIN_MILLIS,
+  );
+  return Math.max(1, grains) * LAST_USED_GRAIN_MILLIS;
 };
 
 /**

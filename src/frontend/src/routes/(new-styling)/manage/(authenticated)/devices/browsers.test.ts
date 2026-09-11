@@ -138,16 +138,20 @@ describe("lastUsedAgeMillis", () => {
     expect(lastUsedAgeMillis(aged(minutesAgo), now)).toBeUndefined();
   });
 
-  /// Up rather than down: the stamp is already behind by up to one grain, so the
-  /// rounded figure lands inside the interval the true one is in and never claims a
-  /// browser was used more recently than it was.
+  /// Rounded up so the figure never claims more recency than the stamp can support,
+  /// and counted from the end of the first grain so one grain is the smallest figure
+  /// shown: measuring from zero would round anything past the threshold to two and
+  /// leave "5 minutes ago" unreachable.
   it.each([
     [5, 5],
-    [5.1, 10],
-    [9, 10],
-    [10, 10],
-    [11, 15],
-    [61, 65],
+    [5.1, 5],
+    [9, 5],
+    [10, 5],
+    [10.1, 10],
+    [11, 10],
+    [15, 10],
+    [16, 15],
+    [61, 60],
   ])("rounds %s minutes up to %s", (minutesAgo, expected) => {
     expect(lastUsedAgeMillis(aged(minutesAgo), now)).toBe(expected * MINUTE);
   });
