@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
-import type { Writable } from "svelte/store";
+import { get, type Readable, type Writable } from "svelte/store";
 
 const CANISTER_ID_TEXT = "rwlgt-iiaaa-aaaaa-aaaaa-cai";
 const ORIGIN = "https://app.example.com";
@@ -772,8 +772,21 @@ describe("an identity switched mid-consent", () => {
     try {
       const { prepared } = await runCeremony(undefined, {}, async () => {
         // Let the ceremony reach the point where it is waiting on the screen, so
-        // the identity below is a switch rather than the first answer.
+        // what follows is a switch rather than the first answer.
         await new Promise((resolve) => setTimeout(resolve, 20));
+        // A switch moves both: the identity re-authenticates and its account is
+        // authorized again, so the session has to be minted for the pair the
+        // user ended on rather than one of each. The actor is kept, so the
+        // calls it records are the same ones read below.
+        const { authenticationStore } =
+          await import("$lib/stores/authentication.store");
+        const left = get(
+          authenticationStore as unknown as Readable<Record<string, unknown>>,
+        );
+        (authenticationStore as unknown as Writable<unknown>).set({
+          ...left,
+          identityNumber: BigInt(10_001),
+        });
         (authorizedStore as unknown as Writable<unknown>).set({
           accountNumberPromise: Promise.resolve(BigInt(7)),
           accessLevel: "full-access",
@@ -783,9 +796,11 @@ describe("an identity switched mid-consent", () => {
         });
       });
 
-      // The account of the identity switched to. The one left behind carries no
-      // account number at all, so a ceremony that never noticed the switch
-      // sends an empty option here.
+      // The identity and the account switched to, both of them: the one left
+      // behind is identity 10_000 and carries no account number at all, so a
+      // ceremony that never noticed the switch names it here — as does one that
+      // took the new account while keeping the old identity.
+      expect(prepared[0].identity_number).toBe(BigInt(10_001));
       expect(prepared[0].account_number).toEqual([BigInt(7)]);
     } finally {
       // Closed again here rather than in a hook: the ceremony cases further
