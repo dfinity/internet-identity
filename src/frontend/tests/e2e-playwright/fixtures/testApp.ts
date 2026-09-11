@@ -5,7 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
-import { II_URL, TEST_APP_URL } from "../utils";
+import { II_URL, installTestAppClock, TEST_APP_URL } from "../utils";
 
 /**
  * The test app, addressed by what it does rather than by which element does it.
@@ -17,9 +17,24 @@ import { II_URL, TEST_APP_URL } from "../utils";
 
 const II_CANISTER_ID = readCanisterId({ canisterName: "internet_identity" });
 
-/** What the panel prints, so no scenario has to quote it. */
-const HOLDS_SESSION = "signed in";
-const HOLDS_NOTHING = "no session";
+/**
+ * What the panel prints, so no scenario has to quote it.
+ *
+ * The two session states are the client's own `getStatus()` values rather than
+ * prose: the panel prints what the library answers, so a scenario asserting on
+ * prose would be asserting on the test app's wording instead of on the state.
+ */
+const HOLDS_SESSION = "signed-in";
+const HOLDS_NOTHING = "signed-out";
+/**
+ * A sign-in the domain announces that this origin holds nothing for.
+ *
+ * Its own state rather than a kind of signed-out: the origin cannot act, so it
+ * has no delegation and no account, but there is something to resume from — and
+ * a scenario about a sibling picking a session up needs to tell that apart from
+ * nobody being signed in at all.
+ */
+const SHARED_NOT_HELD = "signed-in-elsewhere";
 const NO_ACCOUNT = "-";
 const NO_DELEGATION = "none held";
 const NOTHING_SHARED = "none";
@@ -59,9 +74,6 @@ export class TestApp {
   private get account(): Locator {
     return this.page.locator("#sessionAccountPrincipal");
   }
-  private get sessionKey(): Locator {
-    return this.page.locator("#sessionSessionPrincipal");
-  }
   private get delegation(): Locator {
     return this.page.locator("#delegationExpiry");
   }
@@ -77,14 +89,33 @@ export class TestApp {
 
   /** Opens the app and states which provider and protocol to use. */
   async open(options: TestAppOptions = {}): Promise<void> {
+    // Before navigating, so every timer the app creates is one a scenario can
+    // move: `install` only replaces the timer functions from that moment, and a
+    // refresh scheduled during sign-in would otherwise keep running on real time
+    // where `fastForward` cannot reach it. Resumed straight away so time still
+    // flows — the panel polls, and a frozen clock would stop it reporting.
+    // As in `authorize.ts`: the app's own failure reporting is an `alert`, and
+    // an alert Playwright dismisses is a cause thrown away.
+    this.page.on("dialog", (dialog) => {
+      console.error(`test app alert: ${dialog.message()}`);
+      void dialog.dismiss();
+    });
+    await installTestAppClock(this.page);
+
     await this.page.goto(options.url ?? TEST_APP_URL);
     await this.page
       .getByRole("textbox", { name: "Identity Provider" })
       .fill(options.authorizeUrl ?? `${II_URL}/authorize`);
+    // Two boxes, not one: ICRC-25 is the protocol the request travels over, and
+    // a session is what the app asks for across it. The legacy path is neither.
+    const protocol = options.protocol ?? "session";
     await this.page
-      .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
-      .setChecked((options.protocol ?? "session") === "session");
-    if ((options.protocol ?? "session") === "session") {
+      .getByRole("checkbox", { name: "Use ICRC-25:" })
+      .setChecked(protocol === "session");
+    await this.page
+      .getByRole("checkbox", { name: "Use session:" })
+      .setChecked(protocol === "session");
+    if (protocol === "session") {
       // The client refuses a session chain naming any provider but the one it was
       // configured with, and its default is the mainnet canister.
       await this.page
@@ -97,7 +128,7 @@ export class TestApp {
         .fill(options.derivationOrigin);
     }
     if (options.cookieDomain !== undefined) {
-      await this.page.locator("#sessionStorageCookie").check();
+      await this.page.locator("#stateStorageCookie").check();
       await this.page
         .locator("#sessionCookieDomain")
         .fill(options.cookieDomain);
@@ -112,7 +143,24 @@ export class TestApp {
 
   /** Waits until the app holds a session. */
   async waitUntilSignedIn(): Promise<void> {
-    await expect(this.state).toHaveText(HOLDS_SESSION, { timeout: ROUND_TRIP });
+    try {
+      await expect(this.state).toHaveText(HOLDS_SESSION, {
+        timeout: ROUND_TRIP,
+      });
+    } catch (error) {
+      console.error(`test app log:\n${await this.log.innerText()}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Fails unless the app can see a sign-in on this domain that it holds nothing
+   * for, which is what a sibling subdomain arrives to.
+   */
+  async expectSharedButNotHeld(): Promise<void> {
+    await expect(this.state).toHaveText(SHARED_NOT_HELD, {
+      timeout: ROUND_TRIP,
+    });
   }
 
   /** Fails unless the app is holding nothing it could act with. */
@@ -141,14 +189,6 @@ export class TestApp {
   }
 
   /** The key II resolves the session from, once the app has one. */
-  async sessionKeyPrincipal(): Promise<string> {
-    await expect(this.sessionKey).not.toHaveText(NO_ACCOUNT);
-    return this.sessionKey.innerText();
-  }
-
-  async expectSessionKeyOtherThan(principal: string): Promise<void> {
-    await expect(this.sessionKey).not.toHaveText(principal);
-  }
 
   /** Fails unless the app has a delegation it could sign a request with. */
   async expectHoldsDelegation(): Promise<void> {
@@ -160,9 +200,14 @@ export class TestApp {
   }
 
   async expectDelegationReplaced(): Promise<void> {
-    await expect(this.replacements).not.toHaveText("0", {
-      timeout: ROUND_TRIP,
-    });
+    try {
+      await expect(this.replacements).not.toHaveText("0", {
+        timeout: ROUND_TRIP,
+      });
+    } catch (error) {
+      console.error(`test app log:\n${await this.log.innerText()}`);
+      throw error;
+    }
   }
 
   /** Fails unless the domain is announcing a session to its subdomains. */
@@ -262,13 +307,20 @@ export class TestApp {
     await this.page.getByRole("button", { name: "Silent re-auth" }).click();
   }
 
-  /** Makes a real canister call as whoever the app is acting as. */
+  /**
+   * Makes a real canister call as whoever the app is acting as, and fails unless
+   * the canister saw its account.
+   *
+   * The principal is what makes this an assertion rather than a round trip: a
+   * reply on its own would also pass for the anonymous principal, which is what
+   * a call made with no delegation at all reaches the canister as.
+   */
   async whoAmI(): Promise<void> {
+    const account = await this.accountPrincipal();
     await this.page.getByRole("button", { name: "Who am I?" }).click();
-    await expect(this.page.locator("#whoamiResponse")).not.toHaveText(
-      "Loading...",
-      { timeout: 30_000 },
-    );
+    await expect(this.page.locator("#whoamiResponse")).toHaveText(account, {
+      timeout: ROUND_TRIP,
+    });
   }
 
   /** Brings this tab forward, which is a trigger for replacing a delegation. */
@@ -279,38 +331,48 @@ export class TestApp {
     );
   }
 
-  /** Moves this page past the point where its delegation is due. */
+  /**
+   * Moves this page past the point where its delegation is due.
+   *
+   * The clock was installed by {@link open}, before the page had scheduled
+   * anything, so this reaches the refresh the sign-in set up rather than only
+   * the timers created after it.
+   */
   async ageDelegation(duration = "05:30"): Promise<void> {
-    await this.page.clock.install();
     await this.page.clock.fastForward(duration);
   }
 
   /**
    * Forgets everything this origin stored, as clearing site data would.
    *
-   * Cookies included: a domain announces a session to its subdomains in one,
-   * so a clean start that left them would not be one.
+   * Done from outside the page rather than from inside it. A database cannot be
+   * deleted while a connection to it is open, and the client holds one for as
+   * long as the page lives — so `indexedDB.deleteDatabase` is blocked, and the
+   * browser key survives what is supposed to be a clean start. What the
+   * browser's own "clear site data" does is what this asks for.
+   *
+   * Cookies included: a domain announces a session to its subdomains in one, so
+   * a clean start that left them would not be one.
    */
   async clearSiteData(): Promise<void> {
     await this.page.context().clearCookies();
-    await this.page.evaluate(async () => {
-      localStorage.clear();
-      sessionStorage.clear();
-      const databases = (await indexedDB.databases?.()) ?? [];
-      await Promise.all(
-        databases.map(
-          ({ name }) =>
-            new Promise((resolve) => {
-              if (name === undefined) return resolve(undefined);
-              const request = indexedDB.deleteDatabase(name);
-              request.onsuccess =
-                request.onerror =
-                request.onblocked =
-                  () => resolve(undefined);
-            }),
-        ),
-      );
-    });
+    const origin = new URL(this.page.url()).origin;
+    const cdp = await this.page.context().newCDPSession(this.page);
+    try {
+      await cdp.send("Storage.clearDataForOrigin", {
+        origin,
+        storageTypes: "all",
+      });
+    } finally {
+      await cdp.detach();
+    }
+
+    // Asked of the browser, so nothing in the page reports on it: read the
+    // databases back to say whether the start really is clean.
+    const left = await this.page.evaluate(async () =>
+      ((await indexedDB.databases?.()) ?? []).map(({ name }) => name ?? "?"),
+    );
+    expect(left, "site data left behind after clearing it").toEqual([]);
   }
 
   /**
