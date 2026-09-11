@@ -15,6 +15,7 @@ import {
   fromBase64,
   II_URL,
   setTestAppProtocol,
+  setTestAppProvider,
   TEST_APP_URL,
 } from "../../utils";
 
@@ -574,9 +575,7 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       const ssoUrl = `${II_URL}/authorize?sso=${encodeURIComponent(
         SSO_GATING_DISCOVERY_DOMAIN,
       )}`;
-      await page
-        .getByRole("textbox", { name: "Identity Provider" })
-        .fill(ssoUrl);
+      await setTestAppProvider(page, ssoUrl);
       await setTestAppProtocol(page, true);
       await page
         .getByRole("textbox", { name: "Request attributes:" })
@@ -676,9 +675,7 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       const ssoUrl = `${II_URL}/authorize?sso=${encodeURIComponent(
         SSO_GATING_DISCOVERY_DOMAIN,
       )}&derivationOrigin=${encodeURIComponent(TEST_APP_URL)}`;
-      await page
-        .getByRole("textbox", { name: "Identity Provider" })
-        .fill(ssoUrl);
+      await setTestAppProvider(page, ssoUrl);
       await setTestAppProtocol(page, true);
       await page
         .getByRole("textbox", { name: "Request attributes:" })
@@ -767,9 +764,7 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       const ssoUrl = `${II_URL}/authorize?sso=${encodeURIComponent(
         SSO_GATING_DISCOVERY_DOMAIN,
       )}`;
-      await page
-        .getByRole("textbox", { name: "Identity Provider" })
-        .fill(ssoUrl);
+      await setTestAppProvider(page, ssoUrl);
       await setTestAppProtocol(page, true);
       await expect(page.locator("#principal")).toBeHidden();
       const popupPromise = page.context().waitForEvent("page");
@@ -948,9 +943,7 @@ test.describe("Continue as a last-used SSO identity", () => {
     // last-used SSO identity persists across the reload, so the II popup shows
     // the ContinueView "Continue" path.
     await page.goto("https://nice-name.com");
-    await page
-      .getByRole("textbox", { name: "Identity Provider" })
-      .fill(II_URL + "/authorize");
+    await setTestAppProvider(page, II_URL + "/authorize");
     await setTestAppProtocol(page, true);
     await page
       .getByRole("textbox", { name: "Request attributes:" })
@@ -1033,7 +1026,7 @@ test.describe("Authorize with gated non-sub (Entra) SSO", () => {
     userId: string,
   ): Promise<Page> => {
     await page.goto(GATED_ORIGIN);
-    await page.getByRole("textbox", { name: "Identity Provider" }).fill(ssoUrl);
+    await setTestAppProvider(page, ssoUrl);
     await setTestAppProtocol(page, true);
     await expect(page.locator("#principal")).toBeHidden();
     const popupPromise = page.context().waitForEvent("page");
@@ -1124,7 +1117,7 @@ test.describe("Authorize with gated non-sub (Entra) SSO", () => {
     // the dialog to reappear, nobody advances it and #principal below would
     // never show.
     await page.goto(GATED_ORIGIN);
-    await page.getByRole("textbox", { name: "Identity Provider" }).fill(ssoUrl);
+    await setTestAppProvider(page, ssoUrl);
     await setTestAppProtocol(page, true);
     await expect(page.locator("#principal")).toBeHidden();
     const popup2Promise = page.context().waitForEvent("page");
