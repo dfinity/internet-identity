@@ -69,6 +69,51 @@ export const authorize = (
 };
 
 /**
+ * Installs the page's clock, anchored at the real time and still ticking.
+ *
+ * Before the page is navigated, so every timer it creates is one a scenario can
+ * move: `install` only replaces the timer functions from that moment, and a
+ * refresh scheduled during sign-in would otherwise keep running on real time
+ * where `fastForward` cannot reach it.
+ *
+ * Anchored, because `install()` on its own starts the page at the Unix epoch —
+ * and a delegation the canister issues for this year is then never due, so
+ * ageing it moves nothing. Resumed, because the app polls: a frozen clock would
+ * stop it reporting.
+ *
+ * Both paths into the test app call this. Leaving it to one of them is what let
+ * the fixture-driven scenarios fast-forward a page whose clock had never been
+ * installed, where the base is zero and the jump means nothing.
+ * @param page The page about to be navigated to the test app.
+ */
+export const installTestAppClock = async (page: Page): Promise<void> => {
+  await page.clock.install({ time: new Date() });
+  await page.clock.resume();
+};
+
+/**
+ * States which protocol the test app signs in with.
+ *
+ * Two boxes rather than one: the app carries the request over ICRC-25, and a
+ * session is what it asks for across it. They moved apart when the app gained a
+ * plain app-delegation path, so a caller that ticked one box now has to say
+ * whether it meant a session too.
+ * @param page The test app's page.
+ * @param useSessions Whether to use ICRC-25 and ask for a session over it.
+ */
+export const setTestAppProtocol = async (
+  page: Page,
+  useSessions: boolean,
+): Promise<void> => {
+  await page
+    .getByRole("checkbox", { name: "Use ICRC-25:" })
+    .setChecked(useSessions);
+  await page
+    .getByRole("checkbox", { name: "Use session:" })
+    .setChecked(useSessions);
+};
+
+/**
  * Selects the raw postMessage protocol, which creates no session.
  *
  * The test app defaults to the session path, so a test that drives it directly
@@ -76,9 +121,7 @@ export const authorize = (
  * happens to prefer.
  */
 export const useLegacyProtocol = async (page: Page): Promise<void> => {
-  await page
-    .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
-    .setChecked(false);
+  await setTestAppProtocol(page, false);
 };
 
 /**
@@ -101,9 +144,7 @@ export const authorizeWithUrl = async (
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(iiURL);
   // Set either way rather than relying on the test app's default, which selects
   // the session path and would otherwise decide this for every caller.
-  await page
-    .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
-    .setChecked(useIcrc25 === true);
+  await setTestAppProtocol(page, useIcrc25 === true);
   if (useIcrc25 === true) {
     // The session the client is handed is restricted to one identity provider,
     // and the client refuses a chain that names any other. Its default is the

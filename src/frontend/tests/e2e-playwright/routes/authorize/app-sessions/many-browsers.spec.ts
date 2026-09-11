@@ -1,7 +1,7 @@
 import { expect, type BrowserContext } from "@playwright/test";
 import { test } from "../../../fixtures";
 import type { TestApp } from "../../../fixtures/testApp";
-import { continueAs, listedBrowsers, openSettings } from "./helpers";
+import { continueAs, listedBrowserRows, openSettings } from "./helpers";
 
 /**
  * An identity keeps a bounded list of the browsers it is signed in from, so
@@ -48,7 +48,13 @@ test.describe("using many apps and browsers", () => {
         identities[0].identityNumber,
         signInWithIdentity,
       );
-      expect(await listedBrowsers(settings).count()).toBeLessThanOrEqual(CAP);
+      // Exactly the cap, and asserted on the locator so it retries: `<= CAP`
+      // also passes for an empty list or one pruned too far, and reading
+      // `.count()` once takes whatever the page happened to be showing.
+      //
+      // Rows rather than buttons, because the browser reading the list is one of
+      // the ones kept and its own row offers nothing to press.
+      await expect(listedBrowserRows(settings)).toHaveCount(CAP);
       await settings.close();
 
       // DEV-15: dropping an entry ends that browser's sessions.
