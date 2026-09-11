@@ -117,7 +117,7 @@
   <!-- A line of its own below the identity when the row is a block; dissolved into the
        row's own line above the breakpoint, where each pair takes a column. -->
   <div
-    class="col-span-3 row-start-2 grid grid-cols-[auto_auto] items-baseline justify-start gap-x-1.5 gap-y-2 @2xl/list:contents"
+    class="col-span-4 row-start-2 grid grid-cols-[auto_auto] items-baseline justify-start gap-x-1.5 gap-y-2 @2xl/list:contents"
   >
     {@render meta($t`Last used`, lastUsed)}
     {@render meta($t`First seen`, firstSeen)}
