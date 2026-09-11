@@ -52,14 +52,16 @@
        other of the wrappers is `display: contents` at any width, and an element that
        generates no box paints no opacity, so the dimming would silently do nothing in
        one of the two layouts. -->
-  <div class="contents @2xl/list:flex @2xl/list:flex-col @2xl/list:gap-1">
+  <div
+    class="contents @min-[620px]/list:flex @min-[620px]/list:flex-col @min-[620px]/list:gap-1"
+  >
     <span
       class="text-text-tertiary text-xs font-semibold {dimmed
         ? 'opacity-70'
         : ''}">{label}</span
     >
     <span
-      class="text-text-primary text-xs @2xl/list:whitespace-nowrap {dimmed
+      class="text-text-primary text-xs @min-[620px]/list:whitespace-nowrap {dimmed
         ? 'opacity-70'
         : ''}">{value}</span
     >
@@ -77,7 +79,7 @@
   column too small for it, truncating the name and printing the meta over the badge.
 -->
 <div
-  class="col-span-4 grid grid-cols-subgrid gap-y-1.5 py-2.5 @2xl/list:items-center @2xl/list:gap-y-0 @2xl/list:py-4"
+  class="col-span-4 grid grid-cols-subgrid gap-y-1.5 py-2.5 @min-[620px]/list:items-center @min-[620px]/list:gap-y-0 @min-[620px]/list:py-4"
 >
   <!-- Takes the action's column too when there is no action, which is every row that
        carries the badge: a row shows one of the badge, the button or the label, never a
@@ -87,7 +89,7 @@
   <div
     class="{action === 'none'
       ? 'col-span-4'
-      : 'col-span-3'} flex min-h-9 min-w-0 flex-row items-center gap-3 @2xl/list:col-span-1 @2xl/list:ps-6"
+      : 'col-span-3'} flex min-h-9 min-w-0 flex-row items-center gap-3 @min-[620px]/list:col-span-1 @min-[620px]/list:ps-6"
   >
     <span class="flex size-5 shrink-0 items-center justify-center">
       {#if brandIcon !== undefined}
@@ -117,7 +119,7 @@
   <!-- A line of its own below the identity when the row is a block; dissolved into the
        row's own line above the breakpoint, where each pair takes a column. -->
   <div
-    class="col-span-4 row-start-2 grid grid-cols-[auto_auto] items-baseline justify-start gap-x-1.5 gap-y-2 @2xl/list:contents"
+    class="col-span-4 row-start-2 grid grid-cols-[auto_auto] items-baseline justify-start gap-x-1.5 gap-y-2 @min-[620px]/list:contents"
   >
     {@render meta($t`Last used`, lastUsed)}
     {@render meta($t`First seen`, firstSeen)}

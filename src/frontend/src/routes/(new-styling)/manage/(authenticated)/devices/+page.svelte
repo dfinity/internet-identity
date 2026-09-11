@@ -174,9 +174,15 @@
          The card is also the container the rows query. That works because it defines
          tracks rather than inheriting them: `container-type` imposes size containment,
          which forbids an element from being a *subgrid*, so no element below may be
-         both. -->
+         both.
+
+         The column gap is a percentage, which resolves against the card's own content
+         box, so the columns close up as the card narrows and the wide layout survives a
+         narrower pane than a fixed gap would allow. A container unit cannot express
+         this: an element's own `container-type` does not make it its own query
+         container. -->
     <div
-      class="border-border-secondary bg-bg-primary @container/list grid grid-cols-[1fr_auto_auto_auto] gap-x-10 overflow-hidden rounded-xl border px-4"
+      class="border-border-secondary bg-bg-primary @container/list grid grid-cols-[1fr_auto_auto_auto] gap-x-[clamp(1.5rem,4%,2.5rem)] overflow-hidden rounded-xl border px-4"
     >
       {#each groups as group, groupIndex (group.platform)}
         {#if groupIndex > 0}
@@ -206,7 +212,7 @@
               {#if index > 0}
                 <li
                   aria-hidden="true"
-                  class="border-border-tertiary col-span-4 border-t @2xl/list:ms-6"
+                  class="border-border-tertiary col-span-4 border-t @min-[620px]/list:ms-6"
                 ></li>
               {/if}
               <li class="col-span-4 grid grid-cols-subgrid">
