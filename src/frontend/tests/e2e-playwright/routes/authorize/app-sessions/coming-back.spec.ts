@@ -1,5 +1,6 @@
+import { expect } from "@playwright/test";
 import { test } from "../../../fixtures";
-import { continueAs, signInAsFirstIdentity } from "./helpers";
+import { continueAs, listedBrowsers, openSettings } from "./helpers";
 
 /**
  * What a browser keeps between visits, and what it must not. Clearing the site's
@@ -13,19 +14,38 @@ import { continueAs, signInAsFirstIdentity } from "./helpers";
 test.describe("coming back later", () => {
   test.use({ authorizeConfig: { protocol: "icrc25" } });
 
-  test.describe("clearing the site's data is a clean start", () => {
-    test.afterEach(async ({ signedInApp }) => {
-      await signedInApp.clearSiteData();
-      await signedInApp.reload();
+  test("clearing the site's data is a clean start, and signing in works after it", async ({
+    testApp,
+    identities,
+    signInWithIdentity,
+  }) => {
+    const authenticate = continueAs(
+      identities[0].identityNumber,
+      signInWithIdentity,
+    );
+    await testApp.open();
+    await testApp.signIn(authenticate);
+    await testApp.waitUntilSignedIn();
 
-      await signedInApp.expectSignedOut();
-    });
+    await testApp.clearSiteData();
 
-    test("picks an identity and continues", signInAsFirstIdentity);
+    // Opened rather than reloaded, because a clean start makes this a first-time
+    // visitor: which identity provider to use was typed into the form, and the
+    // app's own copy of that went with the data. A reload would send the retry
+    // to the default provider, which is mainnet.
+    await testApp.open();
+    await testApp.expectSignedOut();
+
+    // The other half of STAY-2: a clean start is only clean if it can be built
+    // on. Signing out and never being able to sign in again would pass the half
+    // above.
+    await testApp.signIn(authenticate);
+    await testApp.waitUntilSignedIn();
   });
 
   test("an interrupted sign-in can be retried", async ({
     testApp,
+    browser,
     identities,
     signInWithIdentity,
   }) => {
@@ -41,6 +61,22 @@ test.describe("coming back later", () => {
       continueAs(identities[0].identityNumber, signInWithIdentity),
     );
     await testApp.waitUntilSignedIn();
+
+    // STAY-3 asks for one entry, not merely a retry that worked: an abandoned
+    // attempt that had registered a browser of its own would let the retry
+    // succeed and leave two.
+    const onlooker = await browser.newContext({ ignoreHTTPSErrors: true });
+    try {
+      const settings = await openSettings(
+        onlooker,
+        identities[0].identityNumber,
+        signInWithIdentity,
+      );
+      await expect(listedBrowsers(settings)).toHaveCount(1);
+      await settings.close();
+    } finally {
+      await onlooker.close();
+    }
   });
 
   test.describe("with two identities", () => {
