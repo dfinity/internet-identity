@@ -505,6 +505,9 @@ msgstr "Dibuat {0}"
 msgid "Created {date}"
 msgstr "Dibuat {date}"
 
+msgid "Created on the old Internet Identity site. Can only be used to <0>recover</0>, when upgrading from an identity number."
+msgstr "Dibuat di situs Internet Identity lama. Hanya dapat digunakan untuk <0>memulihkan</0>, saat meningkatkan dari nomor identitas."
+
 msgid "Creating account..."
 msgstr "Membuat akun..."
 

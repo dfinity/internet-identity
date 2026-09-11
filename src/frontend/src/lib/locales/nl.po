@@ -505,6 +505,9 @@ msgstr "Gemaakt {0}"
 msgid "Created {date}"
 msgstr "Gemaakt {date}"
 
+msgid "Created on the old Internet Identity site. Can only be used to <0>recover</0>, when upgrading from an identity number."
+msgstr "Aangemaakt op de oude Internet Identity-website. Kan alleen worden gebruikt om te <0>herstellen</0>, bij het upgraden van een identiteitsnummer."
+
 msgid "Creating account..."
 msgstr "Account aanmaken..."
 
