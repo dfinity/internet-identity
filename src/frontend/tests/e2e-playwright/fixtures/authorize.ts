@@ -70,6 +70,15 @@ const waitForSignInResult = async (
   if (authPage !== undefined) {
     await authPage.waitForEvent("close", { timeout: 15_000 });
   }
+  // Waited for rather than counted: the redirect transport navigates this same
+  // tab through `/callback` and back, so the element is missing while the flow
+  // is still in the middle of it — and a count taken then reports the same
+  // absence as a page that never had one, which read the result before it
+  // existed.
+  await testAppPage
+    .locator("#principal")
+    .waitFor({ state: "attached", timeout: 15_000 })
+    .catch(() => undefined);
   if ((await testAppPage.locator("#principal").count()) === 0) {
     return;
   }
@@ -85,15 +94,16 @@ export const test = base.extend<{
   authorizedAttributes: Record<string, string> | undefined;
   authorizedIcrc3Attributes: { data: string; signature: string } | undefined;
   /**
-   * The delegation chain the test app received, parsed from its `#delegation`
-   * view (pubkeys and publicKey are hex). Lets a spec assert the chain's shape
-   * — e.g. the redirect flow's two-hop intermediate-key structure. Waits for
-   * the redirect return before reading, like {@link authorizedPrincipal};
-   * `undefined` when the page has no delegation.
+   * The delegation chain the test app signs its calls with, parsed from its
+   * `#delegation` view (pubkeys and publicKey are hex, expirations hex
+   * nanoseconds). Lets a spec assert the chain's shape — how many hops it has,
+   * which key each one targets, and how long it lasts. Waits for the redirect
+   * return before reading, like {@link authorizedPrincipal}; `undefined` when
+   * the page has no delegation.
    */
   authorizedDelegation:
     | {
-        delegations: { delegation: { pubkey: string } }[];
+        delegations: { delegation: { pubkey: string; expiration: string } }[];
         publicKey: string;
       }
     | undefined;

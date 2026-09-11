@@ -35,28 +35,37 @@ const decodeIcrc3TextEntries = (base64Data: string): Record<string, string> => {
 };
 
 test.describe("Authorize over the redirect transport", () => {
-  // Every redirect flow must hand back the two-hop intermediate-key chain
-  // (canister → intermediate → RP session key), never a one-hop chain signed
-  // directly to the RP key: what the canister certifies transits the IC and
-  // must be inert on its own, so the RP key is only ever reached via the second
-  // hop assembled in the browser.
+  // The app asks for a session here, not for a delegation, so what it signs
+  // with is the app delegation chain it then mints for itself: one hop, signed
+  // by the canister to the app's own key and rooted at the account's key. The
+  // session chain those mints are made as is the two-hop one, and the app never
+  // signs with it.
+  //
+  // A delegation asked for over this transport — `icrc34_delegation` — is the
+  // chain that gets the intermediate-key treatment instead, because it travels
+  // back through the URL and what the canister certifies must be inert on its
+  // own. Nothing certified rides the URL in a session flow: the app mints after
+  // the return. `transport/url.test.ts` covers that chain's two hops.
   test.afterEach(({ authorizedDelegation }) => {
     expect(authorizedDelegation).toBeDefined();
     if (authorizedDelegation === undefined) {
       return;
     }
-    // The chain runs root (user identity) → intermediate key → RP session key.
-    // Two hops, never one: a one-hop chain would be the canister signing
-    // directly to the RP key, but what the canister certifies transits the IC
-    // and must be inert on its own.
-    const { delegations } = authorizedDelegation;
-    expect(delegations).toHaveLength(2);
-    // The canister-certified inner hop (delegations[0]) targets the intermediate
-    // key; the RP session key is only the chain's leaf (delegations[1]), reached
-    // via the second, browser-signed hop — so the two hops target distinct keys.
-    expect(delegations[0].delegation.pubkey).not.toBe(
-      delegations[1].delegation.pubkey,
+    const { delegations, publicKey } = authorizedDelegation;
+    expect(delegations).toHaveLength(1);
+    // Rooted at the account's key and reaching the app's own: a hop whose
+    // target is the root would be the chain going nowhere.
+    expect(delegations[0].delegation.pubkey).not.toBe(publicKey);
+    // Minutes, not days. `APP_DELEGATION_TTL_NS` is five, and the bound is what
+    // makes a canister-signed hop straight to the app's key safe to hand over:
+    // the 30-day outer delegation of a `icrc34_delegation` chain would fail
+    // here. Loose enough either way for the replica's clock to sit a little
+    // apart from the browser's.
+    const expiresAt = Number(
+      BigInt(`0x${delegations[0].delegation.expiration}`) / BigInt(1_000_000),
     );
+    expect(expiresAt).toBeGreaterThan(Date.now() - 2 * 60_000);
+    expect(expiresAt).toBeLessThan(Date.now() + 10 * 60_000);
   });
 
   test.describe("passkey sign-up", () => {
