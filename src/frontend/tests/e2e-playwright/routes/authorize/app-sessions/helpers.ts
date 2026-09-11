@@ -57,9 +57,48 @@ export const openSettings = async (
   return settings;
 };
 
-/** One row per browser the identity is signed in from. */
+/**
+ * The browsers this list offers to sign out, which is every one but the browser
+ * doing the looking: a browser reading its own list finds itself under no
+ * button, because signing itself out from here is not what that row is for.
+ */
 export const listedBrowsers = (settings: Page): Locator =>
   settings.getByRole("button", { name: "Sign out", exact: true });
+
+/**
+ * Every browser the list shows, the one doing the looking included.
+ *
+ * Counted by a label each row carries rather than by its button, so a count says
+ * how many browsers the identity has rather than how many this browser may end.
+ * Not `getByRole('listitem')`: the navigation beside the list is a list too.
+ */
+export const listedBrowserRows = (settings: Page): Locator =>
+  settings.getByText("First seen", { exact: true });
+
+/**
+ * Ends this browser's own sessions, which is what signing out and choosing to be
+ * forgotten does.
+ *
+ * The list's own buttons cannot: they end another browser's sessions, and the
+ * browser reading the list is the one case that is not another. Its route is the
+ * sign-out the identity offers, where forgetting is what revokes rather than
+ * merely leaving.
+ */
+export const forgetThisBrowser = async (settings: Page): Promise<void> => {
+  await settings.getByRole("button", { name: "Switch identity" }).click();
+  await settings
+    .getByRole("group")
+    .getByRole("button", { name: "Sign Out" })
+    .click();
+  await expect(
+    settings.getByRole("heading", { name: "Remember this browser?" }),
+  ).toBeVisible();
+  // Exact, so it does not also match the "Forgetting..." the button becomes
+  // while the sessions are being revoked.
+  await settings.getByRole("button", { name: "Forget", exact: true }).click();
+  // Forgetting revokes before it navigates, so this waits on a canister call.
+  await settings.waitForURL(II_URL, { timeout: 30_000 });
+};
 
 /** Fails unless the identity's settings list at least one browser. */
 export const expectBrowserListed = async (settings: Page): Promise<void> => {
@@ -75,7 +114,9 @@ export const expectBrowserListed = async (settings: Page): Promise<void> => {
 export const signOutFirstBrowser = async (settings: Page): Promise<void> => {
   await listedBrowsers(settings).first().click();
   await confirmSignOut(settings);
-  await expect(settings.getByText("Signed out")).toBeVisible({
+  // Exact: the toast that confirms it says "Signed out of all apps", so the
+  // substring matches the row's label and the toast both.
+  await expect(settings.getByText("Signed out", { exact: true })).toBeVisible({
     timeout: 30_000,
   });
 };

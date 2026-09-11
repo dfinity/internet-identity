@@ -2,7 +2,12 @@ import { IDL } from "@icp-sdk/core/candid";
 import { Principal } from "@icp-sdk/core/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import { test as base, expect, type Page } from "@playwright/test";
-import { II_URL, toBase64 } from "../utils";
+import {
+  II_URL,
+  installTestAppClock,
+  setTestAppProtocol,
+  toBase64,
+} from "../utils";
 
 export type AuthorizeConfig = {
   testAppURL: string;
@@ -119,6 +124,19 @@ export const test = base.extend<{
       throw new Error("authorizeConfig must be defined");
     }
 
+    // The app reports a failed sign-in with `alert`, which Playwright dismisses
+    // without a word — so a ceremony that threw looked exactly like one that
+    // never finished. Surfaced here instead, where a failing run shows the cause
+    // rather than only the timeout it caused.
+    page.on("dialog", (dialog) => {
+      console.error(`test app alert: ${dialog.message()}`);
+      void dialog.dismiss();
+    });
+    page.on("pageerror", (error) => {
+      console.error(`test app error: ${error.message}`);
+    });
+
+    await installTestAppClock(page);
     await page.goto(authorizeConfig.testAppURL ?? "https://nice-name.com");
     const testAppPage = page;
 
@@ -180,9 +198,7 @@ export const test = base.extend<{
     // Stated for both protocols rather than only for the session one. The app's
     // sign-in button defaults to ICRC-25 and sessions, so a legacy flow that
     // leaves this alone runs the session path under a legacy config.
-    await testAppPage
-      .getByRole("checkbox", { name: "Use ICRC-25 and sessions:" })
-      .setChecked(protocol === "icrc25");
+    await setTestAppProtocol(testAppPage, protocol === "icrc25");
 
     await expect(testAppPage.locator("#principal")).toBeHidden();
 
