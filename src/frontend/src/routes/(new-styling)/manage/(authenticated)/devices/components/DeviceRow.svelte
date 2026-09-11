@@ -86,7 +86,7 @@
   <div
     class="{action === 'none'
       ? 'col-span-4'
-      : 'col-span-3'} flex min-w-0 flex-row items-center gap-3 ps-6 @2xl/list:col-span-1"
+      : 'col-span-3'} flex min-h-9 min-w-0 flex-row items-center gap-3 ps-6 @2xl/list:col-span-1"
   >
     <span class="flex size-5 shrink-0 items-center justify-center">
       {#if brandIcon !== undefined}
@@ -123,10 +123,10 @@
   </div>
 
   <!-- On the name's line and centred on it, because the browser is what it acts on.
-       `h-9` is the button's own height, held whatever the slot contains: without it a
-       row showing "Signed out" would stand shorter than one offering a button, and the
-       list would breathe unevenly. Rendered even when empty for the same reason, and so
-       the column keeps its width. -->
+       `h-9` is the button's own height, so a row showing "Signed out" stands as tall as
+       one offering a button. The name's line carries the same floor, so a row with no
+       action at all — the one with the badge, which drops this column to keep its name
+       and badge on one line — is no shorter than its neighbours either. -->
   {#if action !== "none"}
     <span class="col-start-4 row-start-1 flex h-9 items-center justify-center">
       {@render actionControl()}
