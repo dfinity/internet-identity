@@ -24,6 +24,10 @@ import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { remapToLegacyDomain } from "$lib/utils/urlUtils";
 import { toPermissionsArg } from "$lib/utils/accessLevel";
 import {
+  attributeConsentResultStore,
+  attributeConsentStore,
+} from "$lib/stores/attributeConsent.store";
+import {
   isCanisterError,
   retryFor,
   throwCanisterError,
@@ -331,7 +335,30 @@ const createSession = async (
   resumable: boolean,
 ): Promise<{ record: AppSessionRecord }> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
-  const authorized = await waitForStore(authorizedStore);
+  let authorized = await waitForStore(authorizedStore);
+  // A consent screen is a place the user can change their mind about who they
+  // are: switching identity there authorizes again, and the first value is then
+  // the identity they left rather than the one they settled on. Waited out, as
+  // `delegation.ts` waits it out for a delegation request — without this the
+  // session is minted for the identity that was authorized first, while the
+  // screen the user answered belongs to the other one.
+  while (
+    get(attributeConsentStore) !== undefined &&
+    get(attributeConsentResultStore) === undefined
+  ) {
+    const outcome = await Promise.race([
+      waitForStore(attributeConsentResultStore).then(() => "settled" as const),
+      waitForStore(authorizedStore, (current) =>
+        current !== authorized ? ("switched" as const) : undefined,
+      ),
+    ]);
+    if (outcome === "settled") {
+      break;
+    }
+    authorized = await waitForStore(authorizedStore);
+  }
+  // Read after authorization settled, so the identity is whichever one the user
+  // ended on.
   const [accountNumber, { identityNumber, actor, authMethod }] =
     await Promise.all([
       authorized.accountNumberPromise,
