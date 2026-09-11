@@ -15,6 +15,8 @@
     fromCanisterBrowsers,
     groupBrowsers,
     isSignedOut,
+    lastUsedAgeMillis,
+    brandNameOf,
     nameOf,
     signOutBrowser,
     type Browser,
@@ -105,10 +107,18 @@
           ? "signed-out"
           : "sign-out";
 
-  const lastUsedOf = (browser: Browser): string =>
-    browser.isCurrent
-      ? $t`Now`
-      : $formatRelative(new Date(browser.lastUsedMillis), { style: "long" });
+  // "Right now" is the browser reading the page, which is in use by definition, and
+  // any browser whose stamp is younger than one grain — the record cannot tell those
+  // apart, and on a page for spotting a browser you do not recognise, reading as in use
+  // is the safe direction to be wrong in. Worded as the access methods and recovery
+  // pages word theirs.
+  const lastUsedOf = (browser: Browser): string => {
+    if (browser.isCurrent) return $t`Right now`;
+    const age = lastUsedAgeMillis(browser, now);
+    return age === undefined
+      ? $t`Right now`
+      : $formatRelative(new Date(now - age), { style: "long" });
+  };
   const firstSeenOf = (browser: Browser): string =>
     $formatDate(new Date(browser.createdAtMillis), {
       month: "short",
@@ -155,30 +165,41 @@
   <!-- No empty state: this browser is always one of the rows, so the only moment there
        is nothing to draw is before it has described itself. -->
   {#if groups.length > 0}
+    <!-- Tracks, padding and query container all live on the card: `container-type`
+         imposes size containment, which forbids an element from also being a subgrid,
+         and horizontal padding on a subgrid would inset its tracks out of line with
+         these. The gap is a percentage of the card's own content box, so the columns
+         close up as it narrows; a container unit cannot express that, because an
+         element's own `container-type` does not make it its own query container. -->
     <div
-      class="border-border-secondary bg-bg-primary flex flex-col overflow-hidden rounded-xl border"
+      class="border-border-secondary bg-bg-primary @container/list grid grid-cols-[1fr_auto_auto_auto] gap-x-[clamp(1.5rem,4%,2.5rem)] overflow-hidden rounded-xl border px-4"
     >
       {#each groups as group, groupIndex (group.platform)}
-        <section
-          class={groupIndex > 0 ? "border-border-tertiary border-t" : ""}
-        >
-          <GroupHeading
-            kind={group.kind}
-            platform={group.platform}
-            count={group.browsers.length}
-          />
-          <ul class="flex flex-col">
+        {#if groupIndex > 0}
+          <div
+            aria-hidden="true"
+            class="border-border-tertiary col-span-4 -mx-4 border-t"
+          ></div>
+        {/if}
+        <section class="col-span-4 grid grid-cols-subgrid">
+          <div class="col-span-4 -mx-4">
+            <GroupHeading
+              kind={group.kind}
+              platform={group.platform}
+              count={group.browsers.length}
+            />
+          </div>
+          <ul class="col-span-4 grid grid-cols-subgrid">
             {#each group.browsers as browser, index (browser.id)}
-              <!-- Inset rule between rows of one group, so it reads as a divided group
-                   rather than as the boundary between two. Drawn as its own element:
-                   indenting the row to inset the rule moved the row with it. -->
+              <!-- Its own element: indenting the row to inset the rule moved the row
+                   with it. -->
               {#if index > 0}
                 <li
                   aria-hidden="true"
-                  class="border-border-tertiary ml-4 border-t"
+                  class="border-border-tertiary col-span-4 border-t @min-[620px]/list:ms-6"
                 ></li>
               {/if}
-              <li>
+              <li class="col-span-4 grid grid-cols-subgrid">
                 <DeviceRow
                   description={browser.description}
                   lastUsed={lastUsedOf(browser)}
@@ -210,16 +231,13 @@
 {#if confirming !== undefined}
   {@const target = confirming}
   <Dialog onClose={() => (confirming = undefined)} width="wider">
-    <!-- The title names which browser, the button what happens to it: "Sign out" alone
-         is the ambiguity this dialog exists to resolve, and repeating the scope in both
-         would leave neither saying which row was clicked. -->
     <div class="flex flex-col gap-5 p-1">
       <h2 class="text-text-primary text-2xl font-medium">
-        {$t`Sign out ${target.name}?`}
+        {$t`Sign out ${brandNameOf(target.description)}?`}
       </h2>
 
       <p class="text-text-tertiary text-base text-pretty">
-        {$t`You can sign in again from ${target.name} at any time.`}
+        {$t`You can sign in again at any time.`}
       </p>
 
       <div class="flex flex-col gap-3">
