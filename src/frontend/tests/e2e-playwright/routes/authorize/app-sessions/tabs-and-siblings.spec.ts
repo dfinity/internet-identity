@@ -100,9 +100,11 @@ test.describe("more than one tab, and sibling subdomains", () => {
       derivationOrigin: TEST_APP_DERIVATION_ORIGIN,
       cookieDomain: SHARED_DOMAIN,
     });
-    // Never signed in here, but the domain announces that a session exists.
+    // Never signed in here, but the domain announces that a session exists. That
+    // is its own state rather than signed out: there is something to resume
+    // from, and this origin simply holds nothing for it yet.
     await other.expectSharesSession();
-    await other.expectSignedOut();
+    await other.expectSharedButNotHeld();
 
     // SIL-5: it re-issues its own chain from the same session.
     await other.silentReauth();
