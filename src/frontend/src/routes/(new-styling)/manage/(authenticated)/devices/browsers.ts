@@ -80,6 +80,37 @@ export const brandIconOf = (
 export const NO_RECORD_ID = -1;
 
 const DAY_MILLIS = 86_400_000;
+const MINUTE_MILLIS = 60_000;
+
+/**
+ * How coarse `last_used` really is.
+ *
+ * The canister stamps it with the exact time, but only when something happens, and in
+ * steady use that is the app minting its next app delegation — which the canister gives
+ * a five minute life. So a browser in active use carries a stamp up to five minutes
+ * behind, and a figure read off it to the minute claims a freshness the record does not
+ * have.
+ */
+export const LAST_USED_GRAIN_MILLIS = 5 * MINUTE_MILLIS;
+
+/**
+ * The age to show for a browser, rounded up to the grain, or `undefined` for one used
+ * within a single grain.
+ *
+ * Up rather than down: the stamp is already behind by up to one grain, so rounding up
+ * lands inside the interval the true figure is in, and the page never says a browser
+ * was used more recently than it was. `undefined` is the first interval, where the
+ * record cannot tell a browser still in use from one idle four minutes — so the page
+ * says what both have in common instead of picking a number.
+ */
+export const lastUsedAgeMillis = (
+  browser: Browser,
+  now: number,
+): number | undefined => {
+  const age = now - browser.lastUsedMillis;
+  if (age < LAST_USED_GRAIN_MILLIS) return undefined;
+  return Math.ceil(age / LAST_USED_GRAIN_MILLIS) * LAST_USED_GRAIN_MILLIS;
+};
 
 /**
  * A browser idle this long holds nothing that can still be minted from: the canister's

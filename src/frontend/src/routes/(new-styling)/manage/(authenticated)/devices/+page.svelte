@@ -15,6 +15,7 @@
     fromCanisterBrowsers,
     groupBrowsers,
     isSignedOut,
+    lastUsedAgeMillis,
     brandNameOf,
     nameOf,
     signOutBrowser,
@@ -106,13 +107,18 @@
           ? "signed-out"
           : "sign-out";
 
-  // "Right now" rather than a time, and worded as the access methods and recovery
-  // pages word theirs: this is the browser reading the page, so it is in use by
-  // definition and no stored stamp is as current as that.
-  const lastUsedOf = (browser: Browser): string =>
-    browser.isCurrent
+  // "Right now" is the browser reading the page, which is in use by definition, and
+  // any browser whose stamp is younger than one grain — the record cannot tell those
+  // apart, and on a page for spotting a browser you do not recognise, reading as in use
+  // is the safe direction to be wrong in. Worded as the access methods and recovery
+  // pages word theirs.
+  const lastUsedOf = (browser: Browser): string => {
+    if (browser.isCurrent) return $t`Right now`;
+    const age = lastUsedAgeMillis(browser, now);
+    return age === undefined
       ? $t`Right now`
-      : $formatRelative(new Date(browser.lastUsedMillis), { style: "long" });
+      : $formatRelative(new Date(now - age), { style: "long" });
+  };
   const firstSeenOf = (browser: Browser): string =>
     $formatDate(new Date(browser.createdAtMillis), {
       month: "short",
