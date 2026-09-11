@@ -1,4 +1,4 @@
-import { CDPSession, expect, Page } from "@playwright/test";
+import { CDPSession, ConsoleMessage, expect, Page } from "@playwright/test";
 import { Principal } from "@icp-sdk/core/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import { DER_COSE_OID, wrapDER } from "@icp-sdk/core/identity";
@@ -89,6 +89,23 @@ export const authorize = (
 export const installTestAppClock = async (page: Page): Promise<void> => {
   await page.clock.install({ time: new Date() });
   await page.clock.resume();
+};
+
+/**
+ * Reports what the test app only tells its own console.
+ *
+ * The app writes a failed call to `console.error` and leaves the element it was
+ * filling reading "Loading...", so a rejected call and a slow one look alike
+ * from outside: the assertion waits for text that is never coming and reports a
+ * timeout rather than the refusal that caused it. Chromium's own notices about
+ * a response's status are left out — those name a request, not a cause, and the
+ * app makes failing ones it goes on to handle.
+ * @param message A console message the test app's page emitted.
+ */
+export const reportPageError = (message: ConsoleMessage): void => {
+  if (message.type() !== "error") return;
+  if (message.text().startsWith("Failed to load resource")) return;
+  console.error(`test app console: ${message.text()}`);
 };
 
 /**
