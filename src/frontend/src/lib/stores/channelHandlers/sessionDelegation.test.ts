@@ -58,6 +58,14 @@ vi.mock("$lib/stores/channelHandlers/describeBrowser", () => ({
   describeBrowser: () => Promise.resolve("a browser"),
 }));
 
+vi.mock("$lib/stores/attributeConsent.store", async () => {
+  const { writable } = await import("svelte/store");
+  return {
+    attributeConsentStore: writable<unknown>(undefined),
+    attributeConsentResultStore: writable<unknown>(undefined),
+  };
+});
+
 const setRequestContext = vi.fn();
 vi.mock("$lib/stores/authorization.store", async () => {
   const { writable } = await import("svelte/store");
@@ -90,6 +98,7 @@ import { INTERACTION_REQUIRED_ERROR_CODE } from "$lib/utils/transport/utils";
 const runCeremony = async (
   resumable?: boolean,
   extraParams: Record<string, unknown> = {},
+  whileRunning?: () => Promise<void>,
 ) => {
   const { authorizationPromptStore, authorizedStore } =
     await import("$lib/stores/authorization.store");
@@ -148,7 +157,9 @@ const runCeremony = async (
   });
 
   const { channel, sent } = channelWith();
-  await handleSessionDelegationRequest(
+  // Started rather than awaited, so a caller can act while the ceremony is still
+  // in flight — which is the only time an identity switch can happen.
+  const pending = handleSessionDelegationRequest(
     channel,
     vi.fn(),
   )({
@@ -157,6 +168,10 @@ const runCeremony = async (
     method: "ii_session_delegation",
     params: { sessionPublicKey: await appKey(), ...extraParams },
   });
+  if (whileRunning !== undefined) {
+    await whileRunning();
+  }
+  await pending;
   return { sent, prepared };
 };
 
@@ -740,5 +755,46 @@ describe("asBrowserKeyError", () => {
     const network = new Error("network");
 
     expect(asBrowserKeyError(network)).toBe(network);
+  });
+});
+
+describe("an identity switched mid-consent", () => {
+  it("mints for the identity the user switched to, not the one they left", async () => {
+    const { attributeConsentStore, attributeConsentResultStore } =
+      await import("$lib/stores/attributeConsent.store");
+    const { authorizedStore } = await import("$lib/stores/authorization.store");
+    // A consent screen is open and unanswered, which is where a switch happens.
+    (attributeConsentStore as unknown as Writable<unknown>).set({});
+    (attributeConsentResultStore as unknown as Writable<unknown>).set(
+      undefined,
+    );
+
+    try {
+      const { prepared } = await runCeremony(undefined, {}, async () => {
+        // Let the ceremony reach the point where it is waiting on the screen, so
+        // the identity below is a switch rather than the first answer.
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        (authorizedStore as unknown as Writable<unknown>).set({
+          accountNumberPromise: Promise.resolve(BigInt(7)),
+          accessLevel: "full-access",
+        });
+        (attributeConsentResultStore as unknown as Writable<unknown>).set({
+          attributes: [],
+        });
+      });
+
+      // The account of the identity switched to. The one left behind carries no
+      // account number at all, so a ceremony that never noticed the switch
+      // sends an empty option here.
+      expect(prepared[0].account_number).toEqual([BigInt(7)]);
+    } finally {
+      // Closed again here rather than in a hook: the ceremony cases further
+      // down the file share this module's stores and set up no state of their
+      // own, so a screen left open would change what they run.
+      (attributeConsentStore as unknown as Writable<unknown>).set(undefined);
+      (attributeConsentResultStore as unknown as Writable<unknown>).set(
+        undefined,
+      );
+    }
   });
 });
