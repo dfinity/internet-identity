@@ -5,6 +5,7 @@ import { test as base, expect, type Page } from "@playwright/test";
 import {
   II_URL,
   installTestAppClock,
+  reportPageError,
   setTestAppProtocol,
   toBase64,
 } from "../utils";
@@ -135,6 +136,7 @@ export const test = base.extend<{
     page.on("pageerror", (error) => {
       console.error(`test app error: ${error.message}`);
     });
+    page.on("console", reportPageError);
 
     await installTestAppClock(page);
     await page.goto(authorizeConfig.testAppURL ?? "https://nice-name.com");
