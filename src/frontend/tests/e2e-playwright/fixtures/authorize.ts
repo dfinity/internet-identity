@@ -34,7 +34,6 @@ export type AuthorizeConfig = {
        */
       sso?: string;
       attributes?: string[];
-      useIcrc3Attributes?: boolean;
       icrc3Nonce?: Uint8Array;
     }
 );
@@ -166,14 +165,6 @@ export const test = base.extend<{
       await testAppPage
         .getByRole("textbox", { name: "II canister id:" })
         .fill(readCanisterId({ canisterName: "internet_identity" }));
-      if (
-        "useIcrc3Attributes" in authorizeConfig &&
-        authorizeConfig.useIcrc3Attributes === true
-      ) {
-        await testAppPage
-          .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
-          .setChecked(true);
-      }
       if (
         "icrc3Nonce" in authorizeConfig &&
         authorizeConfig.icrc3Nonce !== undefined

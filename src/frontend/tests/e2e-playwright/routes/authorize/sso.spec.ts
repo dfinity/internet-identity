@@ -86,7 +86,6 @@ test.describe("Authorize with 1-click SSO", () => {
       authorizeConfig: {
         protocol: "icrc25",
         sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
       },
     });
 
@@ -155,7 +154,6 @@ test.describe("Authorize with 1-click SSO", () => {
       authorizeConfig: {
         protocol: "icrc25",
         sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
         attributes: [
           `sso:${SSO_DISCOVERY_DOMAIN}:name`,
           `sso:${SSO_DISCOVERY_DOMAIN}:email`,
@@ -233,7 +231,6 @@ test.describe("Authorize with 1-click SSO", () => {
       authorizeConfig: {
         protocol: "icrc25",
         sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
         icrc3Nonce: knownNonce,
         attributes: [`sso:${SSO_DISCOVERY_DOMAIN}:name`],
       },
@@ -278,7 +275,6 @@ test.describe("Authorize with 1-click SSO", () => {
       authorizeConfig: {
         protocol: "icrc25",
         sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
         attributes: [
           `sso:${SSO_DISCOVERY_DOMAIN}:name`,
           `sso:${SSO_DISCOVERY_DOMAIN}:email`, // Unavailable scoped attribute
@@ -338,7 +334,6 @@ test.describe("Authorize with 1-click SSO", () => {
       authorizeConfig: {
         protocol: "icrc25",
         sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
         attributes: [`sso:${SSO_DISCOVERY_DOMAIN}:verified_email`],
       },
     });
@@ -418,7 +413,6 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       authorizeConfig: {
         protocol: "icrc25",
         testAppURL: GATED_ORIGIN,
-        useIcrc3Attributes: true,
         attributes: [
           `sso:${SSO_GATING_DISCOVERY_DOMAIN}:name`,
           `sso:${SSO_GATING_DISCOVERY_DOMAIN}:email`,
@@ -585,9 +579,6 @@ test.describe("Authorize with IdP-side per-app gating", () => {
         .fill(ssoUrl);
       await setTestAppProtocol(page, true);
       await page
-        .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
-        .setChecked(true);
-      await page
         .getByRole("textbox", { name: "Request attributes:" })
         .fill(
           [
@@ -690,9 +681,6 @@ test.describe("Authorize with IdP-side per-app gating", () => {
         .fill(ssoUrl);
       await setTestAppProtocol(page, true);
       await page
-        .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
-        .setChecked(true);
-      await page
         .getByRole("textbox", { name: "Request attributes:" })
         .fill(
           [
@@ -729,7 +717,6 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       authorizeConfig: {
         protocol: "icrc25",
         testAppURL: DENIED_ORIGIN,
-        useIcrc3Attributes: true,
       },
     });
 
@@ -824,7 +811,6 @@ test.describe("Authorize with manual Sign in with SSO", () => {
     // No `sso:` field → the wizard entry, not the `?sso=` 1-click path.
     authorizeConfig: {
       protocol: "icrc25",
-      useIcrc3Attributes: true,
       attributes: [
         `sso:${SSO_DISCOVERY_DOMAIN}:name`,
         `sso:${SSO_DISCOVERY_DOMAIN}:email`,
@@ -909,7 +895,6 @@ test.describe("Continue as a last-used SSO identity", () => {
     // that entry to run the ContinueView path.
     authorizeConfig: {
       protocol: "icrc25",
-      useIcrc3Attributes: true,
       attributes: [
         `sso:${SSO_DISCOVERY_DOMAIN}:name`,
         `sso:${SSO_DISCOVERY_DOMAIN}:email`,
@@ -967,9 +952,6 @@ test.describe("Continue as a last-used SSO identity", () => {
       .getByRole("textbox", { name: "Identity Provider" })
       .fill(II_URL + "/authorize");
     await setTestAppProtocol(page, true);
-    await page
-      .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
-      .setChecked(true);
     await page
       .getByRole("textbox", { name: "Request attributes:" })
       .fill(

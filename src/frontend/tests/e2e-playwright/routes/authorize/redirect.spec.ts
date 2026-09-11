@@ -140,7 +140,6 @@ test.describe("Authorize over the redirect transport", () => {
         protocol: "icrc25",
         transport: "redirect",
         sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
         attributes: [
           `sso:${SSO_DISCOVERY_DOMAIN}:name`,
           `sso:${SSO_DISCOVERY_DOMAIN}:email`,
