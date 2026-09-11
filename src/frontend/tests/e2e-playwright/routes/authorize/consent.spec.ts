@@ -90,7 +90,6 @@ test.describe("Authorize — explicit consent UI", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: ["email"],
       },
     });
@@ -130,7 +129,6 @@ test.describe("Authorize — explicit consent UI", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: ["email", "verified_email"],
       },
     });
@@ -177,7 +175,6 @@ test.describe("Authorize — explicit consent UI", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: [`openid:${issuer}:email`, "email"],
       },
     });
@@ -223,7 +220,6 @@ test.describe("Authorize — explicit consent UI", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: ["email"],
       },
     });
@@ -286,7 +282,6 @@ test.describe("Authorize — explicit consent UI", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: ["email"],
       },
     });
@@ -326,7 +321,6 @@ test.describe("Authorize — explicit consent UI", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: ["name", "email"],
       },
     });
@@ -369,7 +363,6 @@ test.describe("Authorize — explicit consent UI", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: ["name", "favorite_color", "ghost"],
       },
     });
@@ -412,7 +405,6 @@ test.describe("Authorize — explicit consent UI", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: ["email"],
       },
     });
@@ -461,7 +453,6 @@ test.describe("Authorize — explicit consent UI", () => {
       authorizeConfig: {
         protocol: "icrc25",
         // No `openid:` → the authorize page does not take the 1-click route.
-        useIcrc3Attributes: true,
         attributes: [`openid:${issuer}:name`, `openid:${issuer}:email`],
       },
     });
@@ -540,7 +531,6 @@ test.describe("Authorize — explicit consent UI", () => {
       },
       authorizeConfig: {
         protocol: "icrc25",
-        useIcrc3Attributes: true,
         attributes: [
           `sso:${SSO_DISCOVERY_DOMAIN}:name`,
           `sso:${SSO_DISCOVERY_DOMAIN}:email`,
@@ -614,7 +604,6 @@ test.describe("Authorize — explicit consent UI", () => {
       },
       authorizeConfig: {
         protocol: "icrc25",
-        useIcrc3Attributes: true,
         attributes: ["email"],
       },
     });

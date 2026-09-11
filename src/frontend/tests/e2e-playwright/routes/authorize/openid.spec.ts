@@ -70,7 +70,6 @@ test.describe("Authorize with 1-click OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
       },
     });
 
@@ -234,7 +233,6 @@ test.describe("Authorize with 1-click OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: [
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:name`,
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`,
@@ -309,7 +307,6 @@ test.describe("Authorize with 1-click OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         icrc3Nonce: knownNonce,
         attributes: [`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`],
       },
@@ -361,7 +358,6 @@ test.describe("Authorize with 1-click OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: [
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:name`,
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`, // Unavailable scoped attribute
@@ -459,7 +455,6 @@ test.describe("Authorize with 1-click OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        useIcrc3Attributes: true,
         attributes: [
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:verified_email`,
         ],
