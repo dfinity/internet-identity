@@ -91,7 +91,6 @@ export const test = base.extend<{
   authorizeConfig: Partial<AuthorizeConfig> | undefined;
   authorizePage: AuthorizePage;
   authorizedPrincipal: Principal | undefined;
-  authorizedAttributes: Record<string, string> | undefined;
   authorizedIcrc3Attributes: { data: string; signature: string } | undefined;
   /**
    * The delegation chain the test app signs its calls with, parsed from its
@@ -256,26 +255,6 @@ export const test = base.extend<{
     }
 
     await use(Principal.fromText(principal));
-  },
-  authorizedAttributes: async ({ page }, use) => {
-    const [testAppPage, authPage] = page.context().pages();
-    await waitForSignInResult(testAppPage, authPage);
-
-    const attributes = await testAppPage
-      .locator("#certifiedAttributes")
-      .innerText();
-    if (attributes === "") {
-      return use(undefined);
-    }
-
-    await use(
-      Object.fromEntries(
-        attributes.split("\n").map((line) => {
-          const [key, value] = line.split(": ");
-          return [key, value];
-        }),
-      ),
-    );
   },
   authorizedIcrc3Attributes: async ({ page }, use) => {
     const [testAppPage, authPage] = page.context().pages();
