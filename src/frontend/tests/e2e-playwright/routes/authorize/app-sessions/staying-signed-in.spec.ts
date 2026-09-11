@@ -44,6 +44,14 @@ test.describe("staying signed in", () => {
       // The rest of HOLD-2: it must work when used. Spending nothing while idle
       // is only half the claim, and a tab that came back unusable would satisfy
       // the half above.
+      //
+      // The clock goes back first, because only the page's moved: a page ahead
+      // of the replica signs an expiry the replica refuses, so the call would
+      // fail for the skew rather than for anything the idle period did. What is
+      // left to check is that the tab kept what it needs to sign as its account
+      // — a cancelled refresh that dropped the delegation, or wiped the stored
+      // session, fails here.
+      await signedInApp.restoreClock();
       await signedInApp.whoAmI();
     });
 
