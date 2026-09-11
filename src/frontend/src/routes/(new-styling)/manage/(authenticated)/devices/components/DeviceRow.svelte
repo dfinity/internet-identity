@@ -8,7 +8,8 @@
 
   interface Props {
     description: BrowserDescription;
-    /** Already formatted: a relative time, or "Now" for the browser reading the page. */
+    /** Already formatted: a relative time, or "Right now" for the browser reading the
+     *  page. */
     lastUsed: string;
     /** Already formatted: a short date. */
     firstSeen: string;
@@ -31,8 +32,6 @@
   const dimmed = $derived(action === "signed-out");
 </script>
 
-<!-- Rendered in both layouts, which place it differently: beside the name when the row
-     is a block, at the end of the line when it is a line. -->
 {#snippet actionControl()}
   {#if action === "sign-out"}
     <button class="btn btn-secondary btn-sm" onclick={onSignOut}>
@@ -45,27 +44,42 @@
   {/if}
 {/snippet}
 
-<!--
-  Two layouts rather than one that bends, and they switch on the card's width rather than
-  the page's: this list sits in a settings pane that is narrow at any viewport, so a page
-  breakpoint left the wide layout in a column too small for it, truncating the name and
-  printing the meta over the badge.
+{#snippet meta(label: string, value: string)}
+  <!-- Dimmed on the text rather than the wrapper: one wrapper or the other is
+       `display: contents` at any width, and a box-less element paints no opacity. -->
+  <div
+    class="contents @min-[620px]/list:flex @min-[620px]/list:flex-col @min-[620px]/list:gap-1"
+  >
+    <span
+      class="text-text-tertiary text-xs font-semibold {dimmed
+        ? 'opacity-70'
+        : ''}">{label}</span
+    >
+    <span
+      class="text-text-primary text-xs @min-[620px]/list:whitespace-nowrap {dimmed
+        ? 'opacity-70'
+        : ''}">{value}</span
+    >
+  </div>
+{/snippet}
 
-  Wide, the row is a line: identity, two fixed meta columns, then the action. Narrow,
-  those columns have nowhere to go, so the row becomes a block — identity and action on
-  the first line, the meta beneath them.
--->
+<!-- Switches on the card's width, not the page's: this list sits in a settings pane
+     that is narrow at any viewport. -->
 <div
-  class="@container/row flex flex-col gap-2 px-4 py-3 @md/row:flex-row @md/row:items-center @md/row:gap-3"
+  class="col-span-4 grid grid-cols-subgrid gap-y-1.5 py-2.5 @min-[620px]/list:items-center @min-[620px]/list:gap-y-0 @min-[620px]/list:py-4"
 >
-  <div class="flex flex-row items-center gap-3">
+  <!-- Spans the action's column when there is no action, so the badge does not wrap
+       under the name to leave an empty column beside it. -->
+  <div
+    class="{action === 'none'
+      ? 'col-span-4'
+      : 'col-span-3'} flex min-h-9 min-w-0 flex-row items-center gap-3 @min-[620px]/list:col-span-1 @min-[620px]/list:ps-6"
+  >
     <span class="flex size-5 shrink-0 items-center justify-center">
       {#if brandIcon !== undefined}
-        <img
-          src={brandIcon}
-          alt=""
-          class="size-5 {dimmed ? 'opacity-50' : ''}"
-        />
+        <!-- Not dimmed with the rest of a signed-out row: a faded brand mark reads as
+             an image that failed to load. -->
+        <img src={brandIcon} alt="" class="size-5" />
       {/if}
     </span>
 
@@ -83,49 +97,20 @@
         >
       {/if}
     </span>
+  </div>
 
-    <!-- Narrow, the action sits up here beside the name rather than taking a line of its
-         own below the meta, which is what made the row five lines tall. Wide, it moves
-         to the end of the line and this copy is gone. -->
-    <span
-      class="ms-auto flex shrink-0 items-center @md/row:hidden {action ===
-      'none'
-        ? 'hidden'
-        : ''}"
-    >
+  <div
+    class="col-span-4 row-start-2 grid grid-cols-[auto_auto] items-baseline justify-start gap-x-1.5 gap-y-2 @min-[620px]/list:contents"
+  >
+    {@render meta($t`Last used`, lastUsed)}
+    {@render meta($t`First seen`, firstSeen)}
+  </div>
+
+  <!-- `h-9` is the button's own height, and the name's line carries the same floor, so
+       every row stands equally tall whatever it holds. -->
+  {#if action !== "none"}
+    <span class="col-start-4 row-start-1 flex h-9 items-center justify-center">
       {@render actionControl()}
     </span>
-  </div>
-
-  <!-- Two columns narrow, so the labels and their values line up down the list whatever
-       their length; fixed columns wide, where the row has room for them. Indented to the
-       brand name, past the icon. -->
-  <div
-    class="ms-8 grid grid-cols-2 gap-4 @md/row:ms-0 @md/row:flex @md/row:shrink-0 @md/row:flex-row"
-  >
-    <span
-      class="flex flex-col gap-1 @md/row:w-26 @md/row:shrink-0 @md/row:whitespace-nowrap"
-    >
-      <span class="text-text-tertiary text-xs font-semibold"
-        >{$t`Last used`}</span
-      >
-      <span class="text-text-primary text-xs">{lastUsed}</span>
-    </span>
-    <span
-      class="flex flex-col gap-1 @md/row:w-18 @md/row:shrink-0 @md/row:whitespace-nowrap"
-    >
-      <span class="text-text-tertiary text-xs font-semibold"
-        >{$t`First seen`}</span
-      >
-      <span class="text-text-primary text-xs">{firstSeen}</span>
-    </span>
-  </div>
-
-  <!-- Wide only. Kept as an empty column even with nothing in it, so the meta of a row
-       without a button stays aligned with the rows that have one. -->
-  <span
-    class="hidden @md/row:flex @md/row:w-21 @md/row:shrink-0 @md/row:items-center @md/row:justify-end"
-  >
-    {@render actionControl()}
-  </span>
+  {/if}
 </div>

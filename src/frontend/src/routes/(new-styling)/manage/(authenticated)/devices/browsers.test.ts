@@ -8,6 +8,7 @@ import {
   brandNameOf,
   fromCanisterBrowsers,
   groupBrowsers,
+  lastUsedAgeMillis,
   isSignedOut,
   kindOf,
   nameOf,
@@ -120,6 +121,45 @@ describe("isSignedOut", () => {
   /// zero here only means no write has pruned them yet.
   it("counts a browser idle past the window as signed out whatever the count says", () => {
     expect(isSignedOut(idle(SIGNED_OUT_AFTER_DAYS, 5), now)).toBe(true);
+  });
+});
+
+describe("lastUsedAgeMillis", () => {
+  const MINUTE = 60_000;
+  const now = Date.UTC(2026, 0, 31, 12);
+  const aged = (minutesAgo: number) =>
+    fromCanisterBrowsers([
+      [browser(1, BigInt(now - minutesAgo * MINUTE) * BigInt(1_000_000))],
+    ])[0];
+
+  /// The record cannot tell a browser still in use from one idle four minutes, so the
+  /// first grain reports no figure and the page says what both have in common.
+  it.each([0, 1, 4, 4.99])("reports no age %s minutes in", (minutesAgo) => {
+    expect(lastUsedAgeMillis(aged(minutesAgo), now)).toBeUndefined();
+  });
+
+  /// Rounded up so the figure never claims more recency than the stamp can support,
+  /// and counted from the end of the first grain so one grain is the smallest figure
+  /// shown: measuring from zero would round anything past the threshold to two and
+  /// leave "5 minutes ago" unreachable.
+  it.each([
+    [5, 5],
+    [5.1, 5],
+    [9, 5],
+    [10, 5],
+    [10.1, 10],
+    [11, 10],
+    [15, 10],
+    [16, 15],
+    [61, 60],
+  ])("rounds %s minutes up to %s", (minutesAgo, expected) => {
+    expect(lastUsedAgeMillis(aged(minutesAgo), now)).toBe(expected * MINUTE);
+  });
+
+  /// A stamp in the future is the clock disagreeing, not a browser used later: it falls
+  /// in the first grain like anything else too recent to measure.
+  it("reports no age for a stamp ahead of now", () => {
+    expect(lastUsedAgeMillis(aged(-1), now)).toBeUndefined();
   });
 });
 
