@@ -45,13 +45,8 @@
 {/snippet}
 
 {#snippet meta(label: string, value: string)}
-  <!-- Dissolved when the row is a line, so the label and value become a column of the
-       list's own grid. A two-cell block on its own line when the row is a block.
-
-       A signed-out row dims here, on the text itself, rather than on a wrapper: one or
-       other of the wrappers is `display: contents` at any width, and an element that
-       generates no box paints no opacity, so the dimming would silently do nothing in
-       one of the two layouts. -->
+  <!-- Dimmed on the text rather than the wrapper: one wrapper or the other is
+       `display: contents` at any width, and a box-less element paints no opacity. -->
   <div
     class="contents @min-[620px]/list:flex @min-[620px]/list:flex-col @min-[620px]/list:gap-1"
   >
@@ -68,24 +63,13 @@
   </div>
 {/snippet}
 
-<!--
-  One grid at both widths, taking its columns from the list so that every row's meta and
-  action line up whatever they contain. What the breakpoint changes is where the pieces
-  sit in it: on one line when the row is a line, and identity above meta with the action
-  beside both when the row is a block.
-
-  It switches on the card's width rather than the page's: this list sits in a settings
-  pane that is narrow at any viewport, so a page breakpoint left the wide layout in a
-  column too small for it, truncating the name and printing the meta over the badge.
--->
+<!-- Switches on the card's width, not the page's: this list sits in a settings pane
+     that is narrow at any viewport. -->
 <div
   class="col-span-4 grid grid-cols-subgrid gap-y-1.5 py-2.5 @min-[620px]/list:items-center @min-[620px]/list:gap-y-0 @min-[620px]/list:py-4"
 >
-  <!-- Takes the action's column too when there is no action, which is every row that
-       carries the badge: a row shows one of the badge, the button or the label, never a
-       combination. Without that the name gives up the action column's width to hold
-       nothing, and its badge wraps under it on a narrow card. The column keeps its width
-       either way, because the rows that do have an action size it. -->
+  <!-- Spans the action's column when there is no action, so the badge does not wrap
+       under the name to leave an empty column beside it. -->
   <div
     class="{action === 'none'
       ? 'col-span-4'
@@ -93,9 +77,8 @@
   >
     <span class="flex size-5 shrink-0 items-center justify-center">
       {#if brandIcon !== undefined}
-        <!-- Not dimmed with the rest of a signed-out row: a brand mark is what the
-             browser is, not what state it is in, and fading it reads as an image that
-             failed to load. The name and the "Signed out" label carry the state. -->
+        <!-- Not dimmed with the rest of a signed-out row: a faded brand mark reads as
+             an image that failed to load. -->
         <img src={brandIcon} alt="" class="size-5" />
       {/if}
     </span>
@@ -116,8 +99,6 @@
     </span>
   </div>
 
-  <!-- A line of its own below the identity when the row is a block; dissolved into the
-       row's own line above the breakpoint, where each pair takes a column. -->
   <div
     class="col-span-4 row-start-2 grid grid-cols-[auto_auto] items-baseline justify-start gap-x-1.5 gap-y-2 @min-[620px]/list:contents"
   >
@@ -125,11 +106,8 @@
     {@render meta($t`First seen`, firstSeen)}
   </div>
 
-  <!-- On the name's line and centred on it, because the browser is what it acts on.
-       `h-9` is the button's own height, so a row showing "Signed out" stands as tall as
-       one offering a button. The name's line carries the same floor, so a row with no
-       action at all — the one with the badge, which drops this column to keep its name
-       and badge on one line — is no shorter than its neighbours either. -->
+  <!-- `h-9` is the button's own height, and the name's line carries the same floor, so
+       every row stands equally tall whatever it holds. -->
   {#if action !== "none"}
     <span class="col-start-4 row-start-1 flex h-9 items-center justify-center">
       {@render actionControl()}

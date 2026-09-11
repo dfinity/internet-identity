@@ -165,38 +165,23 @@
   <!-- No empty state: this browser is always one of the rows, so the only moment there
        is nothing to draw is before it has described itself. -->
   {#if groups.length > 0}
-    <!-- The column tracks live on the card, and every section and row below takes them
-         with `grid-cols-subgrid`. So a column is as wide as the widest content in any
-         row of the whole card, in any language, rather than a number chosen for the
-         English strings — and the platform groups line up with each other, which they
-         would not if each owned its own tracks.
-
-         The card is also the container the rows query. That works because it defines
-         tracks rather than inheriting them: `container-type` imposes size containment,
-         which forbids an element from being a *subgrid*, so no element below may be
-         both.
-
-         The column gap is a percentage, which resolves against the card's own content
-         box, so the columns close up as the card narrows and the wide layout survives a
-         narrower pane than a fixed gap would allow. A container unit cannot express
-         this: an element's own `container-type` does not make it its own query
-         container. -->
+    <!-- Tracks, padding and query container all live on the card: `container-type`
+         imposes size containment, which forbids an element from also being a subgrid,
+         and horizontal padding on a subgrid would inset its tracks out of line with
+         these. The gap is a percentage of the card's own content box, so the columns
+         close up as it narrows; a container unit cannot express that, because an
+         element's own `container-type` does not make it its own query container. -->
     <div
       class="border-border-secondary bg-bg-primary @container/list grid grid-cols-[1fr_auto_auto_auto] gap-x-[clamp(1.5rem,4%,2.5rem)] overflow-hidden rounded-xl border px-4"
     >
       {#each groups as group, groupIndex (group.platform)}
         {#if groupIndex > 0}
-          <!-- Full width rather than inset, unlike the rule between rows of one group:
-               this is the boundary between two groups. The card's own padding is undone
-               for it. -->
           <div
             aria-hidden="true"
             class="border-border-tertiary col-span-4 -mx-4 border-t"
           ></div>
         {/if}
         <section class="col-span-4 grid grid-cols-subgrid">
-          <!-- Outdented so the heading's own padding places it, rather than adding to
-               the card's. -->
           <div class="col-span-4 -mx-4">
             <GroupHeading
               kind={group.kind}
@@ -206,9 +191,8 @@
           </div>
           <ul class="col-span-4 grid grid-cols-subgrid">
             {#each group.browsers as browser, index (browser.id)}
-              <!-- Inset rule between rows of one group, so it reads as a divided group
-                   rather than as the boundary between two. Drawn as its own element:
-                   indenting the row to inset the rule moved the row with it. -->
+              <!-- Its own element: indenting the row to inset the rule moved the row
+                   with it. -->
               {#if index > 0}
                 <li
                   aria-hidden="true"
@@ -247,9 +231,6 @@
 {#if confirming !== undefined}
   {@const target = confirming}
   <Dialog onClose={() => (confirming = undefined)} width="wider">
-    <!-- The title names which browser, the button what happens to it: "Sign out" alone
-         is the ambiguity this dialog exists to resolve, and repeating the scope in both
-         would leave neither saying which row was clicked. -->
     <div class="flex flex-col gap-5 p-1">
       <h2 class="text-text-primary text-2xl font-medium">
         {$t`Sign out ${brandNameOf(target.description)}?`}
