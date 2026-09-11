@@ -157,8 +157,6 @@ const runCeremony = async (
   });
 
   const { channel, sent } = channelWith();
-  // Started rather than awaited, so a caller can act while the ceremony is still
-  // in flight — which is the only time an identity switch can happen.
   const pending = handleSessionDelegationRequest(
     channel,
     vi.fn(),
@@ -763,7 +761,6 @@ describe("an identity switched mid-consent", () => {
     const { attributeConsentStore, attributeConsentResultStore } =
       await import("$lib/stores/attributeConsent.store");
     const { authorizedStore } = await import("$lib/stores/authorization.store");
-    // A consent screen is open and unanswered, which is where a switch happens.
     (attributeConsentStore as unknown as Writable<unknown>).set({});
     (attributeConsentResultStore as unknown as Writable<unknown>).set(
       undefined,
@@ -771,13 +768,9 @@ describe("an identity switched mid-consent", () => {
 
     try {
       const { prepared } = await runCeremony(undefined, {}, async () => {
-        // Let the ceremony reach the point where it is waiting on the screen, so
-        // what follows is a switch rather than the first answer.
+        // Reach the consent screen before switching.
         await new Promise((resolve) => setTimeout(resolve, 20));
-        // A switch moves both: the identity re-authenticates and its account is
-        // authorized again, so the session has to be minted for the pair the
-        // user ended on rather than one of each. The actor is kept, so the
-        // calls it records are the same ones read below.
+        // The same actor, so its calls are still the ones read below.
         const { authenticationStore } =
           await import("$lib/stores/authentication.store");
         const left = get(
@@ -796,16 +789,9 @@ describe("an identity switched mid-consent", () => {
         });
       });
 
-      // The identity and the account switched to, both of them: the one left
-      // behind is identity 10_000 and carries no account number at all, so a
-      // ceremony that never noticed the switch names it here — as does one that
-      // took the new account while keeping the old identity.
       expect(prepared[0].identity_number).toBe(BigInt(10_001));
       expect(prepared[0].account_number).toEqual([BigInt(7)]);
     } finally {
-      // Closed again here rather than in a hook: the ceremony cases further
-      // down the file share this module's stores and set up no state of their
-      // own, so a screen left open would change what they run.
       (attributeConsentStore as unknown as Writable<unknown>).set(undefined);
       (attributeConsentResultStore as unknown as Writable<unknown>).set(
         undefined,
