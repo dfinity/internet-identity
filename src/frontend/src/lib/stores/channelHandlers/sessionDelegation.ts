@@ -24,6 +24,10 @@ import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { remapToLegacyDomain } from "$lib/utils/urlUtils";
 import { toPermissionsArg } from "$lib/utils/accessLevel";
 import {
+  attributeConsentResultStore,
+  attributeConsentStore,
+} from "$lib/stores/attributeConsent.store";
+import {
   isCanisterError,
   retryFor,
   throwCanisterError,
@@ -331,7 +335,24 @@ const createSession = async (
   resumable: boolean,
 ): Promise<{ record: AppSessionRecord }> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
-  const authorized = await waitForStore(authorizedStore);
+  let authorized = await waitForStore(authorizedStore);
+  // Switching identity on a consent screen authorizes again; mint for the
+  // identity the user ends on, as `delegation.ts` does.
+  while (
+    get(attributeConsentStore) !== undefined &&
+    get(attributeConsentResultStore) === undefined
+  ) {
+    const outcome = await Promise.race([
+      waitForStore(attributeConsentResultStore).then(() => "settled" as const),
+      waitForStore(authorizedStore, (current) =>
+        current !== authorized ? ("switched" as const) : undefined,
+      ),
+    ]);
+    if (outcome === "settled") {
+      break;
+    }
+    authorized = await waitForStore(authorizedStore);
+  }
   const [accountNumber, { identityNumber, actor, authMethod }] =
     await Promise.all([
       authorized.accountNumberPromise,
