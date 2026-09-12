@@ -1,0 +1,23 @@
+// Implemented by a dApp that sends notifications through Internet Identity.
+// II's side is in src/internet_identity/internet_identity.did.
+//
+// A sending dApp must also serve, at its origin:
+//   /.well-known/ii-notification-senders  ->  { "senders" : [ "<canister-id>", ... ] }
+// naming the canisters allowed to call II's notification_send for this origin.
+// That file is how II authorizes senders; there is no register endpoint.
+
+type Notification = record {
+    id : blob;
+    title : text;
+    body : text;
+    url : opt text;
+    created_at : nat64;
+};
+
+service : {
+    // Called by II's service worker as the user. Must be a query.
+    ii_pending_notifications : () -> (vec Notification) query;
+
+    // Called after display, so the dApp can stop serving them. ids match Notification.id.
+    ii_notifications_delivered : (ids : vec blob) -> ();
+};
