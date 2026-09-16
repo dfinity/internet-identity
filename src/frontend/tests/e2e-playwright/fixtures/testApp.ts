@@ -40,6 +40,14 @@ const HOLDS_NOTHING = "signed-out";
  * nobody being signed in at all.
  */
 const SHARED_NOT_HELD = "signed-in-elsewhere";
+/**
+ * What a session that was revoked or ran out leaves behind.
+ *
+ * Its own state rather than a kind of signed-out: the record names the account
+ * whose session ended, which is what lets an app offer to sign back in. Signing
+ * out removes the record instead — that is the user asking to leave.
+ */
+const SESSION_ENDED = "expired";
 const NO_ACCOUNT = "-";
 const NO_DELEGATION = "none held";
 const NOTHING_SHARED = "none";
@@ -172,6 +180,15 @@ export class TestApp {
   /** Fails unless the app is holding nothing it could act with. */
   async expectSignedOut(): Promise<void> {
     await expect(this.state).toHaveText(HOLDS_NOTHING, { timeout: ROUND_TRIP });
+  }
+
+  /**
+   * Fails unless the app reports its session as ended, holding nothing it could
+   * act with.
+   */
+  async expectSessionEnded(): Promise<void> {
+    await expect(this.state).toHaveText(SESSION_ENDED, { timeout: ROUND_TRIP });
+    await expect(this.delegation).toHaveText(NO_DELEGATION);
   }
 
   /** Fails unless the app is acting as some account. */
