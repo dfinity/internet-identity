@@ -29,11 +29,16 @@
   import type { AccessLevel } from "$lib/utils/accessLevel";
   import AuthWizardView from "./views/AuthWizardView.svelte";
   import AttributeConsentView from "./views/AttributeConsentView.svelte";
+  import NotifOptInView from "./views/NotifOptInView.svelte";
   import {
     type AttributeConsent,
     attributeConsentStore,
     attributeConsentResultStore,
   } from "$lib/stores/attributeConsent.store";
+  import {
+    notificationConsentSettledStore,
+    notificationConsentStore,
+  } from "$lib/stores/notificationConsent.store";
 
   // --- OpenID resume imports ---
   import {
@@ -607,6 +612,9 @@
 {:else if $attributeConsentStore !== undefined && $attributeConsentResultStore === undefined && ($authorizedStore !== undefined || data.flow === "openid-resume")}
   <!-- Consent needed (or loading) — consent view handles its own loading state. -->
   {@render panelWrapper(attributeConsentContent)}
+{:else if $notificationConsentStore !== undefined && $notificationConsentSettledStore === undefined}
+  <!-- Notification consent — runs after authorize, before the redirect. -->
+  {@render panelWrapper(notificationConsentContent)}
 {:else if $authorizedStore !== undefined || (data.flow === "openid-resume" && openIdResumeProcessing)}
   <!-- Authorized or OpenID callback processing — show redirect animation. -->
   <RedirectAnimationView />
@@ -634,6 +642,20 @@
         context={$attributeConsentStore}
         variant={data.flow === "openid-resume" ? "openid" : "normal"}
         onConsent={handleAttributeConsent}
+      />
+    {/key}
+  {/if}
+{/snippet}
+
+{#snippet notificationConsentContent()}
+  {#if $notificationConsentStore !== undefined}
+    {#key $notificationConsentStore}
+      <NotifOptInView
+        appName={$notificationConsentStore.appName}
+        identityNumber={$notificationConsentStore.identityNumber}
+        origin={$notificationConsentStore.effectiveOrigin}
+        resolveActor={$notificationConsentStore.resolveActor}
+        onDone={() => notificationConsentStore.settle()}
       />
     {/key}
   {/if}
