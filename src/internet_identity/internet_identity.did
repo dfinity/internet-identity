@@ -1746,6 +1746,17 @@ type NotificationError = variant {
     NotFound;                          // no such endpoint, or no consent for that origin
 };
 
+// What a browser uploads when it registers for Web Push. The browser's p256dh
+// and auth keys are absent: the push carries no body, so there is no RFC 8291
+// payload to encrypt to them.
+type SubscribeDeviceRequest = record {
+    anchor_number : UserNumber;
+    endpoint : text;                   // the relay URL the browser was issued
+    vapid_public_key : blob;           // uncompressed SEC1 P-256, echoed to the relay as k=
+    jwt_signatures : vec blob;         // one raw ECDSA signature per validity window
+    jwt_issued_at_ns : nat64;
+};
+
 // One consented app with its metadata, for the Settings notifications page.
 type NotificationConsentedApp = record {
     origin : text;
@@ -2242,4 +2253,7 @@ service : (opt InternetIdentityInit) -> {
     // Mute or unmute an already-consented app (keeps consent, skips the send path).
     notification_set_app_muted : (anchor_number : UserNumber, origin : text, muted : bool) -> (variant { Ok; Err : NotificationError });
 
+    // Register the device push subscription and a pool of JWTs so that we don't have to store a VAPID key-pair in the canister.
+    webpush_subscribe_device : (SubscribeDeviceRequest) -> (variant { Ok; Err : NotificationError });
+    webpush_unsubscribe_device : (anchor_number : UserNumber, endpoint : text) -> (variant { Ok; Err : NotificationError });
 };

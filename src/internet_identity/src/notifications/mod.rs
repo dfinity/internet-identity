@@ -1,10 +1,12 @@
 //! Notifications: who may notify a user, and how they're reached.
 //!
-//! Each `pub fn` checks the feature flag and authorizes the
+//! Consent is channel-agnostic and lives here; channel-specific state lives
+//! under [`webpush`]. Each `pub fn` checks the feature flag and authorizes the
 //! anchor, then delegates to a storage-only helper taking the resolved
 //! `anchor_number` — keeping the storage logic testable off-canister.
 
 pub mod consent;
+pub mod webpush;
 
 use crate::authz_utils::{check_authorization, check_authz_and_record_activity};
 use internet_identity_interface::internet_identity::types::{AnchorNumber, FrontendHostname};

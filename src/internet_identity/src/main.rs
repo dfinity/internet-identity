@@ -326,6 +326,21 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 // ---- Notifications: called by II's frontend / service worker ----
 
 #[update]
+fn webpush_subscribe_device(
+    request: notifications::webpush::subscription::SubscribeDeviceRequest,
+) -> Result<(), notifications::NotificationError> {
+    notifications::webpush::subscription::subscribe_device(request)
+}
+
+#[update]
+fn webpush_unsubscribe_device(
+    anchor_number: AnchorNumber,
+    endpoint: String,
+) -> Result<(), notifications::NotificationError> {
+    notifications::webpush::subscription::unsubscribe_device(anchor_number, endpoint)
+}
+
+#[update]
 fn notification_grant_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,

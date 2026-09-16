@@ -122,6 +122,8 @@ use crate::storage::storable::anchor_application_config::AnchorApplicationConfig
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::notifications::consent::StorableNotificationConsent;
+use crate::storage::storable::notifications::webpush::endpoint_hash::StorableEndpointSha256;
+use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::session_handle::StorableSessionHandle;
@@ -217,6 +219,7 @@ const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
 const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
 const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
 // Notification indexes, appended after the current max (36)
+const WEBPUSH_SUBSCRIPTIONS_MEMORY_INDEX: u8 = 38u8;
 const NOTIFICATIONS_CONSENT_MEMORY_INDEX: u8 = 37u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
@@ -310,6 +313,9 @@ const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
 /// which is what makes the revocation final: the id is an input to the session seed.
 const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY_INDEX);
 
+/// Device subscriptions, keyed `(anchor, sha256(endpoint))`. One row per
+/// browser; re-subscribe overwrites. Capped at 20/anchor, evict-oldest.
+const WEBPUSH_SUBSCRIPTIONS_MEMORY_ID: MemoryId = MemoryId::new(WEBPUSH_SUBSCRIPTIONS_MEMORY_INDEX);
 /// Per-`(anchor, origin)` consent grants; presence means granted.
 const NOTIFICATIONS_CONSENT_MEMORY_ID: MemoryId = MemoryId::new(NOTIFICATIONS_CONSENT_MEMORY_INDEX);
 
@@ -522,6 +528,13 @@ pub struct Storage<M: Memory> {
         StableBTreeMap<StorableSsoStableIdKey, StorableAnchorNumberList, ManagedMemory<M>>,
 
     // ---- Notifications ------------------------------------------
+    webpush_subscriptions_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    pub(crate) webpush_subscriptions_memory: StableBTreeMap<
+        (StorableAnchorNumber, StorableEndpointSha256),
+        StorableWebPushSubscription,
+        ManagedMemory<M>,
+    >,
+
     notifications_consent_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     pub(crate) notifications_consent_memory: StableBTreeMap<
         (StorableAnchorNumber, StorableOriginSha256),
@@ -622,6 +635,7 @@ impl<M: Memory + Clone> Storage<M> {
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
         let sso_stable_id_index_memory = memory_manager.get(SSO_STABLE_ID_INDEX_MEMORY_ID);
+        let webpush_subscriptions_memory = memory_manager.get(WEBPUSH_SUBSCRIPTIONS_MEMORY_ID);
         let notifications_consent_memory = memory_manager.get(NOTIFICATIONS_CONSENT_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
@@ -757,6 +771,10 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             sso_stable_id_index_memory: StableBTreeMap::init(sso_stable_id_index_memory),
 
+            webpush_subscriptions_memory_wrapper: MemoryWrapper::new(
+                webpush_subscriptions_memory.clone(),
+            ),
+            webpush_subscriptions_memory: StableBTreeMap::init(webpush_subscriptions_memory),
             notifications_consent_memory_wrapper: MemoryWrapper::new(
                 notifications_consent_memory.clone(),
             ),
@@ -4078,6 +4096,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "sso_stable_id_index_memory".to_string(),
                 self.sso_stable_id_index_memory_wrapper.size(),
+            ),
+            (
+                "webpush_subscriptions_memory".to_string(),
+                self.webpush_subscriptions_memory_wrapper.size(),
             ),
             (
                 "notifications_consent_memory".to_string(),

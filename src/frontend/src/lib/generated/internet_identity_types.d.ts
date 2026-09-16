@@ -1947,6 +1947,18 @@ export type StreamingStrategy = {
     'Callback' : { 'token' : Token, 'callback' : [Principal, string] }
   };
 export type Sub = string;
+/**
+ * What a browser uploads when it registers for Web Push. The browser's p256dh
+ * and auth keys are absent: the push carries no body, so there is no RFC 8291
+ * payload to encrypt to them.
+ */
+export interface SubscribeDeviceRequest {
+  'endpoint' : string,
+  'jwt_signatures' : Array<Uint8Array | number[]>,
+  'jwt_issued_at_ns' : bigint,
+  'anchor_number' : UserNumber,
+  'vapid_public_key' : Uint8Array | number[],
+}
 export type Timestamp = bigint;
 export type Token = {};
 export type UpdateAccountError = { 'AccountLimitReached' : null } |
@@ -2799,6 +2811,19 @@ export interface _SERVICE {
   'verify_tentative_device' : ActorMethod<
     [UserNumber, string],
     VerifyTentativeDeviceResponse
+  >,
+  /**
+   * Register the device push subscription and a pool of JWTs so that we don't have to store a VAPID key-pair in the canister.
+   */
+  'webpush_subscribe_device' : ActorMethod<
+    [SubscribeDeviceRequest],
+    { 'Ok' : null } |
+      { 'Err' : NotificationError }
+  >,
+  'webpush_unsubscribe_device' : ActorMethod<
+    [UserNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : NotificationError }
   >,
   'whoami' : ActorMethod<[], Principal>,
 }
