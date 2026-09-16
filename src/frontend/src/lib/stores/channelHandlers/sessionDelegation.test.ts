@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
-import type { Writable } from "svelte/store";
+import { get, type Readable, type Writable } from "svelte/store";
 
 const CANISTER_ID_TEXT = "rwlgt-iiaaa-aaaaa-aaaaa-cai";
 const ORIGIN = "https://app.example.com";
@@ -58,6 +58,14 @@ vi.mock("$lib/stores/channelHandlers/describeBrowser", () => ({
   describeBrowser: () => Promise.resolve("a browser"),
 }));
 
+vi.mock("$lib/stores/attributeConsent.store", async () => {
+  const { writable } = await import("svelte/store");
+  return {
+    attributeConsentStore: writable<unknown>(undefined),
+    attributeConsentResultStore: writable<unknown>(undefined),
+  };
+});
+
 const setRequestContext = vi.fn();
 vi.mock("$lib/stores/authorization.store", async () => {
   const { writable } = await import("svelte/store");
@@ -90,6 +98,7 @@ import { INTERACTION_REQUIRED_ERROR_CODE } from "$lib/utils/transport/utils";
 const runCeremony = async (
   resumable?: boolean,
   extraParams: Record<string, unknown> = {},
+  whileRunning?: () => Promise<void>,
 ) => {
   const { authorizationPromptStore, authorizedStore } =
     await import("$lib/stores/authorization.store");
@@ -148,7 +157,7 @@ const runCeremony = async (
   });
 
   const { channel, sent } = channelWith();
-  await handleSessionDelegationRequest(
+  const pending = handleSessionDelegationRequest(
     channel,
     vi.fn(),
   )({
@@ -157,6 +166,10 @@ const runCeremony = async (
     method: "ii_session_delegation",
     params: { sessionPublicKey: await appKey(), ...extraParams },
   });
+  if (whileRunning !== undefined) {
+    await whileRunning();
+  }
+  await pending;
   return { sent, prepared };
 };
 
@@ -740,5 +753,49 @@ describe("asBrowserKeyError", () => {
     const network = new Error("network");
 
     expect(asBrowserKeyError(network)).toBe(network);
+  });
+});
+
+describe("an identity switched mid-consent", () => {
+  it("mints for the identity the user switched to, not the one they left", async () => {
+    const { attributeConsentStore, attributeConsentResultStore } =
+      await import("$lib/stores/attributeConsent.store");
+    const { authorizedStore } = await import("$lib/stores/authorization.store");
+    (attributeConsentStore as unknown as Writable<unknown>).set({});
+    (attributeConsentResultStore as unknown as Writable<unknown>).set(
+      undefined,
+    );
+
+    try {
+      const { prepared } = await runCeremony(undefined, {}, async () => {
+        // Reach the consent screen before switching.
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        // The same actor, so its calls are still the ones read below.
+        const { authenticationStore } =
+          await import("$lib/stores/authentication.store");
+        const left = get(
+          authenticationStore as unknown as Readable<Record<string, unknown>>,
+        );
+        (authenticationStore as unknown as Writable<unknown>).set({
+          ...left,
+          identityNumber: BigInt(10_001),
+        });
+        (authorizedStore as unknown as Writable<unknown>).set({
+          accountNumberPromise: Promise.resolve(BigInt(7)),
+          accessLevel: "full-access",
+        });
+        (attributeConsentResultStore as unknown as Writable<unknown>).set({
+          attributes: [],
+        });
+      });
+
+      expect(prepared[0].identity_number).toBe(BigInt(10_001));
+      expect(prepared[0].account_number).toEqual([BigInt(7)]);
+    } finally {
+      (attributeConsentStore as unknown as Writable<unknown>).set(undefined);
+      (attributeConsentResultStore as unknown as Writable<unknown>).set(
+        undefined,
+      );
+    }
   });
 });
