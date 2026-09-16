@@ -224,6 +224,15 @@ pub fn arg_with_captcha_disabled() -> Option<InternetIdentityInit> {
     })
 }
 
+/// Notifications are off in every other test arg, since the feature is inert
+/// until a deployment turns it on. This is the only one that turns it on.
+pub fn arg_with_notifications_enabled() -> Option<InternetIdentityInit> {
+    Some(InternetIdentityInit {
+        notifications_enabled: Some(true),
+        ..arg_with_captcha_disabled().unwrap()
+    })
+}
+
 pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         archive_config: Some(ArchiveConfig {

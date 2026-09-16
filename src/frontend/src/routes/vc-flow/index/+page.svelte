@@ -9,6 +9,7 @@
 
   const connection = new Connection(canisterId.toText(), {
     is_production: [],
+    notifications_enabled: [],
     backend_canister_id: [frontendCanisterConfig.backend_canister_id],
     enable_dapps_explorer: [],
     assigned_user_number_range: [],
