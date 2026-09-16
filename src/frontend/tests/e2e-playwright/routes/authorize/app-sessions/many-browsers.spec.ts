@@ -62,7 +62,7 @@ test.describe("using many apps and browsers", () => {
       await oldest.focus();
       await oldest.ageDelegation();
       await oldest.replaceDelegation();
-      await oldest.expectSignedOut();
+      await oldest.expectSessionEnded();
     } finally {
       await Promise.allSettled(browsers.map(({ context }) => context.close()));
     }
