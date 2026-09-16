@@ -117,6 +117,16 @@ fn canonical_origin(origin: &str) -> Result<FrontendHostname, String> {
     Ok(origin.to_string())
 }
 
+/// Whether this deployment notifies at all. The Web Push channel is per browser rather
+/// than per app, so it turns on with the first app enabled rather than for one of them.
+pub fn notifications_enabled() -> bool {
+    crate::state::persistent_state(|s| {
+        s.notifications_enabled_origins
+            .as_ref()
+            .is_some_and(|origins| !origins.is_empty())
+    })
+}
+
 /// Whether this deployment notifies for `origin`. Configured origins are folded the same
 /// way the request's is, so an operator may list any spelling of a gateway twin.
 fn enabled_for(origin: &FrontendHostname) -> Result<(), String> {

@@ -16,6 +16,10 @@ const BROWSER_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-key";
 /// replayed in the other's role.
 const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
 
+/// A third prefix, so a sign-in signature cannot be presented as a Web Push
+/// registration or the other way round.
+const WEBPUSH_SIGNATURE_DOMAIN: &[u8] = b"ii-webpush-subscription";
+
 /// A browser key is P-256, and the signature the raw `r || s` pair WebCrypto produces.
 const BROWSER_KEY_SIGNATURE_BYTES: usize = 64;
 
@@ -119,6 +123,27 @@ fn signed_message(domain: &[u8], session_key: &SessionKey, other_key: &PublicKey
     message.extend_from_slice(session_key);
     message.extend_from_slice(other_key);
     message
+}
+
+/// Whether `signature` shows the caller holds `browser_key`, over the subscription it is
+/// registering.
+///
+/// Bound to the endpoint and the pool's issue time rather than to a session key, so a
+/// signature cannot be lifted onto another endpoint and a replay re-pins the pool it was
+/// made for.
+pub fn verify_webpush_subscription(
+    browser_key: &PublicKey,
+    signature: &[u8],
+    endpoint: &str,
+    jwt_issued_at_ns: u64,
+) -> bool {
+    let issued_at = jwt_issued_at_ns.to_be_bytes();
+    let mut message =
+        Vec::with_capacity(WEBPUSH_SIGNATURE_DOMAIN.len() + endpoint.len() + issued_at.len());
+    message.extend_from_slice(WEBPUSH_SIGNATURE_DOMAIN);
+    message.extend_from_slice(endpoint.as_bytes());
+    message.extend_from_slice(&issued_at);
+    verify(browser_key, signature, &message)
 }
 
 #[cfg(test)]

@@ -4,6 +4,7 @@
 //! everything here acts on an origin already folded to the spelling consent is keyed by.
 
 mod validation;
+pub mod webpush;
 
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::StorageError;
@@ -12,8 +13,8 @@ use internet_identity_interface::internet_identity::types::{
     Timestamp,
 };
 pub use validation::{
-    ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
-    ValidatedNotificationRevokeConsentRequest,
+    notifications_enabled, ValidatedNotificationConsentGrantedRequest,
+    ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
 };
 
 /// Grants the request's origin permission to notify its identity.

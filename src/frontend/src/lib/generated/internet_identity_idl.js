@@ -960,6 +960,24 @@ export const idlFactory = ({ IDL }) => {
     'wrong_code' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
     'no_device_to_verify' : IDL.Null,
   });
+  const SubscribeDeviceRequest = IDL.Record({
+    'endpoint' : IDL.Text,
+    'jwt_signatures' : IDL.Vec(IDL.Vec(IDL.Nat8)),
+    'jwt_issued_at_ns' : IDL.Nat64,
+    'anchor_number' : UserNumber,
+    'vapid_public_key' : IDL.Vec(IDL.Nat8),
+    'browser_key_signature' : IDL.Vec(IDL.Nat8),
+    'browser_key' : PublicKey,
+  });
+  const SubscribeDeviceError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
+  const UnsubscribeDeviceError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   return IDL.Service({
     'acknowledge_entries' : IDL.Func([IDL.Nat64], [], []),
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
@@ -1594,6 +1612,16 @@ export const idlFactory = ({ IDL }) => {
     'verify_tentative_device' : IDL.Func(
         [UserNumber, IDL.Text],
         [VerifyTentativeDeviceResponse],
+        [],
+      ),
+    'webpush_subscribe_device' : IDL.Func(
+        [SubscribeDeviceRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : SubscribeDeviceError })],
+        [],
+      ),
+    'webpush_unsubscribe_device' : IDL.Func(
+        [UserNumber, IDL.Nat32],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : UnsubscribeDeviceError })],
         [],
       ),
     'whoami' : IDL.Func([], [IDL.Principal], ['query']),

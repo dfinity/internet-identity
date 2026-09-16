@@ -1951,8 +1951,36 @@ export type StreamingStrategy = {
     'Callback' : { 'token' : Token, 'callback' : [Principal, string] }
   };
 export type Sub = string;
+export type SubscribeDeviceError = {
+    /**
+     * The browser's key names no browser this identity is signed in from, or its
+     * signature does not verify against it.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
+/**
+ * What a browser uploads when it registers for Web Push. No p256dh or auth key, since
+ * the push carries no body to encrypt.
+ */
+export interface SubscribeDeviceRequest {
+  'endpoint' : string,
+  'jwt_signatures' : Array<Uint8Array | number[]>,
+  'jwt_issued_at_ns' : bigint,
+  'anchor_number' : UserNumber,
+  'vapid_public_key' : Uint8Array | number[],
+  'browser_key_signature' : Uint8Array | number[],
+  /**
+   * Which browser this is: the key names an entry in the identity's browser registry,
+   * and the signature over endpoint || jwt_issued_at_ns shows the caller holds it.
+   */
+  'browser_key' : PublicKey,
+}
 export type Timestamp = bigint;
 export type Token = {};
+export type UnsubscribeDeviceError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
 export type UpdateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -2786,6 +2814,16 @@ export interface _SERVICE {
   'verify_tentative_device' : ActorMethod<
     [UserNumber, string],
     VerifyTentativeDeviceResponse
+  >,
+  'webpush_subscribe_device' : ActorMethod<
+    [SubscribeDeviceRequest],
+    { 'Ok' : null } |
+      { 'Err' : SubscribeDeviceError }
+  >,
+  'webpush_unsubscribe_device' : ActorMethod<
+    [UserNumber, number],
+    { 'Ok' : null } |
+      { 'Err' : UnsubscribeDeviceError }
   >,
   'whoami' : ActorMethod<[], Principal>,
 }

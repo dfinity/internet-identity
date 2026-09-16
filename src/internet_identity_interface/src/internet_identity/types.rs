@@ -997,3 +997,34 @@ pub struct NotificationConsentGrantedRequest {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
 }
+
+/// Everything a browser uploads when it registers for Web Push.
+///
+/// No `p256dh` or `auth` key, since the push carries no body to encrypt.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SubscribeDeviceRequest {
+    pub anchor_number: AnchorNumber,
+    pub endpoint: String,
+    pub vapid_public_key: ByteBuf,
+    pub jwt_signatures: Vec<ByteBuf>,
+    pub jwt_issued_at_ns: Timestamp,
+    /// The registry key this browser signs in with, which names the row, and its
+    /// signature over the two fields above.
+    pub browser_key: PublicKey,
+    pub browser_key_signature: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SubscribeDeviceError {
+    Unauthorized(Principal),
+    /// The browser's key names no browser this identity is signed in from, or its
+    /// signature does not verify against it.
+    InvalidBrowserKey,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum UnsubscribeDeviceError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}

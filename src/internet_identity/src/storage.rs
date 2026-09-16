@@ -121,6 +121,8 @@ use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
+use crate::storage::storable::browser_id::StorableBrowserId;
+use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::session_handle::StorableSessionHandle;
@@ -215,6 +217,8 @@ const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
 const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
 const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
+// Notification indexes, appended after the current max (36)
+const WEBPUSH_SUBSCRIPTIONS_MEMORY_INDEX: u8 = 37u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -306,6 +310,10 @@ const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
 /// Monotonic [`SessionId`] allocator. A revoked session's id is retired, never reissued,
 /// which is what makes the revocation final: the id is an input to the session seed.
 const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY_INDEX);
+
+/// Device subscriptions, keyed `(anchor, browser)`. One row per browser, which
+/// re-subscribing overwrites; the browser registry's cap bounds it.
+const WEBPUSH_SUBSCRIPTIONS_MEMORY_ID: MemoryId = MemoryId::new(WEBPUSH_SUBSCRIPTIONS_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -514,6 +522,18 @@ pub struct Storage<M: Memory> {
     /// [`SSO_STABLE_ID_INDEX_MEMORY_ID`].
     sso_stable_id_index_memory:
         StableBTreeMap<StorableSsoStableIdKey, StorableAnchorNumberList, ManagedMemory<M>>,
+
+    // ---- Notifications ------------------------------------------
+    // Keyed by the browser registry's id, so the registry's cap bounds this map and its
+    // evictions empty it. A map rather than a field on the registry, which lives on the
+    // anchor: a JWT pool is ~2 KiB and the anchor is read in full on every
+    // authenticated call.
+    webpush_subscriptions_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    pub(crate) webpush_subscriptions_memory: StableBTreeMap<
+        (StorableAnchorNumber, StorableBrowserId),
+        StorableWebPushSubscription,
+        ManagedMemory<M>,
+    >,
 }
 
 #[repr(C, packed)]
@@ -608,6 +628,7 @@ impl<M: Memory + Clone> Storage<M> {
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
         let sso_stable_id_index_memory = memory_manager.get(SSO_STABLE_ID_INDEX_MEMORY_ID);
+        let webpush_subscriptions_memory = memory_manager.get(WEBPUSH_SUBSCRIPTIONS_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -741,6 +762,11 @@ impl<M: Memory + Clone> Storage<M> {
                 sso_stable_id_index_memory.clone(),
             ),
             sso_stable_id_index_memory: StableBTreeMap::init(sso_stable_id_index_memory),
+
+            webpush_subscriptions_memory_wrapper: MemoryWrapper::new(
+                webpush_subscriptions_memory.clone(),
+            ),
+            webpush_subscriptions_memory: StableBTreeMap::init(webpush_subscriptions_memory),
         }
     }
 
@@ -1792,13 +1818,16 @@ impl<M: Memory + Clone> Storage<M> {
         writes: BTreeMap<FrontendHostname, AccountReferenceListWrite>,
     ) -> Result<BTreeMap<FrontendHostname, AccountReferenceListWrite>, StorageError> {
         let given_up = self.browsers_given_up(&anchor)?;
+        let anchor_number = anchor.anchor_number();
         let validated = self.validate_account_state(
-            anchor.anchor_number(),
+            anchor_number,
             anchor.session_count,
             &given_up,
             now,
             writes,
         )?;
+        // Past the last refusal, so this cannot leave a write half-done.
+        self.remove_webpush_subscriptions(anchor_number, &given_up);
         Ok(self.apply_account_state(anchor, validated))
     }
 
@@ -3225,8 +3254,22 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         self.write_account_state(anchor, now, state)?;
+        self.remove_webpush_subscriptions(anchor_number, &BTreeSet::from([browser_id]));
 
         Ok(revoked)
+    }
+
+    /// Drops the Web Push subscriptions of browsers this identity no longer lists. A row
+    /// keyed by a browser that is gone is an endpoint the user can no longer revoke.
+    fn remove_webpush_subscriptions(
+        &mut self,
+        anchor_number: AnchorNumber,
+        browsers: &BTreeSet<BrowserId>,
+    ) {
+        for browser_id in browsers {
+            self.webpush_subscriptions_memory
+                .remove(&(anchor_number, *browser_id));
+        }
     }
 
     /// The session index entries a reference list implies: one per session it holds,
@@ -4097,6 +4140,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "sso_stable_id_index_memory".to_string(),
                 self.sso_stable_id_index_memory_wrapper.size(),
+            ),
+            (
+                "webpush_subscriptions_memory".to_string(),
+                self.webpush_subscriptions_memory_wrapper.size(),
             ),
         ])
     }

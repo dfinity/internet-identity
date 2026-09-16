@@ -1764,6 +1764,33 @@ type NotificationConsentGrantedRequest = record {
     origin : text;
 };
 
+// What a browser uploads when it registers for Web Push. No p256dh or auth key, since
+// the push carries no body to encrypt.
+type SubscribeDeviceRequest = record {
+    anchor_number : UserNumber;
+    endpoint : text;                   // the relay URL the browser was issued
+    vapid_public_key : blob;           // uncompressed SEC1 P-256, echoed to the relay as k=
+    jwt_signatures : vec blob;         // one raw ECDSA signature per validity window
+    jwt_issued_at_ns : nat64;
+    // Which browser this is: the key names an entry in the identity's browser registry,
+    // and the signature over endpoint || jwt_issued_at_ns shows the caller holds it.
+    browser_key : PublicKey;
+    browser_key_signature : blob;
+};
+
+type SubscribeDeviceError = variant {
+    Unauthorized : principal;
+    // The browser's key names no browser this identity is signed in from, or its
+    // signature does not verify against it.
+    InvalidBrowserKey;
+    InternalCanisterError : text;
+};
+
+type UnsubscribeDeviceError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2244,4 +2271,6 @@ service : (opt InternetIdentityInit) -> {
     notification_revoke_consent : (NotificationRevokeConsentRequest) -> (variant { Ok; Err : NotificationRevokeConsentError });
     notification_consent_granted : (NotificationConsentGrantedRequest) -> (bool) query;
 
+    webpush_subscribe_device : (SubscribeDeviceRequest) -> (variant { Ok; Err : SubscribeDeviceError });
+    webpush_unsubscribe_device : (anchor_number : UserNumber, browser_id : nat32) -> (variant { Ok; Err : UnsubscribeDeviceError });
 };

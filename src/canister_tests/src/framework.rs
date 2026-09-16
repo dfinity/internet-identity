@@ -402,6 +402,7 @@ const P256_SPKI_HEADER: [u8; 26] = [
 
 const BROWSER_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-key";
 const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
+const WEBPUSH_SIGNATURE_DOMAIN: &[u8] = b"ii-webpush-subscription";
 
 impl BrowserKey {
     pub fn new(seed: u8) -> Self {
@@ -436,6 +437,18 @@ impl BrowserKey {
     /// The successor's own signature, proving the browser holds the key it announces.
     pub fn sign_as_successor(&self, session_key: &SessionKey, device_key: &PublicKey) -> ByteBuf {
         self.sign_with(SUCCESSOR_KEY_SIGNATURE_DOMAIN, session_key, device_key)
+    }
+
+    /// The proof `webpush_subscribe_device` and `webpush_refresh_jwts` want, over the
+    /// endpoint and the pool's issue time.
+    pub fn sign_webpush_subscription(&self, endpoint: &str, jwt_issued_at_ns: u64) -> ByteBuf {
+        use p256::ecdsa::signature::Signer;
+
+        let mut message = WEBPUSH_SIGNATURE_DOMAIN.to_vec();
+        message.extend_from_slice(endpoint.as_bytes());
+        message.extend_from_slice(&jwt_issued_at_ns.to_be_bytes());
+        let signature: p256::ecdsa::Signature = self.signing_key.sign(&message);
+        ByteBuf::from(signature.to_bytes().to_vec())
     }
 
     fn sign_with(&self, domain: &[u8], session_key: &SessionKey, other: &PublicKey) -> ByteBuf {
