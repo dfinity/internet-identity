@@ -416,6 +416,11 @@ pub struct InternetIdentityInit {
     /// (the deployment then has no official connector), `Some(Some(url))`
     /// points it at `url`.
     pub mcp_official_url: Option<Option<String>>,
+    /// Server-side kill switch for the notifications feature (per-app consent,
+    /// device subscriptions, Web Push delivery). `None` / `Some(false)` (the
+    /// default) disables every notification entry point; `Some(true)` enables
+    /// them. Omitting it on upgrade keeps the stored value.
+    pub notifications_enabled: Option<bool>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -963,4 +968,31 @@ pub struct RevokeBrowserSessionsRequest {
 pub enum SessionRevokeError {
     Unauthorized(Principal),
     InternalCanisterError(String),
+}
+
+/// Why a notification call was refused. A variant rather than a string: a caller
+/// cannot branch on prose, and the shape is free to choose before the first
+/// release and breaking after it.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationError {
+    /// This deployment has notifications turned off.
+    Disabled,
+    /// The caller may not act for this anchor.
+    Unauthorized(String),
+    /// The origin is not a bare `https://host[:port]`.
+    InvalidOrigin(String),
+    /// Subscription fields were rejected; every failure is reported at once.
+    InvalidSubscription(Vec<String>),
+    /// No such subscribed endpoint, or no consent for that origin.
+    NotFound,
+}
+
+/// One consented app with its metadata, for the Settings notifications page.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationConsentedApp {
+    pub origin: FrontendHostname,
+    pub granted_at_ns: Timestamp,
+    pub muted: bool,
+    /// The account the consent was granted from; `None` = the default account.
+    pub account_number: Option<u64>,
 }
