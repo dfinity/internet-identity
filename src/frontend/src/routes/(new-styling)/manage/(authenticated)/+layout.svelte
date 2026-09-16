@@ -18,6 +18,8 @@
   import { afterNavigate, goto, replaceState } from "$app/navigation";
   import { HANDOFF_HASH_KEY } from "$lib/utils/auth-handoff";
   import { onMount } from "svelte";
+  import { reconcileDeviceNotifications } from "$lib/utils/notifications/deviceNotifications";
+  import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
   import { SvelteURLSearchParams } from "svelte/reactivity";
   import { analytics } from "$lib/utils/analytics/analytics";
   import {
@@ -266,6 +268,24 @@
       reauthCleanup?.();
       reauthCleanup = undefined;
     };
+  });
+
+  // Keeps this browser's push registration healthy for an authenticated session.
+  // Best-effort: a failure here must not disrupt the page.
+  let reconciledFor: bigint | undefined;
+  $effect(() => {
+    const authenticated = $authenticationStore;
+    if (authenticated === undefined || !$PUSH_NOTIFICATIONS) {
+      return;
+    }
+    if (reconciledFor === authenticated.identityNumber) {
+      return;
+    }
+    reconciledFor = authenticated.identityNumber;
+    void reconcileDeviceNotifications(
+      authenticated.identityNumber,
+      authenticated.actor,
+    ).catch(() => {});
   });
 </script>
 
