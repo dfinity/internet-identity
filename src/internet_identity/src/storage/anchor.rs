@@ -747,6 +747,17 @@ impl Anchor {
         &self.browsers
     }
 
+    /// The browser holding this key, in either slot.
+    ///
+    /// Either slot, because a sign-in stores the key it was reached by and the successor
+    /// it announced, while the browser keeps only the successor.
+    pub fn browser_by_key(&self, key: &PublicKey) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .find(|browser| browser.current_browser_key == *key || browser.next_browser_key == *key)
+            .map(|browser| browser.id)
+    }
+
     /// Moves each browser's session count by what a write added to or took from it.
     ///
     /// A delta against a browser no entry holds is dropped: the cap can retire an entry

@@ -366,3 +366,267 @@ fn should_refuse_an_origin_that_is_not_enabled() -> Result<(), RejectResponse> {
     )?);
     Ok(())
 }
+
+mod subscriptions {
+    use super::*;
+    use canister_tests::api::internet_identity::api_v2::prepare_account_session;
+    use canister_tests::api::internet_identity::notifications::{
+        subscribe_device, unsubscribe_device,
+    };
+    use canister_tests::framework::BrowserKey;
+    use internet_identity_interface::internet_identity::types::{
+        BrowserBrand, BrowserDescription, BrowserId, FormFactor, OperatingSystem,
+        PrepareAccountSessionRequest, SubscribeDeviceError, SubscribeDeviceRequest,
+        UnsubscribeDeviceError,
+    };
+    use pretty_assertions::assert_eq;
+    use serde_bytes::ByteBuf;
+
+    const ENDPOINT: &str = "https://push.example.com/aBcDeF";
+    const ISSUED_AT_NS: u64 = 1_700_000_000_000_000_000;
+
+    /// An uncompressed SEC1 point on P-256, which is what a browser mints.
+    fn vapid_public_key() -> ByteBuf {
+        use p256::elliptic_curve::sec1::ToEncodedPoint;
+        let key = p256::SecretKey::from_bytes(&[7u8; 32].into()).expect("bad scalar");
+        ByteBuf::from(key.public_key().to_encoded_point(false).as_bytes().to_vec())
+    }
+
+    fn jwt_pool() -> Vec<ByteBuf> {
+        (0..30u8).map(|i| ByteBuf::from(vec![i; 64])).collect()
+    }
+
+    fn session_request(anchor: AnchorNumber, browser: &BrowserKey) -> PrepareAccountSessionRequest {
+        let session_key = ByteBuf::from(vec![1; 32]);
+        let next_browser_key = browser.successor().public_key();
+        PrepareAccountSessionRequest {
+            identity_number: anchor,
+            origin: ORIGIN.to_string(),
+            account_number: None,
+            browser_description: BrowserDescription {
+                brand: BrowserBrand::Chrome,
+                os: OperatingSystem::Macos,
+                form_factor: FormFactor::Desktop,
+                model: None,
+            },
+            current_browser_key: browser.public_key(),
+            current_browser_key_signature: browser.sign(&session_key, &next_browser_key),
+            next_browser_key_signature: browser
+                .successor()
+                .sign_as_successor(&session_key, &browser.public_key()),
+            next_browser_key,
+            session_key,
+            permissions: None,
+            valid_for: None,
+            max_idle: None,
+        }
+    }
+
+    /// Signs a browser in, which puts it in the registry a subscription is keyed by.
+    fn sign_browser_in(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        anchor: AnchorNumber,
+        browser: &BrowserKey,
+    ) -> BrowserId {
+        prepare_account_session(
+            env,
+            canister_id,
+            principal_1(),
+            session_request(anchor, browser),
+        )
+        .expect("prepare_account_session rejected")
+        .expect("prepare_account_session returned Err")
+        .browser_id
+    }
+
+    fn install_with_browser(env: &PocketIc) -> (CanisterId, AnchorNumber, BrowserKey, BrowserId) {
+        let canister_id = install_ii_canister_with_arg(
+            env,
+            II_WASM.clone(),
+            arg_with_notifications_enabled_for(ENABLED),
+        );
+        let anchor = flows::register_anchor(env, canister_id);
+        let browser = BrowserKey::new(1);
+        let browser_id = sign_browser_in(env, canister_id, anchor, &browser);
+        (canister_id, anchor, browser, browser_id)
+    }
+
+    /// What a browser uploads. The successor key is the one it keeps between sign-ins.
+    fn request_from(
+        anchor: AnchorNumber,
+        browser: &BrowserKey,
+        endpoint: &str,
+    ) -> SubscribeDeviceRequest {
+        let key_holder = browser.successor();
+        SubscribeDeviceRequest {
+            anchor_number: anchor,
+            endpoint: endpoint.to_string(),
+            vapid_public_key: vapid_public_key(),
+            jwt_signatures: jwt_pool(),
+            jwt_issued_at_ns: ISSUED_AT_NS,
+            browser_key: key_holder.public_key(),
+            browser_key_signature: key_holder.sign_webpush_subscription(endpoint, ISSUED_AT_NS),
+        }
+    }
+
+    #[test]
+    fn should_refuse_to_subscribe_while_no_origin_is_enabled() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id =
+            install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_captcha_disabled());
+        let anchor = flows::register_anchor(&env, canister_id);
+        let browser = BrowserKey::new(1);
+        sign_browser_in(&env, canister_id, anchor, &browser);
+
+        assert!(matches!(
+            subscribe_device(
+                &env,
+                canister_id,
+                principal_1(),
+                request_from(anchor, &browser, ENDPOINT)
+            )?,
+            Err(SubscribeDeviceError::InternalCanisterError(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn should_subscribe_and_unsubscribe_a_browser() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, browser_id) = install_with_browser(&env);
+
+        subscribe_device(
+            &env,
+            canister_id,
+            principal_1(),
+            request_from(anchor, &browser, ENDPOINT),
+        )?
+        .expect("subscribe rejected");
+
+        unsubscribe_device(&env, canister_id, principal_1(), anchor, browser_id)?
+            .expect("unsubscribe rejected");
+        // Idempotent on purpose, since silencing a browser is done from another one.
+        unsubscribe_device(&env, canister_id, principal_1(), anchor, browser_id)?
+            .expect("a second unsubscribe should be a no-op, not an error");
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_a_browser_this_identity_is_not_signed_in_from() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _browser, _) = install_with_browser(&env);
+
+        // A key the registry has never seen, held by whoever is calling.
+        let stranger = BrowserKey::new(9);
+        let refused = subscribe_device(
+            &env,
+            canister_id,
+            principal_1(),
+            request_from(anchor, &stranger, ENDPOINT),
+        )?;
+        assert!(
+            matches!(refused, Err(SubscribeDeviceError::InvalidBrowserKey)),
+            "{refused:?}"
+        );
+        Ok(())
+    }
+
+    /// Every device of an identity passes the same authorization, so naming a browser
+    /// is not on its own evidence of being it.
+    #[test]
+    fn should_refuse_one_browser_registering_against_anothers_key() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, victim, _) = install_with_browser(&env);
+        let attacker = BrowserKey::new(2);
+        sign_browser_in(&env, canister_id, anchor, &attacker);
+
+        let attacker_endpoint = "https://push.attacker.example/inbox";
+        let forged = SubscribeDeviceRequest {
+            anchor_number: anchor,
+            endpoint: attacker_endpoint.to_string(),
+            vapid_public_key: vapid_public_key(),
+            jwt_signatures: jwt_pool(),
+            jwt_issued_at_ns: ISSUED_AT_NS,
+            // The victim's browser, and the best signature the attacker can make.
+            browser_key: victim.successor().public_key(),
+            browser_key_signature: attacker
+                .successor()
+                .sign_webpush_subscription(attacker_endpoint, ISSUED_AT_NS),
+        };
+
+        let refused = subscribe_device(&env, canister_id, principal_1(), forged)?;
+        assert!(
+            matches!(refused, Err(SubscribeDeviceError::InvalidBrowserKey)),
+            "one browser registered against another's key: {refused:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_a_signature_lifted_onto_another_endpoint() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+
+        let mut request = request_from(anchor, &browser, ENDPOINT);
+        request.endpoint = "https://push.example.com/elsewhere".to_string();
+
+        let refused = subscribe_device(&env, canister_id, principal_1(), request)?;
+        assert!(
+            matches!(refused, Err(SubscribeDeviceError::InvalidBrowserKey)),
+            "{refused:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_report_every_invalid_field_at_once() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+
+        let endpoint = "";
+        let key_holder = browser.successor();
+        let request = SubscribeDeviceRequest {
+            anchor_number: anchor,
+            endpoint: endpoint.to_string(),
+            vapid_public_key: ByteBuf::from(vec![4u8; 65]),
+            jwt_signatures: vec![],
+            jwt_issued_at_ns: ISSUED_AT_NS,
+            browser_key: key_holder.public_key(),
+            browser_key_signature: key_holder.sign_webpush_subscription(endpoint, ISSUED_AT_NS),
+        };
+
+        match subscribe_device(&env, canister_id, principal_1(), request)? {
+            Err(SubscribeDeviceError::InternalCanisterError(problems)) => {
+                // Failing on the first would send a browser round three times to
+                // learn what a single answer can say.
+                assert_eq!(problems.split("; ").count(), 3, "{problems:?}");
+            }
+            other => panic!("expected every field reported at once, got {other:?}"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_a_caller_that_does_not_own_the_anchor() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, browser_id) = install_with_browser(&env);
+
+        let refused = subscribe_device(
+            &env,
+            canister_id,
+            principal_2(),
+            request_from(anchor, &browser, ENDPOINT),
+        )?;
+        assert!(
+            matches!(refused, Err(SubscribeDeviceError::Unauthorized(_))),
+            "{refused:?}"
+        );
+        let refused = unsubscribe_device(&env, canister_id, principal_2(), anchor, browser_id)?;
+        assert!(
+            matches!(refused, Err(UnsubscribeDeviceError::Unauthorized(_))),
+            "{refused:?}"
+        );
+        Ok(())
+    }
+}

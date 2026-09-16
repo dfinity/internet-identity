@@ -330,6 +330,29 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 // ---- Notifications: called by II's frontend / service worker ----
 
 #[update]
+fn webpush_subscribe_device(request: SubscribeDeviceRequest) -> Result<(), SubscribeDeviceError> {
+    notifications::webpush::check_enabled().map_err(SubscribeDeviceError::InternalCanisterError)?;
+    check_authz_and_record_activity(request.anchor_number)
+        .map_err(|_| SubscribeDeviceError::Unauthorized(caller()))?;
+
+    notifications::webpush::subscribe_device(request, ic_cdk::api::time())
+}
+
+#[update]
+fn webpush_unsubscribe_device(
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+) -> Result<(), UnsubscribeDeviceError> {
+    notifications::webpush::check_enabled()
+        .map_err(UnsubscribeDeviceError::InternalCanisterError)?;
+    check_authz_and_record_activity(anchor_number)
+        .map_err(|_| UnsubscribeDeviceError::Unauthorized(caller()))?;
+
+    notifications::webpush::unsubscribe_device(anchor_number, browser_id);
+    Ok(())
+}
+
+#[update]
 fn notification_grant_consent(
     request: NotificationGrantConsentRequest,
 ) -> Result<(), NotificationGrantConsentError> {
