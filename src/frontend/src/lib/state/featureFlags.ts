@@ -173,7 +173,16 @@ export const EMAIL_RECOVERY_SETUP = createFeatureFlagStore(
 /// field, regardless of agent language.
 export const READ_ONLY_MODE = createFeatureFlagStore("READ_ONLY_MODE", false);
 
+// Web Push. Off until a deployment turns the canister's own
+// `notifications_enabled` install argument on: with it off every notification
+// endpoint refuses, so a consent ceremony offered here would only fail.
+export const PUSH_NOTIFICATIONS = createFeatureFlagStore(
+  "PUSH_NOTIFICATIONS",
+  false,
+);
+
 export default {
+  PUSH_NOTIFICATIONS,
   DOMAIN_COMPATIBILITY,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
