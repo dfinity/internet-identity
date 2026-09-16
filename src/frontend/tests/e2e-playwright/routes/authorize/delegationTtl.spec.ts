@@ -1,9 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { addVirtualAuthenticator, II_URL, TEST_APP_URL } from "../../utils";
+import {
+  addVirtualAuthenticator,
+  II_URL,
+  TEST_APP_URL,
+  useLegacyProtocol,
+} from "../../utils";
 
 test("Delegation maxTimeToLive: 1 min", async ({ page }) => {
   // Open demo app and configure II URL
   await page.goto(TEST_APP_URL);
+  await useLegacyProtocol(page);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
 
   // Set maxTimeToLive to 1 minute (60 seconds = 60_000_000_000 nanoseconds)
@@ -38,6 +44,7 @@ test("Delegation maxTimeToLive: 1 min", async ({ page }) => {
 test("Delegation maxTimeToLive: 1 day", async ({ page }) => {
   // Open demo app and configure II URL
   await page.goto(TEST_APP_URL);
+  await useLegacyProtocol(page);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
 
   // Set maxTimeToLive to 1 day (86400 seconds = 86400_000_000_000 nanoseconds)
@@ -71,6 +78,7 @@ test("Delegation maxTimeToLive: 1 day", async ({ page }) => {
 test("Delegation maxTimeToLive: 2 months", async ({ page }) => {
   // Open demo app and configure II URL
   await page.goto(TEST_APP_URL);
+  await useLegacyProtocol(page);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
 
   // Set maxTimeToLive to 60 days (5_184_000_000_000_000 nanoseconds)
