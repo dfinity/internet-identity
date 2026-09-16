@@ -1269,6 +1269,12 @@ export interface InternetIdentityStats {
  */
 export type Iss = string;
 export type JWT = string;
+/**
+ * How many windows a device's JWT pool covers, and when it was minted. Not a
+ * count of unused signatures: the pool is spent by elapsed time, so such a
+ * count would never decrease and the frontend would never top up.
+ */
+export interface JwtPoolStatus { 'issued_at_ns' : bigint, 'pool_len' : number }
 export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
@@ -2811,6 +2817,18 @@ export interface _SERVICE {
   'verify_tentative_device' : ActorMethod<
     [UserNumber, string],
     VerifyTentativeDeviceResponse
+  >,
+  /**
+   * Check the status of the jwt pool so that we can issue more if needed.
+   */
+  'webpush_jwt_pool_status' : ActorMethod<
+    [UserNumber, string],
+    [] | [JwtPoolStatus]
+  >,
+  'webpush_refresh_jwts' : ActorMethod<
+    [UserNumber, string, Array<Uint8Array | number[]>, bigint],
+    { 'Ok' : null } |
+      { 'Err' : NotificationError }
   >,
   /**
    * Register the device push subscription and a pool of JWTs so that we don't have to store a VAPID key-pair in the canister.

@@ -1757,6 +1757,14 @@ type SubscribeDeviceRequest = record {
     jwt_issued_at_ns : nat64;
 };
 
+// How many windows a device's JWT pool covers, and when it was minted. Not a
+// count of unused signatures: the pool is spent by elapsed time, so such a
+// count would never decrease and the frontend would never top up.
+type JwtPoolStatus = record {
+    pool_len : nat32;
+    issued_at_ns : nat64;
+};
+
 // One consented app with its metadata, for the Settings notifications page.
 type NotificationConsentedApp = record {
     origin : text;
@@ -2255,5 +2263,8 @@ service : (opt InternetIdentityInit) -> {
 
     // Register the device push subscription and a pool of JWTs so that we don't have to store a VAPID key-pair in the canister.
     webpush_subscribe_device : (SubscribeDeviceRequest) -> (variant { Ok; Err : NotificationError });
+    webpush_refresh_jwts : (anchor_number : UserNumber, endpoint : text, jwt_signatures : vec blob, jwt_issued_at_ns : nat64) -> (variant { Ok; Err : NotificationError });
+    // Check the status of the jwt pool so that we can issue more if needed.
+    webpush_jwt_pool_status : (anchor_number : UserNumber, endpoint : text) -> (opt JwtPoolStatus) query;
     webpush_unsubscribe_device : (anchor_number : UserNumber, endpoint : text) -> (variant { Ok; Err : NotificationError });
 };

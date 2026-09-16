@@ -333,6 +333,29 @@ fn webpush_subscribe_device(
 }
 
 #[update]
+fn webpush_refresh_jwts(
+    anchor_number: AnchorNumber,
+    endpoint: String,
+    jwt_signatures: Vec<ByteBuf>,
+    jwt_issued_at_ns: Timestamp,
+) -> Result<(), notifications::NotificationError> {
+    notifications::webpush::jwt_pool::refresh_jwts(
+        anchor_number,
+        endpoint,
+        jwt_signatures.into_iter().map(ByteBuf::into_vec).collect(),
+        jwt_issued_at_ns,
+    )
+}
+
+#[query]
+fn webpush_jwt_pool_status(
+    anchor_number: AnchorNumber,
+    endpoint: String,
+) -> Option<notifications::webpush::jwt_pool::JwtPoolStatus> {
+    notifications::webpush::jwt_pool::jwt_pool_state(anchor_number, endpoint)
+}
+
+#[update]
 fn webpush_unsubscribe_device(
     anchor_number: AnchorNumber,
     endpoint: String,

@@ -7,6 +7,7 @@
 //! to the relay whether or not there is a body.
 use std::ops::RangeInclusive;
 
+pub mod jwt_pool;
 pub mod subscription;
 
 /// Relay endpoints run ~200-300 bytes; capped at 1 KiB.

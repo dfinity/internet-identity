@@ -953,6 +953,10 @@ export const idlFactory = ({ IDL }) => {
     'wrong_code' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
     'no_device_to_verify' : IDL.Null,
   });
+  const JwtPoolStatus = IDL.Record({
+    'issued_at_ns' : IDL.Nat64,
+    'pool_len' : IDL.Nat32,
+  });
   const SubscribeDeviceRequest = IDL.Record({
     'endpoint' : IDL.Text,
     'jwt_signatures' : IDL.Vec(IDL.Vec(IDL.Nat8)),
@@ -1594,6 +1598,16 @@ export const idlFactory = ({ IDL }) => {
     'verify_tentative_device' : IDL.Func(
         [UserNumber, IDL.Text],
         [VerifyTentativeDeviceResponse],
+        [],
+      ),
+    'webpush_jwt_pool_status' : IDL.Func(
+        [UserNumber, IDL.Text],
+        [IDL.Opt(JwtPoolStatus)],
+        ['query'],
+      ),
+    'webpush_refresh_jwts' : IDL.Func(
+        [UserNumber, IDL.Text, IDL.Vec(IDL.Vec(IDL.Nat8)), IDL.Nat64],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : NotificationError })],
         [],
       ),
     'webpush_subscribe_device' : IDL.Func(

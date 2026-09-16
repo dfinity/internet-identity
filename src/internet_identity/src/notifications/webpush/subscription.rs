@@ -153,6 +153,16 @@ pub fn unsubscribe_device(
     Ok(())
 }
 
+/// Whether this specific device is currently subscribed.
+pub fn has_subscription(anchor_number: AnchorNumber, endpoint: &str) -> bool {
+    let endpoint_hash = StorableEndpointSha256::from_endpoint(endpoint);
+    crate::state::storage_borrow(|storage| {
+        storage
+            .webpush_subscriptions_memory
+            .contains_key(&(anchor_number, endpoint_hash))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::fixtures::*;
