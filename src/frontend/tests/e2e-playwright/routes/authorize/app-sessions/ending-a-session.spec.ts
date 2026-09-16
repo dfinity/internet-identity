@@ -91,7 +91,7 @@ test.describe("ending a session", () => {
       await app.focus();
       await app.ageDelegation();
       await app.replaceDelegation();
-      await app.expectSignedOut();
+      await app.expectSessionEnded();
     }
     await other.close();
   });
@@ -130,7 +130,7 @@ test.describe("ending a session", () => {
     await testApp.focus();
     await testApp.ageDelegation();
     await testApp.replaceDelegation();
-    await testApp.expectSignedOut();
+    await testApp.expectSessionEnded();
   });
 
   // The two below sign in twice, which `authorizePage` does not do, so they drive
