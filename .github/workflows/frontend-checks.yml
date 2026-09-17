@@ -6,6 +6,12 @@ on:
   pull_request:
   merge_group:
 
+# Cancelling is limited to pull requests, because a cancelled merge-queue run fails
+# the queue and a release tag has nothing to supersede it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   frontend-checks:
     runs-on: ubuntu-latest
