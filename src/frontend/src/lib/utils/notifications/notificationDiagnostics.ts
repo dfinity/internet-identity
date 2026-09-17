@@ -1,7 +1,6 @@
-// A little local memory of how notifications last went, so the next screen can
-// be specific instead of generic: which failure happened, which browser to give
-// unblock steps for, and which apps the user recently declined. None of this is
-// sensitive; it stays in localStorage and never leaves the browser.
+// How notifications last went, so the next screen can be specific: which failure
+// happened, which browser to give unblock steps for, and which apps the user recently
+// declined. Kept in localStorage and never sent anywhere.
 
 const STORE_KEY = "ii-notification-diagnostics";
 // How long a "Maybe later" quiets the opt-in for one app.
