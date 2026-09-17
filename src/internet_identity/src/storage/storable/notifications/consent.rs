@@ -32,7 +32,7 @@ impl Storable for StorableNotificationConsent {
         minicbor::decode(&bytes).expect("failed to decode StorableNotificationConsent")
     }
 
-    // origin (≤ MAX_ORIGIN_LEN = 255, 2-byte header) and a timestamp, each behind a
+    // origin (≤ FRONTEND_HOSTNAME_LIMIT = 255, 2-byte header) and a timestamp, each behind a
     // 1-byte key, inside a map header. `max_size_holds` pins the worst case; the
     // headroom is for the fields listed above coming back.
     const BOUND: Bound = Bound::Bounded {
@@ -65,11 +65,14 @@ mod tests {
         let consent = StorableNotificationConsent {
             origin: format!(
                 "https://{}",
-                "a".repeat(crate::notifications::MAX_ORIGIN_LEN - 8)
+                "a".repeat(crate::delegation::FRONTEND_HOSTNAME_LIMIT - 8)
             ),
             granted_at_ns: u64::MAX,
         };
-        assert_eq!(consent.origin.len(), crate::notifications::MAX_ORIGIN_LEN);
+        assert_eq!(
+            consent.origin.len(),
+            crate::delegation::FRONTEND_HOSTNAME_LIMIT
+        );
 
         let Bound::Bounded { max_size, .. } = StorableNotificationConsent::BOUND else {
             panic!("consent must stay bounded");

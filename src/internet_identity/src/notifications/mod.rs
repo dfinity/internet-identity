@@ -6,13 +6,14 @@
 
 pub mod consent;
 
-use crate::authz_utils::{check_authorization, check_authz_and_record_activity};
+use crate::authz_utils::{
+    check_authorization, check_authz_and_record_activity, IdentityUpdateError,
+};
+use crate::delegation::frontend_length_within_limit;
+use ic_cdk::caller;
+use internet_identity_interface::internet_identity::types::attributes::remap_to_legacy_domain;
 pub use internet_identity_interface::internet_identity::types::NotificationError;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, FrontendHostname};
-
-/// Bounds the origin so `delegation::get_principal` can't trap on it — the same
-/// 255-byte limit `delegation::check_frontend_length` traps on.
-pub const MAX_ORIGIN_LEN: usize = 255;
 
 /// A consent origin must be a length-bounded, bare `https://host[:port]`. The
 /// scheme check mirrors the delegation path, which treats non-`https` frontends
@@ -21,17 +22,21 @@ pub const MAX_ORIGIN_LEN: usize = 255;
 fn validate_origin(origin: &str) -> Result<(), NotificationError> {
     let invalid = |reason: &str| Err(NotificationError::InvalidOrigin(reason.to_string()));
 
-    if origin.is_empty() || origin.len() > MAX_ORIGIN_LEN {
-        return Err(NotificationError::InvalidOrigin(format!(
-            "origin length {} out of range (1..={MAX_ORIGIN_LEN})",
-            origin.len()
-        )));
+    if origin.is_empty() {
+        return invalid("origin is empty");
     }
+    frontend_length_within_limit(&origin.to_string()).map_err(NotificationError::InvalidOrigin)?;
     let Some(authority) = origin.strip_prefix("https://") else {
         return invalid("origin must be an https:// URL");
     };
     if authority.contains(['/', '?', '#']) {
         return invalid("origin must not carry a path, query or fragment");
+    }
+    // A browser strips userinfo when it serializes an origin, so `https://user@app.example`
+    // is a spelling no app can present. Left in, it keys a consent row that reads like
+    // `app.example`'s and can never match it.
+    if authority.contains('@') {
+        return invalid("origin must not carry credentials");
     }
     let (host, port) = match authority.split_once(':') {
         Some((host, port)) => (host, Some(port)),
@@ -46,47 +51,18 @@ fn validate_origin(origin: &str) -> Result<(), NotificationError> {
     Ok(())
 }
 
-/// The gateway domains a canister subdomain can be served through. The
-/// frontend canonicalizes `*.icp0.io` / `*.icp.net` to the legacy `*.ic0.app`
-/// so an identity's principal is the same whichever gateway it signed in
-/// through, which makes the canonical origin a stable key but not necessarily a
-/// reachable URL.
-const LEGACY_GATEWAY: &str = ".ic0.app";
-const GATEWAYS: [&str; 3] = [".ic0.app", ".icp0.io", ".icp.net"];
-
-/// Rewrites a canister-subdomain origin to the legacy gateway, mirroring the
-/// frontend's `remapToLegacyDomain`. Applied to any origin an untrusted caller
-/// declares, so it keys against the same consent the sign-in recorded no matter
-/// which gateway the caller names. Anything else (a custom domain) is returned
-/// unchanged.
-fn canonical_origin(origin: &str) -> String {
-    match subdomain_of(origin) {
-        Some(subdomain) => format!("https://{subdomain}{LEGACY_GATEWAY}"),
-        None => origin.to_string(),
-    }
-}
-
-/// The subdomain of a `https://<subdomain>.<gateway>` origin, or `None` when the
-/// origin is not a canister subdomain on a known gateway.
-fn subdomain_of(origin: &str) -> Option<&str> {
-    let host = origin.strip_prefix("https://")?;
-    if host.contains('/') {
-        return None;
-    }
-    GATEWAYS
-        .iter()
-        .find_map(|gateway| host.strip_suffix(gateway))
-        .filter(|subdomain| !subdomain.is_empty())
-}
-
 /// Validates an origin and folds it to its canonical spelling in one step.
 /// Every path that turns an origin into a consent key goes through this: a
 /// grant naming `https://app.icp0.io` and one naming `https://app.ic0.app` are
 /// the same app, and keying them apart makes the first grant unrevocable and
 /// undeliverable.
+///
+/// The fold is the attribute path's `remap_to_legacy_domain`, not a second
+/// implementation of it. A looser one would treat origins as the same app that the
+/// frontend derives different principals for, so one consent row would cover both.
 fn consent_origin(origin: &str) -> Result<FrontendHostname, NotificationError> {
     validate_origin(origin)?;
-    Ok(canonical_origin(origin))
+    Ok(remap_to_legacy_domain(origin))
 }
 
 fn feature_enabled() -> bool {
@@ -102,10 +78,26 @@ fn check_enabled() -> Result<(), NotificationError> {
     }
 }
 
+/// Whether the anchor is one this canister holds.
+///
+/// Read directly, because the authorization helpers below reach the anchor through
+/// `state::anchor`, which traps on a number nobody registered. Trapping there would
+/// answer differently for a free number than for someone else's, which is how a caller
+/// learns which numbers are taken.
+fn anchor_exists(anchor_number: AnchorNumber) -> bool {
+    crate::state::storage_borrow(|storage| storage.read(anchor_number)).is_ok()
+}
+
 /// Authorize an update via the standard activity-recording gate. Takes the
 /// anchor as an argument (not a caller reverse-lookup) so it works for
 /// OpenID-only identities too.
 fn authorize_update(anchor_number: AnchorNumber) -> Result<(), NotificationError> {
+    if !anchor_exists(anchor_number) {
+        // Word for word what a wrong caller gets, so the two cannot be told apart.
+        return Err(NotificationError::Unauthorized(
+            IdentityUpdateError::Unauthorized(caller()).to_string(),
+        ));
+    }
     check_authz_and_record_activity(anchor_number)
         .map_err(|err| NotificationError::Unauthorized(err.to_string()))?;
     Ok(())
@@ -113,7 +105,7 @@ fn authorize_update(anchor_number: AnchorNumber) -> Result<(), NotificationError
 
 /// Read-only authorization; a query must not record activity.
 fn authorize_query(anchor_number: AnchorNumber) -> bool {
-    check_authorization(anchor_number).is_ok()
+    anchor_exists(anchor_number) && check_authorization(anchor_number).is_ok()
 }
 
 #[cfg(test)]
@@ -127,7 +119,7 @@ pub(crate) fn test_setup() {
 
 #[cfg(test)]
 mod origin_tests {
-    use super::{canonical_origin, validate_origin};
+    use super::{consent_origin, validate_origin};
 
     #[test]
     fn canonicalizes_every_gateway_to_the_legacy_one() {
@@ -136,13 +128,59 @@ mod origin_tests {
             "https://abc-cai.icp.net",
             "https://abc-cai.ic0.app",
         ] {
-            assert_eq!(canonical_origin(origin), "https://abc-cai.ic0.app");
+            assert_eq!(consent_origin(origin).unwrap(), "https://abc-cai.ic0.app");
         }
     }
 
     #[test]
     fn leaves_a_custom_domain_alone() {
-        assert_eq!(canonical_origin("https://oisy.com"), "https://oisy.com");
+        assert_eq!(
+            consent_origin("https://oisy.com").unwrap(),
+            "https://oisy.com"
+        );
+    }
+
+    /// The frontend only remaps a single `[\w-]+(.raw)?` label, so a deeper name is a
+    /// different origin to it and must stay a different consent row here.
+    #[test]
+    fn leaves_a_deeper_subdomain_alone() {
+        assert_eq!(
+            consent_origin("https://foo.bar.icp0.io").unwrap(),
+            "https://foo.bar.icp0.io"
+        );
+    }
+
+    #[test]
+    fn keeps_the_raw_label_the_frontend_keeps() {
+        assert_eq!(
+            consent_origin("https://abc-cai.raw.icp0.io").unwrap(),
+            "https://abc-cai.raw.ic0.app"
+        );
+    }
+
+    /// A browser never serializes userinfo into an origin, so this spelling could only
+    /// ever key a row that looks like `app.example`'s without being it.
+    #[test]
+    fn rejects_credentials_in_the_authority() {
+        for origin in [
+            "https://user@app.example",
+            "https://user:pass@app.example",
+            "https://@app.example",
+        ] {
+            assert!(
+                validate_origin(origin).is_err(),
+                "{origin} must not be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_an_over_long_origin() {
+        let too_long = format!(
+            "https://{}",
+            "a".repeat(crate::delegation::FRONTEND_HOSTNAME_LIMIT)
+        );
+        assert!(validate_origin(&too_long).is_err());
     }
 
     #[test]
