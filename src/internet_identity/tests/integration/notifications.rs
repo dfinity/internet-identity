@@ -1,18 +1,22 @@
 //! Tests for the notification API, exercised through Candid against a canister.
 
-use canister_tests::api::internet_identity::api_v2::create_account;
+use canister_tests::api::internet_identity::api_v2::prepare_account_session;
 use canister_tests::api::internet_identity::notifications::{
     consent_status, grant_consent, revoke_consent,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
     arg_with_captcha_disabled, arg_with_notifications_enabled, env, install_ii_canister_with_arg,
-    principal_1, principal_2, upgrade_ii_canister, II_WASM,
+    principal_1, principal_2, upgrade_ii_canister, BrowserKey, II_WASM,
 };
 use ic_cdk::api::management_canister::main::CanisterId;
-use internet_identity_interface::internet_identity::types::{AnchorNumber, NotificationError};
+use internet_identity_interface::internet_identity::types::{
+    AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, NotificationError, OperatingSystem,
+    PrepareAccountSessionRequest,
+};
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
+use serde_bytes::ByteBuf;
 
 const ORIGIN: &str = "https://some-dapp.com";
 
@@ -25,23 +29,57 @@ fn install_with_anchor(env: &PocketIc) -> (CanisterId, AnchorNumber) {
     let canister_id =
         install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
     let anchor = flows::register_anchor(env, canister_id);
-    sign_in_at(env, canister_id, anchor, ORIGIN);
+    sign_in_at(env, canister_id, anchor, ORIGIN, 1);
     (canister_id, anchor)
 }
 
-/// Gives `anchor` an account at `origin`, which is what puts the origin in the
-/// application registry. Production reaches the same state through a session sign-in.
-fn sign_in_at(env: &PocketIc, canister_id: CanisterId, anchor: AnchorNumber, origin: &str) {
-    create_account(
+fn chrome_on_a_mac() -> BrowserDescription {
+    BrowserDescription {
+        brand: BrowserBrand::Chrome,
+        os: OperatingSystem::Macos,
+        form_factor: FormFactor::Desktop,
+        model: None,
+    }
+}
+
+/// Signs `anchor` in at `origin`, which is what puts the origin in the application
+/// registry and so what gives a consent somewhere to live.
+///
+/// Each sign-in comes from its own browser, which `browser_seed` names: a browser rotates
+/// its key on every sign-in and presenting a spent key is refused.
+fn sign_in_at(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    anchor: AnchorNumber,
+    origin: &str,
+    browser_seed: u8,
+) {
+    let browser = BrowserKey::new(browser_seed);
+    let session_key = ByteBuf::from(vec![1; 32]);
+    let next_browser_key = browser.successor().public_key();
+    prepare_account_session(
         env,
         canister_id,
         principal_1(),
-        anchor,
-        origin.into(),
-        "notifications".to_string(),
+        PrepareAccountSessionRequest {
+            identity_number: anchor,
+            origin: origin.to_string(),
+            account_number: None,
+            browser_description: chrome_on_a_mac(),
+            current_browser_key: browser.public_key(),
+            current_browser_key_signature: browser.sign(&session_key, &next_browser_key),
+            next_browser_key_signature: browser
+                .successor()
+                .sign_as_successor(&session_key, &browser.public_key()),
+            next_browser_key,
+            session_key,
+            permissions: None,
+            valid_for: None,
+            max_idle: None,
+        },
     )
-    .expect("create_account rejected")
-    .expect("create_account refused");
+    .expect("prepare_account_session rejected")
+    .expect("prepare_account_session refused");
 }
 
 #[test]
@@ -154,6 +192,7 @@ fn should_fold_the_gateway_twins_of_one_app_into_one_consent() -> Result<(), Rej
         canister_id,
         anchor,
         "https://abcde-aaaaa-aaaaa-aaaaa-cai.ic0.app",
+        2,
     );
 
     grant_consent(
