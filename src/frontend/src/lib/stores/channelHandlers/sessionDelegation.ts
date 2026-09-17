@@ -14,6 +14,7 @@ import {
   authorizedStore,
 } from "$lib/stores/authorization.store";
 import { authenticationStore } from "$lib/stores/authentication.store";
+import { trackSessionCreation } from "$lib/stores/sessionCreation.store";
 import {
   appSessionsForOrigin,
   rememberAppAccount,
@@ -289,11 +290,16 @@ export const handleSessionDelegationRequest =
           return;
         }
 
-        const created = await createSession(
+        // Registered while it runs, so a notification consent arriving in the same
+        // ceremony waits for this session rather than creating one that would drop it.
+        const created = await trackSessionCreation(
           effectiveOrigin,
-          params.maxTimeToLive,
-          params.maxTimeToIdle,
-          resumable === true,
+          createSession(
+            effectiveOrigin,
+            params.maxTimeToLive,
+            params.maxTimeToIdle,
+            resumable === true,
+          ),
         );
         const chain = await extendToApp(
           created.record,
