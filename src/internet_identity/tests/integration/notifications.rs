@@ -1,7 +1,7 @@
 //! Tests for the notification API, exercised through Candid against a canister.
 
 use canister_tests::api::internet_identity::notifications::{
-    consent_status, consented_apps, grant_consent, revoke_consent, set_app_muted,
+    consent_status, grant_consent, revoke_consent,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
@@ -41,18 +41,7 @@ fn should_refuse_every_entry_point_while_the_feature_is_off() -> Result<(), Reje
         revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
         Err(NotificationError::Disabled)
     );
-    assert_eq!(
-        set_app_muted(
-            &env,
-            canister_id,
-            principal_1(),
-            anchor,
-            ORIGIN.into(),
-            true
-        )?,
-        Err(NotificationError::Disabled)
-    );
-    // The queries answer rather than erroring, and must not leak that anything
+    // The query answers rather than erroring, and must not leak that anything
     // exists: a disabled deployment looks exactly like one nobody consented on.
     assert!(!consent_status(
         &env,
@@ -61,7 +50,6 @@ fn should_refuse_every_entry_point_while_the_feature_is_off() -> Result<(), Reje
         anchor,
         ORIGIN.into()
     )?);
-    assert!(consented_apps(&env, canister_id, principal_1(), anchor)?.is_empty());
     Ok(())
 }
 
@@ -98,7 +86,6 @@ fn should_not_answer_a_query_for_an_anchor_the_caller_does_not_own() -> Result<(
         anchor,
         ORIGIN.into()
     )?);
-    assert!(consented_apps(&env, canister_id, principal_2(), anchor)?.is_empty());
     Ok(())
 }
 
@@ -125,11 +112,6 @@ fn should_record_and_revoke_consent() -> Result<(), RejectResponse> {
         ORIGIN.into()
     )?);
 
-    let apps = consented_apps(&env, canister_id, principal_1(), anchor)?;
-    assert_eq!(apps.len(), 1);
-    assert_eq!(apps[0].origin, ORIGIN);
-    assert!(!apps[0].muted);
-
     revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
         .expect("revoke rejected");
     assert!(!consent_status(
@@ -139,7 +121,6 @@ fn should_record_and_revoke_consent() -> Result<(), RejectResponse> {
         anchor,
         ORIGIN.into()
     )?);
-    assert!(consented_apps(&env, canister_id, principal_1(), anchor)?.is_empty());
     Ok(())
 }
 
@@ -171,12 +152,18 @@ fn should_fold_the_gateway_twins_of_one_app_into_one_consent() -> Result<(), Rej
             twin.into()
         )?);
     }
-    assert_eq!(
-        consented_apps(&env, canister_id, principal_1(), anchor)?.len(),
-        1
-    );
+    // Granting through a twin must land on that same row rather than adding one.
+    grant_consent(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        "https://abcde-aaaaa-aaaaa-aaaaa-cai.ic0.app".into(),
+    )?
+    .expect("grant rejected");
 
-    // And revoking through a third spelling removes the one row.
+    // So one revoke, through a third spelling, clears every spelling. A second row
+    // would have survived it under one of them.
     revoke_consent(
         &env,
         canister_id,
@@ -185,7 +172,16 @@ fn should_fold_the_gateway_twins_of_one_app_into_one_consent() -> Result<(), Rej
         "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp.net".into(),
     )?
     .expect("revoke rejected");
-    assert!(consented_apps(&env, canister_id, principal_1(), anchor)?.is_empty());
+    for spelling in [
+        "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp0.io",
+        "https://abcde-aaaaa-aaaaa-aaaaa-cai.ic0.app",
+        "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp.net",
+    ] {
+        assert!(
+            !consent_status(&env, canister_id, principal_1(), anchor, spelling.into())?,
+            "{spelling} still reports consent after the single revoke"
+        );
+    }
     Ok(())
 }
 
@@ -210,66 +206,14 @@ fn should_reject_an_origin_that_is_not_a_bare_https_authority() -> Result<(), Re
             "{origin} was not rejected: {result:?}"
         );
     }
-    assert!(consented_apps(&env, canister_id, principal_1(), anchor)?.is_empty());
-    Ok(())
-}
-
-#[test]
-fn should_mute_an_app_without_withdrawing_its_consent() -> Result<(), RejectResponse> {
-    let env = env();
-    let (canister_id, anchor) = install_with_anchor(&env);
-    grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
-        .expect("grant rejected");
-
-    set_app_muted(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        ORIGIN.into(),
-        true,
-    )?
-    .expect("mute rejected");
-    let apps = consented_apps(&env, canister_id, principal_1(), anchor)?;
-    assert!(apps[0].muted);
-    // Muting is not revoking: the app is still allowed.
-    assert!(consent_status(
+    // None of the refusals wrote a row under the origin they canonicalize to.
+    assert!(!consent_status(
         &env,
         canister_id,
         principal_1(),
         anchor,
         ORIGIN.into()
     )?);
-
-    set_app_muted(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        ORIGIN.into(),
-        false,
-    )?
-    .expect("unmute rejected");
-    assert!(!consented_apps(&env, canister_id, principal_1(), anchor)?[0].muted);
-    Ok(())
-}
-
-#[test]
-fn should_refuse_to_mute_an_app_that_was_never_consented_to() -> Result<(), RejectResponse> {
-    let env = env();
-    let (canister_id, anchor) = install_with_anchor(&env);
-
-    assert_eq!(
-        set_app_muted(
-            &env,
-            canister_id,
-            principal_1(),
-            anchor,
-            ORIGIN.into(),
-            true
-        )?,
-        Err(NotificationError::NotFound)
-    );
     Ok(())
 }
 
@@ -282,15 +226,6 @@ fn should_keep_consent_across_an_upgrade() -> Result<(), RejectResponse> {
     let (canister_id, anchor) = install_with_anchor(&env);
     grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
         .expect("grant rejected");
-    set_app_muted(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        ORIGIN.into(),
-        true,
-    )?
-    .expect("mute rejected");
 
     // No argument, which is what an upgrade that changes nothing sends: the
     // stored kill-switch value has to survive it too, or every endpoint would
@@ -304,9 +239,5 @@ fn should_keep_consent_across_an_upgrade() -> Result<(), RejectResponse> {
         anchor,
         ORIGIN.into()
     )?);
-    let apps = consented_apps(&env, canister_id, principal_1(), anchor)?;
-    assert_eq!(apps.len(), 1);
-    assert_eq!(apps[0].origin, ORIGIN);
-    assert!(apps[0].muted);
     Ok(())
 }

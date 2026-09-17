@@ -986,11 +986,3 @@ pub enum NotificationError {
     /// No such subscribed endpoint, or no consent for that origin.
     NotFound,
 }
-
-/// One consented app with its metadata, for the Settings notifications page.
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct NotificationConsentedApp {
-    pub origin: FrontendHostname,
-    pub granted_at_ns: Timestamp,
-    pub muted: bool,
-}

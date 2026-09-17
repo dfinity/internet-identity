@@ -1356,14 +1356,6 @@ export type MetadataMapV2 = Array<
   ]
 >;
 /**
- * One consented app with its metadata, for the Settings notifications page.
- */
-export interface NotificationConsentedApp {
-  'muted' : boolean,
-  'origin' : string,
-  'granted_at_ns' : Timestamp,
-}
-/**
  * Why a notification call was refused. A variant rather than text: a caller
  * cannot branch on prose, and the shape is breaking to change after release.
  */
@@ -2554,14 +2546,6 @@ export interface _SERVICE {
    */
   'notification_consent_status' : ActorMethod<[UserNumber, string], boolean>,
   /**
-   * Report the consented apps for an anchor with metadata (grant time, mute
-   * state) for the Settings notifications page.
-   */
-  'notification_consented_apps' : ActorMethod<
-    [UserNumber],
-    Array<NotificationConsentedApp>
-  >,
-  /**
    * ===== Notifications =====
    */
   'notification_grant_consent' : ActorMethod<
@@ -2571,14 +2555,6 @@ export interface _SERVICE {
   >,
   'notification_revoke_consent' : ActorMethod<
     [UserNumber, string],
-    { 'Ok' : null } |
-      { 'Err' : NotificationError }
-  >,
-  /**
-   * Mute or unmute an already-consented app (keeps consent, skips the send path).
-   */
-  'notification_set_app_muted' : ActorMethod<
-    [UserNumber, string, boolean],
     { 'Ok' : null } |
       { 'Err' : NotificationError }
   >,

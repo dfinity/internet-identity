@@ -10,17 +10,15 @@ use std::borrow::Cow;
 #[derive(Encode, Decode, Clone, Debug, PartialEq)]
 #[cbor(map)]
 pub struct StorableNotificationConsent {
-    // Fields 2 and 4 held a send-path `last_sent_ns` and the account the consent was
-    // granted from. Both are left free rather than reused, so the send path can take
-    // them back without a decode ambiguity.
+    // A CBOR map, so later work adds a field by taking the next free tag and nothing
+    // already written has to be migrated. Tags 2, 3 and 4 are spoken for and must not
+    // be reused for anything else: a send-path `last_sent_ns`, a mute flag, and the
+    // account a grant came from. Each was removed because nothing reads it yet, and
+    // each returns under its own number.
     #[n(0)]
     pub origin: FrontendHostname,
     #[n(1)]
     pub granted_at_ns: Timestamp,
-    /// The user muted this app without revoking it: consent stays, but the
-    /// send path skips it. `None`/`Some(false)` = not muted.
-    #[n(3)]
-    pub muted: Option<bool>,
 }
 
 impl Storable for StorableNotificationConsent {
@@ -34,9 +32,9 @@ impl Storable for StorableNotificationConsent {
         minicbor::decode(&bytes).expect("failed to decode StorableNotificationConsent")
     }
 
-    // origin (≤ MAX_ORIGIN_LEN = 255, 2-byte header) + a timestamp and an optional
-    // bool, each behind a 1-byte key, inside a map header. `max_size_holds` pins the
-    // worst case; the headroom is for the fields the send path will add back.
+    // origin (≤ MAX_ORIGIN_LEN = 255, 2-byte header) and a timestamp, each behind a
+    // 1-byte key, inside a map header. `max_size_holds` pins the worst case; the
+    // headroom is for the fields listed above coming back.
     const BOUND: Bound = Bound::Bounded {
         max_size: 384,
         is_fixed_size: false,
@@ -52,7 +50,6 @@ mod tests {
         let consent = StorableNotificationConsent {
             origin: "https://example.com".to_string(),
             granted_at_ns: 1_234_567_890,
-            muted: Some(true),
         };
 
         let decoded = StorableNotificationConsent::from_bytes(consent.to_bytes());
@@ -71,7 +68,6 @@ mod tests {
                 "a".repeat(crate::notifications::MAX_ORIGIN_LEN - 8)
             ),
             granted_at_ns: u64::MAX,
-            muted: Some(true),
         };
         assert_eq!(consent.origin.len(), crate::notifications::MAX_ORIGIN_LEN);
 
