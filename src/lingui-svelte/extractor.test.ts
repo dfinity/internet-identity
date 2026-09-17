@@ -4,6 +4,14 @@ import { ExtractedMessage } from "@lingui/conf";
 
 const FILE_NAME = "test.svelte";
 
+const extractAll = async (code: string): Promise<ExtractedMessage[]> => {
+  const messages: ExtractedMessage[] = [];
+  await svelteExtractor.extract(FILE_NAME, code, (message) =>
+    messages.push(message),
+  );
+  return messages;
+};
+
 const extract = (code: string): Promise<ExtractedMessage> =>
   new Promise<ExtractedMessage>((resolve, reject) => {
     try {
@@ -212,5 +220,117 @@ describe("svelteExtractor", () => {
       const { message } = await extract(code);
       expect(message).toEqual(expected);
     });
+  });
+
+  describe("nested message formats", () => {
+    it.each([
+      {
+        case: "plural in <Trans>",
+        code: '<Trans>{$plural(count, { one: "# browser", other: "# browsers" })}</Trans>',
+        expected: "{count, plural, one {# browser} other {# browsers}}",
+      },
+      {
+        case: "plural in <Trans> among text",
+        code: '<Trans>You have {$plural(count, { one: "# browser", other: "# browsers" })} open</Trans>',
+        expected:
+          "You have {count, plural, one {# browser} other {# browsers}} open",
+      },
+      {
+        case: "plural in <Trans> with variables in its categories",
+        code: "<Trans>{$plural(count, { one: `# browser on ${platform}`, other: `# browsers on ${platform} device(s)` })}</Trans>",
+        expected:
+          "{count, plural, one {# browser on {platform}} other {# browsers on {platform} device(s)}}",
+      },
+      {
+        case: "plural inside a tag in <Trans>",
+        code: '<Trans>Click <strong>{$plural(count, { one: "# time", other: "# times" })}</strong> now</Trans>',
+        expected:
+          "Click <0>{count, plural, one {# time} other {# times}}</0> now",
+      },
+      {
+        case: "plural as a $t descriptor message",
+        code: '{$t({ message: $plural(count, { one: "# browser", other: "# browsers" }) })}',
+        expected: "{count, plural, one {# browser} other {# browsers}}",
+      },
+      {
+        case: "$t in a plural category",
+        code: "{$plural(n, { one: $t`One ${genre} book`, other: $t`# ${genre} books` })}",
+        expected: "{n, plural, one {One {genre} book} other {# {genre} books}}",
+      },
+      {
+        case: "plural in a plural category",
+        code: '{$plural(n, { one: "one", other: $plural(m, { one: "# inner", other: "# inners" }) })}',
+        expected:
+          "{n, plural, one {one} other {{m, plural, one {# inner} other {# inners}}}}",
+      },
+      {
+        case: "plural in a $t template literal",
+        code: '{$t`You have ${$plural(count, { one: "# browser", other: "# browsers" })} open`}',
+        expected:
+          "You have {count, plural, one {# browser} other {# browsers}} open",
+      },
+    ])("should extract message with $case", async ({ code, expected }) => {
+      const { message } = await extract(code);
+      expect(message).toEqual(expected);
+    });
+
+    it.each([
+      {
+        case: "<Trans> attribute",
+        code: '<Trans context="Browsers group by platform">{$plural(count, { one: "# browser", other: "# browsers" })}</Trans>',
+      },
+      {
+        case: "$t descriptor",
+        code: '{$t({ message: $plural(count, { one: "# browser", other: "# browsers" }), context: "Browsers group by platform" })}',
+      },
+    ])("should extract context from the $case", async ({ code }) => {
+      const { context } = await extract(code);
+      expect(context).toEqual("Browsers group by platform");
+    });
+
+    // The nested format is part of the enclosing message, so it must not also
+    // be extracted on its own — that would put an unused entry in the
+    // catalogue for every nested plural.
+    it.each([
+      {
+        case: "<Trans>",
+        code: '<Trans>{$plural(count, { one: "# browser", other: "# browsers" })}</Trans>',
+      },
+      {
+        case: "a $t descriptor",
+        code: '{$t({ message: $plural(count, { one: "# browser", other: "# browsers" }) })}',
+      },
+      {
+        case: "a plural category",
+        code: "{$plural(n, { one: $t`One book`, other: $t`# books` })}",
+      },
+    ])("should extract one message for a plural in $case", async ({ code }) => {
+      const messages = await extractAll(code);
+      expect(messages).toHaveLength(1);
+    });
+
+    it("should keep positional keys distinct across nesting", async () => {
+      const { message } = await extract(
+        '<Trans>{"a"} and {$plural(n, { one: `${"b"} x`, other: `${"c"} y` })}</Trans>',
+      );
+      expect(message).toEqual("{0} and {n, plural, one {{1} x} other {{1} y}}");
+    });
+
+    it.each([
+      {
+        case: "a string",
+        code: '<Trans>Hello {"John"}</Trans>',
+      },
+      {
+        case: "a template literal",
+        code: "<Trans>Hello {`Mr ${name}`}</Trans>",
+      },
+    ])(
+      "should leave a placeholder for an expression holding $case",
+      async ({ code }) => {
+        const { message } = await extract(code);
+        expect(message).toEqual("Hello {0}");
+      },
+    );
   });
 });
