@@ -718,11 +718,6 @@ export const idlFactory = ({ IDL }) => {
     'permissions' : Permissions,
     'expiration' : Timestamp,
   });
-  const NotificationConsentedApp = IDL.Record({
-    'muted' : IDL.Bool,
-    'origin' : IDL.Text,
-    'granted_at_ns' : Timestamp,
-  });
   const NotificationError = IDL.Variant({
     'InvalidSubscription' : IDL.Vec(IDL.Text),
     'Disabled' : IDL.Null,
@@ -1375,11 +1370,6 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Bool],
         ['query'],
       ),
-    'notification_consented_apps' : IDL.Func(
-        [UserNumber],
-        [IDL.Vec(NotificationConsentedApp)],
-        ['query'],
-      ),
     'notification_grant_consent' : IDL.Func(
         [UserNumber, IDL.Text],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : NotificationError })],
@@ -1387,11 +1377,6 @@ export const idlFactory = ({ IDL }) => {
       ),
     'notification_revoke_consent' : IDL.Func(
         [UserNumber, IDL.Text],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : NotificationError })],
-        [],
-      ),
-    'notification_set_app_muted' : IDL.Func(
-        [UserNumber, IDL.Text, IDL.Bool],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : NotificationError })],
         [],
       ),

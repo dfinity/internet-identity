@@ -7,7 +7,6 @@ use super::{
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::notifications::consent::StorableNotificationConsent;
-pub use internet_identity_interface::internet_identity::types::NotificationConsentedApp;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, FrontendHostname, Timestamp,
 };
@@ -55,7 +54,6 @@ fn set_consent(
             StorableNotificationConsent {
                 origin,
                 granted_at_ns: now_ns,
-                muted: None,
             },
         );
     });
@@ -119,47 +117,6 @@ pub fn consent_status(anchor_number: AnchorNumber, origin: FrontendHostname) -> 
     feature_enabled() && authorize_query(anchor_number) && has_consent(anchor_number, origin)
 }
 
-/// Every consented app for the caller's anchor, with metadata.
-pub fn consented_apps(anchor_number: AnchorNumber) -> Vec<NotificationConsentedApp> {
-    if !feature_enabled() || !authorize_query(anchor_number) {
-        return Vec::new();
-    }
-    storage_borrow(|storage| {
-        storage
-            .notifications_consented_apps(anchor_number)
-            .into_iter()
-            .map(|c| NotificationConsentedApp {
-                origin: c.origin,
-                granted_at_ns: c.granted_at_ns,
-                muted: c.muted.unwrap_or(false),
-            })
-            .collect()
-    })
-}
-
-/// Mutes or unmutes an already-consented app. Muting keeps the consent row but
-/// the send path skips it; unmuting resumes delivery. Errors if the app isn't
-/// consented.
-pub fn set_app_muted(
-    anchor_number: AnchorNumber,
-    origin: FrontendHostname,
-    muted: bool,
-) -> Result<(), NotificationError> {
-    check_enabled()?;
-    authorize_update(anchor_number)?;
-    let origin = consent_origin(&origin)?;
-    let origin_hash = StorableOriginSha256::from_origin(&origin);
-    storage_borrow_mut(|storage| {
-        let key = (anchor_number, origin_hash);
-        let Some(mut consent) = storage.notifications_consent_memory.get(&key) else {
-            return Err(NotificationError::NotFound);
-        };
-        consent.muted = Some(muted);
-        storage.notifications_consent_memory.insert(key, consent);
-        Ok(())
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,9 +125,11 @@ mod tests {
 
     fn origins_of(anchor: AnchorNumber) -> Vec<FrontendHostname> {
         storage_borrow(|s| {
-            s.notifications_consented_apps(anchor)
-                .into_iter()
-                .map(|c| c.origin)
+            let start = (anchor, StorableOriginSha256::MIN);
+            let end = (anchor, StorableOriginSha256::MAX);
+            s.notifications_consent_memory
+                .range(start..=end)
+                .map(|(_, consent)| consent.origin)
                 .collect()
         })
     }
@@ -227,33 +186,6 @@ mod tests {
 
         clear_consent(anchor, "https://abc-cai.icp.net".to_string()).unwrap();
         assert!(!has_consent(anchor, "https://abc-cai.icp0.io".to_string()));
-    }
-
-    #[test]
-    fn muting_keeps_consent() {
-        setup();
-        let anchor = 1;
-        let origin = "https://app.example".to_string();
-        set_consent(anchor, origin.clone(), 1_000).unwrap();
-
-        let hash = StorableOriginSha256::from_origin(&origin);
-        storage_borrow_mut(|s| {
-            let mut c = s
-                .notifications_consent_memory
-                .get(&(anchor, hash.clone()))
-                .unwrap();
-            c.muted = Some(true);
-            s.notifications_consent_memory.insert((anchor, hash), c);
-        });
-
-        let muted = storage_borrow(|s| {
-            let hash = StorableOriginSha256::from_origin(&origin);
-            s.notifications_consent_memory
-                .get(&(anchor, hash))
-                .and_then(|c| c.muted)
-        });
-        assert_eq!(muted, Some(true));
-        assert!(has_consent(anchor, origin), "muting keeps consent");
     }
 
     #[test]
