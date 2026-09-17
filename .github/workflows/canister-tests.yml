@@ -13,7 +13,7 @@ on:
 # Cancelling is limited to pull requests, because a cancelled merge-queue run fails
 # the queue and a release tag has nothing to supersede it.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
