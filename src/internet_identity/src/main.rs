@@ -330,9 +330,8 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 fn notification_grant_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
-    account_number: Option<u64>,
 ) -> Result<(), notifications::NotificationError> {
-    notifications::consent::grant_consent(anchor_number, origin, account_number)
+    notifications::consent::grant_consent(anchor_number, origin)
 }
 
 #[update]

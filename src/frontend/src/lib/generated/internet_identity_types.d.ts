@@ -1362,10 +1362,6 @@ export interface NotificationConsentedApp {
   'muted' : boolean,
   'origin' : string,
   'granted_at_ns' : Timestamp,
-  /**
-   * The account the consent was granted from; absent = the default account.
-   */
-  'account_number' : [] | [bigint],
 }
 /**
  * Why a notification call was refused. A variant rather than text: a caller
@@ -2569,7 +2565,7 @@ export interface _SERVICE {
    * ===== Notifications =====
    */
   'notification_grant_consent' : ActorMethod<
-    [UserNumber, string, [] | [bigint]],
+    [UserNumber, string],
     { 'Ok' : null } |
       { 'Err' : NotificationError }
   >,

@@ -722,7 +722,6 @@ export const idlFactory = ({ IDL }) => {
     'muted' : IDL.Bool,
     'origin' : IDL.Text,
     'granted_at_ns' : Timestamp,
-    'account_number' : IDL.Opt(IDL.Nat64),
   });
   const NotificationError = IDL.Variant({
     'InvalidSubscription' : IDL.Vec(IDL.Text),
@@ -1382,7 +1381,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'notification_grant_consent' : IDL.Func(
-        [UserNumber, IDL.Text, IDL.Opt(IDL.Nat64)],
+        [UserNumber, IDL.Text],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : NotificationError })],
         [],
       ),

@@ -1751,8 +1751,6 @@ type NotificationConsentedApp = record {
     origin : text;
     granted_at_ns : Timestamp;
     muted : bool;                  // consented but skipped by the send path
-    // The account the consent was granted from; absent = the default account.
-    account_number : opt nat64;
 };
 
 service : (opt InternetIdentityInit) -> {
@@ -2231,7 +2229,7 @@ service : (opt InternetIdentityInit) -> {
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
 
     // ===== Notifications =====
-    notification_grant_consent : (anchor_number : UserNumber, origin : text, account_number : opt nat64) -> (variant { Ok; Err : NotificationError });
+    notification_grant_consent : (anchor_number : UserNumber, origin : text) -> (variant { Ok; Err : NotificationError });
     notification_revoke_consent : (anchor_number : UserNumber, origin : text) -> (variant { Ok; Err : NotificationError });
     // Whether this app may notify this identity. False for a disabled deployment
     // or an unauthorized caller, so neither can be probed with it.

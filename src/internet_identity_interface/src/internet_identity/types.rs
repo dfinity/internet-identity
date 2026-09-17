@@ -993,6 +993,4 @@ pub struct NotificationConsentedApp {
     pub origin: FrontendHostname,
     pub granted_at_ns: Timestamp,
     pub muted: bool,
-    /// The account the consent was granted from; `None` = the default account.
-    pub account_number: Option<u64>,
 }
