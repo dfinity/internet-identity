@@ -30,14 +30,12 @@ const NotificationConsentParamsCodec = z.object({
 });
 
 /**
- * Asks the user whether this app may notify them, and registers this browser
- * for Web Push if they agree.
+ * Asks the user whether this app may notify them, and registers this browser for Web
+ * Push if they agree.
  *
- * A method of its own rather than a flag on the sign-in request: the app can
- * then ask at a moment the user can make sense of, instead of deciding before
- * it knows anything about them. The cost is that an app on the legacy transport
- * cannot reach this, since that transport emits one `icrc34_delegation` request
- * under a fixed id and rejects a response to any other.
+ * A method of its own rather than a flag on the sign-in request, so an app can ask at a
+ * moment the user can make sense of. Unreachable on the legacy transport, which emits
+ * one `icrc34_delegation` request under a fixed id and rejects any other response.
  */
 export const handleNotificationConsentRequest =
   (channel: Channel, onError: (error: ChannelError) => void) =>
@@ -73,19 +71,16 @@ export const handleNotificationConsentRequest =
           message: z.prettifyError(parsed.error),
         },
       });
-      // A malformed request is a protocol error rather than a denial, so the
-      // code stays INVALID_PARAMS. What the silent path must not do is render:
-      // it was asked to answer without showing anything, and that holds however
-      // it fails.
+      // A malformed request is a protocol error rather than a denial, so the code
+      // stays INVALID_PARAMS. A silent request still must not render, however it fails.
       if (!isSilent) {
         onError("invalid-request");
       }
       return;
     }
 
-    // There is nothing to hand back without asking — consent is the user's
-    // answer, not a cached artifact — so a request that may not paint is
-    // refused before anything else happens.
+    // Consent is the user's answer, not a cached artifact, so a request that may not
+    // paint is refused before anything else happens.
     if (isSilent) {
       await deny();
       return;
@@ -124,16 +119,21 @@ export const handleNotificationConsentRequest =
   };
 
 /**
- * Signs the user in if they are not already, runs the consent screen, then asks
- * the canister what was actually recorded. Reading the outcome back rather than
- * reporting what the screen thinks keeps the answer to the app and the state in
- * the canister from drifting apart, and covers an app that was already allowed.
+ * Authenticates the identity, runs the consent screen, then asks the canister what was
+ * actually recorded, which keeps the answer to the app from drifting from the stored
+ * state and covers an app that was already allowed.
+ *
+ * `authorizedStore` is not evidence of a session at the app: two of the three paths that
+ * set it write nothing to the canister. The grant handles that itself, signing in when
+ * the canister reports there is nowhere to record a consent.
  */
 const runConsentCeremony = async (
   effectiveOrigin: string,
 ): Promise<boolean> => {
   authorizationStore.setRequestContext(effectiveOrigin, undefined);
-  const authorized = await waitForStore(authorizedStore);
+  // Awaited for its ordering and not its value: the user has to have chosen an identity
+  // before a screen can ask them about notifying it.
+  await waitForStore(authorizedStore);
   const { identityNumber, actor } = await waitForStore(authenticationStore);
 
   notificationConsentStore.setContext({
