@@ -40,8 +40,9 @@ msgstr "{application} został przeniesiony do nowej tożsamości internetowej"
 msgid "{attribute}:"
 msgstr "{attribute}:"
 
-msgid "{count} browsers on {platform} device(s)"
-msgstr "Przeglądarki: {count} na urządzeniach {platform}"
+msgctxt "Browsers are grouped by platform, which cannot tell one device from several, so the plural hedges with device(s) instead of naming a number"
+msgid "{count, plural, one {# browser on {platform}} other {# browsers on {platform} device(s)}}"
+msgstr "{count, plural, one {# przeglądarka na {platform}} few {# przeglądarki na {platform}} many {# przeglądarek na {platform}} other {# przeglądarki na {platform}}}"
 
 msgid "{count} of {capacity} verified emails"
 msgstr "{count} z {capacity} zweryfikowanych adresów e-mail"
@@ -105,9 +106,6 @@ msgstr "<0>Koniec z numerami tożsamości:</0> Jak wyjaśniono powyżej, identyf
 
 msgid "<0>Seamless passkey integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Bezproblemowa integracja kluczy dostępu:</0> Nadal przyjmujemy klucze dostępu jako przyszłość bezpiecznego uwierzytelniania. Internet Identity 2.0 wykorzystuje najnowsze standardy kluczy dostępu dla zwiększonego bezpieczeństwa i łatwości użytkowania."
-
-msgid "1 browser on {platform}"
-msgstr "1 przeglądarka na {platform}"
 
 msgid "1 day"
 msgstr "1 dzień"

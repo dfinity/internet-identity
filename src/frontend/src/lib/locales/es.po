@@ -40,8 +40,9 @@ msgstr "{application} se ha trasladado al nuevo Internet Identity"
 msgid "{attribute}:"
 msgstr "{attribute}:"
 
-msgid "{count} browsers on {platform} device(s)"
-msgstr "{count} navegadores en dispositivos {platform}"
+msgctxt "Browsers are grouped by platform, which cannot tell one device from several, so the plural hedges with device(s) instead of naming a number"
+msgid "{count, plural, one {# browser on {platform}} other {# browsers on {platform} device(s)}}"
+msgstr "{count, plural, one {# navegador en {platform}} other {# navegadores en {platform} dispositivo(s)}}"
 
 msgid "{count} of {capacity} verified emails"
 msgstr "{count} de {capacity} correos electrónicos verificados"
@@ -105,9 +106,6 @@ msgstr "<0>Sin números de identidad:</0> Como se explicó anteriormente, las pa
 
 msgid "<0>Seamless passkey integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Integración fluida de passkeys:</0> Seguimos apostando por las passkeys como el futuro de la autenticación segura. Internet Identity 2.0 aprovecha los últimos estándares de passkeys para una mayor seguridad y facilidad de uso."
-
-msgid "1 browser on {platform}"
-msgstr "1 navegador en {platform}"
 
 msgid "1 day"
 msgstr "1 día"

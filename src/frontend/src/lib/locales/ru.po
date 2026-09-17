@@ -40,8 +40,9 @@ msgstr "приложение {application} переехало на новую в
 msgid "{attribute}:"
 msgstr "{attribute}:"
 
-msgid "{count} browsers on {platform} device(s)"
-msgstr "Браузеры: {count} на устройствах {platform}"
+msgctxt "Browsers are grouped by platform, which cannot tell one device from several, so the plural hedges with device(s) instead of naming a number"
+msgid "{count, plural, one {# browser on {platform}} other {# browsers on {platform} device(s)}}"
+msgstr "{count, plural, one {# браузер на {platform}} few {# браузера на {platform}} many {# браузеров на {platform}} other {# браузера на {platform}}}"
 
 msgid "{count} of {capacity} verified emails"
 msgstr "{count} из {capacity} подтверждённых email-адресов"
@@ -105,9 +106,6 @@ msgstr "<0>Больше никаких номеров учётной запис�
 
 msgid "<0>Seamless passkey integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Бесшовная интеграция Passkeys:</0> Мы по-прежнему делаем ставку на Passkeys как на будущее безопасной аутентификации. Internet Identity 2.0 использует новейшие стандарты ключей доступа для повышения безопасности и удобства использования."
-
-msgid "1 browser on {platform}"
-msgstr "1 браузер на {platform}"
 
 msgid "1 day"
 msgstr "1 день"
