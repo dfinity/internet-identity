@@ -139,11 +139,8 @@ describe("handleNotificationConsentRequest", () => {
     expect(errors).toEqual([]);
   });
 
-  /**
-   * There is nothing to hand back without asking — consent is the user's answer,
-   * not a cached artifact — so a request that may not paint is refused before
-   * the ceremony starts.
-   */
+  /** Consent is the user's answer, not a cached artifact, so a request that may not
+   *  paint is refused before the ceremony starts. */
   it("silent requests never paint", async () => {
     const { authorizationPromptStore } =
       await import("$lib/stores/authorization.store");
