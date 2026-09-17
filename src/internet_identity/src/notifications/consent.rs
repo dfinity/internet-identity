@@ -20,7 +20,6 @@ pub const MAX_CONSENTS_PER_ANCHOR: u64 = 50;
 fn set_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
-    account_number: Option<u64>,
     now_ns: Timestamp,
 ) -> Result<(), NotificationError> {
     let origin = consent_origin(&origin)?;
@@ -57,7 +56,6 @@ fn set_consent(
                 origin,
                 granted_at_ns: now_ns,
                 muted: None,
-                account_number,
             },
         );
     });
@@ -97,11 +95,10 @@ pub(crate) fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname)
 pub fn grant_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
-    account_number: Option<u64>,
 ) -> Result<(), NotificationError> {
     check_enabled()?;
     authorize_update(anchor_number)?;
-    set_consent(anchor_number, origin, account_number, ic_cdk::api::time())
+    set_consent(anchor_number, origin, ic_cdk::api::time())
 }
 
 /// Revokes `origin`'s consent. Device subscriptions stay — they're shared
@@ -135,7 +132,6 @@ pub fn consented_apps(anchor_number: AnchorNumber) -> Vec<NotificationConsentedA
                 origin: c.origin,
                 granted_at_ns: c.granted_at_ns,
                 muted: c.muted.unwrap_or(false),
-                account_number: c.account_number,
             })
             .collect()
     })
@@ -185,29 +181,13 @@ mod tests {
         let anchor = 1;
         let origin = "https://app.example".to_string();
 
-        set_consent(anchor, origin.clone(), None, 1_000).unwrap();
+        set_consent(anchor, origin.clone(), 1_000).unwrap();
         assert!(has_consent(anchor, origin.clone()));
         assert_eq!(origins_of(anchor), vec![origin.clone()]);
 
         clear_consent(anchor, origin.clone()).unwrap();
         assert!(!has_consent(anchor, origin));
         assert!(origins_of(anchor).is_empty());
-    }
-
-    #[test]
-    fn consent_records_the_account_it_was_granted_from() {
-        setup();
-        let anchor = 1;
-        let origin = "https://app.example".to_string();
-        set_consent(anchor, origin.clone(), Some(7), 1_000).unwrap();
-
-        let hash = StorableOriginSha256::from_origin(&origin);
-        let stored = storage_borrow(|s| s.notifications_consent_memory.get(&(anchor, hash)));
-        assert_eq!(
-            stored.and_then(|c| c.account_number),
-            Some(7),
-            "grant time is the only moment the account is known"
-        );
     }
 
     #[test]
@@ -220,13 +200,13 @@ mod tests {
     fn consent_rejects_oversized_origin() {
         setup();
         let too_long = "a".repeat(MAX_ORIGIN_LEN + 1);
-        assert!(set_consent(1, too_long, None, 0).is_err());
+        assert!(set_consent(1, too_long, 0).is_err());
     }
 
     #[test]
     fn consent_rejects_non_https_origin() {
         setup();
-        assert!(set_consent(1, "http://app.example".to_string(), None, 0).is_err());
+        assert!(set_consent(1, "http://app.example".to_string(), 0).is_err());
     }
 
     /// A grant naming a modern gateway must be the same row as one naming the
@@ -235,7 +215,7 @@ mod tests {
     fn a_gateway_twin_is_the_same_consent() {
         setup();
         let anchor = 1;
-        set_consent(anchor, "https://abc-cai.icp0.io".to_string(), None, 1_000).unwrap();
+        set_consent(anchor, "https://abc-cai.icp0.io".to_string(), 1_000).unwrap();
 
         assert!(has_consent(anchor, "https://abc-cai.ic0.app".to_string()));
         assert!(has_consent(anchor, "https://abc-cai.icp.net".to_string()));
@@ -254,7 +234,7 @@ mod tests {
         setup();
         let anchor = 1;
         let origin = "https://app.example".to_string();
-        set_consent(anchor, origin.clone(), None, 1_000).unwrap();
+        set_consent(anchor, origin.clone(), 1_000).unwrap();
 
         let hash = StorableOriginSha256::from_origin(&origin);
         storage_borrow_mut(|s| {
@@ -281,11 +261,11 @@ mod tests {
         setup();
         let anchor = 1;
         for i in 0..MAX_CONSENTS_PER_ANCHOR {
-            set_consent(anchor, format!("https://app{i}.example"), None, i).unwrap();
+            set_consent(anchor, format!("https://app{i}.example"), i).unwrap();
         }
         assert_eq!(origins_of(anchor).len() as u64, MAX_CONSENTS_PER_ANCHOR);
 
-        set_consent(anchor, "https://new.example".to_string(), None, 1_000).unwrap();
+        set_consent(anchor, "https://new.example".to_string(), 1_000).unwrap();
 
         assert_eq!(
             origins_of(anchor).len() as u64,
@@ -304,10 +284,10 @@ mod tests {
         setup();
         let anchor = 1;
         for i in 0..MAX_CONSENTS_PER_ANCHOR {
-            set_consent(anchor, format!("https://app{i}.example"), None, i).unwrap();
+            set_consent(anchor, format!("https://app{i}.example"), i).unwrap();
         }
         // A re-grant overwrites in place, so it must not push anyone out.
-        set_consent(anchor, "https://app5.example".to_string(), None, 9_000).unwrap();
+        set_consent(anchor, "https://app5.example".to_string(), 9_000).unwrap();
 
         assert_eq!(origins_of(anchor).len() as u64, MAX_CONSENTS_PER_ANCHOR);
         assert!(has_consent(anchor, "https://app0.example".to_string()));

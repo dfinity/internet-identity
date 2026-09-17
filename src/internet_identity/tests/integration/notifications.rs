@@ -34,14 +34,7 @@ fn should_refuse_every_entry_point_while_the_feature_is_off() -> Result<(), Reje
     let anchor = flows::register_anchor(&env, canister_id);
 
     assert_eq!(
-        grant_consent(
-            &env,
-            canister_id,
-            principal_1(),
-            anchor,
-            ORIGIN.into(),
-            None
-        )?,
+        grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
         Err(NotificationError::Disabled)
     );
     assert_eq!(
@@ -77,14 +70,7 @@ fn should_refuse_a_caller_that_does_not_own_the_anchor() -> Result<(), RejectRes
     let env = env();
     let (canister_id, anchor) = install_with_anchor(&env);
 
-    let granted = grant_consent(
-        &env,
-        canister_id,
-        principal_2(),
-        anchor,
-        ORIGIN.into(),
-        None,
-    )?;
+    let granted = grant_consent(&env, canister_id, principal_2(), anchor, ORIGIN.into())?;
     assert!(matches!(granted, Err(NotificationError::Unauthorized(_))));
 
     // And the refusal wrote nothing.
@@ -102,15 +88,8 @@ fn should_refuse_a_caller_that_does_not_own_the_anchor() -> Result<(), RejectRes
 fn should_not_answer_a_query_for_an_anchor_the_caller_does_not_own() -> Result<(), RejectResponse> {
     let env = env();
     let (canister_id, anchor) = install_with_anchor(&env);
-    grant_consent(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        ORIGIN.into(),
-        None,
-    )?
-    .expect("grant rejected");
+    grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+        .expect("grant rejected");
 
     assert!(!consent_status(
         &env,
@@ -136,15 +115,8 @@ fn should_record_and_revoke_consent() -> Result<(), RejectResponse> {
         ORIGIN.into()
     )?);
 
-    grant_consent(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        ORIGIN.into(),
-        Some(7),
-    )?
-    .expect("grant rejected");
+    grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+        .expect("grant rejected");
     assert!(consent_status(
         &env,
         canister_id,
@@ -157,9 +129,6 @@ fn should_record_and_revoke_consent() -> Result<(), RejectResponse> {
     assert_eq!(apps.len(), 1);
     assert_eq!(apps[0].origin, ORIGIN);
     assert!(!apps[0].muted);
-    // Recorded at grant time because that is the only moment it exists, even
-    // though nothing in this feature reads it back.
-    assert_eq!(apps[0].account_number, Some(7));
 
     revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
         .expect("revoke rejected");
@@ -185,7 +154,6 @@ fn should_fold_the_gateway_twins_of_one_app_into_one_consent() -> Result<(), Rej
         principal_1(),
         anchor,
         "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp0.io".into(),
-        None,
     )?
     .expect("grant rejected");
 
@@ -236,14 +204,7 @@ fn should_reject_an_origin_that_is_not_a_bare_https_authority() -> Result<(), Re
         "some-dapp.com",
         "https://some-dapp.com:port",
     ] {
-        let result = grant_consent(
-            &env,
-            canister_id,
-            principal_1(),
-            anchor,
-            origin.into(),
-            None,
-        )?;
+        let result = grant_consent(&env, canister_id, principal_1(), anchor, origin.into())?;
         assert!(
             matches!(result, Err(NotificationError::InvalidOrigin(_))),
             "{origin} was not rejected: {result:?}"
@@ -257,15 +218,8 @@ fn should_reject_an_origin_that_is_not_a_bare_https_authority() -> Result<(), Re
 fn should_mute_an_app_without_withdrawing_its_consent() -> Result<(), RejectResponse> {
     let env = env();
     let (canister_id, anchor) = install_with_anchor(&env);
-    grant_consent(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        ORIGIN.into(),
-        None,
-    )?
-    .expect("grant rejected");
+    grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+        .expect("grant rejected");
 
     set_app_muted(
         &env,
@@ -326,15 +280,8 @@ fn should_refuse_to_mute_an_app_that_was_never_consented_to() -> Result<(), Reje
 fn should_keep_consent_across_an_upgrade() -> Result<(), RejectResponse> {
     let env = env();
     let (canister_id, anchor) = install_with_anchor(&env);
-    grant_consent(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        ORIGIN.into(),
-        Some(3),
-    )?
-    .expect("grant rejected");
+    grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+        .expect("grant rejected");
     set_app_muted(
         &env,
         canister_id,
@@ -360,7 +307,6 @@ fn should_keep_consent_across_an_upgrade() -> Result<(), RejectResponse> {
     let apps = consented_apps(&env, canister_id, principal_1(), anchor)?;
     assert_eq!(apps.len(), 1);
     assert_eq!(apps[0].origin, ORIGIN);
-    assert_eq!(apps[0].account_number, Some(3));
     assert!(apps[0].muted);
     Ok(())
 }

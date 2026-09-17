@@ -10,8 +10,9 @@ use std::borrow::Cow;
 #[derive(Encode, Decode, Clone, Debug, PartialEq)]
 #[cbor(map)]
 pub struct StorableNotificationConsent {
-    // Field 2 held a send-path `last_sent_ns` and is left free rather than
-    // reused, so the send path can take it back without a decode ambiguity.
+    // Fields 2 and 4 held a send-path `last_sent_ns` and the account the consent was
+    // granted from. Both are left free rather than reused, so the send path can take
+    // them back without a decode ambiguity.
     #[n(0)]
     pub origin: FrontendHostname,
     #[n(1)]
@@ -20,11 +21,6 @@ pub struct StorableNotificationConsent {
     /// send path skips it. `None`/`Some(false)` = not muted.
     #[n(3)]
     pub muted: Option<bool>,
-    /// The account the consent was granted from, so a device that subscribes
-    /// later can mint the service worker's pull credential for the same account
-    /// the app knows. `None` = the default account.
-    #[n(4)]
-    pub account_number: Option<u64>,
 }
 
 impl Storable for StorableNotificationConsent {
@@ -38,9 +34,9 @@ impl Storable for StorableNotificationConsent {
         minicbor::decode(&bytes).expect("failed to decode StorableNotificationConsent")
     }
 
-    // origin (≤ MAX_ORIGIN_LEN = 255, 2-byte header) + a timestamp, an optional
-    // u64 and an optional bool, each behind a 1-byte key, inside a map header:
-    // 281 bytes with every field at its maximum. `max_size_holds` pins it.
+    // origin (≤ MAX_ORIGIN_LEN = 255, 2-byte header) + a timestamp and an optional
+    // bool, each behind a 1-byte key, inside a map header. `max_size_holds` pins the
+    // worst case; the headroom is for the fields the send path will add back.
     const BOUND: Bound = Bound::Bounded {
         max_size: 384,
         is_fixed_size: false,
@@ -57,7 +53,6 @@ mod tests {
             origin: "https://example.com".to_string(),
             granted_at_ns: 1_234_567_890,
             muted: Some(true),
-            account_number: Some(7),
         };
 
         let decoded = StorableNotificationConsent::from_bytes(consent.to_bytes());
@@ -77,7 +72,6 @@ mod tests {
             ),
             granted_at_ns: u64::MAX,
             muted: Some(true),
-            account_number: Some(u64::MAX),
         };
         assert_eq!(consent.origin.len(), crate::notifications::MAX_ORIGIN_LEN);
 

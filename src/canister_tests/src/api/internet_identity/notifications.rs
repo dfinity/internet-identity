@@ -13,7 +13,6 @@ pub fn grant_consent(
     sender: Principal,
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
-    account_number: Option<u64>,
 ) -> Result<Result<(), NotificationError>, RejectResponse> {
     call_candid_as(
         env,
@@ -21,7 +20,7 @@ pub fn grant_consent(
         RawEffectivePrincipal::None,
         sender,
         "notification_grant_consent",
-        (anchor_number, origin, account_number),
+        (anchor_number, origin),
     )
     .map(|(x,)| x)
 }
