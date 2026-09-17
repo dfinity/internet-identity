@@ -724,6 +724,7 @@ export const idlFactory = ({ IDL }) => {
     'NotFound' : IDL.Null,
     'Unauthorized' : IDL.Text,
     'InvalidOrigin' : IDL.Text,
+    'SessionMissing' : IDL.Null,
   });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);

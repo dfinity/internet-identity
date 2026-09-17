@@ -19,7 +19,7 @@ fn set_consent(
     storage_borrow_mut(|storage| {
         let application_number = storage
             .notification_application(anchor_number, &origin)
-            .ok_or(NotificationError::NotFound)?;
+            .ok_or(NotificationError::SessionMissing)?;
         storage.set_notification_consent(anchor_number, application_number, Some(now_ns));
         Ok(())
     })
@@ -59,9 +59,10 @@ pub(crate) fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname)
 
 /// Grants `origin` permission to notify the caller's anchor.
 ///
-/// Refused for an origin this identity has never signed in at: notifications are
-/// addressed to the account principal it holds there, so there is nothing for a grant to
-/// authorize until that exists.
+/// Refused with `SessionMissing` for an origin this identity has never signed in at:
+/// notifications are addressed to the account principal it holds there, so there is
+/// nothing for a grant to authorize until that exists. The caller's remedy is to sign in
+/// at the app and ask again, which is what II's own consent ceremony does.
 pub fn grant_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
@@ -120,7 +121,8 @@ mod tests {
     }
 
     /// The grant has nowhere to live until the identity holds an account at the app, and
-    /// nothing to authorize either: a sender addresses the principal it finds there.
+    /// nothing to authorize either: a sender addresses the principal it finds there. The
+    /// refusal names its own remedy, because the caller can sign in and ask again.
     #[test]
     fn refuses_an_app_the_identity_has_never_signed_in_at() {
         setup();
@@ -128,7 +130,7 @@ mod tests {
 
         assert_eq!(
             set_consent(anchor, "https://never.example".to_string(), 1_000),
-            Err(NotificationError::NotFound)
+            Err(NotificationError::SessionMissing)
         );
     }
 

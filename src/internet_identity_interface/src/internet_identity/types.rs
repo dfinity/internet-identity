@@ -983,7 +983,10 @@ pub enum NotificationError {
     InvalidOrigin(String),
     /// Subscription fields were rejected; every failure is reported at once.
     InvalidSubscription(Vec<String>),
-    /// Nothing here to act on: no consent for that origin, no subscribed endpoint, or an
-    /// app this identity has never signed in at and so holds no account with.
+    /// Nothing here to act on: no consent for that origin, or no subscribed endpoint.
     NotFound,
+    /// This identity has never reached the app, so nothing addresses it there and there
+    /// is nothing for a consent to hang off. Told apart from `NotFound` because it is the
+    /// one refusal the caller can act on: signing in at the app clears it.
+    SessionMissing,
 }
