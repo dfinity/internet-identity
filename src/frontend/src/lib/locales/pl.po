@@ -41,7 +41,7 @@ msgid "{attribute}:"
 msgstr "{attribute}:"
 
 msgid "{count} browsers on {platform} device(s)"
-msgstr "{count} przeglądarek na urządzeniach {platform}"
+msgstr "Przeglądarki: {count} na urządzeniach {platform}"
 
 msgid "{count} of {capacity} verified emails"
 msgstr "{count} z {capacity} zweryfikowanych adresów e-mail"

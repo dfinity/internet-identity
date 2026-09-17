@@ -1521,7 +1521,7 @@ msgid "Signing in..."
 msgstr "سائن ان ہو رہا ہے..."
 
 msgid "Signing out…"
-msgstr "سائن آوٹ ہو رہا ہے…"
+msgstr "سائن آؤٹ ہو رہا ہے…"
 
 msgid "Simplify your sign-in"
 msgstr "اپنا سائن اِن آسان بنائیں"

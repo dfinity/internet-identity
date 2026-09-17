@@ -41,7 +41,7 @@ msgid "{attribute}:"
 msgstr "{attribute}:"
 
 msgid "{count} browsers on {platform} device(s)"
-msgstr "{count} браузерів на пристроях {platform}"
+msgstr "Браузери: {count} на пристроях {platform}"
 
 msgid "{count} of {capacity} verified emails"
 msgstr "{count} з {capacity} підтверджених адрес електронної пошти"
@@ -2110,7 +2110,7 @@ msgid "Your apps stay signed in and your identity is ready the next time you com
 msgstr "Ваші застосунки залишаються ввійденими, а ваш ідентифікатор готовий наступного разу, коли ви повернетеся."
 
 msgid "Your local server tells you when it's ready to connect. Nothing to enter here."
-msgstr "Ваш локальний сервер повідомить вас, коли буде готовий до підключення. Тут нічого вводити."
+msgstr "Ваш локальний сервер повідомить вас, коли буде готовий до підключення. Тут нічого не потрібно вводити."
 
 msgid "Your organization hasn't granted this app access via {domainInput}."
 msgstr "Ваша організація не надала цьому застосунку доступ через {domainInput}."
