@@ -14,6 +14,7 @@ use ic_cdk::caller;
 use internet_identity_interface::internet_identity::types::attributes::remap_to_legacy_domain;
 pub use internet_identity_interface::internet_identity::types::NotificationError;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, FrontendHostname};
+use url::Url;
 
 /// A consent origin must be a length-bounded, bare `https://host[:port]`. The
 /// scheme check mirrors the delegation path, which treats non-`https` frontends
@@ -25,28 +26,22 @@ fn validate_origin(origin: &str) -> Result<(), NotificationError> {
     if origin.is_empty() {
         return invalid("origin is empty");
     }
+    // Before parsing, so an enormous string is refused without being parsed.
     frontend_length_within_limit(&origin.to_string()).map_err(NotificationError::InvalidOrigin)?;
-    let Some(authority) = origin.strip_prefix("https://") else {
+
+    let Ok(url) = Url::parse(origin) else {
+        return invalid("origin is not a URL");
+    };
+    if url.scheme() != "https" {
         return invalid("origin must be an https:// URL");
-    };
-    if authority.contains(['/', '?', '#']) {
-        return invalid("origin must not carry a path, query or fragment");
     }
-    // A browser strips userinfo when it serializes an origin, so `https://user@app.example`
-    // is a spelling no app can present. Left in, it keys a consent row that reads like
-    // `app.example`'s and can never match it.
-    if authority.contains('@') {
-        return invalid("origin must not carry credentials");
-    }
-    let (host, port) = match authority.split_once(':') {
-        Some((host, port)) => (host, Some(port)),
-        None => (authority, None),
-    };
-    if host.is_empty() {
-        return invalid("origin has no host");
-    }
-    if port.is_some_and(|port| port.is_empty() || !port.bytes().all(|b| b.is_ascii_digit())) {
-        return invalid("origin port must be numeric");
+    // What a browser would hand an app, against what was asked for. Everything a browser
+    // spells differently fails here in one comparison: credentials, a path, a query, a
+    // fragment, a trailing slash, an explicit :443, an uppercase host. Each of those would
+    // otherwise key a row under a spelling the app can never present, so the row would sit
+    // there matching nothing.
+    if url.origin().ascii_serialization() != origin {
+        return invalid("origin must be a bare https://host[:port]");
     }
     Ok(())
 }
@@ -166,6 +161,29 @@ mod origin_tests {
             "https://user@app.example",
             "https://user:pass@app.example",
             "https://@app.example",
+        ] {
+            assert!(
+                validate_origin(origin).is_err(),
+                "{origin} must not be accepted"
+            );
+        }
+    }
+
+    /// Every one of these parses far enough to look like an authority and none of them is
+    /// a spelling a browser can hand an app, so a row keyed under one matches nothing.
+    #[test]
+    fn rejects_an_authority_no_browser_can_serialize() {
+        for origin in [
+            // Out of range for a port, which is a u16.
+            "https://app.example:99999",
+            // Not a host: a space cannot appear in one.
+            "https://not a host",
+            // The default port, which a browser drops, so this keys a second row for one app.
+            "https://app.example:443",
+            // A browser lowercases the host, for the same reason.
+            "https://APP.example",
+            // An origin carries no path at all, not even the empty one.
+            "https://app.example/",
         ] {
             assert!(
                 validate_origin(origin).is_err(),
