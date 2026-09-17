@@ -2843,24 +2843,29 @@ impl<M: Memory + Clone> Storage<M> {
             .insert((anchor_number, application_number), config);
     }
 
-    /// Signs `anchor_number` in at `origin`, which is what mints the application a
-    /// notification consent hangs off. Production reaches this through `create_session`.
+    /// Signs `anchor_number` in at `origin` through the write production signs in with,
+    /// which is what mints the application a notification consent hangs off.
     #[cfg(test)]
     pub(crate) fn sign_in_for_testing(
         &mut self,
         anchor_number: AnchorNumber,
         origin: &FrontendHostname,
     ) -> ApplicationNumber {
-        let (account_references, config) = self.account_state_for_origin(anchor_number, origin);
-        // An explicit config, because an application is stored only where the write puts
-        // something at the origin, and writing back the state a fresh origin normalises to
-        // moves nothing.
-        let writes = BTreeMap::from([(
-            origin.clone(),
-            Some((account_references, Some(config.unwrap_or_default()))),
-        )]);
-        self.write_account_state_for_testing(anchor_number, writes)
-            .expect("signing in at the origin");
+        self.create_session(CreateSessionParams {
+            anchor_number,
+            origin: origin.clone(),
+            account_number: None,
+            browser_keys: VerifiedBrowserKeys::unverified_for_test(
+                tests::browser_key(1, 0),
+                tests::browser_key(1, 1),
+            ),
+            browser_description: tests::description(1),
+            valid_till_ns: 10_000,
+            max_idle_ns: None,
+            read_only: true,
+            now_ns: 1_000,
+        })
+        .expect("signing in at the origin");
         self.lookup_application_number_with_origin(origin)
             .expect("signing in stores the application")
     }
