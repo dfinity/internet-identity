@@ -1363,13 +1363,20 @@ export type NotificationError = { 'InvalidSubscription' : Array<string> } |
   { 'Disabled' : null } |
   {
     /**
-     * Nothing here to act on: no consent for that origin, no subscribed endpoint, or an
-     * app this identity has never signed in at and so holds no account with.
+     * Nothing here to act on: no consent for that origin, or no subscribed endpoint.
      */
     'NotFound' : null
   } |
   { 'Unauthorized' : string } |
-  { 'InvalidOrigin' : string };
+  { 'InvalidOrigin' : string } |
+  {
+    /**
+     * This identity has never reached the app, so nothing addresses it there and there is
+     * nothing for a consent to hang off. Told apart from NotFound because it is the one
+     * refusal the caller can act on: signing in at the app clears it.
+     */
+    'SessionMissing' : null
+  };
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,

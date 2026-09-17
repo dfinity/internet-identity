@@ -284,7 +284,9 @@ fn should_reject_an_origin_that_is_not_a_bare_https_authority() -> Result<(), Re
 }
 
 /// Notifications are addressed to the account principal an identity holds at the app, so
-/// there is nothing for a grant to authorize until the identity has one.
+/// there is nothing for a grant to authorize until the identity has one. The refusal is
+/// its own variant because it is the one the caller can act on, and II's frontend does:
+/// it signs in at the app and asks again.
 #[test]
 fn should_refuse_consent_for_an_app_the_identity_has_never_reached() -> Result<(), RejectResponse> {
     let env = env();
@@ -298,7 +300,7 @@ fn should_refuse_consent_for_an_app_the_identity_has_never_reached() -> Result<(
             anchor,
             "https://never-visited.example".into()
         )?,
-        Err(NotificationError::NotFound)
+        Err(NotificationError::SessionMissing)
     );
     assert!(!consent_status(
         &env,
