@@ -5,7 +5,8 @@
     SmartphoneIcon,
     TabletIcon,
   } from "@lucide/svelte";
-  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
+  import { plural } from "$lib/stores/locale.store";
   import type { DeviceKind } from "../browsers";
 
   interface Props {
@@ -33,12 +34,14 @@
       <MonitorSmartphoneIcon class="size-4" />
     {/if}
   </span>
-  <!-- "device(s)" only once there is more than one browser: two of them may be two
-       machines or one machine twice, and nothing reported can tell those apart. A single
-       browser needs no hedge. -->
   <h2 class="text-sm">
-    {count === 1
-      ? $t`1 browser on ${platform}`
-      : $t`${count} browsers on ${platform} device(s)`}
+    <Trans
+      context="Browsers are grouped by platform, which cannot tell one device from several, so the plural hedges with device(s) instead of naming a number"
+    >
+      {$plural(count, {
+        one: `# browser on ${platform}`,
+        other: `# browsers on ${platform} device(s)`,
+      })}
+    </Trans>
   </h2>
 </div>
