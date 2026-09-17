@@ -65,12 +65,6 @@ impl StorableOriginSha256 {
         let hash = sha256sum(origin.as_bytes());
         Self { hash }
     }
-
-    /// Lower bound of a per-anchor prefix range scan keyed by
-    /// `(anchor, origin_hash)`.
-    pub const MIN: Self = Self { hash: [0u8; 32] };
-    /// Upper bound of the same scan.
-    pub const MAX: Self = Self { hash: [0xffu8; 32] };
 }
 
 impl Storable for StorableOriginSha256 {

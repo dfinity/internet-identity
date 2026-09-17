@@ -1,5 +1,6 @@
 //! Tests for the notification API, exercised through Candid against a canister.
 
+use canister_tests::api::internet_identity::api_v2::create_account;
 use canister_tests::api::internet_identity::notifications::{
     consent_status, grant_consent, revoke_consent,
 };
@@ -16,12 +17,31 @@ use pretty_assertions::assert_eq;
 const ORIGIN: &str = "https://some-dapp.com";
 
 /// A canister with the feature turned on, and one anchor registered to
-/// `principal_1`.
+/// `principal_1` which has signed in at `ORIGIN`.
+///
+/// The sign-in is what mints the application a consent hangs off, so a test that skips it
+/// is testing the refusal rather than the grant.
 fn install_with_anchor(env: &PocketIc) -> (CanisterId, AnchorNumber) {
     let canister_id =
         install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
     let anchor = flows::register_anchor(env, canister_id);
+    sign_in_at(env, canister_id, anchor, ORIGIN);
     (canister_id, anchor)
+}
+
+/// Gives `anchor` an account at `origin`, which is what puts the origin in the
+/// application registry. Production reaches the same state through a session sign-in.
+fn sign_in_at(env: &PocketIc, canister_id: CanisterId, anchor: AnchorNumber, origin: &str) {
+    create_account(
+        env,
+        canister_id,
+        principal_1(),
+        anchor,
+        origin.into(),
+        "notifications".to_string(),
+    )
+    .expect("create_account rejected")
+    .expect("create_account refused");
 }
 
 #[test]
@@ -128,6 +148,13 @@ fn should_record_and_revoke_consent() -> Result<(), RejectResponse> {
 fn should_fold_the_gateway_twins_of_one_app_into_one_consent() -> Result<(), RejectResponse> {
     let env = env();
     let (canister_id, anchor) = install_with_anchor(&env);
+    // Signed in through the legacy spelling, which is the one the frontend remaps to.
+    sign_in_at(
+        &env,
+        canister_id,
+        anchor,
+        "https://abcde-aaaaa-aaaaa-aaaaa-cai.ic0.app",
+    );
 
     grant_consent(
         &env,
@@ -213,6 +240,33 @@ fn should_reject_an_origin_that_is_not_a_bare_https_authority() -> Result<(), Re
         principal_1(),
         anchor,
         ORIGIN.into()
+    )?);
+    Ok(())
+}
+
+/// Notifications are addressed to the account principal an identity holds at the app, so
+/// there is nothing for a grant to authorize until the identity has one.
+#[test]
+fn should_refuse_consent_for_an_app_the_identity_has_never_reached() -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor) = install_with_anchor(&env);
+
+    assert_eq!(
+        grant_consent(
+            &env,
+            canister_id,
+            principal_1(),
+            anchor,
+            "https://never-visited.example".into()
+        )?,
+        Err(NotificationError::NotFound)
+    );
+    assert!(!consent_status(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        "https://never-visited.example".into()
     )?);
     Ok(())
 }
