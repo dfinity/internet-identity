@@ -8,7 +8,6 @@ import {
   findTransInTaggedTemplate,
   FoundMessage,
   isWithinRanges,
-  MESSAGE_TAGS,
   Range,
 } from "./utils";
 import { LinesAndColumns } from "lines-and-columns";
@@ -49,10 +48,10 @@ export const svelteExtractor: ExtractorType = {
       walk(ast as unknown as Node, {
         enter(node) {
           if (isWithinRanges(node, consumed)) return;
-          findTransInTaggedTemplate(MESSAGE_TAGS, node, onMessageFound);
-          findTransInCallExpression(MESSAGE_TAGS, node, onMessageFound);
-          findPluralInCallExpression(MESSAGE_TAGS, node, onMessageFound);
-          findTransInComponent(MESSAGE_TAGS, node, onMessageFound);
+          findTransInTaggedTemplate(["$t"], node, onMessageFound);
+          findTransInCallExpression(["$t"], node, onMessageFound);
+          findPluralInCallExpression(["$plural"], node, onMessageFound);
+          findTransInComponent(["Trans"], node, onMessageFound);
         },
       });
     } catch (err) {

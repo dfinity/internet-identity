@@ -42,16 +42,14 @@ export interface FoundMessage extends Omit<ExtractedMessage, "origin"> {
   consumed?: Range[];
 }
 
-/** The names each message format goes by in source. */
-export interface MessageTags {
-  t: string[];
-  plural: string[];
-}
-
-export const MESSAGE_TAGS: MessageTags & { trans: string[] } = {
+/**
+ * The message formats a nested expression may resolve to. Only the resolver
+ * consults this; each finder is handed the names it matches, so widening one
+ * cannot widen another.
+ */
+const NESTED_FORMATS = {
   t: ["$t"],
   plural: ["$plural"],
-  trans: ["Trans"],
 };
 
 interface ResolvedMessage {
@@ -97,7 +95,6 @@ const findPropertyStringLiteral = (
 
 const processTemplateLiteral = (
   node: TemplateLiteral,
-  tags: MessageTags,
   ctx: ResolveContext,
 ): ResolvedMessage => {
   const rawQuasis = node.quasis.map((q) => q.value.raw);
@@ -107,7 +104,7 @@ const processTemplateLiteral = (
   rawQuasis.slice(1).forEach((q, i) => {
     const expression = node.expressions[i];
 
-    const nested = resolveNestedMessage(expression, tags, ctx);
+    const nested = resolveNestedMessage(expression, ctx);
     if (nested) {
       message += `${nested.message}${q}`;
       Object.assign(values, nested.values);
@@ -151,7 +148,6 @@ const propertyKeyName = (property: Property): string | undefined => {
  */
 const resolvePlural = (
   node: CallExpression,
-  tags: MessageTags,
   ctx: ResolveContext,
 ): ResolvedMessage | undefined => {
   const [value, options] = node.arguments;
@@ -180,7 +176,7 @@ const resolvePlural = (
     if (key === undefined) return [];
 
     ctx.positional.next = firstKey;
-    const resolved = resolveMessage(property.value as Expression, tags, ctx);
+    const resolved = resolveMessage(property.value as Expression, ctx);
     if (!resolved) return [];
     lastKey = Math.max(lastKey, ctx.positional.next);
 
@@ -207,7 +203,6 @@ const resolvePlural = (
  */
 const resolveNestedMessage = (
   node: Expression | Property["value"] | undefined,
-  tags: MessageTags,
   ctx: ResolveContext,
 ): ResolvedMessage | undefined => {
   if (!node) return undefined;
@@ -215,9 +210,9 @@ const resolveNestedMessage = (
   if (
     node.type === "TaggedTemplateExpression" &&
     node.tag.type === "Identifier" &&
-    tags.t.includes(node.tag.name)
+    NESTED_FORMATS.t.includes(node.tag.name)
   ) {
-    const resolved = processTemplateLiteral(node.quasi, tags, ctx);
+    const resolved = processTemplateLiteral(node.quasi, ctx);
     if (hasNumericStartEnd(node)) {
       ctx.consumed.push({ start: node.start, end: node.end });
     }
@@ -228,10 +223,10 @@ const resolveNestedMessage = (
     return undefined;
   }
 
-  const resolved = tags.plural.includes(node.callee.name)
-    ? resolvePlural(node, tags, ctx)
-    : tags.t.includes(node.callee.name)
-      ? resolveDescriptor(node, tags, ctx)?.resolved
+  const resolved = NESTED_FORMATS.plural.includes(node.callee.name)
+    ? resolvePlural(node, ctx)
+    : NESTED_FORMATS.t.includes(node.callee.name)
+      ? resolveDescriptor(node, ctx)?.resolved
       : undefined;
 
   if (resolved && hasNumericStartEnd(node)) {
@@ -247,7 +242,6 @@ const resolveNestedMessage = (
  */
 const resolveMessage = (
   node: Expression | Property["value"] | undefined,
-  tags: MessageTags,
   ctx: ResolveContext,
 ): ResolvedMessage | undefined => {
   if (!node) return undefined;
@@ -259,10 +253,10 @@ const resolveMessage = (
   }
 
   if (node.type === "TemplateLiteral") {
-    return processTemplateLiteral(node, tags, ctx);
+    return processTemplateLiteral(node, ctx);
   }
 
-  return resolveNestedMessage(node, tags, ctx);
+  return resolveNestedMessage(node, ctx);
 };
 
 /**
@@ -272,7 +266,6 @@ const resolveMessage = (
  */
 const resolveDescriptor = (
   node: CallExpression,
-  tags: MessageTags,
   ctx: ResolveContext,
 ):
   | {
@@ -287,7 +280,7 @@ const resolveDescriptor = (
 
   const { properties } = descriptor;
   const message = findProperty(properties, "message")?.value;
-  const resolved = resolveMessage(message as Expression, tags, ctx);
+  const resolved = resolveMessage(message as Expression, ctx);
   if (!resolved) return undefined;
 
   return {
@@ -299,14 +292,14 @@ const resolveDescriptor = (
 };
 
 export const findTransInTaggedTemplate = (
-  tags: MessageTags,
+  tags: string[],
   node: Node,
   onMessageFound: (msg: FoundMessage) => void,
 ) => {
   if (
     node.type !== "TaggedTemplateExpression" ||
     node.tag.type !== "Identifier" ||
-    !tags.t.includes(node.tag.name) ||
+    !tags.includes(node.tag.name) ||
     !hasNumericStartEnd(node) ||
     node.quasi.loc == null
   ) {
@@ -314,7 +307,7 @@ export const findTransInTaggedTemplate = (
   }
 
   const ctx = createResolveContext();
-  const { message, values } = processTemplateLiteral(node.quasi, tags, ctx);
+  const { message, values } = processTemplateLiteral(node.quasi, ctx);
 
   onMessageFound({
     tag: node.tag.name,
@@ -328,14 +321,14 @@ export const findTransInTaggedTemplate = (
 };
 
 export const findTransInCallExpression = (
-  tags: MessageTags,
+  tags: string[],
   node: Node,
   onMessageFound: (msg: FoundMessage) => void,
 ) => {
   if (
     node.type !== "CallExpression" ||
     node.callee.type !== "Identifier" ||
-    !tags.t.includes(node.callee.name) ||
+    !tags.includes(node.callee.name) ||
     !hasNumericStartEnd(node) ||
     !node.loc
   ) {
@@ -343,7 +336,7 @@ export const findTransInCallExpression = (
   }
 
   const ctx = createResolveContext();
-  const descriptor = resolveDescriptor(node, tags, ctx);
+  const descriptor = resolveDescriptor(node, ctx);
   if (!descriptor) return;
 
   const { resolved, id, context, comment } = descriptor;
@@ -363,14 +356,14 @@ export const findTransInCallExpression = (
 };
 
 export const findPluralInCallExpression = (
-  tags: MessageTags,
+  tags: string[],
   node: Node,
   onMessageFound: (msg: FoundMessage) => void,
 ) => {
   if (
     node.type !== "CallExpression" ||
     node.callee.type !== "Identifier" ||
-    !tags.plural.includes(node.callee.name) ||
+    !tags.includes(node.callee.name) ||
     !hasNumericStartEnd(node) ||
     !node.loc
   ) {
@@ -378,7 +371,7 @@ export const findPluralInCallExpression = (
   }
 
   const ctx = createResolveContext();
-  const resolved = resolvePlural(node, tags, ctx);
+  const resolved = resolvePlural(node, ctx);
   if (!resolved) return;
 
   const { message, values } = resolved;
@@ -407,7 +400,6 @@ const isComponent = (node: unknown): node is AST.Component =>
 
 const textInNode = (
   node: AST.TemplateNode,
-  tags: MessageTags,
   ctx: ResolveContext,
   register: (entry: { node: Range; content?: Range }) => number,
 ): {
@@ -429,7 +421,7 @@ const textInNode = (
   }
 
   if (node.type === "ExpressionTag" && hasNumericStartEnd(node.expression)) {
-    const nested = resolveNestedMessage(node.expression, tags, ctx);
+    const nested = resolveNestedMessage(node.expression, ctx);
     if (nested) {
       return {
         text: nested.message,
@@ -470,7 +462,7 @@ const textInNode = (
   }
 
   const childResults = node.fragment.nodes.map((child) =>
-    textInNode(child, tags, ctx, register),
+    textInNode(child, ctx, register),
   );
 
   const combinedText = childResults
@@ -506,12 +498,12 @@ const textInNode = (
 };
 
 export const findTransInComponent = (
-  tags: MessageTags & { trans: string[] },
+  tags: string[],
   node: Node,
   onMessageFound: (msg: FoundMessage) => void,
 ) => {
   const component = node as unknown;
-  if (!isComponent(component) || !tags.trans.includes(component.name)) {
+  if (!isComponent(component) || !tags.includes(component.name)) {
     return;
   }
 
@@ -539,7 +531,7 @@ export const findTransInComponent = (
     ) {
       // A nested message format contributes its own text to this message
       // rather than a placeholder standing in for a runtime value.
-      const nested = resolveNestedMessage(child.expression, tags, ctx);
+      const nested = resolveNestedMessage(child.expression, ctx);
       if (nested) {
         message += nested.message;
         values = { ...values, ...nested.values };
@@ -559,7 +551,7 @@ export const findTransInComponent = (
     }
 
     // Element / component node
-    const res = textInNode(child as AST.TemplateNode, tags, ctx, register);
+    const res = textInNode(child as AST.TemplateNode, ctx, register);
     values = { ...values, ...res.values };
 
     const text = res.text.replace(/[\r\n]+/g, "").trim();

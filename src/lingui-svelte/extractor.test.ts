@@ -333,4 +333,32 @@ describe("svelteExtractor", () => {
       },
     );
   });
+
+  // Each finder is handed only the names it matches. A component is a message
+  // only when it is named `Trans`, whatever the message functions are called,
+  // so widening one cannot quietly widen another.
+  describe("tag matching", () => {
+    it.each([
+      { case: "<Plural>", code: "<Plural>Hello world</Plural>" },
+      { case: "<T>", code: "<T>Hello world</T>" },
+      { case: "<Translate>", code: "<Translate>Hello world</Translate>" },
+      { case: "<Message>", code: "<Message>Hello world</Message>" },
+    ])("should extract nothing from $case", async ({ code }) => {
+      expect(await extractAll(code)).toEqual([]);
+    });
+
+    it.each([
+      { case: "a tagged template", code: "{t`Hello world`}" },
+      { case: "a call expression", code: '{t({ message: "Hello world" })}' },
+      {
+        case: "a plural",
+        code: '{plural(1, { one: "One", other: "# many" })}',
+      },
+    ])(
+      "should extract nothing from $case without the $ prefix",
+      async ({ code }) => {
+        expect(await extractAll(code)).toEqual([]);
+      },
+    );
+  });
 });

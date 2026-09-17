@@ -9,7 +9,6 @@ import {
   FoundMessage,
   findTransInComponent,
   isWithinRanges,
-  MESSAGE_TAGS,
   Range,
 } from "./utils";
 
@@ -104,10 +103,10 @@ export const svelteTransform = (isBuild: boolean, code: string) => {
   walk(ast as unknown as Node, {
     enter(node) {
       if (isWithinRanges(node, consumed)) return;
-      findTransInTaggedTemplate(MESSAGE_TAGS, node, collect(false));
-      findTransInCallExpression(MESSAGE_TAGS, node, collect(false));
-      findPluralInCallExpression(MESSAGE_TAGS, node, collect(false));
-      findTransInComponent(MESSAGE_TAGS, node, collect(true));
+      findTransInTaggedTemplate(["$t"], node, collect(false));
+      findTransInCallExpression(["$t"], node, collect(false));
+      findPluralInCallExpression(["$plural"], node, collect(false));
+      findTransInComponent(["Trans"], node, collect(true));
     },
   });
 
