@@ -120,8 +120,8 @@ pub fn consent_status(anchor_number: AnchorNumber, origin: FrontendHostname) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
     use crate::notifications::test_setup as setup;
-    use crate::notifications::MAX_ORIGIN_LEN;
 
     fn origins_of(anchor: AnchorNumber) -> Vec<FrontendHostname> {
         storage_borrow(|s| {
@@ -158,7 +158,7 @@ mod tests {
     #[test]
     fn consent_rejects_oversized_origin() {
         setup();
-        let too_long = "a".repeat(MAX_ORIGIN_LEN + 1);
+        let too_long = "a".repeat(FRONTEND_HOSTNAME_LIMIT + 1);
         assert!(set_consent(1, too_long, 0).is_err());
     }
 

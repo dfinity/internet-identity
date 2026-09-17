@@ -217,6 +217,39 @@ fn should_reject_an_origin_that_is_not_a_bare_https_authority() -> Result<(), Re
     Ok(())
 }
 
+/// A trap is a different answer from a refusal, so trapping on a number nobody
+/// registered is how a caller learns which numbers are free. Only reachable through
+/// Candid: the trapping read sits behind the authorization helpers.
+#[test]
+fn should_refuse_an_anchor_that_does_not_exist_without_trapping() -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor) = install_with_anchor(&env);
+    let missing = anchor + 12_345;
+
+    assert!(matches!(
+        grant_consent(&env, canister_id, principal_1(), missing, ORIGIN.into())?,
+        Err(NotificationError::Unauthorized(_))
+    ));
+    assert!(matches!(
+        revoke_consent(&env, canister_id, principal_1(), missing, ORIGIN.into())?,
+        Err(NotificationError::Unauthorized(_))
+    ));
+    assert!(!consent_status(
+        &env,
+        canister_id,
+        principal_1(),
+        missing,
+        ORIGIN.into()
+    )?);
+
+    // And the refusal is the same one someone else's anchor gives, or the difference
+    // between the two answers is itself the oracle.
+    let absent = grant_consent(&env, canister_id, principal_2(), missing, ORIGIN.into())?;
+    let not_yours = grant_consent(&env, canister_id, principal_2(), anchor, ORIGIN.into())?;
+    assert_eq!(absent, not_yours);
+    Ok(())
+}
+
 /// The one thing no unit test can see: the map lives in stable memory under an
 /// index chosen for this feature, and an upgrade that lost it would be
 /// unrecoverable after release.
