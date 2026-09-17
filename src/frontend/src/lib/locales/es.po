@@ -19,6 +19,9 @@ msgstr "(cualquier cosa, déjalo en blanco)"
 msgid "{0} logo"
 msgstr "Logo de {0}"
 
+msgid "{0} no longer has access to your apps."
+msgstr "{0} ya no tiene acceso a tus apps."
+
 msgid "{0} user"
 msgstr "Usuario de {0}"
 
@@ -36,6 +39,9 @@ msgstr "{application} se ha trasladado al nuevo Internet Identity"
 
 msgid "{attribute}:"
 msgstr "{attribute}:"
+
+msgid "{count} browsers on {platform} device(s)"
+msgstr "{count} navegadores en dispositivos {platform}"
 
 msgid "{count} of {capacity} verified emails"
 msgstr "{count} de {capacity} correos electrónicos verificados"
@@ -100,6 +106,9 @@ msgstr "<0>Sin números de identidad:</0> Como se explicó anteriormente, las pa
 msgid "<0>Seamless passkey integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Integración fluida de passkeys:</0> Seguimos apostando por las passkeys como el futuro de la autenticación segura. Internet Identity 2.0 aprovecha los últimos estándares de passkeys para una mayor seguridad y facilidad de uso."
 
+msgid "1 browser on {platform}"
+msgstr "1 navegador en {platform}"
+
 msgid "1 day"
 msgstr "1 día"
 
@@ -123,6 +132,12 @@ msgstr "Una frase de 24 palabras que anotas y guardas fuera de línea."
 
 msgid "A few things could be going on:"
 msgstr "Pueden estar pasando varias cosas:"
+
+msgid "A local program"
+msgstr "Un programa local"
+
+msgid "A local server picks a new port each time, so any program on this computer can ask to connect. Remove it when you're not using one."
+msgstr "Un servidor local selecciona un puerto nuevo cada vez, por lo que cualquier programa en este ordenador puede solicitar conectarse. Elimínalo cuando no uses uno."
 
 msgid "About"
 msgstr "Acerca de"
@@ -223,6 +238,9 @@ msgstr "Permitir acceso"
 msgid "Allow CLI access"
 msgstr "Permitir acceso de CLI"
 
+msgid "Allow local programs to connect?"
+msgstr "¿Permitir que los programas locales se conecten?"
+
 msgid "Allow to access this info"
 msgstr "Permitir el acceso a esta información"
 
@@ -240,6 +258,12 @@ msgstr "Ya has iniciado sesión"
 
 msgid "Also makes changes on your behalf."
 msgstr "También realiza cambios en tu nombre."
+
+msgid "Any local program can connect"
+msgstr "Cualquier programa local puede conectarse"
+
+msgid "Any program on this computer can ask."
+msgstr "Cualquier programa en este ordenador puede solicitar."
 
 msgid "Are you sure?"
 msgstr "¿Estás seguro?"
@@ -409,6 +433,9 @@ msgstr "Conexión cerrada"
 msgid "Connection duration"
 msgstr "Duración de la conexión"
 
+msgid "Connector type"
+msgstr "Tipo de conector"
+
 msgid "Connector URL"
 msgstr "URL del conector"
 
@@ -451,9 +478,6 @@ msgstr "Copiar asunto"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "No se pudieron cargar los ajustes de SSO de {domainInput}. Pide a tu administrador de SSO que compruebe que /.well-known/ii-openid-configuration sea accesible."
 
-msgid "Couldn't load your AI access settings."
-msgstr "No se pudieron cargar tus ajustes de acceso de IA."
-
 msgid "Couldn't remove the connector. Please try again."
 msgstr "No se pudo eliminar el conector. Por favor, inténtalo de nuevo."
 
@@ -462,6 +486,9 @@ msgstr "No se pudo guardar tu cambio. Por favor, inténtalo de nuevo."
 
 msgid "Couldn't save your connector. Please try again."
 msgstr "No se pudo guardar tu conector. Por favor, inténtalo de nuevo."
+
+msgid "Couldn't sign this browser out"
+msgstr "No se pudo cerrar la sesión de este navegador"
 
 msgid "Couldn't validate MCP support"
 msgstr "No se pudo validar la compatibilidad con MCP"
@@ -505,6 +532,9 @@ msgstr "Creado {0}"
 msgid "Created {date}"
 msgstr "Creado el {date}"
 
+msgid "Created on the old Internet Identity site. Can only be used to <0>recover</0>, when upgrading from an identity number."
+msgstr "Creado en el antiguo sitio de Internet Identity. Solo puede usarse para <0>recuperar</0>, al actualizar desde un número de identidad."
+
 msgid "Creating account..."
 msgstr "Creando cuenta..."
 
@@ -544,11 +574,17 @@ msgstr "Predeterminada"
 msgid "Deny all"
 msgstr "Denegar todo"
 
+msgid "Devices"
+msgstr "Dispositivos"
+
 msgid "Discoverable passkeys"
 msgstr "Passkeys detectables"
 
 msgid "Do you want to continue?"
 msgstr "¿Quieres continuar?"
+
+msgid "Don't recognize a browser? Sign it out, then <0>review your access methods</0>."
+msgstr "¿No reconoces un navegador? Cierra su sesión y luego <0>revisa tus métodos de acceso</0>."
 
 msgid "Done"
 msgstr "Listo"
@@ -647,6 +683,9 @@ msgstr "Preguntas frecuentes"
 msgid "Featured apps"
 msgstr "Apps destacadas"
 
+msgid "First seen"
+msgstr "Visto por primera vez"
+
 msgid "First sign-in with {name}"
 msgstr "Primer inicio de sesión con {name}"
 
@@ -659,11 +698,17 @@ msgstr "Por seguridad, Internet Identity impide que las herramientas de línea d
 msgid "For security, Internet Identity only connects the MCP server you've set as trusted. Set this server in Settings, then try again."
 msgstr "Por seguridad, Internet Identity solo se conecta al servidor MCP que has establecido como de confianza. Configura este servidor en Ajustes e inténtalo de nuevo."
 
+msgid "Forget"
+msgstr "Olvidar"
+
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in. Quick, safe, and hassle-free."
 msgstr "Olvídate de recordar nombres de usuario y contraseñas complicados. Con las passkeys, simplemente eliges tu nombre para iniciar sesión. Rápido, seguro y sin complicaciones."
 
 msgid "Forget this email?"
 msgstr "¿Olvidar este correo electrónico?"
+
+msgid "Forgetting..."
+msgstr "Olvidando..."
 
 msgid "From"
 msgstr "De"
@@ -724,6 +769,9 @@ msgstr "Mantén presionado para continuar"
 
 msgid "Home"
 msgstr "Inicio"
+
+msgid "Hosted, by URL"
+msgstr "Alojado, por URL"
 
 msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
 msgstr "¿Cómo funcionan las integraciones de Google, Microsoft y Apple con Internet Identity?"
@@ -935,6 +983,9 @@ msgstr "Vinculando Internet Identity"
 msgid "Loading permissions"
 msgstr "Cargando permisos"
 
+msgid "Local server"
+msgstr "Servidor local"
+
 msgid "Long-press the link that opened this page."
 msgstr "Mantén presionada la tecla de la página que abrió esta página."
 
@@ -1048,6 +1099,9 @@ msgstr "No verificado"
 
 msgid "Official · Hosted by DFINITY"
 msgstr "Oficial · Alojado por DFINITY"
+
+msgid "On this computer"
+msgstr "En este ordenador"
 
 msgid "Once enabled, any command-line tool on this device can use your identity to sign in to apps."
 msgstr "Una vez habilitado, cualquier herramienta de línea de comandos en este dispositivo puede usar tu identidad para iniciar sesión en aplicaciones."
@@ -1196,6 +1250,15 @@ msgstr "Frase de recuperación activada"
 msgid "Recovery phrase set"
 msgstr "Frase de recuperación establecida"
 
+msgid "Remember"
+msgstr "Recordar"
+
+msgid "Remember this browser?"
+msgstr "¿Recordar este navegador?"
+
+msgid "Remote server"
+msgstr "Servidor remoto"
+
 msgid "Remove"
 msgstr "Eliminar"
 
@@ -1283,20 +1346,29 @@ msgstr "Volver a la app"
 msgid "Return to application"
 msgstr "Volver a la aplicación"
 
+msgid "Review {serverDisplayName}'s <0>Privacy Policy</0> and <1>Terms of Service</1>."
+msgstr "Revisa la <0>Política de privacidad</0> y los <1>Términos de servicio</1> de {serverDisplayName}."
+
+msgid "Review {serverDisplayName}'s <0>Privacy Policy</0>."
+msgstr "Revisa la <0>Política de privacidad</0> de {serverDisplayName}."
+
+msgid "Review {serverDisplayName}'s <0>Terms of Service</0>."
+msgstr "Revisa los <0>Términos de servicio</0> de {serverDisplayName}."
+
 msgid "Review permissions"
 msgstr "Revisar permisos"
 
 msgid "Revoke access anytime"
 msgstr "Revoca el acceso en cualquier momento"
 
-msgid "Revoke access anytime in your <0>settings</0>."
-msgstr "Revoca el acceso en cualquier momento en tu <0>configuración</0>."
-
 msgid "Right now"
 msgstr "Ahora mismo"
 
 msgid "Run a passkey test to see results"
 msgstr "Ejecuta una prueba de passkey para ver los resultados"
+
+msgid "Runs on your own computer · Any port"
+msgstr "Se ejecuta en tu propio ordenador · Cualquier puerto"
 
 msgid "Save changes"
 msgstr "Guardar cambios"
@@ -1315,6 +1387,9 @@ msgstr "Acceso sin interrupciones"
 
 msgid "Securely connecting your identity to the server."
 msgstr "Conectando tu identidad al servidor de forma segura."
+
+msgid "See where you're signed in to apps and sign out remotely."
+msgstr "Ve dónde tienes sesión iniciada en apps y cierra sesión de forma remota."
 
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Selecciona <0>Abrir en Safari</0> o <1>Abrir en Chrome</1>."
@@ -1406,14 +1481,11 @@ msgstr "Inicia sesión con tu cuenta de {displayName} desde cualquier dispositiv
 msgid "Sign out"
 msgstr "Cerrar sesión"
 
-msgid "Sign out and keep identity"
-msgstr "Cerrar sesión y conservar identidad"
+msgid "Sign out {0}?"
+msgstr "¿Cerrar sesión de {0}?"
 
-msgid "Sign out and remove from device"
-msgstr "Cerrar sesión y eliminar del dispositivo"
-
-msgid "Sign out from this device"
-msgstr "Cerrar sesión en este dispositivo"
+msgid "Sign out of all apps"
+msgstr "Cerrar sesión de todas las apps"
 
 msgid "Sign out to remove"
 msgstr "Cerrar sesión para eliminar"
@@ -1433,6 +1505,12 @@ msgstr "Registro"
 msgid "Signed in"
 msgstr "Sesión iniciada"
 
+msgid "Signed out"
+msgstr "Sesión cerrada"
+
+msgid "Signed out of all apps"
+msgstr "Sesión cerrada en todas las apps"
+
 msgid "Signing in"
 msgstr "Iniciando sesión"
 
@@ -1441,6 +1519,9 @@ msgstr "Iniciando sesión de forma segura"
 
 msgid "Signing in..."
 msgstr "Iniciando sesión..."
+
+msgid "Signing out…"
+msgstr "Cerrando sesión…"
 
 msgid "Simplify your sign-in"
 msgstr "Simplifica tu inicio de sesión"
@@ -1620,6 +1701,9 @@ msgstr "Esta app se ha trasladado al nuevo Internet Identity"
 msgid "This app is requesting your email address. You can verify your email address now and share it, or skip and continue without sharing."
 msgstr "Esta app solicita tu dirección de correo electrónico. Puedes verificar tu dirección ahora y compartirla, u omitir y continuar sin compartir."
 
+msgid "This browser"
+msgstr "Este navegador"
+
 msgid "This browser is not supported."
 msgstr "Este navegador no es compatible."
 
@@ -1646,9 +1730,6 @@ msgstr "Este es el método de acceso con el que tienes sesión iniciada actualme
 
 msgid "This is the recovery method you're currently signed in with."
 msgstr "Este es el método de recuperación con el que tienes sesión iniciada actualmente."
-
-msgid "This legacy passkey is no longer usable and should be removed."
-msgstr "Esta passkey de legado ya no es utilizable y debería eliminarse."
 
 msgid "This may take a few seconds"
 msgstr "Esto puede tardar unos segundos"
@@ -1956,9 +2037,6 @@ msgstr "Puedes cerrar esta ventana."
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Puedes continuar con <0>Usar Passkey existente</0> en el proceso de inicio de sesión."
 
-msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
-msgstr "Puedes cerrar sesión y conservar tu identidad guardada para iniciar sesión más rápido la próxima vez, o eliminarla por completo de este dispositivo."
-
 msgid "You can manage your access methods on this page."
 msgstr "Puedes gestionar tus métodos de acceso en esta página."
 
@@ -1967,6 +2045,9 @@ msgstr "Puedes restablecer tu frase de recuperación en cualquier momento. Esto 
 
 msgid "You can return to your agent."
 msgstr "Puedes volver a tu agente."
+
+msgid "You can sign in again at any time."
+msgstr "Puedes iniciar sesión de nuevo en cualquier momento."
 
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
 msgstr "Puedes usarla ahora para recuperar, pero verifica que la hayas guardado correctamente para poder usarla más adelante."
@@ -2024,6 +2105,12 @@ msgstr "Has alcanzado el límite de {capacity} correos electrónicos verificados
 
 msgid "You've reached the limit of {limit} verified emails. Remove one to add another."
 msgstr "Has alcanzado el límite de {limit} correos electrónicos verificados. Elimina uno para añadir otro."
+
+msgid "Your apps stay signed in and your identity is ready the next time you come back."
+msgstr "Tus apps permanecen con la sesión iniciada y tu identidad está lista la próxima vez que vuelvas."
+
+msgid "Your local server tells you when it's ready to connect. Nothing to enter here."
+msgstr "Tu servidor local te indica cuándo está listo para conectarse. No hay nada que introducir aquí."
 
 msgid "Your organization hasn't granted this app access via {domainInput}."
 msgstr "Tu organización no ha concedido acceso a esta app a través de {domainInput}."
