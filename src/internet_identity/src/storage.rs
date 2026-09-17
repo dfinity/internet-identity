@@ -121,7 +121,6 @@ use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
-use crate::storage::storable::notifications::consent::StorableNotificationConsent;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::session_handle::StorableSessionHandle;
@@ -216,8 +215,6 @@ const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
 const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
 const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
-// Notification indexes, appended after the current max (36)
-const NOTIFICATIONS_CONSENT_MEMORY_INDEX: u8 = 37u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -309,9 +306,6 @@ const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
 /// Monotonic [`SessionId`] allocator. A revoked session's id is retired, never reissued,
 /// which is what makes the revocation final: the id is an input to the session seed.
 const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY_INDEX);
-
-/// Per-`(anchor, origin)` consent grants; presence means granted.
-const NOTIFICATIONS_CONSENT_MEMORY_ID: MemoryId = MemoryId::new(NOTIFICATIONS_CONSENT_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -520,14 +514,6 @@ pub struct Storage<M: Memory> {
     /// [`SSO_STABLE_ID_INDEX_MEMORY_ID`].
     sso_stable_id_index_memory:
         StableBTreeMap<StorableSsoStableIdKey, StorableAnchorNumberList, ManagedMemory<M>>,
-
-    // ---- Notifications ------------------------------------------
-    notifications_consent_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    pub(crate) notifications_consent_memory: StableBTreeMap<
-        (StorableAnchorNumber, StorableOriginSha256),
-        StorableNotificationConsent,
-        ManagedMemory<M>,
-    >,
 }
 
 #[repr(C, packed)]
@@ -622,7 +608,6 @@ impl<M: Memory + Clone> Storage<M> {
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
         let sso_stable_id_index_memory = memory_manager.get(SSO_STABLE_ID_INDEX_MEMORY_ID);
-        let notifications_consent_memory = memory_manager.get(NOTIFICATIONS_CONSENT_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -756,11 +741,6 @@ impl<M: Memory + Clone> Storage<M> {
                 sso_stable_id_index_memory.clone(),
             ),
             sso_stable_id_index_memory: StableBTreeMap::init(sso_stable_id_index_memory),
-
-            notifications_consent_memory_wrapper: MemoryWrapper::new(
-                notifications_consent_memory.clone(),
-            ),
-            notifications_consent_memory: StableBTreeMap::init(notifications_consent_memory),
         }
     }
 
@@ -2818,6 +2798,73 @@ impl<M: Memory + Clone> Storage<M> {
         AnchorApplicationConfig::default()
     }
 
+    // ---- Notifications ------------------------------------------
+
+    /// The application this identity reached `origin` through, or `None` when it never
+    /// signed in there.
+    ///
+    /// Consent rides on the `(anchor, application)` config, and that row is reclaimed when
+    /// the identity's account list at this origin goes, which is the only thing that
+    /// reclaims it. An origin the identity never reached has no list, so a row written
+    /// against it would never be reclaimed.
+    pub fn notification_application(
+        &self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+    ) -> Option<ApplicationNumber> {
+        let application_number = self.lookup_application_number_with_origin(origin)?;
+        self.stored_account_references(anchor_number, application_number)
+            .map(|_| application_number)
+    }
+
+    /// When `anchor_number` allowed `application_number` to notify it, or `None`.
+    pub fn notification_consent(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+    ) -> Option<Timestamp> {
+        self.lookup_anchor_application_config(anchor_number, application_number)
+            .notifications_consented_at_ns
+    }
+
+    /// Grants or withdraws `application_number`'s permission to notify `anchor_number`.
+    ///
+    /// Mutates what is stored rather than building a config, for the same reason the write
+    /// path does: this owns one field of it and must not decide the rest by omission.
+    pub fn set_notification_consent(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        consented_at_ns: Option<Timestamp>,
+    ) {
+        let mut config = self.lookup_anchor_application_config(anchor_number, application_number);
+        config.notifications_consented_at_ns = consented_at_ns;
+        self.stable_anchor_application_config_memory
+            .insert((anchor_number, application_number), config);
+    }
+
+    /// Signs `anchor_number` in at `origin`, which is what mints the application a
+    /// notification consent hangs off. Production reaches this through `create_session`.
+    #[cfg(test)]
+    pub(crate) fn sign_in_for_testing(
+        &mut self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+    ) -> ApplicationNumber {
+        let (account_references, config) = self.account_state_for_origin(anchor_number, origin);
+        // An explicit config, because an application is stored only where the write puts
+        // something at the origin, and writing back the state a fresh origin normalises to
+        // moves nothing.
+        let writes = BTreeMap::from([(
+            origin.clone(),
+            Some((account_references, Some(config.unwrap_or_default()))),
+        )]);
+        self.write_account_state_for_testing(anchor_number, writes)
+            .expect("signing in at the origin");
+        self.lookup_application_number_with_origin(origin)
+            .expect("signing in stores the application")
+    }
+
     /// Keeps the principal index in step with one reference-list write, deriving only the
     /// accounts the write moved.
     ///
@@ -4064,10 +4111,6 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "sso_stable_id_index_memory".to_string(),
                 self.sso_stable_id_index_memory_wrapper.size(),
-            ),
-            (
-                "notifications_consent_memory".to_string(),
-                self.notifications_consent_memory_wrapper.size(),
             ),
         ])
     }

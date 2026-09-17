@@ -1743,7 +1743,9 @@ type NotificationError = variant {
     Unauthorized : text;
     InvalidOrigin : text;              // not a bare https://host[:port]
     InvalidSubscription : vec text;    // every rejected field, not just the first
-    NotFound;                          // no such endpoint, or no consent for that origin
+    // Nothing here to act on: no consent for that origin, no subscribed endpoint, or an
+    // app this identity has never signed in at and so holds no account with.
+    NotFound;
 };
 
 service : (opt InternetIdentityInit) -> {

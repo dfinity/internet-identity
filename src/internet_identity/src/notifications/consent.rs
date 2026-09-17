@@ -5,16 +5,9 @@ use super::{
     NotificationError,
 };
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::storable::application::StorableOriginSha256;
-use crate::storage::storable::notifications::consent::StorableNotificationConsent;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, FrontendHostname, Timestamp,
 };
-
-/// Overflow evicts the oldest grant rather than rejecting the new one. It fails
-/// safe either way: an evicted app loses an authorization, so it stops being
-/// able to notify and is offered again on the user's next visit.
-pub const MAX_CONSENTS_PER_ANCHOR: u64 = 50;
 
 fn set_consent(
     anchor_number: AnchorNumber,
@@ -22,42 +15,14 @@ fn set_consent(
     now_ns: Timestamp,
 ) -> Result<(), NotificationError> {
     let origin = consent_origin(&origin)?;
-    let origin_hash = StorableOriginSha256::from_origin(&origin);
 
     storage_borrow_mut(|storage| {
-        let key = (anchor_number, origin_hash);
-        let is_new_app = storage.notifications_consent_memory.get(&key).is_none();
-
-        if is_new_app {
-            let start = (anchor_number, StorableOriginSha256::MIN);
-            let end = (anchor_number, StorableOriginSha256::MAX);
-            let existing: Vec<(StorableOriginSha256, Timestamp)> = storage
-                .notifications_consent_memory
-                .range(start..=end)
-                .map(|((_, hash), consent)| (hash, consent.granted_at_ns))
-                .collect();
-
-            if existing.len() as u64 >= MAX_CONSENTS_PER_ANCHOR {
-                if let Some((oldest_hash, _)) = existing.into_iter().min_by_key(|(_, at)| *at) {
-                    // The key came from the scan just above, so the removal must
-                    // hit; a miss means the row vanished underneath us.
-                    let removed = storage
-                        .notifications_consent_memory
-                        .remove(&(anchor_number, oldest_hash));
-                    debug_assert!(removed.is_some(), "evicted a consent that was not present");
-                }
-            }
-        }
-
-        storage.notifications_consent_memory.insert(
-            key,
-            StorableNotificationConsent {
-                origin,
-                granted_at_ns: now_ns,
-            },
-        );
-    });
-    Ok(())
+        let application_number = storage
+            .notification_application(anchor_number, &origin)
+            .ok_or(NotificationError::NotFound)?;
+        storage.set_notification_consent(anchor_number, application_number, Some(now_ns));
+        Ok(())
+    })
 }
 
 fn clear_consent(
@@ -65,12 +30,13 @@ fn clear_consent(
     origin: FrontendHostname,
 ) -> Result<(), NotificationError> {
     let origin = consent_origin(&origin)?;
-    let origin_hash = StorableOriginSha256::from_origin(&origin);
 
     storage_borrow_mut(|storage| {
-        storage
-            .notifications_consent_memory
-            .remove(&(anchor_number, origin_hash));
+        // Nothing to withdraw where the identity never reached the app, which is the same
+        // answer as withdrawing a consent it never granted.
+        if let Some(application_number) = storage.notification_application(anchor_number, &origin) {
+            storage.set_notification_consent(anchor_number, application_number, None);
+        }
     });
     Ok(())
 }
@@ -79,17 +45,23 @@ pub(crate) fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname)
     let Ok(origin) = consent_origin(&origin) else {
         return false;
     };
-    let origin_hash = StorableOriginSha256::from_origin(&origin);
     storage_borrow(|storage| {
         storage
-            .notifications_consent_memory
-            .contains_key(&(anchor_number, origin_hash))
+            .notification_application(anchor_number, &origin)
+            .and_then(|application_number| {
+                storage.notification_consent(anchor_number, application_number)
+            })
+            .is_some()
     })
 }
 
 // ---- caller-facing entry points (called from main.rs's thin wrappers) ----
 
 /// Grants `origin` permission to notify the caller's anchor.
+///
+/// Refused for an origin this identity has never signed in at: notifications are
+/// addressed to the account principal it holds there, so there is nothing for a grant to
+/// authorize until that exists.
 pub fn grant_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
@@ -123,36 +95,51 @@ mod tests {
     use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
     use crate::notifications::test_setup as setup;
 
-    fn origins_of(anchor: AnchorNumber) -> Vec<FrontendHostname> {
-        storage_borrow(|s| {
-            let start = (anchor, StorableOriginSha256::MIN);
-            let end = (anchor, StorableOriginSha256::MAX);
-            s.notifications_consent_memory
-                .range(start..=end)
-                .map(|(_, consent)| consent.origin)
-                .collect()
+    /// An identity that has signed in at `origin`, which is what a grant needs.
+    fn anchor_at(origin: &str) -> AnchorNumber {
+        storage_borrow_mut(|storage| {
+            let anchor = storage.allocate_anchor(0).expect("allocating an anchor");
+            let anchor_number = anchor.anchor_number();
+            storage.write(anchor).expect("writing the anchor");
+            storage.sign_in_for_testing(anchor_number, &origin.to_string());
+            anchor_number
         })
     }
 
     #[test]
     fn grant_then_revoke_consent_round_trips() {
         setup();
-        let anchor = 1;
         let origin = "https://app.example".to_string();
+        let anchor = anchor_at(&origin);
 
         set_consent(anchor, origin.clone(), 1_000).unwrap();
         assert!(has_consent(anchor, origin.clone()));
-        assert_eq!(origins_of(anchor), vec![origin.clone()]);
 
         clear_consent(anchor, origin.clone()).unwrap();
         assert!(!has_consent(anchor, origin));
-        assert!(origins_of(anchor).is_empty());
+    }
+
+    /// The grant has nowhere to live until the identity holds an account at the app, and
+    /// nothing to authorize either: a sender addresses the principal it finds there.
+    #[test]
+    fn refuses_an_app_the_identity_has_never_signed_in_at() {
+        setup();
+        let anchor = anchor_at("https://visited.example");
+
+        assert_eq!(
+            set_consent(anchor, "https://never.example".to_string(), 1_000),
+            Err(NotificationError::NotFound)
+        );
     }
 
     #[test]
     fn revoking_unconsented_origin_is_a_harmless_no_op() {
         setup();
-        assert!(clear_consent(1, "https://app.example".to_string()).is_ok());
+        let origin = "https://app.example".to_string();
+        let anchor = anchor_at(&origin);
+
+        assert!(clear_consent(anchor, origin).is_ok());
+        assert!(clear_consent(anchor, "https://never.example".to_string()).is_ok());
     }
 
     #[test]
@@ -168,60 +155,46 @@ mod tests {
         assert!(set_consent(1, "http://app.example".to_string(), 0).is_err());
     }
 
-    /// A grant naming a modern gateway must be the same row as one naming the
-    /// legacy gateway, or the first grant is unrevocable and never delivers.
+    /// A grant naming a modern gateway must find the row the sign-in created under the
+    /// legacy one. Keying by the application rather than by the origin is what makes a
+    /// second row impossible rather than merely unlikely.
     #[test]
     fn a_gateway_twin_is_the_same_consent() {
         setup();
-        let anchor = 1;
-        set_consent(anchor, "https://abc-cai.icp0.io".to_string(), 1_000).unwrap();
+        let anchor = anchor_at("https://abc-cai.ic0.app");
 
+        set_consent(anchor, "https://abc-cai.icp0.io".to_string(), 1_000).unwrap();
         assert!(has_consent(anchor, "https://abc-cai.ic0.app".to_string()));
         assert!(has_consent(anchor, "https://abc-cai.icp.net".to_string()));
-        assert_eq!(
-            origins_of(anchor).len(),
-            1,
-            "one app must not occupy three consent rows"
-        );
 
         clear_consent(anchor, "https://abc-cai.icp.net".to_string()).unwrap();
         assert!(!has_consent(anchor, "https://abc-cai.icp0.io".to_string()));
     }
 
+    /// Consent is one field of the config the default account also lives in, so the two
+    /// must not overwrite each other.
     #[test]
-    fn evicts_the_oldest_grant_past_the_cap() {
+    fn consent_leaves_the_default_account_alone() {
         setup();
-        let anchor = 1;
-        for i in 0..MAX_CONSENTS_PER_ANCHOR {
-            set_consent(anchor, format!("https://app{i}.example"), i).unwrap();
-        }
-        assert_eq!(origins_of(anchor).len() as u64, MAX_CONSENTS_PER_ANCHOR);
+        let origin = "https://app.example".to_string();
+        let anchor = anchor_at(&origin);
 
-        set_consent(anchor, "https://new.example".to_string(), 1_000).unwrap();
+        let application = storage_borrow(|s| {
+            s.notification_application(anchor, &origin)
+                .expect("the sign-in stored one")
+        });
+        let before = storage_borrow(|s| {
+            s.lookup_anchor_application_config(anchor, application)
+                .default_account_number
+        });
 
-        assert_eq!(
-            origins_of(anchor).len() as u64,
-            MAX_CONSENTS_PER_ANCHOR,
-            "the cap must hold past the 51st grant"
-        );
-        assert!(
-            !has_consent(anchor, "https://app0.example".to_string()),
-            "the oldest grant should have been evicted"
-        );
-        assert!(has_consent(anchor, "https://new.example".to_string()));
-    }
+        set_consent(anchor, origin.clone(), 1_000).unwrap();
 
-    #[test]
-    fn regranting_a_consented_app_does_not_evict() {
-        setup();
-        let anchor = 1;
-        for i in 0..MAX_CONSENTS_PER_ANCHOR {
-            set_consent(anchor, format!("https://app{i}.example"), i).unwrap();
-        }
-        // A re-grant overwrites in place, so it must not push anyone out.
-        set_consent(anchor, "https://app5.example".to_string(), 9_000).unwrap();
-
-        assert_eq!(origins_of(anchor).len() as u64, MAX_CONSENTS_PER_ANCHOR);
-        assert!(has_consent(anchor, "https://app0.example".to_string()));
+        let after = storage_borrow(|s| {
+            s.lookup_anchor_application_config(anchor, application)
+                .default_account_number
+        });
+        assert_eq!(before, after);
+        assert!(has_consent(anchor, origin));
     }
 }

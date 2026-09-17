@@ -1361,7 +1361,13 @@ export type MetadataMapV2 = Array<
  */
 export type NotificationError = { 'InvalidSubscription' : Array<string> } |
   { 'Disabled' : null } |
-  { 'NotFound' : null } |
+  {
+    /**
+     * Nothing here to act on: no consent for that origin, no subscribed endpoint, or an
+     * app this identity has never signed in at and so holds no account with.
+     */
+    'NotFound' : null
+  } |
   { 'Unauthorized' : string } |
   { 'InvalidOrigin' : string };
 export interface OpenIDRegFinishArg {
