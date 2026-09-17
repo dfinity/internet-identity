@@ -99,6 +99,9 @@ export class TestApp {
   private get log(): Locator {
     return this.page.locator("#sessionLog");
   }
+  private get mayNotify(): Locator {
+    return this.page.locator("#notificationConsent");
+  }
 
   /** Opens the app and states which provider and protocol to use. */
   async open(options: TestAppOptions = {}): Promise<void> {
@@ -303,6 +306,28 @@ export class TestApp {
     await authenticate(authPage);
     await authPage.waitForEvent("close", { timeout: 15_000 });
     await this.waitUntilSignedIn();
+  }
+
+  /**
+   * Asks the provider whether this app may notify the user, and answers the screen that
+   * opens. Its own window, because the request is a JSON-RPC method of its own rather
+   * than part of signing in.
+   */
+  async askToNotify(answer: (authPage: Page) => Promise<void>): Promise<void> {
+    const authPagePromise = this.page.context().waitForEvent("page");
+    await this.page.getByRole("button", { name: "Ask to notify" }).click();
+    const authPage = await authPagePromise;
+    await answer(authPage);
+    await authPage.waitForEvent("close", { timeout: 15_000 });
+  }
+
+  /** What the app was told, which is what the canister recorded. */
+  async expectMayNotify(): Promise<void> {
+    await expect(this.mayNotify).toHaveText("yes", { timeout: ROUND_TRIP });
+  }
+
+  async expectMayNotNotify(): Promise<void> {
+    await expect(this.mayNotify).toHaveText("no", { timeout: ROUND_TRIP });
   }
 
   /** Signs in and abandons the ceremony part way through. */
