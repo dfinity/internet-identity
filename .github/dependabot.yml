@@ -13,7 +13,7 @@ multi-ecosystem-groups:
   weekly-version-updates:
     schedule:
       interval: weekly
-      day: monday
+      day: thursday
       time: "08:00"
       timezone: Etc/UTC
     labels:
@@ -31,7 +31,7 @@ updates:
       - "/src/try-ii"
     schedule:
       interval: weekly
-      day: monday
+      day: thursday
       time: "08:00"
       timezone: Etc/UTC
     ignore:
@@ -59,7 +59,7 @@ updates:
       - "/src/try-ii/src/try-ii-frontend"
     schedule:
       interval: weekly
-      day: monday
+      day: thursday
       time: "09:00"
       timezone: Etc/UTC
     ignore:
@@ -80,7 +80,7 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-      day: monday
+      day: thursday
       time: "10:00"
       timezone: Etc/UTC
     ignore:
@@ -101,7 +101,7 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-      day: monday
+      day: thursday
       time: "10:00"
       timezone: Etc/UTC
     ignore:
