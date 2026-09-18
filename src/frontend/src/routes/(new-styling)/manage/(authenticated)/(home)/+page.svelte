@@ -3,7 +3,6 @@
   import type { Component } from "svelte";
   import { goto } from "$app/navigation";
   import {
-    ArrowUpRightIcon,
     BookAlertIcon,
     BookOpenIcon,
     MailIcon,
@@ -17,6 +16,7 @@
     type KnownDapp,
   } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { deriveSmartActions, type SmartActionId } from "./smartActions";
+  import FeaturedApps from "./components/FeaturedApps.svelte";
   import { EMAIL_RECOVERY_SETUP } from "$lib/state/featureFlags";
 
   const { data }: PageProps = $props();
@@ -97,11 +97,10 @@
   });
 </script>
 
-<!-- Column max-width matches the option-H design. The 0-min on the
-     single grid column prevents the action strip's content width
-     from dragging the whole page into horizontal scroll on narrow
-     viewports. -->
-<div class="grid w-full max-w-[40rem] grid-cols-[minmax(0,1fr)]">
+<!-- The 0-min on the single grid column prevents the action strip's
+     content width from dragging the whole page into horizontal
+     scroll on narrow viewports. -->
+<div class="grid w-full max-w-4xl grid-cols-[minmax(0,1fr)]">
   <header class="flex flex-col gap-3">
     <h1 class="text-text-tertiary text-3xl font-medium tracking-tight">
       <Trans>Welcome, <span class="text-text-primary">{name}</span>.</Trans>
@@ -131,48 +130,6 @@
   </div>
 
   {#if featuredApps.length > 0}
-    <!-- React to the manage pane's actual width, not the viewport:
-         the sidebar can leave a wide screen with a narrow content
-         area, and the cards squish if we key off the viewport. -->
-    <section class="@container mt-12 flex flex-col gap-3.5">
-      <h2 class="text-text-primary text-base font-medium tracking-tight">
-        {$t`Featured apps`}
-      </h2>
-      <div class="grid grid-cols-1 gap-3 @xl:grid-cols-3">
-        {#each featuredApps as dapp (dapp.website)}
-          <a
-            href={dapp.website}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="group bg-bg-primary_alt border-border-secondary hover:border-border-primary flex flex-col gap-5 rounded-xl border p-4 shadow-xs transition-colors"
-          >
-            <div class="flex items-start justify-between">
-              <img
-                src={dapp.logoSrc}
-                alt={`${dapp.name} logo`}
-                width="56"
-                height="56"
-                class="block size-14 rounded-xl"
-              />
-              <ArrowUpRightIcon
-                class="text-text-tertiary group-hover:text-text-primary size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-              />
-            </div>
-            <div class="flex flex-col gap-1">
-              <span
-                class="text-text-primary text-base font-semibold tracking-tight"
-              >
-                {dapp.name}
-              </span>
-              {#if dapp.oneLiner !== undefined}
-                <span class="text-text-tertiary text-sm leading-snug">
-                  {dapp.oneLiner}
-                </span>
-              {/if}
-            </div>
-          </a>
-        {/each}
-      </div>
-    </section>
+    <FeaturedApps apps={featuredApps} />
   {/if}
 </div>
