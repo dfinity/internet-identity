@@ -482,10 +482,6 @@ export type CheckCaptchaError = {
      */
     'WrongSolution' : { 'new_captcha_png_base64' : string }
   };
-export interface ConsentStatusRequest {
-  'origin' : string,
-  'anchor_number' : UserNumber,
-}
 export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -1359,30 +1355,32 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+export interface NotificationConsentGrantedRequest {
+  'origin' : string,
+  'anchor_number' : UserNumber,
+}
 /**
  * Why a notification call was refused.
  */
-export type NotificationError = { 'InvalidSubscription' : Array<string> } |
-  { 'Disabled' : null } |
-  {
-    /**
-     * Nothing here to act on: no consent for that origin, or no subscribed endpoint.
-     */
-    'NotFound' : null
+export type NotificationGrantConsentError = {
+    'InternalCanisterError' : string
   } |
-  { 'Unauthorized' : string } |
-  { 'InvalidOrigin' : string } |
+  { 'Unauthorized' : Principal } |
   {
     /**
      * The identity has never signed in at the app, so there is no application for a
-     * consent to hang off. Apart from NotFound because signing in there clears it.
+     * consent to hang off.
      */
-    'SessionMissing' : null
+    'NoSuchSession' : null
   };
 export interface NotificationGrantConsentRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
 }
+export type NotificationRevokeConsentError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal };
 export interface NotificationRevokeConsentRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
@@ -2563,23 +2561,22 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : string }
   >,
-  /**
-   * Whether this app may notify this identity. False for a disabled deployment
-   * or an unauthorized caller, so neither can be probed with it.
-   */
-  'notification_consent_status' : ActorMethod<[ConsentStatusRequest], boolean>,
+  'notification_consent_granted' : ActorMethod<
+    [NotificationConsentGrantedRequest],
+    boolean
+  >,
   /**
    * ===== Notifications =====
    */
   'notification_grant_consent' : ActorMethod<
     [NotificationGrantConsentRequest],
     { 'Ok' : null } |
-      { 'Err' : NotificationError }
+      { 'Err' : NotificationGrantConsentError }
   >,
   'notification_revoke_consent' : ActorMethod<
     [NotificationRevokeConsentRequest],
     { 'Ok' : null } |
-      { 'Err' : NotificationError }
+      { 'Err' : NotificationRevokeConsentError }
   >,
   /**
    * The trailing `opt text` is the SSO discovery domain (null for a direct

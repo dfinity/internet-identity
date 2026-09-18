@@ -1737,16 +1737,17 @@ type ListAvailableAttributesError = variant {
 };
 
 // Why a notification call was refused.
-type NotificationError = variant {
-    Disabled;                          // this deployment has notifications off
-    Unauthorized : text;
-    InvalidOrigin : text;              // not a bare https://host[:port]
-    InvalidSubscription : vec text;    // every rejected field, not just the first
-    // Nothing here to act on: no consent for that origin, or no subscribed endpoint.
-    NotFound;
+type NotificationGrantConsentError = variant {
+    Unauthorized : principal;
     // The identity has never signed in at the app, so there is no application for a
-    // consent to hang off. Apart from NotFound because signing in there clears it.
-    SessionMissing;
+    // consent to hang off.
+    NoSuchSession;
+    InternalCanisterError : text;
+};
+
+type NotificationRevokeConsentError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
 };
 
 type NotificationGrantConsentRequest = record {
@@ -1759,7 +1760,7 @@ type NotificationRevokeConsentRequest = record {
     origin : text;
 };
 
-type ConsentStatusRequest = record {
+type NotificationConsentGrantedRequest = record {
     anchor_number : UserNumber;
     origin : text;
 };
@@ -2240,10 +2241,8 @@ service : (opt InternetIdentityInit) -> {
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
 
     // ===== Notifications =====
-    notification_grant_consent : (NotificationGrantConsentRequest) -> (variant { Ok; Err : NotificationError });
-    notification_revoke_consent : (NotificationRevokeConsentRequest) -> (variant { Ok; Err : NotificationError });
-    // Whether this app may notify this identity. False for a disabled deployment
-    // or an unauthorized caller, so neither can be probed with it.
-    notification_consent_status : (ConsentStatusRequest) -> (bool) query;
+    notification_grant_consent : (NotificationGrantConsentRequest) -> (variant { Ok; Err : NotificationGrantConsentError });
+    notification_revoke_consent : (NotificationRevokeConsentRequest) -> (variant { Ok; Err : NotificationRevokeConsentError });
+    notification_consent_granted : (NotificationConsentGrantedRequest) -> (bool) query;
 
 };

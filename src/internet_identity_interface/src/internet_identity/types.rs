@@ -969,22 +969,19 @@ pub enum SessionRevokeError {
     InternalCanisterError(String),
 }
 
-/// Why a notification call was refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum NotificationError {
-    /// This deployment has notifications turned off.
-    Disabled,
-    /// The caller may not act for this anchor.
-    Unauthorized(String),
-    /// The origin is not a bare `https://host[:port]`.
-    InvalidOrigin(String),
-    /// Subscription fields were rejected; every failure is reported at once.
-    InvalidSubscription(Vec<String>),
-    /// Nothing here to act on: no consent for that origin, or no subscribed endpoint.
-    NotFound,
+pub enum NotificationGrantConsentError {
+    Unauthorized(Principal),
     /// The identity has never signed in at the app, so there is no application for a
-    /// consent to hang off. Apart from `NotFound` because signing in there clears it.
-    SessionMissing,
+    /// consent to hang off.
+    NoSuchSession,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationRevokeConsentError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -1000,7 +997,7 @@ pub struct NotificationRevokeConsentRequest {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct ConsentStatusRequest {
+pub struct NotificationConsentGrantedRequest {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
 }
