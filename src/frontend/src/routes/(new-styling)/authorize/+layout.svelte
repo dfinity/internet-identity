@@ -6,6 +6,10 @@
     attributeConsentStore,
   } from "$lib/stores/attributeConsent.store";
   import {
+    notificationConsentSettledStore,
+    notificationConsentStore,
+  } from "$lib/stores/notificationConsent.store";
+  import {
     authorizationContextStore,
     authorizationStore,
     authorizedStore,
@@ -130,9 +134,16 @@
     $attributeConsentStore !== undefined &&
       $attributeConsentResultStore === undefined,
   );
+  // Notification consent runs after authorize for the same reason, so it needs
+  // the same exemption.
+  const isNotificationConsenting = $derived(
+    $notificationConsentStore !== undefined &&
+      $notificationConsentSettledStore === undefined,
+  );
   const showHeaderFooter = $derived(
     isReady &&
       (isAttributeConsenting ||
+        isNotificationConsenting ||
         ($authorizedStore === undefined &&
           flow !== "openid-init" &&
           flow !== "sso-init" &&
