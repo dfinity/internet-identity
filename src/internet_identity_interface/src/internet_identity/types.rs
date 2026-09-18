@@ -1001,7 +1001,8 @@ pub struct NotificationConsentGrantedRequest {
     pub origin: FrontendHostname,
 }
 
-/// Everything a browser uploads when it registers for Web Push.
+/// Everything a browser uploads when it registers for Web Push, and how it replaces a
+/// pool that is running out: the same endpoint with a newer `jwt_issued_at_ns`.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SetWebPushSubscriptionRequest {
     pub anchor_number: AnchorNumber,
@@ -1021,6 +1022,9 @@ pub struct RemoveWebPushSubscriptionRequest {
 pub enum SetWebPushSubscriptionError {
     /// The caller signs with no key this identity is signed in from.
     InvalidBrowserKey,
+    /// The pool offered is not newer than the one this endpoint already holds. A pool
+    /// is spent by elapsed time, so taking an older one would shorten coverage.
+    StaleJwtPool,
     InternalCanisterError(String),
 }
 

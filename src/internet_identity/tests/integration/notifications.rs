@@ -510,6 +510,31 @@ mod subscriptions {
         Ok(())
     }
 
+    /// One call both registers and tops up, so a browser replaying a pool it already
+    /// uploaded must not be able to walk its own coverage backwards.
+    #[test]
+    fn should_replace_the_pool_only_with_a_newer_one() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+        let caller = key_holder(&browser).principal();
+
+        set_webpush_subscription(&env, canister_id, caller, request(anchor, ENDPOINT))?
+            .expect("subscribe rejected");
+
+        let mut topped_up = request(anchor, ENDPOINT);
+        topped_up.jwt_issued_at_ns = ISSUED_AT_NS + 1;
+        set_webpush_subscription(&env, canister_id, caller, topped_up)?
+            .expect("a newer pool should replace the stored one");
+
+        let replayed =
+            set_webpush_subscription(&env, canister_id, caller, request(anchor, ENDPOINT))?;
+        assert!(
+            matches!(replayed, Err(SetWebPushSubscriptionError::StaleJwtPool)),
+            "{replayed:?}"
+        );
+        Ok(())
+    }
+
     /// The caller's key is what names the row, so a key the registry has never seen
     /// cannot write one.
     #[test]
