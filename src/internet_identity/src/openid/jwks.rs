@@ -43,6 +43,17 @@ pub(super) fn read_jwks(source: &JwkSource) -> Cached<Vec<Jwk>> {
 #[cfg(not(test))]
 const CERTS_CALL_CYCLES: u128 = 30_000_000_000;
 
+#[cfg(not(test))]
+thread_local! {
+    /// Caps how many key-set refreshes run at once (roughly one per provider).
+    /// The 90s reclaim age is kept above the ~60s outcall timeout so a
+    /// still-live call is never reclaimed early. See [`crate::concurrency`].
+    static JWKS_OUTCALL_LIMIT: std::cell::RefCell<crate::concurrency::ConcurrencyLimiter> =
+        std::cell::RefCell::new(crate::concurrency::ConcurrencyLimiter::new(
+            crate::concurrency::LimiterConfig { max_concurrent: 100, max_age_secs: 90 },
+        ));
+}
+
 /// Response-size cap for a JWKS fetch. Real OIDC key sets run to several KB and
 /// often embed `x5c` certificate chains — Microsoft's is ~14.5 KB — so 32 KiB
 /// leaves headroom (including key-rotation overlap) while still bounding the
@@ -90,9 +101,12 @@ pub(super) async fn fetch_jwks(jwks_uri: String) -> Result<Vec<Jwk>, String> {
         ],
     };
 
-    let (response,) = http_request_with_closure(request, CERTS_CALL_CYCLES, transform_certs)
-        .await
-        .map_err(|(_, err)| err)?;
+    let (response,) = crate::concurrency::guarded(&JWKS_OUTCALL_LIMIT, || {
+        http_request_with_closure(request, CERTS_CALL_CYCLES, transform_certs)
+    })
+    .await
+    .map_err(|_| "outcall concurrency budget exhausted".to_string())?
+    .map_err(|(_, err)| err)?;
 
     serde_json::from_slice::<Certs>(response.body.as_slice())
         .map_err(|_| "Invalid JSON".into())

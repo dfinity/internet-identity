@@ -685,6 +685,18 @@ async fn jwks_fill(jwks_uri: String) -> Result<Vec<Jwk>, String> {
 const DISCOVERY_CALL_CYCLES: u128 = 30_000_000_000;
 
 #[cfg(not(test))]
+thread_local! {
+    /// Caps how many discovery fetches (the two-hop configuration fetch) run at
+    /// once, so a wave of first-time sign-ins doesn't fan out all at the same
+    /// moment. The 90s reclaim age is kept above the ~60s outcall timeout so a
+    /// still-live call is never reclaimed early. See [`crate::concurrency`].
+    static DISCOVERY_OUTCALL_LIMIT: RefCell<crate::concurrency::ConcurrencyLimiter> =
+        RefCell::new(crate::concurrency::ConcurrencyLimiter::new(
+            crate::concurrency::LimiterConfig { max_concurrent: 150, max_age_secs: 90 },
+        ));
+}
+
+#[cfg(not(test))]
 async fn fetch_ii_openid_configuration(url: String) -> Result<IIOpenIdConfiguration, String> {
     let body = http_get_json(url).await?;
     serde_json::from_slice::<IIOpenIdConfiguration>(&body)
@@ -721,10 +733,12 @@ async fn http_get_json(url: String) -> Result<Vec<u8>, String> {
         ],
     };
 
-    let (response,) =
+    let (response,) = crate::concurrency::guarded(&DISCOVERY_OUTCALL_LIMIT, || {
         http_request_with_closure(request, DISCOVERY_CALL_CYCLES, transform_discovery)
-            .await
-            .map_err(|(_, err)| err)?;
+    })
+    .await
+    .map_err(|_| "outcall concurrency budget exhausted".to_string())?
+    .map_err(|(_, err)| err)?;
     Ok(response.body)
 }
 

@@ -259,10 +259,24 @@ fn name_within_domain(name: &str, registered_domain: &str) -> bool {
 #[cfg(not(test))]
 mod prod {
     use super::{classify_upstream, status_to_outcome, Outcome};
+    use crate::concurrency::{ConcurrencyLimiter, LimiterConfig};
     use ic_cdk::api::management_canister::http_request::{
         http_request_with_closure, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
         HttpResponse,
     };
+    use std::cell::RefCell;
+
+    thread_local! {
+        /// Caps how many provider outcalls are in flight at once. A lookup fans
+        /// out to all five providers, so a burst of distinct lookups opens a
+        /// lot of connections at once; this keeps that in check. The 90s reclaim
+        /// frees a slot whose outcall never reported back; keep it above the
+        /// ~60s outcall timeout so a still-live call is never reclaimed early.
+        /// See [`crate::concurrency`].
+        static OUTCALL_LIMIT: RefCell<ConcurrencyLimiter> = RefCell::new(
+            ConcurrencyLimiter::new(LimiterConfig { max_concurrent: 150, max_age_secs: 90 }),
+        );
+    }
 
     /// 4 KiB upper bound on a DoH response. A typical DKIM-SHA256 TXT
     /// record (RSA-2048) sits well under 1 KiB; allowing four times
@@ -305,12 +319,22 @@ mod prod {
                 },
             ],
         };
-        match http_request_with_closure(request, DOH_CALL_CYCLES, transform_doh).await {
-            Ok((response,)) => {
+        // Bound the provider fan-out against this feature's outcall budget. A
+        // refusal reads as a transient fetch error — the caller's quorum
+        // tolerates a missing provider exactly as it does a network failure.
+        match crate::concurrency::guarded(&OUTCALL_LIMIT, || {
+            http_request_with_closure(request, DOH_CALL_CYCLES, transform_doh)
+        })
+        .await
+        {
+            Ok(Ok((response,))) => {
                 let status: u16 = response.status.0.try_into().unwrap_or(u16::MAX);
                 status_to_outcome(status, response.body)
             }
-            Err((_, err)) => Outcome::FetchError(err),
+            Ok(Err((_, err))) => Outcome::FetchError(err),
+            Err(crate::concurrency::BudgetExhausted) => {
+                Outcome::FetchError("outcall concurrency budget exhausted".to_string())
+            }
         }
     }
 
