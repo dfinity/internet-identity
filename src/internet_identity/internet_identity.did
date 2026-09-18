@@ -1764,8 +1764,9 @@ type NotificationConsentGrantedRequest = record {
     origin : text;
 };
 
-// What a browser uploads when it registers for Web Push. Signed with the browser key
-// it signs in with, which is what says the subscription is this browser's.
+// What a browser uploads when it registers for Web Push, and how it replaces a pool
+// that is running out: the same endpoint with a newer jwt_issued_at_ns. Signed with the
+// browser key it signs in with, which is what says the subscription is this browser's.
 type SetWebPushSubscriptionRequest = record {
     anchor_number : UserNumber;
     endpoint : text;                   // the relay URL the browser was issued
@@ -1782,6 +1783,8 @@ type RemoveWebPushSubscriptionRequest = record {
 type SetWebPushSubscriptionError = variant {
     // The caller signs with no key this identity is signed in from.
     InvalidBrowserKey;
+    // The pool offered is not newer than the one this endpoint already holds.
+    StaleJwtPool;
     InternalCanisterError : text;
 };
 

@@ -1805,10 +1805,17 @@ export type SetWebPushSubscriptionError = {
      */
     'InvalidBrowserKey' : null
   } |
-  { 'InternalCanisterError' : string };
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The pool offered is not newer than the one this endpoint already holds.
+     */
+    'StaleJwtPool' : null
+  };
 /**
- * What a browser uploads when it registers for Web Push. Signed with the browser key
- * it signs in with, which is what says the subscription is this browser's.
+ * What a browser uploads when it registers for Web Push, and how it replaces a pool
+ * that is running out: the same endpoint with a newer jwt_issued_at_ns. Signed with the
+ * browser key it signs in with, which is what says the subscription is this browser's.
  */
 export interface SetWebPushSubscriptionRequest {
   'endpoint' : string,

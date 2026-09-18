@@ -901,6 +901,7 @@ export const idlFactory = ({ IDL }) => {
   const SetWebPushSubscriptionError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
+    'StaleJwtPool' : IDL.Null,
   });
   const SmtpAddress = IDL.Record({ 'domain' : IDL.Text, 'user' : IDL.Text });
   const SmtpEnvelope = IDL.Record({
