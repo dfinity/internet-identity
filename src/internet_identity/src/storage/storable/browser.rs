@@ -1,5 +1,6 @@
 use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::browser_id::StorableBrowserId;
+use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use internet_identity_interface::internet_identity::types::Timestamp;
 use minicbor::{Decode, Encode};
 
@@ -25,4 +26,7 @@ pub struct StorableBrowser {
     /// written.
     #[n(6)]
     pub session_count: u32,
+    /// What this browser registered for Web Push, if anything.
+    #[n(7)]
+    pub webpush_subscription: Option<StorableWebPushSubscription>,
 }

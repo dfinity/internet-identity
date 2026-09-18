@@ -1000,3 +1000,32 @@ pub struct NotificationConsentGrantedRequest {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
 }
+
+/// Everything a browser uploads when it registers for Web Push.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SetWebPushSubscriptionRequest {
+    pub anchor_number: AnchorNumber,
+    pub endpoint: String,
+    pub vapid_public_key: ByteBuf,
+    pub jwt_signatures: Vec<ByteBuf>,
+    pub jwt_issued_at_ns: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RemoveWebPushSubscriptionRequest {
+    pub anchor_number: AnchorNumber,
+    pub browser_id: BrowserId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SetWebPushSubscriptionError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum RemoveWebPushSubscriptionError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}

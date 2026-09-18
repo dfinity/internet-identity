@@ -9,6 +9,7 @@ use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
+    check_browser_authorization,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -38,6 +39,9 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
+use notifications::webpush::{
+    ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
+};
 use notifications::{
     ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
     ValidatedNotificationRevokeConsentRequest,
@@ -329,6 +333,32 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 }
 
 // ---- Notifications: called by II's frontend / service worker ----
+
+/// Authorized by the browser key the caller signs with, which is what says whose
+/// subscription this is: the row it writes is the caller's own.
+#[update]
+fn set_webpush_subscription(
+    request: SetWebPushSubscriptionRequest,
+) -> Result<(), SetWebPushSubscriptionError> {
+    let validated: ValidatedSetWebPushSubscriptionRequest = request.try_into()?;
+    let (anchor, browser_id) = check_browser_authorization(validated.anchor_number)
+        .map_err(|_| SetWebPushSubscriptionError::InvalidBrowserKey)?;
+
+    notifications::webpush::set_subscription(anchor, browser_id, validated, ic_cdk::api::time())
+}
+
+/// Authorized by the identity rather than by the browser, so a browser that is lost or
+/// left behind can be silenced from another one.
+#[update]
+fn remove_webpush_subscription(
+    request: RemoveWebPushSubscriptionRequest,
+) -> Result<(), RemoveWebPushSubscriptionError> {
+    let validated: ValidatedRemoveWebPushSubscriptionRequest = request.try_into()?;
+    check_authz_and_record_activity(validated.anchor_number)
+        .map_err(|_| RemoveWebPushSubscriptionError::Unauthorized(caller()))?;
+
+    notifications::webpush::remove_subscription(validated)
+}
 
 #[update]
 fn notification_grant_consent(

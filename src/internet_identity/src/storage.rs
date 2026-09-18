@@ -3204,7 +3204,10 @@ impl<M: Memory + Clone> Storage<M> {
         // back. Nothing here ranges over storage itself and no application number reaches
         // this function: the sweep is one write, so an `Err` cannot sign the browser out
         // of some applications and report failure.
-        let anchor = self.read(anchor_number)?;
+        let mut anchor = self.read(anchor_number)?;
+        // A browser the identity signed out of must stop being notified for it. The
+        // entry itself stays, so that signing back in is not a new browser.
+        anchor.set_webpush_subscription(browser_id, None);
         let mut state = self.account_state(anchor_number);
 
         let mut revoked = 0u64;
