@@ -382,8 +382,8 @@ mod subscriptions {
     use pretty_assertions::assert_eq;
     use serde_bytes::ByteBuf;
 
-    const ENDPOINT: &str = "https://push.example.com/aBcDeF";
-    const ISSUED_AT_NS: u64 = 1_700_000_000_000_000_000;
+    pub(super) const ENDPOINT: &str = "https://push.example.com/aBcDeF";
+    pub(super) const ISSUED_AT_NS: u64 = 1_700_000_000_000_000_000;
 
     /// An uncompressed SEC1 point on P-256, which is what a browser mints.
     fn vapid_public_key() -> ByteBuf {
@@ -423,7 +423,7 @@ mod subscriptions {
     }
 
     /// Signs a browser in, which puts it in the registry a subscription is keyed by.
-    fn sign_browser_in(
+    pub(super) fn sign_browser_in(
         env: &PocketIc,
         canister_id: CanisterId,
         anchor: AnchorNumber,
@@ -440,7 +440,9 @@ mod subscriptions {
         .browser_id
     }
 
-    fn install_with_browser(env: &PocketIc) -> (CanisterId, AnchorNumber, BrowserKey, BrowserId) {
+    pub(super) fn install_with_browser(
+        env: &PocketIc,
+    ) -> (CanisterId, AnchorNumber, BrowserKey, BrowserId) {
         let canister_id = install_ii_canister_with_arg(
             env,
             II_WASM.clone(),
@@ -452,7 +454,7 @@ mod subscriptions {
         (canister_id, anchor, browser, browser_id)
     }
 
-    fn request(anchor: AnchorNumber, endpoint: &str) -> SetWebPushSubscriptionRequest {
+    pub(super) fn request(anchor: AnchorNumber, endpoint: &str) -> SetWebPushSubscriptionRequest {
         SetWebPushSubscriptionRequest {
             anchor_number: anchor,
             endpoint: endpoint.to_string(),
@@ -464,7 +466,7 @@ mod subscriptions {
 
     /// The browser key a registered browser keeps between sign-ins, and so signs its
     /// subscription with.
-    fn key_holder(browser: &BrowserKey) -> BrowserKey {
+    pub(super) fn key_holder(browser: &BrowserKey) -> BrowserKey {
         browser.successor()
     }
 
@@ -507,6 +509,31 @@ mod subscriptions {
         // Idempotent on purpose, since silencing a browser is done from another one.
         remove_webpush_subscription(&env, canister_id, principal_1(), anchor, browser_id)?
             .expect("a second unsubscribe should be a no-op, not an error");
+        Ok(())
+    }
+
+    /// One call both registers and tops up, so a browser replaying a pool it already
+    /// uploaded must not be able to walk its own coverage backwards.
+    #[test]
+    fn should_replace_the_pool_only_with_a_newer_one() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+        let caller = key_holder(&browser).principal();
+
+        set_webpush_subscription(&env, canister_id, caller, request(anchor, ENDPOINT))?
+            .expect("subscribe rejected");
+
+        let mut topped_up = request(anchor, ENDPOINT);
+        topped_up.jwt_issued_at_ns = ISSUED_AT_NS + 1;
+        set_webpush_subscription(&env, canister_id, caller, topped_up)?
+            .expect("a newer pool should replace the stored one");
+
+        let replayed =
+            set_webpush_subscription(&env, canister_id, caller, request(anchor, ENDPOINT))?;
+        assert!(
+            matches!(replayed, Err(SetWebPushSubscriptionError::StaleJwtPool)),
+            "{replayed:?}"
+        );
         Ok(())
     }
 
@@ -602,6 +629,204 @@ mod subscriptions {
             ),
             "{refused:?}"
         );
+        Ok(())
+    }
+}
+
+/// What a browser registered and the pool it signed, read through
+/// `get_webpush_subscription_status`.
+mod subscription_status {
+    use super::subscriptions::*;
+    use super::*;
+    use canister_tests::api::internet_identity::api_v2::revoke_browser_sessions;
+    use canister_tests::api::internet_identity::notifications::{
+        get_webpush_subscription_status, set_webpush_subscription,
+    };
+    use canister_tests::framework::BrowserKey;
+    use internet_identity_interface::internet_identity::types::{
+        BrowserId, RevokeBrowserSessionsRequest, SetWebPushSubscriptionError,
+        WebPushSubscriptionStatus,
+    };
+    use pretty_assertions::assert_eq;
+
+    const LATER_NS: u64 = ISSUED_AT_NS + 1_000_000;
+
+    fn subscribe(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        anchor: AnchorNumber,
+        browser: &BrowserKey,
+    ) -> Result<(), RejectResponse> {
+        set_webpush_subscription(
+            env,
+            canister_id,
+            key_holder(browser).principal(),
+            request(anchor, ENDPOINT),
+        )?
+        .expect("subscribe rejected");
+        Ok(())
+    }
+
+    fn status(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        anchor: AnchorNumber,
+        browser_id: BrowserId,
+    ) -> Result<Option<WebPushSubscriptionStatus>, RejectResponse> {
+        get_webpush_subscription_status(env, canister_id, principal_1(), anchor, browser_id)
+    }
+
+    #[test]
+    fn should_report_nothing_for_a_browser_that_never_subscribed() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _browser, browser_id) = install_with_browser(&env);
+
+        assert_eq!(status(&env, canister_id, anchor, browser_id)?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn should_report_the_pool_a_browser_uploaded() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, browser_id) = install_with_browser(&env);
+        subscribe(&env, canister_id, anchor, &browser)?;
+
+        let reported =
+            status(&env, canister_id, anchor, browser_id)?.expect("no registration reported");
+        // The endpoint, so a browser can tell its own registration from one another
+        // identity's re-subscribe left behind. Then windows covered and issue time,
+        // not a count of unused signatures, which would sit at 30 forever.
+        assert_eq!(reported.endpoint, ENDPOINT);
+        assert_eq!(reported.pool_len, 30);
+        assert_eq!(reported.issued_at_ns, ISSUED_AT_NS);
+        Ok(())
+    }
+
+    #[test]
+    fn should_replace_the_pool_rather_than_grow_it() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, browser_id) = install_with_browser(&env);
+        subscribe(&env, canister_id, anchor, &browser)?;
+
+        let mut topped_up = request(anchor, ENDPOINT);
+        topped_up.jwt_issued_at_ns = LATER_NS;
+        set_webpush_subscription(
+            &env,
+            canister_id,
+            key_holder(&browser).principal(),
+            topped_up,
+        )?
+        .expect("top-up rejected");
+
+        let reported = status(&env, canister_id, anchor, browser_id)?.expect("no pool reported");
+        assert_eq!(
+            reported.pool_len, 30,
+            "the pool grew instead of being replaced"
+        );
+        assert_eq!(reported.issued_at_ns, LATER_NS);
+        Ok(())
+    }
+
+    /// The registration rides on the browser entry in the anchor, and an upgrade that
+    /// lost it would be unrecoverable after release.
+    #[test]
+    fn should_keep_a_subscription_across_an_upgrade() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, browser_id) = install_with_browser(&env);
+        subscribe(&env, canister_id, anchor, &browser)?;
+
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+        let reported = status(&env, canister_id, anchor, browser_id)?
+            .expect("the subscription did not survive the upgrade");
+        assert_eq!(reported.issued_at_ns, ISSUED_AT_NS);
+        Ok(())
+    }
+
+    /// A browser the identity signed out of must stop being notified for it, even
+    /// though the entry itself stays so that signing back in is not a new browser.
+    #[test]
+    fn should_drop_the_subscription_when_the_browser_is_signed_out() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, browser_id) = install_with_browser(&env);
+        subscribe(&env, canister_id, anchor, &browser)?;
+
+        revoke_browser_sessions(
+            &env,
+            canister_id,
+            principal_1(),
+            RevokeBrowserSessionsRequest {
+                identity_number: anchor,
+                browser_id,
+            },
+        )?
+        .expect("revoke_browser_sessions rejected");
+
+        assert_eq!(
+            status(&env, canister_id, anchor, browser_id)?,
+            None,
+            "a signed-out browser kept its subscription"
+        );
+        Ok(())
+    }
+
+    /// The registry holds twenty browsers and evicts the oldest, and the subscription
+    /// goes with it.
+    #[test]
+    fn should_drop_the_subscription_of_an_evicted_browser() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, first, first_id) = install_with_browser(&env);
+        subscribe(&env, canister_id, anchor, &first)?;
+        assert!(status(&env, canister_id, anchor, first_id)?.is_some());
+
+        // Twenty more browsers, so the first is the one the cap retires.
+        for seed in 2..=21u8 {
+            sign_browser_in(&env, canister_id, anchor, &BrowserKey::new(seed));
+        }
+
+        assert_eq!(
+            status(&env, canister_id, anchor, first_id)?,
+            None,
+            "an evicted browser kept its subscription"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_not_report_a_pool_to_a_caller_that_does_not_own_the_anchor(
+    ) -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, browser_id) = install_with_browser(&env);
+        subscribe(&env, canister_id, anchor, &browser)?;
+
+        assert_eq!(
+            get_webpush_subscription_status(&env, canister_id, principal_2(), anchor, browser_id)?,
+            None
+        );
+        Ok(())
+    }
+
+    /// An access method authorizes the identity, not a browser of it, so a refused
+    /// caller must leave the pool the browser signed exactly where it was.
+    #[test]
+    fn should_leave_the_stored_pool_alone_when_the_caller_is_not_the_browser(
+    ) -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, browser_id) = install_with_browser(&env);
+        subscribe(&env, canister_id, anchor, &browser)?;
+
+        let mut topped_up = request(anchor, ENDPOINT);
+        topped_up.jwt_issued_at_ns = LATER_NS;
+        for caller in [principal_1(), principal_2(), BrowserKey::new(9).principal()] {
+            let refused = set_webpush_subscription(&env, canister_id, caller, topped_up.clone())?;
+            assert!(
+                matches!(refused, Err(SetWebPushSubscriptionError::InvalidBrowserKey)),
+                "{refused:?}"
+            );
+        }
+
+        let reported = status(&env, canister_id, anchor, browser_id)?.expect("no pool reported");
+        assert_eq!(reported.issued_at_ns, ISSUED_AT_NS);
         Ok(())
     }
 }

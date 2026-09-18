@@ -1767,8 +1767,9 @@ type NotificationConsentGrantedRequest = record {
     origin : text;
 };
 
-// What a browser uploads when it registers for Web Push. Signed with the browser key
-// it signs in with, which is what says the subscription is this browser's.
+// What a browser uploads when it registers for Web Push, and how it replaces a pool
+// that is running out: the same endpoint with a newer jwt_issued_at_ns. Signed with the
+// browser key it signs in with, which is what says the subscription is this browser's.
 type SetWebPushSubscriptionRequest = record {
     anchor_number : UserNumber;
     endpoint : text;                   // the relay URL the browser was issued
@@ -1785,12 +1786,28 @@ type RemoveWebPushSubscriptionRequest = record {
 type SetWebPushSubscriptionError = variant {
     // The caller signs with no key this identity is signed in from.
     InvalidBrowserKey;
+    // The pool offered is not newer than the one this endpoint already holds.
+    StaleJwtPool;
     InternalCanisterError : text;
 };
 
 type RemoveWebPushSubscriptionError = variant {
     Unauthorized : principal;
     InternalCanisterError : text;
+};
+
+type GetWebPushSubscriptionStatusRequest = record {
+    anchor_number : UserNumber;
+    browser_id : nat32;
+};
+
+// What a browser is registered with, so the frontend can tell a registration that is
+// still live from one another identity's re-subscribe left behind, and knows when to
+// sign the next pool.
+type WebPushSubscriptionStatus = record {
+    endpoint : text;        // compared against the one the browser holds
+    pool_len : nat32;       // windows covered, not a count of unused signatures
+    issued_at_ns : nat64;   // window i expires at issued_at_ns + (i + 1) * window
 };
 
 service : (opt InternetIdentityInit) -> {
@@ -2277,4 +2294,5 @@ service : (opt InternetIdentityInit) -> {
     set_webpush_subscription : (SetWebPushSubscriptionRequest) -> (variant { Ok; Err : SetWebPushSubscriptionError });
     // Called by the identity, so one browser can silence another.
     remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
+    get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 };

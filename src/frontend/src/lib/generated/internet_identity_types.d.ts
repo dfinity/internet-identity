@@ -923,6 +923,10 @@ export interface GetSsoDiscoveryStatusRequest {
   'target_app_origin' : [] | [FrontendHostname],
   'org_domain' : string,
 }
+export interface GetWebPushSubscriptionStatusRequest {
+  'browser_id' : number,
+  'anchor_number' : UserNumber,
+}
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -1812,10 +1816,17 @@ export type SetWebPushSubscriptionError = {
      */
     'InvalidBrowserKey' : null
   } |
-  { 'InternalCanisterError' : string };
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The pool offered is not newer than the one this endpoint already holds.
+     */
+    'StaleJwtPool' : null
+  };
 /**
- * What a browser uploads when it registers for Web Push. Signed with the browser key
- * it signs in with, which is what says the subscription is this browser's.
+ * What a browser uploads when it registers for Web Push, and how it replaces a pool
+ * that is running out: the same endpoint with a newer jwt_issued_at_ns. Signed with the
+ * browser key it signs in with, which is what says the subscription is this browser's.
  */
 export interface SetWebPushSubscriptionRequest {
   'endpoint' : string,
@@ -2048,6 +2059,16 @@ export interface WebAuthn {
 export interface WebAuthnCredential {
   'pubkey' : PublicKey,
   'credential_id' : CredentialId,
+}
+/**
+ * What a browser is registered with, so the frontend can tell a registration that is
+ * still live from one another identity's re-subscribe left behind, and knows when to
+ * sign the next pool.
+ */
+export interface WebPushSubscriptionStatus {
+  'endpoint' : string,
+  'issued_at_ns' : bigint,
+  'pool_len' : number,
 }
 export interface _SERVICE {
   'acknowledge_entries' : ActorMethod<[bigint], undefined>,
@@ -2403,6 +2424,10 @@ export interface _SERVICE {
   'get_sso_discovery_status' : ActorMethod<
     [GetSsoDiscoveryStatusRequest],
     SsoDiscoveryStatus
+  >,
+  'get_webpush_subscription_status' : ActorMethod<
+    [GetWebPushSubscriptionStatusRequest],
+    [] | [WebPushSubscriptionStatus]
   >,
   /**
    * HTTP Gateway protocol
