@@ -52,6 +52,7 @@ mod authz_utils;
 mod browser_key;
 
 mod attributes;
+mod concurrency;
 /// Type conversions between internal and external types.
 mod conversions;
 mod delegation;

@@ -159,8 +159,21 @@ struct InFlight {
     claimed_at: u64,
 }
 
+/// What a fill resolves to. `Ready`/`Failed` are the usual store / back-off
+/// outcomes. `Abandoned` means the fill chose not to run at all — it did no
+/// work and produced neither a value nor a failure. The cache then releases the
+/// in-flight marker and records *nothing*: the key keeps whatever state it had
+/// (cold stays cold, a stale value stays served) and the next `get` retries
+/// immediately, with no backoff. It lets a fill decline under a resource limit
+/// without that decline being mistaken for the resource being unavailable.
+pub enum FillOutcome<V, E> {
+    Ready(V),
+    Failed(E),
+    Abandoned,
+}
+
 /// A boxed fill future and the boxed fill function that produces one per key.
-type BoxFuture<V, E> = Pin<Box<dyn Future<Output = Result<V, E>>>>;
+type BoxFuture<V, E> = Pin<Box<dyn Future<Output = FillOutcome<V, E>>>>;
 type FillFn<K, V, E> = Box<dyn Fn(K) -> BoxFuture<V, E>>;
 
 /// In-memory single-flight cache keyed by `K`, holding values of type `V`
@@ -218,7 +231,7 @@ impl<K, V, E> SingleFlightCache<K, V, E> {
     /// knob is required; see `CacheConfig` for why there are no defaults.
     pub fn new<Fut>(fill: impl Fn(K) -> Fut + 'static, config: CacheConfig) -> Self
     where
-        Fut: Future<Output = Result<V, E>> + 'static,
+        Fut: Future<Output = FillOutcome<V, E>> + 'static,
     {
         Self {
             entries: BTreeMap::new(),
@@ -371,6 +384,22 @@ impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
             }
         }
 
+        self.sweep_expired(now);
+    }
+
+    /// Apply an [`FillOutcome::Abandoned`] fill: release the in-flight marker
+    /// and record nothing — no value, no failure, no backoff. A no-op if a
+    /// takeover already replaced our marker. The entry (if any) is left exactly
+    /// as it was, so a stale value keeps serving and a cold key stays cold; the
+    /// next `get` starts a fresh fill with no penalty.
+    fn abandon_fill(&mut self, key: &K, token: FillToken, now: u64) {
+        let still_ours = self
+            .in_flight
+            .get(key)
+            .is_some_and(|f| f.fill_id == token.fill_id);
+        if still_ours {
+            self.in_flight.remove(key);
+        }
         self.sweep_expired(now);
     }
 
@@ -611,9 +640,13 @@ fn spawn_fill<K, V, E>(
 {
     let fill_fut = cache.with_borrow(|c| (c.fill)(key.clone()));
     detach(async move {
-        let result = fill_fut.await;
+        let outcome = fill_fut.await;
         let now = now();
-        cache.with_borrow_mut(|c| c.complete_fill(&key, token, result, now));
+        cache.with_borrow_mut(|c| match outcome {
+            FillOutcome::Ready(v) => c.complete_fill(&key, token, Ok(v), now),
+            FillOutcome::Failed(e) => c.complete_fill(&key, token, Err(e), now),
+            FillOutcome::Abandoned => c.abandon_fill(&key, token, now),
+        });
     });
 }
 
@@ -704,7 +737,7 @@ mod tests {
         }
     }
     fn cache(config: CacheConfig) -> SingleFlightCache<&'static str, &'static str, ()> {
-        SingleFlightCache::new(|_k| async { Err(()) }, config)
+        SingleFlightCache::new(|_k| async { FillOutcome::Failed(()) }, config)
     }
 
     fn expect_fill(state: Lookup<&'static str>) -> FillToken {
@@ -712,6 +745,34 @@ mod tests {
             Lookup::StartFill(token, _) => token,
             _ => panic!("expected StartFill"),
         }
+    }
+
+    #[test]
+    fn abandoned_cold_fill_records_nothing_and_retries_immediately() {
+        let mut c = cache(base_config());
+        let t = expect_fill(c.lookup(&"k", 0)); // cold → claim the marker
+        c.abandon_fill(&"k", t, 0);
+        let s = c.stats(0);
+        assert_eq!(s.in_flight, 0, "the marker is released");
+        assert_eq!(s.entries, 0, "no value and no failure marker recorded");
+        // No backoff parked the key: the next lookup starts a fresh fill.
+        expect_fill(c.lookup(&"k", 0));
+    }
+
+    #[test]
+    fn abandoned_refresh_keeps_the_stale_value_and_backoff_free() {
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 50,
+            ..base_config()
+        });
+        let t = expect_fill(c.lookup(&"k", 0));
+        c.complete_fill(&"k", t, Ok("v"), 0);
+        // Stale at 120 → refresh due, StartFill hands back the stale value.
+        let t2 = expect_fill(c.lookup(&"k", 120));
+        c.abandon_fill(&"k", t2, 120);
+        // The stale value is untouched and still served; nothing was penalised.
+        assert!(matches!(c.lookup(&"k", 120), Lookup::StartFill(_, Some("v"))));
     }
 
     #[test]
@@ -1096,7 +1157,10 @@ mod tests {
         SingleFlightCache::new(
             |_k| async {
                 FILL_COUNT.with(|c| c.set(c.get() + 1));
-                FILL_RESULT.with(|r| r.get())
+                match FILL_RESULT.with(|r| r.get()) {
+                    Ok(v) => FillOutcome::Ready(v),
+                    Err(e) => FillOutcome::Failed(e),
+                }
             },
             e2e_config(),
         )

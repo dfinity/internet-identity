@@ -49,7 +49,8 @@ use cache::{new_doh_cache, DohCache};
 use parser::build_txt_query;
 use quorum::{decide_quorum, Outcome};
 
-use crate::single_flight_cache::{get, stats, CacheStats, Cached};
+use crate::concurrency::{ConcurrencyLimiter, LimiterConfig};
+use crate::single_flight_cache::{get, stats, CacheStats, Cached, FillOutcome};
 
 #[allow(unused_imports)]
 pub use cache::DohRecord;
@@ -63,6 +64,16 @@ thread_local! {
     /// fine, the next `smtp_request` for an affected domain just
     /// re-fetches.
     static DOH_CACHE: RefCell<DohCache> = RefCell::new(new_doh_cache(doh_fill));
+
+    /// Caps how many DoH lookups fan out at once. Each lookup fans out to all
+    /// five providers, so a burst of distinct lookups opens a lot of
+    /// connections at once; this keeps that in check. The 90s reclaim frees a
+    /// slot whose fill never reported back; keep it above the ~60s outcall
+    /// timeout so a still-live fill is never reclaimed early. See
+    /// [`crate::concurrency`].
+    static OUTCALL_LIMIT: RefCell<ConcurrencyLimiter> = RefCell::new(
+        ConcurrencyLimiter::new(LimiterConfig { max_concurrent: 10, max_age_secs: 90 }),
+    );
 }
 
 /// The cache's shared fill for one FQDN: the five-provider fan-out reduced to
@@ -71,13 +82,22 @@ thread_local! {
 /// failures stay `Err`, which is what the cache debounces. The query is
 /// rebuilt from the key here; the caller ([`fetch_txt`]) already validated
 /// the name before the value was ever requested.
-async fn doh_fill(name: String) -> Result<DohRecord, DohError> {
-    let query = build_txt_query(&name).map_err(|e| DohError::InvalidName(format!("{e:?}")))?;
+async fn doh_fill(name: String) -> FillOutcome<DohRecord, DohError> {
+    let query = match build_txt_query(&name) {
+        Ok(q) => q,
+        Err(e) => return FillOutcome::Failed(DohError::InvalidName(format!("{e:?}"))),
+    };
+    // Take an outcall slot for the whole five-provider fan-out. No slot → don't
+    // fan out at all: abandon the fill so the cache records nothing (no backoff)
+    // and the next poll retries once capacity frees.
+    let Some(_permit) = crate::concurrency::acquire(&OUTCALL_LIMIT) else {
+        return FillOutcome::Abandoned;
+    };
     let outcomes = fetch_all(&query).await;
     match decide_quorum(&outcomes) {
-        Ok(bytes) => Ok(DohRecord::Txt(bytes)),
-        Err(DohError::NoAnswer) => Ok(DohRecord::NoAnswer),
-        Err(transient) => Err(transient),
+        Ok(bytes) => FillOutcome::Ready(DohRecord::Txt(bytes)),
+        Err(DohError::NoAnswer) => FillOutcome::Ready(DohRecord::NoAnswer),
+        Err(transient) => FillOutcome::Failed(transient),
     }
 }
 
