@@ -1,4 +1,4 @@
-use internet_identity_interface::internet_identity::types::Timestamp;
+use crate::storage::storable::timestamp::StorableTimestamp;
 use minicbor::bytes::ByteVec;
 use minicbor::{Decode, Encode};
 
@@ -7,9 +7,8 @@ use minicbor::{Decode, Encode};
 /// deterministic claims (`exp = issued_at_ns + (index + 1) * window`). That byte layout
 /// is a wire contract with the frontend.
 ///
-/// Lives inside [`super::subscription::StorableWebPushSubscription`], which owns the
-/// bound and the round-trip test.
-#[derive(Encode, Decode, Clone, Debug, PartialEq)]
+/// Lives inside [`super::subscription::StorableWebPushSubscription`].
+#[derive(Encode, Decode, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 #[cbor(map)]
 pub struct StorableWebPushJwtPool {
     /// Raw ECDSA P-256 signatures (r‖s, 64 bytes each), in window order.
@@ -20,5 +19,5 @@ pub struct StorableWebPushJwtPool {
     /// Wall-clock time (ns) the device minted this pool. Window `i` expires at
     /// `issued_at_ns + (i + 1) * window_ns`.
     #[n(1)]
-    pub issued_at_ns: Timestamp,
+    pub issued_at_ns: StorableTimestamp,
 }

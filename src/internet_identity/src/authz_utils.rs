@@ -175,11 +175,13 @@ pub fn check_authorization(
 /// its own record.
 pub fn check_browser_authorization(
     anchor_number: AnchorNumber,
-) -> Result<BrowserId, AuthorizationError> {
+) -> Result<(Anchor, BrowserId), AuthorizationError> {
     let caller = caller();
-    state::anchor(anchor_number)
+    let anchor = state::anchor(anchor_number);
+    let browser_id = anchor
         .browser_by_principal(caller)
-        .ok_or(AuthorizationError::from(caller))
+        .ok_or(AuthorizationError::from(caller))?;
+    Ok((anchor, browser_id))
 }
 
 /// Whether the prepare-time [`AuthorizationKey`] is still a valid

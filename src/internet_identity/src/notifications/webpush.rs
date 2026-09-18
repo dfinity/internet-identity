@@ -1,4 +1,4 @@
-//! The Web Push channel: one subscription per browser, and the pool of VAPID JWTs that
+//! The Web Push channel: what a browser registered, and the pool of VAPID JWTs that
 //! browser signed for it.
 //!
 //! Callers reach this through `main.rs`, which validates and authorizes first, so
@@ -15,11 +15,50 @@ pub use validation::{
 #[cfg(test)]
 pub(crate) mod fixtures {
     use super::validation::{ValidatedSetWebPushSubscriptionRequest, JWT_SIG_LEN};
-    use crate::state::storage_borrow;
+    use crate::state::{storage_borrow, storage_borrow_mut};
+    use crate::storage::anchor::Anchor;
     use internet_identity_interface::internet_identity::types::{
-        AnchorNumber, BrowserId, SetWebPushSubscriptionRequest, Timestamp,
+        AnchorNumber, BrowserBrand, BrowserDescription, BrowserId, FormFactor, OperatingSystem,
+        PublicKey, SetWebPushSubscriptionRequest, Timestamp,
     };
     use serde_bytes::ByteBuf;
+
+    /// One anchor with `count` browsers on it, as sign-ins leave them.
+    pub(crate) fn anchor_with_browsers(count: u8) -> (AnchorNumber, Vec<BrowserId>) {
+        storage_borrow_mut(|storage| {
+            let mut anchor = storage
+                .allocate_anchor(0)
+                .expect("the test anchor range has room");
+            let anchor_number = anchor.anchor_number();
+            let ids = (0..count)
+                .map(|seed| {
+                    let (id, _) = anchor
+                        .resolve_browser(key(seed * 2), key(seed * 2 + 1), chrome_on_a_mac(), 0)
+                        .expect("an unseen key registers a browser");
+                    id
+                })
+                .collect();
+            storage.write(anchor).expect("writing a fresh anchor");
+            (anchor_number, ids)
+        })
+    }
+
+    fn key(seed: u8) -> PublicKey {
+        ByteBuf::from(vec![seed.wrapping_add(1); 91])
+    }
+
+    fn chrome_on_a_mac() -> BrowserDescription {
+        BrowserDescription {
+            brand: BrowserBrand::Chrome,
+            os: OperatingSystem::Macos,
+            form_factor: FormFactor::Desktop,
+            model: None,
+        }
+    }
+
+    pub(crate) fn anchor(anchor_number: AnchorNumber) -> Anchor {
+        storage_borrow(|storage| storage.read(anchor_number)).expect("reading the test anchor")
+    }
 
     /// A real, fixed SEC1 point: a length-only fixture cannot pass the curve check.
     pub(crate) fn valid_vapid_key() -> Vec<u8> {
@@ -65,14 +104,28 @@ pub(crate) mod fixtures {
         }
     }
 
+    /// `set_subscription` for a test that has an anchor number rather than the anchor.
+    pub(crate) fn subscribe(
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+        endpoint: &str,
+        now_ns: Timestamp,
+    ) {
+        super::set_subscription(
+            anchor(anchor_number),
+            browser_id,
+            validated(anchor_number, endpoint, now_ns),
+            now_ns,
+        )
+        .expect("writing a subscription");
+    }
+
     pub(crate) fn stored_endpoint(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
     ) -> Option<String> {
-        storage_borrow(|storage| {
-            storage
-                .webpush_subscription(anchor_number, browser_id)
-                .map(|row| row.endpoint)
-        })
+        anchor(anchor_number)
+            .webpush_subscription(browser_id)
+            .map(|subscription| subscription.endpoint.clone())
     }
 }
