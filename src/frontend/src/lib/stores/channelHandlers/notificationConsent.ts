@@ -154,7 +154,7 @@ const runConsentCeremony = async (
   if (settled === undefined) {
     return false;
   }
-  return settled.actor.notification_consent_status({
+  return settled.actor.notification_consent_granted({
     anchor_number: settled.identityNumber,
     origin: effectiveOrigin,
   });

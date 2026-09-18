@@ -58,7 +58,7 @@ const signIn = async () => {
   });
   (authenticationStore as unknown as Writable<unknown>).set({
     identityNumber: BigInt(10_000),
-    actor: { notification_consent_status: consentStatus },
+    actor: { notification_consent_granted: consentStatus },
   });
 };
 
