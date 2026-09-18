@@ -1,7 +1,7 @@
 //! One subscription row per browser, keyed `(anchor, browser_id)` against the
 //! registry the anchor already holds.
 
-use super::{validate_jwt_pool, validate_param_len, validate_vapid_public_key, MAX_ENDPOINT_LEN};
+use super::{validate_endpoint, validate_jwt_pool, validate_vapid_public_key};
 use crate::browser_key::verify_webpush_subscription;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
@@ -61,14 +61,20 @@ pub(super) fn browser_of_key(
 pub(super) fn check_browser_proof(
     browser_key: &PublicKey,
     browser_key_signature: &[u8],
+    anchor_number: AnchorNumber,
     endpoint: &str,
     jwt_issued_at_ns: Timestamp,
+    vapid_public_key: &[u8],
+    jwt_signatures: &[Vec<u8>],
 ) -> Result<(), SubscribeDeviceError> {
     verify_webpush_subscription(
         browser_key,
         browser_key_signature,
+        anchor_number,
         endpoint,
         jwt_issued_at_ns,
+        vapid_public_key,
+        jwt_signatures,
     )
     .then_some(())
     .ok_or(SubscribeDeviceError::InvalidBrowserKey)
@@ -89,7 +95,7 @@ pub(super) fn add_subscription(
 
     // Report every invalid field at once rather than failing on the first.
     let errors: Vec<String> = [
-        validate_param_len(endpoint.len(), 1..=MAX_ENDPOINT_LEN, "endpoint"),
+        validate_endpoint(&endpoint),
         validate_vapid_public_key(&vapid_public_key),
         validate_jwt_pool(&jwt_signatures),
     ]
@@ -136,11 +142,19 @@ pub fn subscribe_device(
     now_ns: Timestamp,
 ) -> Result<(), SubscribeDeviceError> {
     let browser_id = browser_of_key(request.anchor_number, &request.browser_key)?;
+    let jwt_signatures: Vec<Vec<u8>> = request
+        .jwt_signatures
+        .iter()
+        .map(|signature| signature.to_vec())
+        .collect();
     check_browser_proof(
         &request.browser_key,
         &request.browser_key_signature,
+        request.anchor_number,
         &request.endpoint,
         request.jwt_issued_at_ns,
+        &request.vapid_public_key,
+        &jwt_signatures,
     )?;
     add_subscription(Subscription::new(request, browser_id), now_ns)
         .map_err(|problems| SubscribeDeviceError::InternalCanisterError(problems.join("; ")))
@@ -156,7 +170,7 @@ pub fn unsubscribe_device(anchor_number: AnchorNumber, browser_id: BrowserId) {
 #[cfg(test)]
 mod tests {
     use super::super::fixtures::*;
-    use super::super::{JWT_SIG_LEN, MAX_JWT_POOL_LEN};
+    use super::super::{JWT_SIG_LEN, MAX_ENDPOINT_LEN, MAX_JWT_POOL_LEN};
     use super::*;
     use crate::notifications::test_setup as setup;
 
@@ -235,13 +249,89 @@ mod tests {
         // The browser's own key, signed over an endpoint other than the one it is
         // registering: lifting a signature onto a different endpoint must not work.
         let mut request = request_from(&browser, browser.anchor, "https://relay.example/a", 0);
-        request.browser_key_signature = browser.sign("https://relay.example/elsewhere", 0);
+        request.browser_key_signature = browser.sign(
+            "https://relay.example/elsewhere",
+            0,
+            &valid_vapid_key(),
+            &valid_pool(),
+        );
 
         assert!(matches!(
             subscribe_via_proof(request),
             Err(SubscribeDeviceError::InvalidBrowserKey)
         ));
         assert_eq!(subscription_count(browser.anchor), 0);
+    }
+
+    /// The control for the refusals below. Without it they pass against a verifier that
+    /// rejects everything, which is what a signature change would look like.
+    #[test]
+    fn the_request_a_browser_signs_is_accepted() {
+        setup();
+        let browser = registered_browser(1);
+
+        subscribe_via_proof(request_from(
+            &browser,
+            browser.anchor,
+            "https://relay.example/a",
+            0,
+        ))
+        .unwrap();
+
+        assert_eq!(subscription_count(browser.anchor), 1);
+    }
+
+    /// The proof covers the pool and the key, not just the endpoint, so a signature
+    /// lifted from one call cannot be resubmitted over a different pool.
+    #[test]
+    fn a_signature_cannot_be_replayed_over_another_pool() {
+        setup();
+        let browser = registered_browser(1);
+        let endpoint = "https://relay.example/a";
+
+        let mut request = request_from(&browser, browser.anchor, endpoint, 0);
+        // Everything the browser signed, except the pool the row would end up holding.
+        request.jwt_signatures = vec![ByteBuf::from(vec![9u8; 64])];
+
+        assert!(matches!(
+            subscribe_via_proof(request),
+            Err(SubscribeDeviceError::InvalidBrowserKey)
+        ));
+        assert_eq!(subscription_count(browser.anchor), 0);
+    }
+
+    /// Same, for the VAPID key: swapping it would leave the row addressing the right
+    /// browser under a key the relay will not accept.
+    #[test]
+    fn a_signature_cannot_be_replayed_over_another_vapid_key() {
+        setup();
+        let browser = registered_browser(1);
+
+        let mut request = request_from(&browser, browser.anchor, "https://relay.example/a", 0);
+        request.vapid_public_key = ByteBuf::from(other_valid_vapid_key());
+
+        assert!(matches!(
+            subscribe_via_proof(request),
+            Err(SubscribeDeviceError::InvalidBrowserKey)
+        ));
+        assert_eq!(subscription_count(browser.anchor), 0);
+    }
+
+    /// The canister POSTs to this to wake the browser, so a value it could never POST
+    /// to is a row nothing can be delivered to.
+    #[test]
+    fn subscribe_rejects_an_endpoint_that_is_not_an_https_url() {
+        setup();
+        let browser = registered_browser(1);
+
+        for endpoint in ["x", "http://relay.example/a", "relay.example/a", "https://"] {
+            let mut subscription = subscription_of(&browser, "https://relay.example/a");
+            subscription.endpoint = endpoint.to_string();
+            assert!(
+                add_subscription(subscription, 0).is_err(),
+                "{endpoint} must not be accepted"
+            );
+        }
     }
 
     #[test]

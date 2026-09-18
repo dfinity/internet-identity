@@ -5,6 +5,7 @@
 //! `auth` keys are neither asked for nor stored. What remains is RFC 8292 VAPID, which
 //! authenticates II to the relay either way.
 use std::ops::RangeInclusive;
+use url::Url;
 
 pub mod subscription;
 
@@ -47,6 +48,22 @@ fn validate_param_len(
         return Err(format!(
             "{dbg_name} length {observed_len_bytes} out of range ({bounds})"
         ));
+    }
+    Ok(())
+}
+
+/// Length plus an absolute `https://` URL. The canister POSTs to this to wake the
+/// browser, so a value that is not one is a row nothing can ever be delivered to.
+fn validate_endpoint(endpoint: &str) -> Result<(), String> {
+    validate_param_len(endpoint.len(), 1..=MAX_ENDPOINT_LEN, "endpoint")?;
+    let Ok(url) = Url::parse(endpoint) else {
+        return Err("endpoint is not a URL".to_string());
+    };
+    if url.scheme() != "https" {
+        return Err("endpoint must be an https:// URL".to_string());
+    }
+    if url.host().is_none() {
+        return Err("endpoint has no host".to_string());
     }
     Ok(())
 }
@@ -105,10 +122,24 @@ pub(crate) mod fixtures {
     impl TestBrowser {
         /// The signature the canister verifies, spelled out rather than shared with the
         /// verifier so a wire change has to be made on both sides.
-        pub(crate) fn sign(&self, endpoint: &str, jwt_issued_at_ns: Timestamp) -> ByteBuf {
+        pub(crate) fn sign(
+            &self,
+            endpoint: &str,
+            jwt_issued_at_ns: Timestamp,
+            vapid_public_key: &[u8],
+            jwt_signatures: &[Vec<u8>],
+        ) -> ByteBuf {
+            use sha2::{Digest, Sha256};
+            let mut pool = Sha256::new();
+            for signature in jwt_signatures {
+                pool.update(signature);
+            }
             let mut message = b"ii-webpush-subscription".to_vec();
-            message.extend_from_slice(endpoint.as_bytes());
+            message.extend_from_slice(&self.anchor.to_be_bytes());
             message.extend_from_slice(&jwt_issued_at_ns.to_be_bytes());
+            message.extend_from_slice(&Sha256::digest(vapid_public_key));
+            message.extend_from_slice(&pool.finalize());
+            message.extend_from_slice(endpoint.as_bytes());
             let signature: Signature = self.signing.sign(&message);
             ByteBuf::from(signature.to_bytes().to_vec())
         }
@@ -133,10 +164,10 @@ pub(crate) mod fixtures {
     fn entry(id: BrowserId, key: &PublicKey) -> Browser {
         Browser {
             id,
-            current_browser_key: key.clone(),
-            // A key no test presents, standing in for the successor a real sign-in
-            // would have announced.
-            next_browser_key: ByteBuf::from(vec![0xAAu8; 91]),
+            // A key no test presents, standing in for the one the sign-in was reached
+            // by, which the browser has already discarded.
+            current_browser_key: ByteBuf::from(vec![0xAAu8; 91]),
+            next_browser_key: key.clone(),
             description: BrowserDescription {
                 brand: BrowserBrand::Chrome,
                 os: OperatingSystem::Macos,
@@ -213,6 +244,17 @@ pub(crate) mod fixtures {
             .to_vec()
     }
 
+    /// A second real point, for a test that swaps the key the proof was made over.
+    pub(crate) fn other_valid_vapid_key() -> Vec<u8> {
+        use p256::elliptic_curve::sec1::ToEncodedPoint;
+        let secret = p256::SecretKey::from_slice(&[2u8; 32]).expect("fixed scalar is valid");
+        secret
+            .public_key()
+            .to_encoded_point(false)
+            .as_bytes()
+            .to_vec()
+    }
+
     pub(crate) fn valid_pool() -> Vec<Vec<u8>> {
         vec![vec![3u8; JWT_SIG_LEN]; 3]
     }
@@ -234,14 +276,21 @@ pub(crate) mod fixtures {
         endpoint: &str,
         jwt_issued_at_ns: Timestamp,
     ) -> SubscribeDeviceRequest {
+        let vapid_public_key = valid_vapid_key();
+        let jwt_signatures = valid_pool();
         SubscribeDeviceRequest {
             anchor_number: anchor,
             endpoint: endpoint.to_string(),
-            vapid_public_key: ByteBuf::from(valid_vapid_key()),
-            jwt_signatures: valid_pool().into_iter().map(ByteBuf::from).collect(),
+            browser_key_signature: browser.sign(
+                endpoint,
+                jwt_issued_at_ns,
+                &vapid_public_key,
+                &jwt_signatures,
+            ),
+            vapid_public_key: ByteBuf::from(vapid_public_key),
+            jwt_signatures: jwt_signatures.into_iter().map(ByteBuf::from).collect(),
             jwt_issued_at_ns,
             browser_key: browser.key.clone(),
-            browser_key_signature: browser.sign(endpoint, jwt_issued_at_ns),
         }
     }
 
@@ -250,11 +299,19 @@ pub(crate) mod fixtures {
         request: SubscribeDeviceRequest,
     ) -> Result<(), SubscribeDeviceError> {
         let browser_id = browser_of_key(request.anchor_number, &request.browser_key)?;
+        let jwt_signatures: Vec<Vec<u8>> = request
+            .jwt_signatures
+            .iter()
+            .map(|signature| signature.to_vec())
+            .collect();
         check_browser_proof(
             &request.browser_key,
             &request.browser_key_signature,
+            request.anchor_number,
             &request.endpoint,
             request.jwt_issued_at_ns,
+            &request.vapid_public_key,
+            &jwt_signatures,
         )?;
         let mut subscription = subscription_of(
             &TestBrowser {

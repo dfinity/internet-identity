@@ -439,14 +439,29 @@ impl BrowserKey {
         self.sign_with(SUCCESSOR_KEY_SIGNATURE_DOMAIN, session_key, device_key)
     }
 
-    /// The proof `webpush_subscribe_device` and `webpush_refresh_jwts` want, over the
-    /// endpoint and the pool's issue time.
-    pub fn sign_webpush_subscription(&self, endpoint: &str, jwt_issued_at_ns: u64) -> ByteBuf {
+    /// The proof `webpush_subscribe_device` and `webpush_refresh_jwts` want, over every
+    /// field the write stores.
+    pub fn sign_webpush_subscription(
+        &self,
+        anchor_number: u64,
+        endpoint: &str,
+        jwt_issued_at_ns: u64,
+        vapid_public_key: &[u8],
+        jwt_signatures: &[Vec<u8>],
+    ) -> ByteBuf {
         use p256::ecdsa::signature::Signer;
+        use sha2::{Digest, Sha256};
 
+        let mut pool = Sha256::new();
+        for signature in jwt_signatures {
+            pool.update(signature);
+        }
         let mut message = WEBPUSH_SIGNATURE_DOMAIN.to_vec();
-        message.extend_from_slice(endpoint.as_bytes());
+        message.extend_from_slice(&anchor_number.to_be_bytes());
         message.extend_from_slice(&jwt_issued_at_ns.to_be_bytes());
+        message.extend_from_slice(&Sha256::digest(vapid_public_key));
+        message.extend_from_slice(&pool.finalize());
+        message.extend_from_slice(endpoint.as_bytes());
         let signature: p256::ecdsa::Signature = self.signing_key.sign(&message);
         ByteBuf::from(signature.to_bytes().to_vec())
     }
