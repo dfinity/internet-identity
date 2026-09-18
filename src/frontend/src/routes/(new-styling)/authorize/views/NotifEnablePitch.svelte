@@ -26,9 +26,12 @@
 >
   <AuthorizeHeader {origin} />
 
-  <!-- Lock-screen notification preview -->
+  <!-- Lock-screen notification preview. Hidden from assistive technology: the app
+       names and messages in it are made up, and a screen reader would read them
+       ahead of the heading as though they were real. -->
   <div
     class="border-border-tertiary bg-bg-primary_alt relative overflow-hidden rounded-2xl border p-5 pb-8"
+    aria-hidden="true"
   >
     <span
       class="border-border-tertiary bg-bg-secondary text-text-tertiary mb-4 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold"
@@ -49,7 +52,7 @@
           <span class="text-text-primary text-[13px] font-semibold"
             >{$t`A marketplace`}</span
           >
-          <span class="text-text-tertiary text-[11px]">2m</span>
+          <span class="text-text-tertiary text-[11px]">{$t`2m`}</span>
         </div>
         <div class="text-text-secondary text-[13px]">
           {$t`Your item just sold.`}
