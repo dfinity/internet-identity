@@ -158,7 +158,6 @@ const runConsentCeremony = async (
 
   notificationConsentStore.setContext({
     effectiveOrigin,
-    appName: undefined,
     identityNumber,
     resolveActor: () => Promise.resolve(actor),
   });

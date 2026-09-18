@@ -651,7 +651,7 @@
   {#if $notificationConsentStore !== undefined}
     {#key $notificationConsentStore}
       <NotifOptInView
-        appName={$notificationConsentStore.appName}
+        appName={dapp.name}
         identityNumber={$notificationConsentStore.identityNumber}
         origin={$notificationConsentStore.effectiveOrigin}
         resolveActor={$notificationConsentStore.resolveActor}

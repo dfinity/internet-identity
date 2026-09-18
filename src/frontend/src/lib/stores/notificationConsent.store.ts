@@ -6,7 +6,6 @@ import type { _SERVICE } from "$lib/generated/internet_identity_types";
 export interface NotificationConsentContext {
   /** The app being asked about, already folded to its canonical spelling. */
   effectiveOrigin: string;
-  appName: string | undefined;
   identityNumber: bigint;
   resolveActor: () => Promise<ActorSubclass<_SERVICE> | undefined>;
 }
