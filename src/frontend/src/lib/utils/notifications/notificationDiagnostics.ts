@@ -14,7 +14,7 @@ export type FailureReason =
   | "unsupported";
 
 export type BrowserKind =
-  "chrome" | "firefox" | "safari" | "edge" | "ios" | "android" | "other";
+  "chrome" | "firefox" | "safari" | "edge" | "android" | "other";
 
 export interface NotificationDiagnostics {
   lastFailure?: { reason: FailureReason; message?: string; at: number };
@@ -82,9 +82,6 @@ export const detectBrowser = (): BrowserKind => {
     return "other";
   }
   const ua = navigator.userAgent;
-  if (/iPhone|iPad|iPod/.test(ua)) {
-    return "ios";
-  }
   if (/Android/.test(ua)) {
     return "android";
   }
