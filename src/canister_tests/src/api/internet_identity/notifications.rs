@@ -5,7 +5,7 @@ use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, FrontendHostname, NotificationConsentGrantedRequest,
     NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationRevokeConsentError,
     NotificationRevokeConsentRequest, SubscribeDeviceError, SubscribeDeviceRequest,
-    UnsubscribeDeviceError,
+    UnsubscribeDeviceError, UnsubscribeDeviceRequest,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -102,7 +102,10 @@ pub fn unsubscribe_device(
         RawEffectivePrincipal::None,
         sender,
         "webpush_unsubscribe_device",
-        (anchor_number, browser_id),
+        (UnsubscribeDeviceRequest {
+            anchor_number,
+            browser_id,
+        },),
     )
     .map(|(x,)| x)
 }

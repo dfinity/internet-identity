@@ -1778,6 +1778,11 @@ type SubscribeDeviceRequest = record {
     browser_key_signature : blob;
 };
 
+type UnsubscribeDeviceRequest = record {
+    anchor_number : UserNumber;
+    browser_id : nat32;
+};
+
 type SubscribeDeviceError = variant {
     Unauthorized : principal;
     // The browser's key names no browser this identity is signed in from, or its
@@ -2272,5 +2277,5 @@ service : (opt InternetIdentityInit) -> {
     notification_consent_granted : (NotificationConsentGrantedRequest) -> (bool) query;
 
     webpush_subscribe_device : (SubscribeDeviceRequest) -> (variant { Ok; Err : SubscribeDeviceError });
-    webpush_unsubscribe_device : (anchor_number : UserNumber, browser_id : nat32) -> (variant { Ok; Err : UnsubscribeDeviceError });
+    webpush_unsubscribe_device : (UnsubscribeDeviceRequest) -> (variant { Ok; Err : UnsubscribeDeviceError });
 };

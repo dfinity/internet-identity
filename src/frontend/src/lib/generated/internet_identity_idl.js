@@ -974,6 +974,10 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
   });
+  const UnsubscribeDeviceRequest = IDL.Record({
+    'browser_id' : IDL.Nat32,
+    'anchor_number' : UserNumber,
+  });
   const UnsubscribeDeviceError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
@@ -1620,7 +1624,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'webpush_unsubscribe_device' : IDL.Func(
-        [UserNumber, IDL.Nat32],
+        [UnsubscribeDeviceRequest],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : UnsubscribeDeviceError })],
         [],
       ),
