@@ -21,14 +21,6 @@ vi.mock("./subscribeDevice", () => ({
 vi.mock("$lib/stores/browser-key.store", () => ({
   currentBrowserId: vi.fn(() => Promise.resolve(7)),
 }));
-vi.mock("./browserActor", () => ({
-  browserKeyActor: vi.fn(() => Promise.resolve(browserActor)),
-}));
-// `windowsRemaining` is pure and is the unit under test here, so it stays real.
-vi.mock("./vapidPool", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./vapidPool")>()),
-  signJwtPool: vi.fn(() => Promise.resolve([new Uint8Array([1])])),
-}));
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
@@ -64,11 +56,6 @@ const actor = () => ({
   get_webpush_subscription_status: vi.fn(),
   remove_webpush_subscription: vi.fn(() => Promise.resolve({ Ok: null })),
 });
-
-/** The top-up goes out under the browser key, not the identity's session. */
-const browserActor = vi.hoisted(() => ({
-  set_webpush_subscription: vi.fn(() => Promise.resolve({ Ok: null })),
-}));
 
 const run = (a: ReturnType<typeof actor>) =>
   reconcileDeviceNotifications(
@@ -106,7 +93,6 @@ describe("reconcileDeviceNotifications", () => {
     const a = actor();
     a.get_webpush_subscription_status.mockResolvedValue(pool(1));
     await run(a);
-    expect(browserActor.set_webpush_subscription).not.toHaveBeenCalled();
     expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
   });
 
@@ -120,7 +106,7 @@ describe("reconcileDeviceNotifications", () => {
     const a = actor();
     a.get_webpush_subscription_status.mockResolvedValue(pool(25));
     await run(a);
-    expect(browserActor.set_webpush_subscription).toHaveBeenCalledOnce();
+    expect(registerStoredDevice).toHaveBeenCalledOnce();
     expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
   });
 
@@ -137,7 +123,6 @@ describe("reconcileDeviceNotifications", () => {
     await run(a);
     expect(registerStoredDevice).toHaveBeenCalledOnce();
     expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
-    expect(browserActor.set_webpush_subscription).not.toHaveBeenCalled();
   });
 
   /**
@@ -155,7 +140,6 @@ describe("reconcileDeviceNotifications", () => {
     await run(a);
     expect(registerStoredDevice).toHaveBeenCalledOnce();
     expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
-    expect(browserActor.set_webpush_subscription).not.toHaveBeenCalled();
   });
 
   /** The row is keyed by the browser, so re-subscribing overwrites the endpoint. */
@@ -189,7 +173,6 @@ describe("reconcileDeviceNotifications", () => {
     const a = actor();
     await run(a);
     expect(a.get_webpush_subscription_status).not.toHaveBeenCalled();
-    expect(browserActor.set_webpush_subscription).not.toHaveBeenCalled();
     expect(registerStoredDevice).not.toHaveBeenCalled();
   });
 

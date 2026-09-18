@@ -3,20 +3,14 @@
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { throwCanisterError } from "$lib/utils/utils";
-import { signJwtPool, windowsRemaining } from "./vapidPool";
-import {
-  currentDeviceSubscription,
-  isPushSupported,
-  relayOriginOf,
-} from "./pushSubscription";
+import { windowsRemaining } from "./vapidPool";
+import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import {
   registerStoredDevice,
   subscribeAndRegisterDevice,
 } from "./subscribeDevice";
 import { loadVapidKey } from "./vapidKeyStore";
 import { currentBrowserId } from "$lib/stores/browser-key.store";
-import { browserKeyActor } from "./browserActor";
 
 export { currentDeviceSubscription };
 
@@ -65,36 +59,18 @@ export const reconcileDeviceNotifications = async (
     browser_id: browserId,
   });
   // Nothing registered is what a second identity on this browser looks like, and a
-  // different endpoint is what another identity's re-subscribe left behind. Either
-  // way, register what the browser already holds rather than rotating it away.
-  if (status === undefined || status.endpoint !== stored.endpoint) {
+  // different endpoint is what another identity's re-subscribe left behind. A pool
+  // running out wants the same call, which signs a fresh one. Either way, register
+  // what the browser already holds rather than rotating it away.
+  const needsRegistering =
+    status === undefined ||
+    status.endpoint !== stored.endpoint ||
+    windowsRemaining({
+      poolLen: status.pool_len,
+      issuedAtNs: status.issued_at_ns,
+      nowNs: BigInt(Date.now()) * BigInt(1_000_000),
+    }) < JWT_POOL_REFRESH_THRESHOLD;
+  if (needsRegistering) {
     await registerStoredDevice(identityNumber, stored);
-    return;
   }
-  const remaining = windowsRemaining({
-    poolLen: status.pool_len,
-    issuedAtNs: status.issued_at_ns,
-    nowNs: BigInt(Date.now()) * BigInt(1_000_000),
-  });
-  if (remaining >= JWT_POOL_REFRESH_THRESHOLD) {
-    return;
-  }
-  const issuedAtNs = BigInt(Date.now()) * BigInt(1_000_000);
-  const signatures = await signJwtPool(
-    stored.privateKey,
-    relayOriginOf(stored.endpoint),
-    issuedAtNs,
-  );
-  // The call that registers is also the call that tops up: the same endpoint and key
-  // with a pool that moves forward.
-  const browserActor = await browserKeyActor(identityNumber);
-  await browserActor
-    .set_webpush_subscription({
-      anchor_number: identityNumber,
-      endpoint: stored.endpoint,
-      vapid_public_key: stored.publicKeyRaw,
-      jwt_signatures: signatures,
-      jwt_issued_at_ns: issuedAtNs,
-    })
-    .then(throwCanisterError);
 };
