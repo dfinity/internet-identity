@@ -17,7 +17,9 @@
 use super::verify::{Descriptor, SsoProvider};
 use super::OpenIDJWTVerificationError;
 use crate::openid::AudClaim;
-use crate::single_flight_cache::{self, CacheConfig, Cached, RetryBackoff, SingleFlightCache};
+use crate::single_flight_cache::{
+    self, CacheConfig, Cached, FillOutcome, RetryBackoff, SingleFlightCache,
+};
 use crate::HOUR_NS;
 use identity_jose::jwk::Jwk;
 use sha2::{Digest, Sha256};
@@ -612,7 +614,20 @@ fn validate_discovery_document(
 /// them. Errors are surfaced as `Err` (the cache backs off and serves
 /// stale-if-error).
 #[cfg(not(test))]
-async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
+async fn discovery_fill(domain: String) -> FillOutcome<DiscoveredConfig, String> {
+    // One outcall slot for the whole two-hop fetch. No slot → abandon: the cache
+    // records nothing (no backoff) and the next poll retries once capacity frees.
+    let Some(_permit) = crate::concurrency::acquire(&DISCOVERY_OUTCALL_LIMIT) else {
+        return FillOutcome::Abandoned;
+    };
+    match discovery_fetch(domain).await {
+        Ok(config) => FillOutcome::Ready(config),
+        Err(err) => FillOutcome::Failed(err),
+    }
+}
+
+#[cfg(not(test))]
+async fn discovery_fetch(domain: String) -> Result<DiscoveredConfig, String> {
     // Hop 1: fetch /.well-known/ii-openid-configuration. `https` by default; a
     // loopback host may use `http` under the `sso_allow_insecure_discovery` flag
     // (the e2e mock provider, which can't serve TLS).
@@ -658,23 +673,32 @@ async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
 
 /// The JWKS cache fill: fetch and parse the keys at `jwks_uri`.
 #[cfg(not(test))]
-async fn jwks_fill(jwks_uri: String) -> Result<Vec<Jwk>, String> {
-    super::jwks::fetch_jwks(jwks_uri).await
+async fn jwks_fill(jwks_uri: String) -> FillOutcome<Vec<Jwk>, String> {
+    // One outcall slot per refresh. No slot → abandon (no backoff), retry later.
+    let Some(_permit) = crate::concurrency::acquire(&JWKS_OUTCALL_LIMIT) else {
+        return FillOutcome::Abandoned;
+    };
+    match super::jwks::fetch_jwks(jwks_uri).await {
+        Ok(keys) => FillOutcome::Ready(keys),
+        Err(err) => FillOutcome::Failed(err),
+    }
 }
 
 // In test builds the fills read from injected state instead of doing outcalls.
 #[cfg(test)]
-async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
-    tests::TEST_DISCOVERY
-        .with_borrow(|m| m.get(&domain).cloned())
-        .ok_or_else(|| format!("no test discovery for {domain}"))
+async fn discovery_fill(domain: String) -> FillOutcome<DiscoveredConfig, String> {
+    match tests::TEST_DISCOVERY.with_borrow(|m| m.get(&domain).cloned()) {
+        Some(config) => FillOutcome::Ready(config),
+        None => FillOutcome::Failed(format!("no test discovery for {domain}")),
+    }
 }
 
 #[cfg(test)]
-async fn jwks_fill(jwks_uri: String) -> Result<Vec<Jwk>, String> {
-    tests::TEST_JWKS
-        .with_borrow(|m| m.get(&jwks_uri).cloned())
-        .ok_or_else(|| format!("no test jwks for {jwks_uri}"))
+async fn jwks_fill(jwks_uri: String) -> FillOutcome<Vec<Jwk>, String> {
+    match tests::TEST_JWKS.with_borrow(|m| m.get(&jwks_uri).cloned()) {
+        Some(keys) => FillOutcome::Ready(keys),
+        None => FillOutcome::Failed(format!("no test jwks for {jwks_uri}")),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -691,6 +715,14 @@ thread_local! {
     /// moment. The 90s reclaim age is kept above the ~60s outcall timeout so a
     /// still-live call is never reclaimed early. See [`crate::concurrency`].
     static DISCOVERY_OUTCALL_LIMIT: RefCell<crate::concurrency::ConcurrencyLimiter> =
+        RefCell::new(crate::concurrency::ConcurrencyLimiter::new(
+            crate::concurrency::LimiterConfig { max_concurrent: 80, max_age_secs: 90 },
+        ));
+
+    /// Caps how many key-set refreshes run at once (roughly one per provider).
+    /// The 90s reclaim age is kept above the ~60s outcall timeout so a still-live
+    /// call is never reclaimed early. See [`crate::concurrency`].
+    static JWKS_OUTCALL_LIMIT: RefCell<crate::concurrency::ConcurrencyLimiter> =
         RefCell::new(crate::concurrency::ConcurrencyLimiter::new(
             crate::concurrency::LimiterConfig { max_concurrent: 80, max_age_secs: 90 },
         ));
@@ -733,12 +765,10 @@ async fn http_get_json(url: String) -> Result<Vec<u8>, String> {
         ],
     };
 
-    let (response,) = crate::concurrency::guarded(&DISCOVERY_OUTCALL_LIMIT, || {
+    let (response,) =
         http_request_with_closure(request, DISCOVERY_CALL_CYCLES, transform_discovery)
-    })
-    .await
-    .map_err(|_| "outcall concurrency budget exhausted".to_string())?
-    .map_err(|(_, err)| err)?;
+            .await
+            .map_err(|(_, err)| err)?;
     Ok(response.body)
 }
 

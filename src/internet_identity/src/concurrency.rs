@@ -5,16 +5,15 @@
 //! bound across resources is simply the sum of the per-instance budgets, chosen
 //! (like each cache's `max_entries`) to stay within what the resource can take.
 //!
-//! [`guarded`] reserves a slot, runs the operation, and releases the slot the
-//! instant it resolves — the permit releases on `Drop`, so a slot lives exactly
-//! as long as the operation holding it. A permit stranded by a caller that
+//! [`acquire`] hands back a [`Permit`] when a slot is free (else `None`); the
+//! caller holds it across the guarded work and the slot releases on `Drop`, so a
+//! slot lives exactly as long as the permit. A permit stranded by a caller that
 //! trapped after committing state at an `.await` (so its `Drop` never ran) is
 //! reclaimed once older than the configured age, so a leak can't permanently
 //! wedge the budget.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::future::Future;
 use std::thread::LocalKey;
 
 /// Configuration for a [`ConcurrencyLimiter`]. Named fields so call sites read
@@ -89,9 +88,10 @@ impl ConcurrencyLimiter {
 /// `thread_local! { static FOO: RefCell<ConcurrencyLimiter> = ... }`.
 type Limiter = &'static LocalKey<RefCell<ConcurrencyLimiter>>;
 
-/// A reserved slot, released automatically on `Drop`.
+/// A reserved slot. Holding it holds the slot; dropping it frees the slot, so a
+/// slot lives exactly as long as the permit — hold it across the work it guards.
 #[must_use = "the reserved slot is released as soon as the permit is dropped"]
-struct Permit {
+pub struct Permit {
     limiter: Limiter,
     id: u64,
 }
@@ -102,33 +102,13 @@ impl Drop for Permit {
     }
 }
 
-fn acquire(limiter: Limiter) -> Option<Permit> {
+/// Reserve a slot from `limiter`, or `None` when its budget is full. Hold the
+/// returned [`Permit`] for the duration of the guarded work; drop it to release.
+pub fn acquire(limiter: Limiter) -> Option<Permit> {
     let now = now_secs();
     limiter
         .with_borrow_mut(|l| l.try_acquire(now))
         .map(|id| Permit { limiter, id })
-}
-
-/// Returned by [`guarded`] when `limiter`'s budget is full. Callers should treat
-/// it as a transient failure and retry later.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BudgetExhausted;
-
-/// Run `run` under a permit from `limiter`. Reserves a slot, runs the
-/// operation, and releases the slot the instant the future resolves. Returns
-/// `Err(BudgetExhausted)` *without invoking `run`* when the budget is full, so a
-/// refusal costs nothing.
-pub async fn guarded<T, Fut>(
-    limiter: Limiter,
-    run: impl FnOnce() -> Fut,
-) -> Result<T, BudgetExhausted>
-where
-    Fut: Future<Output = T>,
-{
-    let permit = acquire(limiter).ok_or(BudgetExhausted)?;
-    let out = run().await;
-    drop(permit);
-    Ok(out)
 }
 
 #[cfg(not(test))]
@@ -151,9 +131,6 @@ fn now_secs() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::Cell;
-    use std::rc::Rc;
-    use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
     // --- pure limiter accounting (clock passed in explicitly) ---
 
@@ -198,7 +175,7 @@ mod tests {
         );
     }
 
-    // --- the async `guarded` wrapper over a thread_local limiter ---
+    // --- the `acquire` / `Permit` API over a thread_local limiter ---
 
     thread_local! {
         static TEST_LIMITER: RefCell<ConcurrencyLimiter> =
@@ -209,52 +186,21 @@ mod tests {
         TEST_LIMITER.with_borrow_mut(|l| *l = ConcurrencyLimiter::new(LimiterConfig { max_concurrent: 2, max_age_secs: 100 }));
     }
 
-    fn block_on<F: Future>(fut: F) -> F::Output {
-        fn no_op(_: *const ()) {}
-        fn clone(_: *const ()) -> RawWaker {
-            RawWaker::new(std::ptr::null(), &VTABLE)
-        }
-        static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, no_op, no_op, no_op);
-        let waker = unsafe { Waker::from_raw(RawWaker::new(std::ptr::null(), &VTABLE)) };
-        let mut cx = Context::from_waker(&waker);
-        let mut fut = Box::pin(fut);
-        loop {
-            if let Poll::Ready(v) = fut.as_mut().poll(&mut cx) {
-                return v;
-            }
-        }
+    #[test]
+    fn acquire_hands_out_permits_up_to_the_budget_then_none() {
+        reset_test_limiter();
+        let held: Vec<_> = std::iter::from_fn(|| acquire(&TEST_LIMITER)).collect();
+        assert_eq!(held.len(), 2, "budget of 2");
+        assert!(acquire(&TEST_LIMITER).is_none(), "budget-plus-one is refused");
     }
 
     #[test]
-    fn guarded_runs_the_operation_and_releases_the_slot() {
+    fn dropping_a_permit_frees_a_slot() {
         reset_test_limiter();
-        let ran = Rc::new(Cell::new(false));
-        let ran2 = Rc::clone(&ran);
-        let out = block_on(guarded(&TEST_LIMITER, || async move {
-            ran2.set(true);
-            42
-        }));
-        assert_eq!(out, Ok(42));
-        assert!(ran.get(), "the operation ran");
-        assert_eq!(
-            TEST_LIMITER.with_borrow(ConcurrencyLimiter::in_use),
-            0,
-            "the slot is released once the guarded future resolves"
-        );
-    }
-
-    #[test]
-    fn guarded_refuses_without_running_when_the_budget_is_full() {
-        reset_test_limiter();
-        // Hold both slots so the budget is full.
-        let _held: Vec<_> = std::iter::from_fn(|| acquire(&TEST_LIMITER)).collect();
-        assert_eq!(_held.len(), 2);
-        let ran = Rc::new(Cell::new(false));
-        let ran2 = Rc::clone(&ran);
-        let out: Result<(), _> = block_on(guarded(&TEST_LIMITER, || async move {
-            ran2.set(true);
-        }));
-        assert_eq!(out, Err(BudgetExhausted));
-        assert!(!ran.get(), "a refused operation must not run");
+        let mut held: Vec<_> = std::iter::from_fn(|| acquire(&TEST_LIMITER)).collect();
+        assert!(acquire(&TEST_LIMITER).is_none(), "saturated");
+        drop(held.pop()); // release one permit
+        assert_eq!(TEST_LIMITER.with_borrow(ConcurrencyLimiter::in_use), 1);
+        assert!(acquire(&TEST_LIMITER).is_some(), "a freed slot is re-acquirable");
     }
 }
