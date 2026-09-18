@@ -106,9 +106,19 @@ fn canonical_origin(origin: &str) -> Result<FrontendHostname, String> {
     Ok(origin.to_string())
 }
 
-/// Server-side kill switch; every entry point goes through it.
+/// Whether this deployment notifies for `origin`. Configured origins are folded the same
+/// way the request's is, so an operator may list any spelling of a gateway twin.
 fn enabled_for(origin: &FrontendHostname) -> Result<(), String> {
-    if crate::state::persistent_state(|s| s.notifications_enabled.unwrap_or(false)) {
+    let enabled = crate::state::persistent_state(|s| {
+        s.notifications_enabled_origins
+            .as_ref()
+            .is_some_and(|origins| {
+                origins
+                    .iter()
+                    .any(|enabled| &remap_to_legacy_domain(enabled) == origin)
+            })
+    });
+    if enabled {
         Ok(())
     } else {
         Err(format!("notifications are not enabled for {origin}"))
@@ -120,8 +130,10 @@ mod tests {
     use super::*;
     use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
 
-    fn enable(_origins: &[&str]) {
-        crate::state::persistent_state_mut(|s| s.notifications_enabled = Some(true));
+    fn enable(origins: &[&str]) {
+        crate::state::persistent_state_mut(|s| {
+            s.notifications_enabled_origins = Some(origins.iter().map(|o| o.to_string()).collect());
+        });
     }
 
     #[test]
@@ -134,6 +146,14 @@ mod tests {
         ] {
             assert_eq!(notifying_origin(origin).unwrap(), "https://abc-cai.ic0.app");
         }
+    }
+
+    /// An operator listing a modern gateway still enables the row the sign-in created
+    /// under the legacy one.
+    #[test]
+    fn an_enabled_origin_matches_its_gateway_twins() {
+        enable(&["https://abc-cai.icp0.io"]);
+        assert!(notifying_origin("https://abc-cai.ic0.app").is_ok());
     }
 
     #[test]
@@ -166,8 +186,20 @@ mod tests {
     }
 
     #[test]
-    fn refuses_every_origin_while_the_feature_is_off() {
-        crate::state::persistent_state_mut(|s| s.notifications_enabled = None);
+    fn refuses_an_origin_this_deployment_does_not_notify_for() {
+        enable(&["https://allowed.example"]);
+        assert!(notifying_origin("https://other.example").is_err());
+    }
+
+    #[test]
+    fn refuses_every_origin_when_the_list_is_empty() {
+        enable(&[]);
+        assert!(notifying_origin("https://allowed.example").is_err());
+    }
+
+    #[test]
+    fn refuses_every_origin_when_nothing_is_configured() {
+        crate::state::persistent_state_mut(|s| s.notifications_enabled_origins = None);
         assert!(notifying_origin("https://allowed.example").is_err());
     }
 
