@@ -986,3 +986,21 @@ pub enum NotificationError {
     /// consent to hang off. Apart from `NotFound` because signing in there clears it.
     SessionMissing,
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationGrantConsentRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationRevokeConsentRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ConsentStatusRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+}

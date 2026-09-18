@@ -1749,6 +1749,21 @@ type NotificationError = variant {
     SessionMissing;
 };
 
+type NotificationGrantConsentRequest = record {
+    anchor_number : UserNumber;
+    origin : text;
+};
+
+type NotificationRevokeConsentRequest = record {
+    anchor_number : UserNumber;
+    origin : text;
+};
+
+type ConsentStatusRequest = record {
+    anchor_number : UserNumber;
+    origin : text;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2225,10 +2240,10 @@ service : (opt InternetIdentityInit) -> {
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
 
     // ===== Notifications =====
-    notification_grant_consent : (anchor_number : UserNumber, origin : text) -> (variant { Ok; Err : NotificationError });
-    notification_revoke_consent : (anchor_number : UserNumber, origin : text) -> (variant { Ok; Err : NotificationError });
+    notification_grant_consent : (NotificationGrantConsentRequest) -> (variant { Ok; Err : NotificationError });
+    notification_revoke_consent : (NotificationRevokeConsentRequest) -> (variant { Ok; Err : NotificationError });
     // Whether this app may notify this identity. False for a disabled deployment
     // or an unauthorized caller, so neither can be probed with it.
-    notification_consent_status : (anchor_number : UserNumber, origin : text) -> (bool) query;
+    notification_consent_status : (ConsentStatusRequest) -> (bool) query;
 
 };

@@ -718,6 +718,14 @@ export const idlFactory = ({ IDL }) => {
     'permissions' : Permissions,
     'expiration' : Timestamp,
   });
+  const ConsentStatusRequest = IDL.Record({
+    'origin' : IDL.Text,
+    'anchor_number' : UserNumber,
+  });
+  const NotificationGrantConsentRequest = IDL.Record({
+    'origin' : IDL.Text,
+    'anchor_number' : UserNumber,
+  });
   const NotificationError = IDL.Variant({
     'InvalidSubscription' : IDL.Vec(IDL.Text),
     'Disabled' : IDL.Null,
@@ -725,6 +733,10 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Text,
     'InvalidOrigin' : IDL.Text,
     'SessionMissing' : IDL.Null,
+  });
+  const NotificationRevokeConsentRequest = IDL.Record({
+    'origin' : IDL.Text,
+    'anchor_number' : UserNumber,
   });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
@@ -1367,17 +1379,17 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'notification_consent_status' : IDL.Func(
-        [UserNumber, IDL.Text],
+        [ConsentStatusRequest],
         [IDL.Bool],
         ['query'],
       ),
     'notification_grant_consent' : IDL.Func(
-        [UserNumber, IDL.Text],
+        [NotificationGrantConsentRequest],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : NotificationError })],
         [],
       ),
     'notification_revoke_consent' : IDL.Func(
-        [UserNumber, IDL.Text],
+        [NotificationRevokeConsentRequest],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : NotificationError })],
         [],
       ),

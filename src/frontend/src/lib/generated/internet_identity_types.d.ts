@@ -482,6 +482,10 @@ export type CheckCaptchaError = {
      */
     'WrongSolution' : { 'new_captcha_png_base64' : string }
   };
+export interface ConsentStatusRequest {
+  'origin' : string,
+  'anchor_number' : UserNumber,
+}
 export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -1375,6 +1379,14 @@ export type NotificationError = { 'InvalidSubscription' : Array<string> } |
      */
     'SessionMissing' : null
   };
+export interface NotificationGrantConsentRequest {
+  'origin' : string,
+  'anchor_number' : UserNumber,
+}
+export interface NotificationRevokeConsentRequest {
+  'origin' : string,
+  'anchor_number' : UserNumber,
+}
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
@@ -2555,17 +2567,17 @@ export interface _SERVICE {
    * Whether this app may notify this identity. False for a disabled deployment
    * or an unauthorized caller, so neither can be probed with it.
    */
-  'notification_consent_status' : ActorMethod<[UserNumber, string], boolean>,
+  'notification_consent_status' : ActorMethod<[ConsentStatusRequest], boolean>,
   /**
    * ===== Notifications =====
    */
   'notification_grant_consent' : ActorMethod<
-    [UserNumber, string],
+    [NotificationGrantConsentRequest],
     { 'Ok' : null } |
       { 'Err' : NotificationError }
   >,
   'notification_revoke_consent' : ActorMethod<
-    [UserNumber, string],
+    [NotificationRevokeConsentRequest],
     { 'Ok' : null } |
       { 'Err' : NotificationError }
   >,

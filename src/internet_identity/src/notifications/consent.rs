@@ -6,7 +6,8 @@ use super::{
 };
 use crate::state::{storage_borrow, storage_borrow_mut};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, FrontendHostname, Timestamp,
+    AnchorNumber, ConsentStatusRequest, FrontendHostname, NotificationGrantConsentRequest,
+    NotificationRevokeConsentRequest, Timestamp,
 };
 
 /// Records `consented_at_ns` as `origin`'s consent for `anchor_number`, or withdraws it
@@ -58,8 +59,10 @@ pub(crate) fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname)
 /// `SessionMissing` for an origin the identity has never signed in at: consent hangs off
 /// the application, which only a sign-in mints.
 pub fn grant_consent(
-    anchor_number: AnchorNumber,
-    origin: FrontendHostname,
+    NotificationGrantConsentRequest {
+        anchor_number,
+        origin,
+    }: NotificationGrantConsentRequest,
 ) -> Result<(), NotificationError> {
     check_enabled()?;
     authorize_update(anchor_number)?;
@@ -69,8 +72,10 @@ pub fn grant_consent(
 /// Revokes `origin`'s consent. Device subscriptions stay: they are shared across every
 /// consented app.
 pub fn revoke_consent(
-    anchor_number: AnchorNumber,
-    origin: FrontendHostname,
+    NotificationRevokeConsentRequest {
+        anchor_number,
+        origin,
+    }: NotificationRevokeConsentRequest,
 ) -> Result<(), NotificationError> {
     check_enabled()?;
     authorize_update(anchor_number)?;
@@ -79,7 +84,12 @@ pub fn revoke_consent(
 
 /// Whether `origin` may notify this identity. `false` for an unauthorized or disabled
 /// call, so neither can be probed.
-pub fn consent_status(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
+pub fn consent_status(
+    ConsentStatusRequest {
+        anchor_number,
+        origin,
+    }: ConsentStatusRequest,
+) -> bool {
     feature_enabled() && authorize_query(anchor_number) && has_consent(anchor_number, origin)
 }
 
