@@ -17,7 +17,8 @@ export const isPushSupported = (): boolean =>
   "PushManager" in window &&
   "Notification" in window;
 
-/** Prompts for notification permission; resolves true only on an explicit grant. */
+/** Prompts for notification permission, and answers what the user chose. A prompt
+ *  closed without an answer leaves it at `default`, which can be asked again. */
 export const requestNotificationPermission =
   (): Promise<NotificationPermission> => Notification.requestPermission();
 
