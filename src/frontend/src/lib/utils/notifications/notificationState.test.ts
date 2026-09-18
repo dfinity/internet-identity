@@ -5,6 +5,9 @@ vi.mock("./vapidKeyStore", () => ({ loadVapidKey: vi.fn() }));
 vi.mock("./notificationDiagnostics", () => ({
   wasDeclinedRecently: vi.fn(() => false),
 }));
+vi.mock("$lib/stores/browser-key.store", () => ({
+  currentBrowserId: vi.fn(),
+}));
 
 import {
   resolveOptInScreen,
@@ -21,6 +24,7 @@ const state = (
   supported: true,
   permission: "default",
   subscribed: false,
+  registered: false,
   ...over,
 });
 
@@ -36,7 +40,7 @@ describe("resolveOptInScreen", () => {
   it("skips when already fully on for this app", () => {
     expect(
       resolveOptInScreen(
-        state({ permission: "granted", subscribed: true }),
+        state({ permission: "granted", subscribed: true, registered: true }),
         ORIGIN,
         true,
       ),
@@ -57,7 +61,7 @@ describe("resolveOptInScreen", () => {
   it("asks only for this app's consent when the browser is subscribed", () => {
     expect(
       resolveOptInScreen(
-        state({ permission: "granted", subscribed: true }),
+        state({ permission: "granted", subscribed: true, registered: true }),
         ORIGIN,
         false,
       ),
@@ -65,9 +69,19 @@ describe("resolveOptInScreen", () => {
   });
 
   it("offers to enable this device when the app is allowed elsewhere", () => {
-    expect(resolveOptInScreen(state({ subscribed: false }), ORIGIN, true)).toBe(
+    expect(resolveOptInScreen(state({ registered: false }), ORIGIN, true)).toBe(
       "new-device",
     );
+  });
+
+  it("offers to enable this device for an identity the canister has no row for", () => {
+    expect(
+      resolveOptInScreen(
+        state({ permission: "granted", subscribed: true, registered: false }),
+        ORIGIN,
+        true,
+      ),
+    ).toBe("new-device");
   });
 
   it("shows the full pitch to a first-timer", () => {
