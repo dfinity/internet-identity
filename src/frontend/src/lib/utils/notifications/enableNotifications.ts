@@ -12,7 +12,7 @@ import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
 import { awaitSessionCreation } from "$lib/stores/sessionCreation.store";
 import { mintApplicationSession } from "./mintApplicationSession";
 import { requestNotificationPermission } from "./pushSubscription";
-import { subscribeAndRegisterDevice } from "./subscribeDevice";
+import { ensureRegisteredDevice } from "./subscribeDevice";
 
 type GrantArgs = {
   identityNumber: bigint;
@@ -40,7 +40,7 @@ export const enableNotifications = async ({
     return { status: permission === "denied" ? "denied" : "dismissed" };
   }
 
-  await subscribeAndRegisterDevice(identityNumber, actor);
+  await ensureRegisteredDevice(identityNumber, actor);
   await grantConsent({ identityNumber, origin, actor });
 
   return { status: "enabled" };
