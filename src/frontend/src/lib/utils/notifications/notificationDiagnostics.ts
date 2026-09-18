@@ -7,11 +7,7 @@ const STORE_KEY = "ii-notification-diagnostics";
 const DECLINE_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
 
 export type FailureReason =
-  | "permission-denied"
-  | "subscribe-failed"
-  | "register-failed"
-  | "backend-disabled"
-  | "unsupported";
+  "permission-denied" | "subscribe-failed" | "register-failed" | "unsupported";
 
 export interface NotificationDiagnostics {
   lastFailure?: { reason: FailureReason; message?: string; at: number };
