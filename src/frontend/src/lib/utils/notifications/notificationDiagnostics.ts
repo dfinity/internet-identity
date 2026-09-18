@@ -1,6 +1,6 @@
 // How notifications last went, so the next screen can be specific: which failure
-// happened, which browser to give unblock steps for, and which apps the user recently
-// declined. Kept in localStorage and never sent anywhere.
+// happened and which apps the user recently declined. Kept in localStorage and never
+// sent anywhere.
 
 const STORE_KEY = "ii-notification-diagnostics";
 // How long a "Maybe later" quiets the opt-in for one app.
@@ -13,12 +13,8 @@ export type FailureReason =
   | "backend-disabled"
   | "unsupported";
 
-export type BrowserKind =
-  "chrome" | "firefox" | "safari" | "edge" | "android" | "other";
-
 export interface NotificationDiagnostics {
   lastFailure?: { reason: FailureReason; message?: string; at: number };
-  browser?: BrowserKind;
   permission?: NotificationPermission;
   declinedFor?: Record<string, number>;
 }
@@ -46,11 +42,7 @@ export const recordFailure = (
   reason: FailureReason,
   message?: string,
 ): void => {
-  write({
-    ...read(),
-    browser: detectBrowser(),
-    lastFailure: { reason, message, at: Date.now() },
-  });
+  write({ ...read(), lastFailure: { reason, message, at: Date.now() } });
 };
 
 export const clearFailure = (): void => {
@@ -74,28 +66,4 @@ export const recordDeclined = (origin: string): void => {
 export const wasDeclinedRecently = (origin: string): boolean => {
   const at = read().declinedFor?.[origin];
   return at !== undefined && Date.now() - at < DECLINE_COOLDOWN_MS;
-};
-
-/** Best-effort engine sniff, only ever used to pick which unblock steps to show. */
-export const detectBrowser = (): BrowserKind => {
-  if (typeof navigator === "undefined") {
-    return "other";
-  }
-  const ua = navigator.userAgent;
-  if (/Android/.test(ua)) {
-    return "android";
-  }
-  if (/Edg\//.test(ua)) {
-    return "edge";
-  }
-  if (/Firefox\//.test(ua)) {
-    return "firefox";
-  }
-  if (/Chrome\//.test(ua)) {
-    return "chrome";
-  }
-  if (/Safari\//.test(ua)) {
-    return "safari";
-  }
-  return "other";
 };
