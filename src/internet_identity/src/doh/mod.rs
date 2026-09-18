@@ -274,7 +274,7 @@ mod prod {
         /// ~60s outcall timeout so a still-live call is never reclaimed early.
         /// See [`crate::concurrency`].
         static OUTCALL_LIMIT: RefCell<ConcurrencyLimiter> = RefCell::new(
-            ConcurrencyLimiter::new(LimiterConfig { max_concurrent: 150, max_age_secs: 90 }),
+            ConcurrencyLimiter::new(LimiterConfig { max_concurrent: 50, max_age_secs: 90 }),
         );
     }
 

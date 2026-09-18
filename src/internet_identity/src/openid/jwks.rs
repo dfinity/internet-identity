@@ -50,7 +50,7 @@ thread_local! {
     /// still-live call is never reclaimed early. See [`crate::concurrency`].
     static JWKS_OUTCALL_LIMIT: std::cell::RefCell<crate::concurrency::ConcurrencyLimiter> =
         std::cell::RefCell::new(crate::concurrency::ConcurrencyLimiter::new(
-            crate::concurrency::LimiterConfig { max_concurrent: 100, max_age_secs: 90 },
+            crate::concurrency::LimiterConfig { max_concurrent: 80, max_age_secs: 90 },
         ));
 }
 

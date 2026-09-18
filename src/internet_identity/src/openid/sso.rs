@@ -692,7 +692,7 @@ thread_local! {
     /// still-live call is never reclaimed early. See [`crate::concurrency`].
     static DISCOVERY_OUTCALL_LIMIT: RefCell<crate::concurrency::ConcurrencyLimiter> =
         RefCell::new(crate::concurrency::ConcurrencyLimiter::new(
-            crate::concurrency::LimiterConfig { max_concurrent: 150, max_age_secs: 90 },
+            crate::concurrency::LimiterConfig { max_concurrent: 80, max_age_secs: 90 },
         ));
 }
 
