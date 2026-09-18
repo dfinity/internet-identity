@@ -5,7 +5,7 @@ vi.mock("./subscribeDevice", () => ({
   subscribeAndRegisterDevice: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("./pushSubscription", () => ({
-  requestNotificationPermission: vi.fn(() => Promise.resolve(true)),
+  requestNotificationPermission: vi.fn(() => Promise.resolve("granted")),
 }));
 vi.mock("./mintApplicationSession", () => ({
   mintApplicationSession: vi.fn(() => Promise.resolve()),
@@ -13,14 +13,18 @@ vi.mock("./mintApplicationSession", () => ({
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { allowApp } from "./enableNotifications";
+import { allowApp, enableNotifications } from "./enableNotifications";
 import { mintApplicationSession } from "./mintApplicationSession";
+import { subscribeAndRegisterDevice } from "./subscribeDevice";
+import { requestNotificationPermission } from "./pushSubscription";
 import {
   awaitSessionCreation,
   trackSessionCreation,
 } from "$lib/stores/sessionCreation.store";
 
 const mint = vi.mocked(mintApplicationSession);
+const subscribe = vi.mocked(subscribeAndRegisterDevice);
+const permission = vi.mocked(requestNotificationPermission);
 const ORIGIN = "https://app.example";
 const IDENTITY = BigInt(10_000);
 
@@ -135,5 +139,51 @@ describe("granting consent", () => {
       allowApp({ identityNumber: IDENTITY, origin: ORIGIN, actor }),
     ).rejects.toThrow();
     expect(mint).not.toHaveBeenCalled();
+  });
+});
+
+describe("enabling notifications", () => {
+  beforeEach(() => {
+    mint.mockClear();
+    mint.mockResolvedValue(undefined);
+    subscribe.mockClear();
+    permission.mockResolvedValue("granted");
+  });
+
+  it("subscribes the device before recording consent", async () => {
+    const { actor, grant } = actorAnswering(ok);
+
+    await expect(
+      enableNotifications({ identityNumber: IDENTITY, origin: ORIGIN, actor }),
+    ).resolves.toEqual({ status: "enabled" });
+
+    // A refusal at the browser prompt must leave no consent behind, so the
+    // subscription has to land first.
+    expect(subscribe.mock.invocationCallOrder[0]).toBeLessThan(
+      grant.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("records nothing when the prompt is denied", async () => {
+    permission.mockResolvedValue("denied");
+    const { actor, grant } = actorAnswering(ok);
+
+    await expect(
+      enableNotifications({ identityNumber: IDENTITY, origin: ORIGIN, actor }),
+    ).resolves.toEqual({ status: "denied" });
+
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(grant).not.toHaveBeenCalled();
+  });
+
+  it("reports a dismissed prompt apart from a denial", async () => {
+    permission.mockResolvedValue("default");
+    const { actor } = actorAnswering(ok);
+
+    await expect(
+      enableNotifications({ identityNumber: IDENTITY, origin: ORIGIN, actor }),
+    ).resolves.toEqual({ status: "dismissed" });
+
+    expect(subscribe).not.toHaveBeenCalled();
   });
 });

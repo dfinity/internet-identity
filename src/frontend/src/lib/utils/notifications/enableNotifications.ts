@@ -20,8 +20,11 @@ type GrantArgs = {
   actor: ActorSubclass<_SERVICE>;
 };
 
-export type EnableNotificationsResult =
-  { status: "enabled" } | { status: "permission-denied" };
+export type EnableNotificationsResult = {
+  /** `dismissed` is a prompt closed without an answer, which leaves the permission
+   * at `default` and can be asked again; `denied` cannot, and needs unblock steps. */
+  status: "enabled" | "denied" | "dismissed";
+};
 
 export const enableNotifications = async ({
   identityNumber,
@@ -32,8 +35,9 @@ export const enableNotifications = async ({
   origin: string;
   actor: ActorSubclass<_SERVICE>;
 }): Promise<EnableNotificationsResult> => {
-  if (!(await requestNotificationPermission())) {
-    return { status: "permission-denied" };
+  const permission = await requestNotificationPermission();
+  if (permission !== "granted") {
+    return { status: permission === "denied" ? "denied" : "dismissed" };
   }
 
   await subscribeAndRegisterDevice(identityNumber, actor);

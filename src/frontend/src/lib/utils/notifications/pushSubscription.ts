@@ -18,8 +18,8 @@ export const isPushSupported = (): boolean =>
   "Notification" in window;
 
 /** Prompts for notification permission; resolves true only on an explicit grant. */
-export const requestNotificationPermission = async (): Promise<boolean> =>
-  (await Notification.requestPermission()) === "granted";
+export const requestNotificationPermission =
+  (): Promise<NotificationPermission> => Notification.requestPermission();
 
 const registerServiceWorker = async (): Promise<ServiceWorkerRegistration> => {
   await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
