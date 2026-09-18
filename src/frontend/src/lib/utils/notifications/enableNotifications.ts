@@ -86,7 +86,10 @@ const grantConsent = async (args: GrantArgs): Promise<void> => {
   // alongside a delegation method that creates no session.
   await mintApplicationSession(args);
   await args.actor
-    .notification_grant_consent(args.identityNumber, args.origin)
+    .notification_grant_consent({
+      anchor_number: args.identityNumber,
+      origin: args.origin,
+    })
     .then(throwCanisterError);
 };
 
@@ -100,7 +103,7 @@ const granted = ({
   actor,
 }: GrantArgs): Promise<boolean> =>
   actor
-    .notification_grant_consent(identityNumber, origin)
+    .notification_grant_consent({ anchor_number: identityNumber, origin })
     .then(throwCanisterError)
     .then(() => true)
     .catch((error: unknown) => {
