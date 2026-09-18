@@ -22,20 +22,17 @@ fn set_consent(
 ) -> Result<(), NotificationError> {
     let origin = consent_origin(&origin)?;
 
-    storage_borrow_mut(
-        |storage| match storage.notification_application(anchor_number, &origin) {
-            Some(application_number) => {
-                storage.set_notification_consent(
-                    anchor_number,
-                    application_number,
-                    consented_at_ns,
-                );
-                Ok(())
-            }
-            None if consented_at_ns.is_some() => Err(NotificationError::SessionMissing),
-            None => Ok(()),
-        },
-    )
+    storage_borrow_mut(|storage| {
+        let mut config = storage
+            .read_anchor_application_config(anchor_number, &origin)
+            .unwrap_or_default();
+        config.notifications_consented_at_ns = consented_at_ns;
+        match storage.write_anchor_application_config(anchor_number, &origin, config) {
+            Ok(()) => Ok(()),
+            Err(_) if consented_at_ns.is_some() => Err(NotificationError::SessionMissing),
+            Err(_) => Ok(()),
+        }
+    })
 }
 
 pub(crate) fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
@@ -44,10 +41,8 @@ pub(crate) fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname)
     };
     storage_borrow(|storage| {
         storage
-            .notification_application(anchor_number, &origin)
-            .and_then(|application_number| {
-                storage.notification_consent(anchor_number, application_number)
-            })
+            .read_anchor_application_config(anchor_number, &origin)
+            .and_then(|config| config.notifications_consented_at_ns)
             .is_some()
     })
 }
@@ -180,20 +175,16 @@ mod tests {
         let origin = "https://app.example".to_string();
         let anchor = anchor_at(&origin);
 
-        let application = storage_borrow(|s| {
-            s.notification_application(anchor, &origin)
-                .expect("the sign-in stored one")
-        });
         let before = storage_borrow(|s| {
-            s.lookup_anchor_application_config(anchor, application)
-                .default_account_number
+            s.read_anchor_application_config(anchor, &origin)
+                .and_then(|config| config.default_account_number)
         });
 
         set_consent(anchor, origin.clone(), Some(1_000)).unwrap();
 
         let after = storage_borrow(|s| {
-            s.lookup_anchor_application_config(anchor, application)
-                .default_account_number
+            s.read_anchor_application_config(anchor, &origin)
+                .and_then(|config| config.default_account_number)
         });
         assert_eq!(before, after);
         assert!(has_consent(anchor, origin));
