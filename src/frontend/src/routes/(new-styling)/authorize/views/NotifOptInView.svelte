@@ -14,6 +14,7 @@
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import { isCanisterError } from "$lib/utils/utils";
+  import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
   import NotifUnblockSteps from "$lib/components/notifications/NotifUnblockSteps.svelte";
   import {
@@ -181,6 +182,7 @@
 {:else if variant === "first-time"}
   <NotifEnablePitch
     {appName}
+    {origin}
     {busy}
     onEnable={() => void runSubscribe()}
     onSkip={handleSkip}
@@ -189,7 +191,8 @@
   <div
     class="flex flex-1 flex-col items-stretch p-4 sm:max-w-100 sm:justify-center sm:self-center"
   >
-    <div class="flex flex-1 flex-col justify-center">
+    <AuthorizeHeader {origin} />
+    <div class="flex flex-col justify-center">
       {#if variant === "new-device"}
         <span
           class="border-border-secondary bg-bg-secondary text-text-primary mb-6 flex size-12 items-center justify-center rounded-full border"
