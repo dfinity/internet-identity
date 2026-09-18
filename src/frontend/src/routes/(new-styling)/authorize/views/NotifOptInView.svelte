@@ -57,9 +57,9 @@
   let busy = $state(false);
   let browser = $state<BrowserKind>("other");
   let actor: ActorSubclass<_SERVICE> | undefined;
-  // A retry from the failed screen subscribes for a fresh/new device, or only
-  // records consent when the browser is already subscribed.
-  let retrySubscribes = true;
+  // A retry from the failed screen sets this device up, or only records consent
+  // when the device is already registered. Read by the failed screen's copy.
+  let retrySubscribes = $state(true);
 
   onMount(() => {
     void (async () => {
@@ -128,6 +128,10 @@
     } catch (err) {
       const message = messageOf(err);
       recordFailure(classify(err, "subscribe-failed"), message);
+      // The registration may have landed before the consent failed, so a retry
+      // that sets the device up again would drop a working endpoint.
+      retrySubscribes = !(await readDeviceState(identityNumber, actor))
+        .subscribed;
       variant = "failed";
     } finally {
       busy = false;
@@ -243,10 +247,17 @@
           {$t`Couldn't turn on notifications`}
         </h1>
         <p class="text-text-secondary mt-2 text-sm">
-          <Trans>
-            Something went wrong setting up this device. You can try again now,
-            or set it up later in Settings.
-          </Trans>
+          {#if retrySubscribes}
+            <Trans>
+              Something went wrong setting up this device. You can try again
+              now, or set it up later in Settings.
+            </Trans>
+          {:else}
+            <Trans>
+              Something went wrong allowing this app. You can try again now, or
+              allow it later in Settings.
+            </Trans>
+          {/if}
         </p>
       {/if}
     </div>
