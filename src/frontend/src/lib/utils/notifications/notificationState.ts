@@ -15,8 +15,9 @@ export interface DeviceNotificationState {
   permission: NotificationPermission;
   /** This browser holds a live subscription for the signing key we still keep. */
   subscribed: boolean;
-  /** The canister holds that subscription under this identity. A second identity
-   * on a subscribed browser is not registered until it registers for itself. */
+  /** The canister holds that same subscription under this identity. A second identity
+   * on a subscribed browser is not registered until it registers for itself, and one
+   * another identity's re-subscribe left behind is registered on a dead endpoint. */
   registered: boolean;
 }
 
@@ -40,13 +41,21 @@ export const readDeviceState = async (
     supported,
     permission,
     subscribed,
-    registered: subscribed && (await hasCanisterRow(identityNumber, actor)),
+    registered:
+      subscribed &&
+      (await isRegisteredHere(identityNumber, actor, stored.endpoint)),
   };
 };
 
-const hasCanisterRow = async (
+/**
+ * Whether the canister holds this identity's registration on the endpoint the browser
+ * is actually subscribed with. A registration naming any other endpoint is one another
+ * identity's re-subscribe left behind, and reaches nothing.
+ */
+const isRegisteredHere = async (
   identityNumber: bigint,
   actor: ActorSubclass<_SERVICE>,
+  endpoint: string,
 ): Promise<boolean> => {
   const browserId = await currentBrowserId(identityNumber);
   if (browserId === undefined) {
@@ -56,7 +65,7 @@ const hasCanisterRow = async (
     anchor_number: identityNumber,
     browser_id: browserId,
   });
-  return status !== undefined;
+  return status?.endpoint === endpoint;
 };
 
 export type OptInScreen =

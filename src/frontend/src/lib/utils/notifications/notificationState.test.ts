@@ -8,15 +8,26 @@ vi.mock("./notificationDiagnostics", () => ({
 vi.mock("$lib/stores/browser-key.store", () => ({
   currentBrowserId: vi.fn(),
 }));
+vi.mock("./pushSubscription", () => ({
+  isPushSupported: vi.fn(() => true),
+  currentDeviceSubscription: vi.fn(),
+}));
 
+import type { ActorSubclass } from "@icp-sdk/core/agent";
+import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import {
+  readDeviceState,
   resolveOptInScreen,
   type DeviceNotificationState,
 } from "./notificationState";
 import { wasDeclinedRecently } from "./notificationDiagnostics";
+import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
+import { loadVapidKey } from "./vapidKeyStore";
+import { currentBrowserId } from "$lib/stores/browser-key.store";
 
 const declined = vi.mocked(wasDeclinedRecently);
 const ORIGIN = "https://app.example";
+const IDENTITY = BigInt(10_000);
 
 const state = (
   over: Partial<DeviceNotificationState>,
@@ -86,5 +97,60 @@ describe("resolveOptInScreen", () => {
 
   it("shows the full pitch to a first-timer", () => {
     expect(resolveOptInScreen(state({}), ORIGIN, false)).toBe("first-time");
+  });
+});
+
+describe("readDeviceState", () => {
+  const ENDPOINT = "https://relay.example/held";
+
+  /** A canister that reports a registration on `endpoint`, or none at all. */
+  const reporting = (endpoint?: string) =>
+    ({
+      get_webpush_subscription_status: vi.fn(() =>
+        Promise.resolve(
+          endpoint === undefined
+            ? []
+            : [{ endpoint, pool_len: 30, issued_at_ns: BigInt(0) }],
+        ),
+      ),
+    }) as unknown as ActorSubclass<_SERVICE>;
+
+  beforeEach(() => {
+    vi.stubGlobal("Notification", { permission: "granted" });
+    vi.mocked(isPushSupported).mockReturnValue(true);
+    vi.mocked(currentBrowserId).mockResolvedValue(7);
+    vi.mocked(currentDeviceSubscription).mockResolvedValue({
+      endpoint: ENDPOINT,
+    } as PushSubscription);
+    vi.mocked(loadVapidKey).mockResolvedValue({
+      endpoint: ENDPOINT,
+      privateKey: {} as CryptoKey,
+      publicKeyRaw: new Uint8Array(),
+    });
+  });
+
+  it("is registered when the canister names the endpoint this browser holds", async () => {
+    await expect(
+      readDeviceState(IDENTITY, reporting(ENDPOINT)),
+    ).resolves.toMatchObject({ subscribed: true, registered: true });
+  });
+
+  /**
+   * The subscription is shared, so another identity re-subscribing leaves this one
+   * registered on an endpoint that reaches nothing.
+   */
+  it("is not registered when the canister names another endpoint", async () => {
+    await expect(
+      readDeviceState(
+        IDENTITY,
+        reporting("https://relay.example/someone-else"),
+      ),
+    ).resolves.toMatchObject({ subscribed: true, registered: false });
+  });
+
+  it("is not registered when the canister holds nothing for this identity", async () => {
+    await expect(readDeviceState(IDENTITY, reporting())).resolves.toMatchObject(
+      { subscribed: true, registered: false },
+    );
   });
 });
