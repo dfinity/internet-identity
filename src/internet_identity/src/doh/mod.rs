@@ -72,7 +72,7 @@ thread_local! {
     /// timeout so a still-live fill is never reclaimed early. See
     /// [`crate::concurrency`].
     static OUTCALL_LIMIT: RefCell<ConcurrencyLimiter> = RefCell::new(
-        ConcurrencyLimiter::new(LimiterConfig { max_concurrent: 50, max_age_secs: 90 }),
+        ConcurrencyLimiter::new(LimiterConfig { max_concurrent: 10, max_age_secs: 90 }),
     );
 }
 
