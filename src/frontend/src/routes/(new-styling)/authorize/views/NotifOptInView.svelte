@@ -7,9 +7,13 @@
     Loader2Icon,
   } from "@lucide/svelte";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
-  import type { _SERVICE } from "$lib/generated/internet_identity_types";
+  import type {
+    NotificationError,
+    _SERVICE,
+  } from "$lib/generated/internet_identity_types";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
+  import { isCanisterError } from "$lib/utils/utils";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
   import NotifUnblockSteps from "$lib/components/notifications/NotifUnblockSteps.svelte";
   import {
@@ -59,34 +63,42 @@
 
   onMount(() => {
     void (async () => {
-      actor = await resolveActor();
-      if (actor === undefined) {
-        onDone();
-        return;
+      try {
+        actor = await resolveActor();
+        if (actor === undefined) {
+          onDone();
+          return;
+        }
+        const consented = await actor
+          .notification_consent_status(identityNumber, origin)
+          .catch(() => false);
+        const state = await readDeviceState(identityNumber, actor);
+        recordPermission(state.permission);
+        const screen = resolveOptInScreen(state, origin, consented);
+        if (screen === "skip") {
+          onDone();
+          return;
+        }
+        browser = detectBrowser();
+        retrySubscribes = screen !== "allow-app";
+        variant = screen;
+      } catch (err) {
+        // The request is waiting on this window, so a rejection here has to land
+        // on a screen the user can answer rather than leaving it spinning.
+        const message = messageOf(err);
+        recordFailure(classify(err, "subscribe-failed"), message);
+        variant = "failed";
       }
-      const consented = await actor
-        .notification_consent_status(identityNumber, origin)
-        .catch(() => false);
-      const state = await readDeviceState();
-      recordPermission(state.permission);
-      const screen = resolveOptInScreen(state, origin, consented);
-      if (screen === "skip") {
-        onDone();
-        return;
-      }
-      browser = detectBrowser();
-      retrySubscribes = screen !== "allow-app";
-      variant = screen;
     })();
   });
 
   const messageOf = (err: unknown): string =>
     err instanceof Error ? err.message : String(err);
 
-  const classify = (message: string): FailureReason =>
-    /disabled|not enabled/i.test(message)
+  const classify = (err: unknown, fallback: FailureReason): FailureReason =>
+    isCanisterError<NotificationError>(err) && err.type === "Disabled"
       ? "backend-disabled"
-      : "subscribe-failed";
+      : fallback;
 
   const runSubscribe = async (): Promise<void> => {
     if (actor === undefined) {
@@ -100,17 +112,22 @@
         origin,
         actor,
       });
-      if (result.status === "permission-denied") {
+      if (result.status === "denied") {
         recordFailure("permission-denied");
         browser = detectBrowser();
         variant = "blocked";
+        return;
+      }
+      if (result.status === "dismissed") {
+        // The permission is still `default`, so the prompt can be raised again.
+        // Stay where the user is, with Enable still in front of them.
         return;
       }
       clearFailure();
       onDone();
     } catch (err) {
       const message = messageOf(err);
-      recordFailure(classify(message), message);
+      recordFailure(classify(err, "subscribe-failed"), message);
       variant = "failed";
     } finally {
       busy = false;
@@ -133,7 +150,7 @@
       onDone();
     } catch (err) {
       const message = messageOf(err);
-      recordFailure("register-failed", message);
+      recordFailure(classify(err, "register-failed"), message);
       variant = "failed";
     } finally {
       busy = false;
