@@ -40,7 +40,8 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use notifications::webpush::{
-    ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
+    ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
+    ValidatedSetWebPushSubscriptionRequest,
 };
 use notifications::{
     ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
@@ -345,6 +346,26 @@ fn set_webpush_subscription(
         .map_err(|_| SetWebPushSubscriptionError::InvalidBrowserKey)?;
 
     notifications::webpush::set_subscription(anchor, browser_id, validated, ic_cdk::api::time())
+}
+
+/// Authorized by the browser key the caller signs with, like the write it reconciles
+/// against: a browser asks about its own registration, so the key that says which
+/// browser is asking is also the answer to which one to report.
+///
+/// `None` for a deployment that does not notify and for a caller that is no browser of
+/// this identity, so neither can be probed with it.
+#[query]
+fn get_webpush_subscription_status(
+    request: GetWebPushSubscriptionStatusRequest,
+) -> Option<WebPushSubscriptionStatus> {
+    let Ok(validated) = ValidatedGetWebPushSubscriptionStatusRequest::try_from(request) else {
+        return None;
+    };
+    let Ok((anchor, browser_id)) = check_browser_authorization(validated.anchor_number) else {
+        return None;
+    };
+
+    notifications::webpush::subscription_status(&anchor, browser_id)
 }
 
 /// Authorized by the identity rather than by the browser, so a browser that is lost or

@@ -2,10 +2,12 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, FrontendHostname, NotificationConsentGrantedRequest,
-    NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationRevokeConsentError,
+    AnchorNumber, BrowserId, FrontendHostname, GetWebPushSubscriptionStatusRequest,
+    NotificationConsentGrantedRequest, NotificationGrantConsentError,
+    NotificationGrantConsentRequest, NotificationRevokeConsentError,
     NotificationRevokeConsentRequest, RemoveWebPushSubscriptionError,
     RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
+    WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -106,6 +108,22 @@ pub fn remove_webpush_subscription(
             anchor_number,
             browser_id,
         },),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_webpush_subscription_status(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+) -> Result<Option<WebPushSubscriptionStatus>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_webpush_subscription_status",
+        (GetWebPushSubscriptionStatusRequest { anchor_number },),
     )
     .map(|(x,)| x)
 }

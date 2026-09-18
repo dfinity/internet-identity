@@ -923,6 +923,9 @@ export interface GetSsoDiscoveryStatusRequest {
   'target_app_origin' : [] | [FrontendHostname],
   'org_domain' : string,
 }
+export interface GetWebPushSubscriptionStatusRequest {
+  'anchor_number' : UserNumber,
+}
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -2049,6 +2052,16 @@ export interface WebAuthnCredential {
   'pubkey' : PublicKey,
   'credential_id' : CredentialId,
 }
+/**
+ * What a browser is registered with, so the frontend can tell a registration that is
+ * still live from one another identity's re-subscribe left behind, and knows when to
+ * sign the next pool.
+ */
+export interface WebPushSubscriptionStatus {
+  'endpoint' : string,
+  'issued_at_ns' : bigint,
+  'pool_len' : number,
+}
 export interface _SERVICE {
   'acknowledge_entries' : ActorMethod<[bigint], undefined>,
   'add' : ActorMethod<[UserNumber, DeviceData], undefined>,
@@ -2403,6 +2416,10 @@ export interface _SERVICE {
   'get_sso_discovery_status' : ActorMethod<
     [GetSsoDiscoveryStatusRequest],
     SsoDiscoveryStatus
+  >,
+  'get_webpush_subscription_status' : ActorMethod<
+    [GetWebPushSubscriptionStatusRequest],
+    [] | [WebPushSubscriptionStatus]
   >,
   /**
    * HTTP Gateway protocol

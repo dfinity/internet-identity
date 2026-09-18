@@ -569,6 +569,14 @@ export const idlFactory = ({ IDL }) => {
     'Resolved' : SsoDiscovery,
     'Pending' : IDL.Null,
   });
+  const GetWebPushSubscriptionStatusRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const WebPushSubscriptionStatus = IDL.Record({
+    'endpoint' : IDL.Text,
+    'issued_at_ns' : IDL.Nat64,
+    'pool_len' : IDL.Nat32,
+  });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
@@ -1282,6 +1290,11 @@ export const idlFactory = ({ IDL }) => {
     'get_sso_discovery_status' : IDL.Func(
         [GetSsoDiscoveryStatusRequest],
         [SsoDiscoveryStatus],
+        ['query'],
+      ),
+    'get_webpush_subscription_status' : IDL.Func(
+        [GetWebPushSubscriptionStatusRequest],
+        [IDL.Opt(WebPushSubscriptionStatus)],
         ['query'],
       ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),

@@ -1793,6 +1793,19 @@ type RemoveWebPushSubscriptionError = variant {
     InternalCanisterError : text;
 };
 
+type GetWebPushSubscriptionStatusRequest = record {
+    anchor_number : UserNumber;
+};
+
+// What a browser is registered with, so the frontend can tell a registration that is
+// still live from one another identity's re-subscribe left behind, and knows when to
+// sign the next pool.
+type WebPushSubscriptionStatus = record {
+    endpoint : text;        // compared against the one the browser holds
+    pool_len : nat32;       // windows covered, not a count of unused signatures
+    issued_at_ns : nat64;   // window i expires at issued_at_ns + (i + 1) * window
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2277,4 +2290,5 @@ service : (opt InternetIdentityInit) -> {
     set_webpush_subscription : (SetWebPushSubscriptionRequest) -> (variant { Ok; Err : SetWebPushSubscriptionError });
     // Called by the identity, so one browser can silence another.
     remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
+    get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 };

@@ -1030,3 +1030,25 @@ pub enum RemoveWebPushSubscriptionError {
     Unauthorized(Principal),
     InternalCanisterError(String),
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetWebPushSubscriptionStatusRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+/// What a browser is registered with, so the frontend can tell a registration that is
+/// still live from one another identity's re-subscribe left behind, and knows when to
+/// sign the next pool.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct WebPushSubscriptionStatus {
+    /// The relay endpoint this browser is registered with. Compared against the one the
+    /// browser holds: a registration naming any other endpoint is stale.
+    pub endpoint: String,
+    /// Windows the stored pool covers, from `issued_at_ns`. Not a count of unused
+    /// signatures: a signature is picked by index and never removed, so a count would
+    /// sit at the pool size forever.
+    pub pool_len: u32,
+    /// When the browser minted this pool; window `i` expires at
+    /// `issued_at_ns + (i + 1) * window`.
+    pub issued_at_ns: Timestamp,
+}

@@ -2,8 +2,9 @@
 //! that notifies at all, and fields the canister can deliver against.
 
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
-    SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, Timestamp,
+    AnchorNumber, BrowserId, GetWebPushSubscriptionStatusRequest, RemoveWebPushSubscriptionError,
+    RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
+    Timestamp,
 };
 use serde_bytes::ByteBuf;
 use std::ops::RangeInclusive;
@@ -36,6 +37,10 @@ pub struct ValidatedRemoveWebPushSubscriptionRequest {
     pub anchor_number: AnchorNumber,
     pub browser_id: BrowserId,
     _validated: Validated,
+}
+
+pub struct ValidatedGetWebPushSubscriptionStatusRequest {
+    pub anchor_number: AnchorNumber,
 }
 
 impl TryFrom<SetWebPushSubscriptionRequest> for ValidatedSetWebPushSubscriptionRequest {
@@ -98,6 +103,17 @@ impl TryFrom<RemoveWebPushSubscriptionRequest> for ValidatedRemoveWebPushSubscri
             browser_id,
             _validated: Validated,
         })
+    }
+}
+
+impl TryFrom<GetWebPushSubscriptionStatusRequest> for ValidatedGetWebPushSubscriptionStatusRequest {
+    type Error = String;
+
+    fn try_from(
+        GetWebPushSubscriptionStatusRequest { anchor_number }: GetWebPushSubscriptionStatusRequest,
+    ) -> Result<Self, Self::Error> {
+        check_enabled()?;
+        Ok(Self { anchor_number })
     }
 }
 
@@ -206,6 +222,12 @@ mod tests {
             RemoveWebPushSubscriptionRequest {
                 anchor_number: ANCHOR,
                 browser_id: 1,
+            }
+        )
+        .is_err());
+        assert!(ValidatedGetWebPushSubscriptionStatusRequest::try_from(
+            GetWebPushSubscriptionStatusRequest {
+                anchor_number: ANCHOR,
             }
         )
         .is_err());
