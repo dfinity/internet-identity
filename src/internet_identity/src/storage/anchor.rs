@@ -747,14 +747,16 @@ impl Anchor {
         &self.browsers
     }
 
-    /// The browser holding this key, in either slot.
+    /// The browser holding this key as the successor it announced.
     ///
-    /// Either slot, because a sign-in stores the key it was reached by and the successor
-    /// it announced, while the browser keeps only the successor.
+    /// The successor slot only. A browser overwrites its stored keypair with that
+    /// successor as soon as a sign-in is accepted, so the retired key in the other slot
+    /// is one no browser still holds, and matching it would keep a copied key usable
+    /// until the next sign-in.
     pub fn browser_by_key(&self, key: &PublicKey) -> Option<BrowserId> {
         self.browsers
             .iter()
-            .find(|browser| browser.current_browser_key == *key || browser.next_browser_key == *key)
+            .find(|browser| browser.next_browser_key == *key)
             .map(|browser| browser.id)
     }
 

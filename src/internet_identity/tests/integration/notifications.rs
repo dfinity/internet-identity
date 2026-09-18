@@ -459,14 +459,21 @@ mod subscriptions {
         endpoint: &str,
     ) -> SubscribeDeviceRequest {
         let key_holder = browser.successor();
+        let pool: Vec<Vec<u8>> = jwt_pool().into_iter().map(ByteBuf::into_vec).collect();
         SubscribeDeviceRequest {
             anchor_number: anchor,
             endpoint: endpoint.to_string(),
+            browser_key_signature: key_holder.sign_webpush_subscription(
+                anchor,
+                endpoint,
+                ISSUED_AT_NS,
+                &vapid_public_key(),
+                &pool,
+            ),
             vapid_public_key: vapid_public_key(),
             jwt_signatures: jwt_pool(),
             jwt_issued_at_ns: ISSUED_AT_NS,
             browser_key: key_holder.public_key(),
-            browser_key_signature: key_holder.sign_webpush_subscription(endpoint, ISSUED_AT_NS),
         }
     }
 
@@ -550,9 +557,16 @@ mod subscriptions {
             jwt_issued_at_ns: ISSUED_AT_NS,
             // The victim's browser, and the best signature the attacker can make.
             browser_key: victim.successor().public_key(),
-            browser_key_signature: attacker
-                .successor()
-                .sign_webpush_subscription(attacker_endpoint, ISSUED_AT_NS),
+            browser_key_signature: attacker.successor().sign_webpush_subscription(
+                anchor,
+                attacker_endpoint,
+                ISSUED_AT_NS,
+                &vapid_public_key(),
+                &jwt_pool()
+                    .into_iter()
+                    .map(ByteBuf::into_vec)
+                    .collect::<Vec<_>>(),
+            ),
         };
 
         let refused = subscribe_device(&env, canister_id, principal_1(), forged)?;
@@ -593,7 +607,13 @@ mod subscriptions {
             jwt_signatures: vec![],
             jwt_issued_at_ns: ISSUED_AT_NS,
             browser_key: key_holder.public_key(),
-            browser_key_signature: key_holder.sign_webpush_subscription(endpoint, ISSUED_AT_NS),
+            browser_key_signature: key_holder.sign_webpush_subscription(
+                anchor,
+                endpoint,
+                ISSUED_AT_NS,
+                &[4u8; 65],
+                &[],
+            ),
         };
 
         match subscribe_device(&env, canister_id, principal_1(), request)? {

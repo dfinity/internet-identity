@@ -3,10 +3,11 @@
 //! Knows nothing of sessions or storage, so both layers may depend on it: the endpoint
 //! verifies, and storage requires the [`VerifiedBrowserKeys`] that verifying produces.
 
-use internet_identity_interface::internet_identity::types::{PublicKey, SessionKey};
+use internet_identity_interface::internet_identity::types::{AnchorNumber, PublicKey, SessionKey};
 use p256::ecdsa::signature::Verifier;
 use p256::ecdsa::{Signature, VerifyingKey};
 use p256::pkcs8::DecodePublicKey;
+use sha2::{Digest, Sha256};
 
 /// Prefixed to the signed message so the browser key cannot be made to sign for another
 /// purpose by presenting a message from one.
@@ -125,24 +126,55 @@ fn signed_message(domain: &[u8], session_key: &SessionKey, other_key: &PublicKey
     message
 }
 
+/// What a browser signs to register or refresh a subscription.
+///
+/// Every field the write then stores is in here, so a proof taken from one call cannot
+/// be resubmitted over different ones. The endpoint is last and the only variable-length
+/// part, which is what makes the encoding unambiguous: the two byte blobs are hashed
+/// rather than appended, so neither can borrow bytes from its neighbour whatever length
+/// a caller sends before the fields are validated.
+fn webpush_message(
+    anchor_number: AnchorNumber,
+    endpoint: &str,
+    jwt_issued_at_ns: u64,
+    vapid_public_key: &[u8],
+    jwt_signatures: &[Vec<u8>],
+) -> Vec<u8> {
+    let mut pool = Sha256::new();
+    for signature in jwt_signatures {
+        pool.update(signature);
+    }
+    let mut message = Vec::with_capacity(WEBPUSH_SIGNATURE_DOMAIN.len() + 80 + endpoint.len());
+    message.extend_from_slice(WEBPUSH_SIGNATURE_DOMAIN);
+    message.extend_from_slice(&anchor_number.to_be_bytes());
+    message.extend_from_slice(&jwt_issued_at_ns.to_be_bytes());
+    message.extend_from_slice(&Sha256::digest(vapid_public_key));
+    message.extend_from_slice(&pool.finalize());
+    message.extend_from_slice(endpoint.as_bytes());
+    message
+}
+
 /// Whether `signature` shows the caller holds `browser_key`, over the subscription it is
 /// registering.
 ///
-/// Bound to the endpoint and the pool's issue time rather than to a session key, so a
-/// signature cannot be lifted onto another endpoint and a replay re-pins the pool it was
-/// made for.
+/// There is no session key to scope this to one call, so it is bound to the write
+/// instead: resubmitting it can only store what it already stored.
 pub fn verify_webpush_subscription(
     browser_key: &PublicKey,
     signature: &[u8],
+    anchor_number: AnchorNumber,
     endpoint: &str,
     jwt_issued_at_ns: u64,
+    vapid_public_key: &[u8],
+    jwt_signatures: &[Vec<u8>],
 ) -> bool {
-    let issued_at = jwt_issued_at_ns.to_be_bytes();
-    let mut message =
-        Vec::with_capacity(WEBPUSH_SIGNATURE_DOMAIN.len() + endpoint.len() + issued_at.len());
-    message.extend_from_slice(WEBPUSH_SIGNATURE_DOMAIN);
-    message.extend_from_slice(endpoint.as_bytes());
-    message.extend_from_slice(&issued_at);
+    let message = webpush_message(
+        anchor_number,
+        endpoint,
+        jwt_issued_at_ns,
+        vapid_public_key,
+        jwt_signatures,
+    );
     verify(browser_key, signature, &message)
 }
 
