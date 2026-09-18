@@ -135,7 +135,10 @@ describe("handleNotificationConsentRequest", () => {
     const { sent } = await run();
     expect(sent).toHaveLength(1);
     expect(sent[0].result).toEqual({ granted: true });
-    expect(consentStatus).toHaveBeenCalledWith(BigInt(10_000), ORIGIN);
+    expect(consentStatus).toHaveBeenCalledWith({
+      anchor_number: BigInt(10_000),
+      origin: ORIGIN,
+    });
   });
 
   it("accepts a request that carries no params", async () => {
