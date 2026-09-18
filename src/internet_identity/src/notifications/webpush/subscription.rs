@@ -2,12 +2,14 @@
 //! registry.
 
 use super::validation::{
-    ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
+    ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
+    ValidatedSetWebPushSubscriptionRequest,
 };
 use crate::state::storage_borrow_mut;
 use crate::storage::anchor::{Anchor, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, RemoveWebPushSubscriptionError, SetWebPushSubscriptionError, Timestamp,
+    AnchorNumber, BrowserId, RemoveWebPushSubscriptionError, SetWebPushSubscriptionError,
+    Timestamp, WebPushSubscriptionStatus,
 };
 
 /// Registers `browser_id` for Web Push, and is also how it replaces a pool that is
@@ -72,6 +74,24 @@ pub fn remove_subscription(
         .map_err(RemoveWebPushSubscriptionError::InternalCanisterError)
 }
 
+/// What this browser is registered with, and how much of the pool it signed is left
+/// to cover.
+pub fn subscription_status(
+    anchor: &Anchor,
+    ValidatedGetWebPushSubscriptionStatusRequest {
+        anchor_number: _,
+        browser_id,
+    }: ValidatedGetWebPushSubscriptionStatusRequest,
+) -> Option<WebPushSubscriptionStatus> {
+    anchor
+        .webpush_subscription(browser_id)
+        .map(|registered| WebPushSubscriptionStatus {
+            endpoint: registered.endpoint.clone(),
+            pool_len: registered.jwt_signatures.len() as u32,
+            issued_at_ns: registered.jwt_issued_at_ns,
+        })
+}
+
 pub(super) fn read_anchor(anchor_number: AnchorNumber) -> Result<Anchor, String> {
     crate::state::storage_borrow(|storage| storage.read(anchor_number))
         .map_err(|err| format!("{err}"))
@@ -94,6 +114,19 @@ mod tests {
 
     const ENDPOINT: &str = "https://relay.example/a";
     const ROTATED: &str = "https://relay.example/b";
+
+    fn status(
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+    ) -> Option<WebPushSubscriptionStatus> {
+        subscription_status(
+            &anchor(anchor_number),
+            ValidatedGetWebPushSubscriptionStatusRequest {
+                anchor_number,
+                browser_id,
+            },
+        )
+    }
 
     fn remove(anchor_number: AnchorNumber, browser_id: BrowserId) {
         remove_subscription(ValidatedRemoveWebPushSubscriptionRequest {
@@ -232,6 +265,36 @@ mod tests {
         let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
         assert_eq!(stored.endpoint, ROTATED);
         assert_eq!(stored.created_at_ns, 1_000);
+    }
+
+    #[test]
+    fn the_status_reports_the_endpoint_and_the_pool_that_was_registered() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+        subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
+
+        assert_eq!(
+            status(anchor_number, browsers[0]),
+            Some(WebPushSubscriptionStatus {
+                endpoint: ENDPOINT.to_string(),
+                pool_len: valid_pool().len() as u32,
+                issued_at_ns: 1_000,
+            })
+        );
+
+        remove(anchor_number, browsers[0]);
+        assert_eq!(status(anchor_number, browsers[0]), None);
+    }
+
+    /// Browsers register on their own entries, so reading one must not answer for
+    /// whatever another happens to hold.
+    #[test]
+    fn a_status_answers_only_for_the_browser_it_was_asked_about() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(2);
+        subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
+
+        assert_eq!(status(anchor_number, browsers[1]), None);
     }
 
     /// The registration hangs off a browser entry, so one the registry does not list

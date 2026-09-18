@@ -7,9 +7,10 @@
 mod subscription;
 mod validation;
 
-pub use subscription::{remove_subscription, set_subscription};
+pub use subscription::{remove_subscription, set_subscription, subscription_status};
 pub use validation::{
-    ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
+    ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
+    ValidatedSetWebPushSubscriptionRequest,
 };
 
 #[cfg(test)]

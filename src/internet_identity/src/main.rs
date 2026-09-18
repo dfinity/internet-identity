@@ -40,7 +40,8 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use notifications::webpush::{
-    ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
+    ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
+    ValidatedSetWebPushSubscriptionRequest,
 };
 use notifications::{
     ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
@@ -344,6 +345,22 @@ fn set_webpush_subscription(
         .map_err(|_| SetWebPushSubscriptionError::InvalidBrowserKey)?;
 
     notifications::webpush::set_subscription(anchor, browser_id, validated, ic_cdk::api::time())
+}
+
+/// `None` for a deployment that does not notify and for an unauthorized caller, so
+/// neither can be probed with it.
+#[query]
+fn get_webpush_subscription_status(
+    request: GetWebPushSubscriptionStatusRequest,
+) -> Option<WebPushSubscriptionStatus> {
+    let Ok(validated) = ValidatedGetWebPushSubscriptionStatusRequest::try_from(request) else {
+        return None;
+    };
+    let Ok((anchor, _)) = check_authorization(validated.anchor_number) else {
+        return None;
+    };
+
+    notifications::webpush::subscription_status(&anchor, validated)
 }
 
 /// Authorized by the identity rather than by the browser, so a browser that is lost or

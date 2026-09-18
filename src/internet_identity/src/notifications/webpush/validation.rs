@@ -2,8 +2,9 @@
 //! that notifies at all, and fields the canister can deliver against.
 
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
-    SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, Timestamp,
+    AnchorNumber, BrowserId, GetWebPushSubscriptionStatusRequest, RemoveWebPushSubscriptionError,
+    RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
+    Timestamp,
 };
 use serde_bytes::ByteBuf;
 use std::ops::RangeInclusive;
@@ -27,6 +28,11 @@ pub struct ValidatedSetWebPushSubscriptionRequest {
 }
 
 pub struct ValidatedRemoveWebPushSubscriptionRequest {
+    pub anchor_number: AnchorNumber,
+    pub browser_id: BrowserId,
+}
+
+pub struct ValidatedGetWebPushSubscriptionStatusRequest {
     pub anchor_number: AnchorNumber,
     pub browser_id: BrowserId,
 }
@@ -85,6 +91,23 @@ impl TryFrom<RemoveWebPushSubscriptionRequest> for ValidatedRemoveWebPushSubscri
         }: RemoveWebPushSubscriptionRequest,
     ) -> Result<Self, Self::Error> {
         check_enabled().map_err(RemoveWebPushSubscriptionError::InternalCanisterError)?;
+        Ok(Self {
+            anchor_number,
+            browser_id,
+        })
+    }
+}
+
+impl TryFrom<GetWebPushSubscriptionStatusRequest> for ValidatedGetWebPushSubscriptionStatusRequest {
+    type Error = String;
+
+    fn try_from(
+        GetWebPushSubscriptionStatusRequest {
+            anchor_number,
+            browser_id,
+        }: GetWebPushSubscriptionStatusRequest,
+    ) -> Result<Self, Self::Error> {
+        check_enabled()?;
         Ok(Self {
             anchor_number,
             browser_id,
@@ -201,6 +224,13 @@ mod tests {
         assert!(validate(request(ANCHOR, "https://relay.example/a", 0)).is_err());
         assert!(ValidatedRemoveWebPushSubscriptionRequest::try_from(
             RemoveWebPushSubscriptionRequest {
+                anchor_number: ANCHOR,
+                browser_id: 1,
+            }
+        )
+        .is_err());
+        assert!(ValidatedGetWebPushSubscriptionStatusRequest::try_from(
+            GetWebPushSubscriptionStatusRequest {
                 anchor_number: ANCHOR,
                 browser_id: 1,
             }
