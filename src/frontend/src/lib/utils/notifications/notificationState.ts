@@ -52,7 +52,7 @@ const hasCanisterRow = async (
   if (browserId === undefined) {
     return false;
   }
-  const [status] = await actor.webpush_jwt_pool_status({
+  const [status] = await actor.get_webpush_subscription_status({
     anchor_number: identityNumber,
     browser_id: browserId,
   });
