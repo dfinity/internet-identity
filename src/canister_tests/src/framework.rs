@@ -224,10 +224,12 @@ pub fn arg_with_captcha_disabled() -> Option<InternetIdentityInit> {
     })
 }
 
-/// The only test arg with notifications enabled.
-pub fn arg_with_notifications_enabled() -> Option<InternetIdentityInit> {
+/// The only test arg with notifications enabled, for the origins given.
+pub fn arg_with_notifications_enabled_for(origins: &[&str]) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
-        notifications_enabled: Some(true),
+        notifications_enabled_origins: Some(
+            origins.iter().map(|origin| origin.to_string()).collect(),
+        ),
         ..arg_with_captcha_disabled().unwrap()
     })
 }

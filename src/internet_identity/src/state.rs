@@ -153,7 +153,7 @@ pub struct PersistentState {
     pub doh_config: Option<DohConfig>,
     pub mcp_official_url: Option<String>,
     /// Deploy flag for the notifications feature. `None`/`Some(false)` => disabled; `Some(true)` => enabled.
-    pub notifications_enabled: Option<bool>,
+    pub notifications_enabled_origins: Option<Vec<FrontendHostname>>,
 }
 
 impl Default for PersistentState {
@@ -182,7 +182,7 @@ impl Default for PersistentState {
             dnssec_config: None,
             doh_config: None,
             mcp_official_url: None,
-            notifications_enabled: None,
+            notifications_enabled_origins: None,
         }
     }
 }

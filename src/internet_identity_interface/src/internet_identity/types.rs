@@ -416,10 +416,9 @@ pub struct InternetIdentityInit {
     /// (the deployment then has no official connector), `Some(Some(url))`
     /// points it at `url`.
     pub mcp_official_url: Option<Option<String>>,
-    /// Server-side kill switch for the notifications feature. `None` / `Some(false)`
-    /// (the default) disables every notification entry point; `Some(true)` enables them.
-    /// Omitting it on upgrade keeps the stored value.
-    pub notifications_enabled: Option<bool>,
+    /// Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
+    /// turns notifications off, and entries enable them for those origins only.
+    pub notifications_enabled_origins: Option<Vec<FrontendHostname>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

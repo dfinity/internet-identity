@@ -1188,8 +1188,10 @@ export interface InternetIdentityInit {
    * Server-side kill switch for the notifications feature. null / `opt false`
    * (the default) disables every notification endpoint; `opt true` enables
    * them. Omitting it on upgrade keeps the stored value.
+   * Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
+   * turns notifications off, and entries enable them for those origins only.
    */
-  'notifications_enabled' : [] | [boolean],
+  'notifications_enabled_origins' : [] | [Array<string>],
   /**
    * Configuration parameters related to the II archive.
    * Note: some parameters changes (like the polling interval) will only take effect after an archive deployment.

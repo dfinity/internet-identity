@@ -337,7 +337,9 @@ type InternetIdentityInit = record {
     // Server-side kill switch for the notifications feature. null / `opt false`
     // (the default) disables every notification endpoint; `opt true` enables
     // them. Omitting it on upgrade keeps the stored value.
-    notifications_enabled : opt bool;
+    // Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
+    // turns notifications off, and entries enable them for those origins only.
+    notifications_enabled_origins : opt vec text;
 };
 
 // DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS

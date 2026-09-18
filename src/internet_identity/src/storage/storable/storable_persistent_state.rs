@@ -47,7 +47,7 @@ pub struct StorablePersistentState {
     dnssec_config: Option<DnssecConfig>,
     doh_config: Option<DohConfig>,
     mcp_official_url: Option<String>,
-    notifications_enabled: Option<bool>,
+    notifications_enabled_origins: Option<Vec<FrontendHostname>>,
 }
 
 impl Storable for StorablePersistentState {
@@ -99,7 +99,7 @@ impl From<PersistentState> for StorablePersistentState {
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
             mcp_official_url: s.mcp_official_url,
-            notifications_enabled: s.notifications_enabled,
+            notifications_enabled_origins: s.notifications_enabled_origins,
         }
     }
 }
@@ -129,7 +129,7 @@ impl From<StorablePersistentState> for PersistentState {
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
             mcp_official_url: s.mcp_official_url,
-            notifications_enabled: s.notifications_enabled,
+            notifications_enabled_origins: s.notifications_enabled_origins,
         }
     }
 }
@@ -187,7 +187,7 @@ mod tests {
             dnssec_config: None,
             doh_config: None,
             mcp_official_url: None,
-            notifications_enabled: None,
+            notifications_enabled_origins: None,
         };
 
         pretty_assertions::assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -221,7 +221,7 @@ mod tests {
             dnssec_config: None,
             doh_config: None,
             mcp_official_url: None,
-            notifications_enabled: None,
+            notifications_enabled_origins: None,
         };
         pretty_assertions::assert_eq!(PersistentState::default(), expected_defaults);
     }
