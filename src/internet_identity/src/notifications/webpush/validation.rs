@@ -9,8 +9,8 @@ use serde_bytes::ByteBuf;
 use std::ops::RangeInclusive;
 use url::Url;
 
-/// Relay endpoints run ~200-300 bytes; capped at 1 KiB.
-const MAX_ENDPOINT_LEN: usize = 1024;
+/// Relay endpoints run ~200-300 bytes; capped at 512 so the row stays small.
+const MAX_ENDPOINT_LEN: usize = 512;
 /// VAPID application server key: uncompressed SEC1 P-256, 65 bytes.
 const VAPID_PUBKEY_LEN: usize = 65;
 /// Raw ECDSA P-256 signature: r||s, 32 bytes each.
