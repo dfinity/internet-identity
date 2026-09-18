@@ -747,16 +747,17 @@ impl Anchor {
         &self.browsers
     }
 
-    /// The browser holding this key as the successor it announced.
+    /// The browser a caller signing as `principal` is, if the identity is signed in
+    /// from it.
     ///
     /// The successor slot only. A browser overwrites its stored keypair with that
     /// successor as soon as a sign-in is accepted, so the retired key in the other slot
     /// is one no browser still holds, and matching it would keep a copied key usable
     /// until the next sign-in.
-    pub fn browser_by_key(&self, key: &PublicKey) -> Option<BrowserId> {
+    pub fn browser_by_principal(&self, principal: Principal) -> Option<BrowserId> {
         self.browsers
             .iter()
-            .find(|browser| browser.next_browser_key == *key)
+            .find(|browser| principal == Principal::self_authenticating(&browser.next_browser_key))
             .map(|browser| browser.id)
     }
 

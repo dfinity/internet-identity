@@ -529,7 +529,7 @@ pub struct Storage<M: Memory> {
     // anchor: a JWT pool is ~2 KiB and the anchor is read in full on every
     // authenticated call.
     webpush_subscriptions_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    pub(crate) webpush_subscriptions_memory: StableBTreeMap<
+    webpush_subscriptions_memory: StableBTreeMap<
         (StorableAnchorNumber, StorableBrowserId),
         StorableWebPushSubscription,
         ManagedMemory<M>,
@@ -3259,6 +3259,38 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(revoked)
     }
 
+    /// The Web Push subscription this browser registered, if it has one.
+    #[cfg(test)]
+    pub fn webpush_subscription(
+        &self,
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+    ) -> Option<StorableWebPushSubscription> {
+        self.webpush_subscriptions_memory
+            .get(&(anchor_number, browser_id))
+    }
+
+    /// Stores what this browser registered, replacing whatever it registered before.
+    pub fn write_webpush_subscription(
+        &mut self,
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+        subscription: StorableWebPushSubscription,
+    ) {
+        self.webpush_subscriptions_memory
+            .insert((anchor_number, browser_id), subscription);
+    }
+
+    /// Drops this browser's subscription. Idempotent.
+    pub fn remove_webpush_subscription(
+        &mut self,
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+    ) {
+        self.webpush_subscriptions_memory
+            .remove(&(anchor_number, browser_id));
+    }
+
     /// Drops the Web Push subscriptions of browsers this identity no longer lists. A row
     /// keyed by a browser that is gone is an endpoint the user can no longer revoke.
     fn remove_webpush_subscriptions(
@@ -3267,8 +3299,7 @@ impl<M: Memory + Clone> Storage<M> {
         browsers: &BTreeSet<BrowserId>,
     ) {
         for browser_id in browsers {
-            self.webpush_subscriptions_memory
-                .remove(&(anchor_number, *browser_id));
+            self.remove_webpush_subscription(anchor_number, *browser_id);
         }
     }
 
