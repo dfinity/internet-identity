@@ -71,7 +71,10 @@
           return;
         }
         const consented = await actor
-          .notification_consent_status(identityNumber, origin)
+          .notification_consent_status({
+            anchor_number: identityNumber,
+            origin,
+          })
           .catch(() => false);
         const state = await readDeviceState(identityNumber, actor);
         recordPermission(state.permission);
