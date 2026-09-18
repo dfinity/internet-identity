@@ -61,7 +61,11 @@ export const handleNotificationConsentRequest =
       });
     };
 
-    const parsed = NotificationConsentParamsCodec.safeParse(request.params);
+    // Every member is optional, so an app with nothing to pass sends no `params`
+    // at all. The codec rejects `undefined` but accepts `{}`.
+    const parsed = NotificationConsentParamsCodec.safeParse(
+      request.params ?? {},
+    );
     if (!parsed.success) {
       await channel.send({
         jsonrpc: "2.0",

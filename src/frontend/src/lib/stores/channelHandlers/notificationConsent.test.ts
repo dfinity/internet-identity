@@ -65,10 +65,13 @@ const signIn = async () => {
 /** Runs one request to completion, settling the consent screen if it opens. */
 const run = async ({
   params = {},
+  omitParams = false,
   method = NOTIFICATION_CONSENT_METHOD,
   settle = true,
 }: {
   params?: unknown;
+  /** Send a request with no `params` member, as an app with nothing to pass does. */
+  omitParams?: boolean;
   method?: string;
   settle?: boolean;
 } = {}) => {
@@ -82,9 +85,12 @@ const run = async ({
     },
   } as unknown as Channel;
 
+  const request = omitParams
+    ? { jsonrpc: "2.0", id: 1, method }
+    : { jsonrpc: "2.0", id: 1, method, params };
   const running = handleNotificationConsentRequest(channel, (error) =>
     errors.push(error),
-  )({ jsonrpc: "2.0", id: 1, method, params } as unknown as JsonRequest);
+  )(request as unknown as JsonRequest);
 
   if (settle) {
     void (async () => {
@@ -130,6 +136,12 @@ describe("handleNotificationConsentRequest", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].result).toEqual({ granted: true });
     expect(consentStatus).toHaveBeenCalledWith(BigInt(10_000), ORIGIN);
+  });
+
+  it("accepts a request that carries no params", async () => {
+    const { sent, errors } = await run({ omitParams: true });
+    expect(sent[0].result).toEqual({ granted: true });
+    expect(errors).toEqual([]);
   });
 
   it("reports a refusal rather than failing", async () => {
