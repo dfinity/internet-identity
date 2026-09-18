@@ -148,5 +148,14 @@ const runConsentCeremony = async (
   });
   await waitForStore(notificationConsentSettledStore);
 
-  return actor.notification_consent_status(identityNumber, effectiveOrigin);
+  // The identity can be switched while the screen is up, so the answer is read
+  // for whoever is authenticated once it settles rather than whoever opened it.
+  const settled = get(authenticationStore);
+  if (settled === undefined) {
+    return false;
+  }
+  return settled.actor.notification_consent_status(
+    settled.identityNumber,
+    effectiveOrigin,
+  );
 };
