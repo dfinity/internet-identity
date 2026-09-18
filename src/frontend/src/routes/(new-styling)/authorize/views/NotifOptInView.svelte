@@ -7,13 +7,9 @@
     Loader2Icon,
   } from "@lucide/svelte";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
-  import type {
-    NotificationError,
-    _SERVICE,
-  } from "$lib/generated/internet_identity_types";
+  import type { _SERVICE } from "$lib/generated/internet_identity_types";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
-  import { isCanisterError } from "$lib/utils/utils";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
   import NotifUnblockSteps from "$lib/components/notifications/NotifUnblockSteps.svelte";
@@ -33,7 +29,6 @@
     recordFailure,
     recordPermission,
     type BrowserKind,
-    type FailureReason,
   } from "$lib/utils/notifications/notificationDiagnostics";
 
   interface Props {
@@ -71,7 +66,7 @@
           return;
         }
         const consented = await actor
-          .notification_consent_status({
+          .notification_consent_granted({
             anchor_number: identityNumber,
             origin,
           })
@@ -90,7 +85,7 @@
         // The request is waiting on this window, so a rejection here has to land
         // on a screen the user can answer rather than leaving it spinning.
         const message = messageOf(err);
-        recordFailure(classify(err, "subscribe-failed"), message);
+        recordFailure("subscribe-failed", message);
         variant = "failed";
       }
     })();
@@ -98,11 +93,6 @@
 
   const messageOf = (err: unknown): string =>
     err instanceof Error ? err.message : String(err);
-
-  const classify = (err: unknown, fallback: FailureReason): FailureReason =>
-    isCanisterError<NotificationError>(err) && err.type === "Disabled"
-      ? "backend-disabled"
-      : fallback;
 
   const runSubscribe = async (): Promise<void> => {
     if (actor === undefined) {
@@ -131,7 +121,7 @@
       onDone();
     } catch (err) {
       const message = messageOf(err);
-      recordFailure(classify(err, "subscribe-failed"), message);
+      recordFailure("subscribe-failed", message);
       // The registration may have landed before the consent failed, so a retry
       // that sets the device up again would drop a working endpoint.
       retrySubscribes = !(await readDeviceState(identityNumber, actor))
@@ -158,7 +148,7 @@
       onDone();
     } catch (err) {
       const message = messageOf(err);
-      recordFailure(classify(err, "register-failed"), message);
+      recordFailure("register-failed", message);
       variant = "failed";
     } finally {
       busy = false;
