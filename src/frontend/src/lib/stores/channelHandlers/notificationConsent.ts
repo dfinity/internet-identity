@@ -16,6 +16,7 @@ import {
 } from "$lib/stores/notificationConsent.store";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { remapToLegacyDomain } from "$lib/utils/urlUtils";
+import { isNotifiableOrigin } from "$lib/utils/notifications/notifiableOrigin";
 import { waitForStore } from "$lib/utils/utils";
 import { serializeAuthorizationRequest } from "$lib/stores/channelHandlers/serialize";
 import { get } from "svelte/store";
@@ -105,6 +106,21 @@ export const handleNotificationConsentRequest =
         const effectiveOrigin = remapToLegacyDomain(
           params.icrc95DerivationOrigin ?? channel.origin,
         );
+        // Before the ceremony, which asks the browser for permission and registers
+        // the device: an origin the canister cannot key consent by spends both and
+        // then fails at the grant.
+        if (!isNotifiableOrigin(effectiveOrigin)) {
+          await channel.send({
+            jsonrpc: "2.0",
+            id: requestId,
+            error: {
+              code: INVALID_PARAMS_ERROR_CODE,
+              message: `notifications are not available for ${effectiveOrigin}`,
+            },
+          });
+          onError("invalid-request");
+          return;
+        }
 
         const granted = await runConsentCeremony(effectiveOrigin);
 
