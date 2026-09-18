@@ -40,7 +40,7 @@ export const enableNotifications = async ({
     return { status: permission === "denied" ? "denied" : "dismissed" };
   }
 
-  await ensureRegisteredDevice(identityNumber, actor);
+  await ensureRegisteredDevice(identityNumber);
   await grantConsent({ identityNumber, origin, actor });
 
   return { status: "enabled" };

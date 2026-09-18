@@ -17,18 +17,10 @@ vi.mock("./vapidPool", () => ({
   ),
   signJwtPool: vi.fn(() => Promise.resolve([new Uint8Array([1])])),
 }));
-vi.mock("$lib/stores/browser-key.store", () => ({
-  webPushProof: vi.fn(() =>
-    Promise.resolve({
-      browserId: 1,
-      browserKey: new Uint8Array([2]),
-      signature: new Uint8Array([3]),
-    }),
-  ),
+vi.mock("./browserActor", () => ({
+  browserKeyActor: vi.fn(() => Promise.resolve({ set_webpush_subscription })),
 }));
 
-import type { ActorSubclass } from "@icp-sdk/core/agent";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { ensureRegisteredDevice } from "./subscribeDevice";
 import { loadVapidKey, type StoredVapidKey } from "./vapidKeyStore";
 import { currentDeviceSubscription, subscribeToPush } from "./pushSubscription";
@@ -36,6 +28,11 @@ import { currentDeviceSubscription, subscribeToPush } from "./pushSubscription";
 const HELD = "https://relay.example/held";
 const FRESH = "https://relay.example/fresh";
 const IDENTITY = BigInt(10_000);
+
+/** The registration goes out under the browser key, not the identity's session. */
+const set_webpush_subscription = vi.hoisted(() =>
+  vi.fn((_args: { endpoint: string }) => Promise.resolve({ Ok: null })),
+);
 
 const stored = vi.mocked(loadVapidKey);
 const live = vi.mocked(currentDeviceSubscription);
@@ -48,16 +45,6 @@ const heldKey = (endpoint: string) =>
     publicKeyRaw: new Uint8Array([9]),
   }) as unknown as StoredVapidKey;
 
-const actorRecording = () => {
-  const webpush_subscribe_device = vi.fn((_args: { endpoint: string }) =>
-    Promise.resolve({ Ok: null }),
-  );
-  return {
-    actor: { webpush_subscribe_device } as unknown as ActorSubclass<_SERVICE>,
-    registered: webpush_subscribe_device,
-  };
-};
-
 describe("ensureRegisteredDevice", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -69,31 +56,29 @@ describe("ensureRegisteredDevice", () => {
   it("registers the subscription this browser already holds", async () => {
     stored.mockResolvedValue(heldKey(HELD));
     live.mockResolvedValue({ endpoint: HELD } as PushSubscription);
-    const { actor, registered } = actorRecording();
-
-    await ensureRegisteredDevice(IDENTITY, actor);
+    await ensureRegisteredDevice(IDENTITY);
 
     expect(subscribe).not.toHaveBeenCalled();
-    expect(registered.mock.calls[0][0]).toMatchObject({ endpoint: HELD });
+    expect(set_webpush_subscription.mock.calls[0][0]).toMatchObject({
+      endpoint: HELD,
+    });
   });
 
   it("subscribes afresh when the key it holds names a dead endpoint", async () => {
     stored.mockResolvedValue(heldKey(HELD));
     live.mockResolvedValue(undefined);
-    const { actor, registered } = actorRecording();
-
-    await ensureRegisteredDevice(IDENTITY, actor);
+    await ensureRegisteredDevice(IDENTITY);
 
     expect(subscribe).toHaveBeenCalledOnce();
-    expect(registered.mock.calls[0][0]).toMatchObject({ endpoint: FRESH });
+    expect(set_webpush_subscription.mock.calls[0][0]).toMatchObject({
+      endpoint: FRESH,
+    });
   });
 
   it("subscribes afresh for a browser that holds nothing", async () => {
     stored.mockResolvedValue(undefined);
     live.mockResolvedValue(undefined);
-    const { actor } = actorRecording();
-
-    await ensureRegisteredDevice(IDENTITY, actor);
+    await ensureRegisteredDevice(IDENTITY);
 
     expect(subscribe).toHaveBeenCalledOnce();
   });
