@@ -1,4 +1,6 @@
 import { createStore, get as idbGet, set as idbSet } from "idb-keyval";
+import type { SignIdentity } from "@icp-sdk/core/agent";
+import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import type { BrowserDescription } from "$lib/generated/internet_identity_types";
 
 /**
@@ -305,3 +307,21 @@ export const withBrowserProof = <T>(
 export const currentBrowserId = async (
   identityNumber: bigint,
 ): Promise<number | undefined> => (await read(identityNumber))?.browserId;
+
+/**
+ * An identity signing as this browser, which is how the canister tells which browser a
+ * Web Push call comes from.
+ *
+ * The key the last sign-in left us holding, which is the successor the canister
+ * recorded and the only slot it matches. `undefined` before any sign-in has completed,
+ * when there is no entry to sign as.
+ */
+export const browserKeyIdentity = async (
+  identityNumber: bigint,
+): Promise<SignIdentity | undefined> => {
+  const stored = await read(identityNumber);
+  if (stored?.browserId === undefined) {
+    return undefined;
+  }
+  return ECDSAKeyIdentity.fromKeyPair(stored.keyPair);
+};
