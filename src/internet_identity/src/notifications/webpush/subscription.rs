@@ -1,49 +1,46 @@
-//! One subscription row per browser, keyed `(anchor, browser_id)` against the
-//! registry the anchor already holds.
+//! What a browser registered for Web Push, held on its entry in the identity's browser
+//! registry.
 
 use super::validation::{
     ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
 };
 use crate::state::storage_borrow_mut;
-use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
-use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
-use internet_identity_interface::internet_identity::types::{BrowserId, Timestamp};
-use minicbor::bytes::ByteVec;
+use crate::storage::anchor::{Anchor, WebPushSubscription};
+use internet_identity_interface::internet_identity::types::{
+    AnchorNumber, BrowserId, RemoveWebPushSubscriptionError, SetWebPushSubscriptionError, Timestamp,
+};
 
 /// Registers `browser_id` for Web Push. Idempotent: a browser that re-subscribes
-/// overwrites its own row, endpoint included.
+/// overwrites what it registered before, endpoint included.
 pub fn set_subscription(
-    request: ValidatedSetWebPushSubscriptionRequest,
+    anchor: Anchor,
     browser_id: BrowserId,
+    request: ValidatedSetWebPushSubscriptionRequest,
     now_ns: Timestamp,
-) {
+) -> Result<(), SetWebPushSubscriptionError> {
     let ValidatedSetWebPushSubscriptionRequest {
-        anchor_number,
+        anchor_number: _,
         endpoint,
         vapid_public_key,
         jwt_signatures,
         jwt_issued_at_ns,
     } = request;
 
-    let row = StorableWebPushSubscription {
-        anchor: anchor_number,
-        endpoint,
-        created_at_ns: now_ns,
-        vapid_public_key,
-        jwt_pool: Some(StorableWebPushJwtPool {
-            signatures: jwt_signatures.into_iter().map(ByteVec::from).collect(),
-            issued_at_ns: jwt_issued_at_ns,
+    write_subscription(
+        anchor,
+        browser_id,
+        Some(WebPushSubscription {
+            endpoint,
+            created_at_ns: now_ns,
+            vapid_public_key,
+            jwt_signatures,
+            jwt_issued_at_ns,
         }),
-    };
-
-    // No cap and no eviction: the key is a browser the registry already holds, so
-    // `MAX_BROWSERS` bounds this map and the registry's own evictions empty it.
-    storage_borrow_mut(|storage| {
-        storage.write_webpush_subscription(anchor_number, browser_id, row)
-    });
+    )
+    .map_err(SetWebPushSubscriptionError::InternalCanisterError)
 }
 
-/// Stops notifications to one browser, and with them the JWT pool on the same row.
+/// Stops notifications to one browser, and with them the JWT pool it registered.
 /// Idempotent.
 ///
 /// Takes the browser rather than reading it off the caller, since silencing one is done
@@ -53,8 +50,25 @@ pub fn remove_subscription(
         anchor_number,
         browser_id,
     }: ValidatedRemoveWebPushSubscriptionRequest,
-) {
-    storage_borrow_mut(|storage| storage.remove_webpush_subscription(anchor_number, browser_id));
+) -> Result<(), RemoveWebPushSubscriptionError> {
+    let anchor = read_anchor(anchor_number)
+        .map_err(RemoveWebPushSubscriptionError::InternalCanisterError)?;
+    write_subscription(anchor, browser_id, None)
+        .map_err(RemoveWebPushSubscriptionError::InternalCanisterError)
+}
+
+pub(super) fn read_anchor(anchor_number: AnchorNumber) -> Result<Anchor, String> {
+    crate::state::storage_borrow(|storage| storage.read(anchor_number))
+        .map_err(|err| format!("{err}"))
+}
+
+pub(super) fn write_subscription(
+    mut anchor: Anchor,
+    browser_id: BrowserId,
+    subscription: Option<WebPushSubscription>,
+) -> Result<(), String> {
+    anchor.set_webpush_subscription(browser_id, subscription);
+    storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
 }
 
 #[cfg(test)]
@@ -62,78 +76,79 @@ mod tests {
     use super::super::fixtures::*;
     use super::*;
     use crate::notifications::test_setup as setup;
-    use internet_identity_interface::internet_identity::types::AnchorNumber;
-
-    const ANCHOR: AnchorNumber = 10_000;
 
     fn remove(anchor_number: AnchorNumber, browser_id: BrowserId) {
         remove_subscription(ValidatedRemoveWebPushSubscriptionRequest {
             anchor_number,
             browser_id,
-        });
+        })
+        .expect("removing a subscription");
     }
 
     #[test]
     fn setting_then_removing_round_trips() {
         setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
 
-        set_subscription(
-            validated(ANCHOR, "https://relay.example/a", 1_000),
-            1,
-            1_000,
-        );
+        subscribe(anchor_number, browsers[0], "https://relay.example/a", 1_000);
         assert_eq!(
-            stored_endpoint(ANCHOR, 1).as_deref(),
+            stored_endpoint(anchor_number, browsers[0]).as_deref(),
             Some("https://relay.example/a")
         );
 
-        remove(ANCHOR, 1);
-        assert_eq!(stored_endpoint(ANCHOR, 1), None);
+        remove(anchor_number, browsers[0]);
+        assert_eq!(stored_endpoint(anchor_number, browsers[0]), None);
     }
 
     #[test]
-    fn a_browser_that_rotates_its_endpoint_keeps_one_row() {
+    fn a_browser_that_rotates_its_endpoint_keeps_one_subscription() {
         setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
 
-        set_subscription(
-            validated(ANCHOR, "https://relay.example/first", 1_000),
-            1,
+        subscribe(
+            anchor_number,
+            browsers[0],
+            "https://relay.example/first",
             1_000,
         );
-        set_subscription(
-            validated(ANCHOR, "https://relay.example/second", 2_000),
-            1,
+        subscribe(
+            anchor_number,
+            browsers[0],
+            "https://relay.example/second",
             2_000,
         );
 
         assert_eq!(
-            stored_endpoint(ANCHOR, 1).as_deref(),
+            stored_endpoint(anchor_number, browsers[0]).as_deref(),
             Some("https://relay.example/second"),
             "a new endpoint for the same browser must overwrite, not accumulate"
         );
     }
 
     #[test]
-    fn two_browsers_of_one_identity_hold_their_own_rows() {
+    fn two_browsers_of_one_identity_register_on_their_own_entries() {
         setup();
+        let (anchor_number, browsers) = anchor_with_browsers(2);
 
-        set_subscription(
-            validated(ANCHOR, "https://relay.example/one", 1_000),
-            1,
+        subscribe(
+            anchor_number,
+            browsers[0],
+            "https://relay.example/one",
             1_000,
         );
-        set_subscription(
-            validated(ANCHOR, "https://relay.example/other", 1_000),
-            2,
+        subscribe(
+            anchor_number,
+            browsers[1],
+            "https://relay.example/other",
             1_000,
         );
 
         assert_eq!(
-            stored_endpoint(ANCHOR, 1).as_deref(),
+            stored_endpoint(anchor_number, browsers[0]).as_deref(),
             Some("https://relay.example/one")
         );
         assert_eq!(
-            stored_endpoint(ANCHOR, 2).as_deref(),
+            stored_endpoint(anchor_number, browsers[1]).as_deref(),
             Some("https://relay.example/other")
         );
     }
@@ -141,10 +156,24 @@ mod tests {
     #[test]
     fn removing_twice_is_a_harmless_no_op() {
         setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
 
-        remove(ANCHOR, 1);
-        remove(ANCHOR, 1);
+        remove(anchor_number, browsers[0]);
+        remove(anchor_number, browsers[0]);
 
-        assert_eq!(stored_endpoint(ANCHOR, 1), None);
+        assert_eq!(stored_endpoint(anchor_number, browsers[0]), None);
+    }
+
+    /// The registration hangs off a browser entry, so one the registry does not list
+    /// has nothing to hang it on.
+    #[test]
+    fn a_browser_the_registry_does_not_list_registers_nothing() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+        let unlisted = browsers[0] + 1;
+
+        subscribe(anchor_number, unlisted, "https://relay.example/a", 1_000);
+
+        assert_eq!(stored_endpoint(anchor_number, unlisted), None);
     }
 }

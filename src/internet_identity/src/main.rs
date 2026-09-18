@@ -340,11 +340,10 @@ fn set_webpush_subscription(
     request: SetWebPushSubscriptionRequest,
 ) -> Result<(), SetWebPushSubscriptionError> {
     let validated: ValidatedSetWebPushSubscriptionRequest = request.try_into()?;
-    let browser_id = check_browser_authorization(validated.anchor_number)
+    let (anchor, browser_id) = check_browser_authorization(validated.anchor_number)
         .map_err(|_| SetWebPushSubscriptionError::InvalidBrowserKey)?;
 
-    notifications::webpush::set_subscription(validated, browser_id, ic_cdk::api::time());
-    Ok(())
+    notifications::webpush::set_subscription(anchor, browser_id, validated, ic_cdk::api::time())
 }
 
 /// Authorized by the identity rather than by the browser, so a browser that is lost or
@@ -357,8 +356,7 @@ fn remove_webpush_subscription(
     check_authz_and_record_activity(validated.anchor_number)
         .map_err(|_| RemoveWebPushSubscriptionError::Unauthorized(caller()))?;
 
-    notifications::webpush::remove_subscription(validated);
-    Ok(())
+    notifications::webpush::remove_subscription(validated)
 }
 
 #[update]
