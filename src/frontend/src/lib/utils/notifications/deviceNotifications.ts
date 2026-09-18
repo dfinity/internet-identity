@@ -10,7 +10,10 @@ import {
   isPushSupported,
   relayOriginOf,
 } from "./pushSubscription";
-import { subscribeAndRegisterDevice } from "./subscribeDevice";
+import {
+  registerStoredDevice,
+  subscribeAndRegisterDevice,
+} from "./subscribeDevice";
 import { loadVapidKey } from "./vapidKeyStore";
 import { currentBrowserId } from "$lib/stores/browser-key.store";
 import { browserKeyActor } from "./browserActor";
@@ -52,8 +55,7 @@ export const reconcileDeviceNotifications = async (
     return;
   }
 
-  // Registered: top up the pool before it runs out. A missing status means the
-  // canister no longer knows this browser, so re-register instead.
+  // The browser's subscription is sound, so what is left is this identity's own row.
   const browserId = await currentBrowserId(identityNumber);
   if (browserId === undefined) {
     return;
@@ -62,8 +64,11 @@ export const reconcileDeviceNotifications = async (
     anchor_number: identityNumber,
     browser_id: browserId,
   });
-  if (status === undefined) {
-    await subscribeAndRegisterDevice(identityNumber);
+  // Nothing registered is what a second identity on this browser looks like, and a
+  // different endpoint is what another identity's re-subscribe left behind. Either
+  // way, register what the browser already holds rather than rotating it away.
+  if (status === undefined || status.endpoint !== stored.endpoint) {
+    await registerStoredDevice(identityNumber, stored);
     return;
   }
   const remaining = windowsRemaining({

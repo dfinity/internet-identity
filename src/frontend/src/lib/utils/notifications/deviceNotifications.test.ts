@@ -16,6 +16,7 @@ vi.mock("./subscribeDevice", () => ({
   subscribeAndRegisterDevice: vi.fn(() =>
     Promise.resolve("https://relay.example/new"),
   ),
+  registerStoredDevice: vi.fn(() => Promise.resolve(ENDPOINT)),
 }));
 vi.mock("$lib/stores/browser-key.store", () => ({
   currentBrowserId: vi.fn(() => Promise.resolve(7)),
@@ -34,14 +35,18 @@ import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { reconcileDeviceNotifications } from "./deviceNotifications";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
-import { subscribeAndRegisterDevice } from "./subscribeDevice";
+import {
+  registerStoredDevice,
+  subscribeAndRegisterDevice,
+} from "./subscribeDevice";
 import { currentBrowserId } from "$lib/stores/browser-key.store";
 
 const ENDPOINT = "https://relay.example/abc";
 const DAY_NS = BigInt(24 * 60 * 60) * BigInt(1_000_000_000);
-/** A pool of 30 windows minted `daysAgo` days ago. */
-const pool = (daysAgo: number) => [
+/** A registration on `endpoint` whose pool of 30 windows was minted `daysAgo` ago. */
+const pool = (daysAgo: number, endpoint = ENDPOINT) => [
   {
+    endpoint,
     pool_len: 30,
     issued_at_ns:
       BigInt(Date.now()) * BigInt(1_000_000) - BigInt(daysAgo) * DAY_NS,
@@ -119,13 +124,37 @@ describe("reconcileDeviceNotifications", () => {
     expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
   });
 
-  it("re-subscribes when the canister no longer knows the endpoint", async () => {
+  /**
+   * The subscription and its VAPID key belong to the browser, not to one identity, so a
+   * second identity with no row of its own registers what is already there. Rotating
+   * would unsubscribe the endpoint the first identity's row still names.
+   */
+  it("registers the browser's existing subscription for an identity with no row", async () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
     vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
     a.get_webpush_subscription_status.mockResolvedValue([]);
     await run(a);
-    expect(subscribeAndRegisterDevice).toHaveBeenCalledOnce();
+    expect(registerStoredDevice).toHaveBeenCalledOnce();
+    expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
+    expect(browserActor.set_webpush_subscription).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The subscription is shared, so another identity re-subscribing leaves this one
+   * registered on an endpoint that is gone. Registering what the browser now holds
+   * repairs it; re-subscribing would break the identity that just fixed itself.
+   */
+  it("re-registers an identity another identity's re-subscribe left behind", async () => {
+    vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
+    vi.mocked(loadVapidKey).mockResolvedValue(key());
+    const a = actor();
+    a.get_webpush_subscription_status.mockResolvedValue(
+      pool(1, "https://relay.example/someone-else"),
+    );
+    await run(a);
+    expect(registerStoredDevice).toHaveBeenCalledOnce();
+    expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
     expect(browserActor.set_webpush_subscription).not.toHaveBeenCalled();
   });
 
@@ -161,6 +190,7 @@ describe("reconcileDeviceNotifications", () => {
     await run(a);
     expect(a.get_webpush_subscription_status).not.toHaveBeenCalled();
     expect(browserActor.set_webpush_subscription).not.toHaveBeenCalled();
+    expect(registerStoredDevice).not.toHaveBeenCalled();
   });
 
   it("re-subscribes when the browser dropped its subscription", async () => {
