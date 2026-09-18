@@ -2,17 +2,21 @@
   import { ZapIcon, ClockIcon, ShieldIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
+  import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
 
   interface Props {
     /** dApp name for the heading, or undefined when it isn't known. */
     appName: string | undefined;
+    /** The app the notifications would come from, shown as the one thing here
+     * the app cannot choose for itself. */
+    origin: string;
     /** True while the enable request is in flight. */
     busy: boolean;
     onEnable: () => void;
     onSkip: () => void;
   }
 
-  const { appName, busy, onEnable, onSkip }: Props = $props();
+  const { appName, origin, busy, onEnable, onSkip }: Props = $props();
 
   const app = $derived(appName ?? $t`this app`);
 </script>
@@ -20,6 +24,8 @@
 <div
   class="flex flex-1 flex-col items-stretch p-4 sm:max-w-100 sm:justify-center sm:self-center"
 >
+  <AuthorizeHeader {origin} />
+
   <!-- Lock-screen notification preview -->
   <div
     class="border-border-tertiary bg-bg-primary_alt relative overflow-hidden rounded-2xl border p-5 pb-8"
