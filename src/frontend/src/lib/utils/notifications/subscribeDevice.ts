@@ -6,19 +6,21 @@
 import { throwCanisterError } from "$lib/utils/utils";
 import { generateVapidKeypair, signJwtPool } from "./vapidPool";
 import { relayOriginOf, subscribeToPush } from "./pushSubscription";
-import { storeVapidKey } from "./vapidKeyStore";
+import { storeVapidKey, type StoredVapidKey } from "./vapidKeyStore";
 import { browserKeyActor } from "./browserActor";
 
 /**
- * Subscribes and registers the device, returning the relay endpoint. Assumes
- * notification permission is already granted. `subscribeToPush` drops any stale
- * subscription first, so this is safe to call to replace a rotated one.
+ * Registers a subscription this browser already holds with `identityNumber`, signing a
+ * fresh pool with the key it was minted under.
+ *
+ * The subscription and its VAPID key belong to the browser, not to one identity, so a
+ * second identity signing in here registers what is already there. Rotating instead
+ * would unsubscribe the endpoint every other identity's row still names.
  */
-export const subscribeAndRegisterDevice = async (
+export const registerStoredDevice = async (
   identityNumber: bigint,
+  { endpoint, privateKey, publicKeyRaw }: StoredVapidKey,
 ): Promise<string> => {
-  const { publicKeyRaw, privateKey } = await generateVapidKeypair();
-  const endpoint = await subscribeToPush(publicKeyRaw);
   const issuedAtNs = BigInt(Date.now()) * BigInt(1_000_000);
   const signatures = await signJwtPool(
     privateKey,
@@ -35,6 +37,23 @@ export const subscribeAndRegisterDevice = async (
       jwt_issued_at_ns: issuedAtNs,
     })
     .then(throwCanisterError);
-  await storeVapidKey({ endpoint, privateKey, publicKeyRaw });
+  return endpoint;
+};
+
+/**
+ * Mints a subscription and a VAPID key for this browser, then registers it. Assumes
+ * notification permission is already granted. `subscribeToPush` drops any prior
+ * subscription, so this replaces one rather than adding to it, and every other
+ * identity's stored row is left naming an endpoint that is gone: only call it where
+ * the browser has no usable subscription of its own.
+ */
+export const subscribeAndRegisterDevice = async (
+  identityNumber: bigint,
+): Promise<string> => {
+  const { publicKeyRaw, privateKey } = await generateVapidKeypair();
+  const endpoint = await subscribeToPush(publicKeyRaw);
+  const stored = { endpoint, privateKey, publicKeyRaw };
+  await registerStoredDevice(identityNumber, stored);
+  await storeVapidKey(stored);
   return endpoint;
 };
