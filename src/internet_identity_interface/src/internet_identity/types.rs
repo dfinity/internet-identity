@@ -416,6 +416,9 @@ pub struct InternetIdentityInit {
     /// (the deployment then has no official connector), `Some(Some(url))`
     /// points it at `url`.
     pub mcp_official_url: Option<Option<String>>,
+    /// Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
+    /// turns notifications off, and entries enable them for those origins only.
+    pub notifications_enabled_origins: Option<Vec<FrontendHostname>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -963,4 +966,37 @@ pub struct RevokeBrowserSessionsRequest {
 pub enum SessionRevokeError {
     Unauthorized(Principal),
     InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationGrantConsentError {
+    Unauthorized(Principal),
+    /// The identity has never signed in at the app, so there is no application for a
+    /// consent to hang off.
+    NoSuchSession,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationRevokeConsentError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationGrantConsentRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationRevokeConsentRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationConsentGrantedRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
 }

@@ -334,6 +334,12 @@ type InternetIdentityInit = record {
     // set/clear pattern as `dnssec_config`: null keeps the previously stored
     // value, `opt null` clears it, `opt opt "https://..."` sets it.
     mcp_official_url : opt opt text;
+    // Server-side kill switch for the notifications feature. null / `opt false`
+    // (the default) disables every notification endpoint; `opt true` enables
+    // them. Omitting it on upgrade keeps the stored value.
+    // Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
+    // turns notifications off, and entries enable them for those origins only.
+    notifications_enabled_origins : opt vec text;
 };
 
 // DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
@@ -1732,6 +1738,35 @@ type ListAvailableAttributesError = variant {
     AuthorizationError : principal;
 };
 
+// Why a notification call was refused.
+type NotificationGrantConsentError = variant {
+    Unauthorized : principal;
+    // The identity has never signed in at the app, so there is no application for a
+    // consent to hang off.
+    NoSuchSession;
+    InternalCanisterError : text;
+};
+
+type NotificationRevokeConsentError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
+type NotificationGrantConsentRequest = record {
+    anchor_number : UserNumber;
+    origin : text;
+};
+
+type NotificationRevokeConsentRequest = record {
+    anchor_number : UserNumber;
+    origin : text;
+};
+
+type NotificationConsentGrantedRequest = record {
+    anchor_number : UserNumber;
+    origin : text;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2206,4 +2241,10 @@ service : (opt InternetIdentityInit) -> {
 
     // Looks up identity number when called with a recovery phrase
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
+
+    // ===== Notifications =====
+    notification_grant_consent : (NotificationGrantConsentRequest) -> (variant { Ok; Err : NotificationGrantConsentError });
+    notification_revoke_consent : (NotificationRevokeConsentRequest) -> (variant { Ok; Err : NotificationRevokeConsentError });
+    notification_consent_granted : (NotificationConsentGrantedRequest) -> (bool) query;
+
 };

@@ -224,6 +224,16 @@ pub fn arg_with_captcha_disabled() -> Option<InternetIdentityInit> {
     })
 }
 
+/// The only test arg with notifications enabled, for the origins given.
+pub fn arg_with_notifications_enabled_for(origins: &[&str]) -> Option<InternetIdentityInit> {
+    Some(InternetIdentityInit {
+        notifications_enabled_origins: Some(
+            origins.iter().map(|origin| origin.to_string()).collect(),
+        ),
+        ..arg_with_captcha_disabled().unwrap()
+    })
+}
+
 pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         archive_config: Some(ArchiveConfig {
