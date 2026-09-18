@@ -89,7 +89,10 @@ export const resolveOptInScreen = (
   if (state.permission === "denied") {
     return "blocked";
   }
-  if (state.registered && !allowed) {
+  // Only where the browser can already deliver: this screen asks for the app's
+  // consent and nothing else, so a permission that was reset to "default" has to
+  // fall through to one that asks for it back.
+  if (state.permission === "granted" && state.registered && !allowed) {
     return "allow-app";
   }
   if (!state.registered && allowed) {
