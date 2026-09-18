@@ -20,11 +20,8 @@ use serde_bytes::ByteBuf;
 
 const ORIGIN: &str = "https://some-dapp.com";
 
-/// A canister with the feature turned on, and one anchor registered to
-/// `principal_1` which has signed in at `ORIGIN`.
-///
-/// The sign-in is what mints the application a consent hangs off, so a test that skips it
-/// is testing the refusal rather than the grant.
+/// A canister with the feature turned on, and one anchor registered to `principal_1`
+/// which has signed in at `ORIGIN`.
 fn install_with_anchor(env: &PocketIc) -> (CanisterId, AnchorNumber) {
     let canister_id =
         install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
@@ -42,11 +39,9 @@ fn chrome_on_a_mac() -> BrowserDescription {
     }
 }
 
-/// Signs `anchor` in at `origin`, which is what puts the origin in the application
-/// registry and so what gives a consent somewhere to live.
-///
-/// Each sign-in comes from its own browser, which `browser_seed` names: a browser rotates
-/// its key on every sign-in and presenting a spent key is refused.
+/// Signs `anchor` in at `origin`, which puts the origin in the application registry.
+/// `browser_seed` names the browser: a key rotates on every sign-in, so a repeat sign-in
+/// needs a browser of its own.
 fn sign_in_at(
     env: &PocketIc,
     canister_id: CanisterId,
@@ -85,8 +80,7 @@ fn sign_in_at(
 #[test]
 fn should_refuse_every_entry_point_while_the_feature_is_off() -> Result<(), RejectResponse> {
     let env = env();
-    // The default arg, which is what every deployment gets until one turns the
-    // feature on.
+    // The default arg, which leaves the feature off.
     let canister_id =
         install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_captcha_disabled());
     let anchor = flows::register_anchor(&env, canister_id);
@@ -99,8 +93,7 @@ fn should_refuse_every_entry_point_while_the_feature_is_off() -> Result<(), Reje
         revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
         Err(NotificationError::Disabled)
     );
-    // The query answers rather than erroring, and must not leak that anything
-    // exists: a disabled deployment looks exactly like one nobody consented on.
+    // A disabled deployment answers like one nobody consented on.
     assert!(!consent_status(
         &env,
         canister_id,
@@ -204,8 +197,7 @@ fn should_fold_the_gateway_twins_of_one_app_into_one_consent() -> Result<(), Rej
     )?
     .expect("grant rejected");
 
-    // The same canister named through another gateway is the same app, so the
-    // grant is findable under it and does not add a second row.
+    // Another gateway for the same canister is the same app.
     for twin in [
         "https://abcde-aaaaa-aaaaa-aaaaa-cai.ic0.app",
         "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp.net",
@@ -228,8 +220,7 @@ fn should_fold_the_gateway_twins_of_one_app_into_one_consent() -> Result<(), Rej
     )?
     .expect("grant rejected");
 
-    // So one revoke, through a third spelling, clears every spelling. A second row
-    // would have survived it under one of them.
+    // So one revoke, through a third spelling, clears them all.
     revoke_consent(
         &env,
         canister_id,
@@ -283,10 +274,8 @@ fn should_reject_an_origin_that_is_not_a_bare_https_authority() -> Result<(), Re
     Ok(())
 }
 
-/// Notifications are addressed to the account principal an identity holds at the app, so
-/// there is nothing for a grant to authorize until the identity has one. The refusal is
-/// its own variant because it is the one the caller can act on, and II's frontend does:
-/// it signs in at the app and asks again.
+/// Consent hangs off the application, which only a sign-in mints. Its own variant
+/// because signing in at the app clears it.
 #[test]
 fn should_refuse_consent_for_an_app_the_identity_has_never_reached() -> Result<(), RejectResponse> {
     let env = env();
@@ -312,9 +301,8 @@ fn should_refuse_consent_for_an_app_the_identity_has_never_reached() -> Result<(
     Ok(())
 }
 
-/// A trap is a different answer from a refusal, so trapping on a number nobody
-/// registered is how a caller learns which numbers are free. Only reachable through
-/// Candid: the trapping read sits behind the authorization helpers.
+/// A trap is a different answer from a refusal, so trapping on an unregistered number
+/// tells a caller which numbers are free. Only reachable through Candid.
 #[test]
 fn should_refuse_an_anchor_that_does_not_exist_without_trapping() -> Result<(), RejectResponse> {
     let env = env();
@@ -337,17 +325,15 @@ fn should_refuse_an_anchor_that_does_not_exist_without_trapping() -> Result<(), 
         ORIGIN.into()
     )?);
 
-    // And the refusal is the same one someone else's anchor gives, or the difference
-    // between the two answers is itself the oracle.
+    // Word for word what someone else's anchor gives, or the difference is the oracle.
     let absent = grant_consent(&env, canister_id, principal_2(), missing, ORIGIN.into())?;
     let not_yours = grant_consent(&env, canister_id, principal_2(), anchor, ORIGIN.into())?;
     assert_eq!(absent, not_yours);
     Ok(())
 }
 
-/// The one thing no unit test can see: the map lives in stable memory under an
-/// index chosen for this feature, and an upgrade that lost it would be
-/// unrecoverable after release.
+/// The map lives in stable memory under an index chosen for this feature, and an
+/// upgrade that lost it would be unrecoverable after release.
 #[test]
 fn should_keep_consent_across_an_upgrade() -> Result<(), RejectResponse> {
     let env = env();
@@ -355,9 +341,7 @@ fn should_keep_consent_across_an_upgrade() -> Result<(), RejectResponse> {
     grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
         .expect("grant rejected");
 
-    // No argument, which is what an upgrade that changes nothing sends: the
-    // stored kill-switch value has to survive it too, or every endpoint would
-    // come back refusing.
+    // No argument, which is what an upgrade that changes nothing sends.
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
     assert!(consent_status(

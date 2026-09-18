@@ -1736,8 +1736,7 @@ type ListAvailableAttributesError = variant {
     AuthorizationError : principal;
 };
 
-// Why a notification call was refused. A variant rather than text: a caller
-// cannot branch on prose, and the shape is breaking to change after release.
+// Why a notification call was refused.
 type NotificationError = variant {
     Disabled;                          // this deployment has notifications off
     Unauthorized : text;
@@ -1745,9 +1744,8 @@ type NotificationError = variant {
     InvalidSubscription : vec text;    // every rejected field, not just the first
     // Nothing here to act on: no consent for that origin, or no subscribed endpoint.
     NotFound;
-    // This identity has never reached the app, so nothing addresses it there and there is
-    // nothing for a consent to hang off. Told apart from NotFound because it is the one
-    // refusal the caller can act on: signing in at the app clears it.
+    // The identity has never signed in at the app, so there is no application for a
+    // consent to hang off. Apart from NotFound because signing in there clears it.
     SessionMissing;
 };
 

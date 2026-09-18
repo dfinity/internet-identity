@@ -1356,8 +1356,7 @@ export type MetadataMapV2 = Array<
   ]
 >;
 /**
- * Why a notification call was refused. A variant rather than text: a caller
- * cannot branch on prose, and the shape is breaking to change after release.
+ * Why a notification call was refused.
  */
 export type NotificationError = { 'InvalidSubscription' : Array<string> } |
   { 'Disabled' : null } |
@@ -1371,9 +1370,8 @@ export type NotificationError = { 'InvalidSubscription' : Array<string> } |
   { 'InvalidOrigin' : string } |
   {
     /**
-     * This identity has never reached the app, so nothing addresses it there and there is
-     * nothing for a consent to hang off. Told apart from NotFound because it is the one
-     * refusal the caller can act on: signing in at the app clears it.
+     * The identity has never signed in at the app, so there is no application for a
+     * consent to hang off. Apart from NotFound because signing in there clears it.
      */
     'SessionMissing' : null
   };

@@ -10,11 +10,8 @@ use std::borrow::Cow;
 pub struct AnchorApplicationConfig {
     #[n(0)]
     pub default_account_number: Option<StorableAccountNumber>, // None is the unreserved synthetic account
-    /// When the identity allowed this application to notify it. `None` is the answer for
-    /// every row written before this field existed, and it is the right one: nothing
-    /// could have consented then.
     #[n(1)]
-    pub notifications_consented_at_ns: Option<Timestamp>,
+    pub notifications_consented_at_ns: Option<Timestamp>, // None if the app may not notify
 }
 
 impl Storable for AnchorApplicationConfig {

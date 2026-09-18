@@ -1,8 +1,8 @@
 //! Notifications: who may notify a user, and how they're reached.
 //!
-//! Each `pub fn` checks the feature flag and authorizes the
-//! anchor, then delegates to a storage-only helper taking the resolved
-//! `anchor_number` — keeping the storage logic testable off-canister.
+//! Each `pub fn` checks the feature flag and authorizes the anchor, then delegates to a
+//! storage-only helper taking the resolved `anchor_number`, which keeps the storage logic
+//! testable off-canister.
 
 pub mod consent;
 
@@ -16,10 +16,8 @@ pub use internet_identity_interface::internet_identity::types::NotificationError
 use internet_identity_interface::internet_identity::types::{AnchorNumber, FrontendHostname};
 use url::Url;
 
-/// A consent origin must be a length-bounded, bare `https://host[:port]`. The
-/// scheme check mirrors the delegation path, which treats non-`https` frontends
-/// as insecure/dev. Anything past the authority is rejected rather than
-/// trimmed, so one app cannot hold two consent rows.
+/// Accepts a length-bounded, bare `https://host[:port]`. Anything else is rejected
+/// rather than trimmed, so one app cannot hold two consent rows.
 fn validate_origin(origin: &str) -> Result<(), NotificationError> {
     let invalid = |reason: &str| Err(NotificationError::InvalidOrigin(reason.to_string()));
 
@@ -35,26 +33,17 @@ fn validate_origin(origin: &str) -> Result<(), NotificationError> {
     if url.scheme() != "https" {
         return invalid("origin must be an https:// URL");
     }
-    // What a browser would hand an app, against what was asked for. Everything a browser
-    // spells differently fails here in one comparison: credentials, a path, a query, a
-    // fragment, a trailing slash, an explicit :443, an uppercase host. Each of those would
-    // otherwise key a row under a spelling the app can never present, so the row would sit
-    // there matching nothing.
+    // One comparison against the browser's own serialization, so credentials, path,
+    // query, fragment, trailing slash, explicit :443 and uppercase host all fail here.
     if url.origin().ascii_serialization() != origin {
         return invalid("origin must be a bare https://host[:port]");
     }
     Ok(())
 }
 
-/// Validates an origin and folds it to its canonical spelling in one step.
-/// Every path that turns an origin into a consent key goes through this: a
-/// grant naming `https://app.icp0.io` and one naming `https://app.ic0.app` are
-/// the same app, and keying them apart makes the first grant unrevocable and
-/// undeliverable.
-///
-/// The fold is the attribute path's `remap_to_legacy_domain`, not a second
-/// implementation of it. A looser one would treat origins as the same app that the
-/// frontend derives different principals for, so one consent row would cover both.
+/// Validates an origin and folds it to its canonical spelling, through the attribute
+/// path's `remap_to_legacy_domain` so the fold matches the one the frontend derives
+/// principals with. Every path that turns an origin into a consent key goes through this.
 fn consent_origin(origin: &str) -> Result<FrontendHostname, NotificationError> {
     validate_origin(origin)?;
     Ok(remap_to_legacy_domain(origin))
@@ -75,17 +64,15 @@ fn check_enabled() -> Result<(), NotificationError> {
 
 /// Whether the anchor is one this canister holds.
 ///
-/// Read directly, because the authorization helpers below reach the anchor through
-/// `state::anchor`, which traps on a number nobody registered. Trapping there would
-/// answer differently for a free number than for someone else's, which is how a caller
-/// learns which numbers are taken.
+/// Read directly, because the authorization helpers below reach it through
+/// `state::anchor`, which traps on an unregistered number, and a trap tells a caller
+/// which numbers are free.
 fn anchor_exists(anchor_number: AnchorNumber) -> bool {
     crate::state::storage_borrow(|storage| storage.read(anchor_number)).is_ok()
 }
 
-/// Authorize an update via the standard activity-recording gate. Takes the
-/// anchor as an argument (not a caller reverse-lookup) so it works for
-/// OpenID-only identities too.
+/// Authorize an update via the standard activity-recording gate. Takes the anchor as an
+/// argument, not a caller reverse-lookup, so it works for OpenID-only identities too.
 fn authorize_update(anchor_number: AnchorNumber) -> Result<(), NotificationError> {
     if !anchor_exists(anchor_number) {
         // Word for word what a wrong caller gets, so the two cannot be told apart.
@@ -153,8 +140,7 @@ mod origin_tests {
         );
     }
 
-    /// A browser never serializes userinfo into an origin, so this spelling could only
-    /// ever key a row that looks like `app.example`'s without being it.
+    /// A browser never serializes userinfo into an origin.
     #[test]
     fn rejects_credentials_in_the_authority() {
         for origin in [
@@ -169,8 +155,8 @@ mod origin_tests {
         }
     }
 
-    /// Every one of these parses far enough to look like an authority and none of them is
-    /// a spelling a browser can hand an app, so a row keyed under one matches nothing.
+    /// Each parses far enough to look like an authority, and none is a spelling a
+    /// browser can hand an app.
     #[test]
     fn rejects_an_authority_no_browser_can_serialize() {
         for origin in [
@@ -207,8 +193,7 @@ mod origin_tests {
         validate_origin("https://app.example:8443").unwrap();
     }
 
-    /// Anything past the authority would let one app hold several consent rows,
-    /// only one of which the send path would ever find.
+    /// Anything past the authority would let one app hold several consent rows.
     #[test]
     fn rejects_anything_past_the_authority() {
         for origin in [
