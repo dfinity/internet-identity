@@ -95,6 +95,18 @@ describe("resolveOptInScreen", () => {
     ).toBe("new-device");
   });
 
+  /// `allow-app` never asks the browser for permission, so a registration whose
+  /// permission was reset would report success while nothing can be delivered.
+  it("asks for permission again when a registered browser had it reset", () => {
+    expect(
+      resolveOptInScreen(
+        state({ permission: "default", subscribed: true, registered: true }),
+        ORIGIN,
+        false,
+      ),
+    ).toBe("first-time");
+  });
+
   it("shows the full pitch to a first-timer", () => {
     expect(resolveOptInScreen(state({}), ORIGIN, false)).toBe("first-time");
   });
