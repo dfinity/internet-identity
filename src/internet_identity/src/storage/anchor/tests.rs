@@ -1703,6 +1703,35 @@ mod browser_tests {
         assert_eq!(anchor.browsers()[0].next_browser_key, successor_key(2));
     }
 
+    /// A browser signing a call for itself is recognised by the key it still holds,
+    /// which is the successor it announced, never the one the sign-in retired.
+    #[test]
+    fn a_browser_is_recognised_by_the_key_it_still_holds() {
+        let mut anchor = anchor();
+        let (id, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Chrome"),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(
+            anchor.browser_by_principal(Principal::self_authenticating(successor_key(1))),
+            Some(id)
+        );
+        assert_eq!(
+            anchor.browser_by_principal(Principal::self_authenticating(browser_key(1))),
+            None,
+            "the key the sign-in retired must not name a browser"
+        );
+        assert_eq!(
+            anchor.browser_by_principal(Principal::self_authenticating(browser_key(9))),
+            None
+        );
+    }
+
     #[test]
     fn rotating_repeatedly_keeps_the_same_browser() {
         let mut anchor = anchor();

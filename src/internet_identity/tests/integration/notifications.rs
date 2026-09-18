@@ -371,13 +371,13 @@ mod subscriptions {
     use super::*;
     use canister_tests::api::internet_identity::api_v2::prepare_account_session;
     use canister_tests::api::internet_identity::notifications::{
-        subscribe_device, unsubscribe_device,
+        remove_webpush_subscription, set_webpush_subscription,
     };
     use canister_tests::framework::BrowserKey;
     use internet_identity_interface::internet_identity::types::{
         BrowserBrand, BrowserDescription, BrowserId, FormFactor, OperatingSystem,
-        PrepareAccountSessionRequest, SubscribeDeviceError, SubscribeDeviceRequest,
-        UnsubscribeDeviceError,
+        PrepareAccountSessionRequest, RemoveWebPushSubscriptionError, SetWebPushSubscriptionError,
+        SetWebPushSubscriptionRequest,
     };
     use pretty_assertions::assert_eq;
     use serde_bytes::ByteBuf;
@@ -452,29 +452,20 @@ mod subscriptions {
         (canister_id, anchor, browser, browser_id)
     }
 
-    /// What a browser uploads. The successor key is the one it keeps between sign-ins.
-    fn request_from(
-        anchor: AnchorNumber,
-        browser: &BrowserKey,
-        endpoint: &str,
-    ) -> SubscribeDeviceRequest {
-        let key_holder = browser.successor();
-        let pool: Vec<Vec<u8>> = jwt_pool().into_iter().map(ByteBuf::into_vec).collect();
-        SubscribeDeviceRequest {
+    fn request(anchor: AnchorNumber, endpoint: &str) -> SetWebPushSubscriptionRequest {
+        SetWebPushSubscriptionRequest {
             anchor_number: anchor,
             endpoint: endpoint.to_string(),
-            browser_key_signature: key_holder.sign_webpush_subscription(
-                anchor,
-                endpoint,
-                ISSUED_AT_NS,
-                &vapid_public_key(),
-                &pool,
-            ),
             vapid_public_key: vapid_public_key(),
             jwt_signatures: jwt_pool(),
             jwt_issued_at_ns: ISSUED_AT_NS,
-            browser_key: key_holder.public_key(),
         }
+    }
+
+    /// The browser key a registered browser keeps between sign-ins, and so signs its
+    /// subscription with.
+    fn key_holder(browser: &BrowserKey) -> BrowserKey {
+        browser.successor()
     }
 
     #[test]
@@ -487,13 +478,13 @@ mod subscriptions {
         sign_browser_in(&env, canister_id, anchor, &browser);
 
         assert!(matches!(
-            subscribe_device(
+            set_webpush_subscription(
                 &env,
                 canister_id,
-                principal_1(),
-                request_from(anchor, &browser, ENDPOINT)
+                key_holder(&browser).principal(),
+                request(anchor, ENDPOINT)
             )?,
-            Err(SubscribeDeviceError::InternalCanisterError(_))
+            Err(SetWebPushSubscriptionError::InternalCanisterError(_))
         ));
         Ok(())
     }
@@ -503,91 +494,74 @@ mod subscriptions {
         let env = env();
         let (canister_id, anchor, browser, browser_id) = install_with_browser(&env);
 
-        subscribe_device(
+        set_webpush_subscription(
             &env,
             canister_id,
-            principal_1(),
-            request_from(anchor, &browser, ENDPOINT),
+            key_holder(&browser).principal(),
+            request(anchor, ENDPOINT),
         )?
         .expect("subscribe rejected");
 
-        unsubscribe_device(&env, canister_id, principal_1(), anchor, browser_id)?
+        remove_webpush_subscription(&env, canister_id, principal_1(), anchor, browser_id)?
             .expect("unsubscribe rejected");
         // Idempotent on purpose, since silencing a browser is done from another one.
-        unsubscribe_device(&env, canister_id, principal_1(), anchor, browser_id)?
+        remove_webpush_subscription(&env, canister_id, principal_1(), anchor, browser_id)?
             .expect("a second unsubscribe should be a no-op, not an error");
         Ok(())
     }
 
+    /// The caller's key is what names the row, so a key the registry has never seen
+    /// cannot write one.
     #[test]
     fn should_refuse_a_browser_this_identity_is_not_signed_in_from() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, _browser, _) = install_with_browser(&env);
 
-        // A key the registry has never seen, held by whoever is calling.
         let stranger = BrowserKey::new(9);
-        let refused = subscribe_device(
+        let refused = set_webpush_subscription(
             &env,
             canister_id,
-            principal_1(),
-            request_from(anchor, &stranger, ENDPOINT),
+            stranger.principal(),
+            request(anchor, ENDPOINT),
         )?;
         assert!(
-            matches!(refused, Err(SubscribeDeviceError::InvalidBrowserKey)),
+            matches!(refused, Err(SetWebPushSubscriptionError::InvalidBrowserKey)),
             "{refused:?}"
         );
         Ok(())
     }
 
-    /// Every device of an identity passes the same authorization, so naming a browser
-    /// is not on its own evidence of being it.
+    /// The key a browser presented at sign-in is one it has already discarded, so
+    /// accepting it would keep a copy taken off the wire usable.
     #[test]
-    fn should_refuse_one_browser_registering_against_anothers_key() -> Result<(), RejectResponse> {
+    fn should_refuse_the_key_a_sign_in_retired() -> Result<(), RejectResponse> {
         let env = env();
-        let (canister_id, anchor, victim, _) = install_with_browser(&env);
-        let attacker = BrowserKey::new(2);
-        sign_browser_in(&env, canister_id, anchor, &attacker);
+        let (canister_id, anchor, browser, _) = install_with_browser(&env);
 
-        let attacker_endpoint = "https://push.attacker.example/inbox";
-        let forged = SubscribeDeviceRequest {
-            anchor_number: anchor,
-            endpoint: attacker_endpoint.to_string(),
-            vapid_public_key: vapid_public_key(),
-            jwt_signatures: jwt_pool(),
-            jwt_issued_at_ns: ISSUED_AT_NS,
-            // The victim's browser, and the best signature the attacker can make.
-            browser_key: victim.successor().public_key(),
-            browser_key_signature: attacker.successor().sign_webpush_subscription(
-                anchor,
-                attacker_endpoint,
-                ISSUED_AT_NS,
-                &vapid_public_key(),
-                &jwt_pool()
-                    .into_iter()
-                    .map(ByteBuf::into_vec)
-                    .collect::<Vec<_>>(),
-            ),
-        };
-
-        let refused = subscribe_device(&env, canister_id, principal_1(), forged)?;
+        let refused = set_webpush_subscription(
+            &env,
+            canister_id,
+            browser.principal(),
+            request(anchor, ENDPOINT),
+        )?;
         assert!(
-            matches!(refused, Err(SubscribeDeviceError::InvalidBrowserKey)),
-            "one browser registered against another's key: {refused:?}"
+            matches!(refused, Err(SetWebPushSubscriptionError::InvalidBrowserKey)),
+            "{refused:?}"
         );
         Ok(())
     }
 
+    /// An access method authorizes the identity, not a browser of it, so it cannot
+    /// write a subscription no browser asked for.
     #[test]
-    fn should_refuse_a_signature_lifted_onto_another_endpoint() -> Result<(), RejectResponse> {
+    fn should_refuse_an_access_method_that_is_not_a_browser() -> Result<(), RejectResponse> {
         let env = env();
-        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+        let (canister_id, anchor, _browser, _) = install_with_browser(&env);
 
-        let mut request = request_from(anchor, &browser, ENDPOINT);
-        request.endpoint = "https://push.example.com/elsewhere".to_string();
-
-        let refused = subscribe_device(&env, canister_id, principal_1(), request)?;
+        let refused =
+            set_webpush_subscription(&env, canister_id, principal_1(), request(anchor, ENDPOINT))?;
         assert!(
-            matches!(refused, Err(SubscribeDeviceError::InvalidBrowserKey)),
+            matches!(refused, Err(SetWebPushSubscriptionError::InvalidBrowserKey)),
             "{refused:?}"
         );
         Ok(())
@@ -598,26 +572,12 @@ mod subscriptions {
         let env = env();
         let (canister_id, anchor, browser, _) = install_with_browser(&env);
 
-        let endpoint = "";
-        let key_holder = browser.successor();
-        let request = SubscribeDeviceRequest {
-            anchor_number: anchor,
-            endpoint: endpoint.to_string(),
-            vapid_public_key: ByteBuf::from(vec![4u8; 65]),
-            jwt_signatures: vec![],
-            jwt_issued_at_ns: ISSUED_AT_NS,
-            browser_key: key_holder.public_key(),
-            browser_key_signature: key_holder.sign_webpush_subscription(
-                anchor,
-                endpoint,
-                ISSUED_AT_NS,
-                &[4u8; 65],
-                &[],
-            ),
-        };
+        let mut sent = request(anchor, "");
+        sent.vapid_public_key = ByteBuf::from(vec![4u8; 65]);
+        sent.jwt_signatures = vec![];
 
-        match subscribe_device(&env, canister_id, principal_1(), request)? {
-            Err(SubscribeDeviceError::InternalCanisterError(problems)) => {
+        match set_webpush_subscription(&env, canister_id, key_holder(&browser).principal(), sent)? {
+            Err(SetWebPushSubscriptionError::InternalCanisterError(problems)) => {
                 // Failing on the first would send a browser round three times to
                 // learn what a single answer can say.
                 assert_eq!(problems.split("; ").count(), 3, "{problems:?}");
@@ -628,23 +588,18 @@ mod subscriptions {
     }
 
     #[test]
-    fn should_refuse_a_caller_that_does_not_own_the_anchor() -> Result<(), RejectResponse> {
+    fn should_refuse_to_unsubscribe_for_an_anchor_the_caller_does_not_own(
+    ) -> Result<(), RejectResponse> {
         let env = env();
-        let (canister_id, anchor, browser, browser_id) = install_with_browser(&env);
+        let (canister_id, anchor, _browser, browser_id) = install_with_browser(&env);
 
-        let refused = subscribe_device(
-            &env,
-            canister_id,
-            principal_2(),
-            request_from(anchor, &browser, ENDPOINT),
-        )?;
+        let refused =
+            remove_webpush_subscription(&env, canister_id, principal_2(), anchor, browser_id)?;
         assert!(
-            matches!(refused, Err(SubscribeDeviceError::Unauthorized(_))),
-            "{refused:?}"
-        );
-        let refused = unsubscribe_device(&env, canister_id, principal_2(), anchor, browser_id)?;
-        assert!(
-            matches!(refused, Err(UnsubscribeDeviceError::Unauthorized(_))),
+            matches!(
+                refused,
+                Err(RemoveWebPushSubscriptionError::Unauthorized(_))
+            ),
             "{refused:?}"
         );
         Ok(())

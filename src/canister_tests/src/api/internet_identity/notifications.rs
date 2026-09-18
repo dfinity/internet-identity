@@ -4,8 +4,8 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, FrontendHostname, NotificationConsentGrantedRequest,
     NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest, SubscribeDeviceError, SubscribeDeviceRequest,
-    UnsubscribeDeviceError, UnsubscribeDeviceRequest,
+    NotificationRevokeConsentRequest, RemoveWebPushSubscriptionError,
+    RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -72,37 +72,37 @@ pub fn consent_granted(
     .map(|(x,)| x)
 }
 
-pub fn subscribe_device(
+pub fn set_webpush_subscription(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    request: SubscribeDeviceRequest,
-) -> Result<Result<(), SubscribeDeviceError>, RejectResponse> {
+    request: SetWebPushSubscriptionRequest,
+) -> Result<Result<(), SetWebPushSubscriptionError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "webpush_subscribe_device",
+        "set_webpush_subscription",
         (request,),
     )
     .map(|(x,)| x)
 }
 
-pub fn unsubscribe_device(
+pub fn remove_webpush_subscription(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
-) -> Result<Result<(), UnsubscribeDeviceError>, RejectResponse> {
+) -> Result<Result<(), RemoveWebPushSubscriptionError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "webpush_unsubscribe_device",
-        (UnsubscribeDeviceRequest {
+        "remove_webpush_subscription",
+        (RemoveWebPushSubscriptionRequest {
             anchor_number,
             browser_id,
         },),

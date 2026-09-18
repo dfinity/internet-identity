@@ -402,7 +402,6 @@ const P256_SPKI_HEADER: [u8; 26] = [
 
 const BROWSER_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-key";
 const SUCCESSOR_KEY_SIGNATURE_DOMAIN: &[u8] = b"ii-session-browser-successor";
-const WEBPUSH_SIGNATURE_DOMAIN: &[u8] = b"ii-webpush-subscription";
 
 impl BrowserKey {
     pub fn new(seed: u8) -> Self {
@@ -439,31 +438,10 @@ impl BrowserKey {
         self.sign_with(SUCCESSOR_KEY_SIGNATURE_DOMAIN, session_key, device_key)
     }
 
-    /// The proof `webpush_subscribe_device` and `webpush_refresh_jwts` want, over every
-    /// field the write stores.
-    pub fn sign_webpush_subscription(
-        &self,
-        anchor_number: u64,
-        endpoint: &str,
-        jwt_issued_at_ns: u64,
-        vapid_public_key: &[u8],
-        jwt_signatures: &[Vec<u8>],
-    ) -> ByteBuf {
-        use p256::ecdsa::signature::Signer;
-        use sha2::{Digest, Sha256};
-
-        let mut pool = Sha256::new();
-        for signature in jwt_signatures {
-            pool.update(signature);
-        }
-        let mut message = WEBPUSH_SIGNATURE_DOMAIN.to_vec();
-        message.extend_from_slice(&anchor_number.to_be_bytes());
-        message.extend_from_slice(&jwt_issued_at_ns.to_be_bytes());
-        message.extend_from_slice(&Sha256::digest(vapid_public_key));
-        message.extend_from_slice(&pool.finalize());
-        message.extend_from_slice(endpoint.as_bytes());
-        let signature: p256::ecdsa::Signature = self.signing_key.sign(&message);
-        ByteBuf::from(signature.to_bytes().to_vec())
+    /// The principal a call signed with this key arrives as, which is how the canister
+    /// tells one browser from another.
+    pub fn principal(&self) -> Principal {
+        Principal::self_authenticating(self.public_key())
     }
 
     fn sign_with(&self, domain: &[u8], session_key: &SessionKey, other: &PublicKey) -> ByteBuf {
