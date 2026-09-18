@@ -5,8 +5,16 @@
 
 import { throwCanisterError } from "$lib/utils/utils";
 import { generateVapidKeypair, signJwtPool } from "./vapidPool";
-import { relayOriginOf, subscribeToPush } from "./pushSubscription";
-import { storeVapidKey, type StoredVapidKey } from "./vapidKeyStore";
+import {
+  currentDeviceSubscription,
+  relayOriginOf,
+  subscribeToPush,
+} from "./pushSubscription";
+import {
+  loadVapidKey,
+  storeVapidKey,
+  type StoredVapidKey,
+} from "./vapidKeyStore";
 import { browserKeyActor } from "./browserActor";
 
 /**
@@ -56,4 +64,21 @@ export const subscribeAndRegisterDevice = async (
   await registerStoredDevice(identityNumber, stored);
   await storeVapidKey(stored);
   return endpoint;
+};
+
+/**
+ * Registers this browser for `identityNumber`, reusing the subscription it already
+ * holds. Only a browser without a usable one subscribes afresh, since subscribing
+ * drops the endpoint every other identity on this browser is registered with.
+ */
+export const ensureRegisteredDevice = async (
+  identityNumber: bigint,
+): Promise<string> => {
+  const stored = await loadVapidKey();
+  const subscription = await currentDeviceSubscription();
+  return stored !== undefined &&
+    subscription !== undefined &&
+    stored.endpoint === subscription.endpoint
+    ? registerStoredDevice(identityNumber, stored)
+    : subscribeAndRegisterDevice(identityNumber);
 };

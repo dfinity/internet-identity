@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Mocked before the unit is imported. Both reach for a browser: one subscribes a device
 // and the other signs in, and what is under test is the order they are reached in.
 vi.mock("./subscribeDevice", () => ({
-  subscribeAndRegisterDevice: vi.fn(() => Promise.resolve()),
+  ensureRegisteredDevice: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("./pushSubscription", () => ({
   requestNotificationPermission: vi.fn(() => Promise.resolve("granted")),
@@ -15,7 +15,7 @@ import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { allowApp, enableNotifications } from "./enableNotifications";
 import { mintApplicationSession } from "./mintApplicationSession";
-import { subscribeAndRegisterDevice } from "./subscribeDevice";
+import { ensureRegisteredDevice } from "./subscribeDevice";
 import { requestNotificationPermission } from "./pushSubscription";
 import {
   awaitSessionCreation,
@@ -23,7 +23,7 @@ import {
 } from "$lib/stores/sessionCreation.store";
 
 const mint = vi.mocked(mintApplicationSession);
-const subscribe = vi.mocked(subscribeAndRegisterDevice);
+const register = vi.mocked(ensureRegisteredDevice);
 const permission = vi.mocked(requestNotificationPermission);
 const ORIGIN = "https://app.example";
 const IDENTITY = BigInt(10_000);
@@ -146,11 +146,11 @@ describe("enabling notifications", () => {
   beforeEach(() => {
     mint.mockClear();
     mint.mockResolvedValue(undefined);
-    subscribe.mockClear();
+    register.mockClear();
     permission.mockResolvedValue("granted");
   });
 
-  it("subscribes the device before recording consent", async () => {
+  it("registers the device before recording consent", async () => {
     const { actor, grant } = actorAnswering(ok);
 
     await expect(
@@ -158,8 +158,8 @@ describe("enabling notifications", () => {
     ).resolves.toEqual({ status: "enabled" });
 
     // A refusal at the browser prompt must leave no consent behind, so the
-    // subscription has to land first.
-    expect(subscribe.mock.invocationCallOrder[0]).toBeLessThan(
+    // registration has to land first.
+    expect(register.mock.invocationCallOrder[0]).toBeLessThan(
       grant.mock.invocationCallOrder[0],
     );
   });
@@ -172,7 +172,7 @@ describe("enabling notifications", () => {
       enableNotifications({ identityNumber: IDENTITY, origin: ORIGIN, actor }),
     ).resolves.toEqual({ status: "denied" });
 
-    expect(subscribe).not.toHaveBeenCalled();
+    expect(register).not.toHaveBeenCalled();
     expect(grant).not.toHaveBeenCalled();
   });
 
@@ -184,6 +184,6 @@ describe("enabling notifications", () => {
       enableNotifications({ identityNumber: IDENTITY, origin: ORIGIN, actor }),
     ).resolves.toEqual({ status: "dismissed" });
 
-    expect(subscribe).not.toHaveBeenCalled();
+    expect(register).not.toHaveBeenCalled();
   });
 });
