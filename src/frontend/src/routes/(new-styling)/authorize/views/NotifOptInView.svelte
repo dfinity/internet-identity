@@ -24,12 +24,12 @@
   } from "$lib/utils/notifications/notificationState";
   import {
     clearFailure,
-    detectBrowser,
     recordDeclined,
     recordFailure,
     recordPermission,
-    type BrowserKind,
   } from "$lib/utils/notifications/notificationDiagnostics";
+  import { describeBrowser } from "$lib/utils/describeBrowser";
+  import type { BrowserDescription } from "$lib/generated/internet_identity_types";
 
   interface Props {
     /** dApp name for the copy, or undefined when it isn't known. */
@@ -51,7 +51,7 @@
   type Variant = "loading" | OptInScreen | "failed";
   let variant = $state<Variant>("loading");
   let busy = $state(false);
-  let browser = $state<BrowserKind>("other");
+  let browser = $state<BrowserDescription | undefined>(undefined);
   let actor: ActorSubclass<_SERVICE> | undefined;
   // A retry from the failed screen sets this device up, or only records consent
   // when the device is already registered. Read by the failed screen's copy.
@@ -60,25 +60,25 @@
   onMount(() => {
     void (async () => {
       try {
-        actor = await resolveActor();
-        if (actor === undefined) {
+        const client = await ensureActor();
+        if (client === undefined) {
           onDone();
           return;
         }
-        const consented = await actor
+        const consented = await client
           .notification_consent_granted({
             anchor_number: identityNumber,
             origin,
           })
           .catch(() => false);
-        const state = await readDeviceState(identityNumber, actor);
+        const state = await readDeviceState(identityNumber, client);
         recordPermission(state.permission);
         const screen = resolveOptInScreen(state, origin, consented);
         if (screen === "skip") {
           onDone();
           return;
         }
-        browser = detectBrowser();
+        browser = await describeBrowser();
         retrySubscribes = screen !== "allow-app";
         variant = screen;
       } catch (err) {
@@ -94,21 +94,40 @@
   const messageOf = (err: unknown): string =>
     err instanceof Error ? err.message : String(err);
 
-  const runSubscribe = async (): Promise<void> => {
-    if (actor === undefined) {
-      onDone();
-      return;
+  /** Resolved once and kept, so a retry after a failed resolve asks again rather
+   *  than giving up on a request the app is still waiting for. */
+  const ensureActor = async (): Promise<ActorSubclass<_SERVICE> | undefined> =>
+    (actor ??= await resolveActor());
+
+  /** Whether this device is set up and registered for this identity. Best effort:
+   *  a probe that fails must not keep the failed screen from appearing. */
+  const deviceIsReady = async (
+    client: ActorSubclass<_SERVICE>,
+  ): Promise<boolean> => {
+    try {
+      const state = await readDeviceState(identityNumber, client);
+      return state.subscribed && state.registered;
+    } catch {
+      return false;
     }
+  };
+
+  const runSubscribe = async (): Promise<void> => {
     busy = true;
     try {
+      const client = await ensureActor();
+      if (client === undefined) {
+        onDone();
+        return;
+      }
       const result = await enableNotifications({
         identityNumber,
         origin,
-        actor,
+        actor: client,
       });
       if (result.status === "denied") {
         recordFailure("permission-denied");
-        browser = detectBrowser();
+        browser = await describeBrowser();
         variant = "blocked";
         return;
       }
@@ -122,10 +141,10 @@
     } catch (err) {
       const message = messageOf(err);
       recordFailure("subscribe-failed", message);
-      // The registration may have landed before the consent failed, so a retry
-      // that sets the device up again would drop a working endpoint.
-      retrySubscribes = !(await readDeviceState(identityNumber, actor))
-        .subscribed;
+      // Only the consent is left to retry where the device came out of this both
+      // subscribed and registered. Anything short of that, including a probe we
+      // could not make, is retried in full.
+      retrySubscribes = !(actor !== undefined && (await deviceIsReady(actor)));
       variant = "failed";
     } finally {
       busy = false;
@@ -133,16 +152,17 @@
   };
 
   const runAllow = async (): Promise<void> => {
-    if (actor === undefined) {
-      onDone();
-      return;
-    }
     busy = true;
     try {
+      const client = await ensureActor();
+      if (client === undefined) {
+        onDone();
+        return;
+      }
       await allowApp({
         identityNumber,
         origin,
-        actor,
+        actor: client,
       });
       clearFailure();
       onDone();
@@ -155,6 +175,8 @@
     }
   };
 
+  /** Answering "not now" to an offer. Quiets this app for a while, which is not
+   *  what dismissing the unblock guidance means. */
   const handleSkip = () => {
     recordDeclined(origin);
     onDone();
@@ -232,7 +254,9 @@
             then try again.
           </Trans>
         </p>
-        <NotifUnblockSteps {browser} />
+        {#if browser !== undefined}
+          <NotifUnblockSteps {browser} />
+        {/if}
       {:else if variant === "failed"}
         <span
           class="border-border-secondary bg-bg-secondary text-text-primary mb-6 flex size-12 items-center justify-center rounded-full border"
@@ -282,7 +306,7 @@
           {$t`Not now`}
         </button>
       {:else if variant === "blocked"}
-        <button class="btn btn-tertiary" onclick={handleSkip}>
+        <button class="btn btn-tertiary" onclick={onDone}>
           {$t`Continue without`}
         </button>
       {:else if variant === "failed"}
