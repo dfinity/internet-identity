@@ -1,5 +1,6 @@
 import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
+import { isNotifiableOrigin } from "$lib/utils/notifications/notifiableOrigin";
 import { get } from "svelte/store";
 
 const supportedStandards = [
@@ -25,12 +26,14 @@ const supportedStandards = [
   },
 ];
 
-const scopes = () => [
+const scopes = (origin: string) => [
   { method: "icrc34_delegation" },
   { method: "ii_session_delegation" },
-  // Only while the feature is on: an app that saw the scope would otherwise
-  // call a method every handler ignores, and wait for an answer that never comes.
-  ...(get(PUSH_NOTIFICATIONS) ? [{ method: "ii_notification_consent" }] : []),
+  // Only while the feature is on, and only for an origin consent can be keyed by:
+  // an app that saw the scope would otherwise call a method that cannot succeed.
+  ...(get(PUSH_NOTIFICATIONS) && isNotifiableOrigin(origin)
+    ? [{ method: "ii_notification_consent" }]
+    : []),
 ];
 
 /** ICRC-25: respond with the list of supported standards. */
@@ -63,7 +66,10 @@ export const handlePermissions =
       jsonrpc: "2.0",
       id: request.id,
       result: {
-        scopes: scopes().map((scope) => ({ scope, state: "granted" })),
+        scopes: scopes(channel.origin).map((scope) => ({
+          scope,
+          state: "granted",
+        })),
       },
     });
   };
