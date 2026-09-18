@@ -25,7 +25,7 @@
     "@types/html-minifier-terser": "^7.0.0",
     "html-minifier-terser": "^7.2.0",
     "typescript": "*",
-    "undici": "^7.29.0",
+    "undici": "^7.29.1",
     "vite": "^7.3.6",
     "vite-plugin-compression2": "^2.5.3"
   }
