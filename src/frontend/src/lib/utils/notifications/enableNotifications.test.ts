@@ -30,7 +30,7 @@ const IDENTITY = BigInt(10_000);
 
 /** An actor whose grant answers with `replies` in order, one per call. */
 const actorAnswering = (
-  ...replies: ({ Ok: null } | { Err: { SessionMissing: null } })[]
+  ...replies: ({ Ok: null } | { Err: { NoSuchSession: null } })[]
 ) => {
   const notification_grant_consent = vi.fn(() =>
     Promise.resolve(replies[notification_grant_consent.mock.calls.length - 1]),
@@ -42,7 +42,7 @@ const actorAnswering = (
 };
 
 const ok = { Ok: null } as const;
-const missing = { Err: { SessionMissing: null } } as const;
+const missing = { Err: { NoSuchSession: null } } as const;
 
 describe("granting consent", () => {
   beforeEach(() => {

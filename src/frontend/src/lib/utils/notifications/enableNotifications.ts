@@ -5,7 +5,7 @@
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type {
-  NotificationError,
+  NotificationGrantConsentError,
   _SERVICE,
 } from "$lib/generated/internet_identity_types";
 import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
@@ -64,7 +64,7 @@ export const allowApp = ({
 /**
  * Records consent, signing in at the app first where the identity has never reached it.
  *
- * Asks and reacts to `SessionMissing` rather than ensuring a session up front, so it
+ * Asks and reacts to `NoSuchSession` rather than ensuring a session up front, so it
  * never touches an app the identity already holds a session at: a second session there
  * would drop the one the app is still using.
  */
@@ -108,8 +108,8 @@ const granted = ({
     .then(() => true)
     .catch((error: unknown) => {
       if (
-        isCanisterError<NotificationError>(error) &&
-        error.type === "SessionMissing"
+        isCanisterError<NotificationGrantConsentError>(error) &&
+        error.type === "NoSuchSession"
       ) {
         return false;
       }
