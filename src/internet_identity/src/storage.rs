@@ -2801,12 +2801,8 @@ impl<M: Memory + Clone> Storage<M> {
     // ---- Notifications ------------------------------------------
 
     /// The application this identity reached `origin` through, or `None` when it never
-    /// signed in there.
-    ///
-    /// Consent rides on the `(anchor, application)` config, and that row is reclaimed when
-    /// the identity's account list at this origin goes, which is the only thing that
-    /// reclaims it. An origin the identity never reached has no list, so a row written
-    /// against it would never be reclaimed.
+    /// signed in there. Consent rides on the `(anchor, application)` config, which is
+    /// reclaimed with the identity's account list at the origin and nothing else.
     pub fn notification_application(
         &self,
         anchor_number: AnchorNumber,
@@ -2828,9 +2824,8 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Grants or withdraws `application_number`'s permission to notify `anchor_number`.
-    ///
-    /// Mutates what is stored rather than building a config, for the same reason the write
-    /// path does: this owns one field of it and must not decide the rest by omission.
+    /// Mutates the stored config rather than building one, since this owns a single field
+    /// of it.
     pub fn set_notification_consent(
         &mut self,
         anchor_number: AnchorNumber,
@@ -2843,8 +2838,8 @@ impl<M: Memory + Clone> Storage<M> {
             .insert((anchor_number, application_number), config);
     }
 
-    /// Signs `anchor_number` in at `origin` through the write production signs in with,
-    /// which is what mints the application a notification consent hangs off.
+    /// Signs `anchor_number` in at `origin` through the production write, which mints
+    /// the application a consent hangs off.
     #[cfg(test)]
     pub(crate) fn sign_in_for_testing(
         &mut self,

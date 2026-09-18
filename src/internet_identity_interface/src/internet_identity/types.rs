@@ -416,10 +416,9 @@ pub struct InternetIdentityInit {
     /// (the deployment then has no official connector), `Some(Some(url))`
     /// points it at `url`.
     pub mcp_official_url: Option<Option<String>>,
-    /// Server-side kill switch for the notifications feature (per-app consent,
-    /// device subscriptions, Web Push delivery). `None` / `Some(false)` (the
-    /// default) disables every notification entry point; `Some(true)` enables
-    /// them. Omitting it on upgrade keeps the stored value.
+    /// Server-side kill switch for the notifications feature. `None` / `Some(false)`
+    /// (the default) disables every notification entry point; `Some(true)` enables them.
+    /// Omitting it on upgrade keeps the stored value.
     pub notifications_enabled: Option<bool>,
 }
 
@@ -970,9 +969,7 @@ pub enum SessionRevokeError {
     InternalCanisterError(String),
 }
 
-/// Why a notification call was refused. A variant rather than a string: a caller
-/// cannot branch on prose, and the shape is free to choose before the first
-/// release and breaking after it.
+/// Why a notification call was refused.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum NotificationError {
     /// This deployment has notifications turned off.
@@ -985,8 +982,7 @@ pub enum NotificationError {
     InvalidSubscription(Vec<String>),
     /// Nothing here to act on: no consent for that origin, or no subscribed endpoint.
     NotFound,
-    /// This identity has never reached the app, so nothing addresses it there and there
-    /// is nothing for a consent to hang off. Told apart from `NotFound` because it is the
-    /// one refusal the caller can act on: signing in at the app clears it.
+    /// The identity has never signed in at the app, so there is no application for a
+    /// consent to hang off. Apart from `NotFound` because signing in there clears it.
     SessionMissing,
 }

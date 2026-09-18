@@ -32,8 +32,7 @@ fn clear_consent(
     let origin = consent_origin(&origin)?;
 
     storage_borrow_mut(|storage| {
-        // Nothing to withdraw where the identity never reached the app, which is the same
-        // answer as withdrawing a consent it never granted.
+        // No application, so no consent row to withdraw.
         if let Some(application_number) = storage.notification_application(anchor_number, &origin) {
             storage.set_notification_consent(anchor_number, application_number, None);
         }
@@ -59,10 +58,8 @@ pub(crate) fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname)
 
 /// Grants `origin` permission to notify the caller's anchor.
 ///
-/// Refused with `SessionMissing` for an origin this identity has never signed in at:
-/// notifications are addressed to the account principal it holds there, so there is
-/// nothing for a grant to authorize until that exists. The caller's remedy is to sign in
-/// at the app and ask again, which is what II's own consent ceremony does.
+/// `SessionMissing` for an origin the identity has never signed in at: consent hangs off
+/// the application, which only a sign-in mints.
 pub fn grant_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
@@ -72,8 +69,8 @@ pub fn grant_consent(
     set_consent(anchor_number, origin, ic_cdk::api::time())
 }
 
-/// Revokes `origin`'s consent. Device subscriptions stay — they're shared
-/// across every consented app.
+/// Revokes `origin`'s consent. Device subscriptions stay: they are shared across every
+/// consented app.
 pub fn revoke_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
@@ -83,9 +80,8 @@ pub fn revoke_consent(
     clear_consent(anchor_number, origin)
 }
 
-/// Whether `origin` may notify this identity. Answers `false` rather than an
-/// error for an unauthorized or disabled call, so a caller cannot use it to
-/// probe either.
+/// Whether `origin` may notify this identity. `false` for an unauthorized or disabled
+/// call, so neither can be probed.
 pub fn consent_status(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
     feature_enabled() && authorize_query(anchor_number) && has_consent(anchor_number, origin)
 }
@@ -120,9 +116,7 @@ mod tests {
         assert!(!has_consent(anchor, origin));
     }
 
-    /// The grant has nowhere to live until the identity holds an account at the app, and
-    /// nothing to authorize either: a sender addresses the principal it finds there. The
-    /// refusal names its own remedy, because the caller can sign in and ask again.
+    /// Consent hangs off the application, which only a sign-in mints.
     #[test]
     fn refuses_an_app_the_identity_has_never_signed_in_at() {
         setup();
@@ -157,9 +151,8 @@ mod tests {
         assert!(set_consent(1, "http://app.example".to_string(), 0).is_err());
     }
 
-    /// A grant naming a modern gateway must find the row the sign-in created under the
-    /// legacy one. Keying by the application rather than by the origin is what makes a
-    /// second row impossible rather than merely unlikely.
+    /// A grant naming a modern gateway finds the row the sign-in created under the
+    /// legacy one.
     #[test]
     fn a_gateway_twin_is_the_same_consent() {
         setup();
@@ -173,8 +166,7 @@ mod tests {
         assert!(!has_consent(anchor, "https://abc-cai.icp0.io".to_string()));
     }
 
-    /// Consent is one field of the config the default account also lives in, so the two
-    /// must not overwrite each other.
+    /// Consent and the default account share one config row.
     #[test]
     fn consent_leaves_the_default_account_alone() {
         setup();
