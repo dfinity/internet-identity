@@ -1018,6 +1018,12 @@ pub struct SubscribeDeviceRequest {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct UnsubscribeDeviceRequest {
+    pub anchor_number: AnchorNumber,
+    pub browser_id: BrowserId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum SubscribeDeviceError {
     Unauthorized(Principal),
     /// The browser's key names no browser this identity is signed in from, or its

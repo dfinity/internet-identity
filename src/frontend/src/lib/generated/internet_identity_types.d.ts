@@ -1988,6 +1988,10 @@ export type Timestamp = bigint;
 export type Token = {};
 export type UnsubscribeDeviceError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
+export interface UnsubscribeDeviceRequest {
+  'browser_id' : number,
+  'anchor_number' : UserNumber,
+}
 export type UpdateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -2828,7 +2832,7 @@ export interface _SERVICE {
       { 'Err' : SubscribeDeviceError }
   >,
   'webpush_unsubscribe_device' : ActorMethod<
-    [UserNumber, number],
+    [UnsubscribeDeviceRequest],
     { 'Ok' : null } |
       { 'Err' : UnsubscribeDeviceError }
   >,

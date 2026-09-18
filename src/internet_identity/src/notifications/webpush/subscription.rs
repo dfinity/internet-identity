@@ -6,9 +6,11 @@ use crate::browser_key::verify_webpush_subscription;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
-pub use internet_identity_interface::internet_identity::types::SubscribeDeviceRequest;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, PublicKey, SubscribeDeviceError, Timestamp,
+};
+pub use internet_identity_interface::internet_identity::types::{
+    SubscribeDeviceRequest, UnsubscribeDeviceRequest,
 };
 use minicbor::bytes::ByteVec;
 use serde_bytes::ByteBuf;
@@ -163,7 +165,12 @@ pub fn subscribe_device(
 /// Stops notifications to one browser. Idempotent.
 ///
 /// Takes the browser rather than proving it, since turning one off is done from another.
-pub fn unsubscribe_device(anchor_number: AnchorNumber, browser_id: BrowserId) {
+pub fn unsubscribe_device(
+    UnsubscribeDeviceRequest {
+        anchor_number,
+        browser_id,
+    }: UnsubscribeDeviceRequest,
+) {
     remove_subscription(anchor_number, browser_id);
 }
 

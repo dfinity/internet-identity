@@ -340,15 +340,14 @@ fn webpush_subscribe_device(request: SubscribeDeviceRequest) -> Result<(), Subsc
 
 #[update]
 fn webpush_unsubscribe_device(
-    anchor_number: AnchorNumber,
-    browser_id: BrowserId,
+    request: UnsubscribeDeviceRequest,
 ) -> Result<(), UnsubscribeDeviceError> {
     notifications::webpush::check_enabled()
         .map_err(UnsubscribeDeviceError::InternalCanisterError)?;
-    check_authz_and_record_activity(anchor_number)
+    check_authz_and_record_activity(request.anchor_number)
         .map_err(|_| UnsubscribeDeviceError::Unauthorized(caller()))?;
 
-    notifications::webpush::unsubscribe_device(anchor_number, browser_id);
+    notifications::webpush::unsubscribe_device(request);
     Ok(())
 }
 
