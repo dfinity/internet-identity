@@ -9,35 +9,32 @@ use internet_identity_interface::internet_identity::types::{
     AnchorNumber, FrontendHostname, Timestamp,
 };
 
+/// Records `consented_at_ns` as `origin`'s consent for `anchor_number`, or withdraws it
+/// with `None`.
+///
+/// A grant needs an application to hang off and is refused without one. A withdrawal is
+/// not: consent that cannot exist is already withdrawn.
 fn set_consent(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
-    now_ns: Timestamp,
+    consented_at_ns: Option<Timestamp>,
 ) -> Result<(), NotificationError> {
     let origin = consent_origin(&origin)?;
 
-    storage_borrow_mut(|storage| {
-        let application_number = storage
-            .notification_application(anchor_number, &origin)
-            .ok_or(NotificationError::SessionMissing)?;
-        storage.set_notification_consent(anchor_number, application_number, Some(now_ns));
-        Ok(())
-    })
-}
-
-fn clear_consent(
-    anchor_number: AnchorNumber,
-    origin: FrontendHostname,
-) -> Result<(), NotificationError> {
-    let origin = consent_origin(&origin)?;
-
-    storage_borrow_mut(|storage| {
-        // No application, so no consent row to withdraw.
-        if let Some(application_number) = storage.notification_application(anchor_number, &origin) {
-            storage.set_notification_consent(anchor_number, application_number, None);
-        }
-    });
-    Ok(())
+    storage_borrow_mut(
+        |storage| match storage.notification_application(anchor_number, &origin) {
+            Some(application_number) => {
+                storage.set_notification_consent(
+                    anchor_number,
+                    application_number,
+                    consented_at_ns,
+                );
+                Ok(())
+            }
+            None if consented_at_ns.is_some() => Err(NotificationError::SessionMissing),
+            None => Ok(()),
+        },
+    )
 }
 
 pub(crate) fn has_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
@@ -66,7 +63,7 @@ pub fn grant_consent(
 ) -> Result<(), NotificationError> {
     check_enabled()?;
     authorize_update(anchor_number)?;
-    set_consent(anchor_number, origin, ic_cdk::api::time())
+    set_consent(anchor_number, origin, Some(ic_cdk::api::time()))
 }
 
 /// Revokes `origin`'s consent. Device subscriptions stay: they are shared across every
@@ -77,7 +74,7 @@ pub fn revoke_consent(
 ) -> Result<(), NotificationError> {
     check_enabled()?;
     authorize_update(anchor_number)?;
-    clear_consent(anchor_number, origin)
+    set_consent(anchor_number, origin, None)
 }
 
 /// Whether `origin` may notify this identity. `false` for an unauthorized or disabled
@@ -109,10 +106,10 @@ mod tests {
         let origin = "https://app.example".to_string();
         let anchor = anchor_at(&origin);
 
-        set_consent(anchor, origin.clone(), 1_000).unwrap();
+        set_consent(anchor, origin.clone(), Some(1_000)).unwrap();
         assert!(has_consent(anchor, origin.clone()));
 
-        clear_consent(anchor, origin.clone()).unwrap();
+        set_consent(anchor, origin.clone(), None).unwrap();
         assert!(!has_consent(anchor, origin));
     }
 
@@ -123,7 +120,7 @@ mod tests {
         let anchor = anchor_at("https://visited.example");
 
         assert_eq!(
-            set_consent(anchor, "https://never.example".to_string(), 1_000),
+            set_consent(anchor, "https://never.example".to_string(), Some(1_000)),
             Err(NotificationError::SessionMissing)
         );
     }
@@ -134,21 +131,21 @@ mod tests {
         let origin = "https://app.example".to_string();
         let anchor = anchor_at(&origin);
 
-        assert!(clear_consent(anchor, origin).is_ok());
-        assert!(clear_consent(anchor, "https://never.example".to_string()).is_ok());
+        assert!(set_consent(anchor, origin, None).is_ok());
+        assert!(set_consent(anchor, "https://never.example".to_string(), None).is_ok());
     }
 
     #[test]
     fn consent_rejects_oversized_origin() {
         setup();
         let too_long = "a".repeat(FRONTEND_HOSTNAME_LIMIT + 1);
-        assert!(set_consent(1, too_long, 0).is_err());
+        assert!(set_consent(1, too_long, Some(0)).is_err());
     }
 
     #[test]
     fn consent_rejects_non_https_origin() {
         setup();
-        assert!(set_consent(1, "http://app.example".to_string(), 0).is_err());
+        assert!(set_consent(1, "http://app.example".to_string(), Some(0)).is_err());
     }
 
     /// A grant naming a modern gateway finds the row the sign-in created under the
@@ -158,11 +155,11 @@ mod tests {
         setup();
         let anchor = anchor_at("https://abc-cai.ic0.app");
 
-        set_consent(anchor, "https://abc-cai.icp0.io".to_string(), 1_000).unwrap();
+        set_consent(anchor, "https://abc-cai.icp0.io".to_string(), Some(1_000)).unwrap();
         assert!(has_consent(anchor, "https://abc-cai.ic0.app".to_string()));
         assert!(has_consent(anchor, "https://abc-cai.icp.net".to_string()));
 
-        clear_consent(anchor, "https://abc-cai.icp.net".to_string()).unwrap();
+        set_consent(anchor, "https://abc-cai.icp.net".to_string(), None).unwrap();
         assert!(!has_consent(anchor, "https://abc-cai.icp0.io".to_string()));
     }
 
@@ -182,7 +179,7 @@ mod tests {
                 .default_account_number
         });
 
-        set_consent(anchor, origin.clone(), 1_000).unwrap();
+        set_consent(anchor, origin.clone(), Some(1_000)).unwrap();
 
         let after = storage_borrow(|s| {
             s.lookup_anchor_application_config(anchor, application)
