@@ -2,8 +2,9 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, ConsentStatusRequest, FrontendHostname, NotificationError,
-    NotificationGrantConsentRequest, NotificationRevokeConsentRequest,
+    AnchorNumber, FrontendHostname, NotificationConsentGrantedRequest,
+    NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationRevokeConsentError,
+    NotificationRevokeConsentRequest,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -14,7 +15,7 @@ pub fn grant_consent(
     sender: Principal,
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
-) -> Result<Result<(), NotificationError>, RejectResponse> {
+) -> Result<Result<(), NotificationGrantConsentError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -35,7 +36,7 @@ pub fn revoke_consent(
     sender: Principal,
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
-) -> Result<Result<(), NotificationError>, RejectResponse> {
+) -> Result<Result<(), NotificationRevokeConsentError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -50,7 +51,7 @@ pub fn revoke_consent(
     .map(|(x,)| x)
 }
 
-pub fn consent_status(
+pub fn consent_granted(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
@@ -61,8 +62,8 @@ pub fn consent_status(
         env,
         canister_id,
         sender,
-        "notification_consent_status",
-        (ConsentStatusRequest {
+        "notification_consent_granted",
+        (NotificationConsentGrantedRequest {
             anchor_number,
             origin,
         },),

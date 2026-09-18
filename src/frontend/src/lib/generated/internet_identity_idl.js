@@ -718,7 +718,7 @@ export const idlFactory = ({ IDL }) => {
     'permissions' : Permissions,
     'expiration' : Timestamp,
   });
-  const ConsentStatusRequest = IDL.Record({
+  const NotificationConsentGrantedRequest = IDL.Record({
     'origin' : IDL.Text,
     'anchor_number' : UserNumber,
   });
@@ -726,17 +726,18 @@ export const idlFactory = ({ IDL }) => {
     'origin' : IDL.Text,
     'anchor_number' : UserNumber,
   });
-  const NotificationError = IDL.Variant({
-    'InvalidSubscription' : IDL.Vec(IDL.Text),
-    'Disabled' : IDL.Null,
-    'NotFound' : IDL.Null,
-    'Unauthorized' : IDL.Text,
-    'InvalidOrigin' : IDL.Text,
-    'SessionMissing' : IDL.Null,
+  const NotificationGrantConsentError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+    'NoSuchSession' : IDL.Null,
   });
   const NotificationRevokeConsentRequest = IDL.Record({
     'origin' : IDL.Text,
     'anchor_number' : UserNumber,
+  });
+  const NotificationRevokeConsentError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
   });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
@@ -1378,19 +1379,29 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
-    'notification_consent_status' : IDL.Func(
-        [ConsentStatusRequest],
+    'notification_consent_granted' : IDL.Func(
+        [NotificationConsentGrantedRequest],
         [IDL.Bool],
         ['query'],
       ),
     'notification_grant_consent' : IDL.Func(
         [NotificationGrantConsentRequest],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : NotificationError })],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : NotificationGrantConsentError,
+          }),
+        ],
         [],
       ),
     'notification_revoke_consent' : IDL.Func(
         [NotificationRevokeConsentRequest],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : NotificationError })],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : NotificationRevokeConsentError,
+          }),
+        ],
         [],
       ),
     'openid_credential_add' : IDL.Func(

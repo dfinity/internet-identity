@@ -38,6 +38,10 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
+use notifications::{
+    ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
+    ValidatedNotificationRevokeConsentRequest,
+};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -329,20 +333,47 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 #[update]
 fn notification_grant_consent(
     request: NotificationGrantConsentRequest,
-) -> Result<(), notifications::NotificationError> {
-    notifications::consent::grant_consent(request)
+) -> Result<(), NotificationGrantConsentError> {
+    let ValidatedNotificationGrantConsentRequest {
+        anchor_number,
+        origin,
+    } = request.try_into()?;
+    check_authz_and_record_activity(anchor_number)
+        .map_err(|_| NotificationGrantConsentError::Unauthorized(caller()))?;
+
+    notifications::grant_consent(anchor_number, origin, ic_cdk::api::time())
 }
 
 #[update]
 fn notification_revoke_consent(
     request: NotificationRevokeConsentRequest,
-) -> Result<(), notifications::NotificationError> {
-    notifications::consent::revoke_consent(request)
+) -> Result<(), NotificationRevokeConsentError> {
+    let ValidatedNotificationRevokeConsentRequest {
+        anchor_number,
+        origin,
+    } = request.try_into()?;
+    check_authz_and_record_activity(anchor_number)
+        .map_err(|_| NotificationRevokeConsentError::Unauthorized(caller()))?;
+
+    notifications::revoke_consent(anchor_number, origin)
 }
 
+/// `false` for an origin this deployment does not notify for and for an unauthorized
+/// caller, so neither can be probed with it.
 #[query]
-fn notification_consent_status(request: ConsentStatusRequest) -> bool {
-    notifications::consent::consent_status(request)
+fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> bool {
+    let Ok(ValidatedNotificationConsentGrantedRequest {
+        anchor_number,
+        origin,
+    }) = request.try_into()
+    else {
+        return false;
+    };
+    if check_authorization(anchor_number).is_err() {
+        return false;
+    }
+
+    notifications::consent_granted(anchor_number, origin)
 }
 
 #[query]

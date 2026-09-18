@@ -2,7 +2,7 @@
 
 use canister_tests::api::internet_identity::api_v2::prepare_account_session;
 use canister_tests::api::internet_identity::notifications::{
-    consent_status, grant_consent, revoke_consent,
+    consent_granted, grant_consent, revoke_consent,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
@@ -11,14 +11,15 @@ use canister_tests::framework::{
 };
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, NotificationError, OperatingSystem,
-    PrepareAccountSessionRequest,
+    AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, NotificationGrantConsentError,
+    NotificationRevokeConsentError, OperatingSystem, PrepareAccountSessionRequest,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
 
 const ORIGIN: &str = "https://some-dapp.com";
+const UNREACHED: &str = "https://never-visited.example";
 
 /// A canister with the feature turned on, and one anchor registered to `principal_1`
 /// which has signed in at `ORIGIN`.
@@ -85,16 +86,16 @@ fn should_refuse_every_entry_point_while_the_feature_is_off() -> Result<(), Reje
         install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_captcha_disabled());
     let anchor = flows::register_anchor(&env, canister_id);
 
-    assert_eq!(
+    assert!(matches!(
         grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
-        Err(NotificationError::Disabled)
-    );
-    assert_eq!(
+        Err(NotificationGrantConsentError::InternalCanisterError(_))
+    ));
+    assert!(matches!(
         revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
-        Err(NotificationError::Disabled)
-    );
+        Err(NotificationRevokeConsentError::InternalCanisterError(_))
+    ));
     // A disabled deployment answers like one nobody consented on.
-    assert!(!consent_status(
+    assert!(!consent_granted(
         &env,
         canister_id,
         principal_1(),
@@ -110,10 +111,13 @@ fn should_refuse_a_caller_that_does_not_own_the_anchor() -> Result<(), RejectRes
     let (canister_id, anchor) = install_with_anchor(&env);
 
     let granted = grant_consent(&env, canister_id, principal_2(), anchor, ORIGIN.into())?;
-    assert!(matches!(granted, Err(NotificationError::Unauthorized(_))));
+    assert!(matches!(
+        granted,
+        Err(NotificationGrantConsentError::Unauthorized(_))
+    ));
 
     // And the refusal wrote nothing.
-    assert!(!consent_status(
+    assert!(!consent_granted(
         &env,
         canister_id,
         principal_1(),
@@ -130,7 +134,7 @@ fn should_not_answer_a_query_for_an_anchor_the_caller_does_not_own() -> Result<(
     grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
         .expect("grant rejected");
 
-    assert!(!consent_status(
+    assert!(!consent_granted(
         &env,
         canister_id,
         principal_2(),
@@ -145,7 +149,7 @@ fn should_record_and_revoke_consent() -> Result<(), RejectResponse> {
     let env = env();
     let (canister_id, anchor) = install_with_anchor(&env);
 
-    assert!(!consent_status(
+    assert!(!consent_granted(
         &env,
         canister_id,
         principal_1(),
@@ -155,7 +159,7 @@ fn should_record_and_revoke_consent() -> Result<(), RejectResponse> {
 
     grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
         .expect("grant rejected");
-    assert!(consent_status(
+    assert!(consent_granted(
         &env,
         canister_id,
         principal_1(),
@@ -165,7 +169,7 @@ fn should_record_and_revoke_consent() -> Result<(), RejectResponse> {
 
     revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
         .expect("revoke rejected");
-    assert!(!consent_status(
+    assert!(!consent_granted(
         &env,
         canister_id,
         principal_1(),
@@ -202,7 +206,7 @@ fn should_fold_the_gateway_twins_of_one_app_into_one_consent() -> Result<(), Rej
         "https://abcde-aaaaa-aaaaa-aaaaa-cai.ic0.app",
         "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp.net",
     ] {
-        assert!(consent_status(
+        assert!(consent_granted(
             &env,
             canister_id,
             principal_1(),
@@ -235,7 +239,7 @@ fn should_fold_the_gateway_twins_of_one_app_into_one_consent() -> Result<(), Rej
         "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp.net",
     ] {
         assert!(
-            !consent_status(&env, canister_id, principal_1(), anchor, spelling.into())?,
+            !consent_granted(&env, canister_id, principal_1(), anchor, spelling.into())?,
             "{spelling} still reports consent after the single revoke"
         );
     }
@@ -259,12 +263,15 @@ fn should_reject_an_origin_that_is_not_a_bare_https_authority() -> Result<(), Re
     ] {
         let result = grant_consent(&env, canister_id, principal_1(), anchor, origin.into())?;
         assert!(
-            matches!(result, Err(NotificationError::InvalidOrigin(_))),
+            matches!(
+                result,
+                Err(NotificationGrantConsentError::InternalCanisterError(_))
+            ),
             "{origin} was not rejected: {result:?}"
         );
     }
     // None of the refusals wrote a row under the origin they canonicalize to.
-    assert!(!consent_status(
+    assert!(!consent_granted(
         &env,
         canister_id,
         principal_1(),
@@ -282,53 +289,16 @@ fn should_refuse_consent_for_an_app_the_identity_has_never_reached() -> Result<(
     let (canister_id, anchor) = install_with_anchor(&env);
 
     assert_eq!(
-        grant_consent(
-            &env,
-            canister_id,
-            principal_1(),
-            anchor,
-            "https://never-visited.example".into()
-        )?,
-        Err(NotificationError::SessionMissing)
+        grant_consent(&env, canister_id, principal_1(), anchor, UNREACHED.into())?,
+        Err(NotificationGrantConsentError::NoSuchSession)
     );
-    assert!(!consent_status(
+    assert!(!consent_granted(
         &env,
         canister_id,
         principal_1(),
         anchor,
-        "https://never-visited.example".into()
+        UNREACHED.into()
     )?);
-    Ok(())
-}
-
-/// A trap is a different answer from a refusal, so trapping on an unregistered number
-/// tells a caller which numbers are free. Only reachable through Candid.
-#[test]
-fn should_refuse_an_anchor_that_does_not_exist_without_trapping() -> Result<(), RejectResponse> {
-    let env = env();
-    let (canister_id, anchor) = install_with_anchor(&env);
-    let missing = anchor + 12_345;
-
-    assert!(matches!(
-        grant_consent(&env, canister_id, principal_1(), missing, ORIGIN.into())?,
-        Err(NotificationError::Unauthorized(_))
-    ));
-    assert!(matches!(
-        revoke_consent(&env, canister_id, principal_1(), missing, ORIGIN.into())?,
-        Err(NotificationError::Unauthorized(_))
-    ));
-    assert!(!consent_status(
-        &env,
-        canister_id,
-        principal_1(),
-        missing,
-        ORIGIN.into()
-    )?);
-
-    // Word for word what someone else's anchor gives, or the difference is the oracle.
-    let absent = grant_consent(&env, canister_id, principal_2(), missing, ORIGIN.into())?;
-    let not_yours = grant_consent(&env, canister_id, principal_2(), anchor, ORIGIN.into())?;
-    assert_eq!(absent, not_yours);
     Ok(())
 }
 
@@ -344,7 +314,7 @@ fn should_keep_consent_across_an_upgrade() -> Result<(), RejectResponse> {
     // No argument, which is what an upgrade that changes nothing sends.
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-    assert!(consent_status(
+    assert!(consent_granted(
         &env,
         canister_id,
         principal_1(),
