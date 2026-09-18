@@ -328,23 +328,21 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 
 #[update]
 fn notification_grant_consent(
-    anchor_number: AnchorNumber,
-    origin: FrontendHostname,
+    request: NotificationGrantConsentRequest,
 ) -> Result<(), notifications::NotificationError> {
-    notifications::consent::grant_consent(anchor_number, origin)
+    notifications::consent::grant_consent(request)
 }
 
 #[update]
 fn notification_revoke_consent(
-    anchor_number: AnchorNumber,
-    origin: FrontendHostname,
+    request: NotificationRevokeConsentRequest,
 ) -> Result<(), notifications::NotificationError> {
-    notifications::consent::revoke_consent(anchor_number, origin)
+    notifications::consent::revoke_consent(request)
 }
 
 #[query]
-fn notification_consent_status(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
-    notifications::consent::consent_status(anchor_number, origin)
+fn notification_consent_status(request: ConsentStatusRequest) -> bool {
+    notifications::consent::consent_status(request)
 }
 
 #[query]
