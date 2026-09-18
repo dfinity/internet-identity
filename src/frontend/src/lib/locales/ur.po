@@ -19,6 +19,9 @@ msgstr "(کچھ بھی، خالی چھوڑ دیں)"
 msgid "{0} logo"
 msgstr "{0} لوگو"
 
+msgid "{0} no longer has access to your apps."
+msgstr "{0} کو اب آپ کی ایپس تک رسائی نہیں رہی۔"
+
 msgid "{0} user"
 msgstr "{0} صارف"
 
@@ -36,6 +39,10 @@ msgstr "{application} نئی Internet Identity پر منتقل ہو گئی ہے"
 
 msgid "{attribute}:"
 msgstr "{attribute}:"
+
+msgctxt "Browsers are grouped by platform, which cannot tell one device from several, so the plural hedges with device(s) instead of naming a number"
+msgid "{count, plural, one {# browser on {platform}} other {# browsers on {platform} device(s)}}"
+msgstr "{count, plural, one {{platform} پر # براؤزر} other {{platform} پر # براؤزر}}"
 
 msgid "{count} of {capacity} verified emails"
 msgstr "{capacity} میں سے {count} تصدیق شدہ ای میلیں"
@@ -123,6 +130,12 @@ msgstr "۲۴ الفاظ پر مشتمل فریز جسے آپ لکھ کر آف ل
 
 msgid "A few things could be going on:"
 msgstr "چند چیزیں ہو سکتی ہیں:"
+
+msgid "A local program"
+msgstr "ایک مقامی پروگرام"
+
+msgid "A local server picks a new port each time, so any program on this computer can ask to connect. Remove it when you're not using one."
+msgstr "ایک مقامی سرور ہر بار ایک نئی پورٹ چنتا ہے، اس لیے اس کمپیوٹر پر موجود کوئی بھی پروگرام کنیکٹ ہونے کی درخواست کر سکتا ہے۔ جب آپ اسے استعمال نہ کر رہے ہوں تو اسے ہٹا دیں۔"
 
 msgid "About"
 msgstr "تعارف"
@@ -223,6 +236,9 @@ msgstr "رسائی کی اجازت دیں"
 msgid "Allow CLI access"
 msgstr "CLI رسائی کی اجازت دیں"
 
+msgid "Allow local programs to connect?"
+msgstr "مقامی پروگراموں کو کنیکٹ کرنے کی اجازت دیں؟"
+
 msgid "Allow to access this info"
 msgstr "اس معلومات تک رسائی کی اجازت دیں"
 
@@ -240,6 +256,12 @@ msgstr "پہلے ہی سائن اِن ہیں"
 
 msgid "Also makes changes on your behalf."
 msgstr "آپ کی جانب سے تبدیلیاں بھی کرتا ہے۔"
+
+msgid "Any local program can connect"
+msgstr "کوئی بھی مقامی پروگرام کنیکٹ ہو سکتا ہے"
+
+msgid "Any program on this computer can ask."
+msgstr "اس کمپیوٹر پر موجود کوئی بھی پروگرام درخواست کر سکتا ہے۔"
 
 msgid "Are you sure?"
 msgstr "کیا آپ کو یقین ہے؟"
@@ -409,6 +431,9 @@ msgstr "رابطہ منقطع ہو گیا"
 msgid "Connection duration"
 msgstr "رابطے کی مدت"
 
+msgid "Connector type"
+msgstr "کنیکٹر کی قسم"
+
 msgid "Connector URL"
 msgstr "کنیکٹر URL"
 
@@ -451,9 +476,6 @@ msgstr "موضوع کاپی کریں"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "{domainInput} سے SSO سیٹنگز لوڈ نہیں ہو سکیں۔ اپنے SSO ایڈمن سے کہیں کہ وہ یہ یقینی بنائے کہ /.well-known/ii-openid-configuration قابلِ رسائی ہے۔"
 
-msgid "Couldn't load your AI access settings."
-msgstr "آپ کی AI رسائی کی ترتیبات لوڈ نہیں ہو سکیں۔"
-
 msgid "Couldn't remove the connector. Please try again."
 msgstr "کنیکٹر نہیں ہٹایا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔"
 
@@ -462,6 +484,9 @@ msgstr "آپ کی تبدیلی محفوظ نہیں ہو سکی۔ براہ کرم
 
 msgid "Couldn't save your connector. Please try again."
 msgstr "آپ کا کنیکٹر محفوظ نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔"
+
+msgid "Couldn't sign this browser out"
+msgstr "اس براؤزر کو سائن آؤٹ نہیں کیا جا سکا"
 
 msgid "Couldn't validate MCP support"
 msgstr "MCP سپورٹ کی تصدیق نہیں ہو سکی"
@@ -505,6 +530,9 @@ msgstr "{0} کو تخلیق کیا گیا"
 msgid "Created {date}"
 msgstr "{date} کو تخلیق کیا گیا"
 
+msgid "Created on the old Internet Identity site. Can only be used to <0>recover</0>, when upgrading from an identity number."
+msgstr "پرانی Internet Identity سائٹ پر بنایا گیا۔ صرف <0>بازیافت</0> کے لیے استعمال کیا جا سکتا ہے، جب شناخت نمبر سے اپ گریڈ کر رہے ہوں۔"
+
 msgid "Creating account..."
 msgstr "اکاؤنٹ بنایا جا رہا ہے..."
 
@@ -544,11 +572,17 @@ msgstr "ڈیفالٹ"
 msgid "Deny all"
 msgstr "سب مسترد کریں"
 
+msgid "Devices"
+msgstr "آلات"
+
 msgid "Discoverable passkeys"
 msgstr "قابلِ دریافت پاس کیز"
 
 msgid "Do you want to continue?"
 msgstr "کیا آپ جاری رکھنا چاہتے ہیں؟"
+
+msgid "Don't recognize a browser? Sign it out, then <0>review your access methods</0>."
+msgstr "کوئی براؤزر نہیں پہچانتے؟ اسے سائن آؤٹ کریں، پھر <0>اپنے رسائی کے طریقے دیکھیں</0>۔"
 
 msgid "Done"
 msgstr "ہو گیا"
@@ -647,6 +681,9 @@ msgstr "عمومی سوالات"
 msgid "Featured apps"
 msgstr "نمایاں ایپس"
 
+msgid "First seen"
+msgstr "پہلی بار نظر آیا"
+
 msgid "First sign-in with {name}"
 msgstr "{name} کے ساتھ پہلا سائن اِن"
 
@@ -659,11 +696,17 @@ msgstr "سیکیورٹی کے لیے، Internet Identity کمانڈ لائن ٹ�
 msgid "For security, Internet Identity only connects the MCP server you've set as trusted. Set this server in Settings, then try again."
 msgstr "سیکیورٹی کے لیے، Internet Identity صرف اس MCP سرور سے جڑتی ہے جسے آپ نے قابلِ اعتماد مقرر کیا ہو۔ اس سرور کو ترتیبات میں سیٹ کریں، پھر دوبارہ کوشش کریں۔"
 
+msgid "Forget"
+msgstr "بھول جائیں"
+
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in. Quick, safe, and hassle-free."
 msgstr "پیچیدہ یوزرنیم اور پاس ورڈز یاد رکھنا بھول جائیں۔ Passkeys کے ساتھ، آپ لاگ اِن کرنے کے لیے بس اپنا نام منتخب کرتے ہیں۔ تیز، محفوظ، اور بے جھنجھٹ۔"
 
 msgid "Forget this email?"
 msgstr "یہ ای میل بھول جائیں؟"
+
+msgid "Forgetting..."
+msgstr "بھول رہا ہے..."
 
 msgid "From"
 msgstr "از"
@@ -724,6 +767,9 @@ msgstr "جاری رکھنے کے لیے دبائے رکھیں"
 
 msgid "Home"
 msgstr "ہوم"
+
+msgid "Hosted, by URL"
+msgstr "ہوسٹ کردہ، URL کے ذریعے"
 
 msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
 msgstr "گوگل، مائیکروسافٹ اور ایپل کے انضمام Internet Identity کے ساتھ کیسے کام کرتے ہیں؟"
@@ -935,6 +981,9 @@ msgstr "Internet Identity منسلک کی جا رہی ہے"
 msgid "Loading permissions"
 msgstr "اجازتیں لوڈ ہو رہی ہیں"
 
+msgid "Local server"
+msgstr "مقامی سرور"
+
 msgid "Long-press the link that opened this page."
 msgstr "اس لنک کو دیر تک دبائیں جس نے یہ صفحہ کھولا ہے۔"
 
@@ -1048,6 +1097,9 @@ msgstr "تصدیق نہیں ہوئی"
 
 msgid "Official · Hosted by DFINITY"
 msgstr "سرکاری · DFINITY کی میزبانی میں"
+
+msgid "On this computer"
+msgstr "اس کمپیوٹر پر"
 
 msgid "Once enabled, any command-line tool on this device can use your identity to sign in to apps."
 msgstr "ایک بار فعال ہونے کے بعد، اس آلے پر موجود کوئی بھی کمانڈ لائن ٹول آپ کی شناخت کا استعمال کرکے ایپس میں سائن اِن کر سکتا ہے۔"
@@ -1196,6 +1248,15 @@ msgstr "ریکوری فریز فعال ہو گیا"
 msgid "Recovery phrase set"
 msgstr "ریکوری فریز سیٹ کر دیا گیا"
 
+msgid "Remember"
+msgstr "یاد رکھیں"
+
+msgid "Remember this browser?"
+msgstr "یہ براؤزر یاد رکھیں؟"
+
+msgid "Remote server"
+msgstr "ریموٹ سرور"
+
 msgid "Remove"
 msgstr "ہٹائیں"
 
@@ -1283,20 +1344,29 @@ msgstr "ایپ پر واپس جائیں"
 msgid "Return to application"
 msgstr "ایپلی کیشن پر واپس جائیں"
 
+msgid "Review {serverDisplayName}'s <0>Privacy Policy</0> and <1>Terms of Service</1>."
+msgstr "{serverDisplayName} کی <0>رازداری کی پالیسی</0> اور <1>سروس کی شرائط</1> کا جائزہ لیں۔"
+
+msgid "Review {serverDisplayName}'s <0>Privacy Policy</0>."
+msgstr "{serverDisplayName} کی <0>رازداری کی پالیسی</0> کا جائزہ لیں۔"
+
+msgid "Review {serverDisplayName}'s <0>Terms of Service</0>."
+msgstr "{serverDisplayName} کی <0>سروس کی شرائط</0> کا جائزہ لیں۔"
+
 msgid "Review permissions"
 msgstr "اجازتوں کا جائزہ لیں"
 
 msgid "Revoke access anytime"
 msgstr "کسی بھی وقت رسائی منسوخ کریں"
 
-msgid "Revoke access anytime in your <0>settings</0>."
-msgstr "اپنی <0>ترتیبات</0> میں کسی بھی وقت رسائی منسوخ کریں۔"
-
 msgid "Right now"
 msgstr "ابھی"
 
 msgid "Run a passkey test to see results"
 msgstr "نتائج دیکھنے کے لیے پاس کی ٹیسٹ کریں"
+
+msgid "Runs on your own computer · Any port"
+msgstr "آپ کے اپنے کمپیوٹر پر چلتا ہے · کوئی بھی پورٹ"
 
 msgid "Save changes"
 msgstr "تبدیلیاں محفوظ کریں"
@@ -1315,6 +1385,9 @@ msgstr "بلا رکاوٹ رسائی"
 
 msgid "Securely connecting your identity to the server."
 msgstr "آپ کی شناخت کو سرور سے محفوظ طریقے سے جوڑا جا رہا ہے۔"
+
+msgid "See where you're signed in to apps and sign out remotely."
+msgstr "دیکھیں کہ آپ کہاں کہاں ایپس میں سائن اِن ہیں اور دور سے سائن آؤٹ کریں۔"
 
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "<0>Safari میں کھولیں</0> یا <1>Chrome میں کھولیں</1> منتخب کریں۔"
@@ -1406,14 +1479,11 @@ msgstr "اپنے {displayName} اکاؤنٹ سے کسی بھی آلے سے سا�
 msgid "Sign out"
 msgstr "سائن آؤٹ"
 
-msgid "Sign out and keep identity"
-msgstr "سائن آؤٹ کریں اور شناخت رکھیں"
+msgid "Sign out {0}?"
+msgstr "{0} سے سائن آؤٹ کریں؟"
 
-msgid "Sign out and remove from device"
-msgstr "سائن آؤٹ کریں اور آلے سے ہٹائیں"
-
-msgid "Sign out from this device"
-msgstr "اس آلے سے سائن آؤٹ کریں"
+msgid "Sign out of all apps"
+msgstr "تمام ایپس سے سائن آؤٹ کریں"
 
 msgid "Sign out to remove"
 msgstr "ہٹانے کے لیے سائن آؤٹ کریں"
@@ -1433,6 +1503,12 @@ msgstr "سائن اَپ"
 msgid "Signed in"
 msgstr "سائن اِن شدہ"
 
+msgid "Signed out"
+msgstr "سائن آؤٹ ہو گئے"
+
+msgid "Signed out of all apps"
+msgstr "تمام ایپس سے سائن آؤٹ ہو گئے"
+
 msgid "Signing in"
 msgstr "سائن اِن ہو رہا ہے"
 
@@ -1441,6 +1517,9 @@ msgstr "محفوظ طریقے سے سائن اِن کیا جا رہا ہے"
 
 msgid "Signing in..."
 msgstr "سائن ان ہو رہا ہے..."
+
+msgid "Signing out…"
+msgstr "سائن آؤٹ ہو رہا ہے…"
 
 msgid "Simplify your sign-in"
 msgstr "اپنا سائن اِن آسان بنائیں"
@@ -1620,6 +1699,9 @@ msgstr "یہ ایپ نئی Internet Identity پر منتقل ہو گئی ہے"
 msgid "This app is requesting your email address. You can verify your email address now and share it, or skip and continue without sharing."
 msgstr "یہ ایپ آپ کا ای میل پتہ مانگ رہی ہے۔ آپ ابھی اپنے ای میل پتے کی تصدیق کر کے اسے شیئر کر سکتے ہیں، یا چھوڑیں اور شیئر کیے بغیر جاری رکھیں۔"
 
+msgid "This browser"
+msgstr "یہ براؤزر"
+
 msgid "This browser is not supported."
 msgstr "یہ براؤزر معاون نہیں ہے۔"
 
@@ -1646,9 +1728,6 @@ msgstr "یہ وہ رسائی کا طریقہ ہے جس سے آپ فی الحال
 
 msgid "This is the recovery method you're currently signed in with."
 msgstr "یہ وہ ریکوری طریقہ ہے جس سے آپ فی الحال سائن اِن ہیں۔"
-
-msgid "This legacy passkey is no longer usable and should be removed."
-msgstr "یہ پرانی پاس کی اب قابل استعمال نہیں ہے اور اسے ہٹا دینا چاہیے"
 
 msgid "This may take a few seconds"
 msgstr "اس میں کچھ سیکنڈ لگ سکتے ہیں"
@@ -1956,9 +2035,6 @@ msgstr "آپ یہ ونڈو بند کر سکتے ہیں۔"
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "آپ سائن اِن کے عمل میں <0>موجودہ پاس کی استعمال کریں</0> کے ساتھ جاری رکھ سکتے ہیں۔"
 
-msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
-msgstr "آپ سائن آؤٹ کر کے اپنی شناخت کو اگلی بار تیز لاگ اِن کے لیے محفوظ رکھ سکتے ہیں، یا اسے اس آلے سے مکمل طور پر ہٹا سکتے ہیں۔"
-
 msgid "You can manage your access methods on this page."
 msgstr "آپ اس صفحے پر اپنے رسائی کے طریقوں کا انتظام کر سکتے ہیں۔"
 
@@ -1967,6 +2043,9 @@ msgstr "آپ کسی بھی وقت اپنا ریکوری فریز ری سیٹ ک�
 
 msgid "You can return to your agent."
 msgstr "آپ اپنے ایجنٹ پر واپس جا سکتے ہیں۔"
+
+msgid "You can sign in again at any time."
+msgstr "آپ کسی بھی وقت دوبارہ سائن اِن کر سکتے ہیں۔"
 
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
 msgstr "آپ اسے ابھی بازیافت کے لیے استعمال کر سکتے ہیں، لیکن تصدیق کریں کہ آپ نے اسے درست طریقے سے محفوظ کیا ہے تاکہ آپ بعد میں اس پر انحصار کر سکیں۔"
@@ -2024,6 +2103,12 @@ msgstr "آپ {capacity} تصدیق شدہ ای میلز کی حد تک پہنچ 
 
 msgid "You've reached the limit of {limit} verified emails. Remove one to add another."
 msgstr "آپ {limit} تصدیق شدہ ای میلز کی حد تک پہنچ چکے ہیں۔ ایک اور شامل کرنے کے لیے ایک ہٹائیں۔"
+
+msgid "Your apps stay signed in and your identity is ready the next time you come back."
+msgstr "آپ کی ایپس سائن اِن رہتی ہیں اور اگلی بار جب آپ واپس آئیں تو آپ کی شناخت تیار ہے۔"
+
+msgid "Your local server tells you when it's ready to connect. Nothing to enter here."
+msgstr "آپ کا مقامی سرور آپ کو بتاتا ہے جب یہ کنیکٹ ہونے کے لیے تیار ہو۔ یہاں کچھ بھی درج کرنے کی ضرورت نہیں ہے۔"
 
 msgid "Your organization hasn't granted this app access via {domainInput}."
 msgstr "آپ کی تنظیم نے {domainInput} کے ذریعے اس ایپ کو رسائی نہیں دی ہے۔"

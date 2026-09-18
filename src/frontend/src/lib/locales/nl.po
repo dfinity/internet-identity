@@ -19,6 +19,9 @@ msgstr "(alles, laat het leeg)"
 msgid "{0} logo"
 msgstr "{0} logo"
 
+msgid "{0} no longer has access to your apps."
+msgstr "{0} heeft geen toegang meer tot uw apps."
+
 msgid "{0} user"
 msgstr "{0} gebruiker"
 
@@ -36,6 +39,10 @@ msgstr "{application} is overgegaan naar de nieuwe Internet Identity"
 
 msgid "{attribute}:"
 msgstr "{attribute}:"
+
+msgctxt "Browsers are grouped by platform, which cannot tell one device from several, so the plural hedges with device(s) instead of naming a number"
+msgid "{count, plural, one {# browser on {platform}} other {# browsers on {platform} device(s)}}"
+msgstr "{count, plural, one {# browser op {platform}} other {# browsers op {platform}}}"
 
 msgid "{count} of {capacity} verified emails"
 msgstr "{count} van {capacity} geverifieerde e-mailadressen"
@@ -123,6 +130,12 @@ msgstr "Een zin van 24 woorden die u opschrijft en offline bewaart."
 
 msgid "A few things could be going on:"
 msgstr "Er zijn mogelijk een paar oorzaken:"
+
+msgid "A local program"
+msgstr "Een lokaal programma"
+
+msgid "A local server picks a new port each time, so any program on this computer can ask to connect. Remove it when you're not using one."
+msgstr "Een lokale server kiest elke keer een nieuwe poort, zodat elk programma op deze computer kan vragen om verbinding te maken. Verwijder het als u er geen gebruikt."
 
 msgid "About"
 msgstr "Over"
@@ -223,6 +236,9 @@ msgstr "Toegang verlenen"
 msgid "Allow CLI access"
 msgstr "CLI-toegang verlenen"
 
+msgid "Allow local programs to connect?"
+msgstr "Lokale programma's toestaan te verbinden?"
+
 msgid "Allow to access this info"
 msgstr "Toegang tot deze informatie toestaan"
 
@@ -240,6 +256,12 @@ msgstr "Al ingelogd"
 
 msgid "Also makes changes on your behalf."
 msgstr "Voert ook wijzigingen uit namens u."
+
+msgid "Any local program can connect"
+msgstr "Elk lokaal programma kan verbinding maken"
+
+msgid "Any program on this computer can ask."
+msgstr "Elk programma op deze computer kan vragen."
 
 msgid "Are you sure?"
 msgstr "Weet u het zeker?"
@@ -409,6 +431,9 @@ msgstr "Verbinding gesloten"
 msgid "Connection duration"
 msgstr "Verbindingsduur"
 
+msgid "Connector type"
+msgstr "Connectortype"
+
 msgid "Connector URL"
 msgstr "Connector-URL"
 
@@ -451,9 +476,6 @@ msgstr "Onderwerp kopiëren"
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "SSO-instellingen van {domainInput} konden niet worden geladen. Vraag uw SSO-beheerder om te controleren of /.well-known/ii-openid-configuration bereikbaar is."
 
-msgid "Couldn't load your AI access settings."
-msgstr "Uw AI-toegangsinstellingen konden niet worden geladen."
-
 msgid "Couldn't remove the connector. Please try again."
 msgstr "De connector kon niet worden verwijderd. Probeer het opnieuw."
 
@@ -462,6 +484,9 @@ msgstr "Uw wijziging kon niet worden opgeslagen. Probeer het opnieuw."
 
 msgid "Couldn't save your connector. Please try again."
 msgstr "Uw connector kon niet worden opgeslagen. Probeer het opnieuw."
+
+msgid "Couldn't sign this browser out"
+msgstr "Kon deze browser niet uitloggen"
 
 msgid "Couldn't validate MCP support"
 msgstr "MCP-ondersteuning kon niet worden gevalideerd"
@@ -505,6 +530,9 @@ msgstr "Gemaakt {0}"
 msgid "Created {date}"
 msgstr "Gemaakt {date}"
 
+msgid "Created on the old Internet Identity site. Can only be used to <0>recover</0>, when upgrading from an identity number."
+msgstr "Aangemaakt op de oude Internet Identity-site. Kan alleen worden gebruikt om te <0>herstellen</0>, bij upgrade van een identiteitsnummer."
+
 msgid "Creating account..."
 msgstr "Account aanmaken..."
 
@@ -544,11 +572,17 @@ msgstr "Standaard"
 msgid "Deny all"
 msgstr "Alles weigeren"
 
+msgid "Devices"
+msgstr "Apparaten"
+
 msgid "Discoverable passkeys"
 msgstr "Discoverable passkeys"
 
 msgid "Do you want to continue?"
 msgstr "Wilt u doorgaan?"
+
+msgid "Don't recognize a browser? Sign it out, then <0>review your access methods</0>."
+msgstr "Herkent u een browser niet? Log deze uit en <0>controleer uw toegangsmethoden</0>."
 
 msgid "Done"
 msgstr "Klaar"
@@ -647,6 +681,9 @@ msgstr "Veelgestelde vragen"
 msgid "Featured apps"
 msgstr "Uitgelichte apps"
 
+msgid "First seen"
+msgstr "Voor het eerst gezien"
+
 msgid "First sign-in with {name}"
 msgstr "Eerste aanmelding met {name}"
 
@@ -659,11 +696,17 @@ msgstr "Om veiligheidsredenen blokkeert Internet Identity opdrachtregelprogramma
 msgid "For security, Internet Identity only connects the MCP server you've set as trusted. Set this server in Settings, then try again."
 msgstr "Om veiligheidsredenen verbindt Internet Identity alleen de MCP-server die u als vertrouwd heeft ingesteld. Stel deze server in via Instellingen en probeer het opnieuw."
 
+msgid "Forget"
+msgstr "Vergeten"
+
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in. Quick, safe, and hassle-free."
 msgstr "Vergeet het onthouden van ingewikkelde gebruikersnamen en wachtwoorden. Met passkeys kiest u gewoon uw naam om in te loggen. Snel, veilig en probleemloos."
 
 msgid "Forget this email?"
 msgstr "Dit e-mailadres vergeten?"
+
+msgid "Forgetting..."
+msgstr "Vergeten..."
 
 msgid "From"
 msgstr "Van"
@@ -724,6 +767,9 @@ msgstr "Ingedrukt houden om door te gaan"
 
 msgid "Home"
 msgstr "Home"
+
+msgid "Hosted, by URL"
+msgstr "Gehost, via URL"
 
 msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
 msgstr "Hoe werken Google-, Microsoft- en Apple-integraties met Internet Identity?"
@@ -935,6 +981,9 @@ msgstr "Internet Identity koppelen"
 msgid "Loading permissions"
 msgstr "Machtigingen laden"
 
+msgid "Local server"
+msgstr "Lokale server"
+
 msgid "Long-press the link that opened this page."
 msgstr "Houd de link die deze pagina opende lang ingedrukt."
 
@@ -1048,6 +1097,9 @@ msgstr "Niet geverifieerd"
 
 msgid "Official · Hosted by DFINITY"
 msgstr "Officieel · Gehost door DFINITY"
+
+msgid "On this computer"
+msgstr "Op deze computer"
 
 msgid "Once enabled, any command-line tool on this device can use your identity to sign in to apps."
 msgstr "Eenmaal ingeschakeld, kan elk opdrachtregelprogramma op dit apparaat uw identiteit gebruiken om in te loggen bij apps."
@@ -1196,6 +1248,15 @@ msgstr "Herstelzin geactiveerd"
 msgid "Recovery phrase set"
 msgstr "Herstelzin ingesteld"
 
+msgid "Remember"
+msgstr "Onthouden"
+
+msgid "Remember this browser?"
+msgstr "Deze browser onthouden?"
+
+msgid "Remote server"
+msgstr "Externe server"
+
 msgid "Remove"
 msgstr "Verwijderen"
 
@@ -1283,20 +1344,29 @@ msgstr "Terug naar app"
 msgid "Return to application"
 msgstr "Terug naar applicatie"
 
+msgid "Review {serverDisplayName}'s <0>Privacy Policy</0> and <1>Terms of Service</1>."
+msgstr "Lees het <0>Privacybeleid</0> en de <1>Servicevoorwaarden</1> van {serverDisplayName}."
+
+msgid "Review {serverDisplayName}'s <0>Privacy Policy</0>."
+msgstr "Lees het <0>Privacybeleid</0> van {serverDisplayName}."
+
+msgid "Review {serverDisplayName}'s <0>Terms of Service</0>."
+msgstr "Lees de <0>Servicevoorwaarden</0> van {serverDisplayName}."
+
 msgid "Review permissions"
 msgstr "Machtigingen bekijken"
 
 msgid "Revoke access anytime"
 msgstr "Toegang op elk moment intrekken"
 
-msgid "Revoke access anytime in your <0>settings</0>."
-msgstr "Trek de toegang op elk moment in via uw <0>instellingen</0>."
-
 msgid "Right now"
 msgstr "Op dit moment"
 
 msgid "Run a passkey test to see results"
 msgstr "Voer een passkey-test uit om resultaten te zien"
+
+msgid "Runs on your own computer · Any port"
+msgstr "Wordt uitgevoerd op uw eigen computer · Elke poort"
 
 msgid "Save changes"
 msgstr "Wijzigingen opslaan"
@@ -1315,6 +1385,9 @@ msgstr "Naadloze toegang"
 
 msgid "Securely connecting your identity to the server."
 msgstr "Uw identiteit wordt veilig verbonden met de server."
+
+msgid "See where you're signed in to apps and sign out remotely."
+msgstr "Bekijk waar u bent ingelogd bij apps en log op afstand uit."
 
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Selecteer <0>Openen in Safari</0> of <1>Openen in Chrome</1>."
@@ -1406,14 +1479,11 @@ msgstr "Log in met uw {displayName}-account vanaf elk apparaat."
 msgid "Sign out"
 msgstr "Uitloggen"
 
-msgid "Sign out and keep identity"
-msgstr "Uitloggen en identiteit bewaren"
+msgid "Sign out {0}?"
+msgstr "{0} uitloggen?"
 
-msgid "Sign out and remove from device"
-msgstr "Uitloggen en verwijderen van dit apparaat"
-
-msgid "Sign out from this device"
-msgstr "Uitloggen van dit apparaat"
+msgid "Sign out of all apps"
+msgstr "Uitloggen bij alle apps"
 
 msgid "Sign out to remove"
 msgstr "Log uit om te verwijderen"
@@ -1433,6 +1503,12 @@ msgstr "Aanmelden"
 msgid "Signed in"
 msgstr "Ingelogd"
 
+msgid "Signed out"
+msgstr "Uitgelogd"
+
+msgid "Signed out of all apps"
+msgstr "Uitgelogd bij alle apps"
+
 msgid "Signing in"
 msgstr "Inloggen"
 
@@ -1441,6 +1517,9 @@ msgstr "Veilig inloggen"
 
 msgid "Signing in..."
 msgstr "Inloggen..."
+
+msgid "Signing out…"
+msgstr "Bezig met uitloggen…"
 
 msgid "Simplify your sign-in"
 msgstr "Vereenvoudig het inloggen"
@@ -1620,6 +1699,9 @@ msgstr "Deze app is overgegaan naar de nieuwe Internet Identity"
 msgid "This app is requesting your email address. You can verify your email address now and share it, or skip and continue without sharing."
 msgstr "Deze app vraagt om uw e-mailadres. U kunt uw e-mailadres nu verifiëren en delen, of overslaan en doorgaan zonder te delen."
 
+msgid "This browser"
+msgstr "Deze browser"
+
 msgid "This browser is not supported."
 msgstr "Deze browser wordt niet ondersteund."
 
@@ -1646,9 +1728,6 @@ msgstr "Dit is de toegangsmethode waarmee u momenteel bent ingelogd."
 
 msgid "This is the recovery method you're currently signed in with."
 msgstr "Dit is de herstelmethode waarmee u momenteel bent ingelogd."
-
-msgid "This legacy passkey is no longer usable and should be removed."
-msgstr "Deze verouderde passkey is niet meer bruikbaar en moet worden verwijderd."
 
 msgid "This may take a few seconds"
 msgstr "Dit kan enkele seconden duren"
@@ -1956,9 +2035,6 @@ msgstr "U kunt dit venster sluiten."
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "U kunt doorgaan met <0>Gebruik bestaande Passkey</0> in het inlogproces."
 
-msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
-msgstr "U kunt uitloggen en uw identiteit bewaren voor sneller inloggen de volgende keer, of deze volledig verwijderen van dit apparaat."
-
 msgid "You can manage your access methods on this page."
 msgstr "U kunt uw toegangsmethoden op deze pagina beheren."
 
@@ -1967,6 +2043,9 @@ msgstr "U kunt uw herstelzin op elk moment opnieuw instellen. Dit houdt uw ident
 
 msgid "You can return to your agent."
 msgstr "U kunt terugkeren naar uw agent."
+
+msgid "You can sign in again at any time."
+msgstr "U kunt op elk moment opnieuw inloggen."
 
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
 msgstr "U kunt deze nu gebruiken om te herstellen, maar controleer of u hem correct heeft opgeslagen zodat u er later op kunt vertrouwen."
@@ -2024,6 +2103,12 @@ msgstr "U heeft de limiet van {capacity} geverifieerde e-mailadressen bereikt. V
 
 msgid "You've reached the limit of {limit} verified emails. Remove one to add another."
 msgstr "U heeft de limiet van {limit} geverifieerde e-mailadressen bereikt. Verwijder er een om een ander toe te voegen."
+
+msgid "Your apps stay signed in and your identity is ready the next time you come back."
+msgstr "Uw apps blijven ingelogd en uw identiteit is klaar de volgende keer dat u terugkomt."
+
+msgid "Your local server tells you when it's ready to connect. Nothing to enter here."
+msgstr "Uw lokale server vertelt u wanneer hij klaar is om verbinding te maken. Hier hoeft u niets in te vullen."
 
 msgid "Your organization hasn't granted this app access via {domainInput}."
 msgstr "Uw organisatie heeft deze app geen toegang verleend via {domainInput}."

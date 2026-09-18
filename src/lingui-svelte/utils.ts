@@ -6,6 +6,8 @@ import {
   TemplateLiteral,
   Identifier,
   Literal,
+  Expression,
+  CallExpression,
 } from "estree";
 import { createHash } from "crypto";
 import { ExtractedMessage } from "@lingui/conf";
@@ -18,30 +20,62 @@ export const generateMessageId = (message: string, context = "") =>
     .digest("base64")
     .slice(0, 6);
 
+export interface Range {
+  start: number;
+  end: number;
+}
+
 export interface FoundMessage extends Omit<ExtractedMessage, "origin"> {
   tag: string;
   start: number;
   end: number;
-  values?: Record<string, { start: number; end: number }>;
+  values?: Record<string, Range>;
   nodes?: Array<{
-    node: { start: number; end: number };
-    content?: { start: number; end: number };
+    node: Range;
+    content?: Range;
   }>;
+  /**
+   * Ranges of nested message formats whose text this message already carries.
+   * A walker must not emit or rewrite them again — there is one catalogue
+   * entry, and the outer rewrite replaces their source outright.
+   */
+  consumed?: Range[];
 }
 
-const findPropertyTemplateLiteral = (
-  properties: (Property | SpreadElement)[],
-  keyName: string,
-): TemplateLiteral | undefined => {
-  const prop = properties.find(
-    (p): p is Property & { key: Identifier; value: TemplateLiteral } =>
-      p.type === "Property" &&
-      p.key.type === "Identifier" &&
-      p.key.name === keyName &&
-      p.value.type === "TemplateLiteral",
-  );
-  return prop?.value;
+/**
+ * The message formats a nested expression may resolve to. Only the resolver
+ * consults this; each finder is handed the names it matches, so widening one
+ * cannot widen another.
+ */
+const NESTED_FORMATS = {
+  t: ["$t"],
+  plural: ["$plural"],
 };
+
+interface ResolvedMessage {
+  message: string;
+  values: Record<string, Range>;
+}
+
+/**
+ * Positional placeholder keys are unique within one message. Sibling plural
+ * categories are alternatives, so each starts numbering where the enclosing
+ * message left off and the enclosing message resumes past the highest key any
+ * category reached.
+ */
+interface ResolveContext {
+  positional: { next: number };
+  consumed: Range[];
+}
+
+const createResolveContext = (): ResolveContext => ({
+  positional: { next: 0 },
+  consumed: [],
+});
+
+export const isWithinRanges = (node: unknown, ranges: Range[]): boolean =>
+  hasNumericStartEnd(node) &&
+  ranges.some((range) => node.start >= range.start && node.end <= range.end);
 
 type StringLiteral = Literal & { value: string };
 const findPropertyStringLiteral = (
@@ -59,32 +93,202 @@ const findPropertyStringLiteral = (
   return prop?.value as StringLiteral;
 };
 
-const processTemplateLiteral = (node: TemplateLiteral) => {
+const processTemplateLiteral = (
+  node: TemplateLiteral,
+  ctx: ResolveContext,
+): ResolvedMessage => {
   const rawQuasis = node.quasis.map((q) => q.value.raw);
   let message = rawQuasis[0];
-  let values: Record<string, { start: number; end: number }> = {};
+  const values: Record<string, Range> = {};
 
-  let positionalCount = 0;
   rawQuasis.slice(1).forEach((q, i) => {
+    const expression = node.expressions[i];
+
+    const nested = resolveNestedMessage(expression, ctx);
+    if (nested) {
+      message += `${nested.message}${q}`;
+      Object.assign(values, nested.values);
+      return;
+    }
+
     const key =
-      node.expressions[i].type === "Identifier"
-        ? node.expressions[i].name
-        : `${positionalCount++}`;
+      expression.type === "Identifier"
+        ? expression.name
+        : `${ctx.positional.next++}`;
     message += `{${key}}${q}`;
-    if (
-      "start" in node.expressions[i] &&
-      "end" in node.expressions[i] &&
-      typeof node.expressions[i].start === "number" &&
-      typeof node.expressions[i].end === "number"
-    ) {
-      values[key] = {
-        start: node.expressions[i].start,
-        end: node.expressions[i].end,
-      };
+    if (hasNumericStartEnd(expression)) {
+      values[key] = { start: expression.start, end: expression.end };
     }
   });
 
   return { message, values };
+};
+
+const findProperty = (
+  properties: (Property | SpreadElement)[],
+  keyName: string,
+): Property | undefined =>
+  properties.find(
+    (p): p is Property & { key: Identifier } =>
+      p.type === "Property" &&
+      p.key.type === "Identifier" &&
+      p.key.name === keyName,
+  );
+
+const propertyKeyName = (property: Property): string | undefined => {
+  if (property.key.type === "Identifier") return property.key.name;
+  if (property.key.type === "Literal") return String(property.key.value);
+  return undefined;
+};
+
+/**
+ * Builds the ICU plural from a `$plural(value, { …categories })` call. Each
+ * category is resolved through `resolveMessage`, so a category may hold a
+ * plain string, a template literal, or another message format.
+ */
+const resolvePlural = (
+  node: CallExpression,
+  ctx: ResolveContext,
+): ResolvedMessage | undefined => {
+  const [value, options] = node.arguments;
+  if (
+    options?.type !== "ObjectExpression" ||
+    !value ||
+    !hasNumericStartEnd(value)
+  ) {
+    return undefined;
+  }
+
+  const num = value.type === "Identifier" ? value.name : "num";
+  const values: Record<string, Range> = {
+    [num]: { start: value.start, end: value.end },
+  };
+
+  // Categories are alternatives, so each numbers its positional placeholders
+  // from the same starting point and the enclosing message resumes past the
+  // highest any of them reached.
+  const firstKey = ctx.positional.next;
+  let lastKey = firstKey;
+
+  const categories = options.properties.flatMap((property) => {
+    if (property.type !== "Property") return [];
+    const key = propertyKeyName(property);
+    if (key === undefined) return [];
+
+    ctx.positional.next = firstKey;
+    const resolved = resolveMessage(property.value as Expression, ctx);
+    if (!resolved) return [];
+    lastKey = Math.max(lastKey, ctx.positional.next);
+
+    Object.assign(values, resolved.values);
+    return [`${key} {${resolved.message}}`];
+  });
+
+  ctx.positional.next = lastKey;
+
+  if (!categories.length) return undefined;
+
+  return { message: `{${num}, plural, ${categories.join(" ")}}`, values };
+};
+
+/**
+ * Resolves a nested message format — `$t\`…\``, `$t({ … })` or
+ * `$plural(…)` — and records its range as consumed, since its text now
+ * belongs to the enclosing message.
+ *
+ * Returns undefined for anything else. In an expression slot, such as a
+ * template-literal interpolation or a `<Trans>` mustache, a plain string or
+ * template is a runtime value and has to stay a placeholder; only a message
+ * format contributes text of its own.
+ */
+const resolveNestedMessage = (
+  node: Expression | Property["value"] | undefined,
+  ctx: ResolveContext,
+): ResolvedMessage | undefined => {
+  if (!node) return undefined;
+
+  if (
+    node.type === "TaggedTemplateExpression" &&
+    node.tag.type === "Identifier" &&
+    NESTED_FORMATS.t.includes(node.tag.name)
+  ) {
+    const resolved = processTemplateLiteral(node.quasi, ctx);
+    if (hasNumericStartEnd(node)) {
+      ctx.consumed.push({ start: node.start, end: node.end });
+    }
+    return resolved;
+  }
+
+  if (node.type !== "CallExpression" || node.callee.type !== "Identifier") {
+    return undefined;
+  }
+
+  const resolved = NESTED_FORMATS.plural.includes(node.callee.name)
+    ? resolvePlural(node, ctx)
+    : NESTED_FORMATS.t.includes(node.callee.name)
+      ? resolveDescriptor(node, ctx)?.resolved
+      : undefined;
+
+  if (resolved && hasNumericStartEnd(node)) {
+    ctx.consumed.push({ start: node.start, end: node.end });
+  }
+  return resolved;
+};
+
+/**
+ * Resolves whatever stands where a message is expected — a plural category or
+ * a descriptor's `message` — which is a string, a template literal, or another
+ * message format.
+ */
+const resolveMessage = (
+  node: Expression | Property["value"] | undefined,
+  ctx: ResolveContext,
+): ResolvedMessage | undefined => {
+  if (!node) return undefined;
+
+  if (node.type === "Literal") {
+    return typeof node.value === "string"
+      ? { message: node.value, values: {} }
+      : undefined;
+  }
+
+  if (node.type === "TemplateLiteral") {
+    return processTemplateLiteral(node, ctx);
+  }
+
+  return resolveNestedMessage(node, ctx);
+};
+
+/**
+ * Reads a `$t({ message, id, context, comment })` call. The descriptor fields
+ * belong to the outermost call — a nested one contributes only its message,
+ * since there is a single catalogue entry.
+ */
+const resolveDescriptor = (
+  node: CallExpression,
+  ctx: ResolveContext,
+):
+  | {
+      resolved: ResolvedMessage;
+      id?: string;
+      context?: string;
+      comment?: string;
+    }
+  | undefined => {
+  const [descriptor] = node.arguments;
+  if (descriptor?.type !== "ObjectExpression") return undefined;
+
+  const { properties } = descriptor;
+  const message = findProperty(properties, "message")?.value;
+  const resolved = resolveMessage(message as Expression, ctx);
+  if (!resolved) return undefined;
+
+  return {
+    resolved,
+    id: findPropertyStringLiteral(properties, "id")?.value,
+    context: findPropertyStringLiteral(properties, "context")?.value,
+    comment: findPropertyStringLiteral(properties, "comment")?.value,
+  };
 };
 
 export const findTransInTaggedTemplate = (
@@ -102,13 +306,15 @@ export const findTransInTaggedTemplate = (
     return;
   }
 
-  const { message, values } = processTemplateLiteral(node.quasi);
+  const ctx = createResolveContext();
+  const { message, values } = processTemplateLiteral(node.quasi, ctx);
 
   onMessageFound({
     tag: node.tag.name,
     id: generateMessageId(message),
     message,
     values: Object.keys(values).length > 0 ? values : undefined,
+    consumed: ctx.consumed.length > 0 ? ctx.consumed : undefined,
     start: node.start,
     end: node.end,
   });
@@ -123,28 +329,18 @@ export const findTransInCallExpression = (
     node.type !== "CallExpression" ||
     node.callee.type !== "Identifier" ||
     !tags.includes(node.callee.name) ||
-    node.arguments[0].type !== "ObjectExpression" ||
     !hasNumericStartEnd(node) ||
     !node.loc
   ) {
     return;
   }
 
-  const { properties } = node.arguments[0];
+  const ctx = createResolveContext();
+  const descriptor = resolveDescriptor(node, ctx);
+  if (!descriptor) return;
 
-  const messageNode =
-    findPropertyStringLiteral(properties, "message") ??
-    findPropertyTemplateLiteral(properties, "message");
-  if (!messageNode) return;
-
-  const { message, values } =
-    messageNode.type === "TemplateLiteral"
-      ? processTemplateLiteral(messageNode)
-      : { message: messageNode.value, values: {} };
-
-  const id = findPropertyStringLiteral(properties, "id")?.value;
-  const context = findPropertyStringLiteral(properties, "context")?.value;
-  const comment = findPropertyStringLiteral(properties, "comment")?.value;
+  const { resolved, id, context, comment } = descriptor;
+  const { message, values } = resolved;
 
   onMessageFound({
     tag: node.callee.name,
@@ -153,6 +349,7 @@ export const findTransInCallExpression = (
     context,
     comment,
     values: Object.keys(values).length > 0 ? values : undefined,
+    consumed: ctx.consumed.length > 0 ? ctx.consumed : undefined,
     start: node.start,
     end: node.end,
   });
@@ -167,50 +364,24 @@ export const findPluralInCallExpression = (
     node.type !== "CallExpression" ||
     node.callee.type !== "Identifier" ||
     !tags.includes(node.callee.name) ||
-    node.arguments[1].type !== "ObjectExpression" ||
     !hasNumericStartEnd(node) ||
-    !hasNumericStartEnd(node.arguments[0]) ||
     !node.loc
   ) {
     return;
   }
 
-  const num =
-    node.arguments[0].type === "Identifier" ? node.arguments[0].name : "num";
-  let values: Record<string, { start: number; end: number }> = {
-    [num]: { start: node.arguments[0].start, end: node.arguments[0].end },
-  };
+  const ctx = createResolveContext();
+  const resolved = resolvePlural(node, ctx);
+  if (!resolved) return;
 
-  const pluralParts = node.arguments[1].properties.flatMap((p) => {
-    if (
-      p.type !== "Property" ||
-      !(p.key.type === "Identifier" || p.key.type === "Literal") ||
-      !(p.value.type === "Literal" || p.value.type === "TemplateLiteral")
-    )
-      return [];
-
-    const keyStr =
-      p.key.type === "Identifier" ? p.key.name : String(p.key.value);
-
-    if (p.value.type === "TemplateLiteral") {
-      const { message: valueMessage, values: valueValues } =
-        processTemplateLiteral(p.value);
-      values = { ...values, ...valueValues };
-      return [`${keyStr} {${valueMessage}}`];
-    }
-
-    return [`${keyStr} {${p.value.value}}`];
-  });
-
-  if (!pluralParts.length) return;
-
-  const message = `{${num}, plural, ${pluralParts.join(" ")}}`;
+  const { message, values } = resolved;
 
   onMessageFound({
     tag: node.callee.name,
     id: generateMessageId(message),
     message,
     values: Object.keys(values).length > 0 ? values : undefined,
+    consumed: ctx.consumed.length > 0 ? ctx.consumed : undefined,
     start: node.start,
     end: node.end,
   });
@@ -229,16 +400,13 @@ const isComponent = (node: unknown): node is AST.Component =>
 
 const textInNode = (
   node: AST.TemplateNode,
-  valueCount: { count: number },
-  register: (entry: {
-    node: { start: number; end: number };
-    content?: { start: number; end: number };
-  }) => number,
+  ctx: ResolveContext,
+  register: (entry: { node: Range; content?: Range }) => number,
 ): {
   text: string;
   start: number;
   end: number;
-  values: Record<string, { start: number; end: number }>;
+  values: Record<string, Range>;
   registered: boolean;
 } => {
   if (node.type === "Text") {
@@ -253,10 +421,21 @@ const textInNode = (
   }
 
   if (node.type === "ExpressionTag" && hasNumericStartEnd(node.expression)) {
+    const nested = resolveNestedMessage(node.expression, ctx);
+    if (nested) {
+      return {
+        text: nested.message,
+        start: node.expression.start,
+        end: node.expression.end,
+        values: nested.values,
+        registered: false,
+      };
+    }
+
     const key =
       node.expression.type === "Identifier"
         ? node.expression.name
-        : valueCount.count++;
+        : `${ctx.positional.next++}`;
     return {
       text: `{${key}}`,
       start: node.expression.start,
@@ -283,7 +462,7 @@ const textInNode = (
   }
 
   const childResults = node.fragment.nodes.map((child) =>
-    textInNode(child, valueCount, register),
+    textInNode(child, ctx, register),
   );
 
   const combinedText = childResults
@@ -328,20 +507,15 @@ export const findTransInComponent = (
     return;
   }
 
-  const valueCount = { count: 0 };
-  const nodes: Array<{
-    node: { start: number; end: number };
-    content?: { start: number; end: number };
-  }> = [];
+  const ctx = createResolveContext();
+  const nodes: Array<{ node: Range; content?: Range }> = [];
 
   // Helper to register a node and return its index
-  const register = (entry: {
-    node: { start: number; end: number };
-    content?: { start: number; end: number };
-  }) => nodes.push(entry) - 1;
+  const register = (entry: { node: Range; content?: Range }) =>
+    nodes.push(entry) - 1;
 
   let message = "";
-  let values: Record<string, { start: number; end: number }> = {};
+  let values: Record<string, Range> = {};
 
   for (const child of component.fragment.nodes) {
     // Text node
@@ -353,15 +527,21 @@ export const findTransInComponent = (
     // Expression tag / mustache
     if (
       child.type === "ExpressionTag" &&
-      "start" in child.expression &&
-      typeof child.expression.start === "number" &&
-      "end" in child.expression &&
-      typeof child.expression.end === "number"
+      hasNumericStartEnd(child.expression)
     ) {
+      // A nested message format contributes its own text to this message
+      // rather than a placeholder standing in for a runtime value.
+      const nested = resolveNestedMessage(child.expression, ctx);
+      if (nested) {
+        message += nested.message;
+        values = { ...values, ...nested.values };
+        continue;
+      }
+
       const key =
         child.expression.type === "Identifier"
           ? child.expression.name
-          : valueCount.count++;
+          : `${ctx.positional.next++}`;
       message += `{${key}}`;
       values[key] = {
         start: child.expression.start,
@@ -371,7 +551,7 @@ export const findTransInComponent = (
     }
 
     // Element / component node
-    const res = textInNode(child as AST.TemplateNode, valueCount, register);
+    const res = textInNode(child as AST.TemplateNode, ctx, register);
     values = { ...values, ...res.values };
 
     const text = res.text.replace(/[\r\n]+/g, "").trim();
@@ -400,6 +580,7 @@ export const findTransInComponent = (
     comment,
     values: Object.keys(values).length > 0 ? values : undefined,
     nodes: nodes.length > 0 ? nodes : undefined,
+    consumed: ctx.consumed.length > 0 ? ctx.consumed : undefined,
     start: component.start,
     end: component.end,
   });
