@@ -4,12 +4,8 @@
 // browser that cannot receive anything.
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
-import type {
-  NotificationGrantConsentError,
-  _SERVICE,
-} from "$lib/generated/internet_identity_types";
-import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
-import { mintApplicationSession } from "./mintApplicationSession";
+import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import { throwCanisterError } from "$lib/utils/utils";
 import { requestNotificationPermission } from "./pushSubscription";
 import { ensureRegisteredDevice } from "./subscribeDevice";
 
@@ -60,52 +56,13 @@ export const allowApp = ({
   actor: ActorSubclass<_SERVICE>;
 }): Promise<void> => grantConsent({ identityNumber, origin, actor });
 
-/**
- * Records consent, signing in at the app first where the identity has never reached it.
- *
- * Asks and reacts to `NoSuchSession` rather than ensuring a session up front, so it
- * never touches an app the identity already holds a session at: a second session there
- * would drop the one the app is still using.
- *
- * Needs no coordination with the sign-in that a delegation request performs, because
- * `serializeAuthorizationRequest` runs those one at a time and the consent handler holds
- * that queue for the whole ceremony, this call included. So a sign-in has either already
- * finished, in which case the app is reached and the grant above succeeds, or it is
- * queued behind us and replaces what we mint with the session the app asked for.
- */
-const grantConsent = async (args: GrantArgs): Promise<void> => {
-  if (await granted(args)) {
-    return;
-  }
-
-  await mintApplicationSession(args);
-  await args.actor
-    .notification_grant_consent({
-      anchor_number: args.identityNumber,
-      origin: args.origin,
-    })
-    .then(throwCanisterError);
-};
-
-/**
- * Whether the grant landed. `false` only where the identity has never reached the app,
- * which is the one refusal a sign-in fixes; every other error belongs to the caller.
- */
-const granted = ({
+/** Records consent for the app. The canister mints the application it hangs off. */
+const grantConsent = ({
   identityNumber,
   origin,
   actor,
-}: GrantArgs): Promise<boolean> =>
+}: GrantArgs): Promise<void> =>
   actor
     .notification_grant_consent({ anchor_number: identityNumber, origin })
     .then(throwCanisterError)
-    .then(() => true)
-    .catch((error: unknown) => {
-      if (
-        isCanisterError<NotificationGrantConsentError>(error) &&
-        error.type === "NoSuchSession"
-      ) {
-        return false;
-      }
-      throw error;
-    });
+    .then(() => undefined);

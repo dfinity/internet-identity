@@ -1,33 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-// Mocked before the unit is imported. Both reach for a browser: one subscribes a device
-// and the other signs in, and what is under test is the order they are reached in.
+// Mocked before the unit is imported: the device registration reaches for a browser,
+// and what is under test is that it lands before the consent is recorded.
 vi.mock("./subscribeDevice", () => ({
   ensureRegisteredDevice: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("./pushSubscription", () => ({
   requestNotificationPermission: vi.fn(() => Promise.resolve("granted")),
 }));
-vi.mock("./mintApplicationSession", () => ({
-  mintApplicationSession: vi.fn(() => Promise.resolve()),
-}));
-
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { allowApp, enableNotifications } from "./enableNotifications";
-import { mintApplicationSession } from "./mintApplicationSession";
 import { ensureRegisteredDevice } from "./subscribeDevice";
 import { requestNotificationPermission } from "./pushSubscription";
 
-const mint = vi.mocked(mintApplicationSession);
 const register = vi.mocked(ensureRegisteredDevice);
 const permission = vi.mocked(requestNotificationPermission);
 const ORIGIN = "https://app.example";
 const IDENTITY = BigInt(10_000);
 
 /** An actor whose grant answers with `replies` in order, one per call. */
-const actorAnswering = (
-  ...replies: ({ Ok: null } | { Err: { NoSuchSession: null } })[]
-) => {
+const actorAnswering = (...replies: { Ok: null }[]) => {
   const notification_grant_consent = vi.fn(() =>
     Promise.resolve(replies[notification_grant_consent.mock.calls.length - 1]),
   );
@@ -38,33 +30,23 @@ const actorAnswering = (
 };
 
 const ok = { Ok: null } as const;
-const missing = { Err: { NoSuchSession: null } } as const;
 
 describe("granting consent", () => {
-  beforeEach(() => {
-    mint.mockClear();
-    mint.mockResolvedValue(undefined);
-  });
-
-  it("records consent without signing in where the app is already reached", async () => {
+  /** The canister mints the application, so one call records the consent whether or
+   *  not the identity has ever signed in at the app. */
+  it("records consent in one call", async () => {
     const { actor, grant } = actorAnswering(ok);
 
     await allowApp({ identityNumber: IDENTITY, origin: ORIGIN, actor });
 
     expect(grant).toHaveBeenCalledTimes(1);
-    expect(mint).not.toHaveBeenCalled();
+    expect(grant).toHaveBeenCalledWith({
+      anchor_number: IDENTITY,
+      origin: ORIGIN,
+    });
   });
 
-  it("signs in and asks again where the identity has never reached the app", async () => {
-    const { actor, grant } = actorAnswering(missing, ok);
-
-    await allowApp({ identityNumber: IDENTITY, origin: ORIGIN, actor });
-
-    expect(mint).toHaveBeenCalledTimes(1);
-    expect(grant).toHaveBeenCalledTimes(2);
-  });
-
-  it("reports an error that signing in would not fix", async () => {
+  it("reports a refusal rather than swallowing it", async () => {
     const { actor } = actorAnswering({
       Err: { Disabled: null },
     } as unknown as { Ok: null });
@@ -72,14 +54,11 @@ describe("granting consent", () => {
     await expect(
       allowApp({ identityNumber: IDENTITY, origin: ORIGIN, actor }),
     ).rejects.toThrow();
-    expect(mint).not.toHaveBeenCalled();
   });
 });
 
 describe("enabling notifications", () => {
   beforeEach(() => {
-    mint.mockClear();
-    mint.mockResolvedValue(undefined);
     register.mockClear();
     permission.mockResolvedValue("granted");
   });
