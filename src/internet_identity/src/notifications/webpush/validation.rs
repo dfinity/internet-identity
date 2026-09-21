@@ -41,6 +41,7 @@ pub struct ValidatedRemoveWebPushSubscriptionRequest {
 
 pub struct ValidatedGetWebPushSubscriptionStatusRequest {
     pub anchor_number: AnchorNumber,
+    _validated: Validated,
 }
 
 impl TryFrom<SetWebPushSubscriptionRequest> for ValidatedSetWebPushSubscriptionRequest {
@@ -113,7 +114,10 @@ impl TryFrom<GetWebPushSubscriptionStatusRequest> for ValidatedGetWebPushSubscri
         GetWebPushSubscriptionStatusRequest { anchor_number }: GetWebPushSubscriptionStatusRequest,
     ) -> Result<Self, Self::Error> {
         check_enabled()?;
-        Ok(Self { anchor_number })
+        Ok(Self {
+            anchor_number,
+            _validated: Validated,
+        })
     }
 }
 
