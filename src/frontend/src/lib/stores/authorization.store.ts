@@ -63,6 +63,12 @@ export const authorizationStore = {
       maxTimeToLive,
     }));
   },
+  /** The origin alone, for a request that asks nothing about session duration.
+   *  Leaves `maxTimeToLive` as it stands rather than clearing what an earlier
+   *  request set. */
+  setRequestOrigin: (effectiveOrigin: string): void => {
+    contextInternal.update((context) => ({ ...context, effectiveOrigin }));
+  },
   /** Called by the UI as soon as the auth method is chosen — lets consumers
    *  react to the flow type (e.g. OpenID vs passkey) without waiting for
    *  the whole authorization to complete. */

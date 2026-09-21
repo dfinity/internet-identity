@@ -24,12 +24,12 @@ vi.mock("$lib/stores/authentication.store", async () => {
   return { authenticationStore: writable<unknown>(undefined) };
 });
 
-const setRequestContext = vi.fn();
+const setRequestOrigin = vi.fn();
 vi.mock("$lib/stores/authorization.store", async () => {
   const { writable } = await import("svelte/store");
   return {
     authorizationStore: {
-      setRequestContext: (...args: unknown[]) => setRequestContext(...args),
+      setRequestOrigin: (...args: unknown[]) => setRequestOrigin(...args),
     },
     authorizedStore: writable<unknown>(undefined),
     authorizationPromptStore: writable<{ prompt?: string }>({}),
@@ -169,7 +169,7 @@ describe("handleNotificationConsentRequest", () => {
     expect(sent[0].error).toMatchObject({
       code: INTERACTION_REQUIRED_ERROR_CODE,
     });
-    expect(setRequestContext).not.toHaveBeenCalled();
+    expect(setRequestOrigin).not.toHaveBeenCalled();
     expect(errors).toEqual([]);
   });
 

@@ -150,7 +150,7 @@ export const handleNotificationConsentRequest =
 const runConsentCeremony = async (
   effectiveOrigin: string,
 ): Promise<boolean> => {
-  authorizationStore.setRequestContext(effectiveOrigin, undefined);
+  authorizationStore.setRequestOrigin(effectiveOrigin);
   // Awaited for its ordering and not its value: the user has to have chosen an identity
   // before a screen can ask them about notifying it.
   await waitForStore(authorizedStore);
