@@ -1,8 +1,6 @@
 // Keeps this browser's push registration healthy. The device toggle owns the
 // subscription; per-app consent is a separate list and is never touched here.
 
-import type { ActorSubclass } from "@icp-sdk/core/agent";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { windowsRemaining } from "./vapidPool";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import {
@@ -10,7 +8,7 @@ import {
   subscribeAndRegisterDevice,
 } from "./subscribeDevice";
 import { loadVapidKey } from "./vapidKeyStore";
-import { currentBrowserId } from "$lib/stores/browser-key.store";
+import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 
 export { currentDeviceSubscription };
 
@@ -26,7 +24,6 @@ const JWT_POOL_REFRESH_THRESHOLD = 10;
  */
 export const reconcileDeviceNotifications = async (
   identityNumber: bigint,
-  actor: ActorSubclass<_SERVICE>,
 ): Promise<void> => {
   if (!isPushSupported() || Notification.permission !== "granted") {
     return;
@@ -50,13 +47,19 @@ export const reconcileDeviceNotifications = async (
   }
 
   // The browser's subscription is sound, so what is left is this identity's own row.
-  const browserId = await currentBrowserId(identityNumber);
-  if (browserId === undefined) {
-    return;
+  // Signed as the browser, which is what the canister reads the registration off, so
+  // a browser no sign-in has registered has nothing to ask about.
+  let actor;
+  try {
+    actor = await browserKeyActor(identityNumber);
+  } catch (error) {
+    if (error instanceof UnregisteredBrowserError) {
+      return;
+    }
+    throw error;
   }
   const [status] = await actor.get_webpush_subscription_status({
     anchor_number: identityNumber,
-    browser_id: browserId,
   });
   // Nothing registered is what a second identity on this browser looks like, and a
   // different endpoint is what another identity's re-subscribe left behind. A pool

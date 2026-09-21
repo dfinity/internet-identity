@@ -18,9 +18,10 @@ vi.mock("./subscribeDevice", () => ({
   ),
   registerStoredDevice: vi.fn(() => Promise.resolve(ENDPOINT)),
 }));
-vi.mock("$lib/stores/browser-key.store", () => ({
-  currentBrowserId: vi.fn(() => Promise.resolve(7)),
-}));
+vi.mock("./browserActor", () => {
+  class UnregisteredBrowserError extends Error {}
+  return { browserKeyActor: vi.fn(), UnregisteredBrowserError };
+});
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
@@ -31,7 +32,7 @@ import {
   registerStoredDevice,
   subscribeAndRegisterDevice,
 } from "./subscribeDevice";
-import { currentBrowserId } from "$lib/stores/browser-key.store";
+import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 
 const ENDPOINT = "https://relay.example/abc";
 const DAY_NS = BigInt(24 * 60 * 60) * BigInt(1_000_000_000);
@@ -57,11 +58,12 @@ const actor = () => ({
   remove_webpush_subscription: vi.fn(() => Promise.resolve({ Ok: null })),
 });
 
-const run = (a: ReturnType<typeof actor>) =>
-  reconcileDeviceNotifications(
-    BigInt(1),
+const run = (a: ReturnType<typeof actor>) => {
+  vi.mocked(browserKeyActor).mockResolvedValue(
     a as unknown as ActorSubclass<_SERVICE>,
   );
+  return reconcileDeviceNotifications(BigInt(1));
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -154,24 +156,27 @@ describe("reconcileDeviceNotifications", () => {
     expect(subscribeAndRegisterDevice).toHaveBeenCalledOnce();
   });
 
-  it("asks about the browser the store names, not the endpoint", async () => {
+  /** The browser the caller signs as is the browser the canister answers for. */
+  it("asks as the browser, without naming one", async () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
     vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
     a.get_webpush_subscription_status.mockResolvedValue(pool(1));
     await run(a);
+    expect(browserKeyActor).toHaveBeenCalledWith(BigInt(1));
     expect(a.get_webpush_subscription_status).toHaveBeenCalledWith({
       anchor_number: BigInt(1),
-      browser_id: 7,
     });
   });
 
   it("does nothing for a browser no sign-in has registered", async () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
     vi.mocked(loadVapidKey).mockResolvedValue(key());
-    vi.mocked(currentBrowserId).mockResolvedValueOnce(undefined);
     const a = actor();
-    await run(a);
+    vi.mocked(browserKeyActor).mockRejectedValue(
+      new UnregisteredBrowserError(),
+    );
+    await reconcileDeviceNotifications(BigInt(1));
     expect(a.get_webpush_subscription_status).not.toHaveBeenCalled();
     expect(registerStoredDevice).not.toHaveBeenCalled();
   });

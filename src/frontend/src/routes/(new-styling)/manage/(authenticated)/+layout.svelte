@@ -282,10 +282,9 @@
       return;
     }
     reconciledFor = authenticated.identityNumber;
-    void reconcileDeviceNotifications(
-      authenticated.identityNumber,
-      authenticated.actor,
-    ).catch(() => {});
+    void reconcileDeviceNotifications(authenticated.identityNumber).catch(
+      () => {},
+    );
   });
 </script>
 
