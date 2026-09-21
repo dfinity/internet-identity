@@ -133,6 +133,52 @@ describe("handleNotificationConsentRequest", () => {
     expect(errors).toEqual([]);
   });
 
+  /** The identity switcher stays up during this screen. A switch used to leave the
+   *  screen recording against the identity it opened for while the answer was read
+   *  for the new one, so the ceremony has to start again. */
+  it("starts the screen again for an identity switched to mid-ceremony", async () => {
+    const { authenticationStore } =
+      await import("$lib/stores/authentication.store");
+    const switchedStatus = vi.fn(() => Promise.resolve(true));
+
+    const sent: Record<string, unknown>[] = [];
+    const channel = {
+      origin: ORIGIN,
+      send: (message: Record<string, unknown>) => {
+        sent.push(message);
+        return Promise.resolve();
+      },
+    } as unknown as Channel;
+    const running = handleNotificationConsentRequest(channel, () => {})({
+      jsonrpc: "2.0",
+      id: 1,
+      method: NOTIFICATION_CONSENT_METHOD,
+      params: {},
+    } as unknown as JsonRequest);
+
+    const opened = await waitForStore(notificationConsentStore);
+    expect(opened.identityNumber).toBe(BigInt(10_000));
+
+    (authenticationStore as unknown as Writable<unknown>).set({
+      identityNumber: BigInt(20_000),
+      actor: { notification_consent_granted: switchedStatus },
+    });
+
+    const reopened = await waitForStore(notificationConsentStore, (context) =>
+      context?.identityNumber === BigInt(20_000) ? context : undefined,
+    );
+    expect(reopened.identityNumber).toBe(BigInt(20_000));
+    notificationConsentStore.settle();
+    await running;
+
+    expect(consentStatus).not.toHaveBeenCalled();
+    expect(switchedStatus).toHaveBeenCalledWith({
+      anchor_number: BigInt(20_000),
+      origin: ORIGIN,
+    });
+    expect(sent[0].result).toEqual({ granted: true });
+  });
+
   it("reports what the canister recorded", async () => {
     const { sent } = await run();
     expect(sent).toHaveLength(1);

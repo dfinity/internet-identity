@@ -148,26 +148,38 @@ const runConsentCeremony = async (
   effectiveOrigin: string,
 ): Promise<boolean> => {
   authorizationStore.setRequestOrigin(effectiveOrigin);
-  // Awaited for its ordering and not its value: the user has to have chosen an identity
-  // before a screen can ask them about notifying it.
-  await waitForStore(authorizedStore);
-  const { identityNumber, actor } = await waitForStore(authenticationStore);
+  for (;;) {
+    // Awaited for its ordering and not its value: the user has to have chosen an
+    // identity before a screen can ask them about notifying it.
+    await waitForStore(authorizedStore);
+    const authenticated = await waitForStore(authenticationStore);
 
-  notificationConsentStore.setContext({
-    effectiveOrigin,
-    identityNumber,
-    actor,
-  });
-  await waitForStore(notificationConsentSettledStore);
+    notificationConsentStore.setContext({
+      effectiveOrigin,
+      identityNumber: authenticated.identityNumber,
+      actor: authenticated.actor,
+    });
 
-  // The identity can be switched while the screen is up, so the answer is read
-  // for whoever is authenticated once it settles rather than whoever opened it.
-  const settled = get(authenticationStore);
-  if (settled === undefined) {
-    return false;
+    // The header keeps the identity switcher up for this screen, and switching
+    // leaves it holding the identity it opened for, so a grant would land on one
+    // identity while the answer was read for another. Start it again instead.
+    const outcome = await Promise.race([
+      waitForStore(notificationConsentSettledStore).then(
+        () => "settled" as const,
+      ),
+      waitForStore(authenticationStore, (current) =>
+        current?.identityNumber !== authenticated.identityNumber
+          ? ("switched" as const)
+          : undefined,
+      ),
+    ]);
+    if (outcome === "switched") {
+      continue;
+    }
+
+    return authenticated.actor.notification_consent_granted({
+      anchor_number: authenticated.identityNumber,
+      origin: effectiveOrigin,
+    });
   }
-  return settled.actor.notification_consent_granted({
-    anchor_number: settled.identityNumber,
-    origin: effectiveOrigin,
-  });
 };
