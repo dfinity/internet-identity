@@ -729,7 +729,6 @@ export const idlFactory = ({ IDL }) => {
   const NotificationGrantConsentError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
-    'NoSuchSession' : IDL.Null,
   });
   const NotificationRevokeConsentRequest = IDL.Record({
     'origin' : IDL.Text,

@@ -349,7 +349,7 @@ fn notification_revoke_consent(
     check_authz_and_record_activity(validated.anchor_number)
         .map_err(|_| NotificationRevokeConsentError::Unauthorized(caller()))?;
 
-    notifications::revoke_consent(validated)
+    notifications::revoke_consent(validated, ic_cdk::api::time())
 }
 
 /// `false` for an origin this deployment does not notify for and for an unauthorized

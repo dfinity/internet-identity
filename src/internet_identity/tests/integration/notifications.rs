@@ -16,7 +16,6 @@ use internet_identity_interface::internet_identity::types::{
     NotificationRevokeConsentError, OperatingSystem, PrepareAccountSessionRequest,
 };
 use pocket_ic::{PocketIc, RejectResponse};
-use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
 
 const ORIGIN: &str = "https://some-dapp.com";
@@ -290,18 +289,16 @@ fn should_reject_an_origin_that_is_not_a_bare_https_authority() -> Result<(), Re
     Ok(())
 }
 
-/// Consent hangs off the application, which only a sign-in mints. Its own variant
-/// because signing in at the app clears it.
+/// An app can ask before the identity has ever signed in at it, so the grant mints the
+/// application it hangs off rather than refusing.
 #[test]
-fn should_refuse_consent_for_an_app_the_identity_has_never_reached() -> Result<(), RejectResponse> {
+fn should_grant_consent_for_an_app_the_identity_has_never_reached() -> Result<(), RejectResponse> {
     let env = env();
     let (canister_id, anchor) = install_with_anchor(&env);
 
-    assert_eq!(
-        grant_consent(&env, canister_id, principal_1(), anchor, UNREACHED.into())?,
-        Err(NotificationGrantConsentError::NoSuchSession)
-    );
-    assert!(!consent_granted(
+    grant_consent(&env, canister_id, principal_1(), anchor, UNREACHED.into())?
+        .expect("granting at an unreached app");
+    assert!(consent_granted(
         &env,
         canister_id,
         principal_1(),

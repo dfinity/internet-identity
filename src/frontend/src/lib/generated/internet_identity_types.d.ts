@@ -1367,14 +1367,7 @@ export interface NotificationConsentGrantedRequest {
 export type NotificationGrantConsentError = {
     'InternalCanisterError' : string
   } |
-  { 'Unauthorized' : Principal } |
-  {
-    /**
-     * The identity has never signed in at the app, so there is no application for a
-     * consent to hang off.
-     */
-    'NoSuchSession' : null
-  };
+  { 'Unauthorized' : Principal };
 export interface NotificationGrantConsentRequest {
   'origin' : string,
   'anchor_number' : UserNumber,

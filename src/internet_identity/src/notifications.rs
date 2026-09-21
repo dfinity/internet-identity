@@ -28,8 +28,8 @@ pub fn grant_consent(
     }: ValidatedNotificationGrantConsentRequest,
     now_ns: Timestamp,
 ) -> Result<(), NotificationGrantConsentError> {
-    write_consent(anchor_number, &origin, Some(now_ns))
-        .map_err(|_| NotificationGrantConsentError::NoSuchSession)
+    write_consent(anchor_number, &origin, Some(now_ns), now_ns)
+        .map_err(|err| NotificationGrantConsentError::InternalCanisterError(format!("{err}")))
 }
 
 /// Withdraws the origin's consent. Device subscriptions stay: they are shared across
@@ -40,10 +40,11 @@ pub fn revoke_consent(
         origin,
         ..
     }: ValidatedNotificationRevokeConsentRequest,
+    now_ns: Timestamp,
 ) -> Result<(), NotificationRevokeConsentError> {
     // Consent that cannot exist is already withdrawn, so an app the identity never
     // reached is nothing to report.
-    let _ = write_consent(anchor_number, &origin, None);
+    let _ = write_consent(anchor_number, &origin, None, now_ns);
     Ok(())
 }
 
@@ -68,13 +69,14 @@ fn write_consent(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
     consented_at_ns: Option<Timestamp>,
+    now_ns: Timestamp,
 ) -> Result<(), StorageError> {
     storage_borrow_mut(|storage| {
         let mut config = storage
             .read_anchor_application_config(anchor_number, origin)
             .unwrap_or_default();
         config.notifications_consented_at_ns = consented_at_ns;
-        storage.write_anchor_application_config(anchor_number, origin, config)
+        storage.write_anchor_application_config(anchor_number, origin, config, now_ns)
     })
 }
 
@@ -133,7 +135,7 @@ mod tests {
             anchor_number,
             origin: origin.to_string(),
         };
-        revoke_consent(request.try_into().expect("a notifiable origin"))
+        revoke_consent(request.try_into().expect("a notifiable origin"), 1_000)
     }
 
     fn granted(anchor_number: AnchorNumber, origin: &str) -> bool {
@@ -168,17 +170,18 @@ mod tests {
         assert!(!granted(anchor, APP));
     }
 
-    /// Consent hangs off the application, which only a sign-in mints.
+    /// An app can ask before the identity has ever signed in at it, so the grant mints
+    /// the application it hangs off rather than refusing.
     #[test]
-    fn refuses_an_app_the_identity_has_never_signed_in_at() {
+    fn grants_at_an_app_the_identity_has_never_signed_in_at() {
         setup();
         enable_origins();
         let anchor = anchor_at(VISITED);
 
-        assert_eq!(
-            grant(anchor, NEVER, 1_000),
-            Err(NotificationGrantConsentError::NoSuchSession)
-        );
+        grant(anchor, NEVER, 1_000).unwrap();
+        assert!(granted(anchor, NEVER));
+        // The origin it had already reached is untouched by minting another.
+        assert!(!granted(anchor, VISITED));
     }
 
     /// Nothing to withdraw is already withdrawn, so the caller has nothing to handle.

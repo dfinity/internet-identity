@@ -1741,9 +1741,6 @@ type ListAvailableAttributesError = variant {
 // Why a notification call was refused.
 type NotificationGrantConsentError = variant {
     Unauthorized : principal;
-    // The identity has never signed in at the app, so there is no application for a
-    // consent to hang off.
-    NoSuchSession;
     InternalCanisterError : text;
 };
 

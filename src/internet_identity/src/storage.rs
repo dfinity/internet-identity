@@ -2803,26 +2803,27 @@ impl<M: Memory + Clone> Storage<M> {
         self.anchor_application_config(anchor_number, application_number)
     }
 
-    /// Stores `config` for the app at `origin`.
+    /// Stores `config` for the app at `origin`, creating the identity's account list
+    /// there where it has none.
     ///
-    /// Refused where the identity has never signed in there: the config is reclaimed with
-    /// the identity's account list at the origin, so one written without that list behind
-    /// it would be a row nothing ever collects.
+    /// Goes through the account-state write rather than the config map alone, because the
+    /// config is reclaimed with that list: a row written without one behind it is a row
+    /// nothing ever collects. The same write mints the application where the origin is
+    /// new, so a config can be the first thing an identity stores at an app.
     pub fn write_anchor_application_config(
         &mut self,
         anchor_number: AnchorNumber,
         origin: &FrontendHostname,
         config: AnchorApplicationConfig,
+        now: Timestamp,
     ) -> Result<(), StorageError> {
-        let application_number = self
-            .lookup_application_number_with_origin(origin)
-            .filter(|application_number| {
-                self.stored_account_references(anchor_number, *application_number)
-                    .is_some()
-            })
-            .ok_or(StorageError::ApplicationConfigNotFound { anchor_number })?;
-        self.stable_anchor_application_config_memory
-            .insert((anchor_number, application_number), config);
+        let anchor = self.read(anchor_number)?;
+        let (account_references, _) = self.account_state_for_origin(anchor_number, origin);
+        self.write_account_state(
+            anchor,
+            now,
+            BTreeMap::from([(origin.clone(), Some((account_references, Some(config))))]),
+        )?;
         Ok(())
     }
 

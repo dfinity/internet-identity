@@ -971,9 +971,6 @@ pub enum SessionRevokeError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum NotificationGrantConsentError {
     Unauthorized(Principal),
-    /// The identity has never signed in at the app, so there is no application for a
-    /// consent to hang off.
-    NoSuchSession,
     InternalCanisterError(String),
 }
 
