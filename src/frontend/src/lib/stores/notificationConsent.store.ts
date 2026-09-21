@@ -7,7 +7,7 @@ export interface NotificationConsentContext {
   /** The app being asked about, already folded to its canonical spelling. */
   effectiveOrigin: string;
   identityNumber: bigint;
-  resolveActor: () => Promise<ActorSubclass<_SERVICE> | undefined>;
+  actor: ActorSubclass<_SERVICE>;
 }
 
 const contextInternal = writable<NotificationConsentContext | undefined>();

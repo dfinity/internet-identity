@@ -36,15 +36,14 @@
     appName: string | undefined;
     identityNumber: bigint;
     origin: string;
-    /** Resolves the authenticated actor for this identity. */
-    resolveActor: () => Promise<ActorSubclass<_SERVICE> | undefined>;
+    /** The authenticated actor for this identity. */
+    actor: ActorSubclass<_SERVICE>;
     /** Continues sign-in: after enabling, allowing, skipping, or when there is
      * nothing worth showing. */
     onDone: () => void;
   }
 
-  const { appName, identityNumber, origin, resolveActor, onDone }: Props =
-    $props();
+  const { appName, identityNumber, origin, actor, onDone }: Props = $props();
 
   const app = $derived(appName ?? $t`this app`);
 
@@ -52,7 +51,6 @@
   let variant = $state<Variant>("loading");
   let busy = $state(false);
   let browser = $state<BrowserDescription | undefined>(undefined);
-  let actor: ActorSubclass<_SERVICE> | undefined;
   // A retry from the failed screen sets this device up, or only records consent
   // when the device is already registered. Read by the failed screen's copy.
   let retrySubscribes = $state(true);
@@ -60,12 +58,7 @@
   onMount(() => {
     void (async () => {
       try {
-        const client = await ensureActor();
-        if (client === undefined) {
-          onDone();
-          return;
-        }
-        const consented = await client
+        const consented = await actor
           .notification_consent_granted({
             anchor_number: identityNumber,
             origin,
@@ -94,11 +87,6 @@
   const messageOf = (err: unknown): string =>
     err instanceof Error ? err.message : String(err);
 
-  /** Resolved once and kept, so a retry after a failed resolve asks again rather
-   *  than giving up on a request the app is still waiting for. */
-  const ensureActor = async (): Promise<ActorSubclass<_SERVICE> | undefined> =>
-    (actor ??= await resolveActor());
-
   /** Whether this device is set up and registered for this identity. Best effort:
    *  a probe that fails must not keep the failed screen from appearing. */
   const deviceIsReady = async (): Promise<boolean> => {
@@ -113,15 +101,10 @@
   const runSubscribe = async (): Promise<void> => {
     busy = true;
     try {
-      const client = await ensureActor();
-      if (client === undefined) {
-        onDone();
-        return;
-      }
       const result = await enableNotifications({
         identityNumber,
         origin,
-        actor: client,
+        actor,
       });
       if (result.status === "denied") {
         recordFailure("permission-denied");
@@ -152,15 +135,10 @@
   const runAllow = async (): Promise<void> => {
     busy = true;
     try {
-      const client = await ensureActor();
-      if (client === undefined) {
-        onDone();
-        return;
-      }
       await allowApp({
         identityNumber,
         origin,
-        actor: client,
+        actor,
       });
       clearFailure();
       onDone();

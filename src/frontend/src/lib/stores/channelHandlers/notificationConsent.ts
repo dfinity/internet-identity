@@ -51,16 +51,6 @@ export const handleNotificationConsentRequest =
     const requestId = request.id;
 
     const isSilent = get(authorizationPromptStore).prompt === "none";
-    const deny = async () => {
-      await channel.send({
-        jsonrpc: "2.0",
-        id: requestId,
-        error: {
-          code: INTERACTION_REQUIRED_ERROR_CODE,
-          message: "Interaction required",
-        },
-      });
-    };
 
     // Every member is optional, so an app with nothing to pass sends no `params`
     // at all. The codec rejects `undefined` but accepts `{}`.
@@ -87,7 +77,14 @@ export const handleNotificationConsentRequest =
     // Consent is the user's answer, not a cached artifact, so a request that may not
     // paint is refused before anything else happens.
     if (isSilent) {
-      await deny();
+      await channel.send({
+        jsonrpc: "2.0",
+        id: requestId,
+        error: {
+          code: INTERACTION_REQUIRED_ERROR_CODE,
+          message: "Interaction required",
+        },
+      });
       return;
     }
 
@@ -159,7 +156,7 @@ const runConsentCeremony = async (
   notificationConsentStore.setContext({
     effectiveOrigin,
     identityNumber,
-    resolveActor: () => Promise.resolve(actor),
+    actor,
   });
   await waitForStore(notificationConsentSettledStore);
 

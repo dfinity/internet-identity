@@ -654,7 +654,7 @@
         appName={dapp.name}
         identityNumber={$notificationConsentStore.identityNumber}
         origin={$notificationConsentStore.effectiveOrigin}
-        resolveActor={$notificationConsentStore.resolveActor}
+        actor={$notificationConsentStore.actor}
         onDone={() => notificationConsentStore.settle()}
       />
     {/key}
