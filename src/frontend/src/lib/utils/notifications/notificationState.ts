@@ -3,12 +3,10 @@
 // on the combination: a first-timer gets the full pitch, an already-set-up
 // browser only needs the app's consent, a blocked browser gets guidance.
 
-import type { ActorSubclass } from "@icp-sdk/core/agent";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
 import { wasDeclinedRecently } from "./notificationDiagnostics";
-import { currentBrowserId } from "$lib/stores/browser-key.store";
+import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 
 export interface DeviceNotificationState {
   supported: boolean;
@@ -23,7 +21,6 @@ export interface DeviceNotificationState {
 
 export const readDeviceState = async (
   identityNumber: bigint,
-  actor: ActorSubclass<_SERVICE>,
 ): Promise<DeviceNotificationState> => {
   const supported = isPushSupported();
   const permission =
@@ -42,8 +39,7 @@ export const readDeviceState = async (
     permission,
     subscribed,
     registered:
-      subscribed &&
-      (await isRegisteredHere(identityNumber, actor, stored.endpoint)),
+      subscribed && (await isRegisteredHere(identityNumber, stored.endpoint)),
   };
 };
 
@@ -54,16 +50,21 @@ export const readDeviceState = async (
  */
 const isRegisteredHere = async (
   identityNumber: bigint,
-  actor: ActorSubclass<_SERVICE>,
   endpoint: string,
 ): Promise<boolean> => {
-  const browserId = await currentBrowserId(identityNumber);
-  if (browserId === undefined) {
-    return false;
+  // Signed as the browser, which is what the canister reads the registration off, so
+  // a browser no sign-in has registered holds nothing to find.
+  let actor;
+  try {
+    actor = await browserKeyActor(identityNumber);
+  } catch (error) {
+    if (error instanceof UnregisteredBrowserError) {
+      return false;
+    }
+    throw error;
   }
   const [status] = await actor.get_webpush_subscription_status({
     anchor_number: identityNumber,
-    browser_id: browserId,
   });
   return status?.endpoint === endpoint;
 };

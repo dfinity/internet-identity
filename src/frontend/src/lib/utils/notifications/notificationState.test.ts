@@ -5,9 +5,10 @@ vi.mock("./vapidKeyStore", () => ({ loadVapidKey: vi.fn() }));
 vi.mock("./notificationDiagnostics", () => ({
   wasDeclinedRecently: vi.fn(() => false),
 }));
-vi.mock("$lib/stores/browser-key.store", () => ({
-  currentBrowserId: vi.fn(),
-}));
+vi.mock("./browserActor", () => {
+  class UnregisteredBrowserError extends Error {}
+  return { browserKeyActor: vi.fn(), UnregisteredBrowserError };
+});
 vi.mock("./pushSubscription", () => ({
   isPushSupported: vi.fn(() => true),
   currentDeviceSubscription: vi.fn(),
@@ -23,7 +24,7 @@ import {
 import { wasDeclinedRecently } from "./notificationDiagnostics";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
-import { currentBrowserId } from "$lib/stores/browser-key.store";
+import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 
 const declined = vi.mocked(wasDeclinedRecently);
 const ORIGIN = "https://app.example";
@@ -116,8 +117,8 @@ describe("readDeviceState", () => {
   const ENDPOINT = "https://relay.example/held";
 
   /** A canister that reports a registration on `endpoint`, or none at all. */
-  const reporting = (endpoint?: string) =>
-    ({
+  const reporting = (endpoint?: string) => {
+    vi.mocked(browserKeyActor).mockResolvedValue({
       get_webpush_subscription_status: vi.fn(() =>
         Promise.resolve(
           endpoint === undefined
@@ -125,12 +126,12 @@ describe("readDeviceState", () => {
             : [{ endpoint, pool_len: 30, issued_at_ns: BigInt(0) }],
         ),
       ),
-    }) as unknown as ActorSubclass<_SERVICE>;
+    } as unknown as ActorSubclass<_SERVICE>);
+  };
 
   beforeEach(() => {
     vi.stubGlobal("Notification", { permission: "granted" });
     vi.mocked(isPushSupported).mockReturnValue(true);
-    vi.mocked(currentBrowserId).mockResolvedValue(7);
     vi.mocked(currentDeviceSubscription).mockResolvedValue({
       endpoint: ENDPOINT,
     } as PushSubscription);
@@ -142,9 +143,11 @@ describe("readDeviceState", () => {
   });
 
   it("is registered when the canister names the endpoint this browser holds", async () => {
-    await expect(
-      readDeviceState(IDENTITY, reporting(ENDPOINT)),
-    ).resolves.toMatchObject({ subscribed: true, registered: true });
+    reporting(ENDPOINT);
+    await expect(readDeviceState(IDENTITY)).resolves.toMatchObject({
+      subscribed: true,
+      registered: true,
+    });
   });
 
   /**
@@ -152,17 +155,28 @@ describe("readDeviceState", () => {
    * registered on an endpoint that reaches nothing.
    */
   it("is not registered when the canister names another endpoint", async () => {
-    await expect(
-      readDeviceState(
-        IDENTITY,
-        reporting("https://relay.example/someone-else"),
-      ),
-    ).resolves.toMatchObject({ subscribed: true, registered: false });
+    reporting("https://relay.example/someone-else");
+    await expect(readDeviceState(IDENTITY)).resolves.toMatchObject({
+      subscribed: true,
+      registered: false,
+    });
   });
 
   it("is not registered when the canister holds nothing for this identity", async () => {
-    await expect(readDeviceState(IDENTITY, reporting())).resolves.toMatchObject(
-      { subscribed: true, registered: false },
+    reporting();
+    await expect(readDeviceState(IDENTITY)).resolves.toMatchObject({
+      subscribed: true,
+      registered: false,
+    });
+  });
+
+  it("is not registered for a browser no sign-in has registered", async () => {
+    vi.mocked(browserKeyActor).mockRejectedValue(
+      new UnregisteredBrowserError(),
     );
+    await expect(readDeviceState(IDENTITY)).resolves.toMatchObject({
+      subscribed: true,
+      registered: false,
+    });
   });
 });
