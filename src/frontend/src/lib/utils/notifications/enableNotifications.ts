@@ -9,7 +9,6 @@ import type {
   _SERVICE,
 } from "$lib/generated/internet_identity_types";
 import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
-import { awaitSessionCreation } from "$lib/stores/sessionCreation.store";
 import { mintApplicationSession } from "./mintApplicationSession";
 import { requestNotificationPermission } from "./pushSubscription";
 import { ensureRegisteredDevice } from "./subscribeDevice";
@@ -67,23 +66,18 @@ export const allowApp = ({
  * Asks and reacts to `NoSuchSession` rather than ensuring a session up front, so it
  * never touches an app the identity already holds a session at: a second session there
  * would drop the one the app is still using.
+ *
+ * Needs no coordination with the sign-in that a delegation request performs, because
+ * `serializeAuthorizationRequest` runs those one at a time and the consent handler holds
+ * that queue for the whole ceremony, this call included. So a sign-in has either already
+ * finished, in which case the app is reached and the grant above succeeds, or it is
+ * queued behind us and replaces what we mint with the session the app asked for.
  */
 const grantConsent = async (args: GrantArgs): Promise<void> => {
   if (await granted(args)) {
     return;
   }
 
-  // A sign-in already under way is about to mint the application, so waiting for it
-  // leaves the session the app asked for in place. Asked again only where there was
-  // something to wait for.
-  if (await awaitSessionCreation(args.origin)) {
-    if (await granted(args)) {
-      return;
-    }
-  }
-
-  // Nothing else is going to mint it: a consent asked for on its own, or one that came in
-  // alongside a delegation method that creates no session.
   await mintApplicationSession(args);
   await args.actor
     .notification_grant_consent({
