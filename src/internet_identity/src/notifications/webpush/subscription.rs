@@ -4,10 +4,10 @@
 use super::validation::{
     ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
 };
-use crate::state::storage_borrow_mut;
+use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, RemoveWebPushSubscriptionError, SetWebPushSubscriptionError, Timestamp,
+    BrowserId, RemoveWebPushSubscriptionError, SetWebPushSubscriptionError, Timestamp,
 };
 
 /// Registers `browser_id` for Web Push. Idempotent: a browser that re-subscribes
@@ -53,18 +53,13 @@ pub fn remove_subscription(
         ..
     }: ValidatedRemoveWebPushSubscriptionRequest,
 ) -> Result<(), RemoveWebPushSubscriptionError> {
-    let anchor = read_anchor(anchor_number)
-        .map_err(RemoveWebPushSubscriptionError::InternalCanisterError)?;
+    let anchor = storage_borrow(|storage| storage.read(anchor_number))
+        .map_err(|err| RemoveWebPushSubscriptionError::InternalCanisterError(format!("{err}")))?;
     write_subscription(anchor, browser_id, None)
         .map_err(RemoveWebPushSubscriptionError::InternalCanisterError)
 }
 
-pub(super) fn read_anchor(anchor_number: AnchorNumber) -> Result<Anchor, String> {
-    crate::state::storage_borrow(|storage| storage.read(anchor_number))
-        .map_err(|err| format!("{err}"))
-}
-
-pub(super) fn write_subscription(
+fn write_subscription(
     mut anchor: Anchor,
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
@@ -77,6 +72,7 @@ pub(super) fn write_subscription(
 mod tests {
     use super::super::fixtures::*;
     use super::*;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
     use internet_identity_interface::internet_identity::types::RemoveWebPushSubscriptionRequest;
 
     fn remove(anchor_number: AnchorNumber, browser_id: BrowserId) {
