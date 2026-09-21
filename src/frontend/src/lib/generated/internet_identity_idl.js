@@ -158,10 +158,21 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'NoSuchSession' : IDL.Null,
   });
+  const AppGetSessionDelegationRequest = IDL.Record({
+    'session_key' : SessionKey,
+    'expiration' : Timestamp,
+  });
   const AppPrepareDelegationRequest = IDL.Record({
     'session_key' : SessionKey,
   });
   const AppPrepareDelegationResponse = IDL.Record({
+    'user_key' : PublicKey,
+    'expiration' : Timestamp,
+  });
+  const AppPrepareSessionDelegationRequest = IDL.Record({
+    'session_key' : SessionKey,
+  });
+  const AppPrepareSessionDelegationResponse = IDL.Record({
     'user_key' : PublicKey,
     'expiration' : Timestamp,
   });
@@ -952,11 +963,26 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : AppSessionError })],
         ['query'],
       ),
+    'app_get_session_delegation' : IDL.Func(
+        [AppGetSessionDelegationRequest],
+        [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : AppSessionError })],
+        ['query'],
+      ),
     'app_prepare_delegation' : IDL.Func(
         [AppPrepareDelegationRequest],
         [
           IDL.Variant({
             'Ok' : AppPrepareDelegationResponse,
+            'Err' : AppSessionError,
+          }),
+        ],
+        [],
+      ),
+    'app_prepare_session_delegation' : IDL.Func(
+        [AppPrepareSessionDelegationRequest],
+        [
+          IDL.Variant({
+            'Ok' : AppPrepareSessionDelegationResponse,
             'Err' : AppSessionError,
           }),
         ],

@@ -19,8 +19,9 @@ use ic_cdk::caller;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountSessionError, AnchorNumber, AppGetDelegationRequest,
-    AppPrepareDelegationRequest, AppPrepareDelegationResponse, AppSessionError, BrowserBrand,
-    BrowserDescription, Delegation, FrontendHostname, GetAccountSessionRequest,
+    AppGetSessionDelegationRequest, AppPrepareDelegationRequest, AppPrepareDelegationResponse,
+    AppPrepareSessionDelegationRequest, AppPrepareSessionDelegationResponse, AppSessionError,
+    BrowserBrand, BrowserDescription, Delegation, FrontendHostname, GetAccountSessionRequest,
     GetAccountSessionResponse, OperatingSystem, PrepareAccountSessionRequest,
     PrepareAccountSessionResponse, RevokeBrowserSessionsRequest, SessionRevokeError,
     SignedDelegation, Timestamp,
@@ -452,6 +453,82 @@ pub fn app_get_delegation(
     .map_err(|_| AppSessionError::NoSuchDelegation)
 }
 
+/// Signs the calling session's own identity to another key.
+///
+/// Not a second session: the record, its end and its revocation are the ones the caller
+/// already holds, and the seed signed over is the same one `prepare_account_session`
+/// signed to the browser. What changes is which key the chain ends at, so a holder that
+/// received its access by being delegated to can trade a chain of any length for one
+/// hop from `user_key`, and the key a session is towards can be rotated without signing
+/// in again.
+///
+/// Authorized like every other call on this surface: by the chain the caller presents,
+/// resolved through the session index, with nothing named in the request.
+pub fn app_prepare_session_delegation(
+    request: AppPrepareSessionDelegationRequest,
+) -> Result<AppPrepareSessionDelegationResponse, AppSessionError> {
+    let now = time();
+    let AuthorizedSession {
+        locator,
+        account,
+        session,
+    } = authorize_session(now)?;
+
+    // Everything that can refuse, before the stamp, for the reason
+    // `app_prepare_delegation` gives: returning `Err` commits what was written before it.
+    let seed = session_seed(&account, &session)?;
+
+    storage_borrow_mut(|storage| storage.record_session_use(&locator, now)).map_err(
+        |err| match err {
+            StorageError::SessionNotFound { .. } => AppSessionError::NoSuchSession,
+            other => AppSessionError::InternalCanisterError(other.to_string()),
+        },
+    )?;
+
+    state::signature_map_mut(|sigs| {
+        add_delegation_signature(
+            sigs,
+            request.session_key,
+            seed.as_ref(),
+            // The session's own end, not a fresh lifetime. Re-issuing hands out no time
+            // the caller did not already have, so a session cannot outlive itself by
+            // being handed from key to key.
+            session.valid_till_ns,
+            // The same restriction the browser's credential carries. A credential that
+            // could reach anything else would make this a way to widen a session rather
+            // than to move it.
+            Some(&session_delegation_targets()),
+            None,
+        );
+    });
+    update_root_hash();
+
+    Ok(AppPrepareSessionDelegationResponse {
+        user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+        expiration: session.valid_till_ns,
+    })
+}
+
+pub fn app_get_session_delegation(
+    request: AppGetSessionDelegationRequest,
+) -> Result<SignedDelegation, AppSessionError> {
+    let now = time();
+    let AuthorizedSession {
+        account, session, ..
+    } = authorize_session(now)?;
+
+    // A session credential ends when its session does, so the session's own end is the
+    // only expiration this canister ever signs over that seed — anything else is a value
+    // `app_prepare_session_delegation` never returned.
+    if request.expiration != session.valid_till_ns {
+        return Err(AppSessionError::NoSuchDelegation);
+    }
+
+    let seed = session_seed(&account, &session)?;
+    get_session_delegation(&seed, &request.session_key, request.expiration)
+        .ok_or(AppSessionError::NoSuchDelegation)
+}
+
 /// A live session the caller has been proved to be, and where it lives.
 ///
 /// Only [`authorize_session`] constructs one, so holding it is the evidence rather than
@@ -530,6 +607,21 @@ fn account_seed(account: &Account) -> Result<Hash, AppSessionError> {
         AppSessionError::InternalCanisterError(StorageError::SaltNotSet.to_string())
     })?;
     Ok(account.calculate_seed_with_salt(&salt))
+}
+
+/// What a session's own chain roots at, from values [`authorize_session`] already read.
+///
+/// The seed [`session_identity`] derives, without reading the account again: an
+/// authorized session carries it.
+fn session_seed(account: &Account, session: &Session) -> Result<Hash, AppSessionError> {
+    let salt = storage_borrow(|storage| storage.salt().copied()).ok_or_else(|| {
+        AppSessionError::InternalCanisterError(StorageError::SaltNotSet.to_string())
+    })?;
+    Ok(calculate_session_seed_with_salt(
+        &salt,
+        &account.calculate_seed_with_salt(&salt),
+        session.session_id,
+    ))
 }
 
 pub fn revoke_browser_sessions(
