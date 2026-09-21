@@ -4,9 +4,11 @@ import type { BrowserContext } from "@playwright/test";
  * Makes a browser look push-capable.
  *
  * Headless Chromium ships the Push API but has no push service behind it, so
- * `pushManager.subscribe` never resolves. The stub stands in for the service only: the
- * permission prompt, the registration and the subscription are the browser's side, and
- * II's side runs for real against them.
+ * `pushManager.subscribe` never resolves. `Notification`, `navigator.serviceWorker`
+ * and the push manager are all replaced here, so nothing downstream covers the native
+ * permission prompt or a real service-worker registration. What does run for real is
+ * II's side: the consent screen, the VAPID pool the browser signs and the rows the
+ * canister writes.
  *
  * Asserts nothing about the endpoint, which is a relay URL nothing is ever sent to.
  */
