@@ -56,6 +56,15 @@ pub(crate) mod fixtures {
         }
     }
 
+    /// An empty store on a deployment that notifies, which is the only state a Web Push
+    /// request validates in.
+    pub(crate) fn setup() {
+        crate::notifications::test_setup();
+        crate::state::persistent_state_mut(|s| {
+            s.notifications_enabled_origins = Some(vec!["https://app.example".to_string()]);
+        });
+    }
+
     pub(crate) fn anchor(anchor_number: AnchorNumber) -> Anchor {
         storage_borrow(|storage| storage.read(anchor_number)).expect("reading the test anchor")
     }
@@ -90,18 +99,15 @@ pub(crate) mod fixtures {
         }
     }
 
+    /// Only validation can build one, so the fixture goes through it.
     pub(crate) fn validated(
         anchor_number: AnchorNumber,
         endpoint: &str,
         jwt_issued_at_ns: Timestamp,
     ) -> ValidatedSetWebPushSubscriptionRequest {
-        ValidatedSetWebPushSubscriptionRequest {
-            anchor_number,
-            endpoint: endpoint.to_string(),
-            vapid_public_key: valid_vapid_key(),
-            jwt_signatures: valid_pool(),
-            jwt_issued_at_ns,
-        }
+        request(anchor_number, endpoint, jwt_issued_at_ns)
+            .try_into()
+            .expect("the fixture request validates")
     }
 
     /// `set_subscription` for a test that has an anchor number rather than the anchor.

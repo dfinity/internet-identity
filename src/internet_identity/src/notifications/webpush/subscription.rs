@@ -24,6 +24,7 @@ pub fn set_subscription(
         vapid_public_key,
         jwt_signatures,
         jwt_issued_at_ns,
+        ..
     } = request;
 
     write_subscription(
@@ -49,6 +50,7 @@ pub fn remove_subscription(
     ValidatedRemoveWebPushSubscriptionRequest {
         anchor_number,
         browser_id,
+        ..
     }: ValidatedRemoveWebPushSubscriptionRequest,
 ) -> Result<(), RemoveWebPushSubscriptionError> {
     let anchor = read_anchor(anchor_number)
@@ -75,14 +77,15 @@ pub(super) fn write_subscription(
 mod tests {
     use super::super::fixtures::*;
     use super::*;
-    use crate::notifications::test_setup as setup;
+    use internet_identity_interface::internet_identity::types::RemoveWebPushSubscriptionRequest;
 
     fn remove(anchor_number: AnchorNumber, browser_id: BrowserId) {
-        remove_subscription(ValidatedRemoveWebPushSubscriptionRequest {
+        let request = RemoveWebPushSubscriptionRequest {
             anchor_number,
             browser_id,
-        })
-        .expect("removing a subscription");
+        };
+        remove_subscription(request.try_into().expect("the fixture request validates"))
+            .expect("removing a subscription");
     }
 
     #[test]

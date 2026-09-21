@@ -18,17 +18,24 @@ pub(super) const JWT_SIG_LEN: usize = 64;
 /// One JWT per validity window; 30 covers ~30 days. Bounded to cap the row.
 const MAX_JWT_POOL_LEN: usize = 30;
 
+/// Held by every validated request below. Private to this module, so the `TryFrom`
+/// impls are the only way to build one and holding a request is proof its fields have
+/// been through them.
+struct Validated;
+
 pub struct ValidatedSetWebPushSubscriptionRequest {
     pub anchor_number: AnchorNumber,
     pub endpoint: String,
     pub vapid_public_key: Vec<u8>,
     pub jwt_signatures: Vec<Vec<u8>>,
     pub jwt_issued_at_ns: Timestamp,
+    _validated: Validated,
 }
 
 pub struct ValidatedRemoveWebPushSubscriptionRequest {
     pub anchor_number: AnchorNumber,
     pub browser_id: BrowserId,
+    _validated: Validated,
 }
 
 impl TryFrom<SetWebPushSubscriptionRequest> for ValidatedSetWebPushSubscriptionRequest {
@@ -71,6 +78,7 @@ impl TryFrom<SetWebPushSubscriptionRequest> for ValidatedSetWebPushSubscriptionR
             vapid_public_key,
             jwt_signatures,
             jwt_issued_at_ns,
+            _validated: Validated,
         })
     }
 }
@@ -88,6 +96,7 @@ impl TryFrom<RemoveWebPushSubscriptionRequest> for ValidatedRemoveWebPushSubscri
         Ok(Self {
             anchor_number,
             browser_id,
+            _validated: Validated,
         })
     }
 }
@@ -174,12 +183,6 @@ mod tests {
 
     const ANCHOR: AnchorNumber = 10_000;
 
-    fn enable() {
-        crate::state::persistent_state_mut(|s| {
-            s.notifications_enabled_origins = Some(vec!["https://app.example".to_string()]);
-        });
-    }
-
     fn validate(
         request: SetWebPushSubscriptionRequest,
     ) -> Result<ValidatedSetWebPushSubscriptionRequest, SetWebPushSubscriptionError> {
@@ -188,7 +191,7 @@ mod tests {
 
     #[test]
     fn accepts_what_a_browser_sends() {
-        enable();
+        setup();
         assert!(validate(request(ANCHOR, "https://relay.example/a", 0)).is_ok());
     }
 
@@ -212,7 +215,7 @@ mod tests {
     /// to is a row nothing can be delivered to.
     #[test]
     fn rejects_an_endpoint_that_is_not_an_https_url() {
-        enable();
+        setup();
         for endpoint in [
             "",
             "x",
@@ -231,7 +234,7 @@ mod tests {
 
     #[test]
     fn vapid_key_must_be_a_real_point() {
-        enable();
+        setup();
         for bad_key in [
             vec![4u8; 10],
             // Right length, not on the curve, so only the curve check rejects it.
@@ -245,7 +248,7 @@ mod tests {
 
     #[test]
     fn rejects_a_pool_that_is_empty_over_long_or_mis_sized() {
-        enable();
+        setup();
         for bad_pool in [
             vec![],
             vec![vec![3u8; JWT_SIG_LEN]; MAX_JWT_POOL_LEN + 1],
@@ -259,7 +262,7 @@ mod tests {
 
     #[test]
     fn reports_every_invalid_field_at_once() {
-        enable();
+        setup();
         let mut sent = request(ANCHOR, "", 0);
         sent.vapid_public_key = ByteBuf::from(vec![4u8; 10]);
         sent.jwt_signatures = vec![];
