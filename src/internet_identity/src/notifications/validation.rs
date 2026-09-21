@@ -106,13 +106,13 @@ fn canonical_origin(origin: &str) -> Result<FrontendHostname, String> {
     let Ok(url) = Url::parse(origin) else {
         return Err("origin is not a URL".to_string());
     };
-    if url.scheme() != "https" {
-        return Err("origin must be an https:// URL".to_string());
-    }
     // One comparison against the browser's own serialization, so credentials, path,
-    // query, fragment, trailing slash, explicit :443 and uppercase host all fail here.
+    // query, fragment, trailing slash, an explicit default port and uppercase host all
+    // fail here. The scheme is not restricted: the push is delivered to II's own origin
+    // and this is only the key consent is stored under, so an origin II already signs in
+    // at is one it can be asked about.
     if url.origin().ascii_serialization() != origin {
-        return Err("origin must be a bare https://host[:port]".to_string());
+        return Err("origin must be a bare scheme://host[:port]".to_string());
     }
     Ok(origin.to_string())
 }
@@ -264,6 +264,14 @@ mod tests {
         canonical_origin("https://app.example:8443").unwrap();
     }
 
+    /// The scheme is the app's, not the channel the push travels on: II signs in at
+    /// these and the notification is delivered to II's own origin either way.
+    #[test]
+    fn accepts_an_origin_that_is_not_https() {
+        canonical_origin("http://localhost:5173").unwrap();
+        canonical_origin("http://127.0.0.1:8080").unwrap();
+    }
+
     /// Anything past the authority would let one app hold several consent rows.
     #[test]
     fn rejects_anything_past_the_authority() {
@@ -276,7 +284,7 @@ mod tests {
             "https://:443",
             "https://app.example:",
             "https://app.example:https",
-            "http://app.example",
+            "http://app.example:80",
         ] {
             assert!(
                 canonical_origin(origin).is_err(),
