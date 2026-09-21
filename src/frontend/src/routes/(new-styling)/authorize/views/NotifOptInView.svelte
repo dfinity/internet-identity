@@ -71,7 +71,7 @@
             origin,
           })
           .catch(() => false);
-        const state = await readDeviceState(identityNumber, client);
+        const state = await readDeviceState(identityNumber);
         recordPermission(state.permission);
         const screen = resolveOptInScreen(state, origin, consented);
         if (screen === "skip") {
@@ -101,11 +101,9 @@
 
   /** Whether this device is set up and registered for this identity. Best effort:
    *  a probe that fails must not keep the failed screen from appearing. */
-  const deviceIsReady = async (
-    client: ActorSubclass<_SERVICE>,
-  ): Promise<boolean> => {
+  const deviceIsReady = async (): Promise<boolean> => {
     try {
-      const state = await readDeviceState(identityNumber, client);
+      const state = await readDeviceState(identityNumber);
       return state.subscribed && state.registered;
     } catch {
       return false;
@@ -144,7 +142,7 @@
       // Only the consent is left to retry where the device came out of this both
       // subscribed and registered. Anything short of that, including a probe we
       // could not make, is retried in full.
-      retrySubscribes = !(actor !== undefined && (await deviceIsReady(actor)));
+      retrySubscribes = !(await deviceIsReady());
       variant = "failed";
     } finally {
       busy = false;
