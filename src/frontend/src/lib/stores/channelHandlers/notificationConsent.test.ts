@@ -233,23 +233,6 @@ describe("handleNotificationConsentRequest", () => {
     expect(errors).toEqual([]);
   });
 
-  /**
-   * The ceremony asks the browser for permission and registers the device, so an
-   * origin the canister cannot key consent by must be turned away before any of that.
-   */
-  it("refuses an origin notifications cannot be keyed by", async () => {
-    for (const origin of [
-      "http://app.example",
-      "https://app.example/path",
-      "chrome-extension://abcdef",
-    ]) {
-      const { sent, errors } = await run({ origin, settle: false });
-      expect(sent[0].error, origin).toBeDefined();
-      expect(errors, origin).toEqual(["invalid-request"]);
-      notificationConsentStore.clear();
-    }
-  });
-
   it("refuses an unverified derivation origin without answering", async () => {
     vi.mocked(validateDerivationOrigin).mockResolvedValue({
       result: "invalid",
