@@ -334,46 +334,36 @@ fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
 fn notification_grant_consent(
     request: NotificationGrantConsentRequest,
 ) -> Result<(), NotificationGrantConsentError> {
-    let ValidatedNotificationGrantConsentRequest {
-        anchor_number,
-        origin,
-    } = request.try_into()?;
-    check_authz_and_record_activity(anchor_number)
+    let validated: ValidatedNotificationGrantConsentRequest = request.try_into()?;
+    check_authz_and_record_activity(validated.anchor_number)
         .map_err(|_| NotificationGrantConsentError::Unauthorized(caller()))?;
 
-    notifications::grant_consent(anchor_number, origin, ic_cdk::api::time())
+    notifications::grant_consent(validated, ic_cdk::api::time())
 }
 
 #[update]
 fn notification_revoke_consent(
     request: NotificationRevokeConsentRequest,
 ) -> Result<(), NotificationRevokeConsentError> {
-    let ValidatedNotificationRevokeConsentRequest {
-        anchor_number,
-        origin,
-    } = request.try_into()?;
-    check_authz_and_record_activity(anchor_number)
+    let validated: ValidatedNotificationRevokeConsentRequest = request.try_into()?;
+    check_authz_and_record_activity(validated.anchor_number)
         .map_err(|_| NotificationRevokeConsentError::Unauthorized(caller()))?;
 
-    notifications::revoke_consent(anchor_number, origin)
+    notifications::revoke_consent(validated)
 }
 
 /// `false` for an origin this deployment does not notify for and for an unauthorized
 /// caller, so neither can be probed with it.
 #[query]
 fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> bool {
-    let Ok(ValidatedNotificationConsentGrantedRequest {
-        anchor_number,
-        origin,
-    }) = request.try_into()
-    else {
+    let Ok(validated) = ValidatedNotificationConsentGrantedRequest::try_from(request) else {
         return false;
     };
-    if check_authorization(anchor_number).is_err() {
+    if check_authorization(validated.anchor_number).is_err() {
         return false;
     }
 
-    notifications::consent_granted(anchor_number, origin)
+    notifications::consent_granted(validated)
 }
 
 #[query]

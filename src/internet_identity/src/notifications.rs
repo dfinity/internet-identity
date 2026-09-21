@@ -16,21 +16,30 @@ pub use validation::{
     ValidatedNotificationRevokeConsentRequest,
 };
 
-/// Grants `origin` permission to notify `anchor_number`.
+/// Grants the request's origin permission to notify its identity.
+///
+/// Takes the validated request rather than its parts, so an origin that has not been
+/// through `TryFrom` cannot reach the write.
 pub fn grant_consent(
-    anchor_number: AnchorNumber,
-    origin: FrontendHostname,
+    ValidatedNotificationGrantConsentRequest {
+        anchor_number,
+        origin,
+        ..
+    }: ValidatedNotificationGrantConsentRequest,
     now_ns: Timestamp,
 ) -> Result<(), NotificationGrantConsentError> {
     write_consent(anchor_number, &origin, Some(now_ns))
         .map_err(|_| NotificationGrantConsentError::NoSuchSession)
 }
 
-/// Withdraws `origin`'s consent. Device subscriptions stay: they are shared across every
-/// consented app.
+/// Withdraws the origin's consent. Device subscriptions stay: they are shared across
+/// every consented app.
 pub fn revoke_consent(
-    anchor_number: AnchorNumber,
-    origin: FrontendHostname,
+    ValidatedNotificationRevokeConsentRequest {
+        anchor_number,
+        origin,
+        ..
+    }: ValidatedNotificationRevokeConsentRequest,
 ) -> Result<(), NotificationRevokeConsentError> {
     // Consent that cannot exist is already withdrawn, so an app the identity never
     // reached is nothing to report.
@@ -38,8 +47,14 @@ pub fn revoke_consent(
     Ok(())
 }
 
-/// Whether `origin` may notify `anchor_number`.
-pub fn consent_granted(anchor_number: AnchorNumber, origin: FrontendHostname) -> bool {
+/// Whether the request's origin may notify its identity.
+pub fn consent_granted(
+    ValidatedNotificationConsentGrantedRequest {
+        anchor_number,
+        origin,
+        ..
+    }: ValidatedNotificationConsentGrantedRequest,
+) -> bool {
     storage_borrow(|storage| {
         storage
             .read_anchor_application_config(anchor_number, &origin)
@@ -75,6 +90,59 @@ pub(crate) fn test_setup() {
 mod tests {
     use super::*;
     use crate::notifications::test_setup as setup;
+    use internet_identity_interface::internet_identity::types::{
+        NotificationConsentGrantedRequest, NotificationGrantConsentRequest,
+        NotificationRevokeConsentRequest,
+    };
+
+    const APP: &str = "https://app.example";
+    const NEVER: &str = "https://never.example";
+    const VISITED: &str = "https://visited.example";
+
+    /// The three origins these tests use, so a request for any of them validates.
+    fn enable_origins() {
+        crate::state::persistent_state_mut(|s| {
+            s.notifications_enabled_origins = Some(
+                [APP, NEVER, VISITED]
+                    .iter()
+                    .map(|origin| origin.to_string())
+                    .collect(),
+            );
+        });
+    }
+
+    /// Requests are built through `TryFrom`, which is the only way to make one, so the
+    /// tests go through the same validation a caller does.
+    fn grant(
+        anchor_number: AnchorNumber,
+        origin: &str,
+        now_ns: Timestamp,
+    ) -> Result<(), NotificationGrantConsentError> {
+        let request = NotificationGrantConsentRequest {
+            anchor_number,
+            origin: origin.to_string(),
+        };
+        grant_consent(request.try_into().expect("a notifiable origin"), now_ns)
+    }
+
+    fn revoke(
+        anchor_number: AnchorNumber,
+        origin: &str,
+    ) -> Result<(), NotificationRevokeConsentError> {
+        let request = NotificationRevokeConsentRequest {
+            anchor_number,
+            origin: origin.to_string(),
+        };
+        revoke_consent(request.try_into().expect("a notifiable origin"))
+    }
+
+    fn granted(anchor_number: AnchorNumber, origin: &str) -> bool {
+        let request = NotificationConsentGrantedRequest {
+            anchor_number,
+            origin: origin.to_string(),
+        };
+        consent_granted(request.try_into().expect("a notifiable origin"))
+    }
 
     /// An identity that has signed in at `origin`, which is what a grant needs.
     fn anchor_at(origin: &str) -> AnchorNumber {
@@ -90,24 +158,25 @@ mod tests {
     #[test]
     fn grant_then_revoke_consent_round_trips() {
         setup();
-        let origin = "https://app.example".to_string();
-        let anchor = anchor_at(&origin);
+        enable_origins();
+        let anchor = anchor_at(APP);
 
-        grant_consent(anchor, origin.clone(), 1_000).unwrap();
-        assert!(consent_granted(anchor, origin.clone()));
+        grant(anchor, APP, 1_000).unwrap();
+        assert!(granted(anchor, APP));
 
-        revoke_consent(anchor, origin.clone()).unwrap();
-        assert!(!consent_granted(anchor, origin));
+        revoke(anchor, APP).unwrap();
+        assert!(!granted(anchor, APP));
     }
 
     /// Consent hangs off the application, which only a sign-in mints.
     #[test]
     fn refuses_an_app_the_identity_has_never_signed_in_at() {
         setup();
-        let anchor = anchor_at("https://visited.example");
+        enable_origins();
+        let anchor = anchor_at(VISITED);
 
         assert_eq!(
-            grant_consent(anchor, "https://never.example".to_string(), 1_000),
+            grant(anchor, NEVER, 1_000),
             Err(NotificationGrantConsentError::NoSuchSession)
         );
     }
@@ -116,32 +185,33 @@ mod tests {
     #[test]
     fn revoking_what_was_never_granted_succeeds() {
         setup();
-        let origin = "https://app.example".to_string();
-        let anchor = anchor_at(&origin);
+        enable_origins();
+        let anchor = anchor_at(APP);
 
-        assert!(revoke_consent(anchor, origin).is_ok());
-        assert!(revoke_consent(anchor, "https://never.example".to_string()).is_ok());
+        assert!(revoke(anchor, APP).is_ok());
+        assert!(revoke(anchor, NEVER).is_ok());
     }
 
     /// Consent and the default account share one config row.
     #[test]
     fn consent_leaves_the_default_account_alone() {
         setup();
-        let origin = "https://app.example".to_string();
-        let anchor = anchor_at(&origin);
+        enable_origins();
+        let origin = APP.to_string();
+        let anchor = anchor_at(APP);
 
         let before = storage_borrow(|s| {
             s.read_anchor_application_config(anchor, &origin)
                 .and_then(|config| config.default_account_number)
         });
 
-        grant_consent(anchor, origin.clone(), 1_000).unwrap();
+        grant(anchor, APP, 1_000).unwrap();
 
         let after = storage_borrow(|s| {
             s.read_anchor_application_config(anchor, &origin)
                 .and_then(|config| config.default_account_number)
         });
         assert_eq!(before, after);
-        assert!(consent_granted(anchor, origin));
+        assert!(granted(anchor, APP));
     }
 }

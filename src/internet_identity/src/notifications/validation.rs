@@ -10,19 +10,27 @@ use internet_identity_interface::internet_identity::types::{
 };
 use url::Url;
 
+/// Held by every validated request below. Private to this module, so the `TryFrom`
+/// impls are the only way to build one and holding a request is proof its origin has
+/// been through them.
+struct Validated;
+
 pub struct ValidatedNotificationGrantConsentRequest {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
+    _validated: Validated,
 }
 
 pub struct ValidatedNotificationRevokeConsentRequest {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
+    _validated: Validated,
 }
 
 pub struct ValidatedNotificationConsentGrantedRequest {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
+    _validated: Validated,
 }
 
 impl TryFrom<NotificationGrantConsentRequest> for ValidatedNotificationGrantConsentRequest {
@@ -38,6 +46,7 @@ impl TryFrom<NotificationGrantConsentRequest> for ValidatedNotificationGrantCons
             anchor_number,
             origin: notifying_origin(&origin)
                 .map_err(NotificationGrantConsentError::InternalCanisterError)?,
+            _validated: Validated,
         })
     }
 }
@@ -55,6 +64,7 @@ impl TryFrom<NotificationRevokeConsentRequest> for ValidatedNotificationRevokeCo
             anchor_number,
             origin: notifying_origin(&origin)
                 .map_err(NotificationRevokeConsentError::InternalCanisterError)?,
+            _validated: Validated,
         })
     }
 }
@@ -71,6 +81,7 @@ impl TryFrom<NotificationConsentGrantedRequest> for ValidatedNotificationConsent
         Ok(Self {
             anchor_number,
             origin: notifying_origin(&origin)?,
+            _validated: Validated,
         })
     }
 }
