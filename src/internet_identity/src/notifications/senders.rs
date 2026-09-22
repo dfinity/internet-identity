@@ -101,8 +101,10 @@ pub fn authorize(origin: &FrontendHostname, caller: Principal) -> Senders {
     }
 }
 
-/// The list as published by an origin.
-#[derive(serde::Deserialize)]
+/// The list as published by an origin. Serialized as well as deserialized: the
+/// transform re-emits this shape, so what crosses consensus is only the field
+/// the canister reads.
+#[derive(serde::Deserialize, serde::Serialize)]
 struct SenderList {
     senders: Vec<String>,
 }
@@ -184,8 +186,11 @@ async fn fetch_senders(origin: FrontendHostname) -> Result<Vec<Principal>, Strin
     parse_senders(&response.body, MAX_SENDERS)
 }
 
-/// Re-serializes the parsed JSON so subnet nodes reach consensus on a body
-/// that may differ in whitespace or header order between them.
+/// Narrows a response to the shape the canister accepts: the senders and
+/// nothing else, re-serialized without the origin's whitespace or any field
+/// [`parse_senders`] would ignore. What crosses consensus is then exactly what
+/// the authorization reads, and an origin cannot pad the body with data the
+/// canister carries around for it.
 #[cfg(not(test))]
 #[allow(clippy::needless_pass_by_value)]
 fn transform_senders(
@@ -202,19 +207,16 @@ fn transform_senders(
             body: b"invalid ii-notification-senders response status".to_vec(),
         };
     }
-    let Ok(list) = serde_json::from_slice::<serde_json::Value>(response.body.as_slice()) else {
-        return HttpResponse {
-            status: Nat::from(HTTP_STATUS_OK),
-            headers: vec![],
-            body: b"invalid ii-notification-senders JSON".to_vec(),
-        };
+    let invalid = || HttpResponse {
+        status: Nat::from(HTTP_STATUS_OK),
+        headers: vec![],
+        body: b"invalid ii-notification-senders JSON".to_vec(),
+    };
+    let Ok(list) = serde_json::from_slice::<SenderList>(response.body.as_slice()) else {
+        return invalid();
     };
     let Ok(body) = serde_json::to_vec(&list) else {
-        return HttpResponse {
-            status: Nat::from(HTTP_STATUS_OK),
-            headers: vec![],
-            body: b"invalid ii-notification-senders JSON".to_vec(),
-        };
+        return invalid();
     };
     HttpResponse {
         status: Nat::from(HTTP_STATUS_OK),
@@ -331,6 +333,21 @@ mod tests {
     fn rejects_a_list_over_the_cap() {
         let body = br#"{"senders":["ryjl3-tyaaa-aaaaa-aaaba-cai","rrkah-fqaaa-aaaaa-aaaaq-cai"]}"#;
         assert!(parse_senders(body, 1).is_err());
+    }
+
+    /// What the transform re-emits is what the parser accepts, so a body
+    /// carrying extra fields narrows to the senders and still parses.
+    #[test]
+    fn a_padded_body_narrows_to_the_senders_it_carries() {
+        let padded = br#"{"note":"ignored","senders":["ryjl3-tyaaa-aaaaa-aaaba-cai"]}"#;
+        let list = serde_json::from_slice::<SenderList>(padded).expect("the accepted shape");
+        let narrowed = serde_json::to_vec(&list).expect("re-serializing");
+
+        assert_eq!(narrowed, br#"{"senders":["ryjl3-tyaaa-aaaaa-aaaba-cai"]}"#);
+        assert_eq!(
+            parse_senders(&narrowed, 10).unwrap(),
+            vec![principal("ryjl3-tyaaa-aaaaa-aaaba-cai")]
+        );
     }
 
     #[test]
