@@ -1,6 +1,6 @@
 //! Notifications waiting for the dispatcher.
 //!
-//! Each app has a tenant in [`crate::admission_queue`]. Notifications are identified
+//! Each app is a sender in [`crate::admission_queue`]. Notifications are identified
 //! by recipient and app-chosen ID, capped per recipient, and ordered by urgency.
 // The submission endpoint and dispatcher will use this in later PRs.
 #![allow(dead_code)]
@@ -38,7 +38,7 @@ impl QueueItem for PendingNotification {
     /// Limit pending wake-ups per recipient within each app.
     type Group = AnchorNumber;
 
-    const LANES: usize = 4;
+    const PRIORITY_LEVELS: usize = 4;
 
     fn key(&self) -> Self::Key {
         (self.recipient, self.notification_id)
@@ -48,8 +48,8 @@ impl QueueItem for PendingNotification {
         self.recipient
     }
 
-    fn lane(&self) -> usize {
-        self.urgency as usize
+    fn priority(&self) -> usize {
+        self.urgency as usize // Converts the enum variant order to a priority number, highest first.
     }
 }
 
@@ -66,11 +66,11 @@ const MINUTE_NS: u64 = 60 * SECOND_NS;
 pub(crate) const NOTIFICATION_BACKLOG: QueueConfig = QueueConfig {
     max_entries: 10_000,
     // One app may not use every slot.
-    max_entries_per_tenant: 7_000,
+    max_entries_per_sender: 7_000,
     max_pending_per_group: 20,
     pressure_cleared_below: 8_000,
     // Stop trying to wake devices for entries older than five minutes.
-    discard_after_ns: 5 * MINUTE_NS,
+    discard_entries_after_ns: 5 * MINUTE_NS,
     retry: RetryPolicy {
         base_ms: 5_000,
         ceiling_ms: 300_000,
@@ -87,7 +87,7 @@ const _: () = assert!(NOTIFICATION_BACKLOG.is_coherent());
 
 // One app alone must stay below the pressure reset threshold.
 const _: () = assert!(
-    NOTIFICATION_BACKLOG.max_entries_per_tenant < NOTIFICATION_BACKLOG.pressure_cleared_below
+    NOTIFICATION_BACKLOG.max_entries_per_sender < NOTIFICATION_BACKLOG.pressure_cleared_below
 );
 
 // Opening one slot must not reset the pressure timer.
@@ -112,8 +112,8 @@ mod tests {
     }
 
     #[test]
-    fn urgency_lanes_run_highest_first_and_stay_in_range() {
-        let lanes: Vec<usize> = [
+    fn urgency_priorities_run_highest_first_and_stay_in_range() {
+        let priorities: Vec<usize> = [
             Urgency::High,
             Urgency::Normal,
             Urgency::Low,
@@ -125,12 +125,14 @@ mod tests {
                 urgency: *urgency,
                 ..notification(1, 1)
             }
-            .lane()
+            .priority()
         })
         .collect();
 
-        assert_eq!(lanes, vec![0, 1, 2, 3]);
-        assert!(lanes.iter().all(|lane| *lane < PendingNotification::LANES));
+        assert_eq!(priorities, vec![0, 1, 2, 3]);
+        assert!(priorities
+            .iter()
+            .all(|priority| *priority < PendingNotification::PRIORITY_LEVELS));
     }
 
     #[test]
@@ -145,14 +147,14 @@ mod tests {
     }
 
     #[test]
-    fn two_apps_are_two_tenants() {
+    fn two_apps_are_two_senders() {
         let mut backlog = NotificationBacklog::new(NOTIFICATION_BACKLOG, 0);
 
         backlog.admit(origin("https://a.example"), vec![notification(1, 1)], 1);
         let other = backlog.admit(origin("https://b.example"), vec![notification(1, 1)], 1);
 
         assert_eq!(other, vec![Admission::Stored]);
-        assert_eq!(backlog.stats(1).active_tenants, 2);
+        assert_eq!(backlog.stats(1).active_senders, 2);
     }
 
     #[test]
@@ -183,7 +185,7 @@ mod tests {
         let taken = backlog.take_batch(10, 2_000);
 
         assert_eq!(taken.len(), 1);
-        assert_eq!(taken[0].tenant, app);
+        assert_eq!(taken[0].sender, app);
         assert_eq!(taken[0].entry.received_at_ns, 1_000);
         assert_eq!(taken[0].entry.item, notification(42, 7));
     }
