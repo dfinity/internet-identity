@@ -419,10 +419,8 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
 
 // ---- Notifications: called by an app's backend ----
 
-/// Takes a batch of content-free signals for the origin's own users, authorized by that
-/// origin listing the caller as one of its senders.
-///
-/// The send path does not exist yet, so every call is refused.
+/// Authorized by the origin listing the caller as one of its senders. The send
+/// path does not exist yet, so every call is refused.
 #[update]
 fn app_send_notification(
     _request: SendNotificationArg,

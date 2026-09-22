@@ -1379,36 +1379,29 @@ export interface NotAccepted {
 }
 export type NotAcceptedReason = {
     /**
-     * No such recipient at this origin. Permanent: sending it again will not help.
+     * No such recipient at this origin. Permanent.
      */
     'UnknownRecipient' : null
   } |
   {
     /**
-     * The recipient has no notification channel enabled. Sending again is harmless but
-     * pointless until they enable one.
+     * The recipient has no notification channel enabled.
      */
     'NoChannel' : null
   } |
   {
     /**
-     * No room. The sender may send it again from retry_after.
+     * No room. Send it again from retry_after.
      */
     'Deferred' : { 'retry_after' : Timestamp }
   };
 /**
- * A content-free signal: the app holds the content and the recipient's device fetches
- * it, authenticated as that recipient, so the app's content key is (recipient, id). A
- * re-send of an id means that content changed.
+ * A content-free signal: the app holds the content, the recipient's device
+ * fetches it. A re-send means that content changed, and replaces the entry
+ * while it is still pending; once delivered the id is forgotten.
  * 
- * While an entry is still pending, a re-send of it replaces it rather than adding a
- * second one, including a re-send from a different canister of the same origin. Once
- * delivered the id is forgotten, so a later send of it is a new entry and can be
- * deferred like any other.
- * 
- * Acceptance is not a delivery guarantee: an accepted entry may still expire, be
- * displaced by a more urgent entry from the same origin, or fail at the recipient's
- * channel.
+ * Acceptance is not a delivery guarantee — an entry may expire, be displaced by
+ * a more urgent one from the same origin, or fail at the channel.
  */
 export interface Notification {
   'id' : NotificationId,
@@ -1418,8 +1411,8 @@ export interface Notification {
   'urgency' : [] | [Urgency],
   'recipient' : Principal,
   /**
-   * Dropped undelivered once passed, freeing the slot. Null means II's default
-   * retention, which is also the ceiling for any value given here.
+   * Dropped undelivered once passed. Null means II's default retention,
+   * which is also the ceiling.
    */
   'expires_at' : [] | [Timestamp],
 }
@@ -1440,9 +1433,8 @@ export interface NotificationGrantConsentRequest {
 }
 /**
  * ===== Notifications sent by an app =====
- * Identifies one notification within (origin, recipient): the same id may be sent to
- * many recipients and they are independent notifications. The canisters that send for
- * one origin share that origin's id space.
+ * Scoped to (origin, recipient): the same id sent to two recipients is two
+ * notifications. The canisters sending for one origin share its id space.
  */
 export type NotificationId = bigint;
 export type NotificationRevokeConsentError = {
@@ -1861,9 +1853,8 @@ export interface Rrsig {
 }
 export type Salt = Uint8Array | number[];
 /**
- * The batch applies in the order it is given, so a later entry for a (recipient, id)
- * supersedes an earlier one in the same call and the reply names each distinct pair at
- * most once.
+ * Applies in order: a later entry for a (recipient, id) supersedes an earlier
+ * one, and the reply names each pair at most once.
  */
 export interface SendNotificationArg {
   'notifications' : Array<Notification>,
@@ -1871,17 +1862,14 @@ export interface SendNotificationArg {
 }
 export type SendNotificationError = {
     /**
-     * More entries than II will process in one call, so nothing was enqueued. limit is
-     * fixed and not below any origin's queue capacity: a sender never has to split a
-     * batch it could have enqueued.
+     * More entries than II will process in one call; nothing was enqueued.
+     * limit is fixed and never below an origin's queue capacity.
      */
     'TooManyNotifications' : { 'limit' : number }
   } |
   {
     /**
-     * Also what an origin that is malformed or spelled non-canonically comes back as,
-     * carrying the reason: the origin is a fixed value in the sender's own deployment,
-     * not something it programs against.
+     * Also a malformed or non-canonical origin, carrying the reason.
      */
     'InternalCanisterError' : string
   } |
@@ -1892,7 +1880,7 @@ export type SendNotificationError = {
     'SenderNotListed' : null
   };
 /**
- * Everything the batch carried that not_accepted does not name was accepted.
+ * Anything not_accepted does not name was accepted.
  */
 export interface SendNotificationResponse {
   'not_accepted' : Array<NotAccepted>,
@@ -2122,10 +2110,8 @@ export type UpdateAccountError = { 'AccountLimitReached' : null } |
   { 'Unauthorized' : Principal } |
   { 'NameTooLong' : null };
 /**
- * Orders one origin's entries against each other only: which of that origin's own
- * pending entries is displaced when its queue is full, and how eagerly the recipient is
- * notified. It never affects one origin's standing against another's, so marking
- * everything High gains nothing. The levels are Web Push's and are forwarded as sent.
+ * Orders an origin's entries against its own only, so marking everything High
+ * gains nothing. Web Push's levels, forwarded as sent.
  */
 export type Urgency = { 'Low' : null } |
   { 'High' : null } |
@@ -2239,9 +2225,8 @@ export interface _SERVICE {
       { 'Err' : AppSessionError }
   >,
   /**
-   * Called by an app's backend canister for the origin it names, which is authorized
-   * by that origin listing the caller as one of its senders. Not implemented yet:
-   * every call is refused.
+   * Called by an app's backend canister for the origin it names, authorized by
+   * that origin listing the caller. Not implemented yet: every call is refused.
    */
   'app_send_notification' : ActorMethod<
     [SendNotificationArg],
