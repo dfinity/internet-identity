@@ -299,6 +299,11 @@ type InternetIdentityInit = record {
     // `https` for every discovery host. Never enable in production — non-loopback
     // hosts always require `https` regardless.
     sso_allow_insecure_discovery : opt bool;
+    // Deploy flag relaxing the https requirement for sender-list outcalls to
+    // loopback hosts (localhost / 127.0.0.1) so e2e tests and local development can
+    // serve the list over plain http. null / opt false (the default) require https
+    // for every notifying origin, and a non-loopback origin always requires https.
+    notifications_allow_insecure_sender_list : opt bool;
     // Configuration for Web Analytics
     analytics_config : opt opt AnalyticsConfig;
     // Configuration to show dapps explorer or not

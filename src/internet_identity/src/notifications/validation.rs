@@ -95,12 +95,14 @@ impl TryFrom<SendNotificationArg> for ValidatedSendNotificationArg {
                 limit: MAX_NOTIFICATIONS_PER_CALL as u32,
             });
         }
-        Ok(Self {
+        let origin = notifying_origin(&origin)
             // A sender's origin is a fixed value in its own deployment, so a
             // malformed or unenabled one is a deployment fault reported with
             // its reason, the way the consent requests above report theirs.
-            origin: notifying_origin(&origin)
-                .map_err(SendNotificationError::InternalCanisterError)?,
+            .and_then(|origin| fetchable_origin(&origin).map(|()| origin))
+            .map_err(SendNotificationError::InternalCanisterError)?;
+        Ok(Self {
+            origin,
             notifications,
             _validated: Validated,
         })
@@ -155,6 +157,49 @@ fn canonical_origin(origin: &str) -> Result<FrontendHostname, String> {
     Ok(origin.to_string())
 }
 
+/// Refuses an origin II will not fetch a sender list from. Consent keys on the
+/// origin a browser reports, so `notifying_origin` accepts any scheme; this
+/// origin is also the host of an outcall, and a list fetched over plain `http`
+/// can be replaced in flight by anyone on the path, which would authorize a
+/// sender of their choosing.
+///
+/// `http` is therefore allowed only for a loopback host and only under the
+/// `notifications_allow_insecure_sender_list` deploy flag, mirroring what SSO
+/// discovery does for its own outcalls — so an un-flagged deployment can never
+/// be made to read a sender list over `http`.
+fn fetchable_origin(origin: &FrontendHostname) -> Result<(), String> {
+    let Ok(url) = Url::parse(origin) else {
+        return Err("origin is not a URL".to_string());
+    };
+    if url.scheme() == "https" {
+        return Ok(());
+    }
+    if allow_insecure_sender_list() && is_loopback_host(url.host_str().unwrap_or_default()) {
+        return Ok(());
+    }
+    Err(format!(
+        "the sender list for {origin} would not be fetched over https"
+    ))
+}
+
+/// A host the sender list may be fetched from over plain `http` when the deploy
+/// flag allows it.
+fn is_loopback_host(host: &str) -> bool {
+    matches!(host, "localhost" | "127.0.0.1")
+}
+
+fn allow_insecure_sender_list() -> bool {
+    #[cfg(not(test))]
+    {
+        crate::state::persistent_state(|s| s.notifications_allow_insecure_sender_list)
+            .unwrap_or(false)
+    }
+    #[cfg(test)]
+    {
+        tests::TEST_ALLOW_INSECURE_SENDER_LIST.with_borrow(|allow| *allow)
+    }
+}
+
 /// Whether this deployment notifies at all. The Web Push channel is per browser rather
 /// than per app, so it turns on with the first app enabled rather than for one of them.
 pub fn notifications_enabled() -> bool {
@@ -188,11 +233,49 @@ fn enabled_for(origin: &FrontendHostname) -> Result<(), String> {
 mod tests {
     use super::*;
     use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
+    use std::cell::RefCell;
+
+    thread_local! {
+        pub(super) static TEST_ALLOW_INSECURE_SENDER_LIST: RefCell<bool> = const { RefCell::new(false) };
+    }
 
     fn enable(origins: &[&str]) {
         crate::state::persistent_state_mut(|s| {
             s.notifications_enabled_origins = Some(origins.iter().map(|o| o.to_string()).collect());
         });
+    }
+
+    fn allow_insecure(allow: bool) {
+        TEST_ALLOW_INSECURE_SENDER_LIST.with_borrow_mut(|flag| *flag = allow);
+    }
+
+    /// The scheme decides where II sends an outcall, so a list that would be
+    /// fetched over plain http is refused however the origin is spelled.
+    #[test]
+    fn refuses_an_origin_whose_list_would_not_be_fetched_over_https() {
+        allow_insecure(false);
+        for origin in [
+            "http://app.example",
+            "http://localhost:5173",
+            "http://127.0.0.1:8080",
+        ] {
+            assert!(
+                fetchable_origin(&origin.to_string()).is_err(),
+                "{origin} must not be fetched"
+            );
+        }
+        assert!(fetchable_origin(&"https://app.example".to_string()).is_ok());
+    }
+
+    /// The flag reaches loopback only: a public host over http stays refused,
+    /// so a flagged deployment still cannot be pointed at a plaintext app.
+    #[test]
+    fn the_insecure_flag_reaches_loopback_only() {
+        allow_insecure(true);
+        assert!(fetchable_origin(&"http://localhost:5173".to_string()).is_ok());
+        assert!(fetchable_origin(&"http://127.0.0.1:8080".to_string()).is_ok());
+        assert!(fetchable_origin(&"http://app.example".to_string()).is_err());
+        allow_insecure(false);
     }
 
     #[test]

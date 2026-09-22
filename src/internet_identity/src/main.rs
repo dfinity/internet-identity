@@ -955,6 +955,8 @@ fn config() -> InternetIdentityInit {
         new_flow_origins: persistent_state.new_flow_origins.clone(),
         openid_configs: persistent_state.openid_configs.clone(),
         sso_allow_insecure_discovery: persistent_state.sso_allow_insecure_discovery,
+        notifications_allow_insecure_sender_list: persistent_state
+            .notifications_allow_insecure_sender_list,
         analytics_config: Some(persistent_state.analytics_config.clone()),
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
         is_production: persistent_state.is_production,
@@ -1070,6 +1072,14 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(sso_allow_insecure_discovery) = arg.sso_allow_insecure_discovery {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.sso_allow_insecure_discovery = Some(sso_allow_insecure_discovery);
+            })
+        }
+        if let Some(notifications_allow_insecure_sender_list) =
+            arg.notifications_allow_insecure_sender_list
+        {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.notifications_allow_insecure_sender_list =
+                    Some(notifications_allow_insecure_sender_list);
             })
         }
         if let Some(new_flow_origins) = arg.new_flow_origins {

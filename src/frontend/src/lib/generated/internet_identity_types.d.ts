@@ -1257,6 +1257,13 @@ export interface InternetIdentityInit {
    */
   'dummy_auth' : [] | [[] | [DummyAuthConfig]],
   /**
+   * Deploy flag relaxing the https requirement for sender-list outcalls to
+   * loopback hosts (localhost / 127.0.0.1) so e2e tests and local development can
+   * serve the list over plain http. null / opt false (the default) require https
+   * for every notifying origin, and a non-loopback origin always requires https.
+   */
+  'notifications_allow_insecure_sender_list' : [] | [boolean],
+  /**
    * Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
    * loopback hosts (`localhost` / `127.0.0.1`) so e2e tests can point at local
    * mock IdPs served over plain `http`. Unset / `false` (the default) require

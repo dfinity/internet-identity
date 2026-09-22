@@ -383,6 +383,13 @@ pub struct InternetIdentityInit {
     /// require `https` for every discovery host. Never enable in production —
     /// non-loopback hosts always require `https` regardless of this flag.
     pub sso_allow_insecure_discovery: Option<bool>,
+    /// Deploy flag relaxing the `https` requirement for sender-list outcalls to
+    /// loopback hosts (`localhost` / `127.0.0.1`) so e2e tests and local
+    /// development can serve the list over plain `http`. `None` / `Some(false)`
+    /// (the default) require `https` for every notifying origin. Never enable in
+    /// production — a non-loopback origin always requires `https` regardless of
+    /// this flag.
+    pub notifications_allow_insecure_sender_list: Option<bool>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
