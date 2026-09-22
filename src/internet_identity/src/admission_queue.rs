@@ -30,7 +30,7 @@ pub(crate) trait QueueItem: Clone {
     /// Identifies items that share a pending-item limit within one tenant.
     type Group: Copy + Eq + Hash;
 
-    /// Number of priority lanes. Must be positive; lane 0 is taken first.
+    /// Number of priority lanes. Lane 0 is taken first. Zero is treated as one.
     const LANES: usize;
 
     fn key(&self) -> Self::Key;
@@ -60,7 +60,9 @@ pub(crate) struct QueueConfig {
 }
 
 impl QueueConfig {
-    /// Checks the limits and time intervals. Also usable in a compile-time assertion.
+    /// Checks the limits and time intervals. `const`, so a caller asserts on its own
+    /// config at compile time. The queue does not check at runtime: it is built during
+    /// `post_upgrade`, where a panic fails the upgrade itself.
     pub(crate) const fn is_coherent(&self) -> bool {
         self.max_entries > 0
             && self.max_entries_per_tenant > 0
@@ -170,7 +172,7 @@ struct TenantQueue<Item: QueueItem> {
 impl<Item: QueueItem> TenantQueue<Item> {
     fn new() -> Self {
         Self {
-            lanes: (0..Item::LANES).map(|_| BTreeMap::new()).collect(),
+            lanes: (0..Item::LANES.max(1)).map(|_| BTreeMap::new()).collect(),
             present: HashSet::new(),
             pending_per_group: HashMap::new(),
         }
@@ -189,19 +191,23 @@ impl<Item: QueueItem> TenantQueue<Item> {
     }
 
     fn insert(&mut self, received_at_ns: Timestamp, item: Item) {
-        let lane = item.lane().min(Item::LANES - 1);
+        let lane = item.lane().min(self.lanes.len().saturating_sub(1));
         let key = item.key();
         *self.pending_per_group.entry(item.group()).or_insert(0) += 1;
         self.present.insert(key.clone());
+        // In range: `lanes` is never empty and `lane` is clamped to its last index.
         self.lanes[lane].insert((received_at_ns, key), item);
     }
 
     fn remove(&mut self, lane: usize, received_at_ns: Timestamp, key: &Item::Key) -> Option<Item> {
-        let item = self.lanes[lane].remove(&(received_at_ns, key.clone()))?;
+        let item = self
+            .lanes
+            .get_mut(lane)?
+            .remove(&(received_at_ns, key.clone()))?;
         self.present.remove(key);
         let group = item.group();
         if let Some(pending) = self.pending_per_group.get_mut(&group) {
-            *pending -= 1;
+            *pending = pending.saturating_sub(1);
             if *pending == 0 {
                 self.pending_per_group.remove(&group);
             }
@@ -219,7 +225,8 @@ impl<Item: QueueItem> TenantQueue<Item> {
     }
 
     fn oldest_in_lane(&self, lane: usize) -> Option<(Timestamp, Item::Key)> {
-        self.lanes[lane]
+        self.lanes
+            .get(lane)?
             .first_key_value()
             .map(|((received_at_ns, key), _)| (*received_at_ns, key.clone()))
     }
@@ -253,8 +260,6 @@ pub(crate) struct AdmissionQueue<Tenant: Clone + Ord, Item: QueueItem> {
 
 impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
     pub(crate) fn new(config: QueueConfig, now_ns: Timestamp) -> Self {
-        assert!(config.is_coherent(), "invalid queue configuration");
-        assert!(Item::LANES > 0, "queue items need at least one lane");
         Self {
             config,
             tenants: BTreeMap::new(),
@@ -267,16 +272,6 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
             folded_duplicates: 0,
             folded_group_capped: 0,
         }
-    }
-
-    #[cfg(test)]
-    fn len(&self) -> usize {
-        self.stored_total
-    }
-
-    #[cfg(test)]
-    fn is_empty(&self) -> bool {
-        self.stored_total == 0
     }
 
     /// Submits items for a tenant and returns one result per item, in input order.
@@ -501,7 +496,7 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
     }
 
     fn discard_expired_for(&mut self, tenant: &Tenant, now_ns: Timestamp) {
-        for lane in 0..Item::LANES {
+        for lane in 0..Item::LANES.max(1) {
             loop {
                 let Some(queue) = self.tenants.get_mut(tenant) else {
                     return;
@@ -525,7 +520,7 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         if emptied {
             self.tenants.remove(tenant);
         }
-        self.stored_total -= 1;
+        self.stored_total = self.stored_total.saturating_sub(1);
         if self.stored_total == 0 {
             self.nonempty_since_ns = None;
         }
@@ -576,7 +571,7 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         }
 
         let at_capacity_for_ns = now_ns.saturating_sub(self.at_capacity_since_ns.unwrap_or(now_ns));
-        let doublings = (at_capacity_for_ns / retry.doubles_every_ns)
+        let doublings = (at_capacity_for_ns / retry.doubles_every_ns.max(1))
             .min(u64::from(retry.max_doublings)) as u32;
         retry
             .base_ms
@@ -736,6 +731,38 @@ mod tests {
 
     // Folding.
 
+    /// A wrong `LANES` is a programming error, but the queue is built during
+    /// `post_upgrade`, where a panic fails the upgrade, so it degrades instead.
+    #[test]
+    fn an_impl_claiming_no_lanes_still_works() {
+        #[derive(Clone)]
+        struct Laneless(u8);
+
+        impl QueueItem for Laneless {
+            type Key = u8;
+            type Group = u8;
+            const LANES: usize = 0;
+
+            fn key(&self) -> u8 {
+                self.0
+            }
+            fn group(&self) -> u8 {
+                self.0
+            }
+            fn lane(&self) -> usize {
+                7
+            }
+        }
+
+        let mut queue: AdmissionQueue<u8, Laneless> = AdmissionQueue::new(config(), 0);
+
+        assert_eq!(
+            queue.admit(1, vec![Laneless(1)], 1),
+            vec![Admission::Stored]
+        );
+        assert_eq!(queue.take_batch(10, 2).len(), 1);
+    }
+
     #[test]
     fn folds_a_key_it_already_holds() {
         let mut backlog = TestQueue::new(config(), 0);
@@ -744,7 +771,7 @@ mod tests {
         let admissions = backlog.admit(1, vec![item(1, 1)], 2);
 
         assert_eq!(admissions, vec![Admission::Folded]);
-        assert_eq!(backlog.len(), 1);
+        assert_eq!(backlog.stored_total, 1);
         assert_eq!(backlog.stats(2).folded_duplicates, 1);
     }
 
@@ -756,7 +783,7 @@ mod tests {
         let admissions = backlog.admit(2, vec![item(1, 1)], 1);
 
         assert_eq!(admissions, vec![Admission::Stored]);
-        assert_eq!(backlog.len(), 2);
+        assert_eq!(backlog.stored_total, 2);
     }
 
     #[test]
@@ -861,7 +888,7 @@ mod tests {
         let taken = backlog.take_batch(5, 5);
 
         assert_eq!(tenants_taken(&taken), vec![1, 2, 3, 1, 3]);
-        assert_eq!(backlog.len(), 1);
+        assert_eq!(backlog.stored_total, 1);
     }
 
     #[test]
@@ -903,7 +930,7 @@ mod tests {
             ]
         );
         // Other tenants can use the five remaining slots.
-        assert_eq!(backlog.len(), 3);
+        assert_eq!(backlog.stored_total, 3);
     }
 
     #[test]
@@ -1056,7 +1083,7 @@ mod tests {
         assert!(backlog.take_batch(0, 30).is_empty());
 
         assert_eq!(backlog.stats(30).silence_ns, 30);
-        assert_eq!(backlog.len(), 1);
+        assert_eq!(backlog.stored_total, 1);
     }
 
     // Expiry.
@@ -1117,7 +1144,7 @@ mod tests {
 
         assert_eq!(tenants_taken(&taken), vec![3]);
         assert_eq!(backlog.stats(101).discarded_expired, 2);
-        assert!(backlog.is_empty());
+        assert_eq!(backlog.stored_total, 0);
         assert_consistent(&backlog);
     }
 
@@ -1131,7 +1158,7 @@ mod tests {
 
         let mut restored = TestQueue::restore(config(), backlog.snapshot(), 4);
 
-        assert_eq!(restored.len(), backlog.len());
+        assert_eq!(restored.stored_total, backlog.stored_total);
         assert_eq!(restored.snapshot(), backlog.snapshot());
         // Restore must preserve priority and arrival order.
         assert_eq!(
@@ -1149,8 +1176,7 @@ mod tests {
         // The entries are old enough to trigger a stall, but have not expired.
         let mut restored = TestQueue::restore(config(), snapshot, 60);
         assert_eq!(
-            restored.len(),
-            8,
+            restored.stored_total, 8,
             "the entries aged out, so this proves nothing"
         );
 
@@ -1167,7 +1193,7 @@ mod tests {
         let empty = TestQueue::new(config(), 0);
         let restored = TestQueue::restore(config(), empty.snapshot(), 10);
 
-        assert!(restored.is_empty());
+        assert_eq!(restored.stored_total, 0);
         assert_eq!(restored.stats(10).active_tenants, 0);
         assert_consistent(&restored);
     }
@@ -1194,37 +1220,26 @@ mod tests {
         assert_eq!(hint_at(&mut restored, 70), 2_000);
     }
 
+    /// The predicate a caller asserts on at compile time, rather than the panic that
+    /// asserting at runtime would cause during `post_upgrade`.
     #[test]
-    #[should_panic(expected = "invalid queue configuration")]
-    fn rejects_a_configuration_whose_pressure_cannot_clear() {
-        TestQueue::new(
-            QueueConfig {
-                pressure_cleared_below: 0,
-                ..config()
-            },
-            0,
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "queue items need at least one lane")]
-    fn rejects_items_without_any_lanes() {
-        #[derive(Clone)]
-        struct NoLanes;
-
-        impl QueueItem for NoLanes {
-            type Key = ();
-            type Group = ();
-            const LANES: usize = 0;
-
-            fn key(&self) {}
-            fn group(&self) {}
-            fn lane(&self) -> usize {
-                0
-            }
+    fn a_configuration_whose_pressure_cannot_clear_is_incoherent() {
+        assert!(config().is_coherent());
+        assert!(!QueueConfig {
+            pressure_cleared_below: 0,
+            ..config()
         }
-
-        AdmissionQueue::<u8, NoLanes>::new(config(), 0);
+        .is_coherent());
+        assert!(!QueueConfig {
+            max_entries_per_tenant: config().max_entries + 1,
+            ..config()
+        }
+        .is_coherent());
+        assert!(!QueueConfig {
+            discard_after_ns: 0,
+            ..config()
+        }
+        .is_coherent());
     }
 
     // Test helpers.
