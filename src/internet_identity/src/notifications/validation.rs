@@ -204,9 +204,7 @@ fn fetchable_origin(origin: &FrontendHostname) -> Result<(), String> {
     if allow_insecure_sender_list() && is_loopback_host(url.host_str().unwrap_or_default()) {
         return Ok(());
     }
-    Err(format!(
-        "the sender list for {origin} would not be fetched over https"
-    ))
+    Err("origin must be https".to_string())
 }
 
 /// A host the sender list may be fetched from over plain `http` when the deploy
