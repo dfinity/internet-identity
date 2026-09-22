@@ -120,7 +120,7 @@ msgid "10 minutes"
 msgstr "۱۰ منٹ"
 
 msgid "2m"
-msgstr "2 منٹ"
+msgstr "۲ منٹ"
 
 msgid "30 days"
 msgstr "۳۰ دن"
@@ -1522,7 +1522,7 @@ msgid "Set up your private, passwordless identity."
 msgstr "اپنی نجی، بغیر پاس ورڈ کی شناخت ترتیب دیں۔"
 
 msgid "Setting up…"
-msgstr "ترتیب دے رہا ہے…"
+msgstr "ترتیب دی جا رہی ہے…"
 
 msgid "Settings"
 msgstr "ترتیبات"

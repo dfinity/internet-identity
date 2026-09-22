@@ -721,7 +721,7 @@ msgid "Find {host} in the list and set it to Allow."
 msgstr "Busca {host} en la lista y ponlo en Permitir."
 
 msgid "Find Notifications and switch it to Allow."
-msgstr "Busca Notificaciones y cámbialo a Permitir."
+msgstr "Busca Notificaciones y cámbialas a Permitir."
 
 msgid "First seen"
 msgstr "Visto por primera vez"

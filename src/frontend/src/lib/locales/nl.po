@@ -1159,7 +1159,7 @@ msgid "Not verified"
 msgstr "Niet geverifieerd"
 
 msgid "Notification setup failed"
-msgstr "Instelling meldingen mislukt"
+msgstr "Instellen van meldingen mislukt"
 
 msgid "Notifications are turned off for Internet Identity"
 msgstr "Meldingen zijn uitgeschakeld voor Internet Identity"
