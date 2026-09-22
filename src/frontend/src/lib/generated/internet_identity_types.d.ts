@@ -1747,6 +1747,14 @@ export type RegistrationFlowNextStep = {
     'Finish' : null
   };
 export type RegistrationId = string;
+export type RemoveWebPushSubscriptionError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal };
+export interface RemoveWebPushSubscriptionRequest {
+  'browser_id' : number,
+  'anchor_number' : UserNumber,
+}
 export interface RevokeBrowserSessionsRequest {
   'browser_id' : number,
   'identity_number' : UserNumber,
@@ -1791,6 +1799,24 @@ export type SetDefaultAccountError = {
       'anchor_number' : UserNumber,
     }
   };
+export type SetWebPushSubscriptionError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+/**
+ * What a browser uploads when it registers for Web Push. Signed with the browser key
+ * it signs in with, which is what says the subscription is this browser's.
+ */
+export interface SetWebPushSubscriptionRequest {
+  'endpoint' : string,
+  'jwt_signatures' : Array<Uint8Array | number[]>,
+  'jwt_issued_at_ns' : bigint,
+  'anchor_number' : UserNumber,
+  'vapid_public_key' : Uint8Array | number[],
+}
 export interface SignedDelegation {
   'signature' : Uint8Array | number[],
   'delegation' : Delegation,
@@ -2700,6 +2726,14 @@ export interface _SERVICE {
   >,
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   /**
+   * Called by the identity, so one browser can silence another.
+   */
+  'remove_webpush_subscription' : ActorMethod<
+    [RemoveWebPushSubscriptionRequest],
+    { 'Ok' : null } |
+      { 'Err' : RemoveWebPushSubscriptionError }
+  >,
+  /**
    * Atomically replace device matching the device key with the new device data
    */
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
@@ -2712,6 +2746,14 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, [] | [AccountNumber]],
     { 'Ok' : AccountInfo } |
       { 'Err' : SetDefaultAccountError }
+  >,
+  /**
+   * Called by the browser itself, signed with the browser key it signs in with.
+   */
+  'set_webpush_subscription' : ActorMethod<
+    [SetWebPushSubscriptionRequest],
+    { 'Ok' : null } |
+      { 'Err' : SetWebPushSubscriptionError }
   >,
   /**
    * ===================================================================

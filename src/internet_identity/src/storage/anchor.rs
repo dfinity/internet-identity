@@ -6,6 +6,8 @@ use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
+use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
+use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
@@ -97,6 +99,53 @@ pub struct Browser {
     /// Sessions this browser holds. Maintained by the write that changes the reference
     /// lists holding them, so it counts stored records rather than live ones.
     pub session_count: u32,
+    /// What this browser registered for Web Push, if anything.
+    pub webpush_subscription: Option<WebPushSubscription>,
+}
+
+/// A browser's Web Push registration and the pool of VAPID JWTs it signed for it.
+///
+/// Held on the browser entry rather than on its own, so signing the browser out or
+/// letting the registry evict it takes the registration with it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WebPushSubscription {
+    pub endpoint: String,
+    pub created_at_ns: Timestamp,
+    pub vapid_public_key: Vec<u8>,
+    /// Raw ECDSA P-256 signatures, in window order.
+    pub jwt_signatures: Vec<Vec<u8>>,
+    pub jwt_issued_at_ns: Timestamp,
+}
+
+impl From<StorableWebPushSubscription> for WebPushSubscription {
+    fn from(value: StorableWebPushSubscription) -> Self {
+        WebPushSubscription {
+            endpoint: value.endpoint,
+            created_at_ns: value.created_at_ns,
+            vapid_public_key: value.vapid_public_key,
+            jwt_signatures: value
+                .jwt_pool
+                .signatures
+                .into_iter()
+                .map(Vec::from)
+                .collect(),
+            jwt_issued_at_ns: value.jwt_pool.issued_at_ns,
+        }
+    }
+}
+
+impl From<WebPushSubscription> for StorableWebPushSubscription {
+    fn from(value: WebPushSubscription) -> Self {
+        StorableWebPushSubscription {
+            endpoint: value.endpoint,
+            created_at_ns: value.created_at_ns,
+            vapid_public_key: value.vapid_public_key,
+            jwt_pool: StorableWebPushJwtPool {
+                signatures: value.jwt_signatures.into_iter().map(Into::into).collect(),
+                issued_at_ns: value.jwt_issued_at_ns,
+            },
+        }
+    }
 }
 
 impl From<StorableBrowser> for Browser {
@@ -109,6 +158,7 @@ impl From<StorableBrowser> for Browser {
             created_at: value.created_at,
             last_used: value.last_used,
             session_count: value.session_count,
+            webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
         }
     }
 }
@@ -123,6 +173,9 @@ impl From<Browser> for StorableBrowser {
             created_at: value.created_at,
             last_used: value.last_used,
             session_count: value.session_count,
+            webpush_subscription: value
+                .webpush_subscription
+                .map(StorableWebPushSubscription::from),
         }
     }
 }
@@ -747,6 +800,40 @@ impl Anchor {
         &self.browsers
     }
 
+    /// The browser a caller signing as `principal` is, if the identity is signed in
+    /// from it.
+    ///
+    /// The successor slot only. A browser overwrites its stored keypair with that
+    /// successor as soon as a sign-in is accepted, so the retired key in the other slot
+    /// is one no browser still holds, and matching it would keep a copied key usable
+    /// until the next sign-in.
+    pub fn browser_by_principal(&self, principal: Principal) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .find(|browser| principal == Principal::self_authenticating(&browser.next_browser_key))
+            .map(|browser| browser.id)
+    }
+
+    /// What this browser registered for Web Push, if anything.
+    pub fn webpush_subscription(&self, browser_id: BrowserId) -> Option<&WebPushSubscription> {
+        self.browsers
+            .iter()
+            .find(|browser| browser.id == browser_id)
+            .and_then(|browser| browser.webpush_subscription.as_ref())
+    }
+
+    /// Replaces what this browser registered. A browser the registry no longer lists
+    /// has nothing to register against, so the write is dropped.
+    pub fn set_webpush_subscription(
+        &mut self,
+        browser_id: BrowserId,
+        subscription: Option<WebPushSubscription>,
+    ) {
+        if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
+            browser.webpush_subscription = subscription;
+        }
+    }
+
     /// Moves each browser's session count by what a write added to or took from it.
     ///
     /// A delta against a browser no entry holds is dropped: the cap can retire an entry
@@ -879,6 +966,7 @@ impl Anchor {
             created_at: now,
             last_used: now,
             session_count: 0,
+            webpush_subscription: None,
         });
 
         let mut dropped = vec![];

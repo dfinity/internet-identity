@@ -1764,6 +1764,32 @@ type NotificationConsentGrantedRequest = record {
     origin : text;
 };
 
+// What a browser uploads when it registers for Web Push. Signed with the browser key
+// it signs in with, which is what says the subscription is this browser's.
+type SetWebPushSubscriptionRequest = record {
+    anchor_number : UserNumber;
+    endpoint : text;                   // the relay URL the browser was issued
+    vapid_public_key : blob;           // uncompressed SEC1 P-256, echoed to the relay as k=
+    jwt_signatures : vec blob;         // one raw ECDSA signature per validity window
+    jwt_issued_at_ns : nat64;
+};
+
+type RemoveWebPushSubscriptionRequest = record {
+    anchor_number : UserNumber;
+    browser_id : nat32;
+};
+
+type SetWebPushSubscriptionError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    InternalCanisterError : text;
+};
+
+type RemoveWebPushSubscriptionError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2244,4 +2270,8 @@ service : (opt InternetIdentityInit) -> {
     notification_revoke_consent : (NotificationRevokeConsentRequest) -> (variant { Ok; Err : NotificationRevokeConsentError });
     notification_consent_granted : (NotificationConsentGrantedRequest) -> (bool) query;
 
+    // Called by the browser itself, signed with the browser key it signs in with.
+    set_webpush_subscription : (SetWebPushSubscriptionRequest) -> (variant { Ok; Err : SetWebPushSubscriptionError });
+    // Called by the identity, so one browser can silence another.
+    remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
 };

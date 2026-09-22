@@ -438,6 +438,12 @@ impl BrowserKey {
         self.sign_with(SUCCESSOR_KEY_SIGNATURE_DOMAIN, session_key, device_key)
     }
 
+    /// The principal a call signed with this key arrives as, which is how the canister
+    /// tells one browser from another.
+    pub fn principal(&self) -> Principal {
+        Principal::self_authenticating(self.public_key())
+    }
+
     fn sign_with(&self, domain: &[u8], session_key: &SessionKey, other: &PublicKey) -> ByteBuf {
         use p256::ecdsa::signature::Signer;
 
