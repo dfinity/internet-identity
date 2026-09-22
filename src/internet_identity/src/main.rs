@@ -39,13 +39,14 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
+use notifications::senders::Senders;
 use notifications::webpush::{
     ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
     ValidatedSetWebPushSubscriptionRequest,
 };
 use notifications::{
     ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
-    ValidatedNotificationRevokeConsentRequest,
+    ValidatedNotificationRevokeConsentRequest, ValidatedSendNotificationArg,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -419,15 +420,30 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
 
 // ---- Notifications: called by an app's backend ----
 
-/// Authorized by the origin listing the caller as one of its senders. The send
-/// path does not exist yet, so every call is refused.
+/// Takes a batch of content-free signals for the origin's own users, authorized by the
+/// origin listing the caller in the sender list it publishes.
+///
+/// A caller II cannot judge yet — the list for this origin is still being fetched — is
+/// answered with the whole batch deferred rather than turned away, so a correctly listed
+/// sender retries instead of concluding it is unauthorized.
+///
+/// The send path does not exist yet, so an authorized caller is still refused.
 #[update]
 fn app_send_notification(
-    _request: SendNotificationArg,
+    request: SendNotificationArg,
 ) -> Result<SendNotificationResponse, SendNotificationError> {
-    Err(SendNotificationError::InternalCanisterError(
-        "Not enabled".to_string(),
-    ))
+    let validated: ValidatedSendNotificationArg = request.try_into()?;
+
+    match notifications::senders::authorize(&validated.origin, caller()) {
+        Senders::NotListed => Err(SendNotificationError::SenderNotListed),
+        Senders::Pending => Ok(notifications::defer_whole_batch(
+            validated.notifications,
+            ic_cdk::api::time(),
+        )),
+        Senders::Listed => Err(SendNotificationError::InternalCanisterError(
+            "Not enabled".to_string(),
+        )),
+    }
 }
 
 #[query]

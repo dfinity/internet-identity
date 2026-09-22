@@ -4,9 +4,9 @@
 use crate::delegation::frontend_length_within_limit;
 use internet_identity_interface::internet_identity::types::attributes::remap_to_legacy_domain;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, FrontendHostname, NotificationConsentGrantedRequest,
+    AnchorNumber, FrontendHostname, Notification, NotificationConsentGrantedRequest,
     NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest,
+    NotificationRevokeConsentRequest, SendNotificationArg, SendNotificationError,
 };
 use url::Url;
 
@@ -30,6 +30,18 @@ pub struct ValidatedNotificationRevokeConsentRequest {
 pub struct ValidatedNotificationConsentGrantedRequest {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
+    _validated: Validated,
+}
+
+/// Max notifications one call may carry. It bounds the work a single message
+/// asks for — a batch may name one id many times, so its cost is not bounded
+/// by what it could enqueue — and it is a fixed number, never a capacity
+/// signal: a sender that stays under it never has to split a batch.
+pub const MAX_NOTIFICATIONS_PER_CALL: usize = 1_000;
+
+pub struct ValidatedSendNotificationArg {
+    pub origin: FrontendHostname,
+    pub notifications: Vec<Notification>,
     _validated: Validated,
 }
 
@@ -64,6 +76,32 @@ impl TryFrom<NotificationRevokeConsentRequest> for ValidatedNotificationRevokeCo
             anchor_number,
             origin: notifying_origin(&origin)
                 .map_err(NotificationRevokeConsentError::InternalCanisterError)?,
+            _validated: Validated,
+        })
+    }
+}
+
+impl TryFrom<SendNotificationArg> for ValidatedSendNotificationArg {
+    type Error = SendNotificationError;
+
+    fn try_from(
+        SendNotificationArg {
+            origin,
+            notifications,
+        }: SendNotificationArg,
+    ) -> Result<Self, Self::Error> {
+        if notifications.len() > MAX_NOTIFICATIONS_PER_CALL {
+            return Err(SendNotificationError::TooManyNotifications {
+                limit: MAX_NOTIFICATIONS_PER_CALL as u32,
+            });
+        }
+        Ok(Self {
+            // A sender's origin is a fixed value in its own deployment, so a
+            // malformed or unenabled one is a deployment fault reported with
+            // its reason, the way the consent requests above report theirs.
+            origin: notifying_origin(&origin)
+                .map_err(SendNotificationError::InternalCanisterError)?,
+            notifications,
             _validated: Validated,
         })
     }

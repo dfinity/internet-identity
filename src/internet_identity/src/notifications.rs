@@ -3,19 +3,63 @@
 //! Callers reach this through `main.rs`, which validates and authorizes first, so
 //! everything here acts on an origin already folded to the spelling consent is keyed by.
 
+pub mod senders;
 mod validation;
 pub mod webpush;
 
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::StorageError;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, FrontendHostname, NotificationGrantConsentError, NotificationRevokeConsentError,
+    AnchorNumber, FrontendHostname, NotAccepted, NotAcceptedReason, Notification,
+    NotificationGrantConsentError, NotificationRevokeConsentError, SendNotificationResponse,
     Timestamp,
 };
+use std::collections::HashSet;
 pub use validation::{
     notifications_enabled, ValidatedNotificationConsentGrantedRequest,
     ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
+    ValidatedSendNotificationArg,
 };
+
+/// How long a sender waits before sending a batch again that II could not
+/// judge yet. Fetching the origin's sender list is one outcall round trip, so
+/// this covers the healthy case without inviting a caller to hammer the
+/// canister while it resolves.
+const PENDING_RETRY_AFTER_NS: u64 = 30 * 1_000_000_000;
+
+/// Drops all but the last entry for each `(recipient, id)`, which is what the
+/// interface promises a batch does: entries apply in order and a later one
+/// supersedes an earlier one. Surviving entries keep their submitted order.
+fn dedup_last_wins(notifications: Vec<Notification>) -> Vec<Notification> {
+    let mut seen = HashSet::new();
+    let mut kept: Vec<Notification> = notifications
+        .into_iter()
+        .rev()
+        .filter(|notification| seen.insert((notification.recipient, notification.id)))
+        .collect();
+    kept.reverse();
+    kept
+}
+
+/// Nothing was enqueued: II holds no sender list for the origin yet, so it
+/// cannot judge the batch and the whole of it is the sender's to send again.
+pub fn defer_whole_batch(
+    notifications: Vec<Notification>,
+    now_ns: Timestamp,
+) -> SendNotificationResponse {
+    SendNotificationResponse {
+        not_accepted: dedup_last_wins(notifications)
+            .into_iter()
+            .map(|Notification { id, recipient, .. }| NotAccepted {
+                id,
+                recipient,
+                reason: NotAcceptedReason::Deferred {
+                    retry_after: now_ns + PENDING_RETRY_AFTER_NS,
+                },
+            })
+            .collect(),
+    }
+}
 
 /// Grants the request's origin permission to notify its identity.
 ///
@@ -194,6 +238,53 @@ mod tests {
 
         assert!(revoke(anchor, APP).is_ok());
         assert!(revoke(anchor, NEVER).is_ok());
+    }
+
+    fn notification(id: u64, recipient: &str) -> Notification {
+        Notification {
+            id,
+            recipient: candid::Principal::from_text(recipient).expect("a principal"),
+            expires_at: None,
+            urgency: None,
+        }
+    }
+
+    /// The interface promises a batch applies in order and the reply names each
+    /// (recipient, id) at most once, so a repeated pair collapses to its last entry.
+    #[test]
+    fn a_repeated_recipient_and_id_is_deferred_once() {
+        let repeated = notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai");
+        let response = defer_whole_batch(vec![repeated.clone(), repeated.clone()], 1_000);
+
+        assert_eq!(response.not_accepted.len(), 1);
+        assert_eq!(response.not_accepted[0].id, 1);
+    }
+
+    /// One id sent to two recipients is two notifications, not a repeat.
+    #[test]
+    fn one_id_for_two_recipients_is_deferred_twice() {
+        let response = defer_whole_batch(
+            vec![
+                notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai"),
+                notification(1, "rrkah-fqaaa-aaaaa-aaaaq-cai"),
+            ],
+            1_000,
+        );
+
+        assert_eq!(response.not_accepted.len(), 2);
+    }
+
+    #[test]
+    fn a_deferred_entry_carries_when_to_send_it_again() {
+        let response =
+            defer_whole_batch(vec![notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai")], 1_000);
+
+        assert_eq!(
+            response.not_accepted[0].reason,
+            NotAcceptedReason::Deferred {
+                retry_after: 1_000 + PENDING_RETRY_AFTER_NS,
+            }
+        );
     }
 
     /// Consent and the default account share one config row.
