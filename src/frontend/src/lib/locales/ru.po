@@ -119,6 +119,9 @@ msgstr "1 неделя"
 msgid "10 minutes"
 msgstr "10 минут"
 
+msgid "2m"
+msgstr "2 мин"
+
 msgid "30 days"
 msgstr "30 дней"
 
@@ -136,6 +139,9 @@ msgstr "Локальная программа"
 
 msgid "A local server picks a new port each time, so any program on this computer can ask to connect. Remove it when you're not using one."
 msgstr "Локальный сервер каждый раз выбирает новый порт, поэтому любая программа на этом компьютере может запросить подключение. Удалите его, когда не используете."
+
+msgid "A marketplace"
+msgstr "Маркетплейс"
 
 msgid "About"
 msgstr "О сервисе"
@@ -230,6 +236,9 @@ msgstr "Доступ AI"
 msgid "All options"
 msgstr "Все параметры"
 
+msgid "Allow {app}"
+msgstr "Разрешить {app}"
+
 msgid "Allow access"
 msgstr "Разрешить доступ"
 
@@ -238,6 +247,9 @@ msgstr "Разрешить доступ CLI"
 
 msgid "Allow local programs to connect?"
 msgstr "Разрешить локальным программам подключаться?"
+
+msgid "Allow notifications for {host}."
+msgstr "Разрешите уведомления для {host}."
 
 msgid "Allow to access this info"
 msgstr "Разрешить доступ к этим данным"
@@ -377,6 +389,12 @@ msgstr "Доступ CLI"
 msgid "CLI access not enabled"
 msgstr "Доступ CLI не включён"
 
+msgid "Click the lock icon in the address bar."
+msgstr "Нажмите на значок замка в адресной строке."
+
+msgid "Click the tune or lock icon at the left of the address bar."
+msgstr "Нажмите на значок настроек или замка слева от адресной строки."
+
 msgid "Click to reveal"
 msgstr "Нажмите, чтобы показать"
 
@@ -455,6 +473,9 @@ msgstr "Войти с ключом доступа"
 msgid "Continue with SSO"
 msgstr "Продолжить с SSO"
 
+msgid "Continue without"
+msgstr "Продолжить без"
+
 msgid "Copied"
 msgstr "Скопировано"
 
@@ -487,6 +508,9 @@ msgstr "Не удалось сохранить коннектор. Пожалу�
 
 msgid "Couldn't sign this browser out"
 msgstr "Не удалось выйти из этого браузера"
+
+msgid "Couldn't turn on notifications"
+msgstr "Не удалось включить уведомления"
 
 msgid "Couldn't validate MCP support"
 msgstr "Не удалось проверить поддержку MCP"
@@ -569,6 +593,9 @@ msgstr "Настроить доступ AI"
 msgid "Default"
 msgstr "По умолчанию"
 
+msgid "Delivery routes through your identity. Revoke access anytime."
+msgstr "Доставка проходит через вашу учётную запись. Отзовите доступ в любой момент."
+
 msgid "Deny all"
 msgstr "Запретить всё"
 
@@ -629,6 +656,12 @@ msgstr "Включить доступ CLI"
 msgid "Enable CLI access for this device, then try again."
 msgstr "Включите доступ CLI для этого устройства и попробуйте снова."
 
+msgid "Enable notifications"
+msgstr "Включить уведомления"
+
+msgid "Enable on this device"
+msgstr "Включить на этом устройстве"
+
 msgid "Enabled on all devices"
 msgstr "Включено на всех устройствах"
 
@@ -665,6 +698,9 @@ msgstr "Ошибка"
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Всё, что нужно знать об Internet Identity — вашем приватном, безопасном и простом способе входа в приложения на Internet Computer."
 
+msgid "Example"
+msgstr "Пример"
+
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Ощутите"
@@ -680,6 +716,12 @@ msgstr "Часто задаваемые вопросы"
 
 msgid "Featured apps"
 msgstr "Популярные приложения"
+
+msgid "Find {host} in the list and set it to Allow."
+msgstr "Найдите {host} в списке и установите значение «Разрешить»."
+
+msgid "Find Notifications and switch it to Allow."
+msgstr "Найдите «Уведомления» и переключите на «Разрешить»."
 
 msgid "First seen"
 msgstr "Впервые замечен"
@@ -722,6 +764,9 @@ msgstr "Генерация кода..."
 
 msgid "Generating phrase..."
 msgstr "Генерация фразы..."
+
+msgid "Get {app} notifications on this device"
+msgstr "Получать уведомления от {app} на этом устройстве"
 
 msgid "Get started"
 msgstr "Начать восстановление"
@@ -782,6 +827,9 @@ msgstr "Чем Internet Identity отличается от других инст
 
 msgid "How to stay secure"
 msgstr "Как оставаться в безопасности"
+
+msgid "How to unblock"
+msgstr "Как разблокировать"
 
 msgid "I acknowledge"
 msgstr "Я подтверждаю"
@@ -857,6 +905,9 @@ msgstr "Неверно. Попробуйте снова с новым кодом
 
 msgid "Info you can choose to share when an app requests it. Never shared without your consent."
 msgstr "Информация, которой вы можете поделиться по запросу приложения. Никогда не передаётся без вашего согласия."
+
+msgid "Instant activity alerts"
+msgstr "Мгновенные уведомления об активности"
 
 msgid "Interaction canceled. Please try again."
 msgstr "Взаимодействие отменено. Пожалуйста, попробуйте снова."
@@ -960,6 +1011,9 @@ msgstr "Устаревший"
 msgid "Legacy identity"
 msgstr "Устаревшая учётная запись"
 
+msgid "Let {app} notify you"
+msgstr "Разрешить {app} отправлять вам уведомления"
+
 msgid "Let AI access your apps."
 msgstr "Разрешите AI доступ к вашим приложениям."
 
@@ -977,6 +1031,9 @@ msgstr "Ссылка скопирована в буфер обмена"
 
 msgid "Linking Internet Identity"
 msgstr "Привязка Internet Identity"
+
+msgid "Loading"
+msgstr "Загрузка"
 
 msgid "Loading permissions"
 msgstr "Загрузка разрешений"
@@ -1038,6 +1095,9 @@ msgstr "Максимальная длина — 32 символа."
 msgid "Maximum length is 64 characters."
 msgstr "Максимальная длина — 64 символа."
 
+msgid "Maybe later"
+msgstr "Может быть, позже"
+
 msgid "MCP server URL"
 msgstr "URL MCP-сервера"
 
@@ -1089,11 +1149,23 @@ msgstr "Не активирован"
 msgid "Not connected yet"
 msgstr "Ещё не подключён"
 
+msgid "Not now"
+msgstr "Не сейчас"
+
 msgid "Not upgraded"
 msgstr "Не обновлено"
 
 msgid "Not verified"
 msgstr "Не подтверждён"
+
+msgid "Notification setup failed"
+msgstr "Сбой настройки уведомлений"
+
+msgid "Notifications are turned off for Internet Identity"
+msgstr "Уведомления для Internet Identity отключены"
+
+msgid "now"
+msgstr "сейчас"
 
 msgid "Official · Hosted by DFINITY"
 msgstr "Официальный · Размещён DFINITY"
@@ -1131,11 +1203,20 @@ msgstr "Открыть управление"
 msgid "Open menu"
 msgstr "Открыть меню"
 
+msgid "Open Permissions, then Notifications, then Allow."
+msgstr "Откройте «Разрешения», затем «Уведомления», затем «Разрешить»."
+
+msgid "Open Safari, then Settings, then Websites, then Notifications."
+msgstr "Откройте Safari, затем «Настройки», затем «Веб-сайты», затем «Уведомления»."
+
 msgid "Open Settings"
 msgstr "Открыть настройки"
 
 msgid "Open Settings in a new tab to set your trusted MCP server."
 msgstr "Откройте Настройки в новой вкладке, чтобы указать доверенный MCP-сервер."
+
+msgid "Open your browser's site settings for this page."
+msgstr "Откройте настройки сайта браузера для этой страницы."
 
 msgid "Or sign in with another identity"
 msgstr "Или войдите с другой учётной записью"
@@ -1203,14 +1284,23 @@ msgstr "Пожалуйста, войдите снова для продолже�
 msgid "Powered by"
 msgstr "Разработано"
 
+msgid "Private by design"
+msgstr "Конфиденциальность по замыслу"
+
 msgid "Questions only"
 msgstr "Только вопросы"
+
+msgid "Reachable anytime"
+msgstr "Доступно в любое время"
 
 msgid "Reachable MCP server"
 msgstr "Доступный MCP-сервер"
 
 msgid "Real privacy"
 msgstr "Настоящая конфиденциальность"
+
+msgid "Receive alerts from the apps you approve, and stay on top of what matters."
+msgstr "Получайте уведомления от приложений, которые вы одобряете, и будьте в курсе всего важного."
 
 msgid "Recover"
 msgstr "Восстановить доступ"
@@ -1247,6 +1337,12 @@ msgstr "Резервная фраза активирована"
 
 msgid "Recovery phrase set"
 msgstr "Резервная фраза установлена"
+
+msgid "Reload the page and try again."
+msgstr "Перезагрузите страницу и попробуйте снова."
+
+msgid "Reload the page and turn notifications on again."
+msgstr "Перезагрузите страницу и снова включите уведомления."
 
 msgid "Remember"
 msgstr "Запомнить"
@@ -1344,6 +1440,9 @@ msgstr "Вернуться в приложение"
 msgid "Return to application"
 msgstr "Вернуться к приложению"
 
+msgid "Return to this page and try again."
+msgstr "Вернитесь на эту страницу и попробуйте снова."
+
 msgid "Review {serverDisplayName}'s <0>Privacy Policy</0> and <1>Terms of Service</1>."
 msgstr "Ознакомьтесь с <0>Политикой конфиденциальности</0> и <1>Условиями использования</1> {serverDisplayName}."
 
@@ -1421,6 +1520,9 @@ msgstr "Настроить резервную фразу"
 
 msgid "Set up your private, passwordless identity."
 msgstr "Создайте вашу приватную учётную запись без пароля."
+
+msgid "Setting up…"
+msgstr "Настройка…"
 
 msgid "Settings"
 msgstr "Настройки"
@@ -1537,8 +1639,17 @@ msgstr "Что-то не так."
 msgid "Something went wrong"
 msgstr "Что-то пошло не так"
 
+msgid "Something went wrong allowing this app. You can try again now, or allow it later in Settings."
+msgstr "Что-то пошло не так при разрешении этого приложения. Вы можете попробовать снова сейчас или разрешить его позже в Настройках."
+
+msgid "Something went wrong setting up this device. You can try again now, or set it up later in Settings."
+msgstr "Что-то пошло не так при настройке этого устройства. Вы можете попробовать снова сейчас или настроить его позже в Настройках."
+
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Что-то пошло не так при создании делегирования. Пожалуйста, попробуйте снова; если проблема сохраняется, обратитесь в службу поддержки."
+
+msgid "Something went wrong while setting up notifications. Please try again; if the issue persists, contact support."
+msgstr "Что-то пошло не так при настройке уведомлений. Попробуйте снова; если проблема не исчезнет, обратитесь в службу поддержки."
 
 msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
 msgstr "Что-то пошло не так при передаче атрибутов. Пожалуйста, попробуйте снова; если проблема сохраняется, обратитесь в службу поддержки."
@@ -1636,6 +1747,9 @@ msgstr "Нажмите на <0>адресную строку</0> и <1>откр�
 msgid "Tap on the highlighted <0>back</0> button."
 msgstr "Нажмите на выделенную кнопку <0>«Назад»</0>."
 
+msgid "Tap the site-info icon to the left of the address bar."
+msgstr "Нажмите на значок информации о сайте слева от адресной строки."
+
 msgid "Test passkey support"
 msgstr "Проверить поддержку ключей доступа"
 
@@ -1693,6 +1807,9 @@ msgstr "Этот аккаунт {resolvedProviderName} ещё не подклю�
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "Этот аккаунт уже прикреплён к вашей учётной записи. Ваш активный метод доступа будет переключён на него."
 
+msgid "this app"
+msgstr "это приложение"
+
 msgid "This app has moved to the new Internet Identity"
 msgstr "Это приложение переехало на новую версию Internet Identity"
 
@@ -1707,6 +1824,9 @@ msgstr "Этот браузер не поддерживается."
 
 msgid "This connection link is missing information or has been changed."
 msgstr "В ссылке для подключения отсутствует информация или она была изменена."
+
+msgid "This device is already set up for notifications. Allow this app to send them too."
+msgstr "Это устройство уже настроено для получения уведомлений. Разрешите этому приложению тоже отправлять их."
 
 msgid "This doesn't look like a valid email address."
 msgstr "Похоже, это недействительный адрес электронной почты."
@@ -1780,6 +1900,9 @@ msgstr "Чтобы завершить настройку вашего ключа
 msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 msgstr "Чтобы AI мог задавать вопросы и выполнять действия в ваших приложениях, добавьте доверенный <0>MCP коннектор</0>."
 
+msgid "Transfers, replies and mentions the moment they happen."
+msgstr "Переводы, ответы и упоминания в момент их появления."
+
 msgid "Trusted connector"
 msgstr "Доверенный коннектор"
 
@@ -1788,6 +1911,9 @@ msgstr "Попробуйте другой адрес"
 
 msgid "Try again"
 msgstr "Попробовать снова"
+
+msgid "Turn on notifications from {app}?"
+msgstr "Включить уведомления от {app}?"
 
 msgid "Type each word in the correct order:"
 msgstr "Введите каждое слово в правильном порядке:"
@@ -1812,6 +1938,9 @@ msgstr "Не удалось завершить настройку"
 
 msgid "Unable to connect"
 msgstr "Не удалось подключиться"
+
+msgid "Under Permissions, clear the \"Blocked\" setting for Send Notifications."
+msgstr "В разделе «Разрешения» уберите настройку «Заблокировано» для «Отправки уведомлений»."
 
 msgid "Understanding Internet Identity"
 msgstr "Знакомство с Internet Identity"
@@ -1854,6 +1983,9 @@ msgstr "Непроверенный источник"
 
 msgid "Update recovery email"
 msgstr "Обновить резервный email"
+
+msgid "Updates reach your device without keeping the app open."
+msgstr "Обновления доходят до вашего устройства без необходимости держать приложение открытым."
 
 msgid "Upgrade"
 msgstr "Начать обновление"
@@ -2008,6 +2140,9 @@ msgstr "Был установлен неправильный домен. Пож�
 msgid "You <0>cannot</0> rename this once it is set."
 msgstr "Имя <0>нельзя</0> изменить позже."
 
+msgid "You allowed this app on another device. Turn this device on to receive them here too."
+msgstr "Вы разрешили это приложение на другом устройстве. Включите это устройство, чтобы получать уведомления здесь тоже."
+
 msgid "You already have a {name} account linked"
 msgstr "У вас уже есть связанный аккаунт {name}"
 
@@ -2107,6 +2242,12 @@ msgstr "Вы достигли лимита в {limit} подтверждённы
 msgid "Your apps stay signed in and your identity is ready the next time you come back."
 msgstr "Ваши приложения остаются авторизованными, а ваша учётная запись готова к следующему посещению."
 
+msgid "Your browser is blocking notifications for this site, so this app can't reach you here. Turn them back on in your browser settings, then try again."
+msgstr "Ваш браузер блокирует уведомления для этого сайта, поэтому это приложение не может связаться с вами здесь. Включите их снова в настройках браузера и попробуйте снова."
+
+msgid "Your item just sold."
+msgstr "Ваш товар только что продан."
+
 msgid "Your local server tells you when it's ready to connect. Nothing to enter here."
 msgstr "Ваш локальный сервер сообщит вам, когда будет готов к подключению. Здесь ничего вводить не нужно."
 
@@ -2130,3 +2271,9 @@ msgstr "Резервная фраза даёт полный контроль н�
 
 msgid "Your recovery phrase is now active and can be reset anytime."
 msgstr "Ваша резервная фраза теперь активна и может быть сброшена в любое время."
+
+msgid "Your transfer is confirmed."
+msgstr "Ваш перевод подтверждён."
+
+msgid "Your wallet"
+msgstr "Ваш кошелёк"

@@ -119,6 +119,9 @@ msgstr "۱ ہفتہ"
 msgid "10 minutes"
 msgstr "۱۰ منٹ"
 
+msgid "2m"
+msgstr "2 منٹ"
+
 msgid "30 days"
 msgstr "۳۰ دن"
 
@@ -136,6 +139,9 @@ msgstr "ایک مقامی پروگرام"
 
 msgid "A local server picks a new port each time, so any program on this computer can ask to connect. Remove it when you're not using one."
 msgstr "ایک مقامی سرور ہر بار ایک نئی پورٹ چنتا ہے، اس لیے اس کمپیوٹر پر موجود کوئی بھی پروگرام کنیکٹ ہونے کی درخواست کر سکتا ہے۔ جب آپ اسے استعمال نہ کر رہے ہوں تو اسے ہٹا دیں۔"
+
+msgid "A marketplace"
+msgstr "ایک بازار"
 
 msgid "About"
 msgstr "تعارف"
@@ -230,6 +236,9 @@ msgstr "AI رسائی"
 msgid "All options"
 msgstr "تمام آپشنز"
 
+msgid "Allow {app}"
+msgstr "{app} کو اجازت دیں"
+
 msgid "Allow access"
 msgstr "رسائی کی اجازت دیں"
 
@@ -238,6 +247,9 @@ msgstr "CLI رسائی کی اجازت دیں"
 
 msgid "Allow local programs to connect?"
 msgstr "مقامی پروگراموں کو کنیکٹ کرنے کی اجازت دیں؟"
+
+msgid "Allow notifications for {host}."
+msgstr "{host} کے لیے اعلانات کی اجازت دیں۔"
 
 msgid "Allow to access this info"
 msgstr "اس معلومات تک رسائی کی اجازت دیں"
@@ -377,6 +389,12 @@ msgstr "CLI رسائی"
 msgid "CLI access not enabled"
 msgstr "CLI رسائی فعال نہیں"
 
+msgid "Click the lock icon in the address bar."
+msgstr "ایڈریس بار میں تالے کے آئیکن پر کلک کریں۔"
+
+msgid "Click the tune or lock icon at the left of the address bar."
+msgstr "ایڈریس بار کے بائیں جانب ٹیون یا تالے کے آئیکن پر کلک کریں۔"
+
 msgid "Click to reveal"
 msgstr "دکھانے کے لیے کلک کریں"
 
@@ -455,6 +473,9 @@ msgstr "پاس کی کے ساتھ جاری رکھیں"
 msgid "Continue with SSO"
 msgstr "SSO کے ساتھ جاری رکھیں"
 
+msgid "Continue without"
+msgstr "بغیر جاری رکھیں"
+
 msgid "Copied"
 msgstr "کاپی ہو گیا"
 
@@ -487,6 +508,9 @@ msgstr "آپ کا کنیکٹر محفوظ نہیں ہو سکا۔ براہ کرم
 
 msgid "Couldn't sign this browser out"
 msgstr "اس براؤزر کو سائن آؤٹ نہیں کیا جا سکا"
+
+msgid "Couldn't turn on notifications"
+msgstr "اعلانات آن نہیں کیے جا سکے"
 
 msgid "Couldn't validate MCP support"
 msgstr "MCP سپورٹ کی تصدیق نہیں ہو سکی"
@@ -569,6 +593,9 @@ msgstr "AI رسائی حسب ضرورت بنائیں"
 msgid "Default"
 msgstr "ڈیفالٹ"
 
+msgid "Delivery routes through your identity. Revoke access anytime."
+msgstr "ترسیل آپ کی شناخت کے ذریعے ہوتی ہے۔ کسی بھی وقت رسائی منسوخ کریں۔"
+
 msgid "Deny all"
 msgstr "سب مسترد کریں"
 
@@ -629,6 +656,12 @@ msgstr "CLI رسائی فعال کریں"
 msgid "Enable CLI access for this device, then try again."
 msgstr "اس آلے کے لیے CLI رسائی فعال کریں، پھر دوبارہ کوشش کریں۔"
 
+msgid "Enable notifications"
+msgstr "اعلانات فعال کریں"
+
+msgid "Enable on this device"
+msgstr "اس آلے پر فعال کریں"
+
 msgid "Enabled on all devices"
 msgstr "تمام آلات پر فعال"
 
@@ -665,6 +698,9 @@ msgstr "ایرر"
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Internet Identity کے بارے میں وہ سب کچھ جو آپ کو جاننا چاہیے — انٹرنیٹ کمپیوٹر کی ایپس میں لاگ اِن کا نجی، محفوظ اور آسان طریقہ۔"
 
+msgid "Example"
+msgstr "مثال"
+
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "محسوس کریں"
@@ -680,6 +716,12 @@ msgstr "عمومی سوالات"
 
 msgid "Featured apps"
 msgstr "نمایاں ایپس"
+
+msgid "Find {host} in the list and set it to Allow."
+msgstr "فہرست میں {host} تلاش کریں اور اسے اجازت دیں پر سیٹ کریں۔"
+
+msgid "Find Notifications and switch it to Allow."
+msgstr "اعلانات تلاش کریں اور اسے اجازت دیں پر سوئچ کریں۔"
 
 msgid "First seen"
 msgstr "پہلی بار نظر آیا"
@@ -722,6 +764,9 @@ msgstr "کوڈ تیار کیا جا رہا ہے..."
 
 msgid "Generating phrase..."
 msgstr "فریز تیار کیا جا رہا ہے..."
+
+msgid "Get {app} notifications on this device"
+msgstr "اس آلے پر {app} کے اعلانات حاصل کریں"
 
 msgid "Get started"
 msgstr "شروع کریں"
@@ -782,6 +827,9 @@ msgstr "Internet Identity دوسرے Web3 تصدیقی ٹولز سے کیسے م
 
 msgid "How to stay secure"
 msgstr "محفوظ رہنے کا طریقہ"
+
+msgid "How to unblock"
+msgstr "بلاک ہٹانے کا طریقہ"
 
 msgid "I acknowledge"
 msgstr "میں تسلیم کرتا ہوں"
@@ -857,6 +905,9 @@ msgstr "غلط۔ نئے کوڈ کے ساتھ دوبارہ کوشش کریں۔"
 
 msgid "Info you can choose to share when an app requests it. Never shared without your consent."
 msgstr "وہ معلومات جنہیں آپ کسی ایپ کی درخواست پر شیئر کرنے کا انتخاب کر سکتے ہیں۔ آپ کی رضامندی کے بغیر کبھی شیئر نہیں کی جاتیں۔"
+
+msgid "Instant activity alerts"
+msgstr "فوری سرگرمی کے انتباہات"
 
 msgid "Interaction canceled. Please try again."
 msgstr "عمل منسوخ کر دیا گیا۔ براہ کرم دوبارہ کوشش کریں۔"
@@ -960,6 +1011,9 @@ msgstr "پرانی"
 msgid "Legacy identity"
 msgstr "پرانی شناخت"
 
+msgid "Let {app} notify you"
+msgstr "{app} کو آپ کو اطلاع دینے دیں"
+
 msgid "Let AI access your apps."
 msgstr "AI کو اپنی ایپس تک رسائی دیں۔"
 
@@ -977,6 +1031,9 @@ msgstr "لنک کلپ بورڈ پر کاپی ہو گیا"
 
 msgid "Linking Internet Identity"
 msgstr "Internet Identity منسلک کی جا رہی ہے"
+
+msgid "Loading"
+msgstr "لوڈ ہو رہا ہے"
 
 msgid "Loading permissions"
 msgstr "اجازتیں لوڈ ہو رہی ہیں"
@@ -1038,6 +1095,9 @@ msgstr "زیادہ سے زیادہ لمبائی 32 حروف ہے۔"
 msgid "Maximum length is 64 characters."
 msgstr "زیادہ سے زیادہ لمبائی 64 حروف ہے۔"
 
+msgid "Maybe later"
+msgstr "شاید بعد میں"
+
 msgid "MCP server URL"
 msgstr "MCP سرور URL"
 
@@ -1089,11 +1149,23 @@ msgstr "فعال نہیں ہوا"
 msgid "Not connected yet"
 msgstr "ابھی تک منسلک نہیں"
 
+msgid "Not now"
+msgstr "ابھی نہیں"
+
 msgid "Not upgraded"
 msgstr "اپ گریڈ نہیں ہوا"
 
 msgid "Not verified"
 msgstr "تصدیق نہیں ہوئی"
+
+msgid "Notification setup failed"
+msgstr "اعلانات کی ترتیب ناکام ہوئی"
+
+msgid "Notifications are turned off for Internet Identity"
+msgstr "Internet Identity کے لیے اعلانات بند ہیں"
+
+msgid "now"
+msgstr "ابھی"
 
 msgid "Official · Hosted by DFINITY"
 msgstr "سرکاری · DFINITY کی میزبانی میں"
@@ -1131,11 +1203,20 @@ msgstr "انتظام کھولیں"
 msgid "Open menu"
 msgstr "مینو کھولیں"
 
+msgid "Open Permissions, then Notifications, then Allow."
+msgstr "اجازتیں کھولیں، پھر اعلانات، پھر اجازت دیں۔"
+
+msgid "Open Safari, then Settings, then Websites, then Notifications."
+msgstr "Safari کھولیں، پھر ترتیبات، پھر ویب سائٹس، پھر اعلانات۔"
+
 msgid "Open Settings"
 msgstr "ترتیبات کھولیں"
 
 msgid "Open Settings in a new tab to set your trusted MCP server."
 msgstr "اپنے قابلِ اعتماد MCP سرور کو سیٹ کرنے کے لیے ترتیبات نئی ٹیب میں کھولیں۔"
+
+msgid "Open your browser's site settings for this page."
+msgstr "اس صفحے کے لیے اپنے براؤزر کی سائٹ ترتیبات کھولیں۔"
 
 msgid "Or sign in with another identity"
 msgstr "یا کسی دوسری شناخت سے سائن اِن کریں"
@@ -1203,14 +1284,23 @@ msgstr "جاری رکھنے کے لیے براہ کرم دوبارہ سائن ا
 msgid "Powered by"
 msgstr "بذریعہ"
 
+msgid "Private by design"
+msgstr "ڈیزائن کے اعتبار سے نجی"
+
 msgid "Questions only"
 msgstr "صرف سوالات"
+
+msgid "Reachable anytime"
+msgstr "کسی بھی وقت قابل رسائی"
 
 msgid "Reachable MCP server"
 msgstr "قابلِ رسائی MCP سرور"
 
 msgid "Real privacy"
 msgstr "حقیقی رازداری"
+
+msgid "Receive alerts from the apps you approve, and stay on top of what matters."
+msgstr "ان ایپس سے انتباہات وصول کریں جنہیں آپ منظور کریں، اور اہم باتوں سے باخبر رہیں۔"
 
 msgid "Recover"
 msgstr "بازیافت کریں"
@@ -1247,6 +1337,12 @@ msgstr "ریکوری فریز فعال ہو گیا"
 
 msgid "Recovery phrase set"
 msgstr "ریکوری فریز سیٹ کر دیا گیا"
+
+msgid "Reload the page and try again."
+msgstr "صفحہ دوبارہ لوڈ کریں اور پھر کوشش کریں۔"
+
+msgid "Reload the page and turn notifications on again."
+msgstr "صفحہ دوبارہ لوڈ کریں اور اعلانات دوبارہ آن کریں۔"
 
 msgid "Remember"
 msgstr "یاد رکھیں"
@@ -1344,6 +1440,9 @@ msgstr "ایپ پر واپس جائیں"
 msgid "Return to application"
 msgstr "ایپلی کیشن پر واپس جائیں"
 
+msgid "Return to this page and try again."
+msgstr "اس صفحے پر واپس جائیں اور پھر کوشش کریں۔"
+
 msgid "Review {serverDisplayName}'s <0>Privacy Policy</0> and <1>Terms of Service</1>."
 msgstr "{serverDisplayName} کی <0>رازداری کی پالیسی</0> اور <1>سروس کی شرائط</1> کا جائزہ لیں۔"
 
@@ -1421,6 +1520,9 @@ msgstr "ریکوری فریز ترتیب دیں"
 
 msgid "Set up your private, passwordless identity."
 msgstr "اپنی نجی، بغیر پاس ورڈ کی شناخت ترتیب دیں۔"
+
+msgid "Setting up…"
+msgstr "ترتیب دے رہا ہے…"
 
 msgid "Settings"
 msgstr "ترتیبات"
@@ -1537,8 +1639,17 @@ msgstr "کچھ غلط ہے۔"
 msgid "Something went wrong"
 msgstr "کچھ غلط ہو گیا"
 
+msgid "Something went wrong allowing this app. You can try again now, or allow it later in Settings."
+msgstr "اس ایپ کو اجازت دیتے وقت کچھ غلط ہوا۔ آپ ابھی دوبارہ کوشش کر سکتے ہیں، یا اسے بعد میں ترتیبات میں اجازت دے سکتے ہیں۔"
+
+msgid "Something went wrong setting up this device. You can try again now, or set it up later in Settings."
+msgstr "اس آلے کو ترتیب دیتے وقت کچھ غلط ہوا۔ آپ ابھی دوبارہ کوشش کر سکتے ہیں، یا اسے بعد میں ترتیبات میں ترتیب دے سکتے ہیں۔"
+
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "آپ کی ڈیلیگیشن بناتے وقت کچھ غلط ہو گیا۔ براہ کرم دوبارہ کوشش کریں؛ اگر مسئلہ برقرار رہے تو سپورٹ سے رابطہ کریں۔"
+
+msgid "Something went wrong while setting up notifications. Please try again; if the issue persists, contact support."
+msgstr "اعلانات ترتیب دیتے وقت کچھ غلط ہوا۔ دوبارہ کوشش کریں؛ اگر مسئلہ برقرار رہے تو سپورٹ سے رابطہ کریں۔"
 
 msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
 msgstr "ایٹریبیوٹس شیئر کرتے وقت کچھ غلط ہو گیا۔ براہ کرم دوبارہ کوشش کریں؛ اگر مسئلہ برقرار رہے تو سپورٹ سے رابطہ کریں۔"
@@ -1636,6 +1747,9 @@ msgstr "<0>ایڈریس بار</0> پر ٹیپ کریں اور <1>براؤزر �
 msgid "Tap on the highlighted <0>back</0> button."
 msgstr "نمایاں کیے گئے <0>واپس</0> بٹن پر ٹیپ کریں۔"
 
+msgid "Tap the site-info icon to the left of the address bar."
+msgstr "ایڈریس بار کے بائیں جانب سائٹ-انفو آئیکن پر ٹیپ کریں۔"
+
 msgid "Test passkey support"
 msgstr "پاس کی سپورٹ کو ٹیسٹ کریں"
 
@@ -1693,6 +1807,9 @@ msgstr "یہ {resolvedProviderName} اکاؤنٹ ابھی تک کسی Internet I
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "یہ اکاؤنٹ پہلے سے آپ کی شناخت سے منسلک ہے۔ آپ کا فعال رسائی طریقہ اس پر تبدیل کر دیا جائے گا۔"
 
+msgid "this app"
+msgstr "یہ ایپ"
+
 msgid "This app has moved to the new Internet Identity"
 msgstr "یہ ایپ نئی Internet Identity پر منتقل ہو گئی ہے"
 
@@ -1707,6 +1824,9 @@ msgstr "یہ براؤزر معاون نہیں ہے۔"
 
 msgid "This connection link is missing information or has been changed."
 msgstr "اس رابطے کے لنک میں معلومات کی کمی ہے یا اسے تبدیل کر دیا گیا ہے۔"
+
+msgid "This device is already set up for notifications. Allow this app to send them too."
+msgstr "یہ آلہ پہلے سے اعلانات کے لیے ترتیب دیا گیا ہے۔ اس ایپ کو بھی انہیں بھیجنے کی اجازت دیں۔"
 
 msgid "This doesn't look like a valid email address."
 msgstr "یہ درست ای میل پتہ نہیں لگتا۔"
@@ -1780,6 +1900,9 @@ msgstr "اپنی پاس کی سیٹ اپ مکمل کرنے کے لیے، اپن�
 msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 msgstr "AI کو اپنی ایپس میں سوالات پوچھنے اور اعمال انجام دینے کی اجازت دینے کے لیے، ایک <0>MCP کنیکٹر</0> شامل کریں جس پر آپ اعتماد کرتے ہیں۔"
 
+msgid "Transfers, replies and mentions the moment they happen."
+msgstr "منتقلیاں، جوابات اور تذکرے جس لمحے وہ ہوں۔"
+
 msgid "Trusted connector"
 msgstr "قابلِ اعتماد کنیکٹر"
 
@@ -1788,6 +1911,9 @@ msgstr "کوئی اور پتہ آزمائیں"
 
 msgid "Try again"
 msgstr "دوبارہ کوشش کریں"
+
+msgid "Turn on notifications from {app}?"
+msgstr "{app} سے اعلانات آن کریں؟"
 
 msgid "Type each word in the correct order:"
 msgstr "ہر لفظ درست ترتیب میں درج کریں:"
@@ -1812,6 +1938,9 @@ msgstr "سیٹ اپ مکمل نہیں ہو سکا"
 
 msgid "Unable to connect"
 msgstr "رابطہ قائم نہیں ہو سکا"
+
+msgid "Under Permissions, clear the \"Blocked\" setting for Send Notifications."
+msgstr "اجازتوں میں، اعلانات بھیجیں کے لیے \"مسدود\" ترتیب صاف کریں۔"
 
 msgid "Understanding Internet Identity"
 msgstr "Internet Identity کو سمجھیں"
@@ -1854,6 +1983,9 @@ msgstr "غیر تصدیق شدہ اوریجن"
 
 msgid "Update recovery email"
 msgstr "ریکوری ای میل اپ ڈیٹ کریں"
+
+msgid "Updates reach your device without keeping the app open."
+msgstr "اپ ڈیٹس آپ کے آلے تک بغیر ایپ کھلی رکھے پہنچتے ہیں۔"
 
 msgid "Upgrade"
 msgstr "اپ گریڈ کریں"
@@ -2008,6 +2140,9 @@ msgstr "غلط ڈومین سیٹ کیا گیا تھا۔ براہ کرم دوبا
 msgid "You <0>cannot</0> rename this once it is set."
 msgstr "ایک بار سیٹ ہو جانے کے بعد آپ اس کا <0>نام تبدیل نہیں کر سکتے</0>۔"
 
+msgid "You allowed this app on another device. Turn this device on to receive them here too."
+msgstr "آپ نے اس ایپ کو کسی دوسرے آلے پر اجازت دی ہے۔ یہاں بھی انہیں وصول کرنے کے لیے اس آلے کو آن کریں۔"
+
 msgid "You already have a {name} account linked"
 msgstr "آپ کا پہلے ہی ایک {name} اکاؤنٹ منسلک ہے"
 
@@ -2107,6 +2242,12 @@ msgstr "آپ {limit} تصدیق شدہ ای میلز کی حد تک پہنچ چ�
 msgid "Your apps stay signed in and your identity is ready the next time you come back."
 msgstr "آپ کی ایپس سائن اِن رہتی ہیں اور اگلی بار جب آپ واپس آئیں تو آپ کی شناخت تیار ہے۔"
 
+msgid "Your browser is blocking notifications for this site, so this app can't reach you here. Turn them back on in your browser settings, then try again."
+msgstr "آپ کا براؤزر اس سائٹ کے لیے اعلانات بلاک کر رہا ہے، اس لیے یہ ایپ آپ تک یہاں نہیں پہنچ سکتی۔ انہیں براؤزر ترتیبات میں دوبارہ آن کریں، پھر کوشش کریں۔"
+
+msgid "Your item just sold."
+msgstr "آپ کی چیز ابھی فروخت ہوئی۔"
+
 msgid "Your local server tells you when it's ready to connect. Nothing to enter here."
 msgstr "آپ کا مقامی سرور آپ کو بتاتا ہے جب یہ کنیکٹ ہونے کے لیے تیار ہو۔ یہاں کچھ بھی درج کرنے کی ضرورت نہیں ہے۔"
 
@@ -2130,3 +2271,9 @@ msgstr "آپ کا ریکوری فریز آپ کی شناخت پر مکمل کن�
 
 msgid "Your recovery phrase is now active and can be reset anytime."
 msgstr "آپ کا ریکوری فریز اب فعال ہے اور اسے کسی بھی وقت ری سیٹ کیا جا سکتا ہے۔"
+
+msgid "Your transfer is confirmed."
+msgstr "آپ کی منتقلی تصدیق شدہ ہے۔"
+
+msgid "Your wallet"
+msgstr "آپ کا بٹوا"
