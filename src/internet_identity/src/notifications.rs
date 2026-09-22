@@ -43,8 +43,11 @@ fn dedup_last_wins(notifications: Vec<Notification>) -> Vec<Notification> {
 
 /// Nothing was enqueued: II holds no sender list for the origin yet, so it
 /// cannot judge the batch and the whole of it is the sender's to send again.
+///
+/// Takes the validated request rather than its parts, so a batch that has not
+/// been through `TryFrom` cannot reach the reply.
 pub fn defer_whole_batch(
-    notifications: Vec<Notification>,
+    ValidatedSendNotificationArg { notifications, .. }: ValidatedSendNotificationArg,
     now_ns: Timestamp,
 ) -> SendNotificationResponse {
     SendNotificationResponse {
@@ -240,6 +243,18 @@ mod tests {
         assert!(revoke(anchor, NEVER).is_ok());
     }
 
+    /// Built through `TryFrom`, so the deferral tests hand the reply builder
+    /// the same validated request a caller's call would.
+    fn batch(notifications: Vec<Notification>) -> ValidatedSendNotificationArg {
+        enable_origins();
+        internet_identity_interface::internet_identity::types::SendNotificationArg {
+            origin: APP.to_string(),
+            notifications,
+        }
+        .try_into()
+        .expect("a notifiable origin")
+    }
+
     fn notification(id: u64, recipient: &str) -> Notification {
         Notification {
             id,
@@ -254,7 +269,7 @@ mod tests {
     #[test]
     fn a_repeated_recipient_and_id_is_deferred_once() {
         let repeated = notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai");
-        let response = defer_whole_batch(vec![repeated.clone(), repeated.clone()], 1_000);
+        let response = defer_whole_batch(batch(vec![repeated.clone(), repeated.clone()]), 1_000);
 
         assert_eq!(response.not_accepted.len(), 1);
         assert_eq!(response.not_accepted[0].id, 1);
@@ -264,10 +279,10 @@ mod tests {
     #[test]
     fn one_id_for_two_recipients_is_deferred_twice() {
         let response = defer_whole_batch(
-            vec![
+            batch(vec![
                 notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai"),
                 notification(1, "rrkah-fqaaa-aaaaa-aaaaq-cai"),
-            ],
+            ]),
             1_000,
         );
 
@@ -276,8 +291,10 @@ mod tests {
 
     #[test]
     fn a_deferred_entry_carries_when_to_send_it_again() {
-        let response =
-            defer_whole_batch(vec![notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai")], 1_000);
+        let response = defer_whole_batch(
+            batch(vec![notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai")]),
+            1_000,
+        );
 
         assert_eq!(
             response.not_accepted[0].reason,

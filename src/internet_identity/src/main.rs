@@ -434,10 +434,10 @@ fn app_send_notification(
 ) -> Result<SendNotificationResponse, SendNotificationError> {
     let validated: ValidatedSendNotificationArg = request.try_into()?;
 
-    match notifications::senders::authorize(&validated.origin, caller()) {
+    match notifications::senders::authorize(&validated, caller()) {
         Senders::NotListed => Err(SendNotificationError::SenderNotListed),
         Senders::Pending => Ok(notifications::defer_whole_batch(
-            validated.notifications,
+            validated,
             ic_cdk::api::time(),
         )),
         Senders::Listed => Err(SendNotificationError::InternalCanisterError(

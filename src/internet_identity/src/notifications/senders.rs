@@ -24,6 +24,7 @@
 //! failing origin is parked by exponential backoff, and outcalls cost no cycles
 //! on a system subnet. Keep those in place when the gate is removed.
 
+use crate::notifications::ValidatedSendNotificationArg;
 use crate::single_flight_cache::{
     self, CacheConfig, Cached, FillOutcome, RetryBackoff, SingleFlightCache,
 };
@@ -114,9 +115,18 @@ pub enum Senders {
     Pending,
 }
 
-/// Whether `caller` may send for `origin`, starting the fetch if the list is
-/// not cached. Only an update may call this: a fill spawns an outcall.
-pub fn authorize(origin: &FrontendHostname, caller: Principal) -> Senders {
+/// Whether `caller` may send for the request's origin, starting the fetch if
+/// the list is not cached. Only an update may call this: a fill spawns an
+/// outcall.
+///
+/// Takes the validated request rather than a bare origin, so an origin that
+/// has not been through `TryFrom` — one this deployment does not notify for,
+/// or one whose list would not be fetched over https — cannot reach an
+/// outcall.
+pub fn authorize(
+    ValidatedSendNotificationArg { origin, .. }: &ValidatedSendNotificationArg,
+    caller: Principal,
+) -> Senders {
     match single_flight_cache::get(&SENDERS_CACHE, origin.clone()) {
         Cached::Ready(senders) => {
             if senders.contains(&caller) {
@@ -287,6 +297,20 @@ mod tests {
         SENDERS_CACHE.with_borrow_mut(|cache| *cache = new_senders_cache());
     }
 
+    /// Built through `TryFrom`, the only way to make one, so these go through
+    /// the same validation a caller does.
+    fn request(origin: &str) -> ValidatedSendNotificationArg {
+        crate::state::persistent_state_mut(|s| {
+            s.notifications_enabled_origins = Some(vec![origin.to_string()]);
+        });
+        internet_identity_interface::internet_identity::types::SendNotificationArg {
+            origin: origin.to_string(),
+            notifications: vec![],
+        }
+        .try_into()
+        .expect("a notifiable origin")
+    }
+
     /// The first call has no list yet, so it starts the fetch and answers
     /// Pending rather than claiming the caller is unauthorized.
     #[test]
@@ -296,9 +320,9 @@ mod tests {
         publish(APP, &[sender]);
 
         // The first call spawns the fill and has nothing to judge with yet.
-        assert_eq!(authorize(&APP.to_string(), sender), Senders::Pending);
+        assert_eq!(authorize(&request(APP), sender), Senders::Pending);
         single_flight_cache::run_detached();
-        assert_eq!(authorize(&APP.to_string(), sender), Senders::Listed);
+        assert_eq!(authorize(&request(APP), sender), Senders::Listed);
     }
 
     #[test]
@@ -308,9 +332,9 @@ mod tests {
         let other = principal("rrkah-fqaaa-aaaaa-aaaaq-cai");
         publish(APP, &[listed]);
 
-        assert_eq!(authorize(&APP.to_string(), listed), Senders::Pending);
+        assert_eq!(authorize(&request(APP), listed), Senders::Pending);
         single_flight_cache::run_detached();
-        assert_eq!(authorize(&APP.to_string(), other), Senders::NotListed);
+        assert_eq!(authorize(&request(APP), other), Senders::NotListed);
     }
 
     /// An origin serving nothing usable never resolves to Listed, and the
@@ -320,9 +344,9 @@ mod tests {
         reset();
         let sender = principal("ryjl3-tyaaa-aaaaa-aaaba-cai");
 
-        assert_eq!(authorize(&APP.to_string(), sender), Senders::Pending);
+        assert_eq!(authorize(&request(APP), sender), Senders::Pending);
         single_flight_cache::run_detached();
-        assert_eq!(authorize(&APP.to_string(), sender), Senders::Pending);
+        assert_eq!(authorize(&request(APP), sender), Senders::Pending);
     }
 
     /// Every canister of one origin is authorized by the same list.
@@ -333,10 +357,10 @@ mod tests {
         let second = principal("rrkah-fqaaa-aaaaa-aaaaq-cai");
         publish(APP, &[first, second]);
 
-        assert_eq!(authorize(&APP.to_string(), first), Senders::Pending);
+        assert_eq!(authorize(&request(APP), first), Senders::Pending);
         single_flight_cache::run_detached();
-        assert_eq!(authorize(&APP.to_string(), first), Senders::Listed);
-        assert_eq!(authorize(&APP.to_string(), second), Senders::Listed);
+        assert_eq!(authorize(&request(APP), first), Senders::Listed);
+        assert_eq!(authorize(&request(APP), second), Senders::Listed);
     }
 
     #[test]
