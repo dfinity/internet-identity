@@ -773,6 +773,14 @@ export interface EmailChallengeSubmitDkimLeafArg {
   'hops' : Array<SignedRRset>,
   'nonce' : string,
 }
+/**
+ * Email-recovery types
+ * ====================
+ * See `docs/ongoing/email-recovery.md` for the full design. Covers
+ * both halves of the flow: setup (binding a recovery email to an
+ * anchor) and recovery (proving control of a previously-bound
+ * address to obtain a signed delegation).
+ */
 export interface EmailRecoveryCredential {
   'created_at' : Timestamp,
   'address' : string,
@@ -940,6 +948,10 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
+/**
+ * ICRC-3 attribute sharing types
+ * ==============================
+ */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -1360,6 +1372,57 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+export interface NotAccepted {
+  'id' : NotificationId,
+  'recipient' : Principal,
+  'reason' : NotAcceptedReason,
+}
+export type NotAcceptedReason = {
+    /**
+     * No such recipient at this origin. Permanent: sending it again will not help.
+     */
+    'UnknownRecipient' : null
+  } |
+  {
+    /**
+     * The recipient has no notification channel enabled. Sending again is harmless but
+     * pointless until they enable one.
+     */
+    'NoChannel' : null
+  } |
+  {
+    /**
+     * No room. The sender may send it again from retry_after.
+     */
+    'Deferred' : { 'retry_after' : Timestamp }
+  };
+/**
+ * A content-free signal: the app holds the content and the recipient's device fetches
+ * it, authenticated as that recipient, so the app's content key is (recipient, id). A
+ * re-send of an id means that content changed.
+ * 
+ * While an entry is still pending, a re-send of it replaces it rather than adding a
+ * second one, including a re-send from a different canister of the same origin. Once
+ * delivered the id is forgotten, so a later send of it is a new entry and can be
+ * deferred like any other.
+ * 
+ * Acceptance is not a delivery guarantee: an accepted entry may still expire, be
+ * displaced by a more urgent entry from the same origin, or fail at the recipient's
+ * channel.
+ */
+export interface Notification {
+  'id' : NotificationId,
+  /**
+   * Null means Normal.
+   */
+  'urgency' : [] | [Urgency],
+  'recipient' : Principal,
+  /**
+   * Dropped undelivered once passed, freeing the slot. Null means II's default
+   * retention, which is also the ceiling for any value given here.
+   */
+  'expires_at' : [] | [Timestamp],
+}
 export interface NotificationConsentGrantedRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
@@ -1375,6 +1438,13 @@ export interface NotificationGrantConsentRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
 }
+/**
+ * ===== Notifications sent by an app =====
+ * Identifies one notification within (origin, recipient): the same id may be sent to
+ * many recipients and they are independent notifications. The canisters that send for
+ * one origin share that origin's id space.
+ */
+export type NotificationId = bigint;
 export type NotificationRevokeConsentError = {
     'InternalCanisterError' : string
   } |
@@ -1790,6 +1860,43 @@ export interface Rrsig {
   'type_covered' : number,
 }
 export type Salt = Uint8Array | number[];
+/**
+ * The batch applies in the order it is given, so a later entry for a (recipient, id)
+ * supersedes an earlier one in the same call and the reply names each distinct pair at
+ * most once.
+ */
+export interface SendNotificationArg {
+  'notifications' : Array<Notification>,
+  'origin' : FrontendHostname,
+}
+export type SendNotificationError = {
+    /**
+     * More entries than II will process in one call, so nothing was enqueued. limit is
+     * fixed and not below any origin's queue capacity: a sender never has to split a
+     * batch it could have enqueued.
+     */
+    'TooManyNotifications' : { 'limit' : number }
+  } |
+  {
+    /**
+     * Also what an origin that is malformed or spelled non-canonically comes back as,
+     * carrying the reason: the origin is a fixed value in the sender's own deployment,
+     * not something it programs against.
+     */
+    'InternalCanisterError' : string
+  } |
+  {
+    /**
+     * The origin's sender list was read and does not list the caller.
+     */
+    'SenderNotListed' : null
+  };
+/**
+ * Everything the batch carried that not_accepted does not name was accepted.
+ */
+export interface SendNotificationResponse {
+  'not_accepted' : Array<NotAccepted>,
+}
 export type SessionDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -1834,9 +1941,18 @@ export type SetWebPushSubscriptionError = {
  */
 export interface SetWebPushSubscriptionRequest {
   'endpoint' : string,
+  /**
+   * uncompressed SEC1 P-256, echoed to the relay as k=
+   */
   'jwt_signatures' : Array<Uint8Array | number[]>,
+  /**
+   * one raw ECDSA signature per validity window
+   */
   'jwt_issued_at_ns' : bigint,
   'anchor_number' : UserNumber,
+  /**
+   * the relay URL the browser was issued
+   */
   'vapid_public_key' : Uint8Array | number[],
 }
 export interface SignedDelegation {
@@ -2005,6 +2121,16 @@ export type UpdateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
   { 'NameTooLong' : null };
+/**
+ * Orders one origin's entries against each other only: which of that origin's own
+ * pending entries is displaced when its queue is full, and how eagerly the recipient is
+ * notified. It never affects one origin's standing against another's, so marking
+ * everything High gains nothing. The levels are Web Push's and are forwarded as sent.
+ */
+export type Urgency = { 'Low' : null } |
+  { 'High' : null } |
+  { 'VeryLow' : null } |
+  { 'Normal' : null };
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
 /**
@@ -2071,7 +2197,13 @@ export interface WebAuthnCredential {
  */
 export interface WebPushSubscriptionStatus {
   'endpoint' : string,
+  /**
+   * windows covered, not a count of unused signatures
+   */
   'issued_at_ns' : bigint,
+  /**
+   * compared against the one the browser holds
+   */
   'pool_len' : number,
 }
 export interface _SERVICE {
@@ -2105,6 +2237,16 @@ export interface _SERVICE {
     [],
     { 'Ok' : null } |
       { 'Err' : AppSessionError }
+  >,
+  /**
+   * Called by an app's backend canister for the origin it names, which is authorized
+   * by that origin listing the caller as one of its senders. Not implemented yet:
+   * every call is refused.
+   */
+  'app_send_notification' : ActorMethod<
+    [SendNotificationArg],
+    { 'Ok' : SendNotificationResponse } |
+      { 'Err' : SendNotificationError }
   >,
   /**
    * Adds a new authentication method to the identity.

@@ -166,6 +166,42 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : PublicKey,
     'expiration' : Timestamp,
   });
+  const NotificationId = IDL.Nat64;
+  const Urgency = IDL.Variant({
+    'Low' : IDL.Null,
+    'High' : IDL.Null,
+    'VeryLow' : IDL.Null,
+    'Normal' : IDL.Null,
+  });
+  const Notification = IDL.Record({
+    'id' : NotificationId,
+    'urgency' : IDL.Opt(Urgency),
+    'recipient' : IDL.Principal,
+    'expires_at' : IDL.Opt(Timestamp),
+  });
+  const FrontendHostname = IDL.Text;
+  const SendNotificationArg = IDL.Record({
+    'notifications' : IDL.Vec(Notification),
+    'origin' : FrontendHostname,
+  });
+  const NotAcceptedReason = IDL.Variant({
+    'UnknownRecipient' : IDL.Null,
+    'NoChannel' : IDL.Null,
+    'Deferred' : IDL.Record({ 'retry_after' : Timestamp }),
+  });
+  const NotAccepted = IDL.Record({
+    'id' : NotificationId,
+    'recipient' : IDL.Principal,
+    'reason' : NotAcceptedReason,
+  });
+  const SendNotificationResponse = IDL.Record({
+    'not_accepted' : IDL.Vec(NotAccepted),
+  });
+  const SendNotificationError = IDL.Variant({
+    'TooManyNotifications' : IDL.Record({ 'limit' : IDL.Nat32 }),
+    'InternalCanisterError' : IDL.Text,
+    'SenderNotListed' : IDL.Null,
+  });
   const IdentityNumber = IDL.Nat64;
   const AuthnMethodProtection = IDL.Variant({
     'Protected' : IDL.Null,
@@ -269,7 +305,6 @@ export const idlFactory = ({ IDL }) => {
     'UnexpectedCall' : IDL.Record({ 'next_step' : RegistrationFlowNextStep }),
     'WrongSolution' : IDL.Record({ 'new_captcha_png_base64' : IDL.Text }),
   });
-  const FrontendHostname = IDL.Text;
   const AccountNumber = IDL.Nat64;
   const AccountInfo = IDL.Record({
     'name' : IDL.Opt(IDL.Text),
@@ -1017,6 +1052,16 @@ export const idlFactory = ({ IDL }) => {
     'app_revoke_session' : IDL.Func(
         [],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : AppSessionError })],
+        [],
+      ),
+    'app_send_notification' : IDL.Func(
+        [SendNotificationArg],
+        [
+          IDL.Variant({
+            'Ok' : SendNotificationResponse,
+            'Err' : SendNotificationError,
+          }),
+        ],
         [],
       ),
     'authn_method_add' : IDL.Func(
