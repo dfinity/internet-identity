@@ -1094,7 +1094,7 @@ pub struct SendNotificationArg {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum NotAcceptedReason {
-    /// No such recipient at this origin. Permanent.
+    /// No such recipient at this origin.
     UnknownRecipient,
     /// The recipient has no notification channel enabled.
     NoChannel,

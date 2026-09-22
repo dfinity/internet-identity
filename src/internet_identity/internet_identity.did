@@ -1848,7 +1848,7 @@ type SendNotificationArg = record {
 };
 
 type NotAcceptedReason = variant {
-    // No such recipient at this origin. Permanent.
+    // No such recipient at this origin.
     UnknownRecipient;
     // The recipient has no notification channel enabled.
     NoChannel;

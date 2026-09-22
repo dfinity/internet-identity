@@ -1379,7 +1379,7 @@ export interface NotAccepted {
 }
 export type NotAcceptedReason = {
     /**
-     * No such recipient at this origin. Permanent.
+     * No such recipient at this origin.
      */
     'UnknownRecipient' : null
   } |
