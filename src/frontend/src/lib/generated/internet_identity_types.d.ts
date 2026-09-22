@@ -19,9 +19,12 @@ export interface AccountInfo {
   'last_used' : [] | [Timestamp],
 }
 export type AccountNumber = bigint;
-export type AccountSessionError = { 'InternalCanisterError' : string } |
-  { 'Unauthorized' : Principal } |
-  { 'NoSuchSession' : null } |
+export type AccountSessionError = {
+    /**
+     * The browser's key is unusable, or its signature does not verify against it.
+     */
+    'InvalidBrowserKey' : null
+  } |
   {
     /**
      * The session is there, but no delegation was signed for the session_key and
@@ -30,13 +33,8 @@ export type AccountSessionError = { 'InternalCanisterError' : string } |
      */
     'NoSuchDelegation' : null
   } |
-  { 'NoSuchAccount' : null } |
-  {
-    /**
-     * The browser's key is unusable, or its signature does not verify against it.
-     */
-    'InvalidBrowserKey' : null
-  } |
+  { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal } |
   {
     /**
      * The browser presented a key it has already rotated away from, which happens when it
@@ -44,7 +42,9 @@ export type AccountSessionError = { 'InternalCanisterError' : string } |
      * resolve, so the answer is to promote that one and present it.
      */
     'StaleBrowserKey' : null
-  };
+  } |
+  { 'NoSuchSession' : null } |
+  { 'NoSuchAccount' : null };
 export interface AccountUpdate { 'name' : [] | [string] }
 export type AddTentativeDeviceResponse = {
     /**
@@ -346,6 +346,58 @@ export type AuthnMethodSecuritySettingsReplaceError = {
 export interface AuthnMethodSessionInfo {
   'name' : [] | [string],
   'created_at' : [] | [Timestamp],
+}
+/**
+ * Which browser a sign-in came from, as a token rather than a name to show. Products
+ * get renamed — "Chrome OS" became "ChromeOS", "Mac OS X" became "macOS" — so the name
+ * the user reads is derived in the frontend, where a rename reaches every stored record
+ * at once. "Brand" is what the client hints call this, and BrowserInfo below is the
+ * entry it describes.
+ */
+export type BrowserBrand = { 'Edge' : null } |
+  { 'Firefox' : null } |
+  { 'Safari' : null } |
+  { 'SamsungInternet' : null } |
+  { 'Opera' : null } |
+  {
+    /**
+     * A browser this list does not name, shown as the client resolved it. Worth seeing
+     * rather than hiding behind a generic label. Named variants are the six that hold
+     * 97% of the web between them, because a variant is what earns an icon.
+     */
+    'Other' : string
+  } |
+  { 'Chrome' : null };
+/**
+ * What a browser reported about itself when it registered. Self-reported, so it is
+ * something the user reads to recognise their own browser rather than evidence about
+ * where a session came from. The canister stores these and never interprets them.
+ */
+export interface BrowserDescription {
+  'os' : OperatingSystem,
+  /**
+   * The hardware, where the client can name it — Android is the only place that does.
+   */
+  'model' : [] | [string],
+  'form_factor' : FormFactor,
+  'brand' : BrowserBrand,
+}
+export interface BrowserInfo {
+  'id' : number,
+  /**
+   * Sessions this browser holds. Zero means it is signed in to nothing.
+   */
+  'session_count' : number,
+  /**
+   * Fixed at registration. A sign-in reporting something else registers its own entry,
+   * so this describes a registration rather than the last sign-in.
+   */
+  'description' : BrowserDescription,
+  'created_at' : Timestamp,
+  /**
+   * Advanced by a sign-in from this browser and by every session refresh it drives.
+   */
+  'last_used' : Timestamp,
 }
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
@@ -721,14 +773,6 @@ export interface EmailChallengeSubmitDkimLeafArg {
   'hops' : Array<SignedRRset>,
   'nonce' : string,
 }
-/**
- * Email-recovery types
- * ====================
- * See `docs/ongoing/email-recovery.md` for the full design. Covers
- * both halves of the flow: setup (binding a recovery email to an
- * anchor) and recovery (proving control of a previously-bound
- * address to obtain a signed delegation).
- */
 export interface EmailRecoveryCredential {
   'created_at' : Timestamp,
   'address' : string,
@@ -893,10 +937,6 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
-/**
- * ICRC-3 attribute sharing types
- * ==============================
- */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -1145,6 +1185,14 @@ export interface InternetIdentityInit {
    */
   'dnssec_config' : [] | [[] | [DnssecConfig]],
   /**
+   * Server-side kill switch for the notifications feature. null / `opt false`
+   * (the default) disables every notification endpoint; `opt true` enables
+   * them. Omitting it on upgrade keeps the stored value.
+   * Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
+   * turns notifications off, and entries enable them for those origins only.
+   */
+  'notifications_enabled_origins' : [] | [Array<string>],
+  /**
    * Configuration parameters related to the II archive.
    * Note: some parameters changes (like the polling interval) will only take effect after an archive deployment.
    * See ArchiveConfig for details.
@@ -1309,6 +1357,29 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+export interface NotificationConsentGrantedRequest {
+  'origin' : string,
+  'anchor_number' : UserNumber,
+}
+/**
+ * Why a notification call was refused.
+ */
+export type NotificationGrantConsentError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal };
+export interface NotificationGrantConsentRequest {
+  'origin' : string,
+  'anchor_number' : UserNumber,
+}
+export type NotificationRevokeConsentError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal };
+export interface NotificationRevokeConsentRequest {
+  'origin' : string,
+  'anchor_number' : UserNumber,
+}
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
@@ -1415,16 +1486,15 @@ export interface PrepareAccountSessionRequest {
    */
   'permissions' : [] | [Permissions],
   /**
+   * What this browser is, for the user's session list.
+   */
+  'browser_description' : BrowserDescription,
+  /**
    * How long the session may go unminted before it is over, clamped to between
    * 10 minutes and the session's own granted length. Absent leaves the
    * canister's own default.
    */
   'max_idle' : [] | [bigint],
-  /**
-   * The browser's own public key, DER-encoded, as the registry currently holds it. A
-   * key this anchor has not seen registers a browser under it.
-   */
-  'current_browser_key' : PublicKey,
   /**
    * The II frontend's own public key.
    */
@@ -1434,16 +1504,7 @@ export interface PrepareAccountSessionRequest {
    */
   'valid_for' : [] | [bigint],
   'origin' : FrontendHostname,
-  /**
-   * Signature over session_key and next_browser_key, verified with current_browser_key.
-   */
-  'current_browser_key_signature' : Uint8Array | number[],
-  /**
-   * What this browser is, for the user's session list.
-   */
-  'browser_description' : BrowserDescription,
   'account_number' : [] | [AccountNumber],
-  'identity_number' : UserNumber,
   /**
    * What the browser rotates to once this sign-in succeeds. Must differ from
    * current_browser_key: a browser that never rotates keeps a leaked key useful.
@@ -1454,21 +1515,31 @@ export interface PrepareAccountSessionRequest {
    * browser holds the key it is announcing.
    */
   'next_browser_key_signature' : Uint8Array | number[],
+  /**
+   * Signature over session_key and next_browser_key, verified with current_browser_key.
+   */
+  'current_browser_key_signature' : Uint8Array | number[],
+  /**
+   * The browser's own public key, DER-encoded, as the registry currently holds it. A
+   * key this anchor has not seen registers a browser under it.
+   */
+  'current_browser_key' : PublicKey,
+  'identity_number' : UserNumber,
 }
 export interface PrepareAccountSessionResponse {
   'user_key' : PublicKey,
-  /**
-   * Names the session this ceremony created, and is what get_account_session is given
-   * to collect the delegation signed for it. Not a credential: it names a session, it
-   * does not authorise one.
-   */
-  'session_id' : bigint,
   /**
    * Which browser this sign-in was attributed to, so the settings list can mark the one
    * the user is looking at, and so the browser knows which registration its key now
    * belongs to. Not a credential: a caller never presents it.
    */
   'browser_id' : number,
+  /**
+   * Names the session this ceremony created, and is what get_account_session is given
+   * to collect the delegation signed for it. Not a credential: it names a session, it
+   * does not authorise one.
+   */
+  'session_id' : bigint,
   /**
    * The session's valid_till.
    */
@@ -1699,58 +1770,6 @@ export type Salt = Uint8Array | number[];
 export type SessionDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
-/**
- * Which browser a sign-in came from, as a token rather than a name to show. Products
- * get renamed — "Chrome OS" became "ChromeOS", "Mac OS X" became "macOS" — so the name
- * the user reads is derived in the frontend, where a rename reaches every stored record
- * at once. "Brand" is what the client hints call this, and BrowserInfo below is the
- * entry it describes.
- */
-export type BrowserBrand = { 'Edge' : null } |
-  { 'Firefox' : null } |
-  { 'Safari' : null } |
-  { 'SamsungInternet' : null } |
-  { 'Opera' : null } |
-  {
-    /**
-     * A browser this list does not name, shown as the client resolved it. Worth seeing
-     * rather than hiding behind a generic label. Named variants are the six that hold
-     * 97% of the web between them, because a variant is what earns an icon.
-     */
-    'Other' : string
-  } |
-  { 'Chrome' : null };
-/**
- * What a browser reported about itself when it registered. Self-reported, so it is
- * something the user reads to recognise their own browser rather than evidence about
- * where a session came from. The canister stores these and never interprets them.
- */
-export interface BrowserDescription {
-  'os' : OperatingSystem,
-  /**
-   * The hardware, where the client can name it — Android is the only place that does.
-   */
-  'model' : [] | [string],
-  'form_factor' : FormFactor,
-  'brand' : BrowserBrand,
-}
-export interface BrowserInfo {
-  'id' : number,
-  /**
-   * Sessions this browser holds. Zero means it is signed in to nothing.
-   */
-  'session_count' : number,
-  /**
-   * Fixed at registration. A sign-in reporting something else registers its own entry,
-   * so this describes a registration rather than the last sign-in.
-   */
-  'description' : BrowserDescription,
-  'created_at' : Timestamp,
-  /**
-   * Advanced by a sign-in from this browser and by every session refresh it drives.
-   */
-  'last_used' : Timestamp,
-}
 export type SessionKey = PublicKey;
 export type SessionRevokeError = {
     /**
@@ -2020,9 +2039,9 @@ export interface _SERVICE {
       { 'Err' : AppSessionError }
   >,
   /**
-   * Signs the calling session out. Returns nothing and always succeeds, so a client
-   * that retries, or that signs out twice, does not have to reason about whether its
-   * session was already gone. An app can revoke only its own session.
+   * Signs the calling session out. A session that is already gone is success, so a
+   * client that retries, or that signs out twice, does not have to reason about whether
+   * its session was still there. An app can revoke only its own session.
    */
   'app_revoke_session' : ActorMethod<
     [],
@@ -2536,6 +2555,23 @@ export interface _SERVICE {
     [UserNumber, McpConfig],
     { 'Ok' : null } |
       { 'Err' : string }
+  >,
+  'notification_consent_granted' : ActorMethod<
+    [NotificationConsentGrantedRequest],
+    boolean
+  >,
+  /**
+   * ===== Notifications =====
+   */
+  'notification_grant_consent' : ActorMethod<
+    [NotificationGrantConsentRequest],
+    { 'Ok' : null } |
+      { 'Err' : NotificationGrantConsentError }
+  >,
+  'notification_revoke_consent' : ActorMethod<
+    [NotificationRevokeConsentRequest],
+    { 'Ok' : null } |
+      { 'Err' : NotificationRevokeConsentError }
   >,
   /**
    * The trailing `opt text` is the SSO discovery domain (null for a direct

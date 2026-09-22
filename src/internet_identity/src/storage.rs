@@ -2166,8 +2166,8 @@ impl<M: Memory + Clone> Storage<M> {
         // "leave it alone" must not be allowed to mean "leave it naming an account that
         // has gone". The repair below needs to know what is there to decide that.
         let stored_config = stored_number
-            .map(|application_number| {
-                self.lookup_anchor_application_config(anchor_number, application_number)
+            .and_then(|application_number| {
+                self.anchor_application_config(anchor_number, application_number)
             })
             .unwrap_or_default();
         let previous_holds_tracked_default = match &stored {
@@ -2783,19 +2783,75 @@ impl<M: Memory + Clone> Storage<M> {
             .collect()
     }
 
-    pub fn lookup_anchor_application_config(
+    fn anchor_application_config(
         &self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-    ) -> AnchorApplicationConfig {
-        if let Some(config) = self
-            .stable_anchor_application_config_memory
+    ) -> Option<AnchorApplicationConfig> {
+        self.stable_anchor_application_config_memory
             .get(&(anchor_number, application_number))
-        {
-            return config;
-        }
+    }
 
-        AnchorApplicationConfig::default()
+    /// What this identity has configured for the app at `origin`, or `None` where it has
+    /// never signed in there or has configured nothing since.
+    pub fn read_anchor_application_config(
+        &self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+    ) -> Option<AnchorApplicationConfig> {
+        let application_number = self.lookup_application_number_with_origin(origin)?;
+        self.anchor_application_config(anchor_number, application_number)
+    }
+
+    /// Stores `config` for the app at `origin`, creating the identity's account list
+    /// there where it has none.
+    ///
+    /// Goes through the account-state write rather than the config map alone, because the
+    /// config is reclaimed with that list: a row written without one behind it is a row
+    /// nothing ever collects. The same write mints the application where the origin is
+    /// new, so a config can be the first thing an identity stores at an app.
+    pub fn write_anchor_application_config(
+        &mut self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+        config: AnchorApplicationConfig,
+        now: Timestamp,
+    ) -> Result<(), StorageError> {
+        let anchor = self.read(anchor_number)?;
+        let (account_references, _) = self.account_state_for_origin(anchor_number, origin);
+        self.write_account_state(
+            anchor,
+            now,
+            BTreeMap::from([(origin.clone(), Some((account_references, Some(config))))]),
+        )?;
+        Ok(())
+    }
+
+    /// Signs `anchor_number` in at `origin` through the production write, which mints
+    /// the application a consent hangs off.
+    #[cfg(test)]
+    pub(crate) fn sign_in_for_testing(
+        &mut self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+    ) -> ApplicationNumber {
+        self.create_session(CreateSessionParams {
+            anchor_number,
+            origin: origin.clone(),
+            account_number: None,
+            browser_keys: VerifiedBrowserKeys::unverified_for_test(
+                tests::browser_key(1, 0),
+                tests::browser_key(1, 1),
+            ),
+            browser_description: tests::description(1),
+            valid_till_ns: 10_000,
+            max_idle_ns: None,
+            read_only: true,
+            now_ns: 1_000,
+        })
+        .expect("signing in at the origin");
+        self.lookup_application_number_with_origin(origin)
+            .expect("signing in stores the application")
     }
 
     /// Keeps the principal index in step with one reference-list write, deriving only the
@@ -3777,10 +3833,7 @@ impl<M: Memory + Clone> Storage<M> {
         // knows about the default account and nothing else the config may come to hold,
         // and building one would decide those fields by leaving them out.
         let mut config = self
-            .lookup_application_number_with_origin(&origin)
-            .map(|application_number| {
-                self.lookup_anchor_application_config(anchor_number, application_number)
-            })
+            .read_anchor_application_config(anchor_number, &origin)
             .unwrap_or_default();
         config.default_account_number = account_number;
         self.write_account_state(
@@ -4394,6 +4447,11 @@ pub enum StorageError {
     },
     /// The browser presenting itself could not be resolved to a registry entry.
     Browser(BrowserError),
+    /// No application config to write: the identity has never signed in at the origin, so
+    /// there is nothing for the config to hang off.
+    ApplicationConfigNotFound {
+        anchor_number: AnchorNumber,
+    },
     /// A session was asked for that is already over, which no list would hold.
     SessionAlreadyOver {
         anchor_number: AnchorNumber,
@@ -4493,6 +4551,10 @@ impl fmt::Display for StorageError {
             ),
             Self::BadAnchorNumber(n) => write!(f, "bad Identity Anchor {n}"),
             Self::Browser(err) => write!(f, "the browser could not be resolved: {err:?}"),
+            Self::ApplicationConfigNotFound { anchor_number } => write!(
+                f,
+                "Identity Anchor {anchor_number} has never signed in at this origin"
+            ),
             Self::SessionAlreadyOver { anchor_number } => write!(
                 f,
                 "a session for Identity Anchor {anchor_number} would be over before it started"

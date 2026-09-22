@@ -16,6 +16,7 @@ mod delegation_ingress;
 mod email_recovery;
 mod http;
 mod mcp;
+mod notifications;
 mod openid;
 mod rollback;
 mod session_delegation;
