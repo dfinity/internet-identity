@@ -20,21 +20,16 @@ pub use validation::{
     ValidatedSendNotificationArg,
 };
 
-/// How long a sender waits before sending a batch again that II could not
-/// judge yet, which is only ever the wait for one sender-list outcall. Kept
-/// short because the costs are lopsided: retrying before the list lands is one
-/// more cheap update call that defers again, while retrying late is a
-/// notification sitting undelivered for no reason.
-const PENDING_RETRY_AFTER_NS: u64 = 2 * 1_000_000_000;
-
 /// Nothing was enqueued: II holds no sender list for the origin yet, so it
-/// cannot judge the batch and the whole of it is the sender's to send again.
+/// cannot judge the batch and the whole of it is the sender's to send again
+/// at `retry_after`, which the authorization decides — it knows whether a
+/// fetch is running or the origin is parked after a failed one.
 ///
 /// Takes the validated request rather than its parts, so a batch that has not
 /// been through `TryFrom` cannot reach the reply.
 pub fn defer_whole_batch(
     ValidatedSendNotificationArg { notifications, .. }: ValidatedSendNotificationArg,
-    now_ns: Timestamp,
+    retry_after: Timestamp,
 ) -> SendNotificationResponse {
     SendNotificationResponse {
         not_accepted: notifications
@@ -42,9 +37,7 @@ pub fn defer_whole_batch(
             .map(|Notification { id, recipient, .. }| NotAccepted {
                 id,
                 recipient,
-                reason: NotAcceptedReason::Deferred {
-                    retry_after: now_ns + PENDING_RETRY_AFTER_NS,
-                },
+                reason: NotAcceptedReason::Deferred { retry_after },
             })
             .collect(),
     }
@@ -284,9 +277,7 @@ mod tests {
 
         assert_eq!(
             response.not_accepted[0].reason,
-            NotAcceptedReason::Deferred {
-                retry_after: 1_000 + PENDING_RETRY_AFTER_NS,
-            }
+            NotAcceptedReason::Deferred { retry_after: 1_000 }
         );
     }
 

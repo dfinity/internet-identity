@@ -434,12 +434,11 @@ fn app_send_notification(
 ) -> Result<SendNotificationResponse, SendNotificationError> {
     let request: ValidatedSendNotificationArg = request.try_into()?;
 
-    match notifications::senders::authorize(&request, caller()) {
+    match notifications::senders::authorize(&request, caller(), ic_cdk::api::time()) {
         Senders::NotListed => Err(SendNotificationError::SenderNotListed),
-        Senders::Pending => Ok(notifications::defer_whole_batch(
-            request,
-            ic_cdk::api::time(),
-        )),
+        Senders::Pending { retry_after } => {
+            Ok(notifications::defer_whole_batch(request, retry_after))
+        }
         Senders::Listed => Err(SendNotificationError::InternalCanisterError(
             "Not enabled".to_string(),
         )),

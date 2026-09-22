@@ -29,7 +29,7 @@ use crate::single_flight_cache::{
     self, CacheConfig, Cached, FillOutcome, RetryBackoff, SingleFlightCache,
 };
 use candid::Principal;
-use internet_identity_interface::internet_identity::types::FrontendHostname;
+use internet_identity_interface::internet_identity::types::{FrontendHostname, Timestamp};
 use std::cell::RefCell;
 
 #[cfg(not(test))]
@@ -104,6 +104,12 @@ fn new_senders_cache() -> SendersCache {
     )
 }
 
+/// How long a caller waits when the list is still being fetched. One outcall
+/// round trip takes a couple of seconds, so this is a little longer than that:
+/// coming back early is one more cheap call that defers again, coming back
+/// late is a notification sitting undelivered.
+const PENDING_RETRY_AFTER_NS: u64 = 3 * 1_000_000_000;
+
 /// What the origin's list says about a caller.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Senders {
@@ -111,8 +117,10 @@ pub enum Senders {
     Listed,
     /// The list was read and does not name the caller.
     NotListed,
-    /// II has no list yet. The fetch is now running; the caller retries.
-    Pending,
+    /// II has no list yet, so the caller comes back at `retry_after`: the
+    /// cache's own next attempt when a failed fetch has parked this origin,
+    /// otherwise one fill's worth of time from now.
+    Pending { retry_after: Timestamp },
 }
 
 /// Whether `caller` may send for the request's origin, starting the fetch if
@@ -126,6 +134,7 @@ pub enum Senders {
 pub fn authorize(
     ValidatedSendNotificationArg { origin, .. }: &ValidatedSendNotificationArg,
     caller: Principal,
+    now_ns: Timestamp,
 ) -> Senders {
     match single_flight_cache::get(&SENDERS_CACHE, origin.clone()) {
         Cached::Ready(senders) => {
@@ -135,8 +144,18 @@ pub fn authorize(
                 Senders::NotListed
             }
         }
-        Cached::Pending => Senders::Pending,
+        Cached::Pending => Senders::Pending {
+            retry_after: retry_after(origin, now_ns),
+        },
     }
+}
+
+/// When a caller whose list is not ready should come back. A fetch that failed
+/// parks the origin in backoff, and the cache will not try again before its
+/// own deadline, so sending them back sooner only buys deferred calls.
+fn retry_after(origin: &FrontendHostname, now_ns: Timestamp) -> Timestamp {
+    single_flight_cache::retry_at(&SENDERS_CACHE, origin)
+        .map_or(now_ns + PENDING_RETRY_AFTER_NS, |secs| secs * 1_000_000_000)
 }
 
 /// The list as published by an origin. Serialized as well as deserialized: the
@@ -283,6 +302,13 @@ mod tests {
     }
 
     const APP: &str = "https://app.example";
+    /// Any fixed wall clock; the cache keeps its own, set through
+    /// `single_flight_cache::set_test_now`.
+    const NOW_NS: Timestamp = 1_000_000_000_000;
+
+    fn pending(senders: Senders) -> bool {
+        matches!(senders, Senders::Pending { .. })
+    }
 
     fn principal(text: &str) -> Principal {
         Principal::from_text(text).expect("a principal")
@@ -320,9 +346,9 @@ mod tests {
         publish(APP, &[sender]);
 
         // The first call spawns the fill and has nothing to judge with yet.
-        assert_eq!(authorize(&request(APP), sender), Senders::Pending);
+        assert!(pending(authorize(&request(APP), sender, NOW_NS)));
         single_flight_cache::run_detached();
-        assert_eq!(authorize(&request(APP), sender), Senders::Listed);
+        assert_eq!(authorize(&request(APP), sender, NOW_NS), Senders::Listed);
     }
 
     #[test]
@@ -332,9 +358,9 @@ mod tests {
         let other = principal("rrkah-fqaaa-aaaaa-aaaaq-cai");
         publish(APP, &[listed]);
 
-        assert_eq!(authorize(&request(APP), listed), Senders::Pending);
+        assert!(pending(authorize(&request(APP), listed, NOW_NS)));
         single_flight_cache::run_detached();
-        assert_eq!(authorize(&request(APP), other), Senders::NotListed);
+        assert_eq!(authorize(&request(APP), other, NOW_NS), Senders::NotListed);
     }
 
     /// An origin serving nothing usable never resolves to Listed, and the
@@ -344,9 +370,49 @@ mod tests {
         reset();
         let sender = principal("ryjl3-tyaaa-aaaaa-aaaba-cai");
 
-        assert_eq!(authorize(&request(APP), sender), Senders::Pending);
+        assert!(pending(authorize(&request(APP), sender, NOW_NS)));
         single_flight_cache::run_detached();
-        assert_eq!(authorize(&request(APP), sender), Senders::Pending);
+        assert!(pending(authorize(&request(APP), sender, NOW_NS)));
+    }
+
+    /// A fetch that failed parks the origin in backoff, and the cache will not
+    /// try again before its own deadline — so the caller is sent back then,
+    /// not a fill's worth of time from now, which would only buy deferrals.
+    #[test]
+    fn a_failed_fetch_defers_until_the_cache_tries_again() {
+        reset();
+        single_flight_cache::set_test_now(1_000);
+        let sender = principal("ryjl3-tyaaa-aaaaa-aaaba-cai");
+
+        // Nothing published for APP, so the fill fails and parks the origin.
+        assert!(pending(authorize(&request(APP), sender, NOW_NS)));
+        single_flight_cache::run_detached();
+
+        let Senders::Pending { retry_after } = authorize(&request(APP), sender, NOW_NS) else {
+            panic!("a parked origin is still pending");
+        };
+        assert_eq!(retry_after, (1_000 + RETRY_BASE_SECONDS) * 1_000_000_000);
+        assert!(
+            retry_after > NOW_NS + PENDING_RETRY_AFTER_NS,
+            "the parked deadline is what is reported, not the fill estimate"
+        );
+    }
+
+    /// While the first fetch is in flight there is nothing parked, so the
+    /// caller gets the short estimate instead.
+    #[test]
+    fn an_unfinished_fetch_defers_by_one_fill() {
+        reset();
+        single_flight_cache::set_test_now(1_000);
+        let sender = principal("ryjl3-tyaaa-aaaaa-aaaba-cai");
+        publish(APP, &[sender]);
+
+        assert_eq!(
+            authorize(&request(APP), sender, NOW_NS),
+            Senders::Pending {
+                retry_after: NOW_NS + PENDING_RETRY_AFTER_NS
+            }
+        );
     }
 
     /// Every canister of one origin is authorized by the same list.
@@ -357,10 +423,10 @@ mod tests {
         let second = principal("rrkah-fqaaa-aaaaa-aaaaq-cai");
         publish(APP, &[first, second]);
 
-        assert_eq!(authorize(&request(APP), first), Senders::Pending);
+        assert!(pending(authorize(&request(APP), first, NOW_NS)));
         single_flight_cache::run_detached();
-        assert_eq!(authorize(&request(APP), first), Senders::Listed);
-        assert_eq!(authorize(&request(APP), second), Senders::Listed);
+        assert_eq!(authorize(&request(APP), first, NOW_NS), Senders::Listed);
+        assert_eq!(authorize(&request(APP), second, NOW_NS), Senders::Listed);
     }
 
     #[test]
