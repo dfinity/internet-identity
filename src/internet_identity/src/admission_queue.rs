@@ -1,23 +1,20 @@
-//! A bounded queue of opaque items that decides what to let in and says when to
-//! come back.
+//! A bounded queue shared by several tenants.
 //!
-//! Items enter through [`AdmissionQueue::admit`] and leave through
-//! [`AdmissionQueue::take_batch`]. Inside a tenant they are ordered by lane and
-//! then by arrival. Across tenants they are taken round-robin, so a tenant holding
-//! thousands drains no faster than one holding a handful.
+//! [`AdmissionQueue::admit`] removes the submitting tenant's expired entries,
+//! checks for duplicates and the group limit, then checks available capacity.
+//! Each item is stored, folded into existing work, or rejected with a retry delay.
 //!
-//! The queue stamps arrival times itself and never reads one off an item, so a caller
-//! cannot age its own items in or out. Everything else is opaque: [`QueueItem`] asks
-//! an item only for an identity, a group and a lane.
+//! [`AdmissionQueue::take_batch`] takes one item per tenant in turn. Within each
+//! tenant, lower-numbered lanes come first, then older entries. The item key breaks
+//! ties when arrival times match, including items submitted in the same call.
 //!
-//! Admission is synchronous and final. An item is stored, folds into something
-//! already held, or is refused with a hint of how long to wait. The hint grows with
-//! how long the queue has been full and jumps once nothing is leaving at all, which
-//! is a failure further down rather than congestion here.
+//! Callers must supply trusted canister time as `now_ns`. The queue assigns that
+//! time to new entries and discards entries once they reach the configured age.
+//! It forgets entries after taking them, so duplicate detection only covers work
+//! still in this queue. A retry delay describes queue pressure, not delivery status.
 //!
-//! Nothing is kept once an item is taken, so there is no state left to query.
-// Nothing calls this yet. The entrypoint and the dispatcher that do arrive in
-// later PRs of this stack.
+//! This module does not authorize senders or deliver items.
+// The submission endpoint and dispatcher will use this in later PRs.
 #![allow(dead_code)]
 
 use internet_identity_interface::internet_identity::types::Timestamp;
@@ -25,81 +22,76 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::Bound::{Excluded, Unbounded};
 
-/// What the queue needs from the items it holds.
-pub trait QueueItem: Clone {
-    /// Tells two items apart inside one tenant. An item whose key is already held
-    /// folds instead of being stored again.
+/// The key, group, and priority of a queued item.
+pub(crate) trait QueueItem: Clone {
+    /// Identifies an item within one tenant. A duplicate key is not stored again.
     type Key: Clone + Eq + Hash + Ord;
 
-    /// Items sharing a group are capped together, so one group cannot fill a
-    /// tenant's share on its own.
+    /// Identifies items that share a pending-item limit within one tenant.
     type Group: Copy + Eq + Hash;
 
-    /// How many priority lanes items are sorted into. Lane 0 is taken first. At
-    /// least one.
+    /// Number of priority lanes. Must be positive; lane 0 is taken first.
     const LANES: usize;
 
     fn key(&self) -> Self::Key;
     fn group(&self) -> Self::Group;
 
-    /// Which lane this item belongs in. Values at or above [`QueueItem::LANES`]
-    /// are clamped to the last lane.
+    /// The item's lane. Out-of-range values use the last lane.
     fn lane(&self) -> usize;
 }
 
-/// Sizes and clocks the queue runs by.
+/// Capacity limits, expiry time, and retry delays.
 #[derive(Clone, Debug)]
-pub struct QueueConfig {
-    /// Ceiling on the whole queue, bounding both the heap footprint and the
-    /// snapshot an upgrade has to carry.
-    pub max_entries: usize,
-    /// Ceiling on one tenant even when it is the only one. The gap up to
-    /// `max_entries` is what a tenant arriving later finds free.
-    pub max_entries_per_tenant: usize,
-    /// Items one tenant may hold for one group before further ones fold.
-    pub max_pending_per_group: usize,
-    /// Occupancy the queue must fall below before it stops reporting pressure.
-    /// Under `max_entries`, so the retry hint does not flap at the boundary.
-    pub pressure_cleared_below: usize,
-    /// Age at which an item is discarded unseen, measured from its arrival.
-    pub discard_after_ns: u64,
-    pub retry: RetryPolicy,
+pub(crate) struct QueueConfig {
+    /// Maximum number of entries admitted across all tenants. Callers must also
+    /// bound item size if they need a memory limit.
+    pub(crate) max_entries: usize,
+    /// Maximum entries for one tenant. Its limit may be lower when the queue is
+    /// shared by several tenants.
+    pub(crate) max_entries_per_tenant: usize,
+    /// Maximum pending entries per group within one tenant. Further items fold.
+    pub(crate) max_pending_per_group: usize,
+    /// Clear the pressure timer when occupancy falls below this value. A value
+    /// below `max_entries` avoids resetting the timer whenever one slot opens.
+    pub(crate) pressure_cleared_below: usize,
+    /// Discard entries when they reach this age, measured from admission.
+    pub(crate) discard_after_ns: u64,
+    pub(crate) retry: RetryPolicy,
 }
 
 impl QueueConfig {
-    /// Whether the sizes relate the way the queue assumes. `const`, so a config can
-    /// assert on it and fail the build rather than a test.
-    pub const fn is_coherent(&self) -> bool {
+    /// Checks the limits and time intervals. Also usable in a compile-time assertion.
+    pub(crate) const fn is_coherent(&self) -> bool {
         self.max_entries > 0
             && self.max_entries_per_tenant > 0
             && self.max_pending_per_group > 0
             && self.max_entries_per_tenant <= self.max_entries
+            && self.pressure_cleared_below > 0
             && self.pressure_cleared_below <= self.max_entries
             && self.discard_after_ns > 0
             && self.retry.is_coherent()
     }
 }
 
-/// How long the queue tells a caller to wait once it stops accepting.
+/// Retry delays returned when the queue or a tenant reaches its limit.
 #[derive(Clone, Debug)]
-pub struct RetryPolicy {
-    /// First hint, given the moment the queue fills.
-    pub base_ms: u32,
-    /// Ceiling on the backed-off hint while items are still leaving.
-    pub ceiling_ms: u32,
-    /// Hint given once nothing has left for `stalled_after_silence_ns`. Above the
-    /// ceiling on purpose: that is a failure downstream rather than congestion here,
-    /// and a short hint would invite a caller to hammer a queue that cannot drain.
-    pub when_stalled_ms: u32,
-    /// How long the queue stays full for the hint to double.
-    pub doubles_every_ns: u64,
-    pub max_doublings: u32,
-    /// Silence since the last item left that counts as nothing draining.
-    pub stalled_after_silence_ns: u64,
+pub(crate) struct RetryPolicy {
+    /// Initial retry delay.
+    pub(crate) base_ms: u32,
+    /// Maximum retry delay while entries are still being taken.
+    pub(crate) ceiling_ms: u32,
+    /// Longer retry delay when entries are waiting but none have been taken for
+    /// `stalled_after_silence_ns`.
+    pub(crate) when_stalled_ms: u32,
+    /// Double the delay after each interval of queue pressure.
+    pub(crate) doubles_every_ns: u64,
+    pub(crate) max_doublings: u32,
+    /// How long entries may wait without a successful take before declaring a stall.
+    pub(crate) stalled_after_silence_ns: u64,
 }
 
 impl RetryPolicy {
-    pub const fn is_coherent(&self) -> bool {
+    const fn is_coherent(&self) -> bool {
         self.base_ms > 0
             && self.base_ms <= self.ceiling_ms
             && self.ceiling_ms <= self.when_stalled_ms
@@ -108,64 +100,69 @@ impl RetryPolicy {
     }
 }
 
-/// What the queue did with one submitted item.
+/// The result of submitting one item.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Admission {
+pub(crate) enum Admission {
     Stored,
-    /// Not stored, because something already held covers it: either the same key, or
-    /// a group already at its cap.
+    /// Not stored because its key is already queued or its group is at its limit.
+    /// The caller must ensure existing work also covers a folded item.
     Folded,
-    /// Not stored, because there was no room. Offer it again after the hint.
+    /// Not stored because the queue or tenant is full. Retry after this delay.
     Full {
         retry_after_ms: u32,
     },
 }
 
-/// An item with the arrival time the queue gave it. Identity stays the item's, the
-/// clock is the queue's.
+/// An item and the time it was admitted.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Entry<Item> {
-    pub received_at_ns: Timestamp,
-    pub item: Item,
+pub(crate) struct Entry<Item> {
+    pub(crate) received_at_ns: Timestamp,
+    pub(crate) item: Item,
 }
 
-/// An entry on its way out, with the tenant it was held under.
+/// An entry removed from the queue, with its tenant.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Taken<Tenant, Item> {
-    pub tenant: Tenant,
-    pub entry: Entry<Item>,
+pub(crate) struct Taken<Tenant, Item> {
+    pub(crate) tenant: Tenant,
+    pub(crate) entry: Entry<Item>,
 }
 
-/// One tenant's entries, as [`AdmissionQueue::snapshot`] writes them.
+/// One tenant's saved entries.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TenantSnapshot<Tenant, Item> {
-    pub tenant: Tenant,
-    pub entries: Vec<Entry<Item>>,
+struct TenantSnapshot<Tenant, Item> {
+    tenant: Tenant,
+    entries: Vec<Entry<Item>>,
 }
 
-/// A reading of the queue, for metrics.
+/// Saved entries and the next tenant to serve. Private fields keep callers from
+/// constructing snapshots with duplicate keys or inconsistent entries.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct QueueSnapshot<Tenant, Item> {
+    tenants: Vec<TenantSnapshot<Tenant, Item>>,
+    next_tenant: Option<Tenant>,
+}
+
+/// Queue counts and timings for metrics. Expired entries count until removed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct QueueStats {
-    pub stored_total: usize,
-    pub active_tenants: usize,
-    /// Age of the entry that has waited longest.
-    pub oldest_age_ns: Option<u64>,
-    /// How long the queue has been full, if it is.
-    pub at_capacity_for_ns: Option<u64>,
-    /// How long since anything was taken.
-    pub silence_ns: u64,
-    pub discarded_expired: u64,
-    pub folded_duplicates: u64,
-    pub folded_group_capped: u64,
+pub(crate) struct QueueStats {
+    pub(crate) stored_total: usize,
+    pub(crate) active_tenants: usize,
+    /// Age of the oldest stored entry.
+    pub(crate) oldest_age_ns: Option<u64>,
+    /// Time since the queue filled, until occupancy falls below the reset threshold.
+    pub(crate) at_capacity_for_ns: Option<u64>,
+    /// Time since the last successful take, or since construction or restore.
+    pub(crate) silence_ns: u64,
+    pub(crate) discarded_expired: u64,
+    pub(crate) folded_duplicates: u64,
+    pub(crate) folded_group_capped: u64,
 }
 
-/// One tenant's entries, split by lane, with the two indexes admission reads.
+/// One tenant's entries, indexed for ordering, duplicate checks, and group limits.
 struct TenantQueue<Item: QueueItem> {
-    /// One map per lane, keyed by arrival then identity so iteration is oldest
-    /// first and two arrivals in the same nanosecond stay distinct.
+    /// Entries ordered by arrival time, then key, in each priority lane.
     lanes: Vec<BTreeMap<(Timestamp, Item::Key), Item>>,
-    /// Membership only. A duplicate is a no-op, so nothing ever looks an entry up in
-    /// order to change it.
+    /// Keys currently queued for this tenant.
     present: HashSet<Item::Key>,
     pending_per_group: HashMap<Item::Group, usize>,
 }
@@ -212,7 +209,7 @@ impl<Item: QueueItem> TenantQueue<Item> {
         Some(item)
     }
 
-    /// Oldest entry of the first lane holding anything, which is the next one out.
+    /// The next entry to take: the oldest in the first nonempty lane.
     fn front(&self) -> Option<(usize, Timestamp, Item::Key)> {
         self.lanes.iter().enumerate().find_map(|(lane, entries)| {
             entries
@@ -235,19 +232,18 @@ impl<Item: QueueItem> TenantQueue<Item> {
     }
 }
 
-pub struct AdmissionQueue<Tenant: Clone + Ord, Item: QueueItem> {
+pub(crate) struct AdmissionQueue<Tenant: Clone + Ord, Item: QueueItem> {
     config: QueueConfig,
     tenants: BTreeMap<Tenant, TenantQueue<Item>>,
-    /// Where the round-robin resumes. Without it every batch restarts at the first
-    /// tenant and the ones after it are never reached.
+    /// Where the next batch resumes taking turns between tenants.
     next_tenant: Option<Tenant>,
     stored_total: usize,
 
-    /// When the queue last went from empty to holding something.
+    /// When the queue last changed from empty to nonempty.
     nonempty_since_ns: Option<Timestamp>,
-    /// When the queue last reached `max_entries`, while it stays there.
+    /// When the queue filled. Reset below `pressure_cleared_below`.
     at_capacity_since_ns: Option<Timestamp>,
-    /// When something last left. What took it is not the queue's concern.
+    /// Last successful take, or construction or restore time.
     last_taken_ns: Timestamp,
 
     discarded_expired: u64,
@@ -256,7 +252,9 @@ pub struct AdmissionQueue<Tenant: Clone + Ord, Item: QueueItem> {
 }
 
 impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
-    pub fn new(config: QueueConfig, now_ns: Timestamp) -> Self {
+    pub(crate) fn new(config: QueueConfig, now_ns: Timestamp) -> Self {
+        assert!(config.is_coherent(), "invalid queue configuration");
+        assert!(Item::LANES > 0, "queue items need at least one lane");
         Self {
             config,
             tenants: BTreeMap::new(),
@@ -271,22 +269,31 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         }
     }
 
-    pub fn len(&self) -> usize {
+    #[cfg(test)]
+    fn len(&self) -> usize {
         self.stored_total
     }
 
-    pub fn is_empty(&self) -> bool {
+    #[cfg(test)]
+    fn is_empty(&self) -> bool {
         self.stored_total == 0
     }
 
-    /// Offers `items` under `tenant` and answers one [`Admission`] each, in the order
-    /// they were given.
-    ///
-    /// The queue's own room is the only thing that can produce [`Admission::Full`].
-    /// What becomes of an item after it is taken never reaches a caller here.
-    pub fn admit(&mut self, tenant: Tenant, items: Vec<Item>, now_ns: Timestamp) -> Vec<Admission> {
+    /// Submits items for a tenant and returns one result per item, in input order.
+    /// Uses trusted `now_ns` for all new entries. Folding leaves existing entries,
+    /// including their age and priority, unchanged.
+    pub(crate) fn admit(
+        &mut self,
+        tenant: Tenant,
+        items: Vec<Item>,
+        now_ns: Timestamp,
+    ) -> Vec<Admission> {
         let mut admissions = Vec::with_capacity(items.len());
         let mut swept = false;
+
+        if !items.is_empty() {
+            self.discard_expired_for(&tenant, now_ns);
+        }
 
         for item in items {
             if self.holds(&tenant, &item.key()) {
@@ -301,27 +308,16 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
                 continue;
             }
 
-            // Expired entries hold room nobody can use, so reclaim before refusing.
-            // Once per call, since a second sweep at the same instant finds nothing.
+            // Before rejecting for capacity, free expired entries across all tenants.
+            // Once per call is enough because now_ns does not change.
             if !swept && (self.is_full() || self.tenant_at_cap(&tenant)) {
                 self.discard_expired(now_ns);
                 swept = true;
             }
 
-            if self.is_full() {
-                self.at_capacity_since_ns.get_or_insert(now_ns);
+            if self.is_full() || self.tenant_at_cap(&tenant) {
                 admissions.push(Admission::Full {
                     retry_after_ms: self.retry_after_ms(now_ns),
-                });
-                continue;
-            }
-
-            // Over its own share while the queue still has room. This tenant's
-            // entries leave at the round-robin rate whatever the rest is doing, so
-            // there is no congestion to back off from.
-            if self.tenant_at_cap(&tenant) {
-                admissions.push(Admission::Full {
-                    retry_after_ms: self.config.retry.base_ms,
                 });
                 continue;
             }
@@ -333,31 +329,24 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         admissions
     }
 
-    /// Takes up to `limit` entries, one tenant at a time in round-robin order,
-    /// discarding expired ones on the way past.
-    ///
-    /// `limit` is what the caller can accept right now. Zero is a normal answer: it
-    /// records that the queue was asked and nothing moved, which is what
-    /// [`AdmissionQueue::admit`] reads later as a stall.
-    pub fn take_batch(&mut self, limit: usize, now_ns: Timestamp) -> Vec<Taken<Tenant, Item>> {
+    /// Removes up to `limit` live entries, taking one per tenant in turn.
+    /// The caller must have room to keep all returned entries. Zero does nothing.
+    /// Expired entries are discarded and do not count towards the limit.
+    pub(crate) fn take_batch(
+        &mut self,
+        limit: usize,
+        now_ns: Timestamp,
+    ) -> Vec<Taken<Tenant, Item>> {
         let mut taken = Vec::new();
-        let mut tenants_without_work = 0;
 
         while taken.len() < limit {
             let Some(tenant) = self.advance_cursor() else {
                 break;
             };
-            match self.pop_live(&tenant, now_ns) {
-                Some(entry) => {
-                    taken.push(Taken { tenant, entry });
-                    tenants_without_work = 0;
-                }
-                None => {
-                    tenants_without_work += 1;
-                    if tenants_without_work >= self.tenants.len().max(1) {
-                        break;
-                    }
-                }
+            // If nothing is live, pop_live removes the tenant. Each iteration
+            // therefore returns an entry or reduces the number of tenants.
+            if let Some(entry) = self.pop_live(&tenant, now_ns) {
+                taken.push(Taken { tenant, entry });
             }
         }
 
@@ -367,10 +356,11 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         taken
     }
 
-    /// Everything held, grouped by tenant. The indexes are left out because
-    /// [`AdmissionQueue::restore`] rebuilds them from the entries.
-    pub fn snapshot(&self) -> Vec<TenantSnapshot<Tenant, Item>> {
-        self.tenants
+    /// Copies stored entries and the round-robin cursor. Restore rebuilds the
+    /// indexes. Persistence and serialization are the caller's responsibility.
+    pub(crate) fn snapshot(&self) -> QueueSnapshot<Tenant, Item> {
+        let tenants = self
+            .tenants
             .iter()
             .map(|(tenant, queue)| TenantSnapshot {
                 tenant: tenant.clone(),
@@ -385,27 +375,33 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
                     })
                     .collect(),
             })
-            .collect()
+            .collect();
+        QueueSnapshot {
+            tenants,
+            next_tenant: self.next_tenant.clone(),
+        }
     }
 
-    /// Rebuilds from a snapshot, keeping every arrival time. The silence clock starts
-    /// at `now_ns`, so a queue that has just come back is not read as one nothing is
-    /// draining.
-    pub fn restore(
+    /// Restores saved entries with their original arrival times. Retry timers and
+    /// metrics restart at `now_ns`. Existing entries are kept even if the new
+    /// configuration lowers capacity; admission waits for space to become available.
+    pub(crate) fn restore(
         config: QueueConfig,
-        snapshot: Vec<TenantSnapshot<Tenant, Item>>,
+        snapshot: QueueSnapshot<Tenant, Item>,
         now_ns: Timestamp,
     ) -> Self {
         let mut backlog = Self::new(config, now_ns);
-        for tenant in snapshot {
+        for tenant in snapshot.tenants {
             for entry in tenant.entries {
                 backlog.insert(&tenant.tenant, entry.received_at_ns, entry.item);
             }
         }
+        backlog.next_tenant = snapshot.next_tenant;
+        backlog.at_capacity_since_ns = backlog.is_full().then_some(now_ns);
         backlog
     }
 
-    pub fn stats(&self, now_ns: Timestamp) -> QueueStats {
+    pub(crate) fn stats(&self, now_ns: Timestamp) -> QueueStats {
         QueueStats {
             stored_total: self.stored_total,
             active_tenants: self.tenants.len(),
@@ -446,9 +442,8 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         held >= self.tenant_cap()
     }
 
-    /// An equal share of the queue, never more than one tenant may hold alone. The
-    /// divisor counts tenants currently holding something, so a tenant that is not
-    /// using the queue does not reserve space in it.
+    /// Divides capacity equally among active tenants, up to the per-tenant limit.
+    /// Existing entries are not evicted when a new tenant reduces this share.
     fn tenant_cap(&self) -> usize {
         self.config
             .max_entries_per_tenant
@@ -464,10 +459,12 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
             .or_insert_with(TenantQueue::new)
             .insert(received_at_ns, item);
         self.stored_total += 1;
+        if self.is_full() {
+            self.at_capacity_since_ns.get_or_insert(received_at_ns);
+        }
     }
 
-    /// Next live entry of one tenant. Expired ones are discarded rather than handed
-    /// on, so the caller never sees an entry it would only have to throw away.
+    /// Removes the next live entry, discarding expired entries before it.
     fn pop_live(&mut self, tenant: &Tenant, now_ns: Timestamp) -> Option<Entry<Item>> {
         loop {
             let entry = self.pop_front(tenant)?;
@@ -495,34 +492,35 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         })
     }
 
-    /// Discards everything past `discard_after_ns`. Items age out after the same
-    /// interval whatever they are, so the expired ones sit at the front of each lane
-    /// and the walk stops at the first one still live.
+    /// Removes expired entries from every tenant. Each lane is ordered by age,
+    /// so scanning it stops at the first live entry.
     fn discard_expired(&mut self, now_ns: Timestamp) {
-        let discard_after_ns = self.config.discard_after_ns;
         for tenant in self.tenants.keys().cloned().collect::<Vec<_>>() {
-            for lane in 0..Item::LANES {
-                loop {
-                    let Some(queue) = self.tenants.get_mut(&tenant) else {
-                        break;
-                    };
-                    let Some((received_at_ns, key)) = queue.oldest_in_lane(lane) else {
-                        break;
-                    };
-                    if received_at_ns.saturating_add(discard_after_ns) > now_ns {
-                        break;
-                    }
-                    queue.remove(lane, received_at_ns, &key);
-                    let emptied = queue.is_empty();
-                    self.after_removal(&tenant, emptied);
-                    self.discarded_expired += 1;
+            self.discard_expired_for(&tenant, now_ns);
+        }
+    }
+
+    fn discard_expired_for(&mut self, tenant: &Tenant, now_ns: Timestamp) {
+        for lane in 0..Item::LANES {
+            loop {
+                let Some(queue) = self.tenants.get_mut(tenant) else {
+                    return;
+                };
+                let Some((received_at_ns, key)) = queue.oldest_in_lane(lane) else {
+                    break;
+                };
+                if received_at_ns.saturating_add(self.config.discard_after_ns) > now_ns {
+                    break;
                 }
+                queue.remove(lane, received_at_ns, &key);
+                let emptied = queue.is_empty();
+                self.after_removal(tenant, emptied);
+                self.discarded_expired += 1;
             }
         }
     }
 
-    /// Drops an emptied tenant and moves the counters the pressure clocks read. Every
-    /// removal goes through here, so a clock cannot drift from the occupancy.
+    /// Updates counts and timers after removal, and removes empty tenants.
     fn after_removal(&mut self, tenant: &Tenant, emptied: bool) {
         if emptied {
             self.tenants.remove(tenant);
@@ -536,9 +534,8 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         }
     }
 
-    /// Picks the tenant whose turn it is and points the cursor at the next one. The
-    /// cursor may name a tenant that has since emptied and been dropped, so it
-    /// resolves to the first tenant at or after it.
+    /// Selects the next tenant and advances the cursor. If that tenant was removed,
+    /// uses the next remaining tenant, wrapping around at the end.
     fn advance_cursor(&mut self) -> Option<Tenant> {
         if self.tenants.is_empty() {
             self.next_tenant = None;
@@ -566,14 +563,11 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         Some(picked)
     }
 
-    /// How long to tell a caller to wait. Being full is always the reason; this only
-    /// picks the number, from how long the queue has been full and how long since
-    /// anything left it.
+    /// Chooses a retry delay from queue pressure and time since the last take.
     fn retry_after_ms(&self, now_ns: Timestamp) -> u32 {
         let retry = &self.config.retry;
 
-        // Silence counts only from the point there was something to take, so a queue
-        // left idle for an hour and then filled in one call does not look stalled.
+        // Time spent empty does not count as a stall.
         let waiting_since_ns = self
             .last_taken_ns
             .max(self.nonempty_since_ns.unwrap_or(now_ns));
@@ -595,7 +589,7 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
 mod tests {
     use super::*;
 
-    /// Two lanes and small caps, so a test can reach any boundary in a few lines.
+    /// A small test item with two priority lanes.
     #[derive(Clone, Debug, Eq, PartialEq)]
     struct TestItem {
         group: u8,
@@ -649,8 +643,7 @@ mod tests {
         }
     }
 
-    /// Admits items one per nanosecond from `from_ns`, so arrival order is the order
-    /// they are listed in.
+    /// Admits items in order, one nanosecond apart.
     fn admit_each(backlog: &mut TestQueue, tenant: u8, items: Vec<TestItem>, from_ns: Timestamp) {
         for (offset, item) in items.into_iter().enumerate() {
             backlog.admit(tenant, vec![item], from_ns + offset as u64);
@@ -665,8 +658,7 @@ mod tests {
         taken.iter().map(|t| t.tenant).collect()
     }
 
-    /// The counters and the indexes are all derivable from the lanes, so anything
-    /// that touches them has to leave them agreeing.
+    /// Checks that counts, indexes, and timers agree with the stored entries.
     fn assert_consistent(backlog: &TestQueue) {
         let counted: usize = backlog.tenants.values().map(TenantQueue::len).sum();
         assert_eq!(backlog.stored_total, counted, "stored_total drifted");
@@ -704,7 +696,7 @@ mod tests {
         }
     }
 
-    // ---- ordering ------------------------------------------------------
+    // Ordering.
 
     #[test]
     fn takes_in_arrival_order_within_a_lane() {
@@ -742,7 +734,7 @@ mod tests {
         assert_eq!(keys_taken(&backlog.take_batch(10, 2)), vec![(1, 1)]);
     }
 
-    // ---- folding -------------------------------------------------------
+    // Folding.
 
     #[test]
     fn folds_a_key_it_already_holds() {
@@ -772,8 +764,7 @@ mod tests {
         let mut backlog = TestQueue::new(config(), 0);
         admit_each(&mut backlog, 1, vec![item(1, 1), item(2, 2)], 1);
 
-        // Resent last, so a design that refreshed the arrival time would put it
-        // behind the item that followed it.
+        // Resubmitting must not change the original entry's arrival time.
         assert_eq!(
             backlog.admit(1, vec![item(1, 1)], 9),
             vec![Admission::Folded]
@@ -825,7 +816,40 @@ mod tests {
         assert_consistent(&backlog);
     }
 
-    // ---- fairness ------------------------------------------------------
+    #[test]
+    fn an_expired_duplicate_does_not_cover_a_new_submission() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![item(1, 1)], 1);
+
+        assert_eq!(
+            backlog.admit(1, vec![item(1, 1)], 101),
+            vec![Admission::Stored]
+        );
+        assert_eq!(keys_taken(&backlog.take_batch(1, 101)), vec![(1, 1)]);
+        assert_eq!(backlog.stats(101).discarded_expired, 1);
+        assert_consistent(&backlog);
+    }
+
+    #[test]
+    fn expired_entries_do_not_count_towards_the_group_cap() {
+        let mut backlog = TestQueue::new(
+            QueueConfig {
+                max_pending_per_group: 1,
+                ..config()
+            },
+            0,
+        );
+        backlog.admit(1, vec![item(1, 1)], 1);
+
+        assert_eq!(
+            backlog.admit(1, vec![item(1, 2)], 101),
+            vec![Admission::Stored]
+        );
+        assert_eq!(keys_taken(&backlog.take_batch(1, 101)), vec![(1, 2)]);
+        assert_consistent(&backlog);
+    }
+
+    // Fairness.
 
     #[test]
     fn takes_one_tenant_at_a_time_in_turn() {
@@ -878,14 +902,14 @@ mod tests {
                 },
             ]
         );
-        // The queue itself is nowhere near full, so the room is there for others.
+        // Other tenants can use the five remaining slots.
         assert_eq!(backlog.len(), 3);
     }
 
     #[test]
     fn an_incumbent_over_its_share_is_refused_while_a_newcomer_is_admitted() {
         let mut backlog = TestQueue::new(config(), 0);
-        // Alone, so its share is the whole queue and all five are taken.
+        // With only one tenant, all five items fit.
         admit_each(
             &mut backlog,
             1,
@@ -894,7 +918,7 @@ mod tests {
         );
         backlog.admit(2, vec![item(1, 1)], 6);
 
-        // Two tenants now, so the share is four and the incumbent is over it.
+        // Each tenant's share is now four. Tenant 1 already holds five.
         let incumbent = backlog.admit(1, vec![item(6, 6)], 7);
         let newcomer = backlog.admit(2, vec![item(2, 2)], 7);
 
@@ -919,7 +943,7 @@ mod tests {
         assert_consistent(&backlog);
     }
 
-    // ---- back pressure -------------------------------------------------
+    // Retry delays.
 
     #[test]
     fn a_full_buffer_answers_with_the_base_hint() {
@@ -946,11 +970,38 @@ mod tests {
     }
 
     #[test]
+    fn pressure_starts_when_the_last_free_slot_is_filled() {
+        let mut backlog = full_queue(1);
+
+        assert_eq!(backlog.stats(21).at_capacity_for_ns, Some(20));
+        assert_eq!(hint_at(&mut backlog, 21), 4_000);
+    }
+
+    #[test]
+    fn a_tenant_at_its_cap_gets_the_stalled_hint() {
+        let mut backlog = TestQueue::new(
+            QueueConfig {
+                max_entries_per_tenant: 1,
+                ..config()
+            },
+            0,
+        );
+        backlog.admit(1, vec![item(1, 1)], 1);
+
+        assert_eq!(
+            backlog.admit(1, vec![item(2, 2)], 60),
+            vec![Admission::Full {
+                retry_after_ms: 60_000
+            }]
+        );
+    }
+
+    #[test]
     fn the_hint_stops_at_the_ceiling() {
         let mut backlog = full_queue(1);
         backlog.admit(1, vec![item(9, 9)], 1);
 
-        // Three doublings would be 8_000, and more time cannot push it past that.
+        // Three doublings reach the maximum delay of 8_000ms.
         assert_eq!(hint_at(&mut backlog, 41), 8_000);
         assert_eq!(hint_at(&mut backlog, 45), 8_000);
     }
@@ -960,7 +1011,7 @@ mod tests {
         let mut backlog = full_queue(1);
         backlog.admit(1, vec![item(9, 9)], 1);
 
-        // The dispatcher keeps asking and keeps having no room of its own.
+        // The dispatcher has no room to accept entries.
         for tick in 2..60 {
             assert!(backlog.take_batch(0, tick).is_empty());
         }
@@ -970,8 +1021,7 @@ mod tests {
 
     #[test]
     fn an_idle_buffer_filled_in_one_call_is_not_stalled() {
-        // Nothing has been taken since the queue was built, but nothing was waiting
-        // to be taken either, so the silence means idle rather than broken.
+        // Time spent empty must not trigger the stalled retry delay.
         let mut backlog = TestQueue::new(config(), 0);
         let items = (1..=9).map(|id| item(id, id)).collect();
 
@@ -991,7 +1041,7 @@ mod tests {
         backlog.admit(1, vec![item(9, 9)], 1);
         assert!(backlog.stats(1).at_capacity_for_ns.is_some());
 
-        // Eight down to five, under the low mark of six.
+        // Removing three entries brings occupancy below the reset threshold of six.
         backlog.take_batch(3, 2);
 
         assert!(backlog.stats(2).at_capacity_for_ns.is_none());
@@ -1009,7 +1059,7 @@ mod tests {
         assert_eq!(backlog.len(), 1);
     }
 
-    // ---- expiry --------------------------------------------------------
+    // Expiry.
 
     #[test]
     fn an_expired_entry_is_discarded_rather_than_taken() {
@@ -1036,8 +1086,7 @@ mod tests {
         );
         admit_each(&mut backlog, 1, vec![item(1, 1), item(2, 2)], 1);
 
-        // Full, but everything in it aged out, so the room is reclaimed rather than
-        // the newcomer refused.
+        // Both stored entries have expired, so the new item should fit.
         let admissions = backlog.admit(1, vec![item(3, 3)], 200);
 
         assert_eq!(admissions, vec![Admission::Stored]);
@@ -1057,7 +1106,22 @@ mod tests {
         assert_eq!(backlog.stats(151).discarded_expired, 1);
     }
 
-    // ---- upgrade -------------------------------------------------------
+    #[test]
+    fn expired_tenants_do_not_stop_a_batch_before_live_tenants() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![item(1, 1)], 1);
+        backlog.admit(2, vec![item(2, 2)], 1);
+        backlog.admit(3, vec![item(3, 3)], 50);
+
+        let taken = backlog.take_batch(1, 101);
+
+        assert_eq!(tenants_taken(&taken), vec![3]);
+        assert_eq!(backlog.stats(101).discarded_expired, 2);
+        assert!(backlog.is_empty());
+        assert_consistent(&backlog);
+    }
+
+    // Snapshot and restore.
 
     #[test]
     fn snapshot_and_restore_keep_the_entries_and_their_arrival_times() {
@@ -1065,11 +1129,11 @@ mod tests {
         admit_each(&mut backlog, 1, vec![in_lane(1, 1, 1), item(2, 2)], 1);
         backlog.admit(2, vec![item(3, 3)], 3);
 
-        let mut restored = TestQueue::restore(config(), backlog.snapshot(), 500);
+        let mut restored = TestQueue::restore(config(), backlog.snapshot(), 4);
 
         assert_eq!(restored.len(), backlog.len());
         assert_eq!(restored.snapshot(), backlog.snapshot());
-        // Order survives, including the lane that arrived first losing to lane 0.
+        // Restore must preserve priority and arrival order.
         assert_eq!(
             keys_taken(&restored.take_batch(10, 50)),
             keys_taken(&backlog.take_batch(10, 50))
@@ -1082,8 +1146,7 @@ mod tests {
         let backlog = full_queue(1);
         let snapshot = backlog.snapshot();
 
-        // Past the silence threshold of 50ns but inside the 100ns lifetime, so the
-        // entries are still there and only the clock is in question.
+        // The entries are old enough to trigger a stall, but have not expired.
         let mut restored = TestQueue::restore(config(), snapshot, 60);
         assert_eq!(
             restored.len(),
@@ -1101,16 +1164,72 @@ mod tests {
 
     #[test]
     fn restoring_nothing_gives_an_empty_buffer() {
-        let restored = TestQueue::restore(config(), vec![], 10);
+        let empty = TestQueue::new(config(), 0);
+        let restored = TestQueue::restore(config(), empty.snapshot(), 10);
 
         assert!(restored.is_empty());
         assert_eq!(restored.stats(10).active_tenants, 0);
         assert_consistent(&restored);
     }
 
-    // ---- helpers that need the types above -----------------------------
+    #[test]
+    fn restore_preserves_the_next_tenant_to_serve() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![item(1, 1), item(1, 2)], 1);
+        backlog.admit(2, vec![item(2, 1)], 1);
+        assert_eq!(tenants_taken(&backlog.take_batch(1, 2)), vec![1]);
 
-    /// A queue holding exactly `max_entries`, all arrived at nanosecond 1.
+        let mut restored = TestQueue::restore(config(), backlog.snapshot(), 3);
+
+        assert_eq!(tenants_taken(&restored.take_batch(1, 4)), vec![2]);
+        assert_consistent(&restored);
+    }
+
+    #[test]
+    fn restore_restarts_the_pressure_timer() {
+        let backlog = full_queue(1);
+        let mut restored = TestQueue::restore(config(), backlog.snapshot(), 60);
+
+        assert_eq!(restored.stats(60).at_capacity_for_ns, Some(0));
+        assert_eq!(hint_at(&mut restored, 70), 2_000);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid queue configuration")]
+    fn rejects_a_configuration_whose_pressure_cannot_clear() {
+        TestQueue::new(
+            QueueConfig {
+                pressure_cleared_below: 0,
+                ..config()
+            },
+            0,
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "queue items need at least one lane")]
+    fn rejects_items_without_any_lanes() {
+        #[derive(Clone)]
+        struct NoLanes;
+
+        impl QueueItem for NoLanes {
+            type Key = ();
+            type Group = ();
+            const LANES: usize = 0;
+
+            fn key(&self) {}
+            fn group(&self) {}
+            fn lane(&self) -> usize {
+                0
+            }
+        }
+
+        AdmissionQueue::<u8, NoLanes>::new(config(), 0);
+    }
+
+    // Test helpers.
+
+    /// Fills the queue at nanosecond 1.
     fn full_queue(tenant: u8) -> TestQueue {
         let mut backlog = TestQueue::new(config(), 0);
         let items = (1..=8).map(|id| item(id, id)).collect();
@@ -1122,8 +1241,7 @@ mod tests {
         backlog
     }
 
-    /// The hint a full queue gives at `now_ns`, read through `admit` so the test
-    /// exercises the path a caller actually takes.
+    /// Reads the retry delay by submitting to a full queue.
     fn hint_at(backlog: &mut TestQueue, now_ns: Timestamp) -> u32 {
         match backlog.admit(99, vec![item(99, 99)], now_ns).remove(0) {
             Admission::Full { retry_after_ms } => retry_after_ms,

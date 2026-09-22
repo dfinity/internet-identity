@@ -1,47 +1,41 @@
-//! Everything II has accepted and not yet handed to the processing queue.
+//! Notifications waiting for the dispatcher.
 //!
-//! The mechanism is [`crate::admission_queue`], which is generic
-//! and knows nothing about notifications. This is the notification half of that
-//! contract: what an item is, how the queue should identify and order it, and the
-//! sizes II runs at.
-// Nothing calls this yet. The entrypoint and the dispatcher that do arrive in
-// later PRs of this stack.
+//! Each app has a tenant in [`crate::admission_queue`]. Notifications are identified
+//! by recipient and app-chosen ID, capped per recipient, and ordered by urgency.
+// The submission endpoint and dispatcher will use this in later PRs.
 #![allow(dead_code)]
 
 use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use crate::storage::storable::application::StorableOriginSha256;
 use internet_identity_interface::internet_identity::types::AnchorNumber;
 
-/// The four levels of RFC 8030 `Urgency`, highest first so the variant index is the
-/// lane to drain first. Kept identical to the header value the relay is given, so
-/// nothing downstream has to translate it.
+/// RFC 8030 urgency levels. Variant order sets the queue priority, highest first.
+/// The dispatcher must convert these to the corresponding HTTP header strings.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Urgency {
+pub(crate) enum Urgency {
     High,
     Normal,
     Low,
     VeryLow,
 }
 
-/// A notification II has accepted and not yet handed on.
+/// A request to wake a recipient's devices, without notification content.
 ///
-/// Content-free: this says who to wake and for which app, never what the
-/// notification is about. The worker fetches that from the app itself.
+/// Folding assumes a wake-up makes the browser fetch all pending notifications
+/// from the app. That fetch path must be implemented before enabling delivery.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PendingNotification {
-    pub recipient: AnchorNumber,
-    /// Chosen by the app. Unique only within that app and that recipient.
-    pub notification_id: u64,
-    pub urgency: Urgency,
+pub(crate) struct PendingNotification {
+    pub(crate) recipient: AnchorNumber,
+    /// Chosen by the app and unique within that app and recipient.
+    pub(crate) notification_id: u64,
+    pub(crate) urgency: Urgency,
 }
 
 impl QueueItem for PendingNotification {
-    /// The id alone would collide: an app numbering from one per user reuses the
-    /// same id across recipients.
+    /// Different recipients may have the same notification ID.
     type Key = (AnchorNumber, u64);
 
-    /// Capped per recipient, since each pending notification becomes one outcall per
-    /// device, and the first wake-up to land already makes the worker pull the rest.
+    /// Limit pending wake-ups per recipient within each app.
     type Group = AnchorNumber;
 
     const LANES: usize = 4;
@@ -59,26 +53,23 @@ impl QueueItem for PendingNotification {
     }
 }
 
-/// Everything II has accepted and not yet handed to the processing queue, keyed by
-/// the app that sent it.
+/// Pending notifications grouped by the app that sent them.
 ///
-/// The tenant is the SHA-256 of the *canonical* origin, hashed by the caller after
-/// the legacy-domain remap. This type cannot tell `https://app.icp0.io` from
-/// `https://app.ic0.app`, so hashing before the remap would give one app two tenants
-/// and two shares of the queue.
-pub type NotificationBacklog = AdmissionQueue<StorableOriginSha256, PendingNotification>;
+/// The caller must authorize the app and hash its canonical origin after the
+/// legacy-domain remap. Otherwise, aliases such as `https://app.icp0.io` and
+/// `https://app.ic0.app` would receive separate queue allowances.
+pub(crate) type NotificationBacklog = AdmissionQueue<StorableOriginSha256, PendingNotification>;
 
 const SECOND_NS: u64 = 1_000_000_000;
 const MINUTE_NS: u64 = 60 * SECOND_NS;
 
-pub const NOTIFICATION_BACKLOG: QueueConfig = QueueConfig {
+pub(crate) const NOTIFICATION_BACKLOG: QueueConfig = QueueConfig {
     max_entries: 10_000,
-    // Below the ceiling, so an app that signs up later finds room rather than a
-    // queue one broadcast has already filled.
+    // One app may not use every slot.
     max_entries_per_tenant: 7_000,
     max_pending_per_group: 20,
     pressure_cleared_below: 8_000,
-    // How long a notification is still worth waking a device for.
+    // Stop trying to wake devices for entries older than five minutes.
     discard_after_ns: 5 * MINUTE_NS,
     retry: RetryPolicy {
         base_ms: 5_000,
@@ -86,23 +77,20 @@ pub const NOTIFICATION_BACKLOG: QueueConfig = QueueConfig {
         when_stalled_ms: 600_000,
         doubles_every_ns: 30 * SECOND_NS,
         max_doublings: 6,
-        // The dispatcher fires every 2s, so this is thirty missed turns. It moves if
-        // that interval does.
+        // Allow one minute without a successful take before reporting a stall.
         stalled_after_silence_ns: MINUTE_NS,
     },
 };
 
-// Asserted at compile time rather than in a test: these are constants, so a test
-// would be optimized away and the build should refuse an incoherent config.
+// Reject invalid limits at compile time.
 const _: () = assert!(NOTIFICATION_BACKLOG.is_coherent());
 
-// One app must not be able to fill the queue, or an app signing up later finds
-// nothing free.
+// One app alone must stay below the pressure reset threshold.
 const _: () = assert!(
     NOTIFICATION_BACKLOG.max_entries_per_tenant < NOTIFICATION_BACKLOG.pressure_cleared_below
 );
 
-// Pressure has to clear below the ceiling, or the retry hint flaps at the boundary.
+// Opening one slot must not reset the pressure timer.
 const _: () =
     assert!(NOTIFICATION_BACKLOG.pressure_cleared_below < NOTIFICATION_BACKLOG.max_entries);
 
@@ -179,8 +167,7 @@ mod tests {
             .iter()
             .all(|admission| *admission == Admission::Stored));
 
-        // The wake-ups already queued will make the worker pull this one too, so it
-        // is covered rather than refused.
+        // The caller relies on existing wake-ups to cover this notification too.
         assert_eq!(
             backlog.admit(app, vec![notification(1, cap)], 1),
             vec![Admission::Folded]
