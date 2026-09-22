@@ -432,12 +432,12 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
 fn app_send_notification(
     request: SendNotificationArg,
 ) -> Result<SendNotificationResponse, SendNotificationError> {
-    let validated: ValidatedSendNotificationArg = request.try_into()?;
+    let request: ValidatedSendNotificationArg = request.try_into()?;
 
-    match notifications::senders::authorize(&validated, caller()) {
+    match notifications::senders::authorize(&request, caller()) {
         Senders::NotListed => Err(SendNotificationError::SenderNotListed),
         Senders::Pending => Ok(notifications::defer_whole_batch(
-            validated,
+            request,
             ic_cdk::api::time(),
         )),
         Senders::Listed => Err(SendNotificationError::InternalCanisterError(
