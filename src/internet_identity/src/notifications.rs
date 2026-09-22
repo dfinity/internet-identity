@@ -14,7 +14,6 @@ use internet_identity_interface::internet_identity::types::{
     NotificationGrantConsentError, NotificationRevokeConsentError, SendNotificationResponse,
     Timestamp,
 };
-use std::collections::HashSet;
 pub use validation::{
     notifications_enabled, ValidatedNotificationConsentGrantedRequest,
     ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
@@ -22,24 +21,11 @@ pub use validation::{
 };
 
 /// How long a sender waits before sending a batch again that II could not
-/// judge yet. Fetching the origin's sender list is one outcall round trip, so
-/// this covers the healthy case without inviting a caller to hammer the
-/// canister while it resolves.
-const PENDING_RETRY_AFTER_NS: u64 = 30 * 1_000_000_000;
-
-/// Drops all but the last entry for each `(recipient, id)`, which is what the
-/// interface promises a batch does: entries apply in order and a later one
-/// supersedes an earlier one. Surviving entries keep their submitted order.
-fn dedup_last_wins(notifications: Vec<Notification>) -> Vec<Notification> {
-    let mut seen = HashSet::new();
-    let mut kept: Vec<Notification> = notifications
-        .into_iter()
-        .rev()
-        .filter(|notification| seen.insert((notification.recipient, notification.id)))
-        .collect();
-    kept.reverse();
-    kept
-}
+/// judge yet, which is only ever the wait for one sender-list outcall. Kept
+/// short because the costs are lopsided: retrying before the list lands is one
+/// more cheap update call that defers again, while retrying late is a
+/// notification sitting undelivered for no reason.
+const PENDING_RETRY_AFTER_NS: u64 = 2 * 1_000_000_000;
 
 /// Nothing was enqueued: II holds no sender list for the origin yet, so it
 /// cannot judge the batch and the whole of it is the sender's to send again.
@@ -51,7 +37,7 @@ pub fn defer_whole_batch(
     now_ns: Timestamp,
 ) -> SendNotificationResponse {
     SendNotificationResponse {
-        not_accepted: dedup_last_wins(notifications)
+        not_accepted: notifications
             .into_iter()
             .map(|Notification { id, recipient, .. }| NotAccepted {
                 id,

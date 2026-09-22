@@ -8,6 +8,7 @@ use internet_identity_interface::internet_identity::types::{
     NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationRevokeConsentError,
     NotificationRevokeConsentRequest, SendNotificationArg, SendNotificationError,
 };
+use std::collections::HashMap;
 use url::Url;
 
 /// Held by every validated request below. Private to this module, so the `TryFrom`
@@ -103,7 +104,7 @@ impl TryFrom<SendNotificationArg> for ValidatedSendNotificationArg {
             .map_err(SendNotificationError::InternalCanisterError)?;
         Ok(Self {
             origin,
-            notifications,
+            notifications: dedup_last_wins(notifications),
             _validated: Validated,
         })
     }
@@ -155,6 +156,32 @@ fn canonical_origin(origin: &str) -> Result<FrontendHostname, String> {
         return Err("origin must be a bare scheme://host[:port]".to_string());
     }
     Ok(origin.to_string())
+}
+
+/// Collapses each `(recipient, id)` to one entry, which is what the interface
+/// promises a batch does: entries apply in order and a later one supersedes an
+/// earlier one. The later entry takes the earlier one's place rather than the
+/// batch's tail, because a re-send replaces a pending notification instead of
+/// queueing behind it — so what a repeat changes is the entry, never where the
+/// origin put it.
+///
+/// Part of validation rather than of any one consumer, so a validated request
+/// carries a batch that already holds each pair once and nothing downstream
+/// has to rediscover the rule.
+fn dedup_last_wins(notifications: Vec<Notification>) -> Vec<Notification> {
+    let mut placed = HashMap::new();
+    let mut kept: Vec<Notification> = Vec::with_capacity(notifications.len());
+    for notification in notifications {
+        let pair = (notification.recipient, notification.id);
+        match placed.get(&pair) {
+            Some(&index) => kept[index] = notification,
+            None => {
+                placed.insert(pair, kept.len());
+                kept.push(notification);
+            }
+        }
+    }
+    kept
 }
 
 /// Refuses an origin II will not fetch a sender list from. Consent keys on the
@@ -233,6 +260,7 @@ fn enabled_for(origin: &FrontendHostname) -> Result<(), String> {
 mod tests {
     use super::*;
     use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
+    use internet_identity_interface::internet_identity::types::Urgency;
     use std::cell::RefCell;
 
     thread_local! {
@@ -247,6 +275,80 @@ mod tests {
 
     fn allow_insecure(allow: bool) {
         TEST_ALLOW_INSECURE_SENDER_LIST.with_borrow_mut(|flag| *flag = allow);
+    }
+
+    fn notification(id: u64, recipient: &str, urgency: Urgency) -> Notification {
+        Notification {
+            id,
+            recipient: candid::Principal::from_text(recipient).expect("a principal"),
+            expires_at: None,
+            urgency: Some(urgency),
+        }
+    }
+
+    fn validate(notifications: Vec<Notification>) -> ValidatedSendNotificationArg {
+        enable(&["https://app.example"]);
+        SendNotificationArg {
+            origin: "https://app.example".to_string(),
+            notifications,
+        }
+        .try_into()
+        .expect("a notifiable origin")
+    }
+
+    /// A batch applies in order, so a repeated (recipient, id) keeps the last
+    /// entry — the one that supersedes — and the pair appears once.
+    #[test]
+    fn a_repeated_recipient_and_id_keeps_the_last_entry() {
+        let request = validate(vec![
+            notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::Low),
+            notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::High),
+        ]);
+
+        assert_eq!(request.notifications.len(), 1);
+        assert_eq!(request.notifications[0].urgency, Some(Urgency::High));
+    }
+
+    /// One id sent to two recipients is two notifications, not a repeat.
+    #[test]
+    fn one_id_for_two_recipients_survives_as_two() {
+        let request = validate(vec![
+            notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::Normal),
+            notification(1, "rrkah-fqaaa-aaaaa-aaaaq-cai", Urgency::Normal),
+        ]);
+
+        assert_eq!(request.notifications.len(), 2);
+    }
+
+    /// Surviving entries keep the order they were submitted in.
+    #[test]
+    fn deduplication_keeps_the_submitted_order() {
+        let request = validate(vec![
+            notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::Normal),
+            notification(2, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::Normal),
+            notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::High),
+        ]);
+
+        let ids: Vec<u64> = request.notifications.iter().map(|n| n.id).collect();
+        assert_eq!(ids, vec![1, 2]);
+        assert_eq!(request.notifications[0].urgency, Some(Urgency::High));
+    }
+
+    /// The cap counts what was submitted, not what survives deduplication: a
+    /// batch naming one pair many times still costs a message that much work.
+    #[test]
+    fn the_cap_counts_submitted_entries() {
+        enable(&["https://app.example"]);
+        let repeated = notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::Normal);
+        let request = SendNotificationArg {
+            origin: "https://app.example".to_string(),
+            notifications: vec![repeated; MAX_NOTIFICATIONS_PER_CALL + 1],
+        };
+
+        assert!(matches!(
+            ValidatedSendNotificationArg::try_from(request),
+            Err(SendNotificationError::TooManyNotifications { .. })
+        ));
     }
 
     /// The scheme decides where II sends an outcall, so a list that would be
