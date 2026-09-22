@@ -1,11 +1,12 @@
-//! A bounded queue shared by several tenants.
+//! A bounded queue shared by several senders. Each sender has a capacity limit
+//! and gets a turn when items are taken.
 //!
-//! [`AdmissionQueue::admit`] removes the submitting tenant's expired entries,
+//! [`AdmissionQueue::admit`] removes the submitting sender's expired entries,
 //! checks for duplicates and the group limit, then checks available capacity.
 //! Each item is stored, folded into existing work, or rejected with a retry delay.
 //!
-//! [`AdmissionQueue::take_batch`] takes one item per tenant in turn. Within each
-//! tenant, lower-numbered lanes come first, then older entries. The item key breaks
+//! [`AdmissionQueue::take_batch`] takes one item per sender in turn. Within each
+//! sender, lower priority values come first, then older entries. The item key breaks
 //! ties when arrival times match, including items submitted in the same call.
 //!
 //! Callers must supply trusted canister time as `now_ns`. The queue assigns that
@@ -24,58 +25,57 @@ use std::ops::Bound::{Excluded, Unbounded};
 
 /// The key, group, and priority of a queued item.
 pub(crate) trait QueueItem: Clone {
-    /// Identifies an item within one tenant. A duplicate key is not stored again.
+    /// Identifies an item for one sender. A duplicate key is not stored again.
     type Key: Clone + Eq + Hash + Ord;
 
-    /// Identifies items that share a pending-item limit within one tenant.
+    /// Identifies items that share a pending-item limit for one sender.
     type Group: Copy + Eq + Hash;
 
-    /// Number of priority lanes. Lane 0 is taken first. Zero is treated as one.
-    const LANES: usize;
+    /// Number of priority levels. Zero is treated as one.
+    const PRIORITY_LEVELS: usize;
 
     fn key(&self) -> Self::Key;
     fn group(&self) -> Self::Group;
 
-    /// The item's lane. Out-of-range values use the last lane.
-    fn lane(&self) -> usize;
+    /// Processing priority among this sender's items. Lower values are taken first.
+    /// Out-of-range values use the lowest priority.
+    fn priority(&self) -> usize;
 }
 
 /// Capacity limits, expiry time, and retry delays.
 #[derive(Clone, Debug)]
 pub(crate) struct QueueConfig {
-    /// Maximum number of entries admitted across all tenants. Callers must also
+    /// Maximum number of entries admitted across all senders. Callers must also
     /// bound item size if they need a memory limit.
     pub(crate) max_entries: usize,
-    /// Maximum entries for one tenant. Its limit may be lower when the queue is
-    /// shared by several tenants.
-    pub(crate) max_entries_per_tenant: usize,
-    /// Maximum pending entries per group within one tenant. Further items fold.
+    /// Maximum entries for one sender. Its limit may be lower when the queue is
+    /// shared by several senders.
+    pub(crate) max_entries_per_sender: usize,
+    /// Maximum pending entries per group for one sender. Further items fold.
     pub(crate) max_pending_per_group: usize,
     /// Clear the pressure timer when occupancy falls below this value. A value
     /// below `max_entries` avoids resetting the timer whenever one slot opens.
     pub(crate) pressure_cleared_below: usize,
     /// Discard entries when they reach this age, measured from admission.
-    pub(crate) discard_after_ns: u64,
+    pub(crate) discard_entries_after_ns: u64,
     pub(crate) retry: RetryPolicy,
 }
 
 impl QueueConfig {
-    /// Checks the limits and time intervals. `const`, so a caller asserts on its own
-    /// config at compile time. The queue does not check at runtime: it is built during
-    /// `post_upgrade`, where a panic fails the upgrade itself.
+    /// Checks the limits and time intervals. Also usable in a compile-time assertion.
     pub(crate) const fn is_coherent(&self) -> bool {
         self.max_entries > 0
-            && self.max_entries_per_tenant > 0
+            && self.max_entries_per_sender > 0
             && self.max_pending_per_group > 0
-            && self.max_entries_per_tenant <= self.max_entries
+            && self.max_entries_per_sender <= self.max_entries
             && self.pressure_cleared_below > 0
             && self.pressure_cleared_below <= self.max_entries
-            && self.discard_after_ns > 0
+            && self.discard_entries_after_ns > 0
             && self.retry.is_coherent()
     }
 }
 
-/// Retry delays returned when the queue or a tenant reaches its limit.
+/// Retry delays returned when the queue or a sender reaches its limit.
 #[derive(Clone, Debug)]
 pub(crate) struct RetryPolicy {
     /// Initial retry delay.
@@ -87,6 +87,7 @@ pub(crate) struct RetryPolicy {
     pub(crate) when_stalled_ms: u32,
     /// Double the delay after each interval of queue pressure.
     pub(crate) doubles_every_ns: u64,
+    /// Maximum number of doublings before hitting the ceiling.
     pub(crate) max_doublings: u32,
     /// How long entries may wait without a successful take before declaring a stall.
     pub(crate) stalled_after_silence_ns: u64,
@@ -99,6 +100,7 @@ impl RetryPolicy {
             && self.ceiling_ms <= self.when_stalled_ms
             && self.doubles_every_ns > 0
             && self.stalled_after_silence_ns > 0
+            && self.max_doublings > 0
     }
 }
 
@@ -109,7 +111,7 @@ pub(crate) enum Admission {
     /// Not stored because its key is already queued or its group is at its limit.
     /// The caller must ensure existing work also covers a folded item.
     Folded,
-    /// Not stored because the queue or tenant is full. Retry after this delay.
+    /// Not stored because the queue or sender is full. Retry after this delay.
     Full {
         retry_after_ms: u32,
     },
@@ -122,33 +124,33 @@ pub(crate) struct Entry<Item> {
     pub(crate) item: Item,
 }
 
-/// An entry removed from the queue, with its tenant.
+/// An entry removed from the queue, with its sender.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Taken<Tenant, Item> {
-    pub(crate) tenant: Tenant,
+pub(crate) struct Taken<Sender, Item> {
+    pub(crate) sender: Sender,
     pub(crate) entry: Entry<Item>,
 }
 
-/// One tenant's saved entries.
+/// One sender's saved entries.
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct TenantSnapshot<Tenant, Item> {
-    tenant: Tenant,
+struct SenderSnapshot<Sender, Item> {
+    sender: Sender,
     entries: Vec<Entry<Item>>,
 }
 
-/// Saved entries and the next tenant to serve. Private fields keep callers from
+/// Saved entries and the next sender to serve. Private fields keep callers from
 /// constructing snapshots with duplicate keys or inconsistent entries.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct QueueSnapshot<Tenant, Item> {
-    tenants: Vec<TenantSnapshot<Tenant, Item>>,
-    next_tenant: Option<Tenant>,
+pub(crate) struct QueueSnapshot<Sender, Item> {
+    senders: Vec<SenderSnapshot<Sender, Item>>,
+    next_sender: Option<Sender>,
 }
 
 /// Queue counts and timings for metrics. Expired entries count until removed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct QueueStats {
     pub(crate) stored_total: usize,
-    pub(crate) active_tenants: usize,
+    pub(crate) active_senders: usize,
     /// Age of the oldest stored entry.
     pub(crate) oldest_age_ns: Option<u64>,
     /// Time since the queue filled, until occupancy falls below the reset threshold.
@@ -160,30 +162,32 @@ pub(crate) struct QueueStats {
     pub(crate) folded_group_capped: u64,
 }
 
-/// One tenant's entries, indexed for ordering, duplicate checks, and group limits.
-struct TenantQueue<Item: QueueItem> {
-    /// Entries ordered by arrival time, then key, in each priority lane.
-    lanes: Vec<BTreeMap<(Timestamp, Item::Key), Item>>,
-    /// Keys currently queued for this tenant.
+/// One sender's entries, indexed for ordering, duplicate checks, and group limits.
+struct SenderQueue<Item: QueueItem> {
+    /// Entries grouped by priority and ordered by arrival time, then key.
+    entries_by_priority: Vec<BTreeMap<(Timestamp, Item::Key), Item>>,
+    /// Keys currently queued for this sender.
     present: HashSet<Item::Key>,
     pending_per_group: HashMap<Item::Group, usize>,
 }
 
-impl<Item: QueueItem> TenantQueue<Item> {
+impl<Item: QueueItem> SenderQueue<Item> {
     fn new() -> Self {
         Self {
-            lanes: (0..Item::LANES.max(1)).map(|_| BTreeMap::new()).collect(),
+            entries_by_priority: (0..Item::PRIORITY_LEVELS.max(1))
+                .map(|_| BTreeMap::new())
+                .collect(),
             present: HashSet::new(),
             pending_per_group: HashMap::new(),
         }
     }
 
     fn len(&self) -> usize {
-        self.lanes.iter().map(BTreeMap::len).sum()
+        self.entries_by_priority.iter().map(BTreeMap::len).sum()
     }
 
     fn is_empty(&self) -> bool {
-        self.lanes.iter().all(BTreeMap::is_empty)
+        self.entries_by_priority.iter().all(BTreeMap::is_empty)
     }
 
     fn pending(&self, group: &Item::Group) -> usize {
@@ -191,18 +195,25 @@ impl<Item: QueueItem> TenantQueue<Item> {
     }
 
     fn insert(&mut self, received_at_ns: Timestamp, item: Item) {
-        let lane = item.lane().min(self.lanes.len().saturating_sub(1));
+        let priority = item
+            .priority()
+            .min(self.entries_by_priority.len().saturating_sub(1));
         let key = item.key();
         *self.pending_per_group.entry(item.group()).or_insert(0) += 1;
         self.present.insert(key.clone());
-        // In range: `lanes` is never empty and `lane` is clamped to its last index.
-        self.lanes[lane].insert((received_at_ns, key), item);
+        // In range: the vector is never empty and `priority` is clamped to its last index.
+        self.entries_by_priority[priority].insert((received_at_ns, key), item);
     }
 
-    fn remove(&mut self, lane: usize, received_at_ns: Timestamp, key: &Item::Key) -> Option<Item> {
+    fn remove(
+        &mut self,
+        priority: usize,
+        received_at_ns: Timestamp,
+        key: &Item::Key,
+    ) -> Option<Item> {
         let item = self
-            .lanes
-            .get_mut(lane)?
+            .entries_by_priority
+            .get_mut(priority)?
             .remove(&(received_at_ns, key.clone()))?;
         self.present.remove(key);
         let group = item.group();
@@ -215,55 +226,62 @@ impl<Item: QueueItem> TenantQueue<Item> {
         Some(item)
     }
 
-    /// The next entry to take: the oldest in the first nonempty lane.
+    /// The oldest entry at the highest available priority.
     fn front(&self) -> Option<(usize, Timestamp, Item::Key)> {
-        self.lanes.iter().enumerate().find_map(|(lane, entries)| {
-            entries
-                .first_key_value()
-                .map(|((received_at_ns, key), _)| (lane, *received_at_ns, key.clone()))
-        })
+        self.entries_by_priority
+            .iter()
+            .enumerate()
+            .find_map(|(priority, entries)| {
+                entries
+                    .first_key_value()
+                    .map(|((received_at_ns, key), _)| (priority, *received_at_ns, key.clone()))
+            })
     }
 
-    fn oldest_in_lane(&self, lane: usize) -> Option<(Timestamp, Item::Key)> {
-        self.lanes
-            .get(lane)?
+    fn oldest_at_priority(&self, priority: usize) -> Option<(Timestamp, Item::Key)> {
+        self.entries_by_priority
+            .get(priority)?
             .first_key_value()
             .map(|((received_at_ns, key), _)| (*received_at_ns, key.clone()))
     }
 
     fn oldest_arrival_ns(&self) -> Option<Timestamp> {
-        self.lanes
+        self.entries_by_priority
             .iter()
             .filter_map(|entries| entries.first_key_value().map(|((ts, _), _)| *ts))
             .min()
     }
 }
 
-pub(crate) struct AdmissionQueue<Tenant: Clone + Ord, Item: QueueItem> {
+pub(crate) struct AdmissionQueue<Sender: Clone + Ord, Item: QueueItem> {
     config: QueueConfig,
-    tenants: BTreeMap<Tenant, TenantQueue<Item>>,
-    /// Where the next batch resumes taking turns between tenants.
-    next_tenant: Option<Tenant>,
+    senders: BTreeMap<Sender, SenderQueue<Item>>,
+    /// Where the next batch resumes taking turns between senders.
+    next_sender: Option<Sender>,
+    // Total current number of entries across all senders.
     stored_total: usize,
 
-    /// When the queue last changed from empty to nonempty.
+    /// When the queue first became nonempty. Reset when it empties. Used to avoid counting time spent empty as a stall.
     nonempty_since_ns: Option<Timestamp>,
-    /// When the queue filled. Reset below `pressure_cleared_below`.
+    /// When the queue filled. Resets when occupancy falls below `pressure_cleared_below`. Used to compute retry delays.
     at_capacity_since_ns: Option<Timestamp>,
     /// Last successful take, or construction or restore time.
     last_taken_ns: Timestamp,
 
+    /// Metrics for monitoring and testing. These are not persisted, so they reset on canister upgrade.
     discarded_expired: u64,
+    /// When a group has a pending entry with the same key, further items fold. This counts how many times that happened.
     folded_duplicates: u64,
+    /// When a group has too many pending entries, further items fold. This counts how many times that happened.
     folded_group_capped: u64,
 }
 
-impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
+impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
     pub(crate) fn new(config: QueueConfig, now_ns: Timestamp) -> Self {
         Self {
             config,
-            tenants: BTreeMap::new(),
-            next_tenant: None,
+            senders: BTreeMap::new(),
+            next_sender: None,
             stored_total: 0,
             nonempty_since_ns: None,
             at_capacity_since_ns: None,
@@ -274,12 +292,12 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         }
     }
 
-    /// Submits items for a tenant and returns one result per item, in input order.
+    /// Submits items for a sender and returns one result per item, in input order.
     /// Uses trusted `now_ns` for all new entries. Folding leaves existing entries,
     /// including their age and priority, unchanged.
     pub(crate) fn admit(
         &mut self,
-        tenant: Tenant,
+        sender: Sender,
         items: Vec<Item>,
         now_ns: Timestamp,
     ) -> Vec<Admission> {
@@ -287,61 +305,61 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         let mut swept = false;
 
         if !items.is_empty() {
-            self.discard_expired_for(&tenant, now_ns);
+            self.discard_expired_for(&sender, now_ns);
         }
 
         for item in items {
-            if self.holds(&tenant, &item.key()) {
+            if self.holds(&sender, &item.key()) {
                 self.folded_duplicates += 1;
                 admissions.push(Admission::Folded);
                 continue;
             }
 
-            if self.pending_for(&tenant, &item.group()) >= self.config.max_pending_per_group {
+            if self.pending_for(&sender, &item.group()) >= self.config.max_pending_per_group {
                 self.folded_group_capped += 1;
                 admissions.push(Admission::Folded);
                 continue;
             }
 
-            // Before rejecting for capacity, free expired entries across all tenants.
+            // Before rejecting for capacity, free expired entries across all senders.
             // Once per call is enough because now_ns does not change.
-            if !swept && (self.is_full() || self.tenant_at_cap(&tenant)) {
+            if !swept && (self.is_full() || self.sender_at_cap(&sender)) {
                 self.discard_expired(now_ns);
                 swept = true;
             }
 
-            if self.is_full() || self.tenant_at_cap(&tenant) {
+            if self.is_full() || self.sender_at_cap(&sender) {
                 admissions.push(Admission::Full {
                     retry_after_ms: self.retry_after_ms(now_ns),
                 });
                 continue;
             }
 
-            self.insert(&tenant, now_ns, item);
+            self.insert(&sender, now_ns, item);
             admissions.push(Admission::Stored);
         }
 
         admissions
     }
 
-    /// Removes up to `limit` live entries, taking one per tenant in turn.
+    /// Removes up to `limit` live entries, taking one per sender in turn.
     /// The caller must have room to keep all returned entries. Zero does nothing.
     /// Expired entries are discarded and do not count towards the limit.
     pub(crate) fn take_batch(
         &mut self,
         limit: usize,
         now_ns: Timestamp,
-    ) -> Vec<Taken<Tenant, Item>> {
+    ) -> Vec<Taken<Sender, Item>> {
         let mut taken = Vec::new();
 
         while taken.len() < limit {
-            let Some(tenant) = self.advance_cursor() else {
+            let Some(sender) = self.advance_cursor() else {
                 break;
             };
-            // If nothing is live, pop_live removes the tenant. Each iteration
-            // therefore returns an entry or reduces the number of tenants.
-            if let Some(entry) = self.pop_live(&tenant, now_ns) {
-                taken.push(Taken { tenant, entry });
+            // If nothing is live, pop_live removes the sender. Each iteration
+            // therefore returns an entry or reduces the number of senders.
+            if let Some(entry) = self.pop_live(&sender, now_ns) {
+                taken.push(Taken { sender, entry });
             }
         }
 
@@ -353,14 +371,14 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
 
     /// Copies stored entries and the round-robin cursor. Restore rebuilds the
     /// indexes. Persistence and serialization are the caller's responsibility.
-    pub(crate) fn snapshot(&self) -> QueueSnapshot<Tenant, Item> {
-        let tenants = self
-            .tenants
+    pub(crate) fn snapshot(&self) -> QueueSnapshot<Sender, Item> {
+        let senders = self
+            .senders
             .iter()
-            .map(|(tenant, queue)| TenantSnapshot {
-                tenant: tenant.clone(),
+            .map(|(sender, queue)| SenderSnapshot {
+                sender: sender.clone(),
                 entries: queue
-                    .lanes
+                    .entries_by_priority
                     .iter()
                     .flat_map(|entries| {
                         entries.iter().map(|((received_at_ns, _), item)| Entry {
@@ -372,8 +390,8 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
             })
             .collect();
         QueueSnapshot {
-            tenants,
-            next_tenant: self.next_tenant.clone(),
+            senders,
+            next_sender: self.next_sender.clone(),
         }
     }
 
@@ -382,16 +400,16 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
     /// configuration lowers capacity; admission waits for space to become available.
     pub(crate) fn restore(
         config: QueueConfig,
-        snapshot: QueueSnapshot<Tenant, Item>,
+        snapshot: QueueSnapshot<Sender, Item>,
         now_ns: Timestamp,
     ) -> Self {
         let mut backlog = Self::new(config, now_ns);
-        for tenant in snapshot.tenants {
-            for entry in tenant.entries {
-                backlog.insert(&tenant.tenant, entry.received_at_ns, entry.item);
+        for sender in snapshot.senders {
+            for entry in sender.entries {
+                backlog.insert(&sender.sender, entry.received_at_ns, entry.item);
             }
         }
-        backlog.next_tenant = snapshot.next_tenant;
+        backlog.next_sender = snapshot.next_sender;
         backlog.at_capacity_since_ns = backlog.is_full().then_some(now_ns);
         backlog
     }
@@ -399,11 +417,11 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
     pub(crate) fn stats(&self, now_ns: Timestamp) -> QueueStats {
         QueueStats {
             stored_total: self.stored_total,
-            active_tenants: self.tenants.len(),
+            active_senders: self.senders.len(),
             oldest_age_ns: self
-                .tenants
+                .senders
                 .values()
-                .filter_map(TenantQueue::oldest_arrival_ns)
+                .filter_map(SenderQueue::oldest_arrival_ns)
                 .min()
                 .map(|oldest| now_ns.saturating_sub(oldest)),
             at_capacity_for_ns: self
@@ -416,15 +434,15 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         }
     }
 
-    fn holds(&self, tenant: &Tenant, key: &Item::Key) -> bool {
-        self.tenants
-            .get(tenant)
+    fn holds(&self, sender: &Sender, key: &Item::Key) -> bool {
+        self.senders
+            .get(sender)
             .is_some_and(|queue| queue.present.contains(key))
     }
 
-    fn pending_for(&self, tenant: &Tenant, group: &Item::Group) -> usize {
-        self.tenants
-            .get(tenant)
+    fn pending_for(&self, sender: &Sender, group: &Item::Group) -> usize {
+        self.senders
+            .get(sender)
             .map_or(0, |queue| queue.pending(group))
     }
 
@@ -432,26 +450,26 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         self.stored_total >= self.config.max_entries
     }
 
-    fn tenant_at_cap(&self, tenant: &Tenant) -> bool {
-        let held = self.tenants.get(tenant).map_or(0, TenantQueue::len);
-        held >= self.tenant_cap()
+    fn sender_at_cap(&self, sender: &Sender) -> bool {
+        let held = self.senders.get(sender).map_or(0, SenderQueue::len);
+        held >= self.sender_cap()
     }
 
-    /// Divides capacity equally among active tenants, up to the per-tenant limit.
-    /// Existing entries are not evicted when a new tenant reduces this share.
-    fn tenant_cap(&self) -> usize {
+    /// Divides capacity equally among active senders, up to the per-sender limit.
+    /// Existing entries are not evicted when a new sender reduces this share.
+    fn sender_cap(&self) -> usize {
         self.config
-            .max_entries_per_tenant
-            .min(self.config.max_entries / self.tenants.len().max(1))
+            .max_entries_per_sender
+            .min(self.config.max_entries / self.senders.len().max(1))
     }
 
-    fn insert(&mut self, tenant: &Tenant, received_at_ns: Timestamp, item: Item) {
+    fn insert(&mut self, sender: &Sender, received_at_ns: Timestamp, item: Item) {
         if self.stored_total == 0 {
             self.nonempty_since_ns = Some(received_at_ns);
         }
-        self.tenants
-            .entry(tenant.clone())
-            .or_insert_with(TenantQueue::new)
+        self.senders
+            .entry(sender.clone())
+            .or_insert_with(SenderQueue::new)
             .insert(received_at_ns, item);
         self.stored_total += 1;
         if self.is_full() {
@@ -460,12 +478,12 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
     }
 
     /// Removes the next live entry, discarding expired entries before it.
-    fn pop_live(&mut self, tenant: &Tenant, now_ns: Timestamp) -> Option<Entry<Item>> {
+    fn pop_live(&mut self, sender: &Sender, now_ns: Timestamp) -> Option<Entry<Item>> {
         loop {
-            let entry = self.pop_front(tenant)?;
+            let entry = self.pop_front(sender)?;
             if entry
                 .received_at_ns
-                .saturating_add(self.config.discard_after_ns)
+                .saturating_add(self.config.discard_entries_after_ns)
                 <= now_ns
             {
                 self.discarded_expired += 1;
@@ -475,50 +493,50 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         }
     }
 
-    fn pop_front(&mut self, tenant: &Tenant) -> Option<Entry<Item>> {
-        let queue = self.tenants.get_mut(tenant)?;
-        let (lane, received_at_ns, key) = queue.front()?;
-        let item = queue.remove(lane, received_at_ns, &key)?;
+    fn pop_front(&mut self, sender: &Sender) -> Option<Entry<Item>> {
+        let queue = self.senders.get_mut(sender)?;
+        let (priority, received_at_ns, key) = queue.front()?;
+        let item = queue.remove(priority, received_at_ns, &key)?;
         let emptied = queue.is_empty();
-        self.after_removal(tenant, emptied);
+        self.after_removal(sender, emptied);
         Some(Entry {
             received_at_ns,
             item,
         })
     }
 
-    /// Removes expired entries from every tenant. Each lane is ordered by age,
-    /// so scanning it stops at the first live entry.
+    /// Removes expired entries from every sender. At each priority, entries are
+    /// ordered by age, so scanning stops at the first live entry.
     fn discard_expired(&mut self, now_ns: Timestamp) {
-        for tenant in self.tenants.keys().cloned().collect::<Vec<_>>() {
-            self.discard_expired_for(&tenant, now_ns);
+        for sender in self.senders.keys().cloned().collect::<Vec<_>>() {
+            self.discard_expired_for(&sender, now_ns);
         }
     }
 
-    fn discard_expired_for(&mut self, tenant: &Tenant, now_ns: Timestamp) {
-        for lane in 0..Item::LANES.max(1) {
+    fn discard_expired_for(&mut self, sender: &Sender, now_ns: Timestamp) {
+        for priority in 0..Item::PRIORITY_LEVELS.max(1) {
             loop {
-                let Some(queue) = self.tenants.get_mut(tenant) else {
+                let Some(queue) = self.senders.get_mut(sender) else {
                     return;
                 };
-                let Some((received_at_ns, key)) = queue.oldest_in_lane(lane) else {
+                let Some((received_at_ns, key)) = queue.oldest_at_priority(priority) else {
                     break;
                 };
-                if received_at_ns.saturating_add(self.config.discard_after_ns) > now_ns {
+                if received_at_ns.saturating_add(self.config.discard_entries_after_ns) > now_ns {
                     break;
                 }
-                queue.remove(lane, received_at_ns, &key);
+                queue.remove(priority, received_at_ns, &key);
                 let emptied = queue.is_empty();
-                self.after_removal(tenant, emptied);
+                self.after_removal(sender, emptied);
                 self.discarded_expired += 1;
             }
         }
     }
 
-    /// Updates counts and timers after removal, and removes empty tenants.
-    fn after_removal(&mut self, tenant: &Tenant, emptied: bool) {
+    /// Updates counts and timers after removal, and removes empty senders.
+    fn after_removal(&mut self, sender: &Sender, emptied: bool) {
         if emptied {
-            self.tenants.remove(tenant);
+            self.senders.remove(sender);
         }
         self.stored_total = self.stored_total.saturating_sub(1);
         if self.stored_total == 0 {
@@ -529,31 +547,31 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
         }
     }
 
-    /// Selects the next tenant and advances the cursor. If that tenant was removed,
-    /// uses the next remaining tenant, wrapping around at the end.
-    fn advance_cursor(&mut self) -> Option<Tenant> {
-        if self.tenants.is_empty() {
-            self.next_tenant = None;
+    /// Selects the next sender and advances the cursor. If that sender was removed,
+    /// uses the next remaining sender, wrapping around at the end.
+    fn advance_cursor(&mut self) -> Option<Sender> {
+        if self.senders.is_empty() {
+            self.next_sender = None;
             return None;
         }
 
         let picked = self
-            .next_tenant
+            .next_sender
             .as_ref()
             .and_then(|from| {
-                self.tenants
+                self.senders
                     .range(from.clone()..)
                     .next()
-                    .map(|(tenant, _)| tenant.clone())
+                    .map(|(sender, _)| sender.clone())
             })
-            .or_else(|| self.tenants.keys().next().cloned())?;
+            .or_else(|| self.senders.keys().next().cloned())?;
 
-        self.next_tenant = self
-            .tenants
+        self.next_sender = self
+            .senders
             .range((Excluded(picked.clone()), Unbounded))
             .next()
-            .map(|(tenant, _)| tenant.clone())
-            .or_else(|| self.tenants.keys().next().cloned());
+            .map(|(sender, _)| sender.clone())
+            .or_else(|| self.senders.keys().next().cloned());
 
         Some(picked)
     }
@@ -584,18 +602,18 @@ impl<Tenant: Clone + Ord, Item: QueueItem> AdmissionQueue<Tenant, Item> {
 mod tests {
     use super::*;
 
-    /// A small test item with two priority lanes.
+    /// A small test item with two priority levels.
     #[derive(Clone, Debug, Eq, PartialEq)]
     struct TestItem {
         group: u8,
         id: u8,
-        lane: usize,
+        priority: usize,
     }
 
     impl QueueItem for TestItem {
         type Key = (u8, u8);
         type Group = u8;
-        const LANES: usize = 2;
+        const PRIORITY_LEVELS: usize = 2;
 
         fn key(&self) -> Self::Key {
             (self.group, self.id)
@@ -605,28 +623,36 @@ mod tests {
             self.group
         }
 
-        fn lane(&self) -> usize {
-            self.lane
+        fn priority(&self) -> usize {
+            self.priority
         }
     }
 
     type TestQueue = AdmissionQueue<u8, TestItem>;
 
     fn item(group: u8, id: u8) -> TestItem {
-        TestItem { group, id, lane: 0 }
+        TestItem {
+            group,
+            id,
+            priority: 0,
+        }
     }
 
-    fn in_lane(group: u8, id: u8, lane: usize) -> TestItem {
-        TestItem { group, id, lane }
+    fn at_priority(group: u8, id: u8, priority: usize) -> TestItem {
+        TestItem {
+            group,
+            id,
+            priority,
+        }
     }
 
     fn config() -> QueueConfig {
         QueueConfig {
             max_entries: 8,
-            max_entries_per_tenant: 8,
+            max_entries_per_sender: 8,
             max_pending_per_group: 8,
             pressure_cleared_below: 6,
-            discard_after_ns: 100,
+            discard_entries_after_ns: 100,
             retry: RetryPolicy {
                 base_ms: 1_000,
                 ceiling_ms: 8_000,
@@ -639,9 +665,9 @@ mod tests {
     }
 
     /// Admits items in order, one nanosecond apart.
-    fn admit_each(backlog: &mut TestQueue, tenant: u8, items: Vec<TestItem>, from_ns: Timestamp) {
+    fn admit_each(backlog: &mut TestQueue, sender: u8, items: Vec<TestItem>, from_ns: Timestamp) {
         for (offset, item) in items.into_iter().enumerate() {
-            backlog.admit(tenant, vec![item], from_ns + offset as u64);
+            backlog.admit(sender, vec![item], from_ns + offset as u64);
         }
     }
 
@@ -649,24 +675,24 @@ mod tests {
         taken.iter().map(|t| t.entry.item.key()).collect()
     }
 
-    fn tenants_taken(taken: &[Taken<u8, TestItem>]) -> Vec<u8> {
-        taken.iter().map(|t| t.tenant).collect()
+    fn senders_taken(taken: &[Taken<u8, TestItem>]) -> Vec<u8> {
+        taken.iter().map(|t| t.sender).collect()
     }
 
     /// Checks that counts, indexes, and timers agree with the stored entries.
     fn assert_consistent(backlog: &TestQueue) {
-        let counted: usize = backlog.tenants.values().map(TenantQueue::len).sum();
+        let counted: usize = backlog.senders.values().map(SenderQueue::len).sum();
         assert_eq!(backlog.stored_total, counted, "stored_total drifted");
 
-        for (tenant, queue) in &backlog.tenants {
-            assert!(!queue.is_empty(), "tenant {tenant} kept after emptying");
+        for (sender, queue) in &backlog.senders {
+            assert!(!queue.is_empty(), "sender {sender} kept after emptying");
 
             let keys: HashSet<(u8, u8)> = queue
-                .lanes
+                .entries_by_priority
                 .iter()
-                .flat_map(|lane| lane.keys().map(|(_, key)| *key))
+                .flat_map(|entries| entries.keys().map(|(_, key)| *key))
                 .collect();
-            assert_eq!(queue.present, keys, "present drifted for tenant {tenant}");
+            assert_eq!(queue.present, keys, "present drifted for sender {sender}");
 
             let mut groups: HashMap<u8, usize> = HashMap::new();
             for (group, _) in &keys {
@@ -674,7 +700,7 @@ mod tests {
             }
             assert_eq!(
                 queue.pending_per_group, groups,
-                "pending_per_group drifted for tenant {tenant}"
+                "pending_per_group drifted for sender {sender}"
             );
         }
 
@@ -694,7 +720,7 @@ mod tests {
     // Ordering.
 
     #[test]
-    fn takes_in_arrival_order_within_a_lane() {
+    fn takes_in_arrival_order_at_the_same_priority() {
         let mut backlog = TestQueue::new(config(), 0);
         admit_each(&mut backlog, 1, vec![item(1, 1), item(2, 2), item(3, 3)], 1);
 
@@ -705,63 +731,35 @@ mod tests {
     }
 
     #[test]
-    fn takes_lower_lanes_first() {
+    fn takes_highest_priority_first() {
         let mut backlog = TestQueue::new(config(), 0);
         admit_each(
             &mut backlog,
             1,
-            vec![in_lane(1, 1, 1), in_lane(2, 2, 1), in_lane(3, 3, 0)],
+            vec![
+                at_priority(1, 1, 1),
+                at_priority(2, 2, 1),
+                at_priority(3, 3, 0),
+            ],
             1,
         );
 
         let taken = backlog.take_batch(10, 5);
 
-        // The lane-0 item arrived last and still leaves first.
+        // The highest-priority item arrived last and still leaves first.
         assert_eq!(keys_taken(&taken), vec![(3, 3), (1, 1), (2, 2)]);
     }
 
     #[test]
-    fn a_lane_above_the_last_is_clamped_rather_than_panicking() {
+    fn an_out_of_range_priority_is_clamped_rather_than_panicking() {
         let mut backlog = TestQueue::new(config(), 0);
 
-        backlog.admit(1, vec![in_lane(1, 1, 99)], 1);
+        backlog.admit(1, vec![at_priority(1, 1, 99)], 1);
 
         assert_eq!(keys_taken(&backlog.take_batch(10, 2)), vec![(1, 1)]);
     }
 
     // Folding.
-
-    /// A wrong `LANES` is a programming error, but the queue is built during
-    /// `post_upgrade`, where a panic fails the upgrade, so it degrades instead.
-    #[test]
-    fn an_impl_claiming_no_lanes_still_works() {
-        #[derive(Clone)]
-        struct Laneless(u8);
-
-        impl QueueItem for Laneless {
-            type Key = u8;
-            type Group = u8;
-            const LANES: usize = 0;
-
-            fn key(&self) -> u8 {
-                self.0
-            }
-            fn group(&self) -> u8 {
-                self.0
-            }
-            fn lane(&self) -> usize {
-                7
-            }
-        }
-
-        let mut queue: AdmissionQueue<u8, Laneless> = AdmissionQueue::new(config(), 0);
-
-        assert_eq!(
-            queue.admit(1, vec![Laneless(1)], 1),
-            vec![Admission::Stored]
-        );
-        assert_eq!(queue.take_batch(10, 2).len(), 1);
-    }
 
     #[test]
     fn folds_a_key_it_already_holds() {
@@ -776,7 +774,7 @@ mod tests {
     }
 
     #[test]
-    fn the_same_key_under_another_tenant_is_a_different_item() {
+    fn the_same_key_under_another_sender_is_a_different_item() {
         let mut backlog = TestQueue::new(config(), 0);
         backlog.admit(1, vec![item(1, 1)], 1);
 
@@ -879,7 +877,7 @@ mod tests {
     // Fairness.
 
     #[test]
-    fn takes_one_tenant_at_a_time_in_turn() {
+    fn takes_one_sender_at_a_time_in_turn() {
         let mut backlog = TestQueue::new(config(), 0);
         admit_each(&mut backlog, 1, vec![item(1, 1), item(1, 2), item(1, 3)], 1);
         backlog.admit(2, vec![item(2, 1)], 1);
@@ -887,7 +885,7 @@ mod tests {
 
         let taken = backlog.take_batch(5, 5);
 
-        assert_eq!(tenants_taken(&taken), vec![1, 2, 3, 1, 3]);
+        assert_eq!(senders_taken(&taken), vec![1, 2, 3, 1, 3]);
         assert_eq!(backlog.stored_total, 1);
     }
 
@@ -901,16 +899,16 @@ mod tests {
         let second = backlog.take_batch(1, 6);
         let third = backlog.take_batch(1, 7);
 
-        assert_eq!(tenants_taken(&first), vec![1]);
-        assert_eq!(tenants_taken(&second), vec![2]);
-        assert_eq!(tenants_taken(&third), vec![1]);
+        assert_eq!(senders_taken(&first), vec![1]);
+        assert_eq!(senders_taken(&second), vec![2]);
+        assert_eq!(senders_taken(&third), vec![1]);
     }
 
     #[test]
-    fn one_tenant_alone_stops_at_its_own_ceiling() {
+    fn one_sender_alone_stops_at_its_own_ceiling() {
         let mut backlog = TestQueue::new(
             QueueConfig {
-                max_entries_per_tenant: 3,
+                max_entries_per_sender: 3,
                 ..config()
             },
             0,
@@ -929,14 +927,14 @@ mod tests {
                 },
             ]
         );
-        // Other tenants can use the five remaining slots.
+        // Other senders can use the five remaining slots.
         assert_eq!(backlog.stored_total, 3);
     }
 
     #[test]
     fn an_incumbent_over_its_share_is_refused_while_a_newcomer_is_admitted() {
         let mut backlog = TestQueue::new(config(), 0);
-        // With only one tenant, all five items fit.
+        // With only one sender, all five items fit.
         admit_each(
             &mut backlog,
             1,
@@ -945,7 +943,7 @@ mod tests {
         );
         backlog.admit(2, vec![item(1, 1)], 6);
 
-        // Each tenant's share is now four. Tenant 1 already holds five.
+        // Each sender's share is now four. Sender 1 already holds five.
         let incumbent = backlog.admit(1, vec![item(6, 6)], 7);
         let newcomer = backlog.admit(2, vec![item(2, 2)], 7);
 
@@ -959,14 +957,14 @@ mod tests {
     }
 
     #[test]
-    fn a_tenant_is_dropped_once_it_empties() {
+    fn a_sender_is_dropped_once_it_empties() {
         let mut backlog = TestQueue::new(config(), 0);
         backlog.admit(1, vec![item(1, 1)], 1);
         backlog.admit(2, vec![item(2, 1)], 1);
 
         backlog.take_batch(1, 2);
 
-        assert_eq!(backlog.stats(2).active_tenants, 1);
+        assert_eq!(backlog.stats(2).active_senders, 1);
         assert_consistent(&backlog);
     }
 
@@ -1005,10 +1003,10 @@ mod tests {
     }
 
     #[test]
-    fn a_tenant_at_its_cap_gets_the_stalled_hint() {
+    fn a_sender_at_its_cap_gets_the_stalled_hint() {
         let mut backlog = TestQueue::new(
             QueueConfig {
-                max_entries_per_tenant: 1,
+                max_entries_per_sender: 1,
                 ..config()
             },
             0,
@@ -1105,7 +1103,7 @@ mod tests {
         let mut backlog = TestQueue::new(
             QueueConfig {
                 max_entries: 2,
-                max_entries_per_tenant: 2,
+                max_entries_per_sender: 2,
                 pressure_cleared_below: 2,
                 ..config()
             },
@@ -1134,7 +1132,7 @@ mod tests {
     }
 
     #[test]
-    fn expired_tenants_do_not_stop_a_batch_before_live_tenants() {
+    fn expired_senders_do_not_stop_a_batch_before_live_senders() {
         let mut backlog = TestQueue::new(config(), 0);
         backlog.admit(1, vec![item(1, 1)], 1);
         backlog.admit(2, vec![item(2, 2)], 1);
@@ -1142,7 +1140,7 @@ mod tests {
 
         let taken = backlog.take_batch(1, 101);
 
-        assert_eq!(tenants_taken(&taken), vec![3]);
+        assert_eq!(senders_taken(&taken), vec![3]);
         assert_eq!(backlog.stats(101).discarded_expired, 2);
         assert_eq!(backlog.stored_total, 0);
         assert_consistent(&backlog);
@@ -1153,7 +1151,7 @@ mod tests {
     #[test]
     fn snapshot_and_restore_keep_the_entries_and_their_arrival_times() {
         let mut backlog = TestQueue::new(config(), 0);
-        admit_each(&mut backlog, 1, vec![in_lane(1, 1, 1), item(2, 2)], 1);
+        admit_each(&mut backlog, 1, vec![at_priority(1, 1, 1), item(2, 2)], 1);
         backlog.admit(2, vec![item(3, 3)], 3);
 
         let mut restored = TestQueue::restore(config(), backlog.snapshot(), 4);
@@ -1194,20 +1192,20 @@ mod tests {
         let restored = TestQueue::restore(config(), empty.snapshot(), 10);
 
         assert_eq!(restored.stored_total, 0);
-        assert_eq!(restored.stats(10).active_tenants, 0);
+        assert_eq!(restored.stats(10).active_senders, 0);
         assert_consistent(&restored);
     }
 
     #[test]
-    fn restore_preserves_the_next_tenant_to_serve() {
+    fn restore_preserves_the_next_sender_to_serve() {
         let mut backlog = TestQueue::new(config(), 0);
         backlog.admit(1, vec![item(1, 1), item(1, 2)], 1);
         backlog.admit(2, vec![item(2, 1)], 1);
-        assert_eq!(tenants_taken(&backlog.take_batch(1, 2)), vec![1]);
+        assert_eq!(senders_taken(&backlog.take_batch(1, 2)), vec![1]);
 
         let mut restored = TestQueue::restore(config(), backlog.snapshot(), 3);
 
-        assert_eq!(tenants_taken(&restored.take_batch(1, 4)), vec![2]);
+        assert_eq!(senders_taken(&restored.take_batch(1, 4)), vec![2]);
         assert_consistent(&restored);
     }
 
@@ -1220,8 +1218,6 @@ mod tests {
         assert_eq!(hint_at(&mut restored, 70), 2_000);
     }
 
-    /// The predicate a caller asserts on at compile time, rather than the panic that
-    /// asserting at runtime would cause during `post_upgrade`.
     #[test]
     fn a_configuration_whose_pressure_cannot_clear_is_incoherent() {
         assert!(config().is_coherent());
@@ -1231,25 +1227,57 @@ mod tests {
         }
         .is_coherent());
         assert!(!QueueConfig {
-            max_entries_per_tenant: config().max_entries + 1,
+            max_entries_per_sender: config().max_entries + 1,
             ..config()
         }
         .is_coherent());
         assert!(!QueueConfig {
-            discard_after_ns: 0,
+            discard_entries_after_ns: 0,
             ..config()
         }
         .is_coherent());
     }
 
+    /// A wrong `PRIORITY_LEVELS` is a programming error, but the queue is built
+    /// during `post_upgrade`, where a panic fails the upgrade, so it degrades.
+    #[test]
+    fn an_item_without_priority_levels_still_works() {
+        #[derive(Clone)]
+        struct NoPriorityLevels(u8);
+
+        impl QueueItem for NoPriorityLevels {
+            type Key = u8;
+            type Group = u8;
+            const PRIORITY_LEVELS: usize = 0;
+
+            fn key(&self) -> u8 {
+                self.0
+            }
+            fn group(&self) -> u8 {
+                self.0
+            }
+            fn priority(&self) -> usize {
+                7
+            }
+        }
+
+        let mut queue: AdmissionQueue<u8, NoPriorityLevels> = AdmissionQueue::new(config(), 0);
+
+        assert_eq!(
+            queue.admit(1, vec![NoPriorityLevels(1)], 1),
+            vec![Admission::Stored]
+        );
+        assert_eq!(queue.take_batch(10, 2).len(), 1);
+    }
+
     // Test helpers.
 
     /// Fills the queue at nanosecond 1.
-    fn full_queue(tenant: u8) -> TestQueue {
+    fn full_queue(sender: u8) -> TestQueue {
         let mut backlog = TestQueue::new(config(), 0);
         let items = (1..=8).map(|id| item(id, id)).collect();
         assert_eq!(
-            backlog.admit(tenant, items, 1),
+            backlog.admit(sender, items, 1),
             vec![Admission::Stored; 8],
             "test setup failed to fill the queue"
         );
