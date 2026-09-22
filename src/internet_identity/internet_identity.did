@@ -1814,6 +1814,77 @@ type WebPushSubscriptionStatus = record {
     issued_at_ns : nat64;   // window i expires at issued_at_ns + (i + 1) * window
 };
 
+// ===== Notifications sent by an app =====
+
+// Identifies one notification within (origin, recipient): the same id may be sent to
+// many recipients and they are independent notifications. The canisters that send for
+// one origin share that origin's id space.
+type NotificationId = nat64;
+
+// Orders one origin's entries against each other only: which of that origin's own
+// pending entries is displaced when its queue is full, and how eagerly the recipient is
+// notified. It never affects one origin's standing against another's, so marking
+// everything High gains nothing. The levels are Web Push's and are forwarded as sent.
+type Urgency = variant { VeryLow; Low; Normal; High };
+
+// A content-free signal: the app holds the content and the recipient's device fetches
+// it, authenticated as that recipient, so the app's content key is (recipient, id). A
+// re-send of an id means that content changed.
+//
+// While an entry is still pending, a re-send of it replaces it rather than adding a
+// second one, including a re-send from a different canister of the same origin. Once
+// delivered the id is forgotten, so a later send of it is a new entry and can be
+// deferred like any other.
+//
+// Acceptance is not a delivery guarantee: an accepted entry may still expire, be
+// displaced by a more urgent entry from the same origin, or fail at the recipient's
+// channel.
+type Notification = record {
+    id : NotificationId;
+    recipient : principal;
+    // Dropped undelivered once passed, freeing the slot. Null means II's default
+    // retention, which is also the ceiling for any value given here.
+    expires_at : opt Timestamp;
+    // Null means Normal.
+    urgency : opt Urgency;
+};
+
+type SendNotificationArg = record {
+    origin : FrontendHostname;
+    notifications : vec Notification;
+};
+
+type NotAcceptedReason = variant {
+    // No such recipient at this origin. Permanent: sending it again will not help.
+    UnknownRecipient;
+    // The recipient has no notification channel enabled. Sending again is harmless but
+    // pointless until they enable one.
+    NoChannel;
+    // No room. The sender may send it again from retry_after.
+    Deferred : record { retry_after : Timestamp };
+};
+
+type NotAccepted = record {
+    id : NotificationId;
+    recipient : principal;
+    reason : NotAcceptedReason;
+};
+
+// Everything the batch carried that not_accepted does not name was accepted.
+type SendNotificationResponse = record {
+    not_accepted : vec NotAccepted;
+};
+
+type SendNotificationError = variant {
+    // The origin's sender list was read and does not list the caller.
+    SenderNotListed;
+    // More entries than II will process in one call, so nothing was enqueued. limit is
+    // fixed and not below any origin's queue capacity: a sender never has to split a
+    // batch it could have enqueued.
+    TooManyNotifications : record { limit : nat32 };
+    InternalCanisterError : text;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2299,4 +2370,9 @@ service : (opt InternetIdentityInit) -> {
     // Called by the identity, so one browser can silence another.
     remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
+
+    // Called by an app's backend canister for the origin it names, which is authorized
+    // by that origin listing the caller as one of its senders. Not implemented yet:
+    // every call is refused.
+    app_send_notification : (SendNotificationArg) -> (variant { Ok : SendNotificationResponse; Err : SendNotificationError });
 };

@@ -417,6 +417,21 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
     notifications::consent_granted(validated)
 }
 
+// ---- Notifications: called by an app's backend ----
+
+/// Takes a batch of content-free signals for the origin's own users, authorized by that
+/// origin listing the caller as one of its senders.
+///
+/// The send path does not exist yet, so every call is refused.
+#[update]
+fn app_send_notification(
+    _request: SendNotificationArg,
+) -> Result<SendNotificationResponse, SendNotificationError> {
+    Err(SendNotificationError::InternalCanisterError(
+        "Not enabled".to_string(),
+    ))
+}
+
 #[query]
 fn lookup_device_key(credential_id: CredentialId) -> Option<DeviceKeyWithAnchor> {
     anchor_management::lookup_device_key_with_credential_id(&credential_id)
