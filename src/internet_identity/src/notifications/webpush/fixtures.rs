@@ -3,10 +3,10 @@
 
 use super::validation::{ValidatedSetWebPushSubscriptionRequest, JWT_SIG_LEN};
 use crate::state::{storage_borrow, storage_borrow_mut};
-use crate::storage::anchor::Anchor;
+use crate::storage::anchor::{Anchor, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserBrand, BrowserDescription, BrowserId, FormFactor, OperatingSystem,
-    PublicKey, SetWebPushSubscriptionRequest, Timestamp,
+    PublicKey, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, Timestamp,
 };
 use serde_bytes::ByteBuf;
 
@@ -98,26 +98,41 @@ pub(super) fn validated(
 }
 
 /// `set_subscription` for a test that has an anchor number rather than the anchor.
-pub(super) fn subscribe(
+pub(super) fn try_subscribe(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
     endpoint: &str,
     now_ns: Timestamp,
-) {
+) -> Result<(), SetWebPushSubscriptionError> {
     super::set_subscription(
         anchor(anchor_number),
         browser_id,
         validated(anchor_number, endpoint, now_ns),
         now_ns,
     )
-    .expect("writing a subscription");
+}
+
+pub(super) fn subscribe(
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+    endpoint: &str,
+    now_ns: Timestamp,
+) {
+    try_subscribe(anchor_number, browser_id, endpoint, now_ns).expect("writing a subscription");
+}
+
+pub(super) fn stored_subscription(
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+) -> Option<WebPushSubscription> {
+    anchor(anchor_number)
+        .webpush_subscription(browser_id)
+        .cloned()
 }
 
 pub(super) fn stored_endpoint(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
 ) -> Option<String> {
-    anchor(anchor_number)
-        .webpush_subscription(browser_id)
-        .map(|subscription| subscription.endpoint.clone())
+    stored_subscription(anchor_number, browser_id).map(|subscription| subscription.endpoint)
 }
