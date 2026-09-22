@@ -76,8 +76,8 @@ const STALE_FOR_SECONDS: u64 = 60 * 60;
 /// sustaining ~167 calls a second rather than the ~3 a 1k cap would ask for.
 /// An evicted app is not broken — its next send is deferred once and refetches
 /// — so this buys degradation resistance, not denial resistance. At under a
-/// kilobyte an entry (a ≤255-byte origin and at most [`MAX_SENDERS`]
-/// principals) the ceiling is ~50 MB against a ~3 GB heap. Once the origin
+/// kilobyte an entry (an origin up to [`crate::delegation::FRONTEND_HOSTNAME_LIMIT`] and at most
+/// [`MAX_SENDERS`] principals) the ceiling is ~50 MB against a ~3 GB heap. Once the origin
 /// allowlist goes, this is the only bound on a caller-driven key space, so it
 /// is sized for that now.
 const CACHE_MAX_ENTRIES: usize = 50_000;
@@ -85,6 +85,12 @@ const RETRY_BASE_SECONDS: u64 = 60;
 const RETRY_MULTIPLIER: u64 = 2;
 const ABANDON_FILL_AFTER_SECONDS: u64 = 120;
 
+/// Keyed by the origin itself rather than a hash of it, which would bound an
+/// entry's key at 32 bytes instead of [`crate::delegation::FRONTEND_HOSTNAME_LIMIT`]: a fill is
+/// handed only its key (`SingleFlightCache::new` takes `Fn(K) -> Fut`) and has
+/// to rebuild the URL from it, so a hashed key cannot fetch. Keeping the
+/// string is why a caller picks its own entries' key cost by how long an
+/// origin it names, which the sizing below accounts for at the worst case.
 type SendersCache = SingleFlightCache<FrontendHostname, Vec<Principal>, String>;
 
 thread_local! {
