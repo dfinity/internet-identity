@@ -201,16 +201,15 @@ fn fetchable_origin(origin: &FrontendHostname) -> Result<(), String> {
     if url.scheme() == "https" {
         return Ok(());
     }
-    if allow_insecure_sender_list() && is_loopback_host(url.host_str().unwrap_or_default()) {
+    // `http` and nothing else: the exception exists for a local list served
+    // without TLS, so every other scheme stays refused however the flag is set.
+    if url.scheme() == "http"
+        && allow_insecure_sender_list()
+        && crate::utils::is_loopback_host(url.host_str().unwrap_or_default())
+    {
         return Ok(());
     }
     Err("origin must be https".to_string())
-}
-
-/// A host the sender list may be fetched from over plain `http` when the deploy
-/// flag allows it.
-fn is_loopback_host(host: &str) -> bool {
-    matches!(host, "localhost" | "127.0.0.1")
 }
 
 fn allow_insecure_sender_list() -> bool {
@@ -374,7 +373,23 @@ mod tests {
         allow_insecure(true);
         assert!(fetchable_origin(&"http://localhost:5173".to_string()).is_ok());
         assert!(fetchable_origin(&"http://127.0.0.1:8080".to_string()).is_ok());
+        assert!(fetchable_origin(&"http://localhost".to_string()).is_ok());
         assert!(fetchable_origin(&"http://app.example".to_string()).is_err());
+        allow_insecure(false);
+    }
+
+    /// And it reaches `http` only. A scheme II cannot fetch would fail at the
+    /// outcall anyway, but the rule is what the guard states, not where the
+    /// call happens to break.
+    #[test]
+    fn the_insecure_flag_reaches_http_only() {
+        allow_insecure(true);
+        for origin in ["ftp://localhost", "ws://localhost:5173", "wss://localhost"] {
+            assert!(
+                fetchable_origin(&origin.to_string()).is_err(),
+                "{origin} must not be fetched"
+            );
+        }
         allow_insecure(false);
     }
 
