@@ -3,7 +3,7 @@
 //! Callers reach this through `main.rs`, which validates and authorizes first, so
 //! everything here acts on an origin already folded to the spelling consent is keyed by.
 
-pub mod backlog;
+pub(crate) mod backlog;
 mod validation;
 pub mod webpush;
 
