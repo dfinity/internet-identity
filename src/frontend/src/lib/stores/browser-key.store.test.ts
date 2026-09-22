@@ -17,11 +17,13 @@ vi.mock("idb-keyval", async (importOriginal) => {
   };
 });
 import {
+  browserKeyIdentity,
   type BrowserProof,
   currentBrowserId,
   StaleBrowserKeyError,
   withBrowserProof,
 } from "./browser-key.store";
+import { Principal } from "@icp-sdk/core/principal";
 import type { BrowserDescription } from "$lib/generated/internet_identity_types";
 
 /// Names the same store the module under test writes to, so a test can wipe it.
@@ -368,6 +370,26 @@ describe("browser key", () => {
     await attempt(IDENTITY, 1);
 
     await expect(currentBrowserId(IDENTITY)).resolves.toBeUndefined();
+  });
+
+  /**
+   * The Web Push endpoints read the browser off the caller, so the identity has to sign
+   * as the successor the canister recorded and nothing else.
+   */
+  it("signs as the key the canister recorded for this browser", async () => {
+    const proof = await signIn(IDENTITY, 1, 7);
+
+    const identity = await browserKeyIdentity(IDENTITY);
+
+    expect(identity?.getPrincipal().toText()).toBe(
+      Principal.selfAuthenticating(proof.nextPublicKey).toText(),
+    );
+  });
+
+  it("signs as nothing before a sign-in has registered the browser", async () => {
+    await attempt(IDENTITY, 1);
+
+    await expect(browserKeyIdentity(IDENTITY)).resolves.toBeUndefined();
   });
 
   it("has the successor sign for itself, so an unheld key cannot be announced", async () => {
