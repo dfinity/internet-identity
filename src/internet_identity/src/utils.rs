@@ -16,9 +16,7 @@ pub fn sha256sum(slice: &[u8]) -> [u8; 32] {
     slice_to_bounded_32(&sha256sum)
 }
 
-/// True if `host` (host or `host:port`) is loopback. Shared because more than
-/// one outcall path relaxes its `https` requirement for local development and
-/// they must agree on what local means.
+/// True if `host` (host or `host:port`) is loopback.
 pub fn is_loopback_host(host: &str) -> bool {
     let bare = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
     matches!(bare.as_str(), "localhost" | "127.0.0.1")

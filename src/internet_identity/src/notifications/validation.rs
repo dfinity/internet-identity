@@ -34,10 +34,8 @@ pub struct ValidatedNotificationConsentGrantedRequest {
     _validated: Validated,
 }
 
-/// Max notifications one call may carry. It bounds the work a single message
-/// asks for — a batch may name one id many times, so its cost is not bounded
-/// by what it could enqueue — and it is a fixed number, never a capacity
-/// signal: a sender that stays under it never has to split a batch.
+/// Bounds the work one message asks for, not what it could enqueue: a batch
+/// may name one pair many times. Fixed, never a capacity signal.
 pub const MAX_NOTIFICATIONS_PER_CALL: usize = 1_000;
 
 pub struct ValidatedSendNotificationArg {
@@ -97,9 +95,6 @@ impl TryFrom<SendNotificationArg> for ValidatedSendNotificationArg {
             });
         }
         let origin = notifying_origin(&origin)
-            // A sender's origin is a fixed value in its own deployment, so a
-            // malformed or unenabled one is a deployment fault reported with
-            // its reason, the way the consent requests above report theirs.
             .and_then(|origin| fetchable_origin(&origin).map(|()| origin))
             .map_err(SendNotificationError::InternalCanisterError)?;
         Ok(Self {
@@ -158,16 +153,9 @@ fn canonical_origin(origin: &str) -> Result<FrontendHostname, String> {
     Ok(origin.to_string())
 }
 
-/// Collapses each `(recipient, id)` to one entry, which is what the interface
-/// promises a batch does: entries apply in order and a later one supersedes an
-/// earlier one. The later entry takes the earlier one's place rather than the
-/// batch's tail, because a re-send replaces a pending notification instead of
-/// queueing behind it — so what a repeat changes is the entry, never where the
-/// origin put it.
-///
-/// Part of validation rather than of any one consumer, so a validated request
-/// carries a batch that already holds each pair once and nothing downstream
-/// has to rediscover the rule.
+/// Collapses each `(recipient, id)` to its last entry, in the place the first
+/// held: a re-send replaces a pending notification rather than queueing behind
+/// it.
 fn dedup_last_wins(notifications: Vec<Notification>) -> Vec<Notification> {
     let mut placed = HashMap::new();
     let mut kept: Vec<Notification> = Vec::with_capacity(notifications.len());
@@ -184,16 +172,10 @@ fn dedup_last_wins(notifications: Vec<Notification>) -> Vec<Notification> {
     kept
 }
 
-/// Refuses an origin II will not fetch a sender list from. Consent keys on the
-/// origin a browser reports, so `notifying_origin` accepts any scheme; this
-/// origin is also the host of an outcall, and a list fetched over plain `http`
-/// can be replaced in flight by anyone on the path, which would authorize a
-/// sender of their choosing.
-///
-/// `http` is therefore allowed only for a loopback host and only under the
-/// `notifications_allow_insecure_sender_list` deploy flag, mirroring what SSO
-/// discovery does for its own outcalls — so an un-flagged deployment can never
-/// be made to read a sender list over `http`.
+/// Refuses an origin II will not fetch a sender list from: `notifying_origin`
+/// accepts any scheme, but a list read over plain `http` can be replaced in
+/// flight. As in SSO discovery, `http` needs a loopback host and the deploy
+/// flag.
 fn fetchable_origin(origin: &FrontendHostname) -> Result<(), String> {
     let Ok(url) = Url::parse(origin) else {
         return Err("origin is not a URL".to_string());
@@ -201,8 +183,6 @@ fn fetchable_origin(origin: &FrontendHostname) -> Result<(), String> {
     if url.scheme() == "https" {
         return Ok(());
     }
-    // `http` and nothing else: the exception exists for a local list served
-    // without TLS, so every other scheme stays refused however the flag is set.
     if url.scheme() == "http"
         && allow_insecure_sender_list()
         && crate::utils::is_loopback_host(url.host_str().unwrap_or_default())

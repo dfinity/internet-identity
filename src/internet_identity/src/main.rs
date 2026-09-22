@@ -420,12 +420,8 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
 
 // ---- Notifications: called by an app's backend ----
 
-/// Takes a batch of content-free signals for the origin's own users, authorized by the
-/// origin listing the caller in the sender list it publishes.
-///
-/// A caller II cannot judge yet — the list for this origin is still being fetched — is
-/// answered with the whole batch deferred rather than turned away, so a correctly listed
-/// sender retries instead of concluding it is unauthorized.
+/// Authorized by the origin listing the caller in the sender list it publishes. A
+/// caller II cannot judge yet has its batch deferred rather than refused.
 ///
 /// The send path does not exist yet, so an authorized caller is still refused.
 #[update]

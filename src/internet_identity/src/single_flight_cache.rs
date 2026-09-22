@@ -312,10 +312,8 @@ impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
         }
     }
 
-    /// The time a key parked in failure backoff is next attempted, if it is
-    /// parked: a live entry whose `retry_at` is still ahead and which has no
-    /// fill running. A fresh success parks nothing (its `retry_at` is the
-    /// freshness deadline), so `failures` is what tells the two apart.
+    /// A fresh success parks nothing (its `retry_at` is the freshness
+    /// deadline), so `failures` is what tells the two apart.
     fn parked_until(&self, key: &K, now: u64) -> Option<u64> {
         let entry = self.entries.get(key)?;
         (entry.failures > 0
@@ -629,13 +627,9 @@ where
 }
 
 /// When the cache will next attempt a fill for `key`, in absolute seconds, or
-/// `None` when nothing is parked — the key is unknown, or its last fill
-/// succeeded, or a fill is in flight right now. Read-only, like [`peek`].
-///
-/// [`Cached::Pending`] covers both an in-flight fill and a key parked in
-/// failure backoff, which a caller told to come back cannot tell apart. This
-/// is how it finds out: a parked key answers with the time worth returning at,
-/// rather than one derived from how long a healthy fill takes.
+/// `None` when nothing is parked. Read-only, like [`peek`], and the only way
+/// to tell a [`Cached::Pending`] that is parked in backoff from one whose fill
+/// is in flight.
 pub fn retry_at<K, V, E>(
     cache: &'static LocalKey<RefCell<SingleFlightCache<K, V, E>>>,
     key: &K,

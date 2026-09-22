@@ -20,13 +20,8 @@ pub use validation::{
     ValidatedSendNotificationArg,
 };
 
-/// Nothing was enqueued: II holds no sender list for the origin yet, so it
-/// cannot judge the batch and the whole of it is the sender's to send again
-/// at `retry_after`, which the authorization decides — it knows whether a
-/// fetch is running or the origin is parked after a failed one.
-///
-/// Takes the validated request rather than its parts, so a batch that has not
-/// been through `TryFrom` cannot reach the reply.
+/// Nothing was enqueued: the whole batch is the sender's to send again at
+/// `retry_after`.
 pub fn defer_whole_batch(
     ValidatedSendNotificationArg { notifications, .. }: ValidatedSendNotificationArg,
     retry_after: Timestamp,
