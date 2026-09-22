@@ -12,9 +12,17 @@
 //! The list is read through a single-flight cache, so the first call for an
 //! origin starts the fetch and answers [`Senders::Pending`] — the caller is
 //! told to come back rather than told it is unauthorized, because II does not
-//! yet know either way. Only an origin this deployment notifies for is ever
-//! fetched (`main.rs` validates the origin first), so no caller can aim an
-//! outcall at a host of its choosing.
+//! yet know either way.
+//!
+//! What keeps a caller from pointing II's outcalls wherever it likes is the
+//! fetch path itself, not the origin allowlist: `notifications_enabled_origins`
+//! is a rollout gate and goes away once the feature is general, after which any
+//! origin a caller names is fetchable — the position SSO discovery is already
+//! in, with no domain allowlist at all. The durable bounds are the ones it
+//! relies on: the single-flight cache fetches an origin at most once per fresh
+//! window, [`SENDERS_OUTCALL_LIMIT`] caps how many fetches are in flight, a
+//! failing origin is parked by exponential backoff, and outcalls cost no cycles
+//! on a system subnet. Keep those in place when the gate is removed.
 
 use crate::single_flight_cache::{
     self, CacheConfig, Cached, FillOutcome, RetryBackoff, SingleFlightCache,
@@ -42,16 +50,36 @@ const SENDERS_MAX_RESPONSE_BYTES: u64 = 4 * 1024;
 #[cfg(not(test))]
 const SENDERS_CALL_CYCLES: u128 = 30_000_000_000;
 
-/// An hour, matching SSO discovery. It is also the revocation lag: an origin
-/// that drops a sender stays notifiable by it until the entry goes stale.
+/// An hour, matching SSO discovery: how long a fetched list is authoritative.
 const FRESH_FOR_SECONDS: u64 = 60 * 60;
 /// Serve the last-good list through a transient fetch failure for this long
 /// past freshness, so an origin's brief outage doesn't stop its notifications.
 const STALE_FOR_SECONDS: u64 = 60 * 60;
-/// One entry per notifying origin, and only origins this deployment enables
-/// are ever fetched, so the key space is bounded by configuration rather than
-/// by callers. Sized well above any plausible list of enabled origins.
-const CACHE_MAX_ENTRIES: usize = 1_000;
+
+// Revocation lag is `FRESH_FOR_SECONDS + STALE_FOR_SECONDS`, not the freshness
+// window alone. Past `fresh_for` the cache serves the stale list to the call
+// that triggers the refresh (stale-while-revalidate), so the new list is only
+// seen by a later call; and if that refresh fails, the stale list keeps being
+// served through `stale_for` (stale-if-error). An origin that drops a sender
+// therefore stays notifiable by it for up to two hours from the last
+// successful fetch. That is the accepted trade: cutting `stale_for` to zero
+// would let a brief outage at the origin stop its notifications outright, and
+// a sender listed by mistake is the origin's own error to make.
+
+/// One entry per origin fetched. This is not a capacity figure — a few hundred
+/// apps notifying within a fresh window would be a lot — it is eviction
+/// headroom, and the cap is what an attacker has to out-run. Origins are
+/// strings and a failed fill parks an entry too, so junk origins are free to
+/// generate; an app sending every five minutes is only evicted if this many
+/// distinct origins arrive between two of its sends, which at 50k means
+/// sustaining ~167 calls a second rather than the ~3 a 1k cap would ask for.
+/// An evicted app is not broken — its next send is deferred once and refetches
+/// — so this buys degradation resistance, not denial resistance. At under a
+/// kilobyte an entry (a ≤255-byte origin and at most [`MAX_SENDERS`]
+/// principals) the ceiling is ~50 MB against a ~3 GB heap. Once the origin
+/// allowlist goes, this is the only bound on a caller-driven key space, so it
+/// is sized for that now.
+const CACHE_MAX_ENTRIES: usize = 50_000;
 const RETRY_BASE_SECONDS: u64 = 60;
 const RETRY_MULTIPLIER: u64 = 2;
 const ABANDON_FILL_AFTER_SECONDS: u64 = 120;
