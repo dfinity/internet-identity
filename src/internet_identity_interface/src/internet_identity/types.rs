@@ -1093,6 +1093,9 @@ pub struct Notification {
     pub urgency: Option<Urgency>,
 }
 
+/// The batch applies in the order it is given, so a later entry for a `(recipient, id)`
+/// supersedes an earlier one in the same call and the reply names each distinct pair at
+/// most once.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SendNotificationArg {
     pub origin: FrontendHostname,
@@ -1130,8 +1133,9 @@ pub enum SendNotificationError {
     /// More entries than II will process in one call, so nothing was enqueued. `limit`
     /// is fixed and not below any origin's queue capacity: a sender never has to split
     /// a batch it could have enqueued.
-    TooManyNotifications {
-        limit: u32,
-    },
+    TooManyNotifications { limit: u32 },
+    /// Also what an origin that is malformed or spelled non-canonically comes back as,
+    /// carrying the reason: the origin is a fixed value in the sender's own deployment,
+    /// not something it programs against.
     InternalCanisterError(String),
 }
