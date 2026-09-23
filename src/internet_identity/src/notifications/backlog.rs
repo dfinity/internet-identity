@@ -79,6 +79,8 @@ pub(crate) const NOTIFICATION_BACKLOG: QueueConfig = QueueConfig {
     pressure_cleared_below: 8_000,
     // Stop trying to wake devices for entries older than five minutes.
     discard_entries_after_ns: 5 * MINUTE_NS,
+    // An app resending keeps a notification alive, but never beyond this.
+    max_lifetime_ns: 15 * MINUTE_NS,
     retry: RetryPolicy {
         base_ms: 5_000,
         ceiling_ms: 300_000,
