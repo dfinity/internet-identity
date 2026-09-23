@@ -45,8 +45,9 @@ use notifications::webpush::{
     ValidatedSetWebPushSubscriptionRequest,
 };
 use notifications::{
-    ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
-    ValidatedNotificationRevokeConsentRequest, ValidatedSendNotificationArg,
+    ValidatedGetNotificationDelegationRequest, ValidatedNotificationConsentGrantedRequest,
+    ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
+    ValidatedPrepareNotificationDelegationRequest, ValidatedSendNotificationArg,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -387,10 +388,11 @@ fn remove_webpush_subscription(
 fn prepare_notification_delegation(
     request: PrepareNotificationDelegationRequest,
 ) -> Result<PrepareNotificationDelegationResponse, NotificationDelegationError> {
-    check_browser_authorization(request.anchor_number)
-        .map_err(|_| NotificationDelegationError::InvalidBrowserKey)?;
+    let request: ValidatedPrepareNotificationDelegationRequest = request.try_into()?;
+    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
 
-    notifications::delegation::prepare(request, ic_cdk::api::time())
+    notifications::delegation::prepare(request, &anchor, browser_id, ic_cdk::api::time())
 }
 
 /// Authorized by the browser key the caller signs with.
@@ -398,10 +400,11 @@ fn prepare_notification_delegation(
 fn get_notification_delegation(
     request: GetNotificationDelegationRequest,
 ) -> Result<GetNotificationDelegationResponse, NotificationDelegationError> {
-    check_browser_authorization(request.anchor_number)
-        .map_err(|_| NotificationDelegationError::InvalidBrowserKey)?;
+    let request: ValidatedGetNotificationDelegationRequest = request.try_into()?;
+    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
 
-    notifications::delegation::get(request)
+    notifications::delegation::get(request, &anchor, browser_id)
 }
 
 #[update]

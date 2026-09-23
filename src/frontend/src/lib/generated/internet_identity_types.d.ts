@@ -1422,9 +1422,10 @@ export interface NotificationConsentGrantedRequest {
 }
 export type NotificationDelegationError = {
     /**
-     * The caller signs with no key this identity is signed in from.
+     * The caller is no browser of this identity, that browser is not registered
+     * for Web Push, or the identity has not allowed this app to notify it.
      */
-    'InvalidBrowserKey' : null
+    'NoNotificationAccess' : null
   } |
   { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string };

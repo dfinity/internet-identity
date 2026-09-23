@@ -594,7 +594,7 @@ export const idlFactory = ({ IDL }) => {
     'delegation' : SignedDelegation,
   });
   const NotificationDelegationError = IDL.Variant({
-    'InvalidBrowserKey' : IDL.Null,
+    'NoNotificationAccess' : IDL.Null,
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });

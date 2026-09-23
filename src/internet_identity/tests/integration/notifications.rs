@@ -837,17 +837,19 @@ mod subscription_status {
 }
 
 mod pull_delegation {
-    use super::subscriptions::{install_with_browser, key_holder};
+    use super::subscriptions::{install_with_browser, key_holder, ENDPOINT};
     use super::*;
     use candid::Principal;
     use canister_tests::api::internet_identity::api_v2::{
         prepare_account_delegation, AccountDelegationParams,
     };
     use canister_tests::api::internet_identity::notifications::{
-        get_notification_delegation, prepare_notification_delegation,
+        get_notification_delegation, prepare_notification_delegation, remove_webpush_subscription,
+        revoke_consent, set_webpush_subscription,
     };
+    use canister_tests::framework::{verify_delegation, verify_icrc3_attributes};
     use internet_identity_interface::internet_identity::types::{
-        GetNotificationDelegationRequest, NotificationDelegationError,
+        BrowserId, GetNotificationDelegationRequest, NotificationDelegationError,
         PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
     };
 
@@ -873,6 +875,31 @@ mod pull_delegation {
         }
     }
 
+    /// A delegation only exists for a browser that can be notified, so every
+    /// test here registers the browser for Web Push and consents to the app.
+    fn install_notifiable(
+        env: &PocketIc,
+    ) -> (
+        CanisterId,
+        AnchorNumber,
+        canister_tests::framework::BrowserKey,
+        BrowserId,
+    ) {
+        let (canister_id, anchor, browser, browser_id) = install_with_browser(env);
+        set_webpush_subscription(
+            env,
+            canister_id,
+            key_holder(&browser).principal(),
+            super::subscriptions::request(anchor, ENDPOINT),
+        )
+        .expect("set_webpush_subscription rejected")
+        .expect("set_webpush_subscription returned Err");
+        grant_consent(env, canister_id, principal_1(), anchor, ORIGIN.into())
+            .expect("grant_consent rejected")
+            .expect("grant_consent returned Err");
+        (canister_id, anchor, browser, browser_id)
+    }
+
     fn prepare(
         env: &PocketIc,
         canister_id: CanisterId,
@@ -887,7 +914,7 @@ mod pull_delegation {
     #[test]
     fn should_mint_a_delegation_and_its_sender_info() -> Result<(), RejectResponse> {
         let env = env();
-        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+        let (canister_id, anchor, browser, _) = install_notifiable(&env);
         let caller = key_holder(&browser).principal();
 
         let prepared = prepare(&env, canister_id, caller, anchor);
@@ -907,9 +934,24 @@ mod pull_delegation {
             delegation.delegation.delegation.expiration,
             prepared.expiration
         );
-        assert!(!delegation.delegation.signature.is_empty());
-        assert!(!delegation.sender_info_signature.is_empty());
-        assert!(!prepared.sender_info.is_empty());
+
+        // Both are canister signatures the IC verifies against the user key
+        // before the app runs, so verify them the same way here: a wrong
+        // message, domain or seed fails in the test rather than in production.
+        let root_key = env.root_key().expect("no root key");
+        verify_delegation(
+            &env,
+            prepared.user_key.clone(),
+            &delegation.delegation,
+            &root_key,
+        );
+        verify_icrc3_attributes(
+            &env,
+            prepared.user_key,
+            &prepared.sender_info,
+            &delegation.sender_info_signature,
+            &root_key,
+        );
         Ok(())
     }
 
@@ -919,7 +961,7 @@ mod pull_delegation {
     #[test]
     fn should_not_be_the_account_principal() -> Result<(), RejectResponse> {
         let env = env();
-        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+        let (canister_id, anchor, browser, _) = install_notifiable(&env);
         let caller = key_holder(&browser).principal();
 
         let prepared = prepare(&env, canister_id, caller, anchor);
@@ -956,7 +998,7 @@ mod pull_delegation {
     #[test]
     fn should_expire_after_eight_hours() -> Result<(), RejectResponse> {
         let env = env();
-        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+        let (canister_id, anchor, browser, _) = install_notifiable(&env);
         let caller = key_holder(&browser).principal();
 
         let before = env.get_time().as_nanos_since_unix_epoch();
@@ -974,7 +1016,7 @@ mod pull_delegation {
     #[test]
     fn should_differ_per_origin() -> Result<(), RejectResponse> {
         let env = env();
-        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+        let (canister_id, anchor, browser, _) = install_notifiable(&env);
         let caller = key_holder(&browser).principal();
         sign_in_at(&env, canister_id, anchor, GATEWAY, 9);
 
@@ -998,7 +1040,7 @@ mod pull_delegation {
     #[test]
     fn should_refuse_a_caller_that_is_no_browser_of_the_identity() -> Result<(), RejectResponse> {
         let env = env();
-        let (canister_id, anchor, _, _) = install_with_browser(&env);
+        let (canister_id, anchor, _, _) = install_notifiable(&env);
 
         assert!(matches!(
             prepare_notification_delegation(
@@ -1007,11 +1049,131 @@ mod pull_delegation {
                 principal_2(),
                 prepare_request(anchor)
             )?,
-            Err(NotificationDelegationError::InvalidBrowserKey)
+            Err(NotificationDelegationError::NoNotificationAccess)
         ));
         assert!(matches!(
             get_notification_delegation(&env, canister_id, principal_2(), get_request(anchor, 0))?,
-            Err(NotificationDelegationError::InvalidBrowserKey)
+            Err(NotificationDelegationError::NoNotificationAccess)
+        ));
+        Ok(())
+    }
+
+    /// The same app reached through a gateway twin is the same account, so the
+    /// origin folds to the spelling sign-in and consent key on.
+    #[test]
+    fn should_fold_a_gateway_twin_to_the_same_delegation() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_notifiable(&env);
+        let caller = key_holder(&browser).principal();
+        sign_in_at(&env, canister_id, anchor, GATEWAY, 9);
+
+        let legacy = prepare_notification_delegation(
+            &env,
+            canister_id,
+            caller,
+            PrepareNotificationDelegationRequest {
+                origin: GATEWAY.into(),
+                ..prepare_request(anchor)
+            },
+        )?
+        .expect("prepare_notification_delegation returned Err");
+        let modern = prepare_notification_delegation(
+            &env,
+            canister_id,
+            caller,
+            PrepareNotificationDelegationRequest {
+                origin: "https://abcde-aaaaa-aaaaa-aaaaa-cai.icp0.io".into(),
+                ..prepare_request(anchor)
+            },
+        )?
+        .expect("prepare_notification_delegation returned Err");
+
+        assert_eq!(legacy.user_key, modern.user_key);
+        assert_eq!(legacy.sender_info, modern.sender_info);
+        Ok(())
+    }
+
+    /// Notifications roll out app by app, and these two entry points are no
+    /// exception: an origin the operator left off the list mints nothing.
+    #[test]
+    fn should_refuse_an_origin_that_is_not_enabled() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_notifiable(&env);
+        let caller = key_holder(&browser).principal();
+        let disabled = "https://not-enabled.example";
+
+        assert!(matches!(
+            prepare_notification_delegation(
+                &env,
+                canister_id,
+                caller,
+                PrepareNotificationDelegationRequest {
+                    origin: disabled.into(),
+                    ..prepare_request(anchor)
+                },
+            )?,
+            Err(NotificationDelegationError::InternalCanisterError(_))
+        ));
+        assert!(matches!(
+            get_notification_delegation(
+                &env,
+                canister_id,
+                caller,
+                GetNotificationDelegationRequest {
+                    origin: disabled.into(),
+                    ..get_request(anchor, 0)
+                },
+            )?,
+            Err(NotificationDelegationError::InternalCanisterError(_))
+        ));
+        Ok(())
+    }
+
+    /// Signing the browser out clears its Web Push registration, which is how
+    /// an identity cuts a lost device off from minting more of these.
+    #[test]
+    fn should_refuse_a_browser_that_was_signed_out() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, browser_id) = install_notifiable(&env);
+        let caller = key_holder(&browser).principal();
+
+        // Prove it works before the sign-out, so the refusal is the sign-out.
+        prepare(&env, canister_id, caller, anchor);
+        remove_webpush_subscription(&env, canister_id, principal_1(), anchor, browser_id)?
+            .expect("remove_webpush_subscription returned Err");
+
+        assert!(matches!(
+            prepare_notification_delegation(&env, canister_id, caller, prepare_request(anchor))?,
+            Err(NotificationDelegationError::NoNotificationAccess)
+        ));
+        Ok(())
+    }
+
+    /// Withdrawing the app's consent closes it too, which is the other lever
+    /// the identity has from another device.
+    #[test]
+    fn should_refuse_an_app_whose_consent_was_withdrawn() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_notifiable(&env);
+        let caller = key_holder(&browser).principal();
+
+        let prepared = prepare(&env, canister_id, caller, anchor);
+        revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+            .expect("revoke_consent returned Err");
+
+        assert!(matches!(
+            prepare_notification_delegation(&env, canister_id, caller, prepare_request(anchor))?,
+            Err(NotificationDelegationError::NoNotificationAccess)
+        ));
+        // And the one already prepared can no longer be fetched.
+        assert!(matches!(
+            get_notification_delegation(
+                &env,
+                canister_id,
+                caller,
+                get_request(anchor, prepared.expiration)
+            )?,
+            Err(NotificationDelegationError::NoNotificationAccess)
         ));
         Ok(())
     }
@@ -1022,7 +1184,7 @@ mod pull_delegation {
     #[test]
     fn should_refuse_a_delegation_that_was_never_prepared() -> Result<(), RejectResponse> {
         let env = env();
-        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+        let (canister_id, anchor, browser, _) = install_notifiable(&env);
         let caller = key_holder(&browser).principal();
 
         assert!(matches!(

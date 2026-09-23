@@ -1144,6 +1144,9 @@ pub enum SendNotificationError {
     /// `limit` is fixed and never below an origin's queue capacity.
     TooManyNotifications { limit: u32 },
     /// Also a malformed or non-canonical origin, carrying the reason.
+    InternalCanisterError(String),
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct PrepareNotificationDelegationRequest {
     pub anchor_number: AnchorNumber,
@@ -1181,8 +1184,10 @@ pub struct GetNotificationDelegationResponse {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum NotificationDelegationError {
-    /// The caller signs with no key this identity is signed in from.
-    InvalidBrowserKey,
+    /// The caller is no browser of this identity, that browser is not
+    /// registered for Web Push, or the identity has not allowed this app to
+    /// notify it.
+    NoNotificationAccess,
     NoSuchDelegation,
     InternalCanisterError(String),
 }

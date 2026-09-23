@@ -15,17 +15,21 @@ use crate::delegation::{
     add_delegation_signature, delegation_signature_msg_with_permissions,
     der_encode_canister_sig_key,
 };
+use crate::notifications::{
+    consent_granted_for, ValidatedGetNotificationDelegationRequest,
+    ValidatedPrepareNotificationDelegationRequest,
+};
 use crate::state::{self, storage_borrow};
 use crate::storage::account::{Account, AccountKey};
+use crate::storage::anchor::Anchor;
 use crate::update_root_hash;
 use candid::Principal;
 use ic_canister_sig_creation::{signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN};
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, Delegation, FrontendHostname, GetNotificationDelegationRequest,
+    AccountNumber, AnchorNumber, BrowserId, Delegation, FrontendHostname,
     GetNotificationDelegationResponse, NotificationDelegationError,
-    PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse, SignedDelegation,
-    Timestamp,
+    PrepareNotificationDelegationResponse, SignedDelegation, Timestamp,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
@@ -68,6 +72,26 @@ fn sender_info(origin: &FrontendHostname, account_principal: &Principal) -> Vec<
     blob
 }
 
+/// The caller may mint for this identity only while it is a browser of it that
+/// is registered for Web Push, and only while the identity still allows this
+/// app to notify it. Both are what the identity revokes from another device
+/// when a browser is lost: signing it out clears its registration, and
+/// withdrawing consent closes the app. Neither shortens a delegation already
+/// minted, which runs its own lifetime out.
+fn check_notification_access(
+    anchor: &Anchor,
+    browser_id: BrowserId,
+    origin: &FrontendHostname,
+) -> Result<(), NotificationDelegationError> {
+    if anchor.webpush_subscription(browser_id).is_none() {
+        return Err(NotificationDelegationError::NoNotificationAccess);
+    }
+    if !consent_granted_for(anchor.anchor_number(), origin) {
+        return Err(NotificationDelegationError::NoNotificationAccess);
+    }
+    Ok(())
+}
+
 fn read_account(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
@@ -84,14 +108,19 @@ fn read_account(
 }
 
 pub fn prepare(
-    PrepareNotificationDelegationRequest {
+    ValidatedPrepareNotificationDelegationRequest {
         anchor_number,
         origin,
         account_number,
         session_key,
-    }: PrepareNotificationDelegationRequest,
+        ..
+    }: ValidatedPrepareNotificationDelegationRequest,
+    anchor: &Anchor,
+    browser_id: BrowserId,
     now_ns: Timestamp,
 ) -> Result<PrepareNotificationDelegationResponse, NotificationDelegationError> {
+    check_notification_access(anchor, browser_id, &origin)?;
+
     let account = read_account(anchor_number, &origin, account_number)?;
     let seed = notification_pull_seed(&account);
     let message = sender_info(&origin, &account_principal(&account));
@@ -115,14 +144,19 @@ pub fn prepare(
 }
 
 pub fn get(
-    GetNotificationDelegationRequest {
+    ValidatedGetNotificationDelegationRequest {
         anchor_number,
         origin,
         account_number,
         session_key,
         expiration,
-    }: GetNotificationDelegationRequest,
+        ..
+    }: ValidatedGetNotificationDelegationRequest,
+    anchor: &Anchor,
+    browser_id: BrowserId,
 ) -> Result<GetNotificationDelegationResponse, NotificationDelegationError> {
+    check_notification_access(anchor, browser_id, &origin)?;
+
     // Nothing can have been prepared before the salt was set, and deriving a
     // seed without one traps.
     if storage_borrow(|storage| storage.salt().is_none()) {
