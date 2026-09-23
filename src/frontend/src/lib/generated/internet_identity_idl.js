@@ -582,6 +582,22 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
     'NoSuchCredentials' : IDL.Text,
   });
+  const GetNotificationDelegationRequest = IDL.Record({
+    'session_key' : SessionKey,
+    'origin' : FrontendHostname,
+    'account_number' : IDL.Opt(AccountNumber),
+    'expiration' : Timestamp,
+    'anchor_number' : UserNumber,
+  });
+  const GetNotificationDelegationResponse = IDL.Record({
+    'sender_info_signature' : IDL.Vec(IDL.Nat8),
+    'delegation' : SignedDelegation,
+  });
+  const NotificationDelegationError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'NoSuchDelegation' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+  });
   const SessionDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -898,6 +914,17 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : UserKey,
     'trusted_url' : IDL.Text,
     'expiration' : Timestamp,
+  });
+  const PrepareNotificationDelegationRequest = IDL.Record({
+    'session_key' : SessionKey,
+    'origin' : FrontendHostname,
+    'account_number' : IDL.Opt(AccountNumber),
+    'anchor_number' : UserNumber,
+  });
+  const PrepareNotificationDelegationResponse = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
+    'sender_info' : IDL.Vec(IDL.Nat8),
   });
   const PrepareSessionDelegation = IDL.Record({
     'user_key' : UserKey,
@@ -1321,6 +1348,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : IDL.Text })],
         ['query'],
       ),
+    'get_notification_delegation' : IDL.Func(
+        [GetNotificationDelegationRequest],
+        [
+          IDL.Variant({
+            'Ok' : GetNotificationDelegationResponse,
+            'Err' : NotificationDelegationError,
+          }),
+        ],
+        ['query'],
+      ),
     'get_principal' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Principal],
@@ -1597,6 +1634,16 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : PrepareMcpRegistrationDelegation,
             'Err' : IDL.Text,
+          }),
+        ],
+        [],
+      ),
+    'prepare_notification_delegation' : IDL.Func(
+        [PrepareNotificationDelegationRequest],
+        [
+          IDL.Variant({
+            'Ok' : PrepareNotificationDelegationResponse,
+            'Err' : NotificationDelegationError,
           }),
         ],
         [],

@@ -382,6 +382,28 @@ fn remove_webpush_subscription(
     notifications::webpush::remove_subscription(validated)
 }
 
+/// Authorized by the browser key the caller signs with.
+#[update]
+fn prepare_notification_delegation(
+    request: PrepareNotificationDelegationRequest,
+) -> Result<PrepareNotificationDelegationResponse, NotificationDelegationError> {
+    check_browser_authorization(request.anchor_number)
+        .map_err(|_| NotificationDelegationError::InvalidBrowserKey)?;
+
+    notifications::delegation::prepare(request, ic_cdk::api::time())
+}
+
+/// Authorized by the browser key the caller signs with.
+#[query]
+fn get_notification_delegation(
+    request: GetNotificationDelegationRequest,
+) -> Result<GetNotificationDelegationResponse, NotificationDelegationError> {
+    check_browser_authorization(request.anchor_number)
+        .map_err(|_| NotificationDelegationError::InvalidBrowserKey)?;
+
+    notifications::delegation::get(request)
+}
+
 #[update]
 fn notification_grant_consent(
     request: NotificationGrantConsentRequest,

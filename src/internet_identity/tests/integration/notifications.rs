@@ -835,3 +835,211 @@ mod subscription_status {
         Ok(())
     }
 }
+
+mod pull_delegation {
+    use super::subscriptions::{install_with_browser, key_holder};
+    use super::*;
+    use candid::Principal;
+    use canister_tests::api::internet_identity::api_v2::{
+        prepare_account_delegation, AccountDelegationParams,
+    };
+    use canister_tests::api::internet_identity::notifications::{
+        get_notification_delegation, prepare_notification_delegation,
+    };
+    use internet_identity_interface::internet_identity::types::{
+        GetNotificationDelegationRequest, NotificationDelegationError,
+        PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
+    };
+
+    const SESSION_KEY: &[u8] = b"notification session public key";
+    const EIGHT_HOURS_NS: u64 = 8 * 60 * 60 * 1_000_000_000;
+
+    fn prepare_request(anchor: AnchorNumber) -> PrepareNotificationDelegationRequest {
+        PrepareNotificationDelegationRequest {
+            anchor_number: anchor,
+            origin: ORIGIN.into(),
+            account_number: None,
+            session_key: ByteBuf::from(SESSION_KEY),
+        }
+    }
+
+    fn get_request(anchor: AnchorNumber, expiration: u64) -> GetNotificationDelegationRequest {
+        GetNotificationDelegationRequest {
+            anchor_number: anchor,
+            origin: ORIGIN.into(),
+            account_number: None,
+            session_key: ByteBuf::from(SESSION_KEY),
+            expiration,
+        }
+    }
+
+    fn prepare(
+        env: &PocketIc,
+        canister_id: CanisterId,
+        caller: Principal,
+        anchor: AnchorNumber,
+    ) -> PrepareNotificationDelegationResponse {
+        prepare_notification_delegation(env, canister_id, caller, prepare_request(anchor))
+            .expect("prepare_notification_delegation rejected")
+            .expect("prepare_notification_delegation returned Err")
+    }
+
+    #[test]
+    fn should_mint_a_delegation_and_its_sender_info() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+        let caller = key_holder(&browser).principal();
+
+        let prepared = prepare(&env, canister_id, caller, anchor);
+        let delegation = get_notification_delegation(
+            &env,
+            canister_id,
+            caller,
+            get_request(anchor, prepared.expiration),
+        )?
+        .expect("get_notification_delegation returned Err");
+
+        assert_eq!(
+            delegation.delegation.delegation.pubkey,
+            ByteBuf::from(SESSION_KEY)
+        );
+        assert_eq!(
+            delegation.delegation.delegation.expiration,
+            prepared.expiration
+        );
+        assert!(!delegation.delegation.signature.is_empty());
+        assert!(!delegation.sender_info_signature.is_empty());
+        assert!(!prepared.sender_info.is_empty());
+        Ok(())
+    }
+
+    /// The delegation is minted under a seed of its own, so the app is called
+    /// by a principal that holds none of the account's authority — and the
+    /// sender_info is what tells it which account it is serving.
+    #[test]
+    fn should_not_be_the_account_principal() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+        let caller = key_holder(&browser).principal();
+
+        let prepared = prepare(&env, canister_id, caller, anchor);
+        let pull_principal = Principal::self_authenticating(&prepared.user_key);
+        let account_delegation = prepare_account_delegation(
+            &AccountDelegationParams {
+                env: &env,
+                canister_id,
+                sender: principal_1(),
+                identity_number: anchor,
+                origin: ORIGIN.into(),
+                account_number: None,
+                session_key: ByteBuf::from(SESSION_KEY),
+            },
+            None,
+        )?
+        .expect("prepare_account_delegation returned Err");
+        let account_principal = Principal::self_authenticating(&account_delegation.user_key);
+
+        assert_ne!(pull_principal, account_principal);
+        let account_bytes = account_principal.as_slice();
+        assert!(
+            prepared
+                .sender_info
+                .windows(account_bytes.len())
+                .any(|window| window == account_bytes),
+            "sender_info names the account principal"
+        );
+        Ok(())
+    }
+
+    /// Fixed lifetime: the pull happens long after the push, and preparing one
+    /// costs an update plus a query.
+    #[test]
+    fn should_expire_after_eight_hours() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+        let caller = key_holder(&browser).principal();
+
+        let before = env.get_time().as_nanos_since_unix_epoch();
+        let prepared = prepare(&env, canister_id, caller, anchor);
+        let after = env.get_time().as_nanos_since_unix_epoch();
+
+        // The canister stamps it from its own clock, which advances while the
+        // call runs, so the window is the tick rather than a single instant.
+        assert!(prepared.expiration >= before + EIGHT_HOURS_NS);
+        assert!(prepared.expiration <= after + EIGHT_HOURS_NS);
+        Ok(())
+    }
+
+    /// Two apps get different principals, so they cannot link the same user.
+    #[test]
+    fn should_differ_per_origin() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+        let caller = key_holder(&browser).principal();
+        sign_in_at(&env, canister_id, anchor, GATEWAY, 9);
+
+        let at_origin = prepare(&env, canister_id, caller, anchor);
+        let at_gateway = prepare_notification_delegation(
+            &env,
+            canister_id,
+            caller,
+            PrepareNotificationDelegationRequest {
+                origin: GATEWAY.into(),
+                ..prepare_request(anchor)
+            },
+        )?
+        .expect("prepare_notification_delegation returned Err");
+
+        assert_ne!(at_origin.user_key, at_gateway.user_key);
+        assert_ne!(at_origin.sender_info, at_gateway.sender_info);
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_a_caller_that_is_no_browser_of_the_identity() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _, _) = install_with_browser(&env);
+
+        assert!(matches!(
+            prepare_notification_delegation(
+                &env,
+                canister_id,
+                principal_2(),
+                prepare_request(anchor)
+            )?,
+            Err(NotificationDelegationError::InvalidBrowserKey)
+        ));
+        assert!(matches!(
+            get_notification_delegation(&env, canister_id, principal_2(), get_request(anchor, 0))?,
+            Err(NotificationDelegationError::InvalidBrowserKey)
+        ));
+        Ok(())
+    }
+
+    /// Nothing is stored, so a get for a delegation that was never prepared —
+    /// or for a different expiration than the one prepared — finds no
+    /// signature rather than minting one.
+    #[test]
+    fn should_refuse_a_delegation_that_was_never_prepared() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+        let caller = key_holder(&browser).principal();
+
+        assert!(matches!(
+            get_notification_delegation(&env, canister_id, caller, get_request(anchor, 1))?,
+            Err(NotificationDelegationError::NoSuchDelegation)
+        ));
+
+        let prepared = prepare(&env, canister_id, caller, anchor);
+        assert!(matches!(
+            get_notification_delegation(
+                &env,
+                canister_id,
+                caller,
+                get_request(anchor, prepared.expiration + 1)
+            )?,
+            Err(NotificationDelegationError::NoSuchDelegation)
+        ));
+        Ok(())
+    }
+}

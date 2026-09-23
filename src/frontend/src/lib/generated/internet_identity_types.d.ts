@@ -924,6 +924,23 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
+export interface GetNotificationDelegationRequest {
+  /**
+   * null = the unreserved default account
+   */
+  'session_key' : SessionKey,
+  'origin' : FrontendHostname,
+  'account_number' : [] | [AccountNumber],
+  'expiration' : Timestamp,
+  'anchor_number' : UserNumber,
+}
+export interface GetNotificationDelegationResponse {
+  /**
+   * Authenticates sender_info on those calls.
+   */
+  'sender_info_signature' : Uint8Array | number[],
+  'delegation' : SignedDelegation,
+}
 /**
  * Request for `get_sso_discovery_status`.
  */
@@ -1403,6 +1420,14 @@ export interface NotificationConsentGrantedRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
 }
+export type NotificationDelegationError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'NoSuchDelegation' : null } |
+  { 'InternalCanisterError' : string };
 /**
  * Why a notification call was refused.
  */
@@ -1734,6 +1759,27 @@ export interface PrepareMcpRegistrationDelegation {
   'user_key' : UserKey,
   'trusted_url' : string,
   'expiration' : Timestamp,
+}
+/**
+ * ===== Notification pull delegation =====
+ */
+export interface PrepareNotificationDelegationRequest {
+  /**
+   * null = the unreserved default account
+   */
+  'session_key' : SessionKey,
+  'origin' : FrontendHostname,
+  'account_number' : [] | [AccountNumber],
+  'anchor_number' : UserNumber,
+}
+export interface PrepareNotificationDelegationResponse {
+  'user_key' : UserKey,
+  'expiration' : Timestamp,
+  /**
+   * Goes in the sender_info field of every call made with this delegation;
+   * tells the app which account it is being called for.
+   */
+  'sender_info' : Uint8Array | number[],
 }
 export interface PrepareSessionDelegation {
   'user_key' : UserKey,
@@ -2517,6 +2563,11 @@ export interface _SERVICE {
     { 'Ok' : SignedDelegation } |
       { 'Err' : string }
   >,
+  'get_notification_delegation' : ActorMethod<
+    [GetNotificationDelegationRequest],
+    { 'Ok' : GetNotificationDelegationResponse } |
+      { 'Err' : NotificationDelegationError }
+  >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'get_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, Timestamp],
@@ -2848,6 +2899,14 @@ export interface _SERVICE {
     [UserNumber, SessionKey, [] | [Permissions], [] | [bigint]],
     { 'Ok' : PrepareMcpRegistrationDelegation } |
       { 'Err' : string }
+  >,
+  /**
+   * Authorized by the browser key the caller signs with.
+   */
+  'prepare_notification_delegation' : ActorMethod<
+    [PrepareNotificationDelegationRequest],
+    { 'Ok' : PrepareNotificationDelegationResponse } |
+      { 'Err' : NotificationDelegationError }
   >,
   'prepare_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, [] | [bigint]],

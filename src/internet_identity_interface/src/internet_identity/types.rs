@@ -1144,5 +1144,45 @@ pub enum SendNotificationError {
     /// `limit` is fixed and never below an origin's queue capacity.
     TooManyNotifications { limit: u32 },
     /// Also a malformed or non-canonical origin, carrying the reason.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareNotificationDelegationRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    /// `None` is the unreserved default account.
+    pub account_number: Option<AccountNumber>,
+    pub session_key: SessionKey,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareNotificationDelegationResponse {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+    /// Goes in the sender_info field of every call made with this delegation;
+    /// tells the app which account it is being called for.
+    pub sender_info: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNotificationDelegationRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    /// `None` is the unreserved default account.
+    pub account_number: Option<AccountNumber>,
+    pub session_key: SessionKey,
+    pub expiration: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct GetNotificationDelegationResponse {
+    pub delegation: SignedDelegation,
+    /// Authenticates sender_info on those calls.
+    pub sender_info_signature: ByteBuf,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationDelegationError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    NoSuchDelegation,
     InternalCanisterError(String),
 }
