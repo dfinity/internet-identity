@@ -190,6 +190,27 @@ pub(crate) struct QueueSnapshot<Sender, Item> {
     next_sender: Option<Sender>,
 }
 
+impl<Sender, Item: QueueItem> QueueSnapshot<Sender, Item> {
+    /// A snapshot of entries alone, for a caller that kept the work but not the
+    /// rotation. Restoring it starts every sender at its highest priority and the
+    /// sender rotation at the first sender, which costs a sender at most one turn.
+    pub(crate) fn from_entries(senders: Vec<(Sender, Vec<Entry<Item>>)>) -> Self {
+        let levels = Item::PRIORITY_LEVELS.max(1);
+        Self {
+            senders: senders
+                .into_iter()
+                .map(|(sender, entries)| SenderSnapshot {
+                    sender,
+                    entries,
+                    serving_priority: 0,
+                    turns_left: turns_at_priority(0, levels),
+                })
+                .collect(),
+            next_sender: None,
+        }
+    }
+}
+
 /// Queue counts and timings for metrics. Expired entries count until removed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct QueueStats {
@@ -588,6 +609,19 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 Err(error)
             }
         }
+    }
+
+    /// Every stored entry with the sender that submitted it, for a caller that has to
+    /// write them somewhere. Order is unspecified: [`QueueSnapshot::from_entries`]
+    /// files them again wherever they came back in.
+    pub(crate) fn entries(&self) -> impl Iterator<Item = (&Sender, &Entry<Item>)> {
+        self.senders.iter().flat_map(|(sender, queue)| {
+            queue
+                .entries_by_priority
+                .iter()
+                .flat_map(|bucket| bucket.values())
+                .map(move |entry| (sender, entry))
+        })
     }
 
     /// Copies stored entries, the sender rotation, and each sender's place in the

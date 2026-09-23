@@ -121,6 +121,7 @@ use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
+use crate::storage::storable::notifications::backlog::{StorableBacklogEntry, StorableBacklogKey};
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::session_handle::StorableSessionHandle;
@@ -215,6 +216,7 @@ const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
 const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
 const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
+const NOTIFICATIONS_BACKLOG_MEMORY_INDEX: u8 = 37u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -306,6 +308,11 @@ const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
 /// Monotonic [`SessionId`] allocator. A revoked session's id is retired, never reissued,
 /// which is what makes the revocation final: the id is an input to the session seed.
 const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY_INDEX);
+
+/// Notifications apps have queued, held across an upgrade. Occupied only between
+/// `pre_upgrade` and `post_upgrade`: the queue itself lives in the heap, where the
+/// admission path can afford to touch it on every call.
+const NOTIFICATIONS_BACKLOG_MEMORY_ID: MemoryId = MemoryId::new(NOTIFICATIONS_BACKLOG_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -443,6 +450,11 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the session-id allocator.
     next_session_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_session_id_memory: StableCell<StorableSessionId, ManagedMemory<M>>,
+
+    notifications_backlog_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// See [`NOTIFICATIONS_BACKLOG_MEMORY_ID`].
+    notifications_backlog_memory:
+        StableBTreeMap<StorableBacklogKey, StorableBacklogEntry, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -587,6 +599,7 @@ impl<M: Memory + Clone> Storage<M> {
         let stable_account_counter_memory = memory_manager.get(STABLE_ACCOUNT_COUNTER_MEMORY_ID);
         let next_application_number_memory = memory_manager.get(NEXT_APPLICATION_NUMBER_MEMORY_ID);
         let next_session_id_memory = memory_manager.get(NEXT_SESSION_ID_MEMORY_ID);
+        let notifications_backlog_memory = memory_manager.get(NOTIFICATIONS_BACKLOG_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
@@ -679,6 +692,10 @@ impl<M: Memory + Clone> Storage<M> {
             next_session_id_memory_wrapper: MemoryWrapper::new(next_session_id_memory.clone()),
             next_session_id_memory: StableCell::init(next_session_id_memory, 0)
                 .expect("next_session_id_memory"),
+            notifications_backlog_memory_wrapper: MemoryWrapper::new(
+                notifications_backlog_memory.clone(),
+            ),
+            notifications_backlog_memory: StableBTreeMap::init(notifications_backlog_memory),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
             ),
@@ -2827,6 +2844,27 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
+    /// Parks a queued notification for the upgrade to carry.
+    pub fn add_backlog_notification(
+        &mut self,
+        key: StorableBacklogKey,
+        entry: StorableBacklogEntry,
+    ) {
+        self.notifications_backlog_memory.insert(key, entry);
+    }
+
+    /// Reads every parked notification back and empties the map, so the rows exist
+    /// only for the upgrade that wrote them and a later one cannot resurrect them.
+    pub fn drain_backlog_notifications(
+        &mut self,
+    ) -> Vec<(StorableBacklogKey, StorableBacklogEntry)> {
+        let parked: Vec<_> = self.notifications_backlog_memory.iter().collect();
+        for (key, _) in &parked {
+            self.notifications_backlog_memory.remove(key);
+        }
+        parked
+    }
+
     /// Signs `anchor_number` in at `origin` through the production write, which mints
     /// the application a consent hangs off.
     #[cfg(test)]
@@ -4062,6 +4100,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "next_session_id".to_string(),
                 self.next_session_id_memory_wrapper.size(),
+            ),
+            (
+                "notifications_backlog".to_string(),
+                self.notifications_backlog_memory_wrapper.size(),
             ),
             (
                 "stable_anchor_application_config".to_string(),

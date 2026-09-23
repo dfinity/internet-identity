@@ -1,5 +1,6 @@
 use crate::anchor_management::tentative_device_registration::ValidatedRegistrationId;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
+use crate::notifications::backlog::NotificationBacklog;
 use crate::state::flow_states::FlowStates;
 use crate::state::temp_keys::TempKeys;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
@@ -246,6 +247,10 @@ struct State {
     registration_rate_limit: RefCell<Option<RateLimitState>>,
     // Counter to ensure uniqueness of event data in case multiple events have the same timestamp
     event_data_uniqueness_counter: Cell<u16>,
+    // Notifications apps have submitted and nothing has taken yet. Absent until the
+    // first one arrives, so the queue's clocks start from canister time rather than
+    // the epoch. Carried across an upgrade by `notifications::backlog`.
+    notification_backlog: RefCell<Option<NotificationBacklog>>,
 }
 
 /// Gives the canister a salt where it has none, and does nothing where it already has one.
@@ -402,6 +407,17 @@ pub fn signature_map<R>(f: impl FnOnce(&SignatureMap) -> R) -> R {
 
 pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
     STATE.with(|s| f(&mut s.sigs.borrow_mut()))
+}
+
+/// Runs `f` on the queue only if one exists, rather than creating one to look at.
+pub fn notification_backlog<R>(f: impl FnOnce(Option<&NotificationBacklog>) -> R) -> R {
+    STATE.with(|s| f(s.notification_backlog.borrow().as_ref()))
+}
+
+/// Installs a queue read back from stable memory. Runs before anything can submit
+/// into a fresh one, so there is nothing to merge.
+pub fn notification_backlog_replace(backlog: NotificationBacklog) {
+    STATE.with(|s| *s.notification_backlog.borrow_mut() = Some(backlog));
 }
 
 pub fn storage_borrow<R>(f: impl FnOnce(&Storage<DefaultMemoryImpl>) -> R) -> R {

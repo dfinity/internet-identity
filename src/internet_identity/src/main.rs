@@ -982,6 +982,10 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::load_persistent_state();
 
     initialize(maybe_arg);
+
+    if let Some(backlog) = notifications::backlog::restore(time()) {
+        state::notification_backlog_replace(backlog);
+    }
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {
@@ -1117,6 +1121,11 @@ fn update_archive_config(new_config: ArchiveConfig) {
 #[pre_upgrade]
 fn save_persistent_state() {
     state::save_persistent_state();
+    state::notification_backlog(|backlog| {
+        if let Some(backlog) = backlog {
+            notifications::backlog::persist(backlog);
+        }
+    });
 }
 
 fn update_root_hash() {
