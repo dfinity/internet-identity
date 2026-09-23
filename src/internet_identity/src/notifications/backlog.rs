@@ -97,7 +97,15 @@ const _: () =
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::admission_queue::Admission;
+    use crate::admission_queue::{Admission, Admitted};
+
+    /// The outcomes without their keys, for assertions that only check what happened.
+    fn results<Key>(admitted: Vec<Admitted<Key>>) -> Vec<Admission> {
+        admitted
+            .into_iter()
+            .map(|answer| answer.admission)
+            .collect()
+    }
 
     fn origin(host: &str) -> StorableOriginSha256 {
         StorableOriginSha256::from_origin(&host.to_string())
@@ -151,7 +159,8 @@ mod tests {
         let mut backlog = NotificationBacklog::new(NOTIFICATION_BACKLOG, 0);
 
         backlog.admit(origin("https://a.example"), vec![notification(1, 1)], 1);
-        let other = backlog.admit(origin("https://b.example"), vec![notification(1, 1)], 1);
+        let other =
+            results(backlog.admit(origin("https://b.example"), vec![notification(1, 1)], 1));
 
         assert_eq!(other, vec![Admission::Stored]);
         assert_eq!(backlog.stats(1).active_senders, 2);
@@ -164,14 +173,13 @@ mod tests {
         let cap = NOTIFICATION_BACKLOG.max_pending_per_group as u64;
 
         let within: Vec<_> = (0..cap).map(|id| notification(1, id)).collect();
-        assert!(backlog
-            .admit(app.clone(), within, 1)
+        assert!(results(backlog.admit(app.clone(), within, 1))
             .iter()
             .all(|admission| *admission == Admission::Stored));
 
         // The caller relies on existing wake-ups to cover this notification too.
         assert_eq!(
-            backlog.admit(app, vec![notification(1, cap)], 1),
+            results(backlog.admit(app, vec![notification(1, cap)], 1)),
             vec![Admission::Folded]
         );
     }

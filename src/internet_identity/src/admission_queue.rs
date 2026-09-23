@@ -104,7 +104,7 @@ impl RetryPolicy {
     }
 }
 
-/// The result of submitting one item.
+/// What the queue did with one item.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Admission {
     Stored,
@@ -115,6 +115,13 @@ pub(crate) enum Admission {
     Full {
         retry_after_ms: u32,
     },
+}
+
+/// One item's outcome, labelled with that item's key.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Admitted<Key> {
+    pub(crate) key: Key,
+    pub(crate) admission: Admission,
 }
 
 /// An item and the time it was admitted.
@@ -292,7 +299,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         }
     }
 
-    /// Submits items for a sender and returns one result per item, in input order.
+    /// Submits items for a sender and returns each item's outcome, in input order.
     /// Uses trusted `now_ns` for all new entries. Folding leaves existing entries,
     /// including their age and priority, unchanged.
     pub(crate) fn admit(
@@ -300,7 +307,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         sender: Sender,
         items: Vec<Item>,
         now_ns: Timestamp,
-    ) -> Vec<Admission> {
+    ) -> Vec<Admitted<Item::Key>> {
         let mut admissions = Vec::with_capacity(items.len());
         let mut swept = false;
 
@@ -309,15 +316,21 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         }
 
         for item in items {
-            if self.holds(&sender, &item.key()) {
+            let key = item.key();
+            let answer = |admission| Admitted {
+                key: key.clone(),
+                admission,
+            };
+
+            if self.holds(&sender, &key) {
                 self.folded_duplicates += 1;
-                admissions.push(Admission::Folded);
+                admissions.push(answer(Admission::Folded));
                 continue;
             }
 
             if self.pending_for(&sender, &item.group()) >= self.config.max_pending_per_group {
                 self.folded_group_capped += 1;
-                admissions.push(Admission::Folded);
+                admissions.push(answer(Admission::Folded));
                 continue;
             }
 
@@ -329,14 +342,13 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             }
 
             if self.is_full() || self.sender_at_cap(&sender) {
-                admissions.push(Admission::Full {
-                    retry_after_ms: self.retry_after_ms(now_ns),
-                });
+                let retry_after_ms = self.retry_after_ms(now_ns);
+                admissions.push(answer(Admission::Full { retry_after_ms }));
                 continue;
             }
 
             self.insert(&sender, now_ns, item);
-            admissions.push(Admission::Stored);
+            admissions.push(answer(Admission::Stored));
         }
 
         admissions
@@ -766,7 +778,7 @@ mod tests {
         let mut backlog = TestQueue::new(config(), 0);
         backlog.admit(1, vec![item(1, 1)], 1);
 
-        let admissions = backlog.admit(1, vec![item(1, 1)], 2);
+        let admissions = results(backlog.admit(1, vec![item(1, 1)], 2));
 
         assert_eq!(admissions, vec![Admission::Folded]);
         assert_eq!(backlog.stored_total, 1);
@@ -778,7 +790,7 @@ mod tests {
         let mut backlog = TestQueue::new(config(), 0);
         backlog.admit(1, vec![item(1, 1)], 1);
 
-        let admissions = backlog.admit(2, vec![item(1, 1)], 1);
+        let admissions = results(backlog.admit(2, vec![item(1, 1)], 1));
 
         assert_eq!(admissions, vec![Admission::Stored]);
         assert_eq!(backlog.stored_total, 2);
@@ -791,7 +803,7 @@ mod tests {
 
         // Resubmitting must not change the original entry's arrival time.
         assert_eq!(
-            backlog.admit(1, vec![item(1, 1)], 9),
+            results(backlog.admit(1, vec![item(1, 1)], 9)),
             vec![Admission::Folded]
         );
 
@@ -811,7 +823,7 @@ mod tests {
             0,
         );
 
-        let admissions = backlog.admit(1, vec![item(7, 1), item(7, 2), item(7, 3)], 1);
+        let admissions = results(backlog.admit(1, vec![item(7, 1), item(7, 2), item(7, 3)], 1));
 
         assert_eq!(
             admissions,
@@ -835,7 +847,7 @@ mod tests {
         backlog.take_batch(1, 3);
 
         assert_eq!(
-            backlog.admit(1, vec![item(7, 3)], 4),
+            results(backlog.admit(1, vec![item(7, 3)], 4)),
             vec![Admission::Stored]
         );
         assert_consistent(&backlog);
@@ -847,7 +859,7 @@ mod tests {
         backlog.admit(1, vec![item(1, 1)], 1);
 
         assert_eq!(
-            backlog.admit(1, vec![item(1, 1)], 101),
+            results(backlog.admit(1, vec![item(1, 1)], 101)),
             vec![Admission::Stored]
         );
         assert_eq!(keys_taken(&backlog.take_batch(1, 101)), vec![(1, 1)]);
@@ -867,7 +879,7 @@ mod tests {
         backlog.admit(1, vec![item(1, 1)], 1);
 
         assert_eq!(
-            backlog.admit(1, vec![item(1, 2)], 101),
+            results(backlog.admit(1, vec![item(1, 2)], 101)),
             vec![Admission::Stored]
         );
         assert_eq!(keys_taken(&backlog.take_batch(1, 101)), vec![(1, 2)]);
@@ -914,7 +926,8 @@ mod tests {
             0,
         );
 
-        let admissions = backlog.admit(1, vec![item(1, 1), item(2, 2), item(3, 3), item(4, 4)], 1);
+        let admissions =
+            results(backlog.admit(1, vec![item(1, 1), item(2, 2), item(3, 3), item(4, 4)], 1));
 
         assert_eq!(
             admissions,
@@ -944,8 +957,8 @@ mod tests {
         backlog.admit(2, vec![item(1, 1)], 6);
 
         // Each sender's share is now four. Sender 1 already holds five.
-        let incumbent = backlog.admit(1, vec![item(6, 6)], 7);
-        let newcomer = backlog.admit(2, vec![item(2, 2)], 7);
+        let incumbent = results(backlog.admit(1, vec![item(6, 6)], 7));
+        let newcomer = results(backlog.admit(2, vec![item(2, 2)], 7));
 
         assert_eq!(
             incumbent,
@@ -974,7 +987,7 @@ mod tests {
     fn a_full_buffer_answers_with_the_base_hint() {
         let mut backlog = full_queue(1);
 
-        let admissions = backlog.admit(1, vec![item(9, 9)], 1);
+        let admissions = results(backlog.admit(1, vec![item(9, 9)], 1));
 
         assert_eq!(
             admissions,
@@ -1014,7 +1027,7 @@ mod tests {
         backlog.admit(1, vec![item(1, 1)], 1);
 
         assert_eq!(
-            backlog.admit(1, vec![item(2, 2)], 60),
+            results(backlog.admit(1, vec![item(2, 2)], 60)),
             vec![Admission::Full {
                 retry_after_ms: 60_000
             }]
@@ -1050,7 +1063,7 @@ mod tests {
         let mut backlog = TestQueue::new(config(), 0);
         let items = (1..=9).map(|id| item(id, id)).collect();
 
-        let admissions = backlog.admit(1, items, 10_000);
+        let admissions = results(backlog.admit(1, items, 10_000));
 
         assert_eq!(
             admissions.last(),
@@ -1112,7 +1125,7 @@ mod tests {
         admit_each(&mut backlog, 1, vec![item(1, 1), item(2, 2)], 1);
 
         // Both stored entries have expired, so the new item should fit.
-        let admissions = backlog.admit(1, vec![item(3, 3)], 200);
+        let admissions = results(backlog.admit(1, vec![item(3, 3)], 200));
 
         assert_eq!(admissions, vec![Admission::Stored]);
         assert_eq!(backlog.stats(200).discarded_expired, 2);
@@ -1179,7 +1192,7 @@ mod tests {
         );
 
         assert_eq!(
-            restored.admit(1, vec![item(9, 9)], 60),
+            results(restored.admit(1, vec![item(9, 9)], 60)),
             vec![Admission::Full {
                 retry_after_ms: 1_000
             }]
@@ -1216,6 +1229,68 @@ mod tests {
 
         assert_eq!(restored.stats(60).at_capacity_for_ns, Some(0));
         assert_eq!(hint_at(&mut restored, 70), 2_000);
+    }
+
+    /// The result is positional, and the caller zips it against its own list. Zip
+    /// truncates silently, so a branch that forgot to answer would lose the tail of
+    /// a batch without failing anything.
+    #[test]
+    fn every_item_gets_exactly_one_answer() {
+        let mut queue = TestQueue::new(
+            QueueConfig {
+                max_pending_per_group: 2,
+                ..config()
+            },
+            0,
+        );
+        // Group 7 at its limit, and the queue at its ceiling.
+        admit_each(&mut queue, 1, vec![item(7, 1), item(7, 2)], 1);
+        admit_each(
+            &mut queue,
+            1,
+            vec![
+                item(1, 1),
+                item(2, 2),
+                item(3, 3),
+                item(4, 4),
+                item(5, 5),
+                item(6, 6),
+            ],
+            3,
+        );
+        assert_eq!(queue.stored_total, config().max_entries);
+
+        // One item down each of the four paths, in the order admit checks them.
+        let batch = vec![item(7, 1), item(7, 3), item(8, 8), item(9, 9)];
+        let answers = queue.admit(1, batch, 20);
+
+        // Each answer names the item it belongs to, so the caller never reads by position.
+        assert_eq!(
+            answers,
+            vec![
+                Admitted {
+                    key: (7, 1),
+                    admission: Admission::Folded
+                },
+                Admitted {
+                    key: (7, 3),
+                    admission: Admission::Folded
+                },
+                Admitted {
+                    key: (8, 8),
+                    admission: Admission::Full {
+                        retry_after_ms: 2_000
+                    }
+                },
+                Admitted {
+                    key: (9, 9),
+                    admission: Admission::Full {
+                        retry_after_ms: 2_000
+                    }
+                },
+            ]
+        );
+        assert!(queue.admit(1, vec![], 20).is_empty());
     }
 
     #[test]
@@ -1264,7 +1339,7 @@ mod tests {
         let mut queue: AdmissionQueue<u8, NoPriorityLevels> = AdmissionQueue::new(config(), 0);
 
         assert_eq!(
-            queue.admit(1, vec![NoPriorityLevels(1)], 1),
+            results(queue.admit(1, vec![NoPriorityLevels(1)], 1)),
             vec![Admission::Stored]
         );
         assert_eq!(queue.take_batch(10, 2).len(), 1);
@@ -1277,16 +1352,28 @@ mod tests {
         let mut backlog = TestQueue::new(config(), 0);
         let items = (1..=8).map(|id| item(id, id)).collect();
         assert_eq!(
-            backlog.admit(sender, items, 1),
+            results(backlog.admit(sender, items, 1)),
             vec![Admission::Stored; 8],
             "test setup failed to fill the queue"
         );
         backlog
     }
 
+    /// The outcomes without their keys, for assertions that only check what happened.
+    fn results<Key>(admitted: Vec<Admitted<Key>>) -> Vec<Admission> {
+        admitted
+            .into_iter()
+            .map(|answer| answer.admission)
+            .collect()
+    }
+
     /// Reads the retry delay by submitting to a full queue.
     fn hint_at(backlog: &mut TestQueue, now_ns: Timestamp) -> u32 {
-        match backlog.admit(99, vec![item(99, 99)], now_ns).remove(0) {
+        match backlog
+            .admit(99, vec![item(99, 99)], now_ns)
+            .remove(0)
+            .admission
+        {
             Admission::Full { retry_after_ms } => retry_after_ms,
             other => panic!("expected a full queue, got {other:?}"),
         }
