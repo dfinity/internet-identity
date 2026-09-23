@@ -22,8 +22,8 @@ pub(crate) enum Urgency {
 
 /// A request to wake a recipient's devices, without notification content.
 ///
-/// One wake-up carries one notification, so a recipient already holding
-/// `max_pending_per_group` of an app's notifications loses the ones above the cap.
+/// One wake-up carries one notification, so nothing stands in for a notification
+/// above a recipient's cap. The app has to send it again once the cap frees up.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct PendingNotification {
     pub(crate) recipient: AnchorNumber,
@@ -183,7 +183,7 @@ mod tests {
     }
 
     #[test]
-    fn a_recipient_past_the_cap_loses_the_notification() {
+    fn a_recipient_past_the_cap_sends_the_app_away_to_retry() {
         let mut backlog = NotificationBacklog::new(NOTIFICATION_BACKLOG, 0);
         let app = origin("https://a.example");
         let cap = NOTIFICATION_BACKLOG.max_pending_per_group as u64;
@@ -194,8 +194,17 @@ mod tests {
             .all(|admission| *admission == Admission::Accepted));
 
         assert_eq!(
-            results(backlog.admit(app, vec![notification(1, cap)], 1)),
-            vec![Admission::Dropped]
+            results(backlog.admit(app.clone(), vec![notification(1, cap)], 1)),
+            vec![Admission::Full {
+                retry_after_ms: NOTIFICATION_BACKLOG.retry.base_ms
+            }]
+        );
+
+        // Taking one frees the recipient's slot, so the retry lands.
+        backlog.take_batch(1, 2);
+        assert_eq!(
+            results(backlog.admit(app, vec![notification(1, cap)], 2)),
+            vec![Admission::Accepted]
         );
     }
 
