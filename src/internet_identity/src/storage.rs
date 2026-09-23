@@ -317,9 +317,10 @@ const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY
 /// `pre_upgrade` and `post_upgrade`: the queue itself lives in the heap, where the
 /// admission path can afford to touch it on every call.
 const NOTIFICATIONS_BACKLOG_MEMORY_ID: MemoryId = MemoryId::new(NOTIFICATIONS_BACKLOG_MEMORY_INDEX);
-/// Notifications the canister has taken on and not yet delivered. Stable rather
-/// than in the heap because an upgrade must not lose work already accepted from an
-/// app, which has been told the notification is queued and will not resend it.
+
+/// Notifications the canister has taken on and not yet delivered. Stable rather than
+/// in the heap because how long one waits here depends on push relays II does not
+/// control, so an upgrade can land on a queue holding far more than a tick's worth.
 const NOTIFICATIONS_PROCESSING_MEMORY_ID: MemoryId =
     MemoryId::new(NOTIFICATIONS_PROCESSING_MEMORY_INDEX);
 

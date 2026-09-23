@@ -1,4 +1,5 @@
-//! How a notification the canister has taken on is stored while it waits to be sent.
+//! How a notification that the canister has taken on is stored while it waits to be
+//! sent.
 
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::timestamp::StorableTimestamp;

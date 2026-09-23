@@ -3,8 +3,9 @@
 //! An entry arrives here by leaving the backlog, which is the last point a sender
 //! hears anything. Nothing about this queue reaches an app directly. It reaches one
 //! only as the backlog's stall backoff, once a full processing queue stops the ticker
-//! taking. Entries live in stable memory, so an upgrade does not lose work an app was
-//! already told was queued and will not send again.
+//! taking. Entries live in stable memory rather than the heap because how long one
+//! waits here depends on push relays II does not control, so an upgrade can land on a
+//! queue holding far more than the backlog's tick-sized turnover.
 //!
 //! Keyed by deadline, so the entries closest to expiring are the first a scan reaches
 //! and both the sweep and the next batch to send are prefixes of one walk. The backlog
