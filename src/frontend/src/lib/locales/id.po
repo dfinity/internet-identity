@@ -119,6 +119,9 @@ msgstr "1 minggu"
 msgid "10 minutes"
 msgstr "10 menit"
 
+msgid "2m"
+msgstr "2 mnt"
+
 msgid "30 days"
 msgstr "30 hari"
 
@@ -136,6 +139,9 @@ msgstr "Program lokal"
 
 msgid "A local server picks a new port each time, so any program on this computer can ask to connect. Remove it when you're not using one."
 msgstr "Server lokal memilih port baru setiap kali, sehingga program apa pun di komputer ini dapat meminta untuk terhubung. Hapus saat tidak menggunakannya."
+
+msgid "A marketplace"
+msgstr "Sebuah marketplace"
 
 msgid "About"
 msgstr "Tentang"
@@ -230,6 +236,9 @@ msgstr "Akses AI"
 msgid "All options"
 msgstr "Semua opsi"
 
+msgid "Allow {app}"
+msgstr "Izinkan {app}"
+
 msgid "Allow access"
 msgstr "Izinkan akses"
 
@@ -238,6 +247,9 @@ msgstr "Izinkan akses CLI"
 
 msgid "Allow local programs to connect?"
 msgstr "Izinkan program lokal untuk terhubung?"
+
+msgid "Allow notifications for {host}."
+msgstr "Izinkan notifikasi untuk {host}."
 
 msgid "Allow to access this info"
 msgstr "Izinkan untuk mengakses info ini"
@@ -377,6 +389,12 @@ msgstr "Akses CLI"
 msgid "CLI access not enabled"
 msgstr "Akses CLI tidak diaktifkan"
 
+msgid "Click the lock icon in the address bar."
+msgstr "Klik ikon gembok di bilah alamat."
+
+msgid "Click the tune or lock icon at the left of the address bar."
+msgstr "Klik ikon pengaturan atau gembok di sebelah kiri bilah alamat."
+
 msgid "Click to reveal"
 msgstr "Klik untuk menampilkan"
 
@@ -455,6 +473,9 @@ msgstr "Lanjutkan dengan passkey"
 msgid "Continue with SSO"
 msgstr "Lanjutkan dengan SSO"
 
+msgid "Continue without"
+msgstr "Lanjutkan tanpa"
+
 msgid "Copied"
 msgstr "Disalin"
 
@@ -487,6 +508,9 @@ msgstr "Tidak dapat menyimpan konektor Anda. Silakan coba lagi."
 
 msgid "Couldn't sign this browser out"
 msgstr "Browser ini tidak dapat dikeluarkan"
+
+msgid "Couldn't turn on notifications"
+msgstr "Tidak dapat mengaktifkan notifikasi"
 
 msgid "Couldn't validate MCP support"
 msgstr "Tidak dapat memvalidasi dukungan MCP"
@@ -569,6 +593,9 @@ msgstr "Sesuaikan akses AI"
 msgid "Default"
 msgstr "Default"
 
+msgid "Delivery routes through your identity. Revoke access anytime."
+msgstr "Pengiriman melalui identitas Anda. Cabut akses kapan saja."
+
 msgid "Deny all"
 msgstr "Tolak semua"
 
@@ -629,6 +656,12 @@ msgstr "Aktifkan akses CLI"
 msgid "Enable CLI access for this device, then try again."
 msgstr "Aktifkan akses CLI untuk perangkat ini, lalu coba lagi."
 
+msgid "Enable notifications"
+msgstr "Aktifkan notifikasi"
+
+msgid "Enable on this device"
+msgstr "Aktifkan di perangkat ini"
+
 msgid "Enabled on all devices"
 msgstr "Diaktifkan di semua perangkat"
 
@@ -665,6 +698,9 @@ msgstr "Kesalahan"
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Semua yang perlu Anda ketahui tentang Internet Identity, cara yang pribadi, aman, dan mudah untuk masuk ke aplikasi di Internet Computer."
 
+msgid "Example"
+msgstr "Contoh"
+
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Rasakan"
@@ -680,6 +716,12 @@ msgstr "Pertanyaan yang Sering Diajukan"
 
 msgid "Featured apps"
 msgstr "Aplikasi unggulan"
+
+msgid "Find {host} in the list and set it to Allow."
+msgstr "Temukan {host} di daftar dan atur ke Izinkan."
+
+msgid "Find Notifications and switch it to Allow."
+msgstr "Temukan Notifikasi dan alihkan ke Izinkan."
 
 msgid "First seen"
 msgstr "Pertama kali terlihat"
@@ -722,6 +764,9 @@ msgstr "Membuat kode..."
 
 msgid "Generating phrase..."
 msgstr "Membuat frasa..."
+
+msgid "Get {app} notifications on this device"
+msgstr "Dapatkan notifikasi {app} di perangkat ini"
 
 msgid "Get started"
 msgstr "Mulai"
@@ -782,6 +827,9 @@ msgstr "Bagaimana Internet Identity dibandingkan dengan alat autentikasi Web3 la
 
 msgid "How to stay secure"
 msgstr "Cara tetap aman"
+
+msgid "How to unblock"
+msgstr "Cara membuka blokir"
 
 msgid "I acknowledge"
 msgstr "Saya menyatakan"
@@ -857,6 +905,9 @@ msgstr "Salah. Coba lagi dengan kode baru."
 
 msgid "Info you can choose to share when an app requests it. Never shared without your consent."
 msgstr "Info yang dapat Anda bagikan saat aplikasi memintanya. Tidak pernah dibagikan tanpa persetujuan Anda."
+
+msgid "Instant activity alerts"
+msgstr "Notifikasi aktivitas instan"
 
 msgid "Interaction canceled. Please try again."
 msgstr "Interaksi dibatalkan. Silakan coba lagi."
@@ -960,6 +1011,9 @@ msgstr "Legacy"
 msgid "Legacy identity"
 msgstr "Identitas lama"
 
+msgid "Let {app} notify you"
+msgstr "Biarkan {app} memberi Anda notifikasi"
+
 msgid "Let AI access your apps."
 msgstr "Biarkan AI mengakses aplikasi Anda."
 
@@ -977,6 +1031,9 @@ msgstr "Tautan disalin ke papan klip"
 
 msgid "Linking Internet Identity"
 msgstr "Menautkan Internet Identity"
+
+msgid "Loading"
+msgstr "Memuat"
 
 msgid "Loading permissions"
 msgstr "Memuat izin"
@@ -1038,6 +1095,9 @@ msgstr "Panjang maksimum 32 karakter."
 msgid "Maximum length is 64 characters."
 msgstr "Panjang maksimum 64 karakter."
 
+msgid "Maybe later"
+msgstr "Mungkin nanti"
+
 msgid "MCP server URL"
 msgstr "URL server MCP"
 
@@ -1089,11 +1149,23 @@ msgstr "Belum diaktifkan"
 msgid "Not connected yet"
 msgstr "Belum terhubung"
 
+msgid "Not now"
+msgstr "Tidak sekarang"
+
 msgid "Not upgraded"
 msgstr "Belum ditingkatkan"
 
 msgid "Not verified"
 msgstr "Belum diverifikasi"
+
+msgid "Notification setup failed"
+msgstr "Pengaturan notifikasi gagal"
+
+msgid "Notifications are turned off for Internet Identity"
+msgstr "Notifikasi dinonaktifkan untuk Internet Identity"
+
+msgid "now"
+msgstr "sekarang"
 
 msgid "Official · Hosted by DFINITY"
 msgstr "Resmi · Di-hosting oleh DFINITY"
@@ -1131,11 +1203,20 @@ msgstr "Buka kelola"
 msgid "Open menu"
 msgstr "Buka menu"
 
+msgid "Open Permissions, then Notifications, then Allow."
+msgstr "Buka Izin, lalu Notifikasi, lalu Izinkan."
+
+msgid "Open Safari, then Settings, then Websites, then Notifications."
+msgstr "Buka Safari, lalu Pengaturan, lalu Situs web, lalu Notifikasi."
+
 msgid "Open Settings"
 msgstr "Buka Pengaturan"
 
 msgid "Open Settings in a new tab to set your trusted MCP server."
 msgstr "Buka Pengaturan di tab baru untuk mengatur server MCP tepercaya Anda."
+
+msgid "Open your browser's site settings for this page."
+msgstr "Buka pengaturan situs browser Anda untuk halaman ini."
 
 msgid "Or sign in with another identity"
 msgstr "Atau masuk dengan identitas lain"
@@ -1203,14 +1284,23 @@ msgstr "Silakan masuk kembali untuk melanjutkan."
 msgid "Powered by"
 msgstr "Didukung oleh"
 
+msgid "Private by design"
+msgstr "Privat berdasarkan desain"
+
 msgid "Questions only"
 msgstr "Hanya pertanyaan"
+
+msgid "Reachable anytime"
+msgstr "Dapat dijangkau kapan saja"
 
 msgid "Reachable MCP server"
 msgstr "Server MCP yang dapat dijangkau"
 
 msgid "Real privacy"
 msgstr "Privasi sejati"
+
+msgid "Receive alerts from the apps you approve, and stay on top of what matters."
+msgstr "Terima peringatan dari aplikasi yang Anda setujui, dan tetap pantau hal-hal penting."
 
 msgid "Recover"
 msgstr "Pulihkan"
@@ -1247,6 +1337,12 @@ msgstr "Frasa pemulihan diaktifkan"
 
 msgid "Recovery phrase set"
 msgstr "Frasa pemulihan diatur"
+
+msgid "Reload the page and try again."
+msgstr "Muat ulang halaman dan coba lagi."
+
+msgid "Reload the page and turn notifications on again."
+msgstr "Muat ulang halaman dan aktifkan notifikasi lagi."
 
 msgid "Remember"
 msgstr "Ingat"
@@ -1344,6 +1440,9 @@ msgstr "Kembali ke aplikasi"
 msgid "Return to application"
 msgstr "Kembali ke aplikasi"
 
+msgid "Return to this page and try again."
+msgstr "Kembali ke halaman ini dan coba lagi."
+
 msgid "Review {serverDisplayName}'s <0>Privacy Policy</0> and <1>Terms of Service</1>."
 msgstr "Tinjau <0>Kebijakan Privasi</0> dan <1>Ketentuan Layanan</1> dari {serverDisplayName}."
 
@@ -1421,6 +1520,9 @@ msgstr "Siapkan frasa pemulihan"
 
 msgid "Set up your private, passwordless identity."
 msgstr "Siapkan identitas pribadi Anda tanpa kata sandi."
+
+msgid "Setting up…"
+msgstr "Menyiapkan…"
 
 msgid "Settings"
 msgstr "Pengaturan"
@@ -1537,8 +1639,17 @@ msgstr "Ada yang tidak sesuai."
 msgid "Something went wrong"
 msgstr "Terjadi kesalahan"
 
+msgid "Something went wrong allowing this app. You can try again now, or allow it later in Settings."
+msgstr "Terjadi kesalahan saat mengizinkan aplikasi ini. Anda dapat mencoba lagi sekarang, atau mengizinkannya nanti di Pengaturan."
+
+msgid "Something went wrong setting up this device. You can try again now, or set it up later in Settings."
+msgstr "Terjadi kesalahan saat menyiapkan perangkat ini. Anda dapat mencoba lagi sekarang, atau menyiapkannya nanti di Pengaturan."
+
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Terjadi kesalahan saat membuat delegasi Anda. Silakan coba lagi; jika masalah berlanjut, hubungi dukungan."
+
+msgid "Something went wrong while setting up notifications. Please try again; if the issue persists, contact support."
+msgstr "Terjadi kesalahan saat menyiapkan notifikasi. Coba lagi; jika masalah berlanjut, hubungi dukungan."
 
 msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
 msgstr "Terjadi kesalahan saat berbagi atribut. Silakan coba lagi; jika masalah berlanjut, hubungi dukungan."
@@ -1636,6 +1747,9 @@ msgstr "Ketuk pada <0>bilah alamat</0> dan <1>buka di peramban</1>."
 msgid "Tap on the highlighted <0>back</0> button."
 msgstr "Ketuk pada tombol <0>kembali</0> yang disorot."
 
+msgid "Tap the site-info icon to the left of the address bar."
+msgstr "Ketuk ikon info situs di sebelah kiri bilah alamat."
+
 msgid "Test passkey support"
 msgstr "Uji dukungan passkey"
 
@@ -1693,6 +1807,9 @@ msgstr "Akun {resolvedProviderName} ini belum terhubung ke Internet Identity."
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "Akun ini sudah terhubung ke identitas Anda. Metode akses aktif Anda akan dialihkan ke akun ini."
 
+msgid "this app"
+msgstr "aplikasi ini"
+
 msgid "This app has moved to the new Internet Identity"
 msgstr "Aplikasi ini telah pindah ke Internet Identity baru"
 
@@ -1707,6 +1824,9 @@ msgstr "Peramban ini tidak didukung."
 
 msgid "This connection link is missing information or has been changed."
 msgstr "Tautan koneksi ini kekurangan informasi atau telah diubah."
+
+msgid "This device is already set up for notifications. Allow this app to send them too."
+msgstr "Perangkat ini sudah diatur untuk notifikasi. Izinkan aplikasi ini mengirimkannya juga."
 
 msgid "This doesn't look like a valid email address."
 msgstr "Ini tampaknya bukan alamat email yang valid."
@@ -1780,6 +1900,9 @@ msgstr "Untuk menyelesaikan pengaturan passkey Anda, ikuti instruksi yang ditamp
 msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 msgstr "Untuk membiarkan AI mengajukan pertanyaan dan melakukan tindakan di seluruh aplikasi Anda, tambahkan <0>konektor MCP</0> yang Anda percaya."
 
+msgid "Transfers, replies and mentions the moment they happen."
+msgstr "Transfer, balasan, dan sebutan pada saat terjadinya."
+
 msgid "Trusted connector"
 msgstr "Konektor tepercaya"
 
@@ -1788,6 +1911,9 @@ msgstr "Coba alamat lain"
 
 msgid "Try again"
 msgstr "Coba lagi"
+
+msgid "Turn on notifications from {app}?"
+msgstr "Aktifkan notifikasi dari {app}?"
 
 msgid "Type each word in the correct order:"
 msgstr "Ketik setiap kata dalam urutan yang benar:"
@@ -1812,6 +1938,9 @@ msgstr "Tidak dapat menyelesaikan pengaturan"
 
 msgid "Unable to connect"
 msgstr "Tidak dapat terhubung"
+
+msgid "Under Permissions, clear the \"Blocked\" setting for Send Notifications."
+msgstr "Di bagian Izin, hapus pengaturan \"Diblokir\" untuk Kirim Notifikasi."
 
 msgid "Understanding Internet Identity"
 msgstr "Memahami Internet Identity"
@@ -1854,6 +1983,9 @@ msgstr "Asal tidak terverifikasi"
 
 msgid "Update recovery email"
 msgstr "Perbarui email pemulihan"
+
+msgid "Updates reach your device without keeping the app open."
+msgstr "Pembaruan mencapai perangkat Anda tanpa harus membuka aplikasi."
 
 msgid "Upgrade"
 msgstr "Tingkatkan"
@@ -2008,6 +2140,9 @@ msgstr "Domain yang salah diatur. Silakan coba lagi."
 msgid "You <0>cannot</0> rename this once it is set."
 msgstr "Anda <0>tidak dapat</0> mengubah nama ini setelah diatur."
 
+msgid "You allowed this app on another device. Turn this device on to receive them here too."
+msgstr "Anda mengizinkan aplikasi ini di perangkat lain. Aktifkan perangkat ini untuk menerimanya di sini juga."
+
 msgid "You already have a {name} account linked"
 msgstr "Anda sudah memiliki akun {name} yang tertaut"
 
@@ -2107,6 +2242,12 @@ msgstr "Anda telah mencapai batas {limit} email terverifikasi. Hapus salah satu 
 msgid "Your apps stay signed in and your identity is ready the next time you come back."
 msgstr "Aplikasi Anda tetap masuk dan identitas Anda siap saat Anda kembali."
 
+msgid "Your browser is blocking notifications for this site, so this app can't reach you here. Turn them back on in your browser settings, then try again."
+msgstr "Browser Anda memblokir notifikasi untuk situs ini, sehingga aplikasi ini tidak dapat menjangkau Anda di sini. Aktifkan kembali di pengaturan browser Anda, lalu coba lagi."
+
+msgid "Your item just sold."
+msgstr "Barang Anda baru saja terjual."
+
 msgid "Your local server tells you when it's ready to connect. Nothing to enter here."
 msgstr "Server lokal Anda memberi tahu Anda ketika siap untuk terhubung. Tidak ada yang perlu dimasukkan di sini."
 
@@ -2130,3 +2271,9 @@ msgstr "Frasa pemulihan Anda memberikan kontrol penuh atas identitas Anda. Janga
 
 msgid "Your recovery phrase is now active and can be reset anytime."
 msgstr "Frasa pemulihan Anda sekarang aktif dan dapat disetel ulang kapan saja."
+
+msgid "Your transfer is confirmed."
+msgstr "Transfer Anda dikonfirmasi."
+
+msgid "Your wallet"
+msgstr "Dompet Anda"
