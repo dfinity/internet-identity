@@ -1816,43 +1816,31 @@ type WebPushSubscriptionStatus = record {
 
 // ===== Notifications sent by an app =====
 
-// Scoped to (origin, recipient): the same id sent to two recipients is two
-// notifications. The canisters sending for one origin share its id space.
+// Scoped to (origin, recipient), and shared across the canisters sending for
+// one origin.
 type NotificationId = nat64;
 
-// Orders an origin's entries against its own only, so marking everything High
-// gains nothing. Web Push's levels, forwarded as sent.
 type Urgency = variant { VeryLow; Low; Normal; High };
 
-// A content-free signal: the app holds the content, the recipient's device
-// fetches it. A re-send means that content changed, and replaces the entry
-// while it is still pending; once delivered the id is forgotten.
-//
-// Acceptance is not a delivery guarantee — an entry may expire, be displaced by
-// a more urgent one from the same origin, or fail at the channel.
 type Notification = record {
     id : NotificationId;
     recipient : principal;
-    // Dropped undelivered once passed. Null means II's default retention,
-    // which is also the ceiling.
+    // Null means II's default retention, which is also the ceiling.
     expires_at : opt Timestamp;
     // Null means Normal.
     urgency : opt Urgency;
 };
 
-// Applies in order: a later entry for a (recipient, id) supersedes an earlier
-// one, and the reply names each pair at most once.
+// Applies in order: a later entry for a (recipient, id) replaces an earlier
+// one, as a re-send replaces a notification that is still pending.
 type SendNotificationArg = record {
     origin : FrontendHostname;
     notifications : vec Notification;
 };
 
 type NotAcceptedReason = variant {
-    // No such recipient at this origin.
     UnknownRecipient;
-    // The recipient has no notification channel enabled.
     NoChannel;
-    // No room. Send it again from retry_after.
     Deferred : record { retry_after : Timestamp };
 };
 
@@ -1870,10 +1858,7 @@ type SendNotificationResponse = record {
 type SendNotificationError = variant {
     // The origin's sender list was read and does not list the caller.
     SenderNotListed;
-    // More entries than II will process in one call; nothing was enqueued.
-    // limit is fixed and never below an origin's queue capacity.
     TooManyNotifications : record { limit : nat32 };
-    // Also a malformed or non-canonical origin, carrying the reason.
     InternalCanisterError : text;
 };
 
@@ -2363,7 +2348,7 @@ service : (opt InternetIdentityInit) -> {
     remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 
-    // Called by an app's backend canister for the origin it names, authorized by
-    // that origin listing the caller. Not implemented yet: every call is refused.
+    // Called by an app's backend canister for the origin it names. Not
+    // implemented yet: every call is refused.
     app_send_notification : (SendNotificationArg) -> (variant { Ok : SendNotificationResponse; Err : SendNotificationError });
 };

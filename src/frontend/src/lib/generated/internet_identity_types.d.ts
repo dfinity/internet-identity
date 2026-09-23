@@ -1377,32 +1377,9 @@ export interface NotAccepted {
   'recipient' : Principal,
   'reason' : NotAcceptedReason,
 }
-export type NotAcceptedReason = {
-    /**
-     * No such recipient at this origin.
-     */
-    'UnknownRecipient' : null
-  } |
-  {
-    /**
-     * The recipient has no notification channel enabled.
-     */
-    'NoChannel' : null
-  } |
-  {
-    /**
-     * No room. Send it again from retry_after.
-     */
-    'Deferred' : { 'retry_after' : Timestamp }
-  };
-/**
- * A content-free signal: the app holds the content, the recipient's device
- * fetches it. A re-send means that content changed, and replaces the entry
- * while it is still pending; once delivered the id is forgotten.
- * 
- * Acceptance is not a delivery guarantee — an entry may expire, be displaced by
- * a more urgent one from the same origin, or fail at the channel.
- */
+export type NotAcceptedReason = { 'UnknownRecipient' : null } |
+  { 'NoChannel' : null } |
+  { 'Deferred' : { 'retry_after' : Timestamp } };
 export interface Notification {
   'id' : NotificationId,
   /**
@@ -1411,8 +1388,7 @@ export interface Notification {
   'urgency' : [] | [Urgency],
   'recipient' : Principal,
   /**
-   * Dropped undelivered once passed. Null means II's default retention,
-   * which is also the ceiling.
+   * Null means II's default retention, which is also the ceiling.
    */
   'expires_at' : [] | [Timestamp],
 }
@@ -1433,8 +1409,8 @@ export interface NotificationGrantConsentRequest {
 }
 /**
  * ===== Notifications sent by an app =====
- * Scoped to (origin, recipient): the same id sent to two recipients is two
- * notifications. The canisters sending for one origin share its id space.
+ * Scoped to (origin, recipient), and shared across the canisters sending for
+ * one origin.
  */
 export type NotificationId = bigint;
 export type NotificationRevokeConsentError = {
@@ -1853,26 +1829,17 @@ export interface Rrsig {
 }
 export type Salt = Uint8Array | number[];
 /**
- * Applies in order: a later entry for a (recipient, id) supersedes an earlier
- * one, and the reply names each pair at most once.
+ * Applies in order: a later entry for a (recipient, id) replaces an earlier
+ * one, as a re-send replaces a notification that is still pending.
  */
 export interface SendNotificationArg {
   'notifications' : Array<Notification>,
   'origin' : FrontendHostname,
 }
 export type SendNotificationError = {
-    /**
-     * More entries than II will process in one call; nothing was enqueued.
-     * limit is fixed and never below an origin's queue capacity.
-     */
     'TooManyNotifications' : { 'limit' : number }
   } |
-  {
-    /**
-     * Also a malformed or non-canonical origin, carrying the reason.
-     */
-    'InternalCanisterError' : string
-  } |
+  { 'InternalCanisterError' : string } |
   {
     /**
      * The origin's sender list was read and does not list the caller.
@@ -2109,10 +2076,6 @@ export type UpdateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
   { 'NameTooLong' : null };
-/**
- * Orders an origin's entries against its own only, so marking everything High
- * gains nothing. Web Push's levels, forwarded as sent.
- */
 export type Urgency = { 'Low' : null } |
   { 'High' : null } |
   { 'VeryLow' : null } |
@@ -2225,8 +2188,8 @@ export interface _SERVICE {
       { 'Err' : AppSessionError }
   >,
   /**
-   * Called by an app's backend canister for the origin it names, authorized by
-   * that origin listing the caller. Not implemented yet: every call is refused.
+   * Called by an app's backend canister for the origin it names. Not
+   * implemented yet: every call is refused.
    */
   'app_send_notification' : ActorMethod<
     [SendNotificationArg],
