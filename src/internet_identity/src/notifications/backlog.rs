@@ -3,8 +3,12 @@
 // Used by the submission endpoint and dispatcher in follow-up PRs.
 #![allow(dead_code)]
 
-use super::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
+use super::admission_queue::{
+    AdmissionQueue, Entry, QueueConfig, QueueItem, QueueSnapshot, RetryPolicy,
+};
+use crate::state::storage_borrow_mut;
 use crate::storage::storable::application::StorableOriginSha256;
+use crate::storage::storable::notifications::backlog::{StorableBacklogEntry, StorableBacklogKey};
 use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 
 /// RFC 8030 urgency levels, ordered as the candid `Urgency` declares them.
@@ -25,6 +29,18 @@ pub(crate) struct PendingNotification {
     pub(crate) urgency: Urgency,
     /// Optional app deadline, capped by the queue expiry limit.
     pub(crate) expires_at_ns: Option<Timestamp>,
+}
+
+impl Urgency {
+    /// An unknown level reads as the least urgent, costing a row its urgency not the read.
+    pub(crate) fn from_level(level: u8) -> Self {
+        match level {
+            1 => Urgency::Low,
+            2 => Urgency::Normal,
+            3 => Urgency::High,
+            _ => Urgency::VeryLow,
+        }
+    }
 }
 
 impl QueueItem for PendingNotification {
@@ -95,10 +111,91 @@ const _: () = assert!(
 const _: () =
     assert!(NOTIFICATION_BACKLOG.pressure_cleared_below < NOTIFICATION_BACKLOG.max_entries);
 
+/// Writes every queued notification into stable memory for the upgrade to carry.
+///
+/// The rotation is left behind: a sender's place in the turn order is worth less than
+/// the code to carry it, and restarting costs a sender at most one turn. The work
+/// itself is kept, because an app told its notification was accepted will not send it
+/// again.
+pub(crate) fn persist(backlog: &NotificationBacklog) {
+    storage_borrow_mut(|storage| {
+        for (origin, entry) in backlog.entries() {
+            storage.add_backlog_notification(
+                StorableBacklogKey {
+                    origin: origin.clone(),
+                    expires_at_ns: entry.expires_at_ns,
+                    recipient: entry.item.recipient,
+                    notification_id: entry.item.notification_id,
+                },
+                StorableBacklogEntry {
+                    received_at_ns: entry.received_at_ns,
+                    urgency: entry.item.urgency as u8,
+                    expires_at_ns: entry.item.expires_at_ns,
+                },
+            );
+        }
+    });
+}
+
+/// Reads back what [`persist`] wrote and empties the map. `None` when nothing came
+/// back, which is every install and every upgrade that found the queue empty.
+///
+/// A row that does not decode is dropped rather than trapped on, and the count is
+/// logged once. Trapping here would fail the upgrade, which is a steep price for a
+/// wake-up, and the shape most likely to stop decoding is one an older build wrote.
+///
+/// Arrival times and deadlines come back as they were, so an entry keeps the life it
+/// had rather than starting over. Retry clocks restart at `now_ns`, since the silence
+/// a sender should back off from is silence this canister is responsible for.
+pub(crate) fn restore(now_ns: Timestamp) -> Option<NotificationBacklog> {
+    let parked = storage_borrow_mut(|storage| storage.drain_backlog_notifications());
+    if parked.is_empty() {
+        return None;
+    }
+
+    // Rows arrive grouped by sender, since the origin hash leads the key.
+    let mut by_sender: Vec<(StorableOriginSha256, Vec<Entry<PendingNotification>>)> = Vec::new();
+    let mut unreadable = 0usize;
+    for (key, stored) in parked {
+        let Some(stored) = stored else {
+            unreadable += 1;
+            continue;
+        };
+        let entry = Entry {
+            received_at_ns: stored.received_at_ns,
+            expires_at_ns: key.expires_at_ns,
+            item: PendingNotification {
+                recipient: key.recipient,
+                notification_id: key.notification_id,
+                urgency: Urgency::from_level(stored.urgency),
+                expires_at_ns: stored.expires_at_ns,
+            },
+        };
+        match by_sender.last_mut() {
+            Some((origin, entries)) if *origin == key.origin => entries.push(entry),
+            _ => by_sender.push((key.origin, vec![entry])),
+        }
+    }
+
+    if unreadable > 0 {
+        ic_cdk::println!("Dropped {unreadable} queued notifications that did not decode");
+    }
+    if by_sender.is_empty() {
+        return None;
+    }
+
+    Some(NotificationBacklog::restore(
+        NOTIFICATION_BACKLOG,
+        QueueSnapshot::from_entries(by_sender),
+        now_ns,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::notifications::admission_queue::{Admission, Admitted, Taken};
+    use crate::notifications::test_setup;
 
     fn results<Key>(admitted: Vec<Admitted<Key>>) -> Vec<Admission> {
         admitted
@@ -261,6 +358,169 @@ mod tests {
         backlog
             .take_batch(limit, now_ns, |batch| Ok::<_, ()>(batch.to_vec()))
             .unwrap()
+    }
+
+    /// Everything a persisted entry has to come back with, in the order it would be
+    /// sent, so a difference shows up as a difference in what leaves the queue.
+    fn round_trip(
+        backlog: &NotificationBacklog,
+        now_ns: Timestamp,
+    ) -> Vec<Taken<StorableOriginSha256, PendingNotification>> {
+        persist(backlog);
+        let mut restored = restore(now_ns).expect("a queue that held something");
+        take(&mut restored, 1_000, now_ns)
+    }
+
+    #[test]
+    fn a_queued_notification_comes_back_with_its_app_arrival_and_deadline() {
+        test_setup();
+        let app = origin("https://a.example");
+        let mut backlog = NotificationBacklog::new(NOTIFICATION_BACKLOG, 0);
+        backlog.admit(
+            app.clone(),
+            vec![PendingNotification {
+                expires_at_ns: Some(90 * SECOND_NS),
+                ..notification(42, 7)
+            }],
+            1_000,
+        );
+
+        let taken = round_trip(&backlog, 2_000);
+
+        assert_eq!(taken.len(), 1);
+        assert_eq!(taken[0].sender, app);
+        assert_eq!(taken[0].entry.received_at_ns, 1_000);
+        assert_eq!(taken[0].entry.expires_at_ns, 90 * SECOND_NS);
+        assert_eq!(
+            taken[0].entry.item,
+            PendingNotification {
+                expires_at_ns: Some(90 * SECOND_NS),
+                ..notification(42, 7)
+            }
+        );
+    }
+
+    /// Senders share the queue by taking turns, so the restored queue has to hand out
+    /// one per sender rather than draining whoever happened to be read back first.
+    #[test]
+    fn senders_still_take_turns_after_a_restore() {
+        test_setup();
+        let mut backlog = NotificationBacklog::new(NOTIFICATION_BACKLOG, 0);
+        for (host, ids) in [("https://a.example", [1, 2]), ("https://b.example", [3, 4])] {
+            let items = ids.iter().map(|id| notification(1, *id)).collect();
+            backlog.admit(origin(host), items, 1);
+        }
+
+        let senders: Vec<StorableOriginSha256> = round_trip(&backlog, 2)
+            .iter()
+            .map(|taken| taken.sender.clone())
+            .collect();
+
+        // Which app leads is its hash's place among the senders, so the property is
+        // that neither goes twice running, not which one is first.
+        assert_eq!(senders.len(), 4);
+        assert_ne!(senders[0], senders[1]);
+        assert_ne!(senders[1], senders[2]);
+        assert_ne!(senders[2], senders[3]);
+    }
+
+    /// Urgency decides the order entries leave in, so a level that came back wrong
+    /// would reorder the queue.
+    #[test]
+    fn urgency_survives_the_round_trip() {
+        test_setup();
+        let mut backlog = NotificationBacklog::new(NOTIFICATION_BACKLOG, 0);
+        let queued = [
+            Urgency::VeryLow,
+            Urgency::Low,
+            Urgency::Normal,
+            Urgency::High,
+        ]
+        .iter()
+        .enumerate()
+        .map(|(index, urgency)| at_urgency(index as u64, *urgency))
+        .collect();
+        backlog.admit(origin("https://a.example"), queued, 1);
+
+        let urgencies: Vec<Urgency> = round_trip(&backlog, 2)
+            .iter()
+            .map(|taken| taken.entry.item.urgency)
+            .collect();
+
+        assert_eq!(
+            urgencies,
+            vec![
+                Urgency::High,
+                Urgency::Normal,
+                Urgency::Low,
+                Urgency::VeryLow
+            ]
+        );
+    }
+
+    fn unreadable_row(host: &str, notification_id: u64) {
+        storage_borrow_mut(|storage| {
+            storage.add_unreadable_backlog_notification(StorableBacklogKey {
+                origin: origin(host),
+                expires_at_ns: 500,
+                recipient: 1,
+                notification_id,
+            })
+        });
+    }
+
+    /// An upgrade must not fail over one row it cannot read, so the rest of the
+    /// queue still comes back and only that notification is lost.
+    #[test]
+    fn a_row_that_does_not_decode_is_dropped_rather_than_taking_the_rest_with_it() {
+        test_setup();
+        let mut backlog = NotificationBacklog::new(NOTIFICATION_BACKLOG, 0);
+        backlog.admit(origin("https://a.example"), vec![notification(1, 1)], 1);
+        persist(&backlog);
+        unreadable_row("https://b.example", 2);
+
+        let restored = restore(2).expect("the readable row still comes back");
+
+        assert_eq!(restored.stats(2).stored_total, 1);
+    }
+
+    /// Nothing readable is the same as nothing parked, and the unreadable rows still
+    /// have to leave so the next upgrade does not read them again.
+    #[test]
+    fn rows_that_all_fail_to_decode_restore_to_no_queue() {
+        test_setup();
+        unreadable_row("https://a.example", 1);
+        unreadable_row("https://a.example", 2);
+
+        assert!(restore(2).is_none());
+
+        assert!(restore(2).is_none());
+    }
+
+    /// The rows exist for one upgrade. A second restore must not resurrect them, or
+    /// every upgrade would replay whatever the last one carried.
+    #[test]
+    fn a_restore_empties_what_it_read() {
+        test_setup();
+        let mut backlog = NotificationBacklog::new(NOTIFICATION_BACKLOG, 0);
+        backlog.admit(origin("https://a.example"), vec![notification(1, 1)], 1);
+
+        persist(&backlog);
+        assert!(restore(2).is_some());
+
+        assert!(restore(2).is_none());
+    }
+
+    /// An install has nothing parked, and neither has an upgrade that caught the
+    /// queue empty, so both have to read as "no queue" rather than an empty one.
+    #[test]
+    fn nothing_parked_restores_to_no_queue() {
+        test_setup();
+
+        assert!(restore(1).is_none());
+
+        persist(&NotificationBacklog::new(NOTIFICATION_BACKLOG, 0));
+        assert!(restore(1).is_none());
     }
 
     fn ids_taken(backlog: &mut NotificationBacklog, limit: usize, now_ns: u64) -> Vec<u64> {
