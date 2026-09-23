@@ -3,7 +3,8 @@
 //!
 //! [`AdmissionQueue::admit`] removes the submitting sender's expired entries,
 //! checks for duplicates and the group limit, then checks available capacity.
-//! Each item is stored, folded into existing work, or rejected with a retry delay.
+//! Each item is stored, folded into a queued duplicate, dropped for a full group,
+//! or rejected with a retry delay.
 //!
 //! [`AdmissionQueue::take_batch`] takes one item per sender in turn. Within each
 //! sender, lower priority values come first, then older entries. The item key breaks
@@ -109,13 +110,13 @@ impl RetryPolicy {
 pub(crate) enum Admission {
     /// Stored as a new entry.
     Accepted,
-    /// Not stored because its key is already queued or its group is at its limit.
-    /// The caller must ensure existing work also covers a folded item.
+    /// Not stored because its key is already queued. The queued entry stands for it.
     Folded,
+    /// Not stored because its group is at its limit. Retrying repeats the outcome
+    /// until the group drains.
+    Dropped,
     /// Not stored because the queue or sender is full. Retry after this delay.
-    Full {
-        retry_after_ms: u32,
-    },
+    Full { retry_after_ms: u32 },
 }
 
 /// One item's outcome, labelled with that item's key.
@@ -167,7 +168,7 @@ pub(crate) struct QueueStats {
     pub(crate) silence_ns: u64,
     pub(crate) discarded_expired: u64,
     pub(crate) folded_duplicates: u64,
-    pub(crate) folded_group_capped: u64,
+    pub(crate) dropped_group_capped: u64,
 }
 
 /// One sender's entries, indexed for ordering, duplicate checks, and group limits.
@@ -281,7 +282,7 @@ pub(crate) struct AdmissionQueue<Sender: Clone + Ord, Item: QueueItem> {
     /// When a group has a pending entry with the same key, further items fold. This counts how many times that happened.
     folded_duplicates: u64,
     /// When a group has too many pending entries, further items fold. This counts how many times that happened.
-    folded_group_capped: u64,
+    dropped_group_capped: u64,
 }
 
 impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
@@ -296,7 +297,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             last_taken_ns: now_ns,
             discarded_expired: 0,
             folded_duplicates: 0,
-            folded_group_capped: 0,
+            dropped_group_capped: 0,
         }
     }
 
@@ -330,8 +331,8 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             }
 
             if self.pending_for(&sender, &item.group()) >= self.config.max_pending_per_group {
-                self.folded_group_capped += 1;
-                admissions.push(answer(Admission::Folded));
+                self.dropped_group_capped += 1;
+                admissions.push(answer(Admission::Dropped));
                 continue;
             }
 
@@ -443,7 +444,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             silence_ns: now_ns.saturating_sub(self.last_taken_ns),
             discarded_expired: self.discarded_expired,
             folded_duplicates: self.folded_duplicates,
-            folded_group_capped: self.folded_group_capped,
+            dropped_group_capped: self.dropped_group_capped,
         }
     }
 
@@ -815,7 +816,7 @@ mod tests {
     }
 
     #[test]
-    fn folds_once_a_group_is_at_its_cap() {
+    fn drops_once_a_group_is_at_its_cap() {
         let mut backlog = TestQueue::new(
             QueueConfig {
                 max_pending_per_group: 2,
@@ -828,9 +829,9 @@ mod tests {
 
         assert_eq!(
             admissions,
-            vec![Admission::Accepted, Admission::Accepted, Admission::Folded]
+            vec![Admission::Accepted, Admission::Accepted, Admission::Dropped]
         );
-        assert_eq!(backlog.stats(1).folded_group_capped, 1);
+        assert_eq!(backlog.stats(1).dropped_group_capped, 1);
         assert_consistent(&backlog);
     }
 
@@ -1275,7 +1276,7 @@ mod tests {
                 },
                 Admitted {
                     key: (7, 3),
-                    admission: Admission::Folded
+                    admission: Admission::Dropped
                 },
                 Admitted {
                     key: (8, 8),
