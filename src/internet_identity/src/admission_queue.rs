@@ -107,7 +107,8 @@ impl RetryPolicy {
 /// What the queue did with one item.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Admission {
-    Stored,
+    /// Stored as a new entry.
+    Accepted,
     /// Not stored because its key is already queued or its group is at its limit.
     /// The caller must ensure existing work also covers a folded item.
     Folded,
@@ -348,7 +349,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             }
 
             self.insert(&sender, now_ns, item);
-            admissions.push(answer(Admission::Stored));
+            admissions.push(answer(Admission::Accepted));
         }
 
         admissions
@@ -792,7 +793,7 @@ mod tests {
 
         let admissions = results(backlog.admit(2, vec![item(1, 1)], 1));
 
-        assert_eq!(admissions, vec![Admission::Stored]);
+        assert_eq!(admissions, vec![Admission::Accepted]);
         assert_eq!(backlog.stored_total, 2);
     }
 
@@ -827,7 +828,7 @@ mod tests {
 
         assert_eq!(
             admissions,
-            vec![Admission::Stored, Admission::Stored, Admission::Folded]
+            vec![Admission::Accepted, Admission::Accepted, Admission::Folded]
         );
         assert_eq!(backlog.stats(1).folded_group_capped, 1);
         assert_consistent(&backlog);
@@ -848,7 +849,7 @@ mod tests {
 
         assert_eq!(
             results(backlog.admit(1, vec![item(7, 3)], 4)),
-            vec![Admission::Stored]
+            vec![Admission::Accepted]
         );
         assert_consistent(&backlog);
     }
@@ -860,7 +861,7 @@ mod tests {
 
         assert_eq!(
             results(backlog.admit(1, vec![item(1, 1)], 101)),
-            vec![Admission::Stored]
+            vec![Admission::Accepted]
         );
         assert_eq!(keys_taken(&backlog.take_batch(1, 101)), vec![(1, 1)]);
         assert_eq!(backlog.stats(101).discarded_expired, 1);
@@ -880,7 +881,7 @@ mod tests {
 
         assert_eq!(
             results(backlog.admit(1, vec![item(1, 2)], 101)),
-            vec![Admission::Stored]
+            vec![Admission::Accepted]
         );
         assert_eq!(keys_taken(&backlog.take_batch(1, 101)), vec![(1, 2)]);
         assert_consistent(&backlog);
@@ -932,9 +933,9 @@ mod tests {
         assert_eq!(
             admissions,
             vec![
-                Admission::Stored,
-                Admission::Stored,
-                Admission::Stored,
+                Admission::Accepted,
+                Admission::Accepted,
+                Admission::Accepted,
                 Admission::Full {
                     retry_after_ms: 1_000
                 },
@@ -966,7 +967,7 @@ mod tests {
                 retry_after_ms: 1_000
             }]
         );
-        assert_eq!(newcomer, vec![Admission::Stored]);
+        assert_eq!(newcomer, vec![Admission::Accepted]);
     }
 
     #[test]
@@ -1127,7 +1128,7 @@ mod tests {
         // Both stored entries have expired, so the new item should fit.
         let admissions = results(backlog.admit(1, vec![item(3, 3)], 200));
 
-        assert_eq!(admissions, vec![Admission::Stored]);
+        assert_eq!(admissions, vec![Admission::Accepted]);
         assert_eq!(backlog.stats(200).discarded_expired, 2);
         assert_consistent(&backlog);
     }
@@ -1340,7 +1341,7 @@ mod tests {
 
         assert_eq!(
             results(queue.admit(1, vec![NoPriorityLevels(1)], 1)),
-            vec![Admission::Stored]
+            vec![Admission::Accepted]
         );
         assert_eq!(queue.take_batch(10, 2).len(), 1);
     }
@@ -1353,7 +1354,7 @@ mod tests {
         let items = (1..=8).map(|id| item(id, id)).collect();
         assert_eq!(
             results(backlog.admit(sender, items, 1)),
-            vec![Admission::Stored; 8],
+            vec![Admission::Accepted; 8],
             "test setup failed to fill the queue"
         );
         backlog
