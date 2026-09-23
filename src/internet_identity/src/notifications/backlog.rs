@@ -21,8 +21,8 @@ pub(crate) enum Urgency {
 
 /// A request to wake a recipient's devices, without notification content.
 ///
-/// Folding assumes a wake-up makes the browser fetch all pending notifications
-/// from the app. That fetch path must be implemented before enabling delivery.
+/// One wake-up carries one notification, so a recipient already holding
+/// `max_pending_per_group` of an app's notifications loses the ones above the cap.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct PendingNotification {
     pub(crate) recipient: AnchorNumber,
@@ -167,7 +167,7 @@ mod tests {
     }
 
     #[test]
-    fn a_recipient_folds_once_it_has_too_many_pending() {
+    fn a_recipient_past_the_cap_loses_the_notification() {
         let mut backlog = NotificationBacklog::new(NOTIFICATION_BACKLOG, 0);
         let app = origin("https://a.example");
         let cap = NOTIFICATION_BACKLOG.max_pending_per_group as u64;
@@ -177,10 +177,9 @@ mod tests {
             .iter()
             .all(|admission| *admission == Admission::Accepted));
 
-        // The caller relies on existing wake-ups to cover this notification too.
         assert_eq!(
             results(backlog.admit(app, vec![notification(1, cap)], 1)),
-            vec![Admission::Folded]
+            vec![Admission::Dropped]
         );
     }
 
