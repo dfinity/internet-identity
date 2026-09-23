@@ -393,6 +393,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 admission,
             };
 
+            // Drop item if it has already expired
             let expires_at_ns = self.expiry_for(now_ns, &item);
             if expires_at_ns <= now_ns {
                 self.dropped_already_expired += 1;
@@ -400,12 +401,14 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 continue;
             }
 
+            // Fold an item that has already been queued
             if self.holds(&sender, &key) {
                 self.folded_duplicates += 1;
                 admissions.push(answer(Admission::Folded));
                 continue;
             }
 
+            // If the group is full for the given sender, request a retry.
             if self.pending_for(&sender, &item.group()) >= self.config.max_pending_per_group {
                 self.rejected_group_full += 1;
                 let full_since_ns = self.group_full_since(&sender, &item.group());
@@ -421,6 +424,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 swept = true;
             }
 
+            // If the queue or this sender is full, request a retry. The caller may retry later, and the queue may have freed space in the meantime.
             if self.is_full() || self.sender_at_cap(&sender) {
                 let retry_after_ms = self.retry_after_ms(self.at_capacity_since_ns, now_ns);
                 admissions.push(answer(Admission::Full { retry_after_ms }));
@@ -561,10 +565,12 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         self.senders.get(sender)?.full_since(group)
     }
 
+    // Returns true if the queue has reached its total capacity limit.
     fn is_full(&self) -> bool {
         self.stored_total >= self.config.max_entries
     }
 
+    // Returns true if the sender has reached its per-sender capacity limit. Dynamic depending on the number of active senders.
     fn sender_at_cap(&self, sender: &Sender) -> bool {
         let held = self.senders.get(sender).map_or(0, SenderQueue::len);
         held >= self.sender_cap()
