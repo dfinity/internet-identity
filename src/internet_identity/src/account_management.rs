@@ -110,12 +110,8 @@ pub fn get_default_account_for_origin(
 ) -> Result<AccountInfo, GetDefaultAccountError> {
     let reserved = storage_borrow(|storage| {
         storage
-            .lookup_application_number_with_origin(&origin)
-            .and_then(|application_number| {
-                storage
-                    .lookup_anchor_application_config(anchor_number, application_number)
-                    .default_account_number
-            })
+            .read_anchor_application_config(anchor_number, &origin)
+            .and_then(|config| config.default_account_number)
     });
 
     // A `None` here reads the tracked default, so an anchor that reserved nothing and

@@ -19,6 +19,7 @@ const config = {
       lib: "src/frontend/src/lib",
       routes: "src/frontend/src/routes",
       assets: "src/frontend/static",
+      serviceWorker: "src/frontend/src/service-worker",
       hooks: {
         client: "src/frontend/src/hooks.client",
         server: "src/frontend/src/hooks.server",
@@ -32,6 +33,9 @@ const config = {
     // server — adapter-static ships no server in production — and the dev
     // server holds no cookie-backed state a forged POST could abuse.
     csrf: { trustedOrigins: ["*"] },
+    // Registered from the opt-in rather than on every load, so a browser that never
+    // turns notifications on never installs a worker.
+    serviceWorker: { register: false },
     version: { name: packagejson.version },
   },
 };

@@ -72,6 +72,7 @@ export const idlFactory = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'dnssec_config' : IDL.Opt(IDL.Opt(DnssecConfig)),
+    'notifications_enabled_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
@@ -414,13 +415,13 @@ export const idlFactory = ({ IDL }) => {
     'signed_delegation' : SignedDelegation,
   });
   const AccountSessionError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
-    'NoSuchSession' : IDL.Null,
-    'NoSuchDelegation' : IDL.Null,
-    'NoSuchAccount' : IDL.Null,
-    'InvalidBrowserKey' : IDL.Null,
     'StaleBrowserKey' : IDL.Null,
+    'NoSuchSession' : IDL.Null,
+    'NoSuchAccount' : IDL.Null,
   });
   const GetAccountsError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
@@ -567,6 +568,14 @@ export const idlFactory = ({ IDL }) => {
   const SsoDiscoveryStatus = IDL.Variant({
     'Resolved' : SsoDiscovery,
     'Pending' : IDL.Null,
+  });
+  const GetWebPushSubscriptionStatusRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const WebPushSubscriptionStatus = IDL.Record({
+    'endpoint' : IDL.Text,
+    'issued_at_ns' : IDL.Nat64,
+    'pool_len' : IDL.Nat32,
   });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
@@ -717,6 +726,26 @@ export const idlFactory = ({ IDL }) => {
     'permissions' : Permissions,
     'expiration' : Timestamp,
   });
+  const NotificationConsentGrantedRequest = IDL.Record({
+    'origin' : IDL.Text,
+    'anchor_number' : UserNumber,
+  });
+  const NotificationGrantConsentRequest = IDL.Record({
+    'origin' : IDL.Text,
+    'anchor_number' : UserNumber,
+  });
+  const NotificationGrantConsentError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
+  const NotificationRevokeConsentRequest = IDL.Record({
+    'origin' : IDL.Text,
+    'anchor_number' : UserNumber,
+  });
+  const NotificationRevokeConsentError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
@@ -756,22 +785,22 @@ export const idlFactory = ({ IDL }) => {
   });
   const PrepareAccountSessionRequest = IDL.Record({
     'permissions' : IDL.Opt(Permissions),
+    'browser_description' : BrowserDescription,
     'max_idle' : IDL.Opt(IDL.Nat64),
-    'current_browser_key' : PublicKey,
     'session_key' : SessionKey,
     'valid_for' : IDL.Opt(IDL.Nat64),
     'origin' : FrontendHostname,
-    'current_browser_key_signature' : IDL.Vec(IDL.Nat8),
-    'browser_description' : BrowserDescription,
     'account_number' : IDL.Opt(AccountNumber),
-    'identity_number' : UserNumber,
     'next_browser_key' : PublicKey,
     'next_browser_key_signature' : IDL.Vec(IDL.Nat8),
+    'current_browser_key_signature' : IDL.Vec(IDL.Nat8),
+    'current_browser_key' : PublicKey,
+    'identity_number' : UserNumber,
   });
   const PrepareAccountSessionResponse = IDL.Record({
     'user_key' : PublicKey,
-    'session_id' : IDL.Nat64,
     'browser_id' : IDL.Nat32,
+    'session_id' : IDL.Nat64,
     'expiration' : Timestamp,
     'account_principal' : IDL.Principal,
   });
@@ -844,6 +873,14 @@ export const idlFactory = ({ IDL }) => {
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
   });
+  const RemoveWebPushSubscriptionRequest = IDL.Record({
+    'browser_id' : IDL.Nat32,
+    'anchor_number' : UserNumber,
+  });
+  const RemoveWebPushSubscriptionError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const RevokeBrowserSessionsRequest = IDL.Record({
     'browser_id' : IDL.Nat32,
     'identity_number' : UserNumber,
@@ -861,6 +898,18 @@ export const idlFactory = ({ IDL }) => {
       'origin' : FrontendHostname,
       'anchor_number' : UserNumber,
     }),
+  });
+  const SetWebPushSubscriptionRequest = IDL.Record({
+    'endpoint' : IDL.Text,
+    'jwt_signatures' : IDL.Vec(IDL.Vec(IDL.Nat8)),
+    'jwt_issued_at_ns' : IDL.Nat64,
+    'anchor_number' : UserNumber,
+    'vapid_public_key' : IDL.Vec(IDL.Nat8),
+  });
+  const SetWebPushSubscriptionError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'StaleJwtPool' : IDL.Null,
   });
   const SmtpAddress = IDL.Record({ 'domain' : IDL.Text, 'user' : IDL.Text });
   const SmtpEnvelope = IDL.Record({
@@ -1243,6 +1292,11 @@ export const idlFactory = ({ IDL }) => {
         [SsoDiscoveryStatus],
         ['query'],
       ),
+    'get_webpush_subscription_status' : IDL.Func(
+        [GetWebPushSubscriptionStatusRequest],
+        [IDL.Opt(WebPushSubscriptionStatus)],
+        ['query'],
+      ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'identity_authn_info' : IDL.Func(
         [IdentityNumber],
@@ -1355,6 +1409,31 @@ export const idlFactory = ({ IDL }) => {
     'mcp_set_config' : IDL.Func(
         [UserNumber, McpConfig],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'notification_consent_granted' : IDL.Func(
+        [NotificationConsentGrantedRequest],
+        [IDL.Bool],
+        ['query'],
+      ),
+    'notification_grant_consent' : IDL.Func(
+        [NotificationGrantConsentRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : NotificationGrantConsentError,
+          }),
+        ],
+        [],
+      ),
+    'notification_revoke_consent' : IDL.Func(
+        [NotificationRevokeConsentRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : NotificationRevokeConsentError,
+          }),
+        ],
         [],
       ),
     'openid_credential_add' : IDL.Func(
@@ -1489,6 +1568,16 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
+    'remove_webpush_subscription' : IDL.Func(
+        [RemoveWebPushSubscriptionRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : RemoveWebPushSubscriptionError,
+          }),
+        ],
+        [],
+      ),
     'replace' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'revoke_browser_sessions' : IDL.Func(
         [RevokeBrowserSessionsRequest],
@@ -1498,6 +1587,11 @@ export const idlFactory = ({ IDL }) => {
     'set_default_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber)],
         [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : SetDefaultAccountError })],
+        [],
+      ),
+    'set_webpush_subscription' : IDL.Func(
+        [SetWebPushSubscriptionRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : SetWebPushSubscriptionError })],
         [],
       ),
     'smtp_request' : IDL.Func([SmtpRequest], [SmtpResponse], []),
@@ -1625,6 +1719,7 @@ export const init = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'dnssec_config' : IDL.Opt(IDL.Opt(DnssecConfig)),
+    'notifications_enabled_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),

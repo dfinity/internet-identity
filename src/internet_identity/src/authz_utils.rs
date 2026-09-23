@@ -8,7 +8,7 @@ use candid::Principal;
 use ic_cdk::caller;
 use internet_identity_interface::archive::types::Operation;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AuthorizationKey, IdentityNumber,
+    AnchorNumber, AuthorizationKey, BrowserId, IdentityNumber,
 };
 use std::fmt::{Display, Formatter};
 
@@ -166,6 +166,22 @@ pub fn check_authorization(
     }
 
     Err(AuthorizationError::from(caller))
+}
+
+/// Which of this identity's browsers the caller is signing as.
+///
+/// A browser key is not an access method: it says which browser a call comes from and
+/// nothing about who is signed in on it, so it authorizes only what a browser does to
+/// its own record.
+pub fn check_browser_authorization(
+    anchor_number: AnchorNumber,
+) -> Result<(Anchor, BrowserId), AuthorizationError> {
+    let caller = caller();
+    let anchor = state::anchor(anchor_number);
+    let browser_id = anchor
+        .browser_by_principal(caller)
+        .ok_or(AuthorizationError::from(caller))?;
+    Ok((anchor, browser_id))
 }
 
 /// Whether the prepare-time [`AuthorizationKey`] is still a valid

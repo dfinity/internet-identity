@@ -24,6 +24,7 @@ import {
 } from "$lib/stores/channelHandlers/icrc25";
 import { handleDelegationRequest } from "$lib/stores/channelHandlers/delegation";
 import { handleSessionDelegationRequest } from "$lib/stores/channelHandlers/sessionDelegation";
+import { handleNotificationConsentRequest } from "$lib/stores/channelHandlers/notificationConsent";
 import {
   handleLegacyAttributes,
   handleIcrc3OneClickOpenIdAttributes,
@@ -42,7 +43,8 @@ export type ChannelError =
   | "unverified-origin"
   | "unsupported-browser"
   | "delegation-failed"
-  | "attributes-failed";
+  | "attributes-failed"
+  | "notification-consent-failed";
 
 type ChannelStore = Readable<Channel | undefined> & {
   establish: (options?: ChannelOptions) => void;
@@ -112,6 +114,10 @@ export const channelStore: ChannelStore = {
       channel.addEventListener(
         "request",
         handleSessionDelegationRequest(channel, onError),
+      );
+      channel.addEventListener(
+        "request",
+        handleNotificationConsentRequest(channel, onError),
       );
       channel.addEventListener(
         "request",
