@@ -472,6 +472,40 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         taken
     }
 
+    /// Takes up to `limit` entries and hands them to `store`. They leave the queue
+    /// only if `store` succeeds. On an error each entry goes back with its original
+    /// arrival time and deadline, and the queue records no progress, so the next
+    /// attempt sees exactly what this one did.
+    ///
+    /// `store` runs to completion inside this call and cannot await, which is what
+    /// makes the recovery exact: no other message runs while the batch is out, so
+    /// nothing can expire, be resubmitted, or take the space the entries need back.
+    /// It borrows the batch rather than taking it for the same reason.
+    pub(crate) fn take_batch_with<T, E>(
+        &mut self,
+        limit: usize,
+        now_ns: Timestamp,
+        store: impl FnOnce(&[Taken<Sender, Item>]) -> Result<T, E>,
+    ) -> Result<T, E> {
+        let nonempty_since_ns = self.nonempty_since_ns;
+        let at_capacity_since_ns = self.at_capacity_since_ns;
+        let last_taken_ns = self.last_taken_ns;
+
+        let batch = self.take_batch(limit, now_ns);
+        match store(&batch) {
+            Ok(stored) => Ok(stored),
+            Err(error) => {
+                for taken in batch {
+                    self.insert(&taken.sender, taken.entry);
+                }
+                self.nonempty_since_ns = nonempty_since_ns;
+                self.at_capacity_since_ns = at_capacity_since_ns;
+                self.last_taken_ns = last_taken_ns;
+                Err(error)
+            }
+        }
+    }
+
     /// Copies stored entries and the round-robin cursor. Restore rebuilds the
     /// indexes. Persistence and serialization are the caller's responsibility.
     pub(crate) fn snapshot(&self) -> QueueSnapshot<Sender, Item> {
@@ -1384,6 +1418,46 @@ mod tests {
         assert_eq!(admissions, vec![Admission::Accepted]);
         assert_eq!(backlog.stats(200).discarded_expired, 2);
         assert_consistent(&backlog);
+    }
+
+    #[test]
+    fn a_stored_batch_is_taken_for_good() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![item(1, 1), item(2, 2)], 1);
+
+        let keys = backlog
+            .take_batch_with(2, 30, |batch| {
+                Ok::<_, ()>(batch.iter().map(|t| t.entry.item.key()).collect::<Vec<_>>())
+            })
+            .unwrap();
+
+        assert_eq!(keys, vec![(1, 1), (2, 2)]);
+        assert_eq!(backlog.stored_total, 0);
+        assert_eq!(backlog.stats(30).silence_ns, 0, "a take is progress");
+        assert_consistent(&backlog);
+    }
+
+    #[test]
+    fn a_batch_the_caller_cannot_store_stays_in_the_queue() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![item(1, 1), item(2, 2)], 1);
+
+        let outcome = backlog.take_batch_with(2, 30, |batch| {
+            assert_eq!(batch.len(), 2, "the batch reaches the caller either way");
+            Err::<(), _>("no room downstream")
+        });
+
+        assert_eq!(outcome, Err("no room downstream"));
+        assert_eq!(backlog.stored_total, 2);
+        // A take that was not stored is not progress, so the stall clock keeps running.
+        assert_eq!(backlog.stats(30).silence_ns, 30);
+        assert_consistent(&backlog);
+
+        // Original arrival times survived, so nothing got a fresh lease on life.
+        let retried = backlog.take_batch(2, 40);
+        assert_eq!(keys_taken(&retried), vec![(1, 1), (2, 2)]);
+        assert_eq!(retried[0].entry.received_at_ns, 1);
+        assert_eq!(retried[0].entry.expires_at_ns, 101);
     }
 
     #[test]
