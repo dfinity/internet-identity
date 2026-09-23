@@ -130,6 +130,40 @@ pub(crate) struct Taken<Sender, Item> {
     pub(crate) entry: Entry<Item>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SenderSnapshot<Sender, Item> {
+    sender: Sender,
+    entries: Vec<Entry<Item>>,
+    serving_priority: usize,
+    turns_left: usize,
+}
+
+/// Private fields prevent callers from constructing inconsistent snapshots.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct QueueSnapshot<Sender, Item> {
+    senders: Vec<SenderSnapshot<Sender, Item>>,
+    next_sender: Option<Sender>,
+}
+
+impl<Sender, Item: QueueItem> QueueSnapshot<Sender, Item> {
+    /// Rebuild from entries, restarting sender and priority rotations.
+    pub(crate) fn from_entries(senders: Vec<(Sender, Vec<Entry<Item>>)>) -> Self {
+        let levels = Item::PRIORITY_LEVELS.max(1);
+        Self {
+            senders: senders
+                .into_iter()
+                .map(|(sender, entries)| SenderSnapshot {
+                    sender,
+                    entries,
+                    serving_priority: 0,
+                    turns_left: turns_at_priority(0, levels),
+                })
+                .collect(),
+            next_sender: None,
+        }
+    }
+}
+
 /// Expired entries count until removed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct QueueStats {
@@ -487,6 +521,40 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 Err(error)
             }
         }
+    }
+
+    /// Iterate over stored entries with their senders; order is unspecified.
+    pub(crate) fn entries(&self) -> impl Iterator<Item = (&Sender, &Entry<Item>)> {
+        self.senders.iter().flat_map(|(sender, queue)| {
+            queue
+                .entries_by_priority
+                .iter()
+                .flat_map(|bucket| bucket.values())
+                .map(move |entry| (sender, entry))
+        })
+    }
+
+    /// Restore entries and scheduling cursors, resetting retry timers and metrics.
+    /// Keep entries even if the new capacity is lower; reject new items until space frees up.
+    pub(crate) fn restore(
+        config: QueueConfig,
+        snapshot: QueueSnapshot<Sender, Item>,
+        now_ns: Timestamp,
+    ) -> Self {
+        let mut backlog = Self::new(config, now_ns);
+        for sender in snapshot.senders {
+            for entry in sender.entries {
+                backlog.insert(&sender.sender, entry);
+            }
+            if let Some(queue) = backlog.senders.get_mut(&sender.sender) {
+                let levels = queue.entries_by_priority.len();
+                queue.serving_priority = sender.serving_priority.min(levels.saturating_sub(1));
+                queue.turns_left = sender.turns_left;
+            }
+        }
+        backlog.next_sender = snapshot.next_sender;
+        backlog.at_capacity_since_ns = backlog.is_full().then_some(now_ns);
+        backlog
     }
 
     pub(crate) fn stats(&self, now_ns: Timestamp) -> QueueStats {

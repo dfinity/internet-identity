@@ -979,6 +979,10 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::init_from_stable_memory();
     // load the persistent state after initializing storage as it manages the respective stable cell
     state::load_persistent_state();
+    // Before `initialize`, which is what arms the timers that read this queue.
+    if let Some(backlog) = notifications::backlog::restore(time()) {
+        state::notification_backlog_replace(backlog);
+    }
 
     initialize(maybe_arg);
 }
@@ -1116,6 +1120,11 @@ fn update_archive_config(new_config: ArchiveConfig) {
 #[pre_upgrade]
 fn save_persistent_state() {
     state::save_persistent_state();
+    state::notification_backlog(|backlog| {
+        if let Some(backlog) = backlog {
+            notifications::backlog::persist(backlog);
+        }
+    });
 }
 
 fn update_root_hash() {
