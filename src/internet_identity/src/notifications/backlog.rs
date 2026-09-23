@@ -105,7 +105,7 @@ const _: () =
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::admission_queue::{Admission, Admitted};
+    use crate::admission_queue::{Admission, Admitted, Taken};
 
     /// The outcomes without their keys, for assertions that only check what happened.
     fn results<Key>(admitted: Vec<Admitted<Key>>) -> Vec<Admission> {
@@ -201,7 +201,7 @@ mod tests {
         );
 
         // Taking one frees the recipient's slot, so the retry lands.
-        backlog.take_batch(1, 2);
+        take(&mut backlog, 1, 2);
         assert_eq!(
             results(backlog.admit(app, vec![notification(1, cap)], 2)),
             vec![Admission::Accepted]
@@ -214,7 +214,7 @@ mod tests {
         let app = origin("https://a.example");
         backlog.admit(app.clone(), vec![notification(42, 7)], 1_000);
 
-        let taken = backlog.take_batch(10, 2_000);
+        let taken = take(&mut backlog, 10, 2_000);
 
         assert_eq!(taken.len(), 1);
         assert_eq!(taken[0].sender, app);
@@ -259,12 +259,22 @@ mod tests {
         );
 
         // Well inside the five minutes the queue would otherwise allow.
-        assert!(backlog.take_batch(10, 31 * SECOND_NS).is_empty());
+        assert!(take(&mut backlog, 10, 31 * SECOND_NS).is_empty());
+    }
+
+    /// Takes a batch this caller always keeps.
+    fn take(
+        backlog: &mut NotificationBacklog,
+        limit: usize,
+        now_ns: u64,
+    ) -> Vec<Taken<StorableOriginSha256, PendingNotification>> {
+        backlog
+            .take_batch(limit, now_ns, |batch| Ok::<_, ()>(batch.to_vec()))
+            .unwrap()
     }
 
     fn ids_taken(backlog: &mut NotificationBacklog, limit: usize, now_ns: u64) -> Vec<u64> {
-        backlog
-            .take_batch(limit, now_ns)
+        take(backlog, limit, now_ns)
             .iter()
             .map(|taken| taken.entry.item.notification_id)
             .collect()
