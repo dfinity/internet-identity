@@ -4,6 +4,7 @@
 //! everything here acts on an origin already folded to the spelling consent is keyed by.
 
 pub(crate) mod backlog;
+pub(crate) mod processing;
 mod validation;
 pub mod webpush;
 
