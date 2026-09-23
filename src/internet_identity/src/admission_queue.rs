@@ -4,7 +4,9 @@
 //! [`AdmissionQueue::admit`] removes the submitting sender's expired entries,
 //! checks for duplicates and the group limit, then checks available capacity.
 //! Each item is stored, folded into a queued duplicate, dropped as already expired,
-//! or refused with a retry delay.
+//! or refused with a retry delay. Folding moves the queued entry's deadline forward,
+//! so resending keeps an item alive, bounded by `max_lifetime_ns` from its first
+//! arrival.
 //!
 //! [`AdmissionQueue::take_batch`] hands out one item per sender in turn and keeps
 //! the removal only once the caller has stored them. Priorities take turns within a
@@ -13,23 +15,25 @@
 //! deadline goes first, and the item key breaks ties.
 //!
 //! Callers must supply trusted canister time as `now_ns`. An item may name its own
-//! expiry, which the queue clamps to `discard_entries_after_ns` from admission, so a
-//! sender can shorten an item's life but never stretch it. The queue forgets entries
-//! after taking them, so duplicate detection only covers work still in this queue. A
-//! retry delay describes queue pressure, not delivery.
+//! expiry, which the queue clamps to `discard_entries_after_ns` from its most recent
+//! submission, so a sender can shorten an item's life but never stretch it past the
+//! configured limits. The queue forgets entries after taking them, so duplicate
+//! detection only covers work still in this queue. A retry delay describes queue
+//! pressure, not delivery.
 //!
 //! This module does not authorize senders or deliver items.
 // The submission endpoint and dispatcher will use this in later PRs.
 #![allow(dead_code)]
 
 use internet_identity_interface::internet_identity::types::Timestamp;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
 use std::ops::Bound::{Excluded, Unbounded};
 
 /// The key, group, and priority of a queued item.
 pub(crate) trait QueueItem: Clone {
-    /// Identifies an item for one sender. A duplicate key is not stored again.
+    /// Identifies an item for one sender. A duplicate key is not stored again, but
+    /// it does move the queued entry's deadline forward.
     type Key: Clone + Eq + Hash + Ord;
 
     /// Identifies items that share a pending-item limit for one sender.
@@ -77,9 +81,13 @@ pub(crate) struct QueueConfig {
     /// Clear the pressure timer when occupancy falls below this value. A value
     /// below `max_entries` avoids resetting the timer whenever one slot opens.
     pub(crate) pressure_cleared_below: usize,
-    /// Longest an entry may wait, measured from admission. An item's own expiry
-    /// can only shorten this.
+    /// Longest an entry may wait, measured from the most recent submission of its
+    /// key. An item's own expiry can only shorten this.
     pub(crate) discard_entries_after_ns: u64,
+    /// Hard ceiling on an entry's life, measured from when it first arrived. Resends
+    /// move a queued entry's deadline forward but never past this, so an item cannot
+    /// be kept alive indefinitely by resubmitting it.
+    pub(crate) max_lifetime_ns: u64,
     pub(crate) retry: RetryPolicy,
 }
 
@@ -93,6 +101,7 @@ impl QueueConfig {
             && self.pressure_cleared_below > 0
             && self.pressure_cleared_below <= self.max_entries
             && self.discard_entries_after_ns > 0
+            && self.max_lifetime_ns >= self.discard_entries_after_ns
             && self.retry.is_coherent()
     }
 }
@@ -131,7 +140,8 @@ impl RetryPolicy {
 pub(crate) enum Admission {
     /// Stored as a new entry.
     Accepted,
-    /// Not stored because its key is already queued. The queued entry stands for it.
+    /// Not stored because its key is already queued. The queued entry stands for it
+    /// and its deadline moves forward, up to the configured total lifetime.
     Folded,
     /// Not stored because the item was already past its expiry on arrival. The only
     /// outcome retrying cannot change.
@@ -197,6 +207,14 @@ pub(crate) struct QueueStats {
     pub(crate) dropped_already_expired: u64,
 }
 
+/// Where one of a sender's entries sits: the priority holding it, and the deadline
+/// it is filed under. Enough to find the entry again from its key alone.
+#[derive(Clone, Copy, Debug)]
+struct Placed {
+    priority: usize,
+    expires_at_ns: Timestamp,
+}
+
 /// How many of a group's entries are pending, and when it last reached its limit.
 #[derive(Clone, Copy, Debug, Default)]
 struct GroupState {
@@ -210,8 +228,8 @@ type PriorityBucket<Item> = BTreeMap<(Timestamp, <Item as QueueItem>::Key), Entr
 /// One sender's entries, indexed for ordering, duplicate checks, and group limits.
 struct SenderQueue<Item: QueueItem> {
     entries_by_priority: Vec<PriorityBucket<Item>>,
-    /// Keys currently queued for this sender.
-    present: HashSet<Item::Key>,
+    /// Where each of this sender's queued keys currently sits.
+    placement: HashMap<Item::Key, Placed>,
     pending_per_group: HashMap<Item::Group, GroupState>,
     /// Priority being served, and turns left before the next one is served.
     serving_priority: usize,
@@ -225,7 +243,7 @@ impl<Item: QueueItem> SenderQueue<Item> {
         let levels = Item::PRIORITY_LEVELS.max(1);
         Self {
             entries_by_priority: (0..levels).map(|_| BTreeMap::new()).collect(),
-            present: HashSet::new(),
+            placement: HashMap::new(),
             pending_per_group: HashMap::new(),
             serving_priority: 0,
             turns_left: turns_at_priority(0, levels),
@@ -277,7 +295,13 @@ impl<Item: QueueItem> SenderQueue<Item> {
             .or_default();
         group.pending += 1;
         self.at_cap_since_ns = None;
-        self.present.insert(key.clone());
+        self.placement.insert(
+            key.clone(),
+            Placed {
+                priority,
+                expires_at_ns: entry.expires_at_ns,
+            },
+        );
         // In range: the vector is never empty and `priority` is clamped to its last index.
         self.entries_by_priority[priority].insert((entry.expires_at_ns, key), entry);
     }
@@ -293,7 +317,7 @@ impl<Item: QueueItem> SenderQueue<Item> {
             .entries_by_priority
             .get_mut(priority)?
             .remove(&(expires_at_ns, key.clone()))?;
-        self.present.remove(key);
+        self.placement.remove(key);
         let group = entry.item.group();
         if let Some(state) = self.pending_per_group.get_mut(&group) {
             state.pending = state.pending.saturating_sub(1);
@@ -304,6 +328,38 @@ impl<Item: QueueItem> SenderQueue<Item> {
             }
         }
         Some(entry)
+    }
+
+    /// Moves a queued entry to a later deadline, leaving its priority and arrival
+    /// time alone. Refuses to move it past `received_at_ns + max_lifetime_ns`, and
+    /// does nothing when that leaves the deadline where it already was.
+    fn refresh(&mut self, key: &Item::Key, candidate_ns: Timestamp, max_lifetime_ns: u64) {
+        let Some(placed) = self.placement.get(key).copied() else {
+            return;
+        };
+        let Some(bucket) = self.entries_by_priority.get_mut(placed.priority) else {
+            return;
+        };
+        let slot = (placed.expires_at_ns, key.clone());
+        let Some(received_at_ns) = bucket.get(&slot).map(|entry| entry.received_at_ns) else {
+            return;
+        };
+        let expires_at_ns = candidate_ns.min(received_at_ns.saturating_add(max_lifetime_ns));
+        if expires_at_ns <= placed.expires_at_ns {
+            return;
+        }
+        let Some(mut entry) = bucket.remove(&slot) else {
+            return;
+        };
+        entry.expires_at_ns = expires_at_ns;
+        bucket.insert((expires_at_ns, key.clone()), entry);
+        self.placement.insert(
+            key.clone(),
+            Placed {
+                priority: placed.priority,
+                expires_at_ns,
+            },
+        );
     }
 
     /// Locates the next entry to take and advances the priority cursor. A priority
@@ -364,7 +420,7 @@ pub(crate) struct AdmissionQueue<Sender: Clone + Ord, Item: QueueItem> {
     /// Metrics for monitoring and testing. These are not persisted, so they reset
     /// on canister upgrade.
     discarded_expired: u64,
-    /// Duplicates folded into an entry this sender already had queued.
+    /// Resends folded into an entry this sender already had queued.
     folded_duplicates: u64,
     /// Items refused because their group was at its limit for this sender.
     rejected_group_full: u64,
@@ -390,8 +446,8 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
     }
 
     /// Submits items for a sender and returns each item's outcome, in input order.
-    /// Uses trusted `now_ns` for all new entries. Folding leaves existing entries,
-    /// including their age and priority, unchanged.
+    /// Uses trusted `now_ns` for all new entries. Folding leaves the queued entry's
+    /// arrival time and priority alone and only moves its deadline forward.
     pub(crate) fn admit(
         &mut self,
         sender: Sender,
@@ -420,9 +476,10 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 continue;
             }
 
-            // Fold an item that has already been queued
+            // Fold a resend into the queued entry, moving its deadline forward
             if self.holds(&sender, &key) {
                 self.folded_duplicates += 1;
+                self.refresh(&sender, &key, expires_at_ns);
                 admissions.push(answer(Admission::Folded));
                 continue;
             }
@@ -614,7 +671,16 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
     fn holds(&self, sender: &Sender, key: &Item::Key) -> bool {
         self.senders
             .get(sender)
-            .is_some_and(|queue| queue.present.contains(key))
+            .is_some_and(|queue| queue.placement.contains_key(key))
+    }
+
+    /// Moves a queued entry's deadline forward, so resending keeps an item alive
+    /// rather than leaving it to die on the clock the first submission started.
+    fn refresh(&mut self, sender: &Sender, key: &Item::Key, candidate_ns: Timestamp) {
+        let max_lifetime_ns = self.config.max_lifetime_ns;
+        if let Some(queue) = self.senders.get_mut(sender) {
+            queue.refresh(key, candidate_ns, max_lifetime_ns);
+        }
     }
 
     fn pending_for(&self, sender: &Sender, group: &Item::Group) -> usize {
@@ -792,6 +858,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     /// A small test item with two priority levels.
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -856,6 +923,7 @@ mod tests {
             max_pending_per_group: 8,
             pressure_cleared_below: 6,
             discard_entries_after_ns: 100,
+            max_lifetime_ns: 250,
             retry: RetryPolicy {
                 base_ms: 1_000,
                 ceiling_ms: 8_000,
@@ -895,7 +963,19 @@ mod tests {
                 .iter()
                 .flat_map(|entries| entries.keys().map(|(_, key)| *key))
                 .collect();
-            assert_eq!(queue.present, keys, "present drifted for sender {sender}");
+            let placed: HashSet<(u8, u8)> = queue.placement.keys().copied().collect();
+            assert_eq!(placed, keys, "placement drifted for sender {sender}");
+
+            for (key, placed) in &queue.placement {
+                let found = queue
+                    .entries_by_priority
+                    .get(placed.priority)
+                    .and_then(|bucket| bucket.get(&(placed.expires_at_ns, *key)));
+                assert!(
+                    found.is_some(),
+                    "placement points nowhere for {key:?} of sender {sender}"
+                );
+            }
 
             let mut groups: HashMap<u8, usize> = HashMap::new();
             for (group, _) in &keys {
@@ -934,6 +1014,68 @@ mod tests {
     }
 
     // Expiry.
+
+    #[test]
+    fn a_resend_moves_the_queued_entry_past_its_first_deadline() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![item(1, 1)], 1);
+
+        // Its first deadline was nanosecond 101.
+        assert_eq!(
+            results(backlog.admit(1, vec![item(1, 1)], 90)),
+            vec![Admission::Folded]
+        );
+
+        let taken = backlog.remove_batch(1, 150);
+        assert_eq!(keys_taken(&taken), vec![(1, 1)]);
+        assert_eq!(taken[0].entry.expires_at_ns, 190);
+        // Only the deadline moved. It is still the entry that arrived first.
+        assert_eq!(taken[0].entry.received_at_ns, 1);
+    }
+
+    #[test]
+    fn resending_cannot_keep_an_entry_alive_for_ever() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![item(1, 1)], 1);
+
+        // Each resend would otherwise buy another 100ns, indefinitely.
+        for now_ns in (50..=250).step_by(50) {
+            backlog.admit(1, vec![item(1, 1)], now_ns);
+        }
+
+        // max_lifetime_ns caps it 250 after it first arrived. Without that cap the
+        // last resend would have carried it to 350.
+        assert!(backlog.remove_batch(1, 252).is_empty());
+        assert_eq!(backlog.stats(252).discarded_expired, 1);
+        assert_consistent(&backlog);
+    }
+
+    #[test]
+    fn a_resend_never_shortens_a_queued_entrys_life() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![item(1, 1)], 1);
+
+        // The resend asks for less time than the entry already has.
+        backlog.admit(1, vec![expiring(1, 1, 50)], 2);
+
+        assert_eq!(keys_taken(&backlog.remove_batch(1, 100)), vec![(1, 1)]);
+    }
+
+    #[test]
+    fn a_refreshed_entry_moves_behind_a_nearer_deadline() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![item(1, 1)], 1);
+        backlog.admit(1, vec![item(2, 2)], 2);
+
+        // (1, 1) was first in line; refreshing it puts (2, 2) ahead.
+        backlog.admit(1, vec![item(1, 1)], 10);
+
+        assert_eq!(
+            keys_taken(&backlog.remove_batch(2, 20)),
+            vec![(2, 2), (1, 1)]
+        );
+        assert_consistent(&backlog);
+    }
 
     #[test]
     fn a_sender_at_its_own_ceiling_is_sent_away_for_longer_each_time() {
@@ -1125,23 +1267,6 @@ mod tests {
 
         assert_eq!(admissions, vec![Admission::Accepted]);
         assert_eq!(backlog.stored_total, 2);
-    }
-
-    #[test]
-    fn a_fold_leaves_the_original_where_it_was() {
-        let mut backlog = TestQueue::new(config(), 0);
-        admit_each(&mut backlog, 1, vec![item(1, 1), item(2, 2)], 1);
-
-        // Resubmitting must not change the original entry's arrival time.
-        assert_eq!(
-            results(backlog.admit(1, vec![item(1, 1)], 9)),
-            vec![Admission::Folded]
-        );
-
-        assert_eq!(
-            keys_taken(&backlog.remove_batch(10, 10)),
-            vec![(1, 1), (2, 2)]
-        );
     }
 
     #[test]
