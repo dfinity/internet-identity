@@ -8,6 +8,13 @@
 //! building the [`OpenIdCredential`] lives here and runs identically for both
 //! — this module is "the implementation up to the JWK read", and one step past
 //! it.
+//!
+//! Two JWS signature algorithms are accepted (see [`verify_signature`]):
+//! `RS256`, the OIDC default that Google / Microsoft / Apple sign with, and
+//! `EdDSA` over Ed25519 (RFC 8037), so an SSO provider can sign ID tokens with
+//! an Ed25519 key — e.g. a canister-based provider using threshold Schnorr,
+//! which has no RSA counterpart on the IC. The `kid` lookup, the JWK's `alg`
+//! consistency check and every claim check are identical for both.
 
 use super::{
     get_all_claims, get_issuer_placeholders, replace_issuer_placeholders, AudClaim,
@@ -17,9 +24,10 @@ use crate::secs_to_nanos;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use candid::Deserialize;
+use ed25519_dalek::{Signature as Ed25519Signature, VerifyingKey as Ed25519VerifyingKey};
 use ic_stable_structures::Storable;
-use identity_jose::jwk::{Jwk, JwkParamsRsa};
-use identity_jose::jws::JwsAlgorithm::RS256;
+use identity_jose::jwk::{EdCurve, Jwk, JwkParamsOkp, JwkParamsRsa};
+use identity_jose::jws::JwsAlgorithm::{EdDSA, RS256};
 use identity_jose::jws::{
     Decoder, JwsVerifierFn, SignatureVerificationError, SignatureVerificationErrorKind,
     VerificationInput,
@@ -289,24 +297,71 @@ fn create_rsa_public_key(jwk: &Jwk) -> Result<RsaPublicKey, String> {
     .map_err(|_| "Unable to construct RSA public key".into())
 }
 
+/// Ed25519 public-key length (RFC 8032 §5.1.5); the JWK `x` parameter holds
+/// exactly this many bytes once base64url-decoded (RFC 8037 §2).
+const ED25519_PUBLIC_KEY_LEN: usize = 32;
+
+/// Ed25519 signature length (RFC 8032 §5.1.6).
+const ED25519_SIGNATURE_LEN: usize = 64;
+
+fn create_ed25519_public_key(jwk: &Jwk) -> Result<Ed25519VerifyingKey, String> {
+    // Extract the OKP parameters (curve 'crv' and public key 'x') from the JWK.
+    // `try_okp_params` also rejects any other key type (RSA, EC, oct).
+    let params: &JwkParamsOkp = jwk
+        .try_okp_params()
+        .map_err(|_| "Unable to extract OKP parameters")?;
+
+    // RFC 8037 defines `EdDSA` over both Ed25519 and Ed448; only Ed25519 is
+    // supported here (Ed448 has no verifier in this canister, and X25519 is a
+    // key-agreement curve that must never verify a signature).
+    if !matches!(params.try_ed_curve(), Ok(EdCurve::Ed25519)) {
+        return Err("Unsupported OKP curve".into());
+    }
+
+    // Decode the base64-url encoded public key 'x'.
+    let x = BASE64_URL_SAFE_NO_PAD
+        .decode(&params.x)
+        .map_err(|_| "Unable to decode public key")?;
+    let x: [u8; ED25519_PUBLIC_KEY_LEN] = x
+        .as_slice()
+        .try_into()
+        .map_err(|_| "Ed25519 public key is not 32 bytes")?;
+
+    // Construct the Ed25519 public key; this rejects an encoding that is not a
+    // valid curve point.
+    Ed25519VerifyingKey::from_bytes(&x).map_err(|_| "Unable to construct Ed25519 public key".into())
+}
+
 /// Verifier implementation for `identity_jose` that verifies the signature of a JWT.
 ///
 /// - `input`: A `VerificationInput` struct containing the JWT's algorithm (`alg`),
-///   the signing input (payload to be hashed and verified), and the decoded signature.
-/// - `jwk`: A reference to a `Jwk` (JSON Web Key) that contains the RSA public key
-///   parameters (`n` and `e`) used to verify the JWT signature.
+///   the signing input (payload to be verified), and the decoded signature.
+/// - `jwk`: A reference to a `Jwk` (JSON Web Key) holding the public key the
+///   JWT claims to be signed with — RSA parameters (`n` and `e`) for `RS256`,
+///   or an Ed25519 OKP parameter (`x`) for `EdDSA`.
+///
+/// Dispatches on the JWT header's `alg`. The key type is enforced per
+/// algorithm (`try_rsa_params` / `try_okp_params`), so a JWT can't be verified
+/// against a key of the wrong type even when the JWK carries no `alg` of its
+/// own; when it does, `identity_jose` has already checked it matches the header
+/// before calling this. Any other algorithm is rejected as unsupported.
 #[allow(clippy::needless_pass_by_value)]
 fn verify_signature(input: VerificationInput, jwk: &Jwk) -> Result<(), SignatureVerificationError> {
-    // Ensure the algorithm specified in the JWT header matches the expected algorithm (RS256).
-    // If the algorithm does not match, return an UnsupportedAlg error.
-    // Additional algorithms can be implemented here if needed in the future.
-    if input.alg != RS256 {
-        return Err(SignatureVerificationErrorKind::UnsupportedAlg.into());
+    match input.alg {
+        RS256 => verify_rs256_signature(&input, jwk),
+        EdDSA => verify_eddsa_signature(&input, jwk),
+        _ => Err(SignatureVerificationErrorKind::UnsupportedAlg.into()),
     }
+}
 
+/// `RS256`: RSASSA-PKCS1-v1_5 with SHA-256 (RFC 7518 §3.3).
+fn verify_rs256_signature(
+    input: &VerificationInput,
+    jwk: &Jwk,
+) -> Result<(), SignatureVerificationError> {
     // Compute the SHA-256 hash of the JWT payload (the signing input).
     // This hashed value will be used for signature verification.
-    let hashed_input = Sha256::digest(input.signing_input);
+    let hashed_input = Sha256::digest(input.signing_input.as_ref());
 
     // Define the signature scheme to be used for verification (RSA PKCS#1 v1.5 with SHA-256).
     let scheme = Pkcs1v15Sign::new::<Sha256>();
@@ -320,6 +375,32 @@ fn verify_signature(input: VerificationInput, jwk: &Jwk) -> Result<(), Signature
     // If the signature is invalid, return an InvalidSignature error.
     public_key
         .verify(scheme, &hashed_input, input.decoded_signature.as_ref())
+        .map_err(|_| SignatureVerificationErrorKind::InvalidSignature.into())
+}
+
+/// `EdDSA` over Ed25519 (RFC 8037 §3.1): PureEdDSA, so the signing input is
+/// verified directly, without a separate hash step.
+fn verify_eddsa_signature(
+    input: &VerificationInput,
+    jwk: &Jwk,
+) -> Result<(), SignatureVerificationError> {
+    // Create Ed25519 public key from JWK
+    let public_key = create_ed25519_public_key(jwk).map_err(|_| {
+        SignatureVerificationError::new(SignatureVerificationErrorKind::KeyDecodingFailure)
+    })?;
+
+    // An Ed25519 signature is exactly 64 bytes; anything else can't be valid.
+    let signature: [u8; ED25519_SIGNATURE_LEN] =
+        input.decoded_signature.as_ref().try_into().map_err(|_| {
+            SignatureVerificationError::new(SignatureVerificationErrorKind::InvalidSignature)
+        })?;
+    let signature = Ed25519Signature::from_bytes(&signature);
+
+    // `verify_strict` additionally rejects the weak public keys and
+    // non-canonical signatures the plain RFC 8032 check lets through, so a
+    // signature verifies for exactly one (key, message) pair.
+    public_key
+        .verify_strict(input.signing_input.as_ref(), &signature)
         .map_err(|_| SignatureVerificationErrorKind::InvalidSignature.into())
 }
 
@@ -769,5 +850,310 @@ mod tests {
                 "Issuer too long".to_string()
             ))
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // EdDSA (Ed25519), the second accepted signature algorithm.
+    // -----------------------------------------------------------------------
+
+    use ed25519_dalek::{Signer, SigningKey};
+
+    const EDDSA_KID: &str = "eddsa-test-key";
+
+    /// Deterministic Ed25519 signing key for these tests; `eddsa_test_certs`
+    /// publishes its public half.
+    fn eddsa_signing_key() -> SigningKey {
+        SigningKey::from_bytes(&[42u8; 32])
+    }
+
+    /// One OKP JWK (RFC 8037 §2) for `eddsa_signing_key`, published under
+    /// `EDDSA_KID`. `with_alg` controls the optional `"alg":"EdDSA"` member:
+    /// real providers set it, but a JWK without it must be verified against the
+    /// key type alone, which is what the algorithm-confusion tests exercise.
+    fn eddsa_test_certs(with_alg: bool) -> Vec<Jwk> {
+        let x = BASE64_URL_SAFE_NO_PAD.encode(eddsa_signing_key().verifying_key().to_bytes());
+        okp_test_certs("Ed25519", &x, with_alg)
+    }
+
+    fn okp_test_certs(crv: &str, x: &str, with_alg: bool) -> Vec<Jwk> {
+        let alg = if with_alg { r#""alg":"EdDSA","# } else { "" };
+        let jwk = format!(
+            r#"{{"kty":"OKP","crv":"{crv}",{alg}"use":"sig","kid":"{EDDSA_KID}","x":"{x}"}}"#
+        );
+        vec![serde_json::from_str(&jwk).unwrap()]
+    }
+
+    /// Claims equivalent to `VALID_JWT`'s: same issuer, audience and validity,
+    /// with the nonce bound to the default test caller + `test_salt()`.
+    fn eddsa_test_claims() -> String {
+        format!(
+            r#"{{"iss":"https://accounts.google.com","aud":"{TEST_AUD}","sub":"ed25519-subject","nonce":"{}","iat":{TEST_IAT_SECONDS},"exp":{TEST_EXP_SECONDS},"email":"alice@example.org","email_verified":true,"name":"Alice"}}"#,
+            matching_nonce()
+        )
+    }
+
+    fn jwt_header(alg: &str, kid: &str) -> String {
+        format!(r#"{{"alg":"{alg}","kid":"{kid}","typ":"JWT"}}"#)
+    }
+
+    /// Compact-serialize `header` and `claims` and sign them with `key`
+    /// (PureEdDSA over the JWS signing input, RFC 7515 §5.1 / RFC 8037 §3.1).
+    fn sign_jwt_eddsa(header: &str, claims: &str, key: &SigningKey) -> String {
+        let signing_input = format!(
+            "{}.{}",
+            BASE64_URL_SAFE_NO_PAD.encode(header),
+            BASE64_URL_SAFE_NO_PAD.encode(claims)
+        );
+        let signature = key.sign(signing_input.as_bytes());
+        format!(
+            "{signing_input}.{}",
+            BASE64_URL_SAFE_NO_PAD.encode(signature.to_bytes())
+        )
+    }
+
+    /// A valid EdDSA-signed JWT: `EdDSA` header naming `EDDSA_KID`, signed by
+    /// `eddsa_signing_key`.
+    fn eddsa_test_jwt() -> String {
+        sign_jwt_eddsa(
+            &jwt_header("EdDSA", EDDSA_KID),
+            &eddsa_test_claims(),
+            &eddsa_signing_key(),
+        )
+    }
+
+    /// Replace the signature segment of `jwt` with `signature`.
+    fn with_signature(jwt: &str, signature: &[u8]) -> String {
+        let (signed, _) = jwt.rsplit_once('.').unwrap();
+        format!("{signed}.{}", BASE64_URL_SAFE_NO_PAD.encode(signature))
+    }
+
+    fn assert_invalid_signature(err: OpenIDJWTVerificationError) {
+        assert!(
+            matches!(&err, OpenIDJWTVerificationError::GenericError(msg) if msg.contains("Invalid signature")),
+            "expected an invalid-signature error, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn should_verify_eddsa_signed_jwt() {
+        reset_test_env();
+        // Same pipeline as RS256: `kid` lookup, claim checks and credential
+        // build are shared, only the signature check dispatches on `alg`. The
+        // JWK verifies with and without its optional `alg` member.
+        for with_alg in [true, false] {
+            let credential = verify_and_build(
+                &eddsa_test_jwt(),
+                &descriptor(),
+                &eddsa_test_certs(with_alg),
+                &test_salt(),
+            )
+            .expect("expected EdDSA verification to succeed");
+            assert_eq!(credential.iss, "https://accounts.google.com");
+            assert_eq!(credential.aud, TEST_AUD);
+            assert_eq!(credential.sub, "ed25519-subject");
+            assert_eq!(
+                credential.get_email(),
+                Some("alice@example.org".to_string())
+            );
+        }
+    }
+
+    #[test]
+    fn should_verify_eddsa_signed_jwt_for_sso_descriptor() {
+        reset_test_env();
+        // The SSO path is where EdDSA matters in practice (a discoverable
+        // provider signing with its own Ed25519 key); its stamp is unaffected.
+        let descriptor = Descriptor {
+            issuer: "https://accounts.google.com".to_string(),
+            client_id: TEST_AUD.to_string(),
+            sso: Some(SsoProvider {
+                domain: "example.org".to_string(),
+                name: Some("Example".to_string()),
+                stable_identifier_claim: None,
+            }),
+        };
+        let credential = verify_and_build(
+            &eddsa_test_jwt(),
+            &descriptor,
+            &eddsa_test_certs(true),
+            &test_salt(),
+        )
+        .expect("expected EdDSA verification to succeed");
+        assert_eq!(credential.sso_domain, Some("example.org".to_string()));
+        assert_eq!(credential.sso_name, Some("Example".to_string()));
+    }
+
+    #[test]
+    fn should_reject_eddsa_jwt_with_tampered_signature() {
+        reset_test_env();
+        let jwt = eddsa_test_jwt();
+        let (_, signature) = jwt.rsplit_once('.').unwrap();
+        let mut signature = BASE64_URL_SAFE_NO_PAD.decode(signature).unwrap();
+        signature[0] ^= 0x01;
+        let err = verify_and_build(
+            &with_signature(&jwt, &signature),
+            &descriptor(),
+            &eddsa_test_certs(true),
+            &test_salt(),
+        )
+        .unwrap_err();
+        assert_invalid_signature(err);
+    }
+
+    #[test]
+    fn should_reject_eddsa_jwt_with_tampered_claims() {
+        reset_test_env();
+        // Re-sign nothing: swap the claims for ones with a different subject
+        // while keeping the original signature, so the JWT still decodes and
+        // passes every claim check but the signing input no longer matches.
+        let jwt = eddsa_test_jwt();
+        let mut segments: Vec<&str> = jwt.split('.').collect();
+        let tampered_claims = eddsa_test_claims().replace("ed25519-subject", "someone-else");
+        let tampered_claims = BASE64_URL_SAFE_NO_PAD.encode(tampered_claims);
+        segments[1] = &tampered_claims;
+        let err = verify_and_build(
+            &segments.join("."),
+            &descriptor(),
+            &eddsa_test_certs(true),
+            &test_salt(),
+        )
+        .unwrap_err();
+        assert_invalid_signature(err);
+    }
+
+    #[test]
+    fn should_reject_eddsa_jwt_signed_by_another_key() {
+        reset_test_env();
+        // Right `kid`, wrong private key.
+        let other_key = SigningKey::from_bytes(&[7u8; 32]);
+        let jwt = sign_jwt_eddsa(
+            &jwt_header("EdDSA", EDDSA_KID),
+            &eddsa_test_claims(),
+            &other_key,
+        );
+        let err = verify_and_build(&jwt, &descriptor(), &eddsa_test_certs(true), &test_salt())
+            .unwrap_err();
+        assert_invalid_signature(err);
+    }
+
+    #[test]
+    fn should_reject_eddsa_jwt_with_wrong_length_signature() {
+        reset_test_env();
+        // An Ed25519 signature is exactly 64 bytes; a truncated or padded one
+        // is rejected before any curve arithmetic.
+        let jwt = eddsa_test_jwt();
+        let (_, signature) = jwt.rsplit_once('.').unwrap();
+        let signature = BASE64_URL_SAFE_NO_PAD.decode(signature).unwrap();
+        for bad in [&signature[..63], &[signature.as_slice(), &[0u8]].concat()] {
+            let err = verify_and_build(
+                &with_signature(&jwt, bad),
+                &descriptor(),
+                &eddsa_test_certs(true),
+                &test_salt(),
+            )
+            .unwrap_err();
+            assert_invalid_signature(err);
+        }
+    }
+
+    #[test]
+    fn should_reject_rs256_header_against_ed25519_key() {
+        reset_test_env();
+        // Algorithm confusion, direction 1: an Ed25519-signed JWT whose header
+        // claims `RS256`, resolved (by `kid`) to the OKP key. Without an `alg`
+        // on the JWK nothing upstream objects, so the RS256 branch's key-type
+        // check is what has to reject it; with `alg` the JWK check does.
+        let jwt = sign_jwt_eddsa(
+            &jwt_header("RS256", EDDSA_KID),
+            &eddsa_test_claims(),
+            &eddsa_signing_key(),
+        );
+        for with_alg in [false, true] {
+            let err = verify_and_build(
+                &jwt,
+                &descriptor(),
+                &eddsa_test_certs(with_alg),
+                &test_salt(),
+            )
+            .unwrap_err();
+            assert_invalid_signature(err);
+        }
+    }
+
+    #[test]
+    fn should_reject_eddsa_header_against_rsa_key() {
+        reset_test_env();
+        // Algorithm confusion, direction 2: an `EdDSA` header naming the RSA
+        // test key's `kid`. Rejected both when the RSA JWK carries
+        // `"alg":"RS256"` (mismatch) and when it carries no `alg` (key type).
+        let rsa_kid = test_certs()[0].kid().unwrap().to_string();
+        let jwt = sign_jwt_eddsa(
+            &jwt_header("EdDSA", &rsa_kid),
+            &eddsa_test_claims(),
+            &eddsa_signing_key(),
+        );
+        let mut rsa_without_alg = serde_json::to_value(&test_certs()[0]).unwrap();
+        rsa_without_alg.as_object_mut().unwrap().remove("alg");
+        let rsa_without_alg: Jwk = serde_json::from_value(rsa_without_alg).unwrap();
+        for certs in [test_certs(), vec![rsa_without_alg]] {
+            let err = verify_and_build(&jwt, &descriptor(), &certs, &test_salt()).unwrap_err();
+            assert_invalid_signature(err);
+        }
+    }
+
+    #[test]
+    fn should_reject_unsupported_algorithm() {
+        reset_test_env();
+        // Only `RS256` and `EdDSA` are accepted; any other registered JWS
+        // algorithm is rejected as unsupported even with a matching `kid`.
+        for alg in ["ES256", "ES256K", "PS256", "HS256"] {
+            let jwt = sign_jwt_eddsa(
+                &jwt_header(alg, EDDSA_KID),
+                &eddsa_test_claims(),
+                &eddsa_signing_key(),
+            );
+            let err = verify_and_build(&jwt, &descriptor(), &eddsa_test_certs(false), &test_salt())
+                .unwrap_err();
+            assert_invalid_signature(err);
+        }
+    }
+
+    #[test]
+    fn should_reject_okp_key_on_unsupported_curve() {
+        reset_test_env();
+        // `EdDSA` also covers Ed448, and OKP JWKs also carry X25519/X448
+        // key-agreement keys; none of them may verify a signature here.
+        let x = BASE64_URL_SAFE_NO_PAD.encode(eddsa_signing_key().verifying_key().to_bytes());
+        for crv in ["Ed448", "X25519", "X448"] {
+            let err = verify_and_build(
+                &eddsa_test_jwt(),
+                &descriptor(),
+                &okp_test_certs(crv, &x, false),
+                &test_salt(),
+            )
+            .unwrap_err();
+            assert_invalid_signature(err);
+        }
+    }
+
+    #[test]
+    fn should_reject_malformed_ed25519_public_key() {
+        reset_test_env();
+        // `x` must decode to exactly 32 bytes that form a valid curve point.
+        let key_bytes = eddsa_signing_key().verifying_key().to_bytes();
+        let short = BASE64_URL_SAFE_NO_PAD.encode(&key_bytes[..31]);
+        let long = BASE64_URL_SAFE_NO_PAD.encode([key_bytes.as_slice(), &[0u8]].concat());
+        // A 32-byte encoding of a non-canonical / invalid point: all 0xff.
+        let invalid_point = BASE64_URL_SAFE_NO_PAD.encode([0xffu8; 32]);
+        for x in [short, long, invalid_point, "not-base64!".to_string()] {
+            let err = verify_and_build(
+                &eddsa_test_jwt(),
+                &descriptor(),
+                &okp_test_certs("Ed25519", &x, true),
+                &test_salt(),
+            )
+            .unwrap_err();
+            assert_invalid_signature(err);
+        }
     }
 }
