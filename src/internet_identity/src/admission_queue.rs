@@ -7,13 +7,14 @@
 //! or rejected with a retry delay.
 //!
 //! [`AdmissionQueue::take_batch`] takes one item per sender in turn. Within each
-//! sender, lower priority values come first, then older entries. The item key breaks
-//! ties when arrival times match, including items submitted in the same call.
+//! sender, lower priority values come first, then the nearest deadline. The item
+//! key breaks ties.
 //!
-//! Callers must supply trusted canister time as `now_ns`. The queue assigns that
-//! time to new entries and discards entries once they reach the configured age.
-//! It forgets entries after taking them, so duplicate detection only covers work
-//! still in this queue. A retry delay describes queue pressure, not delivery status.
+//! Callers must supply trusted canister time as `now_ns`. An item may name its own
+//! expiry, which the queue clamps to `discard_entries_after_ns` after admission, so
+//! a sender can shorten an item's life but never extend it.
+//! The queue forgets entries after taking them, so duplicate detection only covers
+//! work still in this queue. A retry delay describes queue pressure, not delivery.
 //!
 //! This module does not authorize senders or deliver items.
 // The submission endpoint and dispatcher will use this in later PRs.
@@ -41,6 +42,12 @@ pub(crate) trait QueueItem: Clone {
     /// Processing priority among this sender's items. Lower values are taken first.
     /// Out-of-range values use the lowest priority.
     fn priority(&self) -> usize;
+
+    /// When the item stops being worth delivering, as chosen by the submitter.
+    /// `None` leaves the queue's own limit in charge.
+    fn expires_at_ns(&self) -> Option<Timestamp> {
+        None
+    }
 }
 
 /// Capacity limits, expiry time, and retry delays.
@@ -52,12 +59,13 @@ pub(crate) struct QueueConfig {
     /// Maximum entries for one sender. Its limit may be lower when the queue is
     /// shared by several senders.
     pub(crate) max_entries_per_sender: usize,
-    /// Maximum pending entries per group for one sender. Further items fold.
+    /// Maximum pending entries per group for one sender. Further items are dropped.
     pub(crate) max_pending_per_group: usize,
     /// Clear the pressure timer when occupancy falls below this value. A value
     /// below `max_entries` avoids resetting the timer whenever one slot opens.
     pub(crate) pressure_cleared_below: usize,
-    /// Discard entries when they reach this age, measured from admission.
+    /// Longest an entry may wait, measured from admission. An item's own expiry
+    /// can only shorten this.
     pub(crate) discard_entries_after_ns: u64,
     pub(crate) retry: RetryPolicy,
 }
@@ -112,8 +120,8 @@ pub(crate) enum Admission {
     Accepted,
     /// Not stored because its key is already queued. The queued entry stands for it.
     Folded,
-    /// Not stored because its group is at its limit. Retrying repeats the outcome
-    /// until the group drains.
+    /// Not stored and not delivered: the item had already expired, or its group is
+    /// at its limit. Retrying repeats the outcome until the group drains.
     Dropped,
     /// Not stored because the queue or sender is full. Retry after this delay.
     Full { retry_after_ms: u32 },
@@ -126,10 +134,11 @@ pub(crate) struct Admitted<Key> {
     pub(crate) admission: Admission,
 }
 
-/// An item and the time it was admitted.
+/// An item, when it was admitted, and when it stops being worth delivering.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Entry<Item> {
     pub(crate) received_at_ns: Timestamp,
+    pub(crate) expires_at_ns: Timestamp,
     pub(crate) item: Item,
 }
 
@@ -160,8 +169,8 @@ pub(crate) struct QueueSnapshot<Sender, Item> {
 pub(crate) struct QueueStats {
     pub(crate) stored_total: usize,
     pub(crate) active_senders: usize,
-    /// Age of the oldest stored entry.
-    pub(crate) oldest_age_ns: Option<u64>,
+    /// Time until the nearest deadline among stored entries.
+    pub(crate) next_expiry_in_ns: Option<u64>,
     /// Time since the queue filled, until occupancy falls below the reset threshold.
     pub(crate) at_capacity_for_ns: Option<u64>,
     /// Time since the last successful take, or since construction or restore.
@@ -169,12 +178,15 @@ pub(crate) struct QueueStats {
     pub(crate) discarded_expired: u64,
     pub(crate) folded_duplicates: u64,
     pub(crate) dropped_group_capped: u64,
+    pub(crate) dropped_already_expired: u64,
 }
+
+/// One priority's entries, ordered by deadline, then key.
+type PriorityBucket<Item> = BTreeMap<(Timestamp, <Item as QueueItem>::Key), Entry<Item>>;
 
 /// One sender's entries, indexed for ordering, duplicate checks, and group limits.
 struct SenderQueue<Item: QueueItem> {
-    /// Entries grouped by priority and ordered by arrival time, then key.
-    entries_by_priority: Vec<BTreeMap<(Timestamp, Item::Key), Item>>,
+    entries_by_priority: Vec<PriorityBucket<Item>>,
     /// Keys currently queued for this sender.
     present: HashSet<Item::Key>,
     pending_per_group: HashMap<Item::Group, usize>,
@@ -203,39 +215,43 @@ impl<Item: QueueItem> SenderQueue<Item> {
         self.pending_per_group.get(group).copied().unwrap_or(0)
     }
 
-    fn insert(&mut self, received_at_ns: Timestamp, item: Item) {
-        let priority = item
+    fn insert(&mut self, entry: Entry<Item>) {
+        let priority = entry
+            .item
             .priority()
             .min(self.entries_by_priority.len().saturating_sub(1));
-        let key = item.key();
-        *self.pending_per_group.entry(item.group()).or_insert(0) += 1;
+        let key = entry.item.key();
+        *self
+            .pending_per_group
+            .entry(entry.item.group())
+            .or_insert(0) += 1;
         self.present.insert(key.clone());
         // In range: the vector is never empty and `priority` is clamped to its last index.
-        self.entries_by_priority[priority].insert((received_at_ns, key), item);
+        self.entries_by_priority[priority].insert((entry.expires_at_ns, key), entry);
     }
 
     fn remove(
         &mut self,
         priority: usize,
-        received_at_ns: Timestamp,
+        expires_at_ns: Timestamp,
         key: &Item::Key,
-    ) -> Option<Item> {
-        let item = self
+    ) -> Option<Entry<Item>> {
+        let entry = self
             .entries_by_priority
             .get_mut(priority)?
-            .remove(&(received_at_ns, key.clone()))?;
+            .remove(&(expires_at_ns, key.clone()))?;
         self.present.remove(key);
-        let group = item.group();
+        let group = entry.item.group();
         if let Some(pending) = self.pending_per_group.get_mut(&group) {
             *pending = pending.saturating_sub(1);
             if *pending == 0 {
                 self.pending_per_group.remove(&group);
             }
         }
-        Some(item)
+        Some(entry)
     }
 
-    /// The oldest entry at the highest available priority.
+    /// The nearest deadline at the highest available priority.
     fn front(&self) -> Option<(usize, Timestamp, Item::Key)> {
         self.entries_by_priority
             .iter()
@@ -243,18 +259,19 @@ impl<Item: QueueItem> SenderQueue<Item> {
             .find_map(|(priority, entries)| {
                 entries
                     .first_key_value()
-                    .map(|((received_at_ns, key), _)| (priority, *received_at_ns, key.clone()))
+                    .map(|((expires_at_ns, key), _)| (priority, *expires_at_ns, key.clone()))
             })
     }
 
-    fn oldest_at_priority(&self, priority: usize) -> Option<(Timestamp, Item::Key)> {
+    /// The nearest deadline at one priority.
+    fn first_at(&self, priority: usize) -> Option<(Timestamp, Item::Key)> {
         self.entries_by_priority
             .get(priority)?
             .first_key_value()
-            .map(|((received_at_ns, key), _)| (*received_at_ns, key.clone()))
+            .map(|((expires_at_ns, key), _)| (*expires_at_ns, key.clone()))
     }
 
-    fn oldest_arrival_ns(&self) -> Option<Timestamp> {
+    fn next_expiry_ns(&self) -> Option<Timestamp> {
         self.entries_by_priority
             .iter()
             .filter_map(|entries| entries.first_key_value().map(|((ts, _), _)| *ts))
@@ -281,8 +298,10 @@ pub(crate) struct AdmissionQueue<Sender: Clone + Ord, Item: QueueItem> {
     discarded_expired: u64,
     /// When a group has a pending entry with the same key, further items fold. This counts how many times that happened.
     folded_duplicates: u64,
-    /// When a group has too many pending entries, further items fold. This counts how many times that happened.
+    /// When a group has too many pending entries, further items are dropped. This counts how many times that happened.
     dropped_group_capped: u64,
+    /// Items whose own expiry had already passed when they were submitted.
+    dropped_already_expired: u64,
 }
 
 impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
@@ -298,6 +317,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             discarded_expired: 0,
             folded_duplicates: 0,
             dropped_group_capped: 0,
+            dropped_already_expired: 0,
         }
     }
 
@@ -324,6 +344,13 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 admission,
             };
 
+            let expires_at_ns = self.expiry_for(now_ns, &item);
+            if expires_at_ns <= now_ns {
+                self.dropped_already_expired += 1;
+                admissions.push(answer(Admission::Dropped));
+                continue;
+            }
+
             if self.holds(&sender, &key) {
                 self.folded_duplicates += 1;
                 admissions.push(answer(Admission::Folded));
@@ -349,7 +376,14 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 continue;
             }
 
-            self.insert(&sender, now_ns, item);
+            self.insert(
+                &sender,
+                Entry {
+                    received_at_ns: now_ns,
+                    expires_at_ns,
+                    item,
+                },
+            );
             admissions.push(answer(Admission::Accepted));
         }
 
@@ -394,12 +428,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 entries: queue
                     .entries_by_priority
                     .iter()
-                    .flat_map(|entries| {
-                        entries.iter().map(|((received_at_ns, _), item)| Entry {
-                            received_at_ns: *received_at_ns,
-                            item: item.clone(),
-                        })
-                    })
+                    .flat_map(|entries| entries.values().cloned())
                     .collect(),
             })
             .collect();
@@ -409,8 +438,8 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         }
     }
 
-    /// Restores saved entries with their original arrival times. Retry timers and
-    /// metrics restart at `now_ns`. Existing entries are kept even if the new
+    /// Restores saved entries with their original arrival times and deadlines. Retry
+    /// timers and metrics restart at `now_ns`. Entries are kept even if the new
     /// configuration lowers capacity; admission waits for space to become available.
     pub(crate) fn restore(
         config: QueueConfig,
@@ -420,7 +449,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         let mut backlog = Self::new(config, now_ns);
         for sender in snapshot.senders {
             for entry in sender.entries {
-                backlog.insert(&sender.sender, entry.received_at_ns, entry.item);
+                backlog.insert(&sender.sender, entry);
             }
         }
         backlog.next_sender = snapshot.next_sender;
@@ -432,12 +461,12 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         QueueStats {
             stored_total: self.stored_total,
             active_senders: self.senders.len(),
-            oldest_age_ns: self
+            next_expiry_in_ns: self
                 .senders
                 .values()
-                .filter_map(SenderQueue::oldest_arrival_ns)
+                .filter_map(SenderQueue::next_expiry_ns)
                 .min()
-                .map(|oldest| now_ns.saturating_sub(oldest)),
+                .map(|nearest| nearest.saturating_sub(now_ns)),
             at_capacity_for_ns: self
                 .at_capacity_since_ns
                 .map(|since| now_ns.saturating_sub(since)),
@@ -445,7 +474,16 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             discarded_expired: self.discarded_expired,
             folded_duplicates: self.folded_duplicates,
             dropped_group_capped: self.dropped_group_capped,
+            dropped_already_expired: self.dropped_already_expired,
         }
+    }
+
+    /// When an item stops being worth delivering. A submitter may ask for less time
+    /// than the queue's limit, never more.
+    fn expiry_for(&self, received_at_ns: Timestamp, item: &Item) -> Timestamp {
+        let limit = received_at_ns.saturating_add(self.config.discard_entries_after_ns);
+        item.expires_at_ns()
+            .map_or(limit, |chosen| chosen.min(limit))
     }
 
     fn holds(&self, sender: &Sender, key: &Item::Key) -> bool {
@@ -477,14 +515,15 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             .min(self.config.max_entries / self.senders.len().max(1))
     }
 
-    fn insert(&mut self, sender: &Sender, received_at_ns: Timestamp, item: Item) {
+    fn insert(&mut self, sender: &Sender, entry: Entry<Item>) {
+        let received_at_ns = entry.received_at_ns;
         if self.stored_total == 0 {
             self.nonempty_since_ns = Some(received_at_ns);
         }
         self.senders
             .entry(sender.clone())
             .or_insert_with(SenderQueue::new)
-            .insert(received_at_ns, item);
+            .insert(entry);
         self.stored_total += 1;
         if self.is_full() {
             self.at_capacity_since_ns.get_or_insert(received_at_ns);
@@ -495,11 +534,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
     fn pop_live(&mut self, sender: &Sender, now_ns: Timestamp) -> Option<Entry<Item>> {
         loop {
             let entry = self.pop_front(sender)?;
-            if entry
-                .received_at_ns
-                .saturating_add(self.config.discard_entries_after_ns)
-                <= now_ns
-            {
+            if entry.expires_at_ns <= now_ns {
                 self.discarded_expired += 1;
                 continue;
             }
@@ -509,18 +544,15 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
 
     fn pop_front(&mut self, sender: &Sender) -> Option<Entry<Item>> {
         let queue = self.senders.get_mut(sender)?;
-        let (priority, received_at_ns, key) = queue.front()?;
-        let item = queue.remove(priority, received_at_ns, &key)?;
+        let (priority, expires_at_ns, key) = queue.front()?;
+        let entry = queue.remove(priority, expires_at_ns, &key)?;
         let emptied = queue.is_empty();
         self.after_removal(sender, emptied);
-        Some(Entry {
-            received_at_ns,
-            item,
-        })
+        Some(entry)
     }
 
     /// Removes expired entries from every sender. At each priority, entries are
-    /// ordered by age, so scanning stops at the first live entry.
+    /// ordered by deadline, so scanning stops at the first live entry.
     fn discard_expired(&mut self, now_ns: Timestamp) {
         for sender in self.senders.keys().cloned().collect::<Vec<_>>() {
             self.discard_expired_for(&sender, now_ns);
@@ -533,13 +565,13 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 let Some(queue) = self.senders.get_mut(sender) else {
                     return;
                 };
-                let Some((received_at_ns, key)) = queue.oldest_at_priority(priority) else {
+                let Some((expires_at_ns, key)) = queue.first_at(priority) else {
                     break;
                 };
-                if received_at_ns.saturating_add(self.config.discard_entries_after_ns) > now_ns {
+                if expires_at_ns > now_ns {
                     break;
                 }
-                queue.remove(priority, received_at_ns, &key);
+                queue.remove(priority, expires_at_ns, &key);
                 let emptied = queue.is_empty();
                 self.after_removal(sender, emptied);
                 self.discarded_expired += 1;
@@ -622,6 +654,7 @@ mod tests {
         group: u8,
         id: u8,
         priority: usize,
+        expires_at_ns: Option<Timestamp>,
     }
 
     impl QueueItem for TestItem {
@@ -640,6 +673,10 @@ mod tests {
         fn priority(&self) -> usize {
             self.priority
         }
+
+        fn expires_at_ns(&self) -> Option<Timestamp> {
+            self.expires_at_ns
+        }
     }
 
     type TestQueue = AdmissionQueue<u8, TestItem>;
@@ -649,14 +686,21 @@ mod tests {
             group,
             id,
             priority: 0,
+            expires_at_ns: None,
         }
     }
 
     fn at_priority(group: u8, id: u8, priority: usize) -> TestItem {
         TestItem {
-            group,
-            id,
             priority,
+            ..item(group, id)
+        }
+    }
+
+    fn expiring(group: u8, id: u8, expires_at_ns: Timestamp) -> TestItem {
+        TestItem {
+            expires_at_ns: Some(expires_at_ns),
+            ..item(group, id)
         }
     }
 
@@ -729,6 +773,63 @@ mod tests {
                 "pressure clock left running below the low mark"
             );
         }
+    }
+
+    // Expiry.
+
+    #[test]
+    fn an_item_may_ask_to_die_before_the_queues_own_limit() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![expiring(1, 1, 11)], 1);
+
+        // The configured lifetime would have kept this until nanosecond 101.
+        assert!(backlog.take_batch(10, 12).is_empty());
+        assert_eq!(backlog.stats(12).discarded_expired, 1);
+        assert_consistent(&backlog);
+    }
+
+    #[test]
+    fn an_item_may_not_ask_to_outlive_the_queues_own_limit() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![expiring(1, 1, 10_000)], 1);
+
+        assert_eq!(keys_taken(&backlog.take_batch(10, 100)), vec![(1, 1)]);
+
+        backlog.admit(1, vec![expiring(2, 2, 10_000)], 1);
+        assert!(backlog.take_batch(10, 101).is_empty());
+        assert_consistent(&backlog);
+    }
+
+    #[test]
+    fn an_item_that_has_already_expired_is_dropped_on_arrival() {
+        let mut backlog = TestQueue::new(config(), 0);
+
+        assert_eq!(
+            results(backlog.admit(1, vec![expiring(1, 1, 5)], 5)),
+            vec![Admission::Dropped]
+        );
+        assert_eq!(backlog.stored_total, 0);
+        assert_eq!(backlog.stats(5).dropped_already_expired, 1);
+        assert_consistent(&backlog);
+    }
+
+    #[test]
+    fn the_nearest_deadline_leaves_first_whatever_the_arrival_order() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![expiring(1, 1, 90)], 1);
+        backlog.admit(1, vec![expiring(2, 2, 20)], 2);
+
+        assert_eq!(keys_taken(&backlog.take_batch(10, 3)), vec![(2, 2), (1, 1)]);
+        assert_consistent(&backlog);
+    }
+
+    #[test]
+    fn stats_report_the_time_left_on_the_nearest_deadline() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![expiring(1, 1, 90)], 1);
+        backlog.admit(2, vec![expiring(2, 2, 20)], 1);
+
+        assert_eq!(backlog.stats(5).next_expiry_in_ns, Some(15));
     }
 
     // Ordering.

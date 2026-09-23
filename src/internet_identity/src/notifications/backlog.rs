@@ -7,7 +7,7 @@
 
 use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use crate::storage::storable::application::StorableOriginSha256;
-use internet_identity_interface::internet_identity::types::AnchorNumber;
+use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 
 /// RFC 8030 urgency levels. Variant order sets the queue priority, highest first.
 /// The dispatcher must convert these to the corresponding HTTP header strings.
@@ -29,6 +29,9 @@ pub(crate) struct PendingNotification {
     /// Chosen by the app and unique within that app and recipient.
     pub(crate) notification_id: u64,
     pub(crate) urgency: Urgency,
+    /// When the app stops wanting this delivered. `None` leaves
+    /// `discard_entries_after_ns` in charge, and a later time is clamped to it.
+    pub(crate) expires_at_ns: Option<Timestamp>,
 }
 
 impl QueueItem for PendingNotification {
@@ -50,6 +53,10 @@ impl QueueItem for PendingNotification {
 
     fn priority(&self) -> usize {
         self.urgency as usize // Converts the enum variant order to a priority number, highest first.
+    }
+
+    fn expires_at_ns(&self) -> Option<Timestamp> {
+        self.expires_at_ns
     }
 }
 
@@ -116,6 +123,14 @@ mod tests {
             recipient,
             notification_id,
             urgency: Urgency::Normal,
+            expires_at_ns: None,
+        }
+    }
+
+    fn at_urgency(notification_id: u64, urgency: Urgency) -> PendingNotification {
+        PendingNotification {
+            urgency,
+            ..notification(1, notification_id)
         }
     }
 
@@ -194,6 +209,7 @@ mod tests {
         assert_eq!(taken.len(), 1);
         assert_eq!(taken[0].sender, app);
         assert_eq!(taken[0].entry.received_at_ns, 1_000);
+        assert_eq!(taken[0].entry.expires_at_ns, 1_000 + 5 * MINUTE_NS);
         assert_eq!(taken[0].entry.item, notification(42, 7));
     }
 
@@ -201,31 +217,33 @@ mod tests {
     fn the_more_urgent_notification_leaves_first() {
         let mut backlog = NotificationBacklog::new(NOTIFICATION_BACKLOG, 0);
         let app = origin("https://a.example");
+        backlog.admit(app.clone(), vec![at_urgency(1, Urgency::VeryLow)], 1);
+        backlog.admit(app, vec![at_urgency(2, Urgency::High)], 2);
+
+        assert_eq!(ids_taken(&mut backlog, 10, 3), vec![2, 1]);
+    }
+
+    #[test]
+    fn an_app_may_retire_a_notification_early() {
+        let mut backlog = NotificationBacklog::new(NOTIFICATION_BACKLOG, 0);
         backlog.admit(
-            app.clone(),
+            origin("https://a.example"),
             vec![PendingNotification {
-                urgency: Urgency::VeryLow,
+                expires_at_ns: Some(30 * SECOND_NS),
                 ..notification(1, 1)
             }],
-            1,
-        );
-        backlog.admit(
-            app,
-            vec![PendingNotification {
-                urgency: Urgency::High,
-                ..notification(1, 2)
-            }],
-            2,
+            0,
         );
 
-        let taken = backlog.take_batch(10, 3);
+        // Well inside the five minutes the queue would otherwise allow.
+        assert!(backlog.take_batch(10, 31 * SECOND_NS).is_empty());
+    }
 
-        assert_eq!(
-            taken
-                .iter()
-                .map(|t| t.entry.item.notification_id)
-                .collect::<Vec<_>>(),
-            vec![2, 1]
-        );
+    fn ids_taken(backlog: &mut NotificationBacklog, limit: usize, now_ns: u64) -> Vec<u64> {
+        backlog
+            .take_batch(limit, now_ns)
+            .iter()
+            .map(|taken| taken.entry.item.notification_id)
+            .collect()
     }
 }
