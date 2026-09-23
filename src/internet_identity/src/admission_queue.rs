@@ -1387,6 +1387,28 @@ mod tests {
     }
 
     #[test]
+    fn a_batch_that_fills_the_queue_sweeps_and_carries_on() {
+        let mut backlog = TestQueue::new(config(), 0);
+        // Another sender's entries, all dead by the time the batch arrives. Only the
+        // sweep inside the loop reaches them, since admit only sweeps the submitter.
+        admit_each(
+            &mut backlog,
+            2,
+            vec![item(1, 1), item(2, 2), item(3, 3), item(4, 4)],
+            1,
+        );
+
+        let batch = (1..=6).map(|id| item(5, id)).collect();
+        let admissions = results(backlog.admit(1, batch, 150));
+
+        // The queue has room at the first item and is full by the fifth, so a sweep
+        // hoisted out of the loop would never run and the last two would be refused.
+        assert_eq!(admissions, vec![Admission::Accepted; 6]);
+        assert_eq!(backlog.stats(150).discarded_expired, 4);
+        assert_consistent(&backlog);
+    }
+
+    #[test]
     fn a_live_entry_behind_an_expired_one_still_leaves() {
         let mut backlog = TestQueue::new(config(), 0);
         backlog.admit(1, vec![item(1, 1)], 1);
