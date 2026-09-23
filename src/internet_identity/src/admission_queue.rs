@@ -6,16 +6,17 @@
 //! Each item is stored, folded into a queued duplicate, dropped as already expired,
 //! or refused with a retry delay.
 //!
-//! [`AdmissionQueue::remove_batch`] takes one item per sender in turn. Priorities
-//! take turns within a sender too: priority `p` of `n` runs for `n - p` turns before
-//! the next one runs, so a busy high priority does not starve the rest. Within a
-//! priority the nearest deadline goes first, and the item key breaks ties.
+//! [`AdmissionQueue::take_batch`] hands out one item per sender in turn and keeps
+//! the removal only once the caller has stored them. Priorities take turns within a
+//! sender too: priority `p` of `n` runs for `n - p` turns before the next one runs,
+//! so a busy high priority does not starve the rest. Within a priority the nearest
+//! deadline goes first, and the item key breaks ties.
 //!
 //! Callers must supply trusted canister time as `now_ns`. An item may name its own
-//! expiry, which the queue clamps to `discard_entries_after_ns` after admission, so
-//! a sender can shorten an item's life but never extend it.
-//! The queue forgets entries after taking them, so duplicate detection only covers
-//! work still in this queue. A retry delay describes queue pressure, not delivery.
+//! expiry, which the queue clamps to `discard_entries_after_ns` from admission, so a
+//! sender can shorten an item's life but never stretch it. The queue forgets entries
+//! after taking them, so duplicate detection only covers work still in this queue. A
+//! retry delay describes queue pressure, not delivery.
 //!
 //! This module does not authorize senders or deliver items.
 // The submission endpoint and dispatcher will use this in later PRs.
@@ -70,7 +71,8 @@ pub(crate) struct QueueConfig {
     /// Maximum entries for one sender. Its limit may be lower when the queue is
     /// shared by several senders.
     pub(crate) max_entries_per_sender: usize,
-    /// Maximum pending entries per group for one sender. Further items are dropped.
+    /// Maximum pending entries per group for one sender. Further items are refused
+    /// with a retry delay.
     pub(crate) max_pending_per_group: usize,
     /// Clear the pressure timer when occupancy falls below this value. A value
     /// below `max_entries` avoids resetting the timer whenever one slot opens.
@@ -214,6 +216,8 @@ struct SenderQueue<Item: QueueItem> {
     /// Priority being served, and turns left before the next one is served.
     serving_priority: usize,
     turns_left: usize,
+    /// Since when this sender has been refused for its own ceiling.
+    at_cap_since_ns: Option<Timestamp>,
 }
 
 impl<Item: QueueItem> SenderQueue<Item> {
@@ -225,6 +229,7 @@ impl<Item: QueueItem> SenderQueue<Item> {
             pending_per_group: HashMap::new(),
             serving_priority: 0,
             turns_left: turns_at_priority(0, levels),
+            at_cap_since_ns: None,
         }
     }
 
@@ -242,12 +247,25 @@ impl<Item: QueueItem> SenderQueue<Item> {
             .map_or(0, |state| state.pending)
     }
 
-    /// When this group reached its limit, if it is still there.
-    fn full_since(&self, group: &Item::Group) -> Option<Timestamp> {
-        self.pending_per_group.get(group)?.full_since_ns
+    /// Starts this group's pressure clock if it is not already running, and returns
+    /// it. Clocks start at the first refusal rather than when the group fills, so
+    /// nothing reconstructs a stale one from an entry's age.
+    fn group_pressure_since(&mut self, group: &Item::Group, now_ns: Timestamp) -> Timestamp {
+        *self
+            .pending_per_group
+            .entry(*group)
+            .or_default()
+            .full_since_ns
+            .get_or_insert(now_ns)
     }
 
-    fn insert(&mut self, entry: Entry<Item>, max_pending_per_group: usize) {
+    /// Same for this sender's own ceiling, which the dynamic per-sender cap can move
+    /// under it, so only an observed refusal is a reliable moment to start it.
+    fn sender_pressure_since(&mut self, now_ns: Timestamp) -> Timestamp {
+        *self.at_cap_since_ns.get_or_insert(now_ns)
+    }
+
+    fn insert(&mut self, entry: Entry<Item>) {
         let priority = entry
             .item
             .priority()
@@ -258,9 +276,7 @@ impl<Item: QueueItem> SenderQueue<Item> {
             .entry(entry.item.group())
             .or_default();
         group.pending += 1;
-        if group.pending >= max_pending_per_group {
-            group.full_since_ns.get_or_insert(entry.received_at_ns);
-        }
+        self.at_cap_since_ns = None;
         self.present.insert(key.clone());
         // In range: the vector is never empty and `priority` is clamped to its last index.
         self.entries_by_priority[priority].insert((entry.expires_at_ns, key), entry);
@@ -333,21 +349,24 @@ pub(crate) struct AdmissionQueue<Sender: Clone + Ord, Item: QueueItem> {
     senders: BTreeMap<Sender, SenderQueue<Item>>,
     /// Where the next batch resumes taking turns between senders.
     next_sender: Option<Sender>,
-    // Total current number of entries across all senders.
+    /// Total current number of entries across all senders.
     stored_total: usize,
 
-    /// When the queue first became nonempty. Reset when it empties. Used to avoid counting time spent empty as a stall.
+    /// When the queue first became nonempty. Reset when it empties. Used to avoid
+    /// counting time spent empty as a stall.
     nonempty_since_ns: Option<Timestamp>,
-    /// When the queue filled. Resets when occupancy falls below `pressure_cleared_below`. Used to compute retry delays.
+    /// When the queue filled. Resets when occupancy falls below
+    /// `pressure_cleared_below`. Used to compute retry delays.
     at_capacity_since_ns: Option<Timestamp>,
     /// Last successful take, or construction or restore time.
     last_taken_ns: Timestamp,
 
-    /// Metrics for monitoring and testing. These are not persisted, so they reset on canister upgrade.
+    /// Metrics for monitoring and testing. These are not persisted, so they reset
+    /// on canister upgrade.
     discarded_expired: u64,
-    /// When a group has a pending entry with the same key, further items fold. This counts how many times that happened.
+    /// Duplicates folded into an entry this sender already had queued.
     folded_duplicates: u64,
-    /// When a group has too many pending entries, further items are refused. This counts how many times that happened.
+    /// Items refused because their group was at its limit for this sender.
     rejected_group_full: u64,
     /// Items whose own expiry had already passed when they were submitted.
     dropped_already_expired: u64,
@@ -411,8 +430,8 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             // If the group is full for the given sender, request a retry.
             if self.pending_for(&sender, &item.group()) >= self.config.max_pending_per_group {
                 self.rejected_group_full += 1;
-                let full_since_ns = self.group_full_since(&sender, &item.group());
-                let retry_after_ms = self.retry_after_ms(full_since_ns, now_ns);
+                let since_ns = self.group_pressure_since(&sender, &item.group(), now_ns);
+                let retry_after_ms = self.retry_after_ms(Some(since_ns), now_ns);
                 admissions.push(answer(Admission::Full { retry_after_ms }));
                 continue;
             }
@@ -426,7 +445,13 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
 
             // If the queue or this sender is full, request a retry. The caller may retry later, and the queue may have freed space in the meantime.
             if self.is_full() || self.sender_at_cap(&sender) {
-                let retry_after_ms = self.retry_after_ms(self.at_capacity_since_ns, now_ns);
+                // A sender can sit at its own ceiling while the queue has room, so it
+                // needs its own clock or its hints would never escalate.
+                let since_ns = match self.at_capacity_since_ns {
+                    Some(since_ns) => since_ns,
+                    None => self.sender_pressure_since(&sender, now_ns),
+                };
+                let retry_after_ms = self.retry_after_ms(Some(since_ns), now_ns);
                 admissions.push(answer(Admission::Full { retry_after_ms }));
                 continue;
             }
@@ -472,8 +497,9 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
 
     /// Takes up to `limit` entries, one per sender in turn, and hands them to
     /// `store`. They leave the queue only if `store` succeeds. On an error each entry
-    /// goes back with its original arrival time and deadline, and the queue records
-    /// no progress, so the next attempt sees exactly what this one did.
+    /// goes back with its original arrival time and deadline and the queue records no
+    /// progress, so the next attempt has the same entries to offer. Only the fairness
+    /// rotation moves on, which costs a sender at most one turn.
     ///
     /// `store` runs to completion inside this call and cannot await, which is what
     /// makes the recovery exact: no other message runs while the batch is out, so
@@ -507,8 +533,9 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         }
     }
 
-    /// Copies stored entries and the round-robin cursor. Restore rebuilds the
-    /// indexes. Persistence and serialization are the caller's responsibility.
+    /// Copies stored entries, the sender rotation, and each sender's place in the
+    /// priority rotation. Restore rebuilds the indexes. Persistence and
+    /// serialization are the caller's responsibility.
     pub(crate) fn snapshot(&self) -> QueueSnapshot<Sender, Item> {
         let senders = self
             .senders
@@ -596,8 +623,23 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             .map_or(0, |queue| queue.pending(group))
     }
 
-    fn group_full_since(&self, sender: &Sender, group: &Item::Group) -> Option<Timestamp> {
-        self.senders.get(sender)?.full_since(group)
+    fn group_pressure_since(
+        &mut self,
+        sender: &Sender,
+        group: &Item::Group,
+        now_ns: Timestamp,
+    ) -> Timestamp {
+        self.senders
+            .entry(sender.clone())
+            .or_insert_with(SenderQueue::new)
+            .group_pressure_since(group, now_ns)
+    }
+
+    fn sender_pressure_since(&mut self, sender: &Sender, now_ns: Timestamp) -> Timestamp {
+        self.senders
+            .entry(sender.clone())
+            .or_insert_with(SenderQueue::new)
+            .sender_pressure_since(now_ns)
     }
 
     // Returns true if the queue has reached its total capacity limit.
@@ -627,7 +669,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         self.senders
             .entry(sender.clone())
             .or_insert_with(SenderQueue::new)
-            .insert(entry, self.config.max_pending_per_group);
+            .insert(entry);
         self.stored_total += 1;
         if self.is_full() {
             self.at_capacity_since_ns.get_or_insert(received_at_ns);
@@ -870,10 +912,10 @@ mod tests {
             );
 
             for (group, state) in &queue.pending_per_group {
-                assert_eq!(
-                    state.full_since_ns.is_some(),
-                    state.pending >= backlog.config.max_pending_per_group,
-                    "group {group} full clock disagrees with its count"
+                assert!(
+                    state.full_since_ns.is_none()
+                        || state.pending >= backlog.config.max_pending_per_group,
+                    "group {group} kept a pressure clock below its cap"
                 );
             }
         }
@@ -892,6 +934,26 @@ mod tests {
     }
 
     // Expiry.
+
+    #[test]
+    fn a_sender_at_its_own_ceiling_is_sent_away_for_longer_each_time() {
+        // Two senders, so the per-sender share is 4 while the queue holds 8.
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(2, vec![item(9, 9)], 1);
+        admit_each(
+            &mut backlog,
+            1,
+            vec![item(1, 1), item(2, 2), item(3, 3), item(4, 4)],
+            1,
+        );
+
+        assert_eq!(sender_hint_at(&mut backlog, 5), 1_000);
+        assert_eq!(sender_hint_at(&mut backlog, 25), 4_000);
+
+        // The queue itself never filled, so only the sender's own clock did this.
+        assert!(!backlog.is_full());
+        assert_eq!(backlog.stats(25).at_capacity_for_ns, None);
+    }
 
     #[test]
     fn an_item_may_ask_to_die_before_the_queues_own_limit() {
@@ -1628,10 +1690,12 @@ mod tests {
                     key: (7, 1),
                     admission: Admission::Folded
                 },
+                // Base delay, not the doubled one below it: the group's clock starts
+                // at this refusal, while the queue has been full since nanosecond 8.
                 Admitted {
                     key: (7, 3),
                     admission: Admission::Full {
-                        retry_after_ms: 2_000
+                        retry_after_ms: 1_000
                     }
                 },
                 Admitted {
@@ -1723,6 +1787,18 @@ mod tests {
             .into_iter()
             .map(|answer| answer.admission)
             .collect()
+    }
+
+    /// Reads the retry delay by submitting for a sender that is at its own ceiling.
+    fn sender_hint_at(backlog: &mut TestQueue, now_ns: Timestamp) -> u32 {
+        match backlog
+            .admit(1, vec![item(8, 8)], now_ns)
+            .remove(0)
+            .admission
+        {
+            Admission::Full { retry_after_ms } => retry_after_ms,
+            other => panic!("expected a full sender, got {other:?}"),
+        }
     }
 
     /// Reads the retry delay by submitting to a group that is already at its limit.
