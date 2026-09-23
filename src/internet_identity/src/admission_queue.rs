@@ -6,9 +6,10 @@
 //! Each item is stored, folded into a queued duplicate, dropped for a full group,
 //! or rejected with a retry delay.
 //!
-//! [`AdmissionQueue::take_batch`] takes one item per sender in turn. Within each
-//! sender, lower priority values come first, then the nearest deadline. The item
-//! key breaks ties.
+//! [`AdmissionQueue::take_batch`] takes one item per sender in turn. Priorities
+//! take turns within a sender too: priority `p` of `n` runs for `n - p` turns before
+//! the next one runs, so a busy high priority does not starve the rest. Within a
+//! priority the nearest deadline goes first, and the item key breaks ties.
 //!
 //! Callers must supply trusted canister time as `now_ns`. An item may name its own
 //! expiry, which the queue clamps to `discard_entries_after_ns` after admission, so
@@ -39,14 +40,24 @@ pub(crate) trait QueueItem: Clone {
     fn key(&self) -> Self::Key;
     fn group(&self) -> Self::Group;
 
-    /// Processing priority among this sender's items. Lower values are taken first.
-    /// Out-of-range values use the lowest priority.
+    /// Processing priority among this sender's items. Lower values are taken first
+    /// and get more turns. Out-of-range values use the lowest priority.
     fn priority(&self) -> usize;
 
     /// When the item stops being worth delivering, as chosen by the submitter.
     /// `None` leaves the queue's own limit in charge.
     fn expires_at_ns(&self) -> Option<Timestamp> {
         None
+    }
+}
+
+/// Consecutive turns a priority gets before the next one runs. Priority `p` of `n`
+/// gets `n - p`, so the highest gets the most turns and the lowest still gets one.
+const fn turns_at_priority(priority: usize, levels: usize) -> usize {
+    if levels > priority {
+        levels - priority
+    } else {
+        1
     }
 }
 
@@ -154,6 +165,8 @@ pub(crate) struct Taken<Sender, Item> {
 struct SenderSnapshot<Sender, Item> {
     sender: Sender,
     entries: Vec<Entry<Item>>,
+    serving_priority: usize,
+    turns_left: usize,
 }
 
 /// Saved entries and the next sender to serve. Private fields keep callers from
@@ -190,16 +203,20 @@ struct SenderQueue<Item: QueueItem> {
     /// Keys currently queued for this sender.
     present: HashSet<Item::Key>,
     pending_per_group: HashMap<Item::Group, usize>,
+    /// Priority being served, and turns left before the next one is served.
+    serving_priority: usize,
+    turns_left: usize,
 }
 
 impl<Item: QueueItem> SenderQueue<Item> {
     fn new() -> Self {
+        let levels = Item::PRIORITY_LEVELS.max(1);
         Self {
-            entries_by_priority: (0..Item::PRIORITY_LEVELS.max(1))
-                .map(|_| BTreeMap::new())
-                .collect(),
+            entries_by_priority: (0..levels).map(|_| BTreeMap::new()).collect(),
             present: HashSet::new(),
             pending_per_group: HashMap::new(),
+            serving_priority: 0,
+            turns_left: turns_at_priority(0, levels),
         }
     }
 
@@ -251,16 +268,26 @@ impl<Item: QueueItem> SenderQueue<Item> {
         Some(entry)
     }
 
-    /// The nearest deadline at the highest available priority.
-    fn front(&self) -> Option<(usize, Timestamp, Item::Key)> {
-        self.entries_by_priority
-            .iter()
-            .enumerate()
-            .find_map(|(priority, entries)| {
-                entries
-                    .first_key_value()
-                    .map(|((expires_at_ns, key), _)| (priority, *expires_at_ns, key.clone()))
-            })
+    /// Locates the next entry to take and advances the priority cursor. A priority
+    /// runs until its turns are spent; an empty one hands over immediately.
+    fn next_to_take(&mut self) -> Option<(usize, Timestamp, Item::Key)> {
+        let levels = self.entries_by_priority.len().max(1);
+        // Each pass either returns or moves to the next priority, so one pass per
+        // priority plus the one already being served covers them all.
+        for _ in 0..=levels {
+            if self.turns_left == 0 {
+                self.serving_priority = (self.serving_priority + 1) % levels;
+                self.turns_left = turns_at_priority(self.serving_priority, levels);
+            }
+            match self.first_at(self.serving_priority) {
+                Some((expires_at_ns, key)) => {
+                    self.turns_left = self.turns_left.saturating_sub(1);
+                    return Some((self.serving_priority, expires_at_ns, key));
+                }
+                None => self.turns_left = 0,
+            }
+        }
+        None
     }
 
     /// The nearest deadline at one priority.
@@ -430,6 +457,8 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                     .iter()
                     .flat_map(|entries| entries.values().cloned())
                     .collect(),
+                serving_priority: queue.serving_priority,
+                turns_left: queue.turns_left,
             })
             .collect();
         QueueSnapshot {
@@ -438,9 +467,10 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         }
     }
 
-    /// Restores saved entries with their original arrival times and deadlines. Retry
-    /// timers and metrics restart at `now_ns`. Entries are kept even if the new
-    /// configuration lowers capacity; admission waits for space to become available.
+    /// Restores saved entries with their original arrival times and deadlines, and
+    /// each sender's place in the priority rotation. Retry timers and metrics restart
+    /// at `now_ns`. Entries are kept even if the new configuration lowers capacity;
+    /// admission waits for space to become available.
     pub(crate) fn restore(
         config: QueueConfig,
         snapshot: QueueSnapshot<Sender, Item>,
@@ -450,6 +480,11 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         for sender in snapshot.senders {
             for entry in sender.entries {
                 backlog.insert(&sender.sender, entry);
+            }
+            if let Some(queue) = backlog.senders.get_mut(&sender.sender) {
+                let levels = queue.entries_by_priority.len();
+                queue.serving_priority = sender.serving_priority.min(levels.saturating_sub(1));
+                queue.turns_left = sender.turns_left;
             }
         }
         backlog.next_sender = snapshot.next_sender;
@@ -530,21 +565,16 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         }
     }
 
-    /// Removes the next live entry, discarding expired entries before it.
+    /// Removes this sender's next live entry. Sweeping first keeps expired entries
+    /// from spending the priority's turns.
     fn pop_live(&mut self, sender: &Sender, now_ns: Timestamp) -> Option<Entry<Item>> {
-        loop {
-            let entry = self.pop_front(sender)?;
-            if entry.expires_at_ns <= now_ns {
-                self.discarded_expired += 1;
-                continue;
-            }
-            return Some(entry);
-        }
+        self.discard_expired_for(sender, now_ns);
+        self.pop_front(sender)
     }
 
     fn pop_front(&mut self, sender: &Sender) -> Option<Entry<Item>> {
         let queue = self.senders.get_mut(sender)?;
-        let (priority, expires_at_ns, key) = queue.front()?;
+        let (priority, expires_at_ns, key) = queue.next_to_take()?;
         let entry = queue.remove(priority, expires_at_ns, &key)?;
         let emptied = queue.is_empty();
         self.after_removal(sender, emptied);
@@ -863,6 +893,50 @@ mod tests {
 
         // The highest-priority item arrived last and still leaves first.
         assert_eq!(keys_taken(&taken), vec![(3, 3), (1, 1), (2, 2)]);
+    }
+
+    #[test]
+    fn a_busy_high_priority_still_hands_turns_to_the_low_one() {
+        // Two levels, so priority zero runs two turns and priority one runs one.
+        let mut backlog = TestQueue::new(config(), 0);
+        admit_each(
+            &mut backlog,
+            1,
+            vec![
+                item(1, 1),
+                item(2, 2),
+                item(3, 3),
+                at_priority(4, 4, 1),
+                at_priority(5, 5, 1),
+                at_priority(6, 6, 1),
+            ],
+            1,
+        );
+
+        assert_eq!(
+            keys_taken(&backlog.take_batch(10, 7)),
+            vec![(1, 1), (2, 2), (4, 4), (3, 3), (5, 5), (6, 6)]
+        );
+        assert_consistent(&backlog);
+    }
+
+    #[test]
+    fn the_priority_rotation_resumes_after_a_restore() {
+        let mut backlog = TestQueue::new(config(), 0);
+        admit_each(
+            &mut backlog,
+            1,
+            vec![item(1, 1), item(2, 2), item(3, 3), at_priority(4, 4, 1)],
+            1,
+        );
+        // Spends both of priority zero's turns.
+        assert_eq!(keys_taken(&backlog.take_batch(2, 5)), vec![(1, 1), (2, 2)]);
+
+        let mut restored = TestQueue::restore(config(), backlog.snapshot(), 5);
+
+        // A queue starting fresh would run priority zero again here.
+        assert_eq!(keys_taken(&restored.take_batch(1, 6)), vec![(4, 4)]);
+        assert_consistent(&restored);
     }
 
     #[test]

@@ -9,7 +9,8 @@ use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy
 use crate::storage::storable::application::StorableOriginSha256;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 
-/// RFC 8030 urgency levels. Variant order sets the queue priority, highest first.
+/// RFC 8030 urgency levels. Variant order sets the queue priority, highest first,
+/// which also decides how many turns each level gets when notifications are taken.
 /// The dispatcher must convert these to the corresponding HTTP header strings.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Urgency {
@@ -221,6 +222,19 @@ mod tests {
         backlog.admit(app, vec![at_urgency(2, Urgency::High)], 2);
 
         assert_eq!(ids_taken(&mut backlog, 10, 3), vec![2, 1]);
+    }
+
+    #[test]
+    fn urgency_levels_take_turns_rather_than_draining_in_order() {
+        let mut backlog = NotificationBacklog::new(NOTIFICATION_BACKLOG, 0);
+        let queued: Vec<_> = (1..=6)
+            .map(|id| at_urgency(id, Urgency::High))
+            .chain((7..=8).map(|id| at_urgency(id, Urgency::Normal)))
+            .collect();
+        backlog.admit(origin("https://a.example"), queued, 1);
+
+        // Four levels, so High runs four turns and hands over to Normal with work left.
+        assert_eq!(ids_taken(&mut backlog, 10, 2), vec![1, 2, 3, 4, 7, 8, 5, 6]);
     }
 
     #[test]
