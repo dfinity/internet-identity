@@ -6,7 +6,7 @@
 //! Each item is stored, folded into a queued duplicate, dropped as already expired,
 //! or refused with a retry delay.
 //!
-//! [`AdmissionQueue::take_batch`] takes one item per sender in turn. Priorities
+//! [`AdmissionQueue::remove_batch`] takes one item per sender in turn. Priorities
 //! take turns within a sender too: priority `p` of `n` runs for `n - p` turns before
 //! the next one runs, so a busy high priority does not starve the rest. Within a
 //! priority the nearest deadline goes first, and the item key breaks ties.
@@ -445,14 +445,12 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         admissions
     }
 
-    /// Removes up to `limit` live entries, taking one per sender in turn.
-    /// The caller must have room to keep all returned entries. Zero does nothing.
-    /// Expired entries are discarded and do not count towards the limit.
-    pub(crate) fn take_batch(
-        &mut self,
-        limit: usize,
-        now_ns: Timestamp,
-    ) -> Vec<Taken<Sender, Item>> {
+    /// Removes up to `limit` live entries, taking one per sender in turn, and
+    /// forgets them. Expired entries are discarded along the way and do not count
+    /// towards the limit. Private because nothing can put these back: callers go
+    /// through [`AdmissionQueue::take_batch`], which removes them only once the
+    /// caller has kept them.
+    fn remove_batch(&mut self, limit: usize, now_ns: Timestamp) -> Vec<Taken<Sender, Item>> {
         let mut taken = Vec::new();
 
         while taken.len() < limit {
@@ -472,16 +470,19 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         taken
     }
 
-    /// Takes up to `limit` entries and hands them to `store`. They leave the queue
-    /// only if `store` succeeds. On an error each entry goes back with its original
-    /// arrival time and deadline, and the queue records no progress, so the next
-    /// attempt sees exactly what this one did.
+    /// Takes up to `limit` entries, one per sender in turn, and hands them to
+    /// `store`. They leave the queue only if `store` succeeds. On an error each entry
+    /// goes back with its original arrival time and deadline, and the queue records
+    /// no progress, so the next attempt sees exactly what this one did.
     ///
     /// `store` runs to completion inside this call and cannot await, which is what
     /// makes the recovery exact: no other message runs while the batch is out, so
     /// nothing can expire, be resubmitted, or take the space the entries need back.
     /// It borrows the batch rather than taking it for the same reason.
-    pub(crate) fn take_batch_with<T, E>(
+    ///
+    /// A `limit` of zero does nothing at all: no entry leaves, nothing expired is
+    /// swept, and no progress is recorded, so the stall clock keeps running.
+    pub(crate) fn take_batch<T, E>(
         &mut self,
         limit: usize,
         now_ns: Timestamp,
@@ -491,7 +492,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         let at_capacity_since_ns = self.at_capacity_since_ns;
         let last_taken_ns = self.last_taken_ns;
 
-        let batch = self.take_batch(limit, now_ns);
+        let batch = self.remove_batch(limit, now_ns);
         match store(&batch) {
             Ok(stored) => Ok(stored),
             Err(error) => {
@@ -898,7 +899,7 @@ mod tests {
         backlog.admit(1, vec![expiring(1, 1, 11)], 1);
 
         // The configured lifetime would have kept this until nanosecond 101.
-        assert!(backlog.take_batch(10, 12).is_empty());
+        assert!(backlog.remove_batch(10, 12).is_empty());
         assert_eq!(backlog.stats(12).discarded_expired, 1);
         assert_consistent(&backlog);
     }
@@ -908,10 +909,10 @@ mod tests {
         let mut backlog = TestQueue::new(config(), 0);
         backlog.admit(1, vec![expiring(1, 1, 10_000)], 1);
 
-        assert_eq!(keys_taken(&backlog.take_batch(10, 100)), vec![(1, 1)]);
+        assert_eq!(keys_taken(&backlog.remove_batch(10, 100)), vec![(1, 1)]);
 
         backlog.admit(1, vec![expiring(2, 2, 10_000)], 1);
-        assert!(backlog.take_batch(10, 101).is_empty());
+        assert!(backlog.remove_batch(10, 101).is_empty());
         assert_consistent(&backlog);
     }
 
@@ -934,7 +935,10 @@ mod tests {
         backlog.admit(1, vec![expiring(1, 1, 90)], 1);
         backlog.admit(1, vec![expiring(2, 2, 20)], 2);
 
-        assert_eq!(keys_taken(&backlog.take_batch(10, 3)), vec![(2, 2), (1, 1)]);
+        assert_eq!(
+            keys_taken(&backlog.remove_batch(10, 3)),
+            vec![(2, 2), (1, 1)]
+        );
         assert_consistent(&backlog);
     }
 
@@ -954,7 +958,7 @@ mod tests {
         let mut backlog = TestQueue::new(config(), 0);
         admit_each(&mut backlog, 1, vec![item(1, 1), item(2, 2), item(3, 3)], 1);
 
-        let taken = backlog.take_batch(10, 5);
+        let taken = backlog.remove_batch(10, 5);
 
         assert_eq!(keys_taken(&taken), vec![(1, 1), (2, 2), (3, 3)]);
         assert_consistent(&backlog);
@@ -974,7 +978,7 @@ mod tests {
             1,
         );
 
-        let taken = backlog.take_batch(10, 5);
+        let taken = backlog.remove_batch(10, 5);
 
         // The highest-priority item arrived last and still leaves first.
         assert_eq!(keys_taken(&taken), vec![(3, 3), (1, 1), (2, 2)]);
@@ -999,7 +1003,7 @@ mod tests {
         );
 
         assert_eq!(
-            keys_taken(&backlog.take_batch(10, 7)),
+            keys_taken(&backlog.remove_batch(10, 7)),
             vec![(1, 1), (2, 2), (4, 4), (3, 3), (5, 5), (6, 6)]
         );
         assert_consistent(&backlog);
@@ -1015,12 +1019,15 @@ mod tests {
             1,
         );
         // Spends both of priority zero's turns.
-        assert_eq!(keys_taken(&backlog.take_batch(2, 5)), vec![(1, 1), (2, 2)]);
+        assert_eq!(
+            keys_taken(&backlog.remove_batch(2, 5)),
+            vec![(1, 1), (2, 2)]
+        );
 
         let mut restored = TestQueue::restore(config(), backlog.snapshot(), 5);
 
         // A queue starting fresh would run priority zero again here.
-        assert_eq!(keys_taken(&restored.take_batch(1, 6)), vec![(4, 4)]);
+        assert_eq!(keys_taken(&restored.remove_batch(1, 6)), vec![(4, 4)]);
         assert_consistent(&restored);
     }
 
@@ -1030,7 +1037,7 @@ mod tests {
 
         backlog.admit(1, vec![at_priority(1, 1, 99)], 1);
 
-        assert_eq!(keys_taken(&backlog.take_batch(10, 2)), vec![(1, 1)]);
+        assert_eq!(keys_taken(&backlog.remove_batch(10, 2)), vec![(1, 1)]);
     }
 
     // Folding.
@@ -1070,7 +1077,7 @@ mod tests {
         );
 
         assert_eq!(
-            keys_taken(&backlog.take_batch(10, 10)),
+            keys_taken(&backlog.remove_batch(10, 10)),
             vec![(1, 1), (2, 2)]
         );
     }
@@ -1132,7 +1139,7 @@ mod tests {
         );
         admit_each(&mut backlog, 1, vec![item(7, 1), item(7, 2)], 1);
 
-        backlog.take_batch(1, 3);
+        backlog.remove_batch(1, 3);
 
         assert_eq!(
             results(backlog.admit(1, vec![item(7, 3)], 4)),
@@ -1150,7 +1157,7 @@ mod tests {
             results(backlog.admit(1, vec![item(1, 1)], 101)),
             vec![Admission::Accepted]
         );
-        assert_eq!(keys_taken(&backlog.take_batch(1, 101)), vec![(1, 1)]);
+        assert_eq!(keys_taken(&backlog.remove_batch(1, 101)), vec![(1, 1)]);
         assert_eq!(backlog.stats(101).discarded_expired, 1);
         assert_consistent(&backlog);
     }
@@ -1170,7 +1177,7 @@ mod tests {
             results(backlog.admit(1, vec![item(1, 2)], 101)),
             vec![Admission::Accepted]
         );
-        assert_eq!(keys_taken(&backlog.take_batch(1, 101)), vec![(1, 2)]);
+        assert_eq!(keys_taken(&backlog.remove_batch(1, 101)), vec![(1, 2)]);
         assert_consistent(&backlog);
     }
 
@@ -1183,7 +1190,7 @@ mod tests {
         backlog.admit(2, vec![item(2, 1)], 1);
         admit_each(&mut backlog, 3, vec![item(3, 1), item(3, 2)], 1);
 
-        let taken = backlog.take_batch(5, 5);
+        let taken = backlog.remove_batch(5, 5);
 
         assert_eq!(senders_taken(&taken), vec![1, 2, 3, 1, 3]);
         assert_eq!(backlog.stored_total, 1);
@@ -1195,9 +1202,9 @@ mod tests {
         admit_each(&mut backlog, 1, vec![item(1, 1), item(1, 2)], 1);
         admit_each(&mut backlog, 2, vec![item(2, 1), item(2, 2)], 1);
 
-        let first = backlog.take_batch(1, 5);
-        let second = backlog.take_batch(1, 6);
-        let third = backlog.take_batch(1, 7);
+        let first = backlog.remove_batch(1, 5);
+        let second = backlog.remove_batch(1, 6);
+        let third = backlog.remove_batch(1, 7);
 
         assert_eq!(senders_taken(&first), vec![1]);
         assert_eq!(senders_taken(&second), vec![2]);
@@ -1263,7 +1270,7 @@ mod tests {
         backlog.admit(1, vec![item(1, 1)], 1);
         backlog.admit(2, vec![item(2, 1)], 1);
 
-        backlog.take_batch(1, 2);
+        backlog.remove_batch(1, 2);
 
         assert_eq!(backlog.stats(2).active_senders, 1);
         assert_consistent(&backlog);
@@ -1339,7 +1346,7 @@ mod tests {
 
         // The dispatcher has no room to accept entries.
         for tick in 2..60 {
-            assert!(backlog.take_batch(0, tick).is_empty());
+            assert!(backlog.remove_batch(0, tick).is_empty());
         }
 
         assert_eq!(hint_at(&mut backlog, 60), 60_000);
@@ -1368,7 +1375,7 @@ mod tests {
         assert!(backlog.stats(1).at_capacity_for_ns.is_some());
 
         // Removing three entries brings occupancy below the reset threshold of six.
-        backlog.take_batch(3, 2);
+        backlog.remove_batch(3, 2);
 
         assert!(backlog.stats(2).at_capacity_for_ns.is_none());
         assert_consistent(&backlog);
@@ -1379,7 +1386,7 @@ mod tests {
         let mut backlog = TestQueue::new(config(), 0);
         backlog.admit(1, vec![item(1, 1)], 1);
 
-        assert!(backlog.take_batch(0, 30).is_empty());
+        assert!(backlog.remove_batch(0, 30).is_empty());
 
         assert_eq!(backlog.stats(30).silence_ns, 30);
         assert_eq!(backlog.stored_total, 1);
@@ -1392,7 +1399,7 @@ mod tests {
         let mut backlog = TestQueue::new(config(), 0);
         backlog.admit(1, vec![item(1, 1)], 1);
 
-        let taken = backlog.take_batch(10, 101);
+        let taken = backlog.remove_batch(10, 101);
 
         assert!(taken.is_empty());
         assert_eq!(backlog.stats(101).discarded_expired, 1);
@@ -1426,7 +1433,7 @@ mod tests {
         backlog.admit(1, vec![item(1, 1), item(2, 2)], 1);
 
         let keys = backlog
-            .take_batch_with(2, 30, |batch| {
+            .take_batch(2, 30, |batch| {
                 Ok::<_, ()>(batch.iter().map(|t| t.entry.item.key()).collect::<Vec<_>>())
             })
             .unwrap();
@@ -1442,7 +1449,7 @@ mod tests {
         let mut backlog = TestQueue::new(config(), 0);
         backlog.admit(1, vec![item(1, 1), item(2, 2)], 1);
 
-        let outcome = backlog.take_batch_with(2, 30, |batch| {
+        let outcome = backlog.take_batch(2, 30, |batch| {
             assert_eq!(batch.len(), 2, "the batch reaches the caller either way");
             Err::<(), _>("no room downstream")
         });
@@ -1454,7 +1461,7 @@ mod tests {
         assert_consistent(&backlog);
 
         // Original arrival times survived, so nothing got a fresh lease on life.
-        let retried = backlog.take_batch(2, 40);
+        let retried = backlog.remove_batch(2, 40);
         assert_eq!(keys_taken(&retried), vec![(1, 1), (2, 2)]);
         assert_eq!(retried[0].entry.received_at_ns, 1);
         assert_eq!(retried[0].entry.expires_at_ns, 101);
@@ -1488,7 +1495,7 @@ mod tests {
         backlog.admit(1, vec![item(1, 1)], 1);
         backlog.admit(1, vec![item(2, 2)], 150);
 
-        let taken = backlog.take_batch(10, 151);
+        let taken = backlog.remove_batch(10, 151);
 
         assert_eq!(keys_taken(&taken), vec![(2, 2)]);
         assert_eq!(backlog.stats(151).discarded_expired, 1);
@@ -1501,7 +1508,7 @@ mod tests {
         backlog.admit(2, vec![item(2, 2)], 1);
         backlog.admit(3, vec![item(3, 3)], 50);
 
-        let taken = backlog.take_batch(1, 101);
+        let taken = backlog.remove_batch(1, 101);
 
         assert_eq!(senders_taken(&taken), vec![3]);
         assert_eq!(backlog.stats(101).discarded_expired, 2);
@@ -1523,8 +1530,8 @@ mod tests {
         assert_eq!(restored.snapshot(), backlog.snapshot());
         // Restore must preserve priority and arrival order.
         assert_eq!(
-            keys_taken(&restored.take_batch(10, 50)),
-            keys_taken(&backlog.take_batch(10, 50))
+            keys_taken(&restored.remove_batch(10, 50)),
+            keys_taken(&backlog.remove_batch(10, 50))
         );
         assert_consistent(&restored);
     }
@@ -1564,11 +1571,11 @@ mod tests {
         let mut backlog = TestQueue::new(config(), 0);
         backlog.admit(1, vec![item(1, 1), item(1, 2)], 1);
         backlog.admit(2, vec![item(2, 1)], 1);
-        assert_eq!(senders_taken(&backlog.take_batch(1, 2)), vec![1]);
+        assert_eq!(senders_taken(&backlog.remove_batch(1, 2)), vec![1]);
 
         let mut restored = TestQueue::restore(config(), backlog.snapshot(), 3);
 
-        assert_eq!(senders_taken(&restored.take_batch(1, 4)), vec![2]);
+        assert_eq!(senders_taken(&restored.remove_batch(1, 4)), vec![2]);
         assert_consistent(&restored);
     }
 
@@ -1693,7 +1700,7 @@ mod tests {
             results(queue.admit(1, vec![NoPriorityLevels(1)], 1)),
             vec![Admission::Accepted]
         );
-        assert_eq!(queue.take_batch(10, 2).len(), 1);
+        assert_eq!(queue.remove_batch(10, 2).len(), 1);
     }
 
     // Test helpers.
