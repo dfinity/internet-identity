@@ -162,7 +162,7 @@ mod tests {
         let other =
             results(backlog.admit(origin("https://b.example"), vec![notification(1, 1)], 1));
 
-        assert_eq!(other, vec![Admission::Stored]);
+        assert_eq!(other, vec![Admission::Accepted]);
         assert_eq!(backlog.stats(1).active_senders, 2);
     }
 
@@ -175,7 +175,7 @@ mod tests {
         let within: Vec<_> = (0..cap).map(|id| notification(1, id)).collect();
         assert!(results(backlog.admit(app.clone(), within, 1))
             .iter()
-            .all(|admission| *admission == Admission::Stored));
+            .all(|admission| *admission == Admission::Accepted));
 
         // The caller relies on existing wake-ups to cover this notification too.
         assert_eq!(
