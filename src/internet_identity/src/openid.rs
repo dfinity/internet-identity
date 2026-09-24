@@ -399,6 +399,31 @@ pub(super) fn decode_iss_aud_claims(
     Ok((iss, aud, validation_item.claims().to_vec()))
 }
 
+/// Resolve the anchor a verified OpenID credential signs into, scoped to the
+/// discovery domain the login was verified through (`None` for a configured
+/// provider). A credential no anchor holds is `NoSuchAnchor`; one that is
+/// held, but stored under a different domain stamp, is `SsoDomainMismatch`,
+/// so the client can tell the user the account is already linked rather than
+/// offer a sign-up that registration would reject as a duplicate.
+pub fn resolve_anchor_with_openid_credential(
+    key: &OpenIdCredentialKey,
+    discovery_domain: Option<&str>,
+) -> Result<AnchorNumber, OpenIdDelegationError> {
+    state::storage_borrow(|storage| {
+        if let Some(anchor_number) =
+            storage.lookup_anchor_with_openid_credential(key, discovery_domain)
+        {
+            return Ok(anchor_number);
+        }
+        match storage.openid_credential_sso_domain(key) {
+            Some(registered_sso_domain) => Err(OpenIdDelegationError::SsoDomainMismatch {
+                registered_sso_domain,
+            }),
+            None => Err(OpenIdDelegationError::NoSuchAnchor),
+        }
+    })
+}
+
 /// Verify a JWT and bind the nonce to the caller via the salt, returning the
 /// resulting credential. `discovery_domain` selects the provider kind: `None`
 /// resolves a configured provider by `(iss, aud)`; `Some(domain)` resolves an

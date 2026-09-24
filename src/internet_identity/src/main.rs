@@ -1454,7 +1454,7 @@ mod openid_api {
     use crate::openid::{self, OpenIdCredentialKey};
     use crate::storage::anchor::AnchorError;
     use crate::{
-        state, AnchorNumber, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
+        state, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
         OpenIdDelegationError, OpenIdPrepareDelegationResponse, OpenIdResult, SessionKey,
         SsoGetDelegationRequest, SsoGetDelegationResponse, SsoPrepareDelegationRequest,
         SsoPrepareDelegationResponse, Timestamp,
@@ -1476,31 +1476,6 @@ mod openid_api {
         fn from(_: IdentityUpdateError) -> Self {
             OpenIdCredentialRemoveError::Unauthorized(caller())
         }
-    }
-
-    /// Resolve the anchor a verified OpenID credential signs into, scoped to the
-    /// discovery domain the login was verified through (`None` for a configured
-    /// provider). A credential no anchor holds is `NoSuchAnchor`; one that is
-    /// held, but stored under a different domain stamp, is `SsoDomainMismatch`,
-    /// so the client can tell the user the account is already linked rather than
-    /// offer a sign-up that registration would reject as a duplicate.
-    fn resolve_anchor_with_openid_credential(
-        key: &OpenIdCredentialKey,
-        discovery_domain: Option<&str>,
-    ) -> Result<AnchorNumber, OpenIdDelegationError> {
-        state::storage_borrow(|storage| {
-            if let Some(anchor_number) =
-                storage.lookup_anchor_with_openid_credential(key, discovery_domain)
-            {
-                return Ok(anchor_number);
-            }
-            match storage.openid_credential_sso_domain(key) {
-                Some(registered_sso_domain) => Err(OpenIdDelegationError::SsoDomainMismatch {
-                    registered_sso_domain,
-                }),
-                None => Err(OpenIdDelegationError::NoSuchAnchor),
-            }
-        })
     }
 
     #[update]
@@ -1618,7 +1593,7 @@ mod openid_api {
         // The verified credential already carries the SSO stable identifier, so
         // the anchor write below reconciles the stable-id index.
         let prepared: Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> = async {
-            let anchor_number = resolve_anchor_with_openid_credential(
+            let anchor_number = openid::resolve_anchor_with_openid_credential(
                 &openid_credential.key(),
                 discovery_domain.as_deref(),
             )?;
@@ -1635,7 +1610,7 @@ mod openid_api {
                 openid_credential.prepare_jwt_delegation(session_key, anchor_number);
 
             // Checking again because the association could've changed during the .await
-            let still_anchor_number = resolve_anchor_with_openid_credential(
+            let still_anchor_number = openid::resolve_anchor_with_openid_credential(
                 &openid_credential.key(),
                 discovery_domain.as_deref(),
             )?;
@@ -1677,7 +1652,7 @@ mod openid_api {
             Err(err) => return OpenIdResult::Err(err.into()),
         };
 
-        let delegation = resolve_anchor_with_openid_credential(
+        let delegation = openid::resolve_anchor_with_openid_credential(
             &openid_credential.key(),
             discovery_domain.as_deref(),
         )
@@ -1745,7 +1720,7 @@ mod openid_api {
         let prepared: Result<SsoPrepareDelegationResponse, OpenIdDelegationError> = async {
             let key = identity.credential.key();
             let anchor_number =
-                resolve_anchor_with_openid_credential(&key, Some(&discovery_domain))?;
+                openid::resolve_anchor_with_openid_credential(&key, Some(&discovery_domain))?;
 
             // Refresh the II-client credential's metadata from the token; never adds a per-app credential.
             let mut anchor = state::anchor(anchor_number);
@@ -1776,7 +1751,7 @@ mod openid_api {
 
             // The association could change during the `.await`.
             let still_anchor_number =
-                resolve_anchor_with_openid_credential(&key, Some(&discovery_domain))?;
+                openid::resolve_anchor_with_openid_credential(&key, Some(&discovery_domain))?;
             if anchor_number != still_anchor_number {
                 // The credential re-associated to a different anchor during the
                 // `.await` (a concurrent account change). Deliberately reported
@@ -1825,7 +1800,7 @@ mod openid_api {
         };
         let key = identity.credential.key();
         let anchor_number =
-            match resolve_anchor_with_openid_credential(&key, Some(&discovery_domain)) {
+            match openid::resolve_anchor_with_openid_credential(&key, Some(&discovery_domain)) {
                 Ok(anchor_number) => anchor_number,
                 Err(err) => return OpenIdResult::Err(err),
             };
