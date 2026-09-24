@@ -1,8 +1,10 @@
-//! Tests for revocable app sessions: creating one, and minting app delegations from it.
+//! Tests for revocable app sessions: creating one, minting app delegations from it, and
+//! re-issuing it to another key.
 
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2::{
-    app_get_delegation, app_prepare_delegation, app_revoke_session, get_account_session,
+    app_get_delegation, app_get_session_delegation, app_prepare_delegation,
+    app_prepare_session_delegation, app_revoke_session, get_account_session,
     prepare_account_session, revoke_browser_sessions,
 };
 use canister_tests::flows;
@@ -10,9 +12,10 @@ use canister_tests::framework::{
     env, install_ii_with_archive, principal_1, principal_2, time, verify_delegation, BrowserKey,
 };
 use internet_identity_interface::internet_identity::types::{
-    AccountSessionError, AppGetDelegationRequest, AppPrepareDelegationRequest, AppSessionError,
-    BrowserBrand, BrowserDescription, BrowserInfo, FormFactor, GetAccountSessionRequest,
-    OperatingSystem, Permissions, PrepareAccountSessionRequest, PrepareAccountSessionResponse,
+    AccountSessionError, AppGetDelegationRequest, AppGetSessionDelegationRequest,
+    AppPrepareDelegationRequest, AppPrepareSessionDelegationRequest, AppSessionError, BrowserBrand,
+    BrowserDescription, BrowserInfo, FormFactor, GetAccountSessionRequest, OperatingSystem,
+    Permissions, PrepareAccountSessionRequest, PrepareAccountSessionResponse,
     RevokeBrowserSessionsRequest, SessionRevokeError,
 };
 use pocket_ic::{PocketIc, RejectResponse};
@@ -424,6 +427,297 @@ fn should_refuse_an_app_delegation_that_was_never_prepared() -> Result<(), Rejec
         },
     )?
     .is_ok());
+
+    Ok(())
+}
+
+/// Re-issuing moves a session to a key it was never towards. What comes back is the
+/// credential `prepare_account_session` handed the browser — same root, same end, same
+/// restriction — over a different key.
+#[test]
+fn should_re_issue_a_session_delegation_to_another_key() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (prepared, session_principal) = create_session(&env, canister_id, identity_number);
+    let another_key = ByteBuf::from(vec![8; 32]);
+
+    // So that a re-issue that quietly started the session's lifetime again would show up
+    // as an expiration later than the one the session was created with.
+    env.advance_time(Duration::from_secs(60));
+
+    let re_issued = app_prepare_session_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareSessionDelegationRequest {
+            session_key: another_key.clone(),
+        },
+    )?
+    .unwrap();
+
+    // The same session rather than a second one: a chain rooted here resolves to the
+    // caller that asked for it, and ends when that session ends.
+    assert_eq!(re_issued.user_key, prepared.user_key);
+    assert_eq!(
+        Principal::self_authenticating(&re_issued.user_key),
+        session_principal
+    );
+    assert_eq!(re_issued.expiration, prepared.expiration);
+
+    let signed = app_get_session_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppGetSessionDelegationRequest {
+            session_key: another_key.clone(),
+            expiration: re_issued.expiration,
+        },
+    )?
+    .unwrap();
+
+    verify_delegation(&env, re_issued.user_key, &signed, &env.root_key().unwrap());
+    assert_eq!(signed.delegation.pubkey, another_key);
+
+    // Asserted for the reason the browser's own credential asserts them: drop the
+    // targets on both sides and the signature still verifies, so only this says a
+    // re-issue cannot hand out a credential wider than the one it re-issues.
+    assert_eq!(
+        signed.delegation.targets,
+        Some(vec![canister_id]),
+        "a re-issued credential must be usable only against Internet Identity"
+    );
+    assert!(
+        signed.delegation.permissions.is_none(),
+        "it mints app delegations, which is an update call"
+    );
+
+    Ok(())
+}
+
+/// A re-issue names nothing, so the chain the caller presents is the whole
+/// authorization. A caller the session index does not know is refused whatever else it
+/// holds — the account principal this very session mints included.
+#[test]
+fn should_re_issue_for_the_calling_session_and_nobody_else() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (prepared, _) = create_session(&env, canister_id, identity_number);
+
+    for stranger in [principal_1(), principal_2(), prepared.account_principal] {
+        assert_eq!(
+            app_prepare_session_delegation(
+                &env,
+                canister_id,
+                stranger,
+                AppPrepareSessionDelegationRequest {
+                    session_key: ByteBuf::from(vec![8; 32]),
+                },
+            )?,
+            Err(AppSessionError::NoSuchSession),
+            "{stranger} holds no session and must not be able to re-issue one"
+        );
+        assert!(matches!(
+            app_get_session_delegation(
+                &env,
+                canister_id,
+                stranger,
+                AppGetSessionDelegationRequest {
+                    session_key: ByteBuf::from(vec![8; 32]),
+                    expiration: prepared.expiration,
+                },
+            )?,
+            Err(AppSessionError::NoSuchSession)
+        ));
+    }
+
+    Ok(())
+}
+
+/// Two live sessions, and the chain decides which of them is re-issued: each is signed
+/// over its own seed, so neither can be handed the other's root or witness what the
+/// other prepared.
+#[test]
+fn should_re_issue_the_session_the_chain_belongs_to() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (first, first_principal) = create_session(&env, canister_id, identity_number);
+
+    let mut second_request = session_request_from(identity_number, &BrowserKey::new(2));
+    second_request.browser_description = firefox_on_linux();
+    let second =
+        prepare_account_session(&env, canister_id, principal_1(), second_request)?.unwrap();
+    let second_principal = Principal::self_authenticating(&second.user_key);
+    let another_key = ByteBuf::from(vec![8; 32]);
+
+    let re_issued = app_prepare_session_delegation(
+        &env,
+        canister_id,
+        second_principal,
+        AppPrepareSessionDelegationRequest {
+            session_key: another_key.clone(),
+        },
+    )?
+    .unwrap();
+
+    assert_eq!(re_issued.user_key, second.user_key);
+    assert_ne!(re_issued.user_key, first.user_key);
+
+    // Both sessions end at the same instant, so the expiration is no obstacle here: what
+    // refuses is the seed, which is the second session's and not the first's.
+    assert!(matches!(
+        app_get_session_delegation(
+            &env,
+            canister_id,
+            first_principal,
+            AppGetSessionDelegationRequest {
+                session_key: another_key,
+                expiration: re_issued.expiration,
+            },
+        )?,
+        Err(AppSessionError::NoSuchDelegation)
+    ));
+
+    Ok(())
+}
+
+#[test]
+fn should_refuse_a_re_issue_once_the_session_has_expired() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let mut request = session_request(identity_number);
+    request.valid_for = Some(10 * 60 * 1_000_000_000);
+    let prepared = prepare_account_session(&env, canister_id, principal_1(), request)?.unwrap();
+    let session_principal = Principal::self_authenticating(&prepared.user_key);
+
+    env.advance_time(Duration::from_secs(11 * 60));
+
+    assert_eq!(
+        app_prepare_session_delegation(
+            &env,
+            canister_id,
+            session_principal,
+            AppPrepareSessionDelegationRequest {
+                session_key: ByteBuf::from(vec![8; 32]),
+            },
+        )?,
+        Err(AppSessionError::NoSuchSession)
+    );
+
+    Ok(())
+}
+
+/// The `get` half witnesses what was prepared and nothing else: not a key the session
+/// was never re-issued to, and not an expiration other than the session's own end,
+/// which is the only one this canister signs over a session's seed.
+#[test]
+fn should_refuse_a_re_issued_delegation_that_was_never_prepared() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (prepared, session_principal) = create_session(&env, canister_id, identity_number);
+    let another_key = ByteBuf::from(vec![8; 32]);
+
+    let witness = |env: &PocketIc, session_key: ByteBuf, expiration: u64| {
+        app_get_session_delegation(
+            env,
+            canister_id,
+            session_principal,
+            AppGetSessionDelegationRequest {
+                session_key,
+                expiration,
+            },
+        )
+        .unwrap()
+    };
+
+    assert!(
+        matches!(
+            witness(&env, another_key.clone(), prepared.expiration),
+            Err(AppSessionError::NoSuchDelegation)
+        ),
+        "the session was never re-issued to this key"
+    );
+
+    app_prepare_session_delegation(
+        &env,
+        canister_id,
+        session_principal,
+        AppPrepareSessionDelegationRequest {
+            session_key: another_key.clone(),
+        },
+    )?
+    .unwrap();
+
+    assert!(
+        matches!(
+            witness(&env, another_key, prepared.expiration - 1),
+            Err(AppSessionError::NoSuchDelegation)
+        ),
+        "a session credential ends when its session does"
+    );
+
+    Ok(())
+}
+
+/// The one property re-issuing introduces: a session vouches for several keys at once,
+/// so signing it out has to end all of them. It does, and without tracking the keys —
+/// every key resolves to the same principal, and that principal names one record.
+#[test]
+fn should_end_every_key_a_session_vouches_for() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let (prepared, session_principal) = create_session(&env, canister_id, identity_number);
+
+    let re_issue = |env: &PocketIc, session_key: ByteBuf| {
+        app_prepare_session_delegation(
+            env,
+            canister_id,
+            session_principal,
+            AppPrepareSessionDelegationRequest { session_key },
+        )
+        .unwrap()
+    };
+    let second_key = ByteBuf::from(vec![8; 32]);
+    let third_key = ByteBuf::from(vec![9; 32]);
+    assert!(re_issue(&env, second_key.clone()).is_ok());
+    assert!(re_issue(&env, third_key.clone()).is_ok());
+
+    app_revoke_session(&env, canister_id, session_principal)?
+        .expect("signing a session out succeeds, present or not");
+
+    for key in [second_key, third_key] {
+        assert!(matches!(
+            app_get_session_delegation(
+                &env,
+                canister_id,
+                session_principal,
+                AppGetSessionDelegationRequest {
+                    session_key: key.clone(),
+                    expiration: prepared.expiration,
+                },
+            )?,
+            Err(AppSessionError::NoSuchSession)
+        ));
+        assert_eq!(
+            re_issue(&env, key.clone()),
+            Err(AppSessionError::NoSuchSession)
+        );
+        assert_eq!(
+            app_prepare_delegation(
+                &env,
+                canister_id,
+                session_principal,
+                AppPrepareDelegationRequest { session_key: key },
+            )?,
+            Err(AppSessionError::NoSuchSession),
+            "a revoked session mints for none of the keys it vouched for"
+        );
+    }
 
     Ok(())
 }

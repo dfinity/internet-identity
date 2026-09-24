@@ -808,6 +808,39 @@ pub fn app_get_delegation(
     query_candid_as(env, canister_id, sender, "app_get_delegation", (request,)).map(|(x,)| x)
 }
 
+pub fn app_prepare_session_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: AppPrepareSessionDelegationRequest,
+) -> Result<Result<AppPrepareSessionDelegationResponse, AppSessionError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "app_prepare_session_delegation",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn app_get_session_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: AppGetSessionDelegationRequest,
+) -> Result<Result<SignedDelegation, AppSessionError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "app_get_session_delegation",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn app_revoke_session(
     env: &PocketIc,
     canister_id: CanisterId,

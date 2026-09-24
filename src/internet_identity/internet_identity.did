@@ -1150,6 +1150,26 @@ type AppGetDelegationRequest = record {
     expiration : Timestamp;
 };
 
+type AppPrepareSessionDelegationRequest = record {
+    // The key the session's own chain is re-issued to. Nothing about the session is
+    // named: the caller's chain is what identifies it, as for app_prepare_delegation.
+    session_key : SessionKey;
+};
+
+type AppPrepareSessionDelegationResponse = record {
+    // The session's own root, the same value prepare_account_session returned. A
+    // re-issue moves a session to another key; it does not create one.
+    user_key : PublicKey;
+    // The session's end. Re-issuing hands out no time the caller did not already have.
+    expiration : Timestamp;
+};
+
+type AppGetSessionDelegationRequest = record {
+    session_key : SessionKey;
+    // Must match the prepared value.
+    expiration : Timestamp;
+};
+
 
 type RevokeBrowserSessionsRequest = record {
     identity_number : UserNumber;
@@ -2109,6 +2129,14 @@ service : (opt InternetIdentityInit) -> {
     // lifetime.
     app_prepare_delegation : (AppPrepareDelegationRequest) -> (variant { Ok : AppPrepareDelegationResponse; Err : AppSessionError });
     app_get_delegation : (AppGetDelegationRequest) -> (variant { Ok : SignedDelegation; Err : AppSessionError }) query;
+
+    // Re-issues the calling session's own credential to another key: same session
+    // record, same end, same revocation, a chain that ends somewhere else. A holder
+    // that was delegated to by the session, rather than by Internet Identity, trades
+    // the chain it holds for one hop from user_key, so chains do not grow as a session
+    // is passed between the applications that share it.
+    app_prepare_session_delegation : (AppPrepareSessionDelegationRequest) -> (variant { Ok : AppPrepareSessionDelegationResponse; Err : AppSessionError });
+    app_get_session_delegation : (AppGetSessionDelegationRequest) -> (variant { Ok : SignedDelegation; Err : AppSessionError }) query;
 
     // Signs the calling session out. A session that is already gone is success, so a
     // client that retries, or that signs out twice, does not have to reason about whether

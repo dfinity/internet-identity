@@ -937,6 +937,27 @@ pub struct AppGetDelegationRequest {
     pub expiration: Timestamp,
 }
 
+/// Re-issues the calling session's own delegation to another key. The session is proven
+/// by the caller's chain exactly as it is for [`AppPrepareDelegationRequest`], and what
+/// comes back is another credential for that same session rather than a second session:
+/// same record, same end, same revocation.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppPrepareSessionDelegationRequest {
+    pub session_key: SessionKey,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppPrepareSessionDelegationResponse {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AppGetSessionDelegationRequest {
+    pub session_key: SessionKey,
+    pub expiration: Timestamp,
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AppSessionError {
     /// No usable session behind this caller: revoked, expired, pruned, or never one at

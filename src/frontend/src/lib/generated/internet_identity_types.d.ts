@@ -96,6 +96,13 @@ export interface AppGetDelegationRequest {
    */
   'expiration' : Timestamp,
 }
+export interface AppGetSessionDelegationRequest {
+  'session_key' : SessionKey,
+  /**
+   * Must match the prepared value.
+   */
+  'expiration' : Timestamp,
+}
 export interface AppPrepareDelegationRequest {
   /**
    * The key the app delegation delegates to. Nothing about the account is named:
@@ -105,6 +112,24 @@ export interface AppPrepareDelegationRequest {
 }
 export interface AppPrepareDelegationResponse {
   'user_key' : PublicKey,
+  'expiration' : Timestamp,
+}
+export interface AppPrepareSessionDelegationRequest {
+  /**
+   * The key the session's own chain is re-issued to. Nothing about the session is
+   * named: the caller's chain is what identifies it, as for app_prepare_delegation.
+   */
+  'session_key' : SessionKey,
+}
+export interface AppPrepareSessionDelegationResponse {
+  /**
+   * The session's own root, the same value prepare_account_session returned. A
+   * re-issue moves a session to another key; it does not create one.
+   */
+  'user_key' : PublicKey,
+  /**
+   * The session's end. Re-issuing hands out no time the caller did not already have.
+   */
   'expiration' : Timestamp,
 }
 export type AppSessionError = {
@@ -2074,6 +2099,11 @@ export interface _SERVICE {
     { 'Ok' : SignedDelegation } |
       { 'Err' : AppSessionError }
   >,
+  'app_get_session_delegation' : ActorMethod<
+    [AppGetSessionDelegationRequest],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : AppSessionError }
+  >,
   /**
    * Mints a short-lived app delegation from a live session. Called by app frontends
    * with the session chain, so revoking the session ends access within one delegation
@@ -2089,6 +2119,18 @@ export interface _SERVICE {
    * client that retries, or that signs out twice, does not have to reason about whether
    * its session was still there. An app can revoke only its own session.
    */
+  /**
+   * Re-issues the calling session's own credential to another key: same session
+   * record, same end, same revocation, a chain that ends somewhere else. A holder
+   * that was delegated to by the session, rather than by Internet Identity, trades
+   * the chain it holds for one hop from user_key, so chains do not grow as a session
+   * is passed between the applications that share it.
+   */
+  'app_prepare_session_delegation' : ActorMethod<
+    [AppPrepareSessionDelegationRequest],
+    { 'Ok' : AppPrepareSessionDelegationResponse } |
+      { 'Err' : AppSessionError }
+  >,
   'app_revoke_session' : ActorMethod<
     [],
     { 'Ok' : null } |
