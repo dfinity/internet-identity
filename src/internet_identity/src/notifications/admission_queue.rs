@@ -130,21 +130,6 @@ pub(crate) struct Taken<Sender, Item> {
     pub(crate) entry: Entry<Item>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct SenderSnapshot<Sender, Item> {
-    sender: Sender,
-    entries: Vec<Entry<Item>>,
-    serving_priority: usize,
-    turns_left: usize,
-}
-
-/// Private fields prevent callers from constructing inconsistent snapshots.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct QueueSnapshot<Sender, Item> {
-    senders: Vec<SenderSnapshot<Sender, Item>>,
-    next_sender: Option<Sender>,
-}
-
 /// Expired entries count until removed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct QueueStats {
@@ -153,7 +138,7 @@ pub(crate) struct QueueStats {
     pub(crate) next_expiry_in_ns: Option<u64>,
     /// Queue pressure duration; resets below `pressure_cleared_below`.
     pub(crate) at_capacity_for_ns: Option<u64>,
-    /// Time since the last successful take, construction, or restore.
+    /// Time since the last successful take or construction.
     pub(crate) silence_ns: u64,
     pub(crate) discarded_expired: u64,
     pub(crate) folded_duplicates: u64,
@@ -359,7 +344,6 @@ pub(crate) struct AdmissionQueue<Sender: Clone + Ord, Item: QueueItem> {
     at_capacity_since_ns: Option<Timestamp>,
     last_taken_ns: Timestamp,
 
-    /// Counters reset on restore.
     discarded_expired: u64,
     folded_duplicates: u64,
     rejected_group_full: u64,
@@ -503,51 +487,6 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 Err(error)
             }
         }
-    }
-
-    /// Capture entries and scheduling cursors; callers handle persistence.
-    pub(crate) fn snapshot(&self) -> QueueSnapshot<Sender, Item> {
-        let senders = self
-            .senders
-            .iter()
-            .map(|(sender, queue)| SenderSnapshot {
-                sender: sender.clone(),
-                entries: queue
-                    .entries_by_priority
-                    .iter()
-                    .flat_map(|entries| entries.values().cloned())
-                    .collect(),
-                serving_priority: queue.serving_priority,
-                turns_left: queue.turns_left,
-            })
-            .collect();
-        QueueSnapshot {
-            senders,
-            next_sender: self.next_sender.clone(),
-        }
-    }
-
-    /// Restore entries and scheduling cursors, resetting retry timers and metrics.
-    /// Keep entries even if the new capacity is lower; reject new items until space frees up.
-    pub(crate) fn restore(
-        config: QueueConfig,
-        snapshot: QueueSnapshot<Sender, Item>,
-        now_ns: Timestamp,
-    ) -> Self {
-        let mut backlog = Self::new(config, now_ns);
-        for sender in snapshot.senders {
-            for entry in sender.entries {
-                backlog.insert(&sender.sender, entry);
-            }
-            if let Some(queue) = backlog.senders.get_mut(&sender.sender) {
-                let levels = queue.entries_by_priority.len();
-                queue.serving_priority = sender.serving_priority.min(levels.saturating_sub(1));
-                queue.turns_left = sender.turns_left;
-            }
-        }
-        backlog.next_sender = snapshot.next_sender;
-        backlog.at_capacity_since_ns = backlog.is_full().then_some(now_ns);
-        backlog
     }
 
     pub(crate) fn stats(&self, now_ns: Timestamp) -> QueueStats {
@@ -1124,27 +1063,6 @@ mod tests {
     }
 
     #[test]
-    fn the_priority_rotation_resumes_after_a_restore() {
-        let mut backlog = TestQueue::new(config(), 0);
-        admit_each(
-            &mut backlog,
-            1,
-            vec![item(1, 1), item(2, 2), item(3, 3), at_priority(4, 4, 1)],
-            1,
-        );
-        assert_eq!(
-            keys_taken(&backlog.remove_batch(2, 5)),
-            vec![(1, 1), (2, 2)]
-        );
-
-        let mut restored = TestQueue::restore(config(), backlog.snapshot(), 5);
-
-        // Restoring the cursor gives priority 1 the next turn.
-        assert_eq!(keys_taken(&restored.remove_batch(1, 6)), vec![(4, 4)]);
-        assert_consistent(&restored);
-    }
-
-    #[test]
     fn an_out_of_range_priority_is_clamped_rather_than_panicking() {
         let mut backlog = TestQueue::new(config(), 0);
 
@@ -1591,75 +1509,6 @@ mod tests {
         assert_eq!(backlog.stats(101).discarded_expired, 2);
         assert_eq!(backlog.stored_total, 0);
         assert_consistent(&backlog);
-    }
-
-    #[test]
-    fn snapshot_and_restore_keep_the_entries_and_their_arrival_times() {
-        let mut backlog = TestQueue::new(config(), 0);
-        admit_each(&mut backlog, 1, vec![at_priority(1, 1, 1), item(2, 2)], 1);
-        backlog.admit(2, vec![item(3, 3)], 3);
-
-        let mut restored = TestQueue::restore(config(), backlog.snapshot(), 4);
-
-        assert_eq!(restored.stored_total, backlog.stored_total);
-        assert_eq!(restored.snapshot(), backlog.snapshot());
-        assert_eq!(
-            keys_taken(&restored.remove_batch(10, 50)),
-            keys_taken(&backlog.remove_batch(10, 50))
-        );
-        assert_consistent(&restored);
-    }
-
-    #[test]
-    fn a_restored_buffer_is_not_reported_as_stalled() {
-        let backlog = full_queue(1);
-        let snapshot = backlog.snapshot();
-
-        // Old enough to trigger a stall, but not expiry.
-        let mut restored = TestQueue::restore(config(), snapshot, 60);
-        assert_eq!(
-            restored.stored_total, 8,
-            "the entries aged out, so this proves nothing"
-        );
-
-        assert_eq!(
-            results(restored.admit(1, vec![item(9, 9)], 60)),
-            vec![Admission::Full {
-                retry_after_ms: 1_000
-            }]
-        );
-    }
-
-    #[test]
-    fn restoring_nothing_gives_an_empty_buffer() {
-        let empty = TestQueue::new(config(), 0);
-        let restored = TestQueue::restore(config(), empty.snapshot(), 10);
-
-        assert_eq!(restored.stored_total, 0);
-        assert_eq!(restored.stats(10).active_senders, 0);
-        assert_consistent(&restored);
-    }
-
-    #[test]
-    fn restore_preserves_the_next_sender_to_serve() {
-        let mut backlog = TestQueue::new(config(), 0);
-        backlog.admit(1, vec![item(1, 1), item(1, 2)], 1);
-        backlog.admit(2, vec![item(2, 1)], 1);
-        assert_eq!(senders_taken(&backlog.remove_batch(1, 2)), vec![1]);
-
-        let mut restored = TestQueue::restore(config(), backlog.snapshot(), 3);
-
-        assert_eq!(senders_taken(&restored.remove_batch(1, 4)), vec![2]);
-        assert_consistent(&restored);
-    }
-
-    #[test]
-    fn restore_restarts_the_pressure_timer() {
-        let backlog = full_queue(1);
-        let mut restored = TestQueue::restore(config(), backlog.snapshot(), 60);
-
-        assert_eq!(restored.stats(60).at_capacity_for_ns, Some(0));
-        assert_eq!(hint_at(&mut restored, 70), 2_000);
     }
 
     #[test]
