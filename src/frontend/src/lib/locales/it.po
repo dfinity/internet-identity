@@ -1642,7 +1642,7 @@ msgid "Signing in securely"
 msgstr "Accesso sicuro in corso"
 
 msgid "Signing in with the provider directly doesn't reach it."
-msgstr "L'accesso diretto al provider non lo raggiunge."
+msgstr "L'accesso diretto al provider non raggiunge l'identità."
 
 msgid "Signing in..."
 msgstr "Accesso in corso..."
