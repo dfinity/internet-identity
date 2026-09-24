@@ -269,6 +269,9 @@ msgstr "Già connesso"
 msgid "Also makes changes on your behalf."
 msgstr "Apporta anche modifiche per conto tuo."
 
+msgid "An SSO account signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one, but {enteredDomain} isn't the domain it was linked through."
+msgstr ""
+
 msgid "Any local program can connect"
 msgstr "Qualsiasi programma locale può connettersi"
 
@@ -496,6 +499,9 @@ msgstr "Copia oggetto"
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Impossibile caricare le impostazioni SSO da {domainInput}. Chiedi al tuo amministratore SSO di verificare che /.well-known/ii-openid-configuration sia raggiungibile."
+
+msgid "Couldn't load the SSO settings of {registeredDomain}. Try again later or use a different method."
+msgstr ""
 
 msgid "Couldn't remove the connector. Please try again."
 msgstr "Impossibile rimuovere il connettore. Riprova."
@@ -1029,6 +1035,15 @@ msgstr "Limite raggiunto"
 msgid "Link copied to clipboard"
 msgstr "Link copiato negli appunti"
 
+msgid "Linked through {registeredDomain}"
+msgstr ""
+
+msgid "Linked through another domain"
+msgstr ""
+
+msgid "Linked through another SSO domain"
+msgstr ""
+
 msgid "Linking Internet Identity"
 msgstr "Collegamento di Internet Identity"
 
@@ -1560,6 +1575,9 @@ msgstr "Accedi utilizzando metodi familiari"
 msgid "Sign in with {name}"
 msgstr "Accedi con {name}"
 
+msgid "Sign in with {registeredDomain}"
+msgstr ""
+
 msgid "Sign in with another identity"
 msgstr "Accedi con un'altra identità"
 
@@ -1797,6 +1815,12 @@ msgstr "La frase è stata inserita correttamente ma appartiene a un prodotto div
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Si è verificato un problema durante la connessione all'applicazione. Prova un browser diverso; se il problema persiste, contatta lo sviluppatore."
+
+msgid "This {providerName} account is already linked to an Internet Identity, but through {registeredDomain} rather than {enteredDomain}."
+msgstr ""
+
+msgid "This {providerName} account is already linked to an Internet Identity, but through a different SSO domain than {enteredDomain}."
+msgstr ""
 
 msgid "This {resolvedProviderName} account is already connected to an Internet Identity."
 msgstr "Questo account {resolvedProviderName} è già connesso a un'Internet Identity."

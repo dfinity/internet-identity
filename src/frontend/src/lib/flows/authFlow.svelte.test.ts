@@ -164,6 +164,7 @@ vi.mock("$lib/utils/openidPoll", () => ({
 }));
 
 import { AuthFlow } from "./authFlow.svelte";
+import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
 import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
 import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
 
@@ -361,6 +362,85 @@ describe("AuthFlow — continueWithOpenId disambiguation", () => {
     expect(flow.configIssuer).toBe(testConfig.issuer);
     expect(flow.userName).toBe("Alice");
     expect(flow.userEmail).toBe("alice@example.com");
+  });
+
+  // The canister's `SsoDomainMismatch`: the credential is registered, but
+  // through another discovery domain than the one just signed in through.
+  const ssoDomainMismatchError = {
+    type: "SsoDomainMismatch",
+    value: () => ({ registered_sso_domain: ["registered.example.com"] }),
+  };
+
+  it("parks the JWT and transitions to ssoDomainMismatch when the credential is registered through another domain", async () => {
+    requestJWTMock.mockResolvedValue("fake-jwt");
+    decodeJWTMock.mockReturnValue({
+      iss: testConfig.issuer,
+      sub: "user-1",
+      name: "Alice",
+      email: "alice@example.com",
+    });
+    authenticateWithJWTMock.mockRejectedValue(ssoDomainMismatchError);
+
+    const flow = new AuthFlow({ trackLastUsed: false });
+    flow.setMode("signin");
+    const result = await flow.continueWithOpenId(
+      testConfig,
+      undefined,
+      "signin",
+      "entered.example.com",
+    );
+
+    // Not a sign-up: registration would reject the credential as a duplicate.
+    expect(result).toBeUndefined();
+    expect(flow.view).toBe("ssoDomainMismatch");
+    expect(flow.ssoDomainMismatch).toEqual({
+      enteredDomain: "entered.example.com",
+      registeredDomain: "registered.example.com",
+    });
+    expect(flow.userName).toBe("Alice");
+    expect(flow.userEmail).toBe("alice@example.com");
+
+    flow.cancelOpenIdDisambiguation();
+    expect(flow.view).toBe("chooseMethod");
+    expect(flow.ssoDomainMismatch).toBeUndefined();
+  });
+
+  it("transitions to ssoDomainMismatch on an SSO sign-in in any mode, without a registered domain when the stored credential has no stamp", async () => {
+    requestJWTMock.mockResolvedValue("fake-jwt");
+    decodeJWTMock.mockReturnValue({
+      iss: "https://idp.example.com",
+      sub: "user-1",
+      name: "Alice",
+      email: "alice@example.com",
+    });
+    authenticateWithJWTMock.mockRejectedValue({
+      type: "SsoDomainMismatch",
+      value: () => ({ registered_sso_domain: [] }),
+    });
+    const ssoResult: SsoDiscoveryResult = {
+      domain: "sso.example.com",
+      clientId: "sso-client",
+      resolvedClientId: "sso-client",
+      sessionMaxAgeNs: BigInt(0),
+      name: "Example Org",
+      discovery: {
+        issuer: "https://idp.example.com",
+        authorization_endpoint: "https://idp.example.com/auth",
+        scopes_supported: ["openid", "email"],
+      },
+    };
+
+    const flow = new AuthFlow({ trackLastUsed: false });
+    flow.setMode("signup");
+    const result = await flow.continueWithSso(ssoResult);
+
+    expect(result).toBeUndefined();
+    expect(flow.view).toBe("ssoDomainMismatch");
+    expect(flow.ssoDomainMismatch).toEqual({
+      enteredDomain: "sso.example.com",
+      registeredDomain: undefined,
+    });
+    expect(flow.providerName).toBe("Example Org");
   });
 
   it("returns signUp result without disambiguation when mode is signup", async () => {
