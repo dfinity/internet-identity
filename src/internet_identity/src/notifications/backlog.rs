@@ -7,13 +7,13 @@ use super::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy
 use crate::storage::storable::application::StorableOriginSha256;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 
-/// Variant order maps RFC 8030 urgency to queue priority, highest first.
+/// RFC 8030 urgency levels, ordered as the candid `Urgency` declares them.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Urgency {
-    High,
-    Normal,
-    Low,
     VeryLow,
+    Low,
+    Normal,
+    High,
 }
 
 /// One device wake-up request per notification, without notification content.
@@ -42,8 +42,17 @@ impl QueueItem for PendingNotification {
         self.recipient
     }
 
+    /// Lanes run most urgent first, which is the reverse of how the levels are
+    /// declared. Written out rather than derived from the discriminant, so adding a
+    /// level is a compile error here instead of a silent renumbering.
     fn priority(&self) -> usize {
-        self.urgency as usize
+        // Lanes run most urgent first, the reverse of the declaration order.
+        match self.urgency {
+            Urgency::High => 0,
+            Urgency::Normal => 1,
+            Urgency::Low => 2,
+            Urgency::VeryLow => 3,
+        }
     }
 
     fn expires_at_ns(&self) -> Option<Timestamp> {
