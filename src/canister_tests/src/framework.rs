@@ -224,6 +224,16 @@ pub fn arg_with_captcha_disabled() -> Option<InternetIdentityInit> {
     })
 }
 
+/// The only test arg with notifications enabled, for the origins given.
+pub fn arg_with_notifications_enabled_for(origins: &[&str]) -> Option<InternetIdentityInit> {
+    Some(InternetIdentityInit {
+        notifications_enabled_origins: Some(
+            origins.iter().map(|origin| origin.to_string()).collect(),
+        ),
+        ..arg_with_captcha_disabled().unwrap()
+    })
+}
+
 pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         archive_config: Some(ArchiveConfig {
@@ -426,6 +436,12 @@ impl BrowserKey {
     /// The successor's own signature, proving the browser holds the key it announces.
     pub fn sign_as_successor(&self, session_key: &SessionKey, device_key: &PublicKey) -> ByteBuf {
         self.sign_with(SUCCESSOR_KEY_SIGNATURE_DOMAIN, session_key, device_key)
+    }
+
+    /// The principal a call signed with this key arrives as, which is how the canister
+    /// tells one browser from another.
+    pub fn principal(&self) -> Principal {
+        Principal::self_authenticating(self.public_key())
     }
 
     fn sign_with(&self, domain: &[u8], session_key: &SessionKey, other: &PublicKey) -> ByteBuf {

@@ -923,6 +923,9 @@ export interface GetSsoDiscoveryStatusRequest {
   'target_app_origin' : [] | [FrontendHostname],
   'org_domain' : string,
 }
+export interface GetWebPushSubscriptionStatusRequest {
+  'anchor_number' : UserNumber,
+}
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -1185,6 +1188,14 @@ export interface InternetIdentityInit {
    */
   'dnssec_config' : [] | [[] | [DnssecConfig]],
   /**
+   * Server-side kill switch for the notifications feature. null / `opt false`
+   * (the default) disables every notification endpoint; `opt true` enables
+   * them. Omitting it on upgrade keeps the stored value.
+   * Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
+   * turns notifications off, and entries enable them for those origins only.
+   */
+  'notifications_enabled_origins' : [] | [Array<string>],
+  /**
    * Configuration parameters related to the II archive.
    * Note: some parameters changes (like the polling interval) will only take effect after an archive deployment.
    * See ArchiveConfig for details.
@@ -1349,6 +1360,29 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+export interface NotificationConsentGrantedRequest {
+  'origin' : string,
+  'anchor_number' : UserNumber,
+}
+/**
+ * Why a notification call was refused.
+ */
+export type NotificationGrantConsentError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal };
+export interface NotificationGrantConsentRequest {
+  'origin' : string,
+  'anchor_number' : UserNumber,
+}
+export type NotificationRevokeConsentError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal };
+export interface NotificationRevokeConsentRequest {
+  'origin' : string,
+  'anchor_number' : UserNumber,
+}
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
@@ -1728,6 +1762,14 @@ export type RegistrationFlowNextStep = {
     'Finish' : null
   };
 export type RegistrationId = string;
+export type RemoveWebPushSubscriptionError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal };
+export interface RemoveWebPushSubscriptionRequest {
+  'browser_id' : number,
+  'anchor_number' : UserNumber,
+}
 export interface RevokeBrowserSessionsRequest {
   'browser_id' : number,
   'identity_number' : UserNumber,
@@ -1772,6 +1814,31 @@ export type SetDefaultAccountError = {
       'anchor_number' : UserNumber,
     }
   };
+export type SetWebPushSubscriptionError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The pool offered is not newer than the one this endpoint already holds.
+     */
+    'StaleJwtPool' : null
+  };
+/**
+ * What a browser uploads when it registers for Web Push, and how it replaces a pool
+ * that is running out: the same endpoint with a newer jwt_issued_at_ns. Signed with the
+ * browser key it signs in with, which is what says the subscription is this browser's.
+ */
+export interface SetWebPushSubscriptionRequest {
+  'endpoint' : string,
+  'jwt_signatures' : Array<Uint8Array | number[]>,
+  'jwt_issued_at_ns' : bigint,
+  'anchor_number' : UserNumber,
+  'vapid_public_key' : Uint8Array | number[],
+}
 export interface SignedDelegation {
   'signature' : Uint8Array | number[],
   'delegation' : Delegation,
@@ -1996,6 +2063,16 @@ export interface WebAuthn {
 export interface WebAuthnCredential {
   'pubkey' : PublicKey,
   'credential_id' : CredentialId,
+}
+/**
+ * What a browser is registered with, so the frontend can tell a registration that is
+ * still live from one another identity's re-subscribe left behind, and knows when to
+ * sign the next pool.
+ */
+export interface WebPushSubscriptionStatus {
+  'endpoint' : string,
+  'issued_at_ns' : bigint,
+  'pool_len' : number,
 }
 export interface _SERVICE {
   'acknowledge_entries' : ActorMethod<[bigint], undefined>,
@@ -2352,6 +2429,10 @@ export interface _SERVICE {
     [GetSsoDiscoveryStatusRequest],
     SsoDiscoveryStatus
   >,
+  'get_webpush_subscription_status' : ActorMethod<
+    [GetWebPushSubscriptionStatusRequest],
+    [] | [WebPushSubscriptionStatus]
+  >,
   /**
    * HTTP Gateway protocol
    * =====================
@@ -2537,6 +2618,23 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : string }
   >,
+  'notification_consent_granted' : ActorMethod<
+    [NotificationConsentGrantedRequest],
+    boolean
+  >,
+  /**
+   * ===== Notifications =====
+   */
+  'notification_grant_consent' : ActorMethod<
+    [NotificationGrantConsentRequest],
+    { 'Ok' : null } |
+      { 'Err' : NotificationGrantConsentError }
+  >,
+  'notification_revoke_consent' : ActorMethod<
+    [NotificationRevokeConsentRequest],
+    { 'Ok' : null } |
+      { 'Err' : NotificationRevokeConsentError }
+  >,
   /**
    * The trailing `opt text` is the SSO discovery domain (null for a direct
    * provider). For SSO sign-ins a cold discovery/JWKS cache yields the
@@ -2664,6 +2762,14 @@ export interface _SERVICE {
   >,
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   /**
+   * Called by the identity, so one browser can silence another.
+   */
+  'remove_webpush_subscription' : ActorMethod<
+    [RemoveWebPushSubscriptionRequest],
+    { 'Ok' : null } |
+      { 'Err' : RemoveWebPushSubscriptionError }
+  >,
+  /**
    * Atomically replace device matching the device key with the new device data
    */
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
@@ -2676,6 +2782,14 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, [] | [AccountNumber]],
     { 'Ok' : AccountInfo } |
       { 'Err' : SetDefaultAccountError }
+  >,
+  /**
+   * Called by the browser itself, signed with the browser key it signs in with.
+   */
+  'set_webpush_subscription' : ActorMethod<
+    [SetWebPushSubscriptionRequest],
+    { 'Ok' : null } |
+      { 'Err' : SetWebPushSubscriptionError }
   >,
   /**
    * ===================================================================

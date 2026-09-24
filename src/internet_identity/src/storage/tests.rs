@@ -2974,8 +2974,9 @@ mod reference_list_write_path_tests {
             )
             .unwrap();
         let accounts_before = storage.stable_account_memory.len();
-        let config_before =
-            storage.lookup_anchor_application_config(anchor_number, application_number);
+        let config_before = storage
+            .anchor_application_config(anchor_number, application_number)
+            .unwrap_or_default();
 
         let result = storage.write_account(
             Account::new(
@@ -2992,8 +2993,8 @@ mod reference_list_write_path_tests {
         assert_eq!(storage.stable_account_memory.len(), accounts_before);
         assert_eq!(
             storage
-                .lookup_anchor_application_config(anchor_number, application_number)
-                .default_account_number,
+                .anchor_application_config(anchor_number, application_number)
+                .and_then(|config| config.default_account_number),
             config_before.default_account_number
         );
     }
@@ -3487,8 +3488,8 @@ mod account_reference_state_tests {
         );
         assert_eq!(
             storage
-                .lookup_anchor_application_config(anchor_number, application_number)
-                .default_account_number,
+                .anchor_application_config(anchor_number, application_number)
+                .and_then(|config| config.default_account_number),
             None
         );
     }
@@ -3515,8 +3516,8 @@ mod account_reference_state_tests {
             .unwrap();
         assert_eq!(
             storage
-                .lookup_anchor_application_config(anchor_number, application_number)
-                .default_account_number,
+                .anchor_application_config(anchor_number, application_number)
+                .and_then(|config| config.default_account_number),
             references[0].account_number,
             "the default should have moved to the first reference the list still holds"
         );
@@ -3543,8 +3544,8 @@ mod account_reference_state_tests {
             .unwrap();
         assert_eq!(
             storage
-                .lookup_anchor_application_config(anchor_number, application_number)
-                .default_account_number,
+                .anchor_application_config(anchor_number, application_number)
+                .and_then(|config| config.default_account_number),
             Some(account_number)
         );
 
@@ -3571,8 +3572,8 @@ mod account_reference_state_tests {
 
         assert_eq!(
             storage
-                .lookup_anchor_application_config(anchor_number, application_number)
-                .default_account_number,
+                .anchor_application_config(anchor_number, application_number)
+                .and_then(|config| config.default_account_number),
             None,
             "the default should have moved to the tracked default the list still holds"
         );

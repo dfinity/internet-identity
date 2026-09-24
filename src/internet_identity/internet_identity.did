@@ -334,6 +334,12 @@ type InternetIdentityInit = record {
     // set/clear pattern as `dnssec_config`: null keeps the previously stored
     // value, `opt null` clears it, `opt opt "https://..."` sets it.
     mcp_official_url : opt opt text;
+    // Server-side kill switch for the notifications feature. null / `opt false`
+    // (the default) disables every notification endpoint; `opt true` enables
+    // them. Omitting it on upgrade keeps the stored value.
+    // Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
+    // turns notifications off, and entries enable them for those origins only.
+    notifications_enabled_origins : opt vec text;
 };
 
 // DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
@@ -1740,6 +1746,74 @@ type ListAvailableAttributesError = variant {
     AuthorizationError : principal;
 };
 
+// Why a notification call was refused.
+type NotificationGrantConsentError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
+type NotificationRevokeConsentError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
+type NotificationGrantConsentRequest = record {
+    anchor_number : UserNumber;
+    origin : text;
+};
+
+type NotificationRevokeConsentRequest = record {
+    anchor_number : UserNumber;
+    origin : text;
+};
+
+type NotificationConsentGrantedRequest = record {
+    anchor_number : UserNumber;
+    origin : text;
+};
+
+// What a browser uploads when it registers for Web Push, and how it replaces a pool
+// that is running out: the same endpoint with a newer jwt_issued_at_ns. Signed with the
+// browser key it signs in with, which is what says the subscription is this browser's.
+type SetWebPushSubscriptionRequest = record {
+    anchor_number : UserNumber;
+    endpoint : text;                   // the relay URL the browser was issued
+    vapid_public_key : blob;           // uncompressed SEC1 P-256, echoed to the relay as k=
+    jwt_signatures : vec blob;         // one raw ECDSA signature per validity window
+    jwt_issued_at_ns : nat64;
+};
+
+type RemoveWebPushSubscriptionRequest = record {
+    anchor_number : UserNumber;
+    browser_id : nat32;
+};
+
+type SetWebPushSubscriptionError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    // The pool offered is not newer than the one this endpoint already holds.
+    StaleJwtPool;
+    InternalCanisterError : text;
+};
+
+type RemoveWebPushSubscriptionError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
+type GetWebPushSubscriptionStatusRequest = record {
+    anchor_number : UserNumber;
+};
+
+// What a browser is registered with, so the frontend can tell a registration that is
+// still live from one another identity's re-subscribe left behind, and knows when to
+// sign the next pool.
+type WebPushSubscriptionStatus = record {
+    endpoint : text;        // compared against the one the browser holds
+    pool_len : nat32;       // windows covered, not a count of unused signatures
+    issued_at_ns : nat64;   // window i expires at issued_at_ns + (i + 1) * window
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2214,4 +2288,15 @@ service : (opt InternetIdentityInit) -> {
 
     // Looks up identity number when called with a recovery phrase
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
+
+    // ===== Notifications =====
+    notification_grant_consent : (NotificationGrantConsentRequest) -> (variant { Ok; Err : NotificationGrantConsentError });
+    notification_revoke_consent : (NotificationRevokeConsentRequest) -> (variant { Ok; Err : NotificationRevokeConsentError });
+    notification_consent_granted : (NotificationConsentGrantedRequest) -> (bool) query;
+
+    // Called by the browser itself, signed with the browser key it signs in with.
+    set_webpush_subscription : (SetWebPushSubscriptionRequest) -> (variant { Ok; Err : SetWebPushSubscriptionError });
+    // Called by the identity, so one browser can silence another.
+    remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
+    get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 };

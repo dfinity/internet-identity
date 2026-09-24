@@ -9,6 +9,7 @@ use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
+    check_browser_authorization,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -38,6 +39,14 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
+use notifications::webpush::{
+    ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
+    ValidatedSetWebPushSubscriptionRequest,
+};
+use notifications::{
+    ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
+    ValidatedNotificationRevokeConsentRequest,
+};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -67,6 +76,7 @@ mod ii_domain;
 mod mcp;
 mod mcp_registration;
 
+mod notifications;
 mod openid;
 mod session_delegation;
 mod sessions;
@@ -321,6 +331,90 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
 fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
     let caller = caller();
     anchor_management::lookup_caller_identity_by_recovery_phrase(caller)
+}
+
+// ---- Notifications: called by II's frontend / service worker ----
+
+/// Authorized by the browser key the caller signs with, which is what says whose
+/// subscription this is: the row it writes is the caller's own.
+#[update]
+fn set_webpush_subscription(
+    request: SetWebPushSubscriptionRequest,
+) -> Result<(), SetWebPushSubscriptionError> {
+    let validated: ValidatedSetWebPushSubscriptionRequest = request.try_into()?;
+    let (anchor, browser_id) = check_browser_authorization(validated.anchor_number)
+        .map_err(|_| SetWebPushSubscriptionError::InvalidBrowserKey)?;
+
+    notifications::webpush::set_subscription(anchor, browser_id, validated, ic_cdk::api::time())
+}
+
+/// Authorized by the browser key the caller signs with, like the write it reconciles
+/// against: a browser asks about its own registration, so the key that says which
+/// browser is asking is also the answer to which one to report.
+///
+/// `None` for a deployment that does not notify and for a caller that is no browser of
+/// this identity, so neither can be probed with it.
+#[query]
+fn get_webpush_subscription_status(
+    request: GetWebPushSubscriptionStatusRequest,
+) -> Option<WebPushSubscriptionStatus> {
+    let Ok(validated) = ValidatedGetWebPushSubscriptionStatusRequest::try_from(request) else {
+        return None;
+    };
+    let Ok((anchor, browser_id)) = check_browser_authorization(validated.anchor_number) else {
+        return None;
+    };
+
+    notifications::webpush::subscription_status(&anchor, browser_id)
+}
+
+/// Authorized by the identity rather than by the browser, so a browser that is lost or
+/// left behind can be silenced from another one.
+#[update]
+fn remove_webpush_subscription(
+    request: RemoveWebPushSubscriptionRequest,
+) -> Result<(), RemoveWebPushSubscriptionError> {
+    let validated: ValidatedRemoveWebPushSubscriptionRequest = request.try_into()?;
+    check_authz_and_record_activity(validated.anchor_number)
+        .map_err(|_| RemoveWebPushSubscriptionError::Unauthorized(caller()))?;
+
+    notifications::webpush::remove_subscription(validated)
+}
+
+#[update]
+fn notification_grant_consent(
+    request: NotificationGrantConsentRequest,
+) -> Result<(), NotificationGrantConsentError> {
+    let validated: ValidatedNotificationGrantConsentRequest = request.try_into()?;
+    check_authz_and_record_activity(validated.anchor_number)
+        .map_err(|_| NotificationGrantConsentError::Unauthorized(caller()))?;
+
+    notifications::grant_consent(validated, ic_cdk::api::time())
+}
+
+#[update]
+fn notification_revoke_consent(
+    request: NotificationRevokeConsentRequest,
+) -> Result<(), NotificationRevokeConsentError> {
+    let validated: ValidatedNotificationRevokeConsentRequest = request.try_into()?;
+    check_authz_and_record_activity(validated.anchor_number)
+        .map_err(|_| NotificationRevokeConsentError::Unauthorized(caller()))?;
+
+    notifications::revoke_consent(validated, ic_cdk::api::time())
+}
+
+/// `false` for an origin this deployment does not notify for and for an unauthorized
+/// caller, so neither can be probed with it.
+#[query]
+fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> bool {
+    let Ok(validated) = ValidatedNotificationConsentGrantedRequest::try_from(request) else {
+        return false;
+    };
+    if check_authorization(validated.anchor_number).is_err() {
+        return false;
+    }
+
+    notifications::consent_granted(validated)
 }
 
 #[query]
@@ -842,6 +936,7 @@ fn config() -> InternetIdentityInit {
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
         mcp_official_url: Some(persistent_state.mcp_official_url.clone()),
+        notifications_enabled_origins: persistent_state.notifications_enabled_origins.clone(),
     })
 }
 
@@ -994,6 +1089,12 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
             // Outer Some -> apply: inner None clears, inner Some replaces.
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.mcp_official_url = mcp_official_url;
+            })
+        }
+        if let Some(notifications_enabled_origins) = arg.notifications_enabled_origins {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.notifications_enabled_origins =
+                    Some(notifications_enabled_origins);
             })
         }
     }

@@ -119,6 +119,9 @@ msgstr "1 week"
 msgid "10 minutes"
 msgstr "10 minutes"
 
+msgid "2m"
+msgstr "2m"
+
 msgid "30 days"
 msgstr "30 days"
 
@@ -136,6 +139,9 @@ msgstr "A local program"
 
 msgid "A local server picks a new port each time, so any program on this computer can ask to connect. Remove it when you're not using one."
 msgstr "A local server picks a new port each time, so any program on this computer can ask to connect. Remove it when you're not using one."
+
+msgid "A marketplace"
+msgstr "A marketplace"
 
 msgid "About"
 msgstr "About"
@@ -230,6 +236,9 @@ msgstr "AI access"
 msgid "All options"
 msgstr "All options"
 
+msgid "Allow {app}"
+msgstr "Allow {app}"
+
 msgid "Allow access"
 msgstr "Allow access"
 
@@ -238,6 +247,9 @@ msgstr "Allow CLI access"
 
 msgid "Allow local programs to connect?"
 msgstr "Allow local programs to connect?"
+
+msgid "Allow notifications for {host}."
+msgstr "Allow notifications for {host}."
 
 msgid "Allow to access this info"
 msgstr "Allow to access this info"
@@ -377,6 +389,12 @@ msgstr "CLI access"
 msgid "CLI access not enabled"
 msgstr "CLI access not enabled"
 
+msgid "Click the lock icon in the address bar."
+msgstr "Click the lock icon in the address bar."
+
+msgid "Click the tune or lock icon at the left of the address bar."
+msgstr "Click the tune or lock icon at the left of the address bar."
+
 msgid "Click to reveal"
 msgstr "Click to reveal"
 
@@ -455,6 +473,9 @@ msgstr "Continue with passkey"
 msgid "Continue with SSO"
 msgstr "Continue with SSO"
 
+msgid "Continue without"
+msgstr "Continue without"
+
 msgid "Copied"
 msgstr "Copied"
 
@@ -487,6 +508,9 @@ msgstr "Couldn't save your connector. Please try again."
 
 msgid "Couldn't sign this browser out"
 msgstr "Couldn't sign this browser out"
+
+msgid "Couldn't turn on notifications"
+msgstr "Couldn't turn on notifications"
 
 msgid "Couldn't validate MCP support"
 msgstr "Couldn't validate MCP support"
@@ -569,6 +593,9 @@ msgstr "Customize AI access"
 msgid "Default"
 msgstr "Default"
 
+msgid "Delivery routes through your identity. Revoke access anytime."
+msgstr "Delivery routes through your identity. Revoke access anytime."
+
 msgid "Deny all"
 msgstr "Deny all"
 
@@ -629,6 +656,12 @@ msgstr "Enable CLI access"
 msgid "Enable CLI access for this device, then try again."
 msgstr "Enable CLI access for this device, then try again."
 
+msgid "Enable notifications"
+msgstr "Enable notifications"
+
+msgid "Enable on this device"
+msgstr "Enable on this device"
+
 msgid "Enabled on all devices"
 msgstr "Enabled on all devices"
 
@@ -665,6 +698,9 @@ msgstr "Error"
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 
+msgid "Example"
+msgstr "Example"
+
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Experience"
@@ -680,6 +716,12 @@ msgstr "FAQs"
 
 msgid "Featured apps"
 msgstr "Featured apps"
+
+msgid "Find {host} in the list and set it to Allow."
+msgstr "Find {host} in the list and set it to Allow."
+
+msgid "Find Notifications and switch it to Allow."
+msgstr "Find Notifications and switch it to Allow."
 
 msgid "First seen"
 msgstr "First seen"
@@ -722,6 +764,9 @@ msgstr "Generating code..."
 
 msgid "Generating phrase..."
 msgstr "Generating phrase..."
+
+msgid "Get {app} notifications on this device"
+msgstr "Get {app} notifications on this device"
 
 msgid "Get started"
 msgstr "Get started"
@@ -782,6 +827,9 @@ msgstr "How does Internet Identity compare to other Web3 authentication tools?"
 
 msgid "How to stay secure"
 msgstr "How to stay secure"
+
+msgid "How to unblock"
+msgstr "How to unblock"
 
 msgid "I acknowledge"
 msgstr "I acknowledge"
@@ -857,6 +905,9 @@ msgstr "Incorrect. Try again with the new code."
 
 msgid "Info you can choose to share when an app requests it. Never shared without your consent."
 msgstr "Info you can choose to share when an app requests it. Never shared without your consent."
+
+msgid "Instant activity alerts"
+msgstr "Instant activity alerts"
 
 msgid "Interaction canceled. Please try again."
 msgstr "Interaction canceled. Please try again."
@@ -960,6 +1011,9 @@ msgstr "Legacy"
 msgid "Legacy identity"
 msgstr "Legacy identity"
 
+msgid "Let {app} notify you"
+msgstr "Let {app} notify you"
+
 msgid "Let AI access your apps."
 msgstr "Let AI access your apps."
 
@@ -977,6 +1031,9 @@ msgstr "Link copied to clipboard"
 
 msgid "Linking Internet Identity"
 msgstr "Linking Internet Identity"
+
+msgid "Loading"
+msgstr "Loading"
 
 msgid "Loading permissions"
 msgstr "Loading permissions"
@@ -1038,6 +1095,9 @@ msgstr "Maximum length is 32 characters."
 msgid "Maximum length is 64 characters."
 msgstr "Maximum length is 64 characters."
 
+msgid "Maybe later"
+msgstr "Maybe later"
+
 msgid "MCP server URL"
 msgstr "MCP server URL"
 
@@ -1089,11 +1149,23 @@ msgstr "Not activated"
 msgid "Not connected yet"
 msgstr "Not connected yet"
 
+msgid "Not now"
+msgstr "Not now"
+
 msgid "Not upgraded"
 msgstr "Not upgraded"
 
 msgid "Not verified"
 msgstr "Not verified"
+
+msgid "Notification setup failed"
+msgstr "Notification setup failed"
+
+msgid "Notifications are turned off for Internet Identity"
+msgstr "Notifications are turned off for Internet Identity"
+
+msgid "now"
+msgstr "now"
 
 msgid "Official · Hosted by DFINITY"
 msgstr "Official · Hosted by DFINITY"
@@ -1131,11 +1203,20 @@ msgstr "Open manage"
 msgid "Open menu"
 msgstr "Open menu"
 
+msgid "Open Permissions, then Notifications, then Allow."
+msgstr "Open Permissions, then Notifications, then Allow."
+
+msgid "Open Safari, then Settings, then Websites, then Notifications."
+msgstr "Open Safari, then Settings, then Websites, then Notifications."
+
 msgid "Open Settings"
 msgstr "Open Settings"
 
 msgid "Open Settings in a new tab to set your trusted MCP server."
 msgstr "Open Settings in a new tab to set your trusted MCP server."
+
+msgid "Open your browser's site settings for this page."
+msgstr "Open your browser's site settings for this page."
 
 msgid "Or sign in with another identity"
 msgstr "Or sign in with another identity"
@@ -1203,14 +1284,23 @@ msgstr "Please sign in again to continue."
 msgid "Powered by"
 msgstr "Powered by"
 
+msgid "Private by design"
+msgstr "Private by design"
+
 msgid "Questions only"
 msgstr "Questions only"
+
+msgid "Reachable anytime"
+msgstr "Reachable anytime"
 
 msgid "Reachable MCP server"
 msgstr "Reachable MCP server"
 
 msgid "Real privacy"
 msgstr "Real privacy"
+
+msgid "Receive alerts from the apps you approve, and stay on top of what matters."
+msgstr "Receive alerts from the apps you approve, and stay on top of what matters."
 
 msgid "Recover"
 msgstr "Recover"
@@ -1247,6 +1337,12 @@ msgstr "Recovery phrase activated"
 
 msgid "Recovery phrase set"
 msgstr "Recovery phrase set"
+
+msgid "Reload the page and try again."
+msgstr "Reload the page and try again."
+
+msgid "Reload the page and turn notifications on again."
+msgstr "Reload the page and turn notifications on again."
 
 msgid "Remember"
 msgstr "Remember"
@@ -1344,6 +1440,9 @@ msgstr "Return to app"
 msgid "Return to application"
 msgstr "Return to application"
 
+msgid "Return to this page and try again."
+msgstr "Return to this page and try again."
+
 msgid "Review {serverDisplayName}'s <0>Privacy Policy</0> and <1>Terms of Service</1>."
 msgstr "Review {serverDisplayName}'s <0>Privacy Policy</0> and <1>Terms of Service</1>."
 
@@ -1421,6 +1520,9 @@ msgstr "Set up recovery phrase"
 
 msgid "Set up your private, passwordless identity."
 msgstr "Set up your private, passwordless identity."
+
+msgid "Setting up…"
+msgstr "Setting up…"
 
 msgid "Settings"
 msgstr "Settings"
@@ -1537,8 +1639,17 @@ msgstr "Something is wrong."
 msgid "Something went wrong"
 msgstr "Something went wrong"
 
+msgid "Something went wrong allowing this app. You can try again now, or allow it later in Settings."
+msgstr "Something went wrong allowing this app. You can try again now, or allow it later in Settings."
+
+msgid "Something went wrong setting up this device. You can try again now, or set it up later in Settings."
+msgstr "Something went wrong setting up this device. You can try again now, or set it up later in Settings."
+
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
+
+msgid "Something went wrong while setting up notifications. Please try again; if the issue persists, contact support."
+msgstr "Something went wrong while setting up notifications. Please try again; if the issue persists, contact support."
 
 msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
 msgstr "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
@@ -1636,6 +1747,9 @@ msgstr "Tap on the <0>address bar</0> and <1>open in browser</1>."
 msgid "Tap on the highlighted <0>back</0> button."
 msgstr "Tap on the highlighted <0>back</0> button."
 
+msgid "Tap the site-info icon to the left of the address bar."
+msgstr "Tap the site-info icon to the left of the address bar."
+
 msgid "Test passkey support"
 msgstr "Test passkey support"
 
@@ -1693,6 +1807,9 @@ msgstr "This {resolvedProviderName} account isn't connected to an Internet Ident
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "This account is already attached to your identity. Your active access method will be switched to it."
 
+msgid "this app"
+msgstr "this app"
+
 msgid "This app has moved to the new Internet Identity"
 msgstr "This app has moved to the new Internet Identity"
 
@@ -1707,6 +1824,9 @@ msgstr "This browser is not supported."
 
 msgid "This connection link is missing information or has been changed."
 msgstr "This connection link is missing information or has been changed."
+
+msgid "This device is already set up for notifications. Allow this app to send them too."
+msgstr "This device is already set up for notifications. Allow this app to send them too."
 
 msgid "This doesn't look like a valid email address."
 msgstr "This doesn't look like a valid email address."
@@ -1780,6 +1900,9 @@ msgstr "To finish setting up your passkey, follow the instructions shown on your
 msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 msgstr "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 
+msgid "Transfers, replies and mentions the moment they happen."
+msgstr "Transfers, replies and mentions the moment they happen."
+
 msgid "Trusted connector"
 msgstr "Trusted connector"
 
@@ -1788,6 +1911,9 @@ msgstr "Try a different address"
 
 msgid "Try again"
 msgstr "Try again"
+
+msgid "Turn on notifications from {app}?"
+msgstr "Turn on notifications from {app}?"
 
 msgid "Type each word in the correct order:"
 msgstr "Type each word in the correct order:"
@@ -1812,6 +1938,9 @@ msgstr "Unable to complete setup"
 
 msgid "Unable to connect"
 msgstr "Unable to connect"
+
+msgid "Under Permissions, clear the \"Blocked\" setting for Send Notifications."
+msgstr "Under Permissions, clear the \"Blocked\" setting for Send Notifications."
 
 msgid "Understanding Internet Identity"
 msgstr "Understanding Internet Identity"
@@ -1854,6 +1983,9 @@ msgstr "Unverified origin"
 
 msgid "Update recovery email"
 msgstr "Update recovery email"
+
+msgid "Updates reach your device without keeping the app open."
+msgstr "Updates reach your device without keeping the app open."
 
 msgid "Upgrade"
 msgstr "Upgrade"
@@ -2008,6 +2140,9 @@ msgstr "Wrong domain was set. Please try again."
 msgid "You <0>cannot</0> rename this once it is set."
 msgstr "You <0>cannot</0> rename this once it is set."
 
+msgid "You allowed this app on another device. Turn this device on to receive them here too."
+msgstr "You allowed this app on another device. Turn this device on to receive them here too."
+
 msgid "You already have a {name} account linked"
 msgstr "You already have a {name} account linked"
 
@@ -2107,6 +2242,12 @@ msgstr "You've reached the limit of {limit} verified emails. Remove one to add a
 msgid "Your apps stay signed in and your identity is ready the next time you come back."
 msgstr "Your apps stay signed in and your identity is ready the next time you come back."
 
+msgid "Your browser is blocking notifications for this site, so this app can't reach you here. Turn them back on in your browser settings, then try again."
+msgstr "Your browser is blocking notifications for this site, so this app can't reach you here. Turn them back on in your browser settings, then try again."
+
+msgid "Your item just sold."
+msgstr "Your item just sold."
+
 msgid "Your local server tells you when it's ready to connect. Nothing to enter here."
 msgstr "Your local server tells you when it's ready to connect. Nothing to enter here."
 
@@ -2130,3 +2271,9 @@ msgstr "Your recovery phrase gives full control over your identity. Never share 
 
 msgid "Your recovery phrase is now active and can be reset anytime."
 msgstr "Your recovery phrase is now active and can be reset anytime."
+
+msgid "Your transfer is confirmed."
+msgstr "Your transfer is confirmed."
+
+msgid "Your wallet"
+msgstr "Your wallet"

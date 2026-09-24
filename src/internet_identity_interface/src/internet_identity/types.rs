@@ -416,6 +416,9 @@ pub struct InternetIdentityInit {
     /// (the deployment then has no official connector), `Some(Some(url))`
     /// points it at `url`.
     pub mcp_official_url: Option<Option<String>>,
+    /// Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
+    /// turns notifications off, and entries enable them for those origins only.
+    pub notifications_enabled_origins: Option<Vec<FrontendHostname>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -963,4 +966,89 @@ pub struct RevokeBrowserSessionsRequest {
 pub enum SessionRevokeError {
     Unauthorized(Principal),
     InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationGrantConsentError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotificationRevokeConsentError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationGrantConsentRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationRevokeConsentRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationConsentGrantedRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+}
+
+/// Everything a browser uploads when it registers for Web Push, and how it replaces a
+/// pool that is running out: the same endpoint with a newer `jwt_issued_at_ns`.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SetWebPushSubscriptionRequest {
+    pub anchor_number: AnchorNumber,
+    pub endpoint: String,
+    pub vapid_public_key: ByteBuf,
+    pub jwt_signatures: Vec<ByteBuf>,
+    pub jwt_issued_at_ns: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RemoveWebPushSubscriptionRequest {
+    pub anchor_number: AnchorNumber,
+    pub browser_id: BrowserId,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SetWebPushSubscriptionError {
+    /// The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey,
+    /// The pool offered is not newer than the one this endpoint already holds. A pool
+    /// is spent by elapsed time, so taking an older one would shorten coverage.
+    StaleJwtPool,
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum RemoveWebPushSubscriptionError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetWebPushSubscriptionStatusRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+/// What a browser is registered with, so the frontend can tell a registration that is
+/// still live from one another identity's re-subscribe left behind, and knows when to
+/// sign the next pool.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct WebPushSubscriptionStatus {
+    /// The relay endpoint this browser is registered with. Compared against the one the
+    /// browser holds: a registration naming any other endpoint is stale.
+    pub endpoint: String,
+    /// Windows the stored pool covers, from `issued_at_ns`. Not a count of unused
+    /// signatures: a signature is picked by index and never removed, so a count would
+    /// sit at the pool size forever.
+    pub pool_len: u32,
+    /// When the browser minted this pool; window `i` expires at
+    /// `issued_at_ns + (i + 1) * window`.
+    pub issued_at_ns: Timestamp,
 }

@@ -139,12 +139,8 @@ fn default_account_number(
         // a config left naming an account the anchor no longer holds answers the same
         // as no reservation at all.
         let reserved = storage
-            .lookup_application_number_with_origin(origin)
-            .and_then(|application_number| {
-                storage
-                    .lookup_anchor_application_config(anchor_number, application_number)
-                    .default_account_number
-            });
+            .read_anchor_application_config(anchor_number, origin)
+            .and_then(|config| config.default_account_number);
 
         storage.read_account(&AccountKey {
             anchor_number,

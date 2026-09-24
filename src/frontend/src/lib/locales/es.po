@@ -119,6 +119,9 @@ msgstr "1 semana"
 msgid "10 minutes"
 msgstr "10 minutos"
 
+msgid "2m"
+msgstr "2 min"
+
 msgid "30 days"
 msgstr "30 días"
 
@@ -136,6 +139,9 @@ msgstr "Un programa local"
 
 msgid "A local server picks a new port each time, so any program on this computer can ask to connect. Remove it when you're not using one."
 msgstr "Un servidor local selecciona un puerto nuevo cada vez, por lo que cualquier programa en este ordenador puede solicitar conectarse. Elimínalo cuando no uses uno."
+
+msgid "A marketplace"
+msgstr "Un marketplace"
 
 msgid "About"
 msgstr "Acerca de"
@@ -230,6 +236,9 @@ msgstr "Acceso de IA"
 msgid "All options"
 msgstr "Todas las opciones"
 
+msgid "Allow {app}"
+msgstr "Permitir {app}"
+
 msgid "Allow access"
 msgstr "Permitir acceso"
 
@@ -238,6 +247,9 @@ msgstr "Permitir acceso de CLI"
 
 msgid "Allow local programs to connect?"
 msgstr "¿Permitir que los programas locales se conecten?"
+
+msgid "Allow notifications for {host}."
+msgstr "Permite notificaciones para {host}."
 
 msgid "Allow to access this info"
 msgstr "Permitir el acceso a esta información"
@@ -377,6 +389,12 @@ msgstr "Acceso CLI"
 msgid "CLI access not enabled"
 msgstr "Acceso CLI no habilitado"
 
+msgid "Click the lock icon in the address bar."
+msgstr "Haz clic en el ícono de candado en la barra de direcciones."
+
+msgid "Click the tune or lock icon at the left of the address bar."
+msgstr "Haz clic en el ícono de ajuste o candado a la izquierda de la barra de direcciones."
+
 msgid "Click to reveal"
 msgstr "Haz clic para mostrar"
 
@@ -455,6 +473,9 @@ msgstr "Continuar con passkey"
 msgid "Continue with SSO"
 msgstr "Continuar con SSO"
 
+msgid "Continue without"
+msgstr "Continuar sin"
+
 msgid "Copied"
 msgstr "Copiado"
 
@@ -487,6 +508,9 @@ msgstr "No se pudo guardar tu conector. Por favor, inténtalo de nuevo."
 
 msgid "Couldn't sign this browser out"
 msgstr "No se pudo cerrar la sesión de este navegador"
+
+msgid "Couldn't turn on notifications"
+msgstr "No se pudieron activar las notificaciones"
 
 msgid "Couldn't validate MCP support"
 msgstr "No se pudo validar la compatibilidad con MCP"
@@ -569,6 +593,9 @@ msgstr "Personalizar acceso de IA"
 msgid "Default"
 msgstr "Predeterminada"
 
+msgid "Delivery routes through your identity. Revoke access anytime."
+msgstr "La entrega se realiza a través de tu identidad. Revoca el acceso en cualquier momento."
+
 msgid "Deny all"
 msgstr "Denegar todo"
 
@@ -629,6 +656,12 @@ msgstr "Habilitar acceso CLI"
 msgid "Enable CLI access for this device, then try again."
 msgstr "Habilita el acceso CLI para este dispositivo, luego inténtalo de nuevo."
 
+msgid "Enable notifications"
+msgstr "Activar notificaciones"
+
+msgid "Enable on this device"
+msgstr "Activar en este dispositivo"
+
 msgid "Enabled on all devices"
 msgstr "Habilitado en todos los dispositivos"
 
@@ -665,6 +698,9 @@ msgstr "Error"
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Todo lo que necesitas saber sobre Internet Identity, tu forma privada, segura y sencilla de iniciar sesión en aplicaciones de Internet Computer."
 
+msgid "Example"
+msgstr "Ejemplo"
+
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Descubre"
@@ -680,6 +716,12 @@ msgstr "Preguntas frecuentes"
 
 msgid "Featured apps"
 msgstr "Apps destacadas"
+
+msgid "Find {host} in the list and set it to Allow."
+msgstr "Busca {host} en la lista y ponlo en Permitir."
+
+msgid "Find Notifications and switch it to Allow."
+msgstr "Busca Notificaciones y cámbialas a Permitir."
 
 msgid "First seen"
 msgstr "Visto por primera vez"
@@ -722,6 +764,9 @@ msgstr "Generando código..."
 
 msgid "Generating phrase..."
 msgstr "Generando frase..."
+
+msgid "Get {app} notifications on this device"
+msgstr "Recibir notificaciones de {app} en este dispositivo"
 
 msgid "Get started"
 msgstr "Empezar"
@@ -782,6 +827,9 @@ msgstr "¿Cómo se compara Internet Identity con otras herramientas de autentica
 
 msgid "How to stay secure"
 msgstr "Cómo mantenerse seguro"
+
+msgid "How to unblock"
+msgstr "Cómo desbloquear"
 
 msgid "I acknowledge"
 msgstr "Lo reconozco"
@@ -857,6 +905,9 @@ msgstr "Incorrecto. Inténtalo de nuevo con el nuevo código."
 
 msgid "Info you can choose to share when an app requests it. Never shared without your consent."
 msgstr "Información que puedes compartir cuando una app lo solicite. Nunca se comparte sin tu consentimiento."
+
+msgid "Instant activity alerts"
+msgstr "Alertas de actividad instantáneas"
 
 msgid "Interaction canceled. Please try again."
 msgstr "Interacción cancelada. Por favor, inténtalo de nuevo."
@@ -960,6 +1011,9 @@ msgstr "Legado"
 msgid "Legacy identity"
 msgstr "Identidad heredada"
 
+msgid "Let {app} notify you"
+msgstr "Permite que {app} te notifique"
+
 msgid "Let AI access your apps."
 msgstr "Permite que la IA acceda a tus apps."
 
@@ -977,6 +1031,9 @@ msgstr "Enlace copiado al portapapeles"
 
 msgid "Linking Internet Identity"
 msgstr "Vinculando Internet Identity"
+
+msgid "Loading"
+msgstr "Cargando"
 
 msgid "Loading permissions"
 msgstr "Cargando permisos"
@@ -1038,6 +1095,9 @@ msgstr "Longitud máxima de 32 caracteres."
 msgid "Maximum length is 64 characters."
 msgstr "Longitud máxima de 64 caracteres."
 
+msgid "Maybe later"
+msgstr "Quizás después"
+
 msgid "MCP server URL"
 msgstr "URL del servidor MCP"
 
@@ -1089,11 +1149,23 @@ msgstr "No activado"
 msgid "Not connected yet"
 msgstr "Aún no conectado"
 
+msgid "Not now"
+msgstr "Ahora no"
+
 msgid "Not upgraded"
 msgstr "No actualizado"
 
 msgid "Not verified"
 msgstr "No verificado"
+
+msgid "Notification setup failed"
+msgstr "Error al configurar las notificaciones"
+
+msgid "Notifications are turned off for Internet Identity"
+msgstr "Las notificaciones de Internet Identity están desactivadas"
+
+msgid "now"
+msgstr "ahora"
 
 msgid "Official · Hosted by DFINITY"
 msgstr "Oficial · Alojado por DFINITY"
@@ -1131,11 +1203,20 @@ msgstr "Abrir gestión"
 msgid "Open menu"
 msgstr "Abrir menú"
 
+msgid "Open Permissions, then Notifications, then Allow."
+msgstr "Abre Permisos, luego Notificaciones, luego Permitir."
+
+msgid "Open Safari, then Settings, then Websites, then Notifications."
+msgstr "Abre Safari, luego Configuración, luego Sitios web, luego Notificaciones."
+
 msgid "Open Settings"
 msgstr "Abrir Ajustes"
 
 msgid "Open Settings in a new tab to set your trusted MCP server."
 msgstr "Abre Ajustes en una nueva pestaña para configurar tu servidor MCP de confianza."
+
+msgid "Open your browser's site settings for this page."
+msgstr "Abre la configuración del sitio de tu navegador para esta página."
 
 msgid "Or sign in with another identity"
 msgstr "O inicia sesión con otra identidad"
@@ -1203,14 +1284,23 @@ msgstr "Por favor, inicia sesión de nuevo para continuar."
 msgid "Powered by"
 msgstr "Desarrollado por"
 
+msgid "Private by design"
+msgstr "Privado por diseño"
+
 msgid "Questions only"
 msgstr "Solo preguntas"
+
+msgid "Reachable anytime"
+msgstr "Disponible en todo momento"
 
 msgid "Reachable MCP server"
 msgstr "Servidor MCP accesible"
 
 msgid "Real privacy"
 msgstr "Privacidad real"
+
+msgid "Receive alerts from the apps you approve, and stay on top of what matters."
+msgstr "Recibe alertas de las apps que apruebes y mantente al tanto de lo que importa."
 
 msgid "Recover"
 msgstr "Recuperar"
@@ -1247,6 +1337,12 @@ msgstr "Frase de recuperación activada"
 
 msgid "Recovery phrase set"
 msgstr "Frase de recuperación establecida"
+
+msgid "Reload the page and try again."
+msgstr "Recarga la página e inténtalo de nuevo."
+
+msgid "Reload the page and turn notifications on again."
+msgstr "Recarga la página y activa las notificaciones de nuevo."
 
 msgid "Remember"
 msgstr "Recordar"
@@ -1344,6 +1440,9 @@ msgstr "Volver a la app"
 msgid "Return to application"
 msgstr "Volver a la aplicación"
 
+msgid "Return to this page and try again."
+msgstr "Vuelve a esta página e inténtalo de nuevo."
+
 msgid "Review {serverDisplayName}'s <0>Privacy Policy</0> and <1>Terms of Service</1>."
 msgstr "Revisa la <0>Política de privacidad</0> y los <1>Términos de servicio</1> de {serverDisplayName}."
 
@@ -1421,6 +1520,9 @@ msgstr "Configurar frase de recuperación"
 
 msgid "Set up your private, passwordless identity."
 msgstr "Configura tu identidad privada y sin contraseña."
+
+msgid "Setting up…"
+msgstr "Configurando…"
 
 msgid "Settings"
 msgstr "Configuración"
@@ -1537,8 +1639,17 @@ msgstr "Algo no es correcto."
 msgid "Something went wrong"
 msgstr "Algo salió mal"
 
+msgid "Something went wrong allowing this app. You can try again now, or allow it later in Settings."
+msgstr "Algo salió mal al permitir esta app. Puedes intentarlo de nuevo ahora, o permitirla más tarde en Configuración."
+
+msgid "Something went wrong setting up this device. You can try again now, or set it up later in Settings."
+msgstr "Algo salió mal al configurar este dispositivo. Puedes intentarlo de nuevo ahora, o configurarlo más tarde en Configuración."
+
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Algo salió mal al crear tu delegación. Por favor, inténtalo de nuevo; si el problema persiste, contacta con el soporte."
+
+msgid "Something went wrong while setting up notifications. Please try again; if the issue persists, contact support."
+msgstr "Algo salió mal al configurar las notificaciones. Inténtalo de nuevo; si el problema persiste, contacta con el soporte."
 
 msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
 msgstr "Algo salió mal al compartir los atributos. Por favor, inténtalo de nuevo; si el problema persiste, contacta con el soporte."
@@ -1636,6 +1747,9 @@ msgstr "Toca en la <0>barra de direcciones</0> y <1>abrir en el navegador</1>."
 msgid "Tap on the highlighted <0>back</0> button."
 msgstr "Toca en el botón <0>atrás</0> resaltado."
 
+msgid "Tap the site-info icon to the left of the address bar."
+msgstr "Toca el ícono de información del sitio a la izquierda de la barra de direcciones."
+
 msgid "Test passkey support"
 msgstr "Probar compatibilidad de passkey"
 
@@ -1693,6 +1807,9 @@ msgstr "Esta cuenta de {resolvedProviderName} aún no está conectada a una Inte
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "Esta cuenta ya está vinculada a tu identidad. Tu método de acceso activo cambiará a ella."
 
+msgid "this app"
+msgstr "esta app"
+
 msgid "This app has moved to the new Internet Identity"
 msgstr "Esta app se ha trasladado al nuevo Internet Identity"
 
@@ -1707,6 +1824,9 @@ msgstr "Este navegador no es compatible."
 
 msgid "This connection link is missing information or has been changed."
 msgstr "A este enlace de conexión le falta información o ha sido modificado."
+
+msgid "This device is already set up for notifications. Allow this app to send them too."
+msgstr "Este dispositivo ya está configurado para notificaciones. Permite que esta app las envíe también."
 
 msgid "This doesn't look like a valid email address."
 msgstr "Esto no parece una dirección de correo electrónico válida."
@@ -1780,6 +1900,9 @@ msgstr "Para terminar de configurar tu passkey, sigue las instrucciones que apar
 msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 msgstr "Para que la IA pueda hacer preguntas y realizar acciones en tus apps, añade un <0>conector MCP</0> de confianza."
 
+msgid "Transfers, replies and mentions the moment they happen."
+msgstr "Transferencias, respuestas y menciones en el momento en que ocurren."
+
 msgid "Trusted connector"
 msgstr "Conector de confianza"
 
@@ -1788,6 +1911,9 @@ msgstr "Prueba con una dirección diferente"
 
 msgid "Try again"
 msgstr "Intentar de nuevo"
+
+msgid "Turn on notifications from {app}?"
+msgstr "¿Activar notificaciones de {app}?"
 
 msgid "Type each word in the correct order:"
 msgstr "Escribe cada palabra en el orden correcto:"
@@ -1812,6 +1938,9 @@ msgstr "No se pudo completar la configuración"
 
 msgid "Unable to connect"
 msgstr "No se puede conectar"
+
+msgid "Under Permissions, clear the \"Blocked\" setting for Send Notifications."
+msgstr "En Permisos, elimina la configuración \"Bloqueado\" para Enviar notificaciones."
 
 msgid "Understanding Internet Identity"
 msgstr "Entiende Internet Identity"
@@ -1854,6 +1983,9 @@ msgstr "Origen no verificado"
 
 msgid "Update recovery email"
 msgstr "Actualizar correo de recuperación"
+
+msgid "Updates reach your device without keeping the app open."
+msgstr "Las actualizaciones llegan a tu dispositivo sin tener que mantener la app abierta."
 
 msgid "Upgrade"
 msgstr "Actualizar"
@@ -2008,6 +2140,9 @@ msgstr "Se estableció un dominio incorrecto. Por favor, inténtalo de nuevo."
 msgid "You <0>cannot</0> rename this once it is set."
 msgstr "Una vez establecido, <0>no puedes</0> cambiarle el nombre."
 
+msgid "You allowed this app on another device. Turn this device on to receive them here too."
+msgstr "Permitiste esta app en otro dispositivo. Activa este dispositivo para recibirlas aquí también."
+
 msgid "You already have a {name} account linked"
 msgstr "Ya tienes una cuenta de {name} vinculada"
 
@@ -2107,6 +2242,12 @@ msgstr "Has alcanzado el límite de {limit} correos electrónicos verificados. E
 msgid "Your apps stay signed in and your identity is ready the next time you come back."
 msgstr "Tus apps permanecen con la sesión iniciada y tu identidad está lista la próxima vez que vuelvas."
 
+msgid "Your browser is blocking notifications for this site, so this app can't reach you here. Turn them back on in your browser settings, then try again."
+msgstr "Tu navegador está bloqueando las notificaciones de este sitio, por lo que esta app no puede contactarte aquí. Vuelve a activarlas en la configuración del navegador e inténtalo de nuevo."
+
+msgid "Your item just sold."
+msgstr "Tu artículo acaba de venderse."
+
 msgid "Your local server tells you when it's ready to connect. Nothing to enter here."
 msgstr "Tu servidor local te indica cuándo está listo para conectarse. No hay nada que introducir aquí."
 
@@ -2130,3 +2271,9 @@ msgstr "Tu frase de recuperación otorga control total sobre tu identidad. Nunca
 
 msgid "Your recovery phrase is now active and can be reset anytime."
 msgstr "Tu frase de recuperación ahora está activa y se puede restablecer en cualquier momento."
+
+msgid "Your transfer is confirmed."
+msgstr "Tu transferencia está confirmada."
+
+msgid "Your wallet"
+msgstr "Tu billetera"

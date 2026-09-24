@@ -13,6 +13,9 @@ use pocket_ic::{
 /// The experimental v2 API
 pub mod api_v2;
 
+/// The notification API: per-app consent and Web Push device subscriptions.
+pub mod notifications;
+
 // API of verifiable credentials MVP.
 pub mod vc_mvp;
 
