@@ -1200,6 +1200,9 @@ msgstr "Satu atau lebih kata salah atau urutannya tidak tepat."
 msgid "Only add trusted connectors"
 msgstr "Hanya tambahkan konektor tepercaya"
 
+msgid "Only continue if you recognize these domains. If an app or a guide told you to enter a domain you don't know, stop here and use the domain your organization gave you."
+msgstr ""
+
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "Aktifkan ini hanya untuk <0>ICP CLI</0> resmi. Jika Anda tidak yakin, instal ulang dari <1>sumber resmi</1>."
 

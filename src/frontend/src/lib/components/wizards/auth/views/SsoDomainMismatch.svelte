@@ -160,6 +160,9 @@
           {$t`Signing in with the provider directly doesn't reach it.`}
         {/if}
       </p>
+      <p class="mt-2">
+        {$t`Only continue if you recognize these domains. If an app or a guide told you to enter a domain you don't know, stop here and use the domain your organization gave you.`}
+      </p>
       <div
         class="border-border-secondary mt-3 flex items-center justify-between border-t pt-2.5"
       >

@@ -1200,6 +1200,9 @@ msgstr "Un ou plusieurs mots sont incorrects ou dans le mauvais ordre."
 msgid "Only add trusted connectors"
 msgstr "N'ajoutez que des connecteurs approuvés"
 
+msgid "Only continue if you recognize these domains. If an app or a guide told you to enter a domain you don't know, stop here and use the domain your organization gave you."
+msgstr ""
+
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "N'activez ceci que pour l'<0>ICP CLI</0> officiel. En cas de doute, réinstallez-le depuis la <1>source officielle</1>."
 

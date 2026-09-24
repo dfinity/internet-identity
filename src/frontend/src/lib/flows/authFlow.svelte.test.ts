@@ -405,6 +405,30 @@ describe("AuthFlow — continueWithOpenId disambiguation", () => {
     expect(flow.ssoDomainMismatch).toBeUndefined();
   });
 
+  it("surfaces the canister error instead of the guided view when the JWT is caller-supplied (1-click resume)", async () => {
+    decodeJWTMock.mockReturnValue({
+      iss: testConfig.issuer,
+      sub: "user-1",
+      name: "Alice",
+      email: "alice@example.com",
+    });
+    authenticateWithJWTMock.mockRejectedValue(ssoDomainMismatchError);
+
+    const flow = new AuthFlow({ trackLastUsed: false });
+    // The dapp chose the domain here, so no "sign in with X" / recover guidance.
+    await expect(
+      flow.continueWithOpenId(
+        testConfig,
+        "dapp-supplied-jwt",
+        "signin",
+        "dapp-chosen.example.com",
+      ),
+    ).rejects.toBe(ssoDomainMismatchError);
+    expect(flow.view).toBe("chooseMethod");
+    expect(flow.ssoDomainMismatch).toBeUndefined();
+    expect(requestJWTMock).not.toHaveBeenCalled();
+  });
+
   it("leaves enteredDomain unset for a configured provider, which enters no domain", async () => {
     requestJWTMock.mockResolvedValue("fake-jwt");
     decodeJWTMock.mockReturnValue({

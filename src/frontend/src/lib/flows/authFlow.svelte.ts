@@ -654,7 +654,8 @@ export class AuthFlow {
       }
     | {
         // Registered, but through another discovery domain: see
-        // `OpenIdDelegationError::SsoDomainMismatch`.
+        // `OpenIdDelegationError::SsoDomainMismatch`. Interactive flows only;
+        // a caller-supplied JWT surfaces the canister error instead.
         type: "domainMismatch";
         jwt: string;
         registeredDomain?: string;
@@ -728,7 +729,13 @@ export class AuthFlow {
       }
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
-        error.type === "SsoDomainMismatch"
+        error.type === "SsoDomainMismatch" &&
+        // Only the interactive wizard flows get the guided view: there the
+        // user typed the domain themselves. A caller-supplied JWT is the
+        // non-interactive 1-click resume, where the *dapp* chose the domain, so
+        // guiding the user (or offering recovery) there would let a malicious
+        // dapp script the "fix". Those callers get the plain error instead.
+        existingJwt === undefined
       ) {
         return {
           type: "domainMismatch",
