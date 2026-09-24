@@ -591,7 +591,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const GetNotificationDelegationResponse = IDL.Record({
     'sender_info_signature' : IDL.Vec(IDL.Nat8),
-    'delegation' : SignedDelegation,
+    'signed_delegation' : SignedDelegation,
   });
   const NotificationDelegationError = IDL.Variant({
     'NoNotificationAccess' : IDL.Null,

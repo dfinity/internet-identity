@@ -196,7 +196,7 @@ pub fn get(
             .map_err(|_| NotificationDelegationError::NoSuchDelegation)?;
 
         Ok(GetNotificationDelegationResponse {
-            delegation: SignedDelegation {
+            signed_delegation: SignedDelegation {
                 delegation: Delegation {
                     pubkey: session_key,
                     expiration,

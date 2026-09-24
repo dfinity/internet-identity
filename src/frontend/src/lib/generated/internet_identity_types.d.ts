@@ -939,7 +939,7 @@ export interface GetNotificationDelegationResponse {
    * Authenticates sender_info on those calls.
    */
   'sender_info_signature' : Uint8Array | number[],
-  'delegation' : SignedDelegation,
+  'signed_delegation' : SignedDelegation,
 }
 /**
  * Request for `get_sso_discovery_status`.

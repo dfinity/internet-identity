@@ -927,11 +927,11 @@ mod pull_delegation {
         .expect("get_notification_delegation returned Err");
 
         assert_eq!(
-            delegation.delegation.delegation.pubkey,
+            delegation.signed_delegation.delegation.pubkey,
             ByteBuf::from(SESSION_KEY)
         );
         assert_eq!(
-            delegation.delegation.delegation.expiration,
+            delegation.signed_delegation.delegation.expiration,
             prepared.expiration
         );
 
@@ -942,7 +942,7 @@ mod pull_delegation {
         verify_delegation(
             &env,
             prepared.user_key.clone(),
-            &delegation.delegation,
+            &delegation.signed_delegation,
             &root_key,
         );
         verify_icrc3_attributes(

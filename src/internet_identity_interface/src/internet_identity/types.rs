@@ -1177,7 +1177,7 @@ pub struct GetNotificationDelegationRequest {
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct GetNotificationDelegationResponse {
-    pub delegation: SignedDelegation,
+    pub signed_delegation: SignedDelegation,
     /// Authenticates sender_info on those calls.
     pub sender_info_signature: ByteBuf,
 }

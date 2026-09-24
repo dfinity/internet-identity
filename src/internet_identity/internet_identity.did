@@ -1894,7 +1894,7 @@ type GetNotificationDelegationRequest = record {
 };
 
 type GetNotificationDelegationResponse = record {
-    delegation : SignedDelegation;
+    signed_delegation : SignedDelegation;
     // Authenticates sender_info on those calls.
     sender_info_signature : blob;
 };
