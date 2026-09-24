@@ -773,14 +773,6 @@ export interface EmailChallengeSubmitDkimLeafArg {
   'hops' : Array<SignedRRset>,
   'nonce' : string,
 }
-/**
- * Email-recovery types
- * ====================
- * See `docs/ongoing/email-recovery.md` for the full design. Covers
- * both halves of the flow: setup (binding a recovery email to an
- * anchor) and recovery (proving control of a previously-bound
- * address to obtain a signed delegation).
- */
 export interface EmailRecoveryCredential {
   'created_at' : Timestamp,
   'address' : string,
@@ -927,9 +919,6 @@ export interface GetIdAliasRequest {
 export interface GetNotificationDelegationRequest {
   'session_key' : SessionKey,
   'origin' : FrontendHostname,
-  /**
-   * null = the unreserved default account
-   */
   'account_number' : [] | [AccountNumber],
   'expiration' : Timestamp,
   'anchor_number' : UserNumber,
@@ -965,10 +954,6 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
-/**
- * ICRC-3 attribute sharing types
- * ==============================
- */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -1441,7 +1426,6 @@ export interface NotificationGrantConsentRequest {
   'anchor_number' : UserNumber,
 }
 /**
- * ===== Notifications sent by an app =====
  * Scoped to (origin, recipient), and shared across the canisters sending for
  * one origin.
  */
@@ -1761,15 +1745,9 @@ export interface PrepareMcpRegistrationDelegation {
   'trusted_url' : string,
   'expiration' : Timestamp,
 }
-/**
- * ===== Notification pull delegation =====
- */
 export interface PrepareNotificationDelegationRequest {
   'session_key' : SessionKey,
   'origin' : FrontendHostname,
-  /**
-   * null = the unreserved default account
-   */
   'account_number' : [] | [AccountNumber],
   'anchor_number' : UserNumber,
 }
@@ -1950,19 +1928,10 @@ export type SetWebPushSubscriptionError = {
  * browser key it signs in with, which is what says the subscription is this browser's.
  */
 export interface SetWebPushSubscriptionRequest {
-  /**
-   * the relay URL the browser was issued
-   */
   'endpoint' : string,
-  /**
-   * one raw ECDSA signature per validity window
-   */
   'jwt_signatures' : Array<Uint8Array | number[]>,
   'jwt_issued_at_ns' : bigint,
   'anchor_number' : UserNumber,
-  /**
-   * uncompressed SEC1 P-256, echoed to the relay as k=
-   */
   'vapid_public_key' : Uint8Array | number[],
 }
 export interface SignedDelegation {
@@ -2200,17 +2169,8 @@ export interface WebAuthnCredential {
  * sign the next pool.
  */
 export interface WebPushSubscriptionStatus {
-  /**
-   * compared against the one the browser holds
-   */
   'endpoint' : string,
-  /**
-   * window i expires at issued_at_ns + (i + 1) * window
-   */
   'issued_at_ns' : bigint,
-  /**
-   * windows covered, not a count of unused signatures
-   */
   'pool_len' : number,
 }
 export interface _SERVICE {
