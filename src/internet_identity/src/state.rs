@@ -247,9 +247,7 @@ struct State {
     registration_rate_limit: RefCell<Option<RateLimitState>>,
     // Counter to ensure uniqueness of event data in case multiple events have the same timestamp
     event_data_uniqueness_counter: Cell<u16>,
-    // Notifications apps have submitted and nothing has taken yet. Absent until the
-    // first one arrives, so the queue's clocks start from canister time rather than
-    // the epoch. Carried across an upgrade by `notifications::backlog`.
+    // Initialize on first use so queue timers start from canister time.
     notification_backlog: RefCell<Option<NotificationBacklog>>,
 }
 
@@ -409,13 +407,11 @@ pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
     STATE.with(|s| f(&mut s.sigs.borrow_mut()))
 }
 
-/// Runs `f` on the queue only if one exists, rather than creating one to look at.
 pub fn notification_backlog<R>(f: impl FnOnce(Option<&NotificationBacklog>) -> R) -> R {
     STATE.with(|s| f(s.notification_backlog.borrow().as_ref()))
 }
 
-/// Installs a queue read back from stable memory. Runs before anything can submit
-/// into a fresh one, so there is nothing to merge.
+/// Install the restored queue before submissions resume.
 pub fn notification_backlog_replace(backlog: NotificationBacklog) {
     STATE.with(|s| *s.notification_backlog.borrow_mut() = Some(backlog));
 }

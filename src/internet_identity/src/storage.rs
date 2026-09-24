@@ -311,9 +311,7 @@ const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
 /// which is what makes the revocation final: the id is an input to the session seed.
 const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY_INDEX);
 
-/// Notifications apps have queued, held across an upgrade. Occupied only between
-/// `pre_upgrade` and `post_upgrade`: the queue itself lives in the heap, where the
-/// admission path can afford to touch it on every call.
+/// Upgrade snapshot; entries live in the heap between upgrades.
 const NOTIFICATIONS_BACKLOG_MEMORY_ID: MemoryId = MemoryId::new(NOTIFICATIONS_BACKLOG_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
@@ -454,7 +452,6 @@ pub struct Storage<M: Memory> {
     next_session_id_memory: StableCell<StorableSessionId, ManagedMemory<M>>,
 
     notifications_backlog_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    /// See [`NOTIFICATIONS_BACKLOG_MEMORY_ID`].
     notifications_backlog_memory: StableBTreeMap<StorableBacklogKey, BacklogRow, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
@@ -2845,7 +2842,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Parks a queued notification for the upgrade to carry.
     pub fn add_backlog_notification(
         &mut self,
         key: StorableBacklogKey,
@@ -2855,9 +2851,8 @@ impl<M: Memory + Clone> Storage<M> {
             .insert(key, BacklogRow(Some(entry)));
     }
 
-    /// Reads every parked notification back and empties the map, so the rows exist
-    /// only for the upgrade that wrote them and a later one cannot resurrect them.
-    /// A row that did not decode comes back as `None` for the caller to count.
+    /// Drain the upgrade snapshot so later upgrades cannot replay it.
+    /// Unreadable entries are returned as `None`.
     pub fn drain_backlog_notifications(
         &mut self,
     ) -> Vec<(StorableBacklogKey, Option<StorableBacklogEntry>)> {
@@ -2868,8 +2863,6 @@ impl<M: Memory + Clone> Storage<M> {
         parked.into_iter().map(|(key, row)| (key, row.0)).collect()
     }
 
-    /// Parks a row this build cannot read, which is what a row an older build wrote
-    /// in a shape since changed looks like on the way back.
     #[cfg(test)]
     pub(crate) fn add_unreadable_backlog_notification(&mut self, key: StorableBacklogKey) {
         self.notifications_backlog_memory
