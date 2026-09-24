@@ -414,13 +414,13 @@ export const idlFactory = ({ IDL }) => {
     'signed_delegation' : SignedDelegation,
   });
   const AccountSessionError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
-    'NoSuchSession' : IDL.Null,
-    'NoSuchDelegation' : IDL.Null,
-    'NoSuchAccount' : IDL.Null,
-    'InvalidBrowserKey' : IDL.Null,
     'StaleBrowserKey' : IDL.Null,
+    'NoSuchSession' : IDL.Null,
+    'NoSuchAccount' : IDL.Null,
   });
   const GetAccountsError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
@@ -733,6 +733,9 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
   });
   const OpenIdDelegationError = IDL.Variant({
+    'SsoDomainMismatch' : IDL.Record({
+      'registered_sso_domain' : IDL.Opt(IDL.Text),
+    }),
     'NoSuchDelegation' : IDL.Null,
     'NoSuchAnchor' : IDL.Null,
     'JwtExpired' : IDL.Null,
@@ -756,22 +759,22 @@ export const idlFactory = ({ IDL }) => {
   });
   const PrepareAccountSessionRequest = IDL.Record({
     'permissions' : IDL.Opt(Permissions),
+    'browser_description' : BrowserDescription,
     'max_idle' : IDL.Opt(IDL.Nat64),
-    'current_browser_key' : PublicKey,
     'session_key' : SessionKey,
     'valid_for' : IDL.Opt(IDL.Nat64),
     'origin' : FrontendHostname,
-    'current_browser_key_signature' : IDL.Vec(IDL.Nat8),
-    'browser_description' : BrowserDescription,
     'account_number' : IDL.Opt(AccountNumber),
-    'identity_number' : UserNumber,
     'next_browser_key' : PublicKey,
     'next_browser_key_signature' : IDL.Vec(IDL.Nat8),
+    'current_browser_key_signature' : IDL.Vec(IDL.Nat8),
+    'current_browser_key' : PublicKey,
+    'identity_number' : UserNumber,
   });
   const PrepareAccountSessionResponse = IDL.Record({
     'user_key' : PublicKey,
-    'session_id' : IDL.Nat64,
     'browser_id' : IDL.Nat32,
+    'session_id' : IDL.Nat64,
     'expiration' : Timestamp,
     'account_principal' : IDL.Principal,
   });

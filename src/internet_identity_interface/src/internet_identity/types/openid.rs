@@ -92,12 +92,20 @@ pub struct SsoGetDelegationResponse {
     pub sso_attr_bundle_signature: ByteBuf,
 }
 
-#[derive(CandidType, Debug, Deserialize, Serialize)]
+#[derive(Clone, CandidType, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub enum OpenIdDelegationError {
     NoSuchAnchor,
     NoSuchDelegation,
     JwtVerificationFailed,
     JwtExpired,
+    /// The credential is registered on an anchor, but through a different SSO
+    /// discovery domain than the one this login was verified through, so the
+    /// domain-scoped anchor lookup cannot resolve it. Carries the domain the
+    /// credential is registered through (`None` for one stored without a stamp)
+    /// so the caller can point the user at it.
+    SsoDomainMismatch {
+        registered_sso_domain: Option<String>,
+    },
 }
 
 /// Result of an OpenID call whose verification may need SSO discovery / JWKS
