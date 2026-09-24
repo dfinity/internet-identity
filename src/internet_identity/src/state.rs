@@ -1,5 +1,6 @@
 use crate::anchor_management::tentative_device_registration::ValidatedRegistrationId;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
+use crate::notifications::backlog::{NotificationBacklog, NOTIFICATION_BACKLOG};
 use crate::state::flow_states::FlowStates;
 use crate::state::temp_keys::TempKeys;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
@@ -253,6 +254,10 @@ struct State {
     registration_rate_limit: RefCell<Option<RateLimitState>>,
     // Counter to ensure uniqueness of event data in case multiple events have the same timestamp
     event_data_uniqueness_counter: Cell<u16>,
+    // Notifications apps have submitted and the ticker has not moved on yet. Absent
+    // until the first one arrives, so the queue's clocks start from canister time
+    // rather than the epoch. An upgrade drops what is still here.
+    notification_backlog: RefCell<Option<NotificationBacklog>>,
 }
 
 /// Gives the canister a salt where it has none, and does nothing where it already has one.
@@ -409,6 +414,17 @@ pub fn signature_map<R>(f: impl FnOnce(&SignatureMap) -> R) -> R {
 
 pub fn signature_map_mut<R>(f: impl FnOnce(&mut SignatureMap) -> R) -> R {
     STATE.with(|s| f(&mut s.sigs.borrow_mut()))
+}
+
+/// Initialize the backlog at `now_ns` on first use.
+pub fn notification_backlog_mut<R>(
+    now_ns: Timestamp,
+    f: impl FnOnce(&mut NotificationBacklog) -> R,
+) -> R {
+    STATE.with(|s| {
+        let mut backlog = s.notification_backlog.borrow_mut();
+        f(backlog.get_or_insert_with(|| NotificationBacklog::new(NOTIFICATION_BACKLOG, now_ns)))
+    })
 }
 
 pub fn storage_borrow<R>(f: impl FnOnce(&Storage<DefaultMemoryImpl>) -> R) -> R {

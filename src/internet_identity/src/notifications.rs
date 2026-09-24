@@ -8,6 +8,7 @@ pub(crate) mod admission_queue;
 pub(crate) mod backlog;
 pub(crate) mod processing;
 pub mod senders;
+pub(crate) mod ticker;
 mod validation;
 pub mod webpush;
 
