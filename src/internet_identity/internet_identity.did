@@ -1868,6 +1868,45 @@ type SendNotificationError = variant {
     InternalCanisterError : text;
 };
 
+// ===== Notification pull delegation =====
+
+type PrepareNotificationDelegationRequest = record {
+    anchor_number : UserNumber;
+    origin : FrontendHostname;
+    account_number : opt AccountNumber;   // null = the unreserved default account
+    session_key : SessionKey;
+};
+
+type PrepareNotificationDelegationResponse = record {
+    user_key : UserKey;
+    expiration : Timestamp;
+    // Goes in the sender_info field of every call made with this delegation;
+    // tells the app which account it is being called for.
+    sender_info : blob;
+};
+
+type GetNotificationDelegationRequest = record {
+    anchor_number : UserNumber;
+    origin : FrontendHostname;
+    account_number : opt AccountNumber;   // null = the unreserved default account
+    session_key : SessionKey;
+    expiration : Timestamp;
+};
+
+type GetNotificationDelegationResponse = record {
+    signed_delegation : SignedDelegation;
+    // Authenticates sender_info on those calls.
+    sender_info_signature : blob;
+};
+
+type NotificationDelegationError = variant {
+    // The caller is no browser of this identity, that browser is not registered
+    // for Web Push, or the identity has not allowed this app to notify it.
+    NoNotificationAccess;
+    NoSuchDelegation;
+    InternalCanisterError : text;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2347,6 +2386,10 @@ service : (opt InternetIdentityInit) -> {
     notification_grant_consent : (NotificationGrantConsentRequest) -> (variant { Ok; Err : NotificationGrantConsentError });
     notification_revoke_consent : (NotificationRevokeConsentRequest) -> (variant { Ok; Err : NotificationRevokeConsentError });
     notification_consent_granted : (NotificationConsentGrantedRequest) -> (bool) query;
+
+    // Authorized by the browser key the caller signs with.
+    prepare_notification_delegation : (PrepareNotificationDelegationRequest) -> (variant { Ok : PrepareNotificationDelegationResponse; Err : NotificationDelegationError });
+    get_notification_delegation : (GetNotificationDelegationRequest) -> (variant { Ok : GetNotificationDelegationResponse; Err : NotificationDelegationError }) query;
 
     // Called by the browser itself, signed with the browser key it signs in with.
     set_webpush_subscription : (SetWebPushSubscriptionRequest) -> (variant { Ok; Err : SetWebPushSubscriptionError });
