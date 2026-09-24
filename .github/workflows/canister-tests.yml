@@ -398,10 +398,15 @@ jobs:
       # /src/test_openid_provider). 11105 / 11106 back the direct OpenID
       # fixtures; 11107 backs the SSO discovery (two-hop) fixture; 11108 is an
       # Entra-style provider (pairwise `sub` + stable `oid`) for the non-`sub`
-      # gating tests.
-      openid_providers: "11105 11106 11107 11108"
+      # gating tests; 11109 only serves a well-known pointing at the 11107 IdP,
+      # a second SSO discovery domain for the same accounts (domain-mismatch
+      # tests).
+      openid_providers: "11105 11106 11107 11108 11109"
       # The Entra-style provider port — started with pairwise env below.
       pairwise_openid_provider: "11108"
+      # The alias discovery-domain port and the IdP it points at.
+      alias_openid_provider: "11109"
+      alias_openid_target: "11107"
       # Direct OpenID provider ports — only these get an `openid_configs`
       # entry on the canister. 11107 is intentionally excluded: it's
       # registered exclusively as an SSO `DiscoverableOidcConfig`, so the
@@ -467,6 +472,12 @@ jobs:
               # dialog copy. Pairwise needs single-host redirect_uris; the e2e II
               # origin is https://id.ai, so restrict to that one callback.
               OIDC_SUBJECT_TYPE=pairwise OIDC_SSO_NAME="Entra SSO" OIDC_REDIRECT_URIS="https://id.ai/callback" \
+                npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
+            elif [ "$port" = "${{ env.alias_openid_provider }}" ]; then
+              # Alias discovery domain: its well-known hands II the target
+              # provider's OIDC configuration, so sign-ins through it hit the
+              # same IdP and accounts (see fixtures/sso.ts).
+              OIDC_ISSUER="http://localhost:${{ env.alias_openid_target }}" OIDC_SSO_NAME="Test SSO alias" \
                 npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
             else
               npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
