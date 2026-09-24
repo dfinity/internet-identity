@@ -230,12 +230,10 @@ mod tests {
     }
 
     fn notification(id: u64, recipient: &str) -> Notification {
-        Notification {
+        Notification::new(
             id,
-            recipient: candid::Principal::from_text(recipient).expect("a principal"),
-            expires_at: None,
-            urgency: None,
-        }
+            candid::Principal::from_text(recipient).expect("a principal"),
+        )
     }
 
     /// The interface promises a batch applies in order and the reply names each
