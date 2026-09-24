@@ -6,11 +6,16 @@
 
 pub(crate) mod admission_queue;
 pub(crate) mod backlog;
+pub(crate) mod dispatch;
 pub(crate) mod processing;
 pub mod senders;
 pub(crate) mod ticker;
 mod validation;
 pub mod webpush;
+
+/// A browser unused for this long counts as gone and is not woken. The send endpoint
+/// answers `NoSuchRecipient` for a recipient whose every browser is past it.
+pub(crate) const BROWSER_GONE_AFTER_NS: u64 = 60 * 24 * 60 * 60 * 1_000_000_000;
 
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::StorageError;

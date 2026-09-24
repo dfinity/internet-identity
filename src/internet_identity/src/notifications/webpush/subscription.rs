@@ -7,8 +7,8 @@ use super::validation::{
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
-    BrowserId, RemoveWebPushSubscriptionError, SetWebPushSubscriptionError, Timestamp,
-    WebPushSubscriptionStatus,
+    AnchorNumber, BrowserId, RemoveWebPushSubscriptionError, SetWebPushSubscriptionError,
+    Timestamp, WebPushSubscriptionStatus,
 };
 
 /// Registers `browser_id` for Web Push, and is also how it replaces a pool that is
@@ -69,10 +69,18 @@ pub fn remove_subscription(
         ..
     }: ValidatedRemoveWebPushSubscriptionRequest,
 ) -> Result<(), RemoveWebPushSubscriptionError> {
-    let anchor = storage_borrow(|storage| storage.read(anchor_number))
-        .map_err(|err| RemoveWebPushSubscriptionError::InternalCanisterError(format!("{err}")))?;
-    write_subscription(anchor, browser_id, None)
+    clear_subscription(anchor_number, browser_id)
         .map_err(RemoveWebPushSubscriptionError::InternalCanisterError)
+}
+
+/// Idempotently remove a registration reported gone by its relay.
+pub(crate) fn clear_subscription(
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+) -> Result<(), String> {
+    let anchor =
+        storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
+    write_subscription(anchor, browser_id, None)
 }
 
 /// What this browser is registered with, and how much of the pool it signed is left

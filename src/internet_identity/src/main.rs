@@ -1026,6 +1026,7 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     // Install and upgrade both re-arm timers from the configured origins.
     if notifications::notifications_enabled() {
         notifications::ticker::start();
+        notifications::dispatch::start();
     }
 }
 
