@@ -925,11 +925,11 @@ export interface GetIdAliasRequest {
   'identity_number' : IdentityNumber,
 }
 export interface GetNotificationDelegationRequest {
+  'session_key' : SessionKey,
+  'origin' : FrontendHostname,
   /**
    * null = the unreserved default account
    */
-  'session_key' : SessionKey,
-  'origin' : FrontendHostname,
   'account_number' : [] | [AccountNumber],
   'expiration' : Timestamp,
   'anchor_number' : UserNumber,
@@ -1765,11 +1765,11 @@ export interface PrepareMcpRegistrationDelegation {
  * ===== Notification pull delegation =====
  */
 export interface PrepareNotificationDelegationRequest {
+  'session_key' : SessionKey,
+  'origin' : FrontendHostname,
   /**
    * null = the unreserved default account
    */
-  'session_key' : SessionKey,
-  'origin' : FrontendHostname,
   'account_number' : [] | [AccountNumber],
   'anchor_number' : UserNumber,
 }
@@ -1950,18 +1950,18 @@ export type SetWebPushSubscriptionError = {
  * browser key it signs in with, which is what says the subscription is this browser's.
  */
 export interface SetWebPushSubscriptionRequest {
-  'endpoint' : string,
   /**
-   * uncompressed SEC1 P-256, echoed to the relay as k=
+   * the relay URL the browser was issued
    */
-  'jwt_signatures' : Array<Uint8Array | number[]>,
+  'endpoint' : string,
   /**
    * one raw ECDSA signature per validity window
    */
+  'jwt_signatures' : Array<Uint8Array | number[]>,
   'jwt_issued_at_ns' : bigint,
   'anchor_number' : UserNumber,
   /**
-   * the relay URL the browser was issued
+   * uncompressed SEC1 P-256, echoed to the relay as k=
    */
   'vapid_public_key' : Uint8Array | number[],
 }
@@ -2200,13 +2200,16 @@ export interface WebAuthnCredential {
  * sign the next pool.
  */
 export interface WebPushSubscriptionStatus {
+  /**
+   * compared against the one the browser holds
+   */
   'endpoint' : string,
   /**
-   * windows covered, not a count of unused signatures
+   * window i expires at issued_at_ns + (i + 1) * window
    */
   'issued_at_ns' : bigint,
   /**
-   * compared against the one the browser holds
+   * windows covered, not a count of unused signatures
    */
   'pool_len' : number,
 }
