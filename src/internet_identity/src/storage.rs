@@ -121,6 +121,9 @@ use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
+use crate::storage::storable::notifications::processing::{
+    StorableProcessingEntry, StorableProcessingKey,
+};
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::session_handle::StorableSessionHandle;
@@ -215,6 +218,7 @@ const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
 const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
 const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
+const NOTIFICATIONS_PROCESSING_MEMORY_INDEX: u8 = 37u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -306,6 +310,10 @@ const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
 /// Monotonic [`SessionId`] allocator. A revoked session's id is retired, never reissued,
 /// which is what makes the revocation final: the id is an input to the session seed.
 const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY_INDEX);
+
+/// Persist pending deliveries across upgrades while relay requests are outstanding.
+const NOTIFICATIONS_PROCESSING_MEMORY_ID: MemoryId =
+    MemoryId::new(NOTIFICATIONS_PROCESSING_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -443,6 +451,10 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the session-id allocator.
     next_session_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_session_id_memory: StableCell<StorableSessionId, ManagedMemory<M>>,
+
+    notifications_processing_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    notifications_processing_memory:
+        StableBTreeMap<StorableProcessingKey, StorableProcessingEntry, ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -587,6 +599,8 @@ impl<M: Memory + Clone> Storage<M> {
         let stable_account_counter_memory = memory_manager.get(STABLE_ACCOUNT_COUNTER_MEMORY_ID);
         let next_application_number_memory = memory_manager.get(NEXT_APPLICATION_NUMBER_MEMORY_ID);
         let next_session_id_memory = memory_manager.get(NEXT_SESSION_ID_MEMORY_ID);
+        let notifications_processing_memory =
+            memory_manager.get(NOTIFICATIONS_PROCESSING_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
@@ -679,6 +693,10 @@ impl<M: Memory + Clone> Storage<M> {
             next_session_id_memory_wrapper: MemoryWrapper::new(next_session_id_memory.clone()),
             next_session_id_memory: StableCell::init(next_session_id_memory, 0)
                 .expect("next_session_id_memory"),
+            notifications_processing_memory_wrapper: MemoryWrapper::new(
+                notifications_processing_memory.clone(),
+            ),
+            notifications_processing_memory: StableBTreeMap::init(notifications_processing_memory),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
             ),
@@ -2848,6 +2866,35 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
+    /// Number of notifications taken on and not yet delivered.
+    pub fn processing_notifications_len(&self) -> u64 {
+        self.notifications_processing_memory.len()
+    }
+
+    /// Insert by deadline, overwriting an identical key.
+    pub fn add_processing_notification(
+        &mut self,
+        key: StorableProcessingKey,
+        entry: StorableProcessingEntry,
+    ) {
+        self.notifications_processing_memory.insert(key, entry);
+    }
+
+    pub fn remove_processing_notification(&mut self, key: &StorableProcessingKey) -> bool {
+        self.notifications_processing_memory.remove(key).is_some()
+    }
+
+    /// Read up to `limit` entries in deadline order.
+    pub fn processing_notifications_by_deadline(
+        &self,
+        limit: usize,
+    ) -> Vec<(StorableProcessingKey, StorableProcessingEntry)> {
+        self.notifications_processing_memory
+            .iter()
+            .take(limit)
+            .collect()
+    }
+
     /// Signs `anchor_number` in at `origin` through the production write, which mints
     /// the application a consent hangs off.
     #[cfg(test)]
@@ -4083,6 +4130,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "next_session_id".to_string(),
                 self.next_session_id_memory_wrapper.size(),
+            ),
+            (
+                "notifications_processing".to_string(),
+                self.notifications_processing_memory_wrapper.size(),
             ),
             (
                 "stable_anchor_application_config".to_string(),

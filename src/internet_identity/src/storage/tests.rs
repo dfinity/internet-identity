@@ -10,6 +10,10 @@ use crate::storage::account::{Account, AccountKey};
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::storable::account::StorableAccount;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
+use crate::storage::storable::application::StorableOriginSha256;
+use crate::storage::storable::notifications::processing::{
+    StorableProcessingEntry, StorableProcessingKey,
+};
 use crate::storage::{AccountReferenceListWrite, AccountReferenceWrite};
 use crate::storage::{CreateSessionParams, Header, StorageError, MAX_ENTRIES, TEST_NOW};
 use crate::Storage;
@@ -7439,4 +7443,41 @@ mod browser_session_count_tests {
         );
         assert_eq!(total as usize, MAX_BROWSERS);
     }
+}
+
+#[test]
+fn should_keep_processing_notifications_and_their_order_across_a_reload() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+    storage.flush();
+
+    let key = |expires_at_ns: Timestamp, notification_id: u64| StorableProcessingKey {
+        expires_at_ns,
+        origin: StorableOriginSha256::from_origin(&"https://app.example".to_string()),
+        notification_id,
+        recipient: Principal::from_slice(&[7]),
+    };
+    let entry = StorableProcessingEntry {
+        received_at_ns: 42,
+        urgency: 2,
+        anchor_number: 7,
+    };
+    for (expires_at_ns, notification_id) in [(300, 3), (100, 1), (200, 2)] {
+        storage.add_processing_notification(key(expires_at_ns, notification_id), entry.clone());
+    }
+
+    // Re-read from the same backing memory to simulate a canister upgrade.
+    let reloaded = Storage::from_memory(memory);
+
+    assert_eq!(reloaded.processing_notifications_len(), 3);
+    let restored = reloaded.processing_notifications_by_deadline(10);
+    assert_eq!(
+        restored
+            .iter()
+            .map(|(key, _)| key.notification_id)
+            .collect::<Vec<_>>(),
+        vec![1, 2, 3]
+    );
+    assert_eq!(restored[0].0, key(100, 1));
+    assert_eq!(restored[0].1, entry);
 }
