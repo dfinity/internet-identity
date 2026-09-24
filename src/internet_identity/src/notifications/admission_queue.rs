@@ -101,7 +101,7 @@ impl RetryPolicy {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Admission {
     Accepted,
-    /// Duplicate key; extend the queued deadline within its maximum lifetime.
+    /// Duplicate key; the resend replaces the queued entry, keeping its arrival time.
     Folded,
     /// Already expired on arrival.
     Dropped,
@@ -275,34 +275,40 @@ impl<Item: QueueItem> SenderQueue<Item> {
         Some(entry)
     }
 
-    /// Extend the deadline without changing the item or its original arrival time.
-    fn refresh(&mut self, key: &Item::Key, candidate_ns: Timestamp, max_lifetime_ns: u64) {
+    /// Replace the queued item and deadline, keeping its original arrival time.
+    fn refresh(
+        &mut self,
+        key: &Item::Key,
+        item: Item,
+        candidate_ns: Timestamp,
+        max_lifetime_ns: u64,
+    ) {
         let Some(placed) = self.placement.get(key).copied() else {
             return;
         };
-        let Some(bucket) = self.entries_by_priority.get_mut(placed.priority) else {
+        let Some(mut entry) = self
+            .entries_by_priority
+            .get_mut(placed.priority)
+            .and_then(|bucket| bucket.remove(&(placed.expires_at_ns, key.clone())))
+        else {
             return;
         };
-        let slot = (placed.expires_at_ns, key.clone());
-        let Some(received_at_ns) = bucket.get(&slot).map(|entry| entry.received_at_ns) else {
-            return;
-        };
-        let expires_at_ns = candidate_ns.min(received_at_ns.saturating_add(max_lifetime_ns));
-        if expires_at_ns <= placed.expires_at_ns {
-            return;
-        }
-        let Some(mut entry) = bucket.remove(&slot) else {
-            return;
-        };
-        entry.expires_at_ns = expires_at_ns;
-        bucket.insert((expires_at_ns, key.clone()), entry);
+        entry.expires_at_ns =
+            candidate_ns.min(entry.received_at_ns.saturating_add(max_lifetime_ns));
+        entry.item = item;
+        // The key is unchanged, so the group count stands and only the lane can move.
+        let priority = entry
+            .item
+            .priority()
+            .min(self.entries_by_priority.len().saturating_sub(1));
         self.placement.insert(
             key.clone(),
             Placed {
-                priority: placed.priority,
-                expires_at_ns,
+                priority,
+                expires_at_ns: entry.expires_at_ns,
             },
         );
+        self.entries_by_priority[priority].insert((entry.expires_at_ns, key.clone()), entry);
     }
 
     /// Advance priorities after their allotted turns, skipping empty buckets.
@@ -407,7 +413,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
 
             if self.holds(&sender, &key) {
                 self.folded_duplicates += 1;
-                self.refresh(&sender, &key, expires_at_ns);
+                self.refresh(&sender, &key, item, expires_at_ns);
                 admissions.push(answer(Admission::Folded));
                 continue;
             }
@@ -577,10 +583,10 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             .is_some_and(|queue| queue.placement.contains_key(key))
     }
 
-    fn refresh(&mut self, sender: &Sender, key: &Item::Key, candidate_ns: Timestamp) {
+    fn refresh(&mut self, sender: &Sender, key: &Item::Key, item: Item, candidate_ns: Timestamp) {
         let max_lifetime_ns = self.config.max_lifetime_ns;
         if let Some(queue) = self.senders.get_mut(sender) {
-            queue.refresh(key, candidate_ns, max_lifetime_ns);
+            queue.refresh(key, item, candidate_ns, max_lifetime_ns);
         }
     }
 
@@ -933,13 +939,41 @@ mod tests {
     }
 
     #[test]
-    fn a_resend_never_shortens_a_queued_entrys_life() {
+    fn a_resend_may_shorten_a_queued_entrys_life() {
         let mut backlog = TestQueue::new(config(), 0);
         backlog.admit(1, vec![item(1, 1)], 1);
 
         backlog.admit(1, vec![expiring(1, 1, 50)], 2);
 
-        assert_eq!(keys_taken(&backlog.remove_batch(1, 100)), vec![(1, 1)]);
+        assert_eq!(keys_taken(&backlog.remove_batch(1, 40)), vec![(1, 1)]);
+    }
+
+    #[test]
+    fn a_shortened_resend_expires_on_its_new_deadline() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![item(1, 1)], 1);
+        backlog.admit(1, vec![expiring(1, 1, 50)], 2);
+
+        // Nanosecond 101 was the deadline it would have kept without the resend.
+        assert!(backlog.remove_batch(1, 60).is_empty());
+        assert_eq!(backlog.stats(60).discarded_expired, 1);
+        assert_consistent(&backlog);
+    }
+
+    #[test]
+    fn a_resend_moves_the_entry_into_the_lane_it_now_asks_for() {
+        let mut backlog = TestQueue::new(config(), 0);
+        backlog.admit(1, vec![at_priority(1, 1, 1)], 1);
+        backlog.admit(1, vec![at_priority(2, 2, 1)], 2);
+
+        // Both sat in the same lane, (2, 2) ahead on the nearer deadline.
+        backlog.admit(1, vec![at_priority(1, 1, 0)], 3);
+
+        assert_eq!(
+            keys_taken(&backlog.remove_batch(2, 4)),
+            vec![(1, 1), (2, 2)]
+        );
+        assert_consistent(&backlog);
     }
 
     #[test]
