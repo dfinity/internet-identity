@@ -1,8 +1,11 @@
-//! Per-app consent: whether an app may notify an identity.
+//! Per-app consent, and the queue an app's accepted notifications wait in.
 //!
-//! Callers reach this through `main.rs`, which validates and authorizes first, so
-//! everything here acts on an origin already folded to the spelling consent is keyed by.
+//! Callers reach the consent functions through `main.rs`, which validates and
+//! authorizes first, so everything here acts on an origin already folded to the
+//! spelling consent is keyed by.
 
+pub(crate) mod admission_queue;
+pub(crate) mod backlog;
 pub mod senders;
 mod validation;
 pub mod webpush;
