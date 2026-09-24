@@ -1019,6 +1019,8 @@ mod pull_delegation {
         let (canister_id, anchor, browser, _) = install_notifiable(&env);
         let caller = key_holder(&browser).principal();
         sign_in_at(&env, canister_id, anchor, GATEWAY, 9);
+        grant_consent(&env, canister_id, principal_1(), anchor, GATEWAY.into())?
+            .expect("grant_consent returned Err");
 
         let at_origin = prepare(&env, canister_id, caller, anchor);
         let at_gateway = prepare_notification_delegation(
@@ -1066,6 +1068,8 @@ mod pull_delegation {
         let (canister_id, anchor, browser, _) = install_notifiable(&env);
         let caller = key_holder(&browser).principal();
         sign_in_at(&env, canister_id, anchor, GATEWAY, 9);
+        grant_consent(&env, canister_id, principal_1(), anchor, GATEWAY.into())?
+            .expect("grant_consent returned Err");
 
         let legacy = prepare_notification_delegation(
             &env,
