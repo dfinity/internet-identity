@@ -1,8 +1,4 @@
-//! How a queued notification is held while the canister upgrades.
-//!
-//! These rows exist only between `pre_upgrade` and `post_upgrade`. Nothing scans
-//! them, so the key orders by sender first purely to group a sender's work together
-//! as it is read back.
+//! Stable backlog snapshot, written before upgrade and drained after upgrade.
 
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::timestamp::StorableTimestamp;
@@ -11,14 +7,13 @@ use internet_identity_interface::internet_identity::types::AnchorNumber;
 use minicbor::{Decode, Encode};
 use std::borrow::Cow;
 
-/// Origin hash, deadline, recipient, notification id.
+/// Origin hash, deadline, recipient, notification ID.
 const BACKLOG_KEY_SIZE: usize = 32 + 8 + 8 + 8;
 
-/// Room for the entry's three fields plus CBOR framing.
+/// Three fields plus CBOR framing.
 const BACKLOG_ENTRY_SIZE: u32 = 48;
 
-/// Identifies one queued notification. Big-endian throughout, so a sender's rows are
-/// contiguous and come back in deadline order within it.
+/// Group entries by sender, then deadline; encode numeric fields big-endian.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct StorableBacklogKey {
     pub origin: StorableOriginSha256,
@@ -37,9 +32,7 @@ impl Storable for StorableBacklogKey {
         Cow::Owned(buffer)
     }
 
-    /// Total, so a row of the wrong length costs the notification it holds rather
-    /// than the upgrade reading it. The key is fixed-size and has no shape to
-    /// change, so a short one means the row is corrupt either way.
+    /// Default missing fields to zero to avoid trapping during upgrade.
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         let field = |from: usize| {
             bytes
@@ -63,25 +56,20 @@ impl Storable for StorableBacklogKey {
     };
 }
 
-/// What the key does not already carry. The app's own expiry rides along even though
-/// the deadline in the key already accounts for it, so an entry comes back as it was
-/// rather than as something that merely behaves the same.
+/// Preserve the app deadline separately from the effective deadline in the key.
 #[derive(Encode, Decode, Clone, Debug, Eq, PartialEq)]
 #[cbor(map)]
 pub struct StorableBacklogEntry {
     #[n(0)]
     pub received_at_ns: StorableTimestamp,
-    /// Urgency level, least urgent first. An unknown one reads as the least urgent.
+    /// Urgency level; unknown values restore as the least urgent.
     #[n(1)]
     pub urgency: u8,
     #[n(2)]
     pub expires_at_ns: Option<StorableTimestamp>,
 }
 
-/// A stored row. Holds `None` when the bytes do not decode, which is how a row an
-/// older build wrote in a shape this one no longer understands costs the one
-/// notification rather than the whole upgrade: a trap here would fail the upgrade,
-/// and nothing that is only a wake-up is worth that.
+/// Decode failures become `None` so restore can skip the row without trapping.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BacklogRow(pub Option<StorableBacklogEntry>);
 
@@ -133,8 +121,6 @@ mod tests {
         );
     }
 
-    /// A sender's rows have to be contiguous, or reading them back groups one
-    /// sender's work under another.
     #[test]
     fn the_encoding_groups_by_sender_before_anything_else() {
         let origins = [
@@ -155,8 +141,6 @@ mod tests {
         assert_eq!(grouped.len(), origins.len(), "a sender's rows are split up");
     }
 
-    /// A trap in `pre_upgrade` fails the whole upgrade, so the largest entry the
-    /// queue can hold has to encode inside the bound.
     #[test]
     fn a_largest_case_entry_round_trips_within_its_bound() {
         let original = BacklogRow(Some(StorableBacklogEntry {
@@ -185,8 +169,6 @@ mod tests {
         assert_eq!(BacklogRow::from_bytes(original.to_bytes()), original);
     }
 
-    /// Bytes this build cannot read must not trap: a trap here fails the upgrade,
-    /// and the shape most likely to stop decoding is one an older build wrote.
     #[test]
     fn bytes_that_do_not_decode_read_as_no_entry() {
         for bytes in [vec![], vec![0xffu8; 8], b"not cbor at all".to_vec()] {
@@ -194,8 +176,6 @@ mod tests {
         }
     }
 
-    /// Same for a key of the wrong length, which the fixed-size map should never
-    /// hand back but which must not take the upgrade down if it does.
     #[test]
     fn a_key_of_the_wrong_length_reads_without_trapping() {
         let short = StorableBacklogKey::from_bytes(Cow::Owned(vec![1u8; 10]));

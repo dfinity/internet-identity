@@ -979,7 +979,7 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::init_from_stable_memory();
     // load the persistent state after initializing storage as it manages the respective stable cell
     state::load_persistent_state();
-    // Before `initialize`, which is what arms the timers that read this queue.
+    // Restore before initialize arms the queue timers.
     if let Some(backlog) = notifications::backlog::restore(time()) {
         state::notification_backlog_replace(backlog);
     }

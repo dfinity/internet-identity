@@ -32,7 +32,7 @@ pub(crate) struct PendingNotification {
 }
 
 impl Urgency {
-    /// An unknown level reads as the least urgent, costing a row its urgency not the read.
+    /// Unknown levels map to the least urgent.
     pub(crate) fn from_level(level: u8) -> Self {
         match level {
             1 => Urgency::Low,
@@ -111,12 +111,7 @@ const _: () = assert!(
 const _: () =
     assert!(NOTIFICATION_BACKLOG.pressure_cleared_below < NOTIFICATION_BACKLOG.max_entries);
 
-/// Writes every queued notification into stable memory for the upgrade to carry.
-///
-/// The rotation is left behind: a sender's place in the turn order is worth less than
-/// the code to carry it, and restarting costs a sender at most one turn. The work
-/// itself is kept, because an app told its notification was accepted will not send it
-/// again.
+/// Persist queued entries for upgrade; scheduling cursors are not saved.
 pub(crate) fn persist(backlog: &NotificationBacklog) {
     storage_borrow_mut(|storage| {
         for (origin, entry) in backlog.entries() {
@@ -137,23 +132,15 @@ pub(crate) fn persist(backlog: &NotificationBacklog) {
     });
 }
 
-/// Reads back what [`persist`] wrote and empties the map. `None` when nothing came
-/// back, which is every install and every upgrade that found the queue empty.
-///
-/// A row that does not decode is dropped rather than trapped on, and the count is
-/// logged once. Trapping here would fail the upgrade, which is a steep price for a
-/// wake-up, and the shape most likely to stop decoding is one an older build wrote.
-///
-/// Arrival times and deadlines come back as they were, so an entry keeps the life it
-/// had rather than starting over. Retry clocks restart at `now_ns`, since the silence
-/// a sender should back off from is silence this canister is responsible for.
+/// Drain stable storage, preserving entry timestamps and restarting retry timers.
+/// Skip unreadable rows and log their count instead of failing the upgrade.
 pub(crate) fn restore(now_ns: Timestamp) -> Option<NotificationBacklog> {
     let parked = storage_borrow_mut(|storage| storage.drain_backlog_notifications());
     if parked.is_empty() {
         return None;
     }
 
-    // Rows arrive grouped by sender, since the origin hash leads the key.
+    // The origin-first key keeps each sender's entries contiguous.
     let mut by_sender: Vec<(StorableOriginSha256, Vec<Entry<PendingNotification>>)> = Vec::new();
     let mut unreadable = 0usize;
     for (key, stored) in parked {
@@ -360,8 +347,6 @@ mod tests {
             .unwrap()
     }
 
-    /// Everything a persisted entry has to come back with, in the order it would be
-    /// sent, so a difference shows up as a difference in what leaves the queue.
     fn round_trip(
         backlog: &NotificationBacklog,
         now_ns: Timestamp,
@@ -400,8 +385,6 @@ mod tests {
         );
     }
 
-    /// Senders share the queue by taking turns, so the restored queue has to hand out
-    /// one per sender rather than draining whoever happened to be read back first.
     #[test]
     fn senders_still_take_turns_after_a_restore() {
         test_setup();
@@ -416,16 +399,13 @@ mod tests {
             .map(|taken| taken.sender.clone())
             .collect();
 
-        // Which app leads is its hash's place among the senders, so the property is
-        // that neither goes twice running, not which one is first.
+        // Hash order determines the first sender; subsequent senders must alternate.
         assert_eq!(senders.len(), 4);
         assert_ne!(senders[0], senders[1]);
         assert_ne!(senders[1], senders[2]);
         assert_ne!(senders[2], senders[3]);
     }
 
-    /// Urgency decides the order entries leave in, so a level that came back wrong
-    /// would reorder the queue.
     #[test]
     fn urgency_survives_the_round_trip() {
         test_setup();
@@ -469,8 +449,6 @@ mod tests {
         });
     }
 
-    /// An upgrade must not fail over one row it cannot read, so the rest of the
-    /// queue still comes back and only that notification is lost.
     #[test]
     fn a_row_that_does_not_decode_is_dropped_rather_than_taking_the_rest_with_it() {
         test_setup();
@@ -484,8 +462,6 @@ mod tests {
         assert_eq!(restored.stats(2).stored_total, 1);
     }
 
-    /// Nothing readable is the same as nothing parked, and the unreadable rows still
-    /// have to leave so the next upgrade does not read them again.
     #[test]
     fn rows_that_all_fail_to_decode_restore_to_no_queue() {
         test_setup();
@@ -497,8 +473,6 @@ mod tests {
         assert!(restore(2).is_none());
     }
 
-    /// The rows exist for one upgrade. A second restore must not resurrect them, or
-    /// every upgrade would replay whatever the last one carried.
     #[test]
     fn a_restore_empties_what_it_read() {
         test_setup();
@@ -511,8 +485,6 @@ mod tests {
         assert!(restore(2).is_none());
     }
 
-    /// An install has nothing parked, and neither has an upgrade that caught the
-    /// queue empty, so both have to read as "no queue" rather than an empty one.
     #[test]
     fn nothing_parked_restores_to_no_queue() {
         test_setup();
