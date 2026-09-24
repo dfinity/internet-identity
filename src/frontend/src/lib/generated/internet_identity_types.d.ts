@@ -773,6 +773,14 @@ export interface EmailChallengeSubmitDkimLeafArg {
   'hops' : Array<SignedRRset>,
   'nonce' : string,
 }
+/**
+ * Email-recovery types
+ * ====================
+ * See `docs/ongoing/email-recovery.md` for the full design. Covers
+ * both halves of the flow: setup (binding a recovery email to an
+ * anchor) and recovery (proving control of a previously-bound
+ * address to obtain a signed delegation).
+ */
 export interface EmailRecoveryCredential {
   'created_at' : Timestamp,
   'address' : string,
@@ -940,6 +948,10 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
+/**
+ * ICRC-3 attribute sharing types
+ * ==============================
+ */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -1245,6 +1257,13 @@ export interface InternetIdentityInit {
    */
   'dummy_auth' : [] | [[] | [DummyAuthConfig]],
   /**
+   * Deploy flag relaxing the https requirement for sender-list outcalls to
+   * loopback hosts (localhost / 127.0.0.1) so e2e tests and local development can
+   * serve the list over plain http. null / opt false (the default) require https
+   * for every notifying origin, and a non-loopback origin always requires https.
+   */
+  'notifications_allow_insecure_sender_list' : [] | [boolean],
+  /**
    * Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
    * loopback hosts (`localhost` / `127.0.0.1`) so e2e tests can point at local
    * mock IdPs served over plain `http`. Unset / `false` (the default) require
@@ -1360,6 +1379,26 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+export interface NotAccepted {
+  'id' : NotificationId,
+  'recipient' : Principal,
+  'reason' : NotAcceptedReason,
+}
+export type NotAcceptedReason = { 'NoSuchRecipient' : null } |
+  { 'NoChannel' : null } |
+  { 'Deferred' : { 'retry_after' : Timestamp } };
+export interface Notification {
+  'id' : NotificationId,
+  /**
+   * Null means Normal.
+   */
+  'urgency' : [] | [Urgency],
+  'recipient' : Principal,
+  /**
+   * Null means II's default retention, which is also the ceiling.
+   */
+  'expires_at' : [] | [Timestamp],
+}
 export interface NotificationConsentGrantedRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
@@ -1375,6 +1414,12 @@ export interface NotificationGrantConsentRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
 }
+/**
+ * ===== Notifications sent by an app =====
+ * Scoped to (origin, recipient), and shared across the canisters sending for
+ * one origin.
+ */
+export type NotificationId = bigint;
 export type NotificationRevokeConsentError = {
     'InternalCanisterError' : string
   } |
@@ -1790,6 +1835,31 @@ export interface Rrsig {
   'type_covered' : number,
 }
 export type Salt = Uint8Array | number[];
+/**
+ * Applies in order: a later entry for a (recipient, id) replaces an earlier
+ * one, as a re-send replaces a notification that is still pending.
+ */
+export interface SendNotificationArg {
+  'notifications' : Array<Notification>,
+  'origin' : FrontendHostname,
+}
+export type SendNotificationError = {
+    'TooManyNotifications' : { 'limit' : number }
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The origin lists no such sender: no file, an empty or unusable one, or
+     * one that does not name the caller.
+     */
+    'NoSuchSender' : null
+  };
+/**
+ * Anything not_accepted does not name was accepted.
+ */
+export interface SendNotificationResponse {
+  'not_accepted' : Array<NotAccepted>,
+}
 export type SessionDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -1834,9 +1904,18 @@ export type SetWebPushSubscriptionError = {
  */
 export interface SetWebPushSubscriptionRequest {
   'endpoint' : string,
+  /**
+   * uncompressed SEC1 P-256, echoed to the relay as k=
+   */
   'jwt_signatures' : Array<Uint8Array | number[]>,
+  /**
+   * one raw ECDSA signature per validity window
+   */
   'jwt_issued_at_ns' : bigint,
   'anchor_number' : UserNumber,
+  /**
+   * the relay URL the browser was issued
+   */
   'vapid_public_key' : Uint8Array | number[],
 }
 export interface SignedDelegation {
@@ -2005,6 +2084,10 @@ export type UpdateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
   { 'NameTooLong' : null };
+export type Urgency = { 'Low' : null } |
+  { 'High' : null } |
+  { 'VeryLow' : null } |
+  { 'Normal' : null };
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
 /**
@@ -2071,7 +2154,13 @@ export interface WebAuthnCredential {
  */
 export interface WebPushSubscriptionStatus {
   'endpoint' : string,
+  /**
+   * windows covered, not a count of unused signatures
+   */
   'issued_at_ns' : bigint,
+  /**
+   * compared against the one the browser holds
+   */
   'pool_len' : number,
 }
 export interface _SERVICE {
@@ -2105,6 +2194,15 @@ export interface _SERVICE {
     [],
     { 'Ok' : null } |
       { 'Err' : AppSessionError }
+  >,
+  /**
+   * Called by an app's backend canister for the origin it names. Not
+   * implemented yet: every call is refused.
+   */
+  'app_send_notification' : ActorMethod<
+    [SendNotificationArg],
+    { 'Ok' : SendNotificationResponse } |
+      { 'Err' : SendNotificationError }
   >,
   /**
    * Adds a new authentication method to the identity.

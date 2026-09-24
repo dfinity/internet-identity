@@ -3,19 +3,40 @@
 //! Callers reach this through `main.rs`, which validates and authorizes first, so
 //! everything here acts on an origin already folded to the spelling consent is keyed by.
 
+pub mod senders;
 mod validation;
 pub mod webpush;
 
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::StorageError;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, FrontendHostname, NotificationGrantConsentError, NotificationRevokeConsentError,
+    AnchorNumber, FrontendHostname, NotAccepted, NotAcceptedReason, Notification,
+    NotificationGrantConsentError, NotificationRevokeConsentError, SendNotificationResponse,
     Timestamp,
 };
 pub use validation::{
     notifications_enabled, ValidatedNotificationConsentGrantedRequest,
     ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
+    ValidatedSendNotificationArg,
 };
+
+/// Nothing was enqueued: the whole batch is the sender's to send again at
+/// `retry_after`.
+pub fn defer_whole_batch(
+    ValidatedSendNotificationArg { notifications, .. }: ValidatedSendNotificationArg,
+    retry_after: Timestamp,
+) -> SendNotificationResponse {
+    SendNotificationResponse {
+        not_accepted: notifications
+            .into_iter()
+            .map(|Notification { id, recipient, .. }| NotAccepted {
+                id,
+                recipient,
+                reason: NotAcceptedReason::Deferred { retry_after },
+            })
+            .collect(),
+    }
+}
 
 /// Grants the request's origin permission to notify its identity.
 ///
@@ -194,6 +215,63 @@ mod tests {
 
         assert!(revoke(anchor, APP).is_ok());
         assert!(revoke(anchor, NEVER).is_ok());
+    }
+
+    /// Built through `TryFrom`, so the deferral tests hand the reply builder
+    /// the same validated request a caller's call would.
+    fn batch(notifications: Vec<Notification>) -> ValidatedSendNotificationArg {
+        enable_origins();
+        internet_identity_interface::internet_identity::types::SendNotificationArg {
+            origin: APP.to_string(),
+            notifications,
+        }
+        .try_into()
+        .expect("a notifiable origin")
+    }
+
+    fn notification(id: u64, recipient: &str) -> Notification {
+        Notification::new(
+            id,
+            candid::Principal::from_text(recipient).expect("a principal"),
+        )
+    }
+
+    /// The interface promises a batch applies in order and the reply names each
+    /// (recipient, id) at most once, so a repeated pair collapses to its last entry.
+    #[test]
+    fn a_repeated_recipient_and_id_is_deferred_once() {
+        let repeated = notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai");
+        let response = defer_whole_batch(batch(vec![repeated.clone(), repeated.clone()]), 1_000);
+
+        assert_eq!(response.not_accepted.len(), 1);
+        assert_eq!(response.not_accepted[0].id, 1);
+    }
+
+    /// One id sent to two recipients is two notifications, not a repeat.
+    #[test]
+    fn one_id_for_two_recipients_is_deferred_twice() {
+        let response = defer_whole_batch(
+            batch(vec![
+                notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai"),
+                notification(1, "rrkah-fqaaa-aaaaa-aaaaq-cai"),
+            ]),
+            1_000,
+        );
+
+        assert_eq!(response.not_accepted.len(), 2);
+    }
+
+    #[test]
+    fn a_deferred_entry_carries_when_to_send_it_again() {
+        let response = defer_whole_batch(
+            batch(vec![notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai")]),
+            1_000,
+        );
+
+        assert_eq!(
+            response.not_accepted[0].reason,
+            NotAcceptedReason::Deferred { retry_after: 1_000 }
+        );
     }
 
     /// Consent and the default account share one config row.

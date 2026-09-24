@@ -20,6 +20,7 @@
     related_origins: frontendCanisterConfig.related_origins,
     openid_configs: [],
     sso_allow_insecure_discovery: [],
+    notifications_allow_insecure_sender_list: [],
     backend_origin: [frontendCanisterConfig.backend_origin],
     captcha_config: [],
     dummy_auth: [],

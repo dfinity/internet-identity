@@ -15,3 +15,9 @@ pub fn sha256sum(slice: &[u8]) -> [u8; 32] {
     let sha256sum = hasher.finalize();
     slice_to_bounded_32(&sha256sum)
 }
+
+/// True if `host` (host or `host:port`) is loopback.
+pub fn is_loopback_host(host: &str) -> bool {
+    let bare = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
+    matches!(bare.as_str(), "localhost" | "127.0.0.1")
+}

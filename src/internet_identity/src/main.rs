@@ -39,13 +39,14 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
+use notifications::senders::Senders;
 use notifications::webpush::{
     ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
     ValidatedSetWebPushSubscriptionRequest,
 };
 use notifications::{
     ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
-    ValidatedNotificationRevokeConsentRequest,
+    ValidatedNotificationRevokeConsentRequest, ValidatedSendNotificationArg,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -415,6 +416,29 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
     }
 
     notifications::consent_granted(validated)
+}
+
+// ---- Notifications: called by an app's backend ----
+
+/// Authorized by the origin listing the caller in the sender list it publishes. A
+/// caller II cannot judge yet has its batch deferred rather than refused.
+///
+/// The send path does not exist yet, so an authorized caller is still refused.
+#[update]
+fn app_send_notification(
+    request: SendNotificationArg,
+) -> Result<SendNotificationResponse, SendNotificationError> {
+    let request: ValidatedSendNotificationArg = request.try_into()?;
+
+    match notifications::senders::authorize(&request, caller(), ic_cdk::api::time()) {
+        Senders::NotListed => Err(SendNotificationError::NoSuchSender),
+        Senders::Pending { retry_after } => {
+            Ok(notifications::defer_whole_batch(request, retry_after))
+        }
+        Senders::Listed => Err(SendNotificationError::InternalCanisterError(
+            "Not enabled".to_string(),
+        )),
+    }
 }
 
 #[query]
@@ -926,6 +950,8 @@ fn config() -> InternetIdentityInit {
         new_flow_origins: persistent_state.new_flow_origins.clone(),
         openid_configs: persistent_state.openid_configs.clone(),
         sso_allow_insecure_discovery: persistent_state.sso_allow_insecure_discovery,
+        notifications_allow_insecure_sender_list: persistent_state
+            .notifications_allow_insecure_sender_list,
         analytics_config: Some(persistent_state.analytics_config.clone()),
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
         is_production: persistent_state.is_production,
@@ -1041,6 +1067,14 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(sso_allow_insecure_discovery) = arg.sso_allow_insecure_discovery {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.sso_allow_insecure_discovery = Some(sso_allow_insecure_discovery);
+            })
+        }
+        if let Some(notifications_allow_insecure_sender_list) =
+            arg.notifications_allow_insecure_sender_list
+        {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.notifications_allow_insecure_sender_list =
+                    Some(notifications_allow_insecure_sender_list);
             })
         }
         if let Some(new_flow_origins) = arg.new_flow_origins {
