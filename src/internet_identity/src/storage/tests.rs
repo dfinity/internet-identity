@@ -797,61 +797,6 @@ fn sample_device() -> Device {
     }
 }
 
-/// A credential registered through one SSO domain is not resolvable through
-/// another, but is still reported as registered, with the stamp it carries.
-#[test]
-fn should_report_sso_domain_of_registered_openid_credential() {
-    let memory = VectorMemory::default();
-    let mut storage = Storage::new((10_000, 3_784_873), memory);
-
-    let mut anchor = storage.allocate_anchor(0).unwrap();
-    let stamped = OpenIdCredential {
-        sso_domain: Some("example.org".to_string()),
-        ..openid_credential(0)
-    };
-    // A credential stored before the stamp existed decodes with `None`.
-    let unstamped = openid_credential(1);
-    anchor.add_openid_credential(stamped.clone()).unwrap();
-    anchor.add_openid_credential(unstamped.clone()).unwrap();
-    storage.write(anchor.clone()).unwrap();
-
-    // The domain the credential was established through resolves it.
-    assert_eq!(
-        storage.lookup_anchor_with_openid_credential(&stamped.key(), Some("example.org")),
-        Some(anchor.anchor_number())
-    );
-    // Any other domain does not, but the credential is registered — under
-    // the stamp the lookup would have needed.
-    assert_eq!(
-        storage.lookup_anchor_with_openid_credential(&stamped.key(), Some("other.example.org")),
-        None
-    );
-    assert_eq!(
-        storage.openid_credential_sso_domain(&stamped.key()),
-        Some(Some("example.org".to_string()))
-    );
-    assert_eq!(
-        storage.lookup_anchor_with_openid_credential(&unstamped.key(), Some("example.org")),
-        None
-    );
-    assert_eq!(
-        storage.openid_credential_sso_domain(&unstamped.key()),
-        Some(None)
-    );
-
-    // A credential no anchor holds is not registered at all.
-    assert_eq!(
-        storage.openid_credential_sso_domain(&openid_credential(2).key()),
-        None
-    );
-
-    // Removing the credential drops it from the index, so it is gone rather
-    // than mismatched.
-    anchor.remove_openid_credential(&stamped.key()).unwrap();
-    storage.write(anchor).unwrap();
-    assert_eq!(storage.openid_credential_sso_domain(&stamped.key()), None);
-}
-
 fn openid_credential(n: u8) -> OpenIdCredential {
     OpenIdCredential {
         iss: "https://example.com".into(),

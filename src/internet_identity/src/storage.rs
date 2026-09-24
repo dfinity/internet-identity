@@ -1133,27 +1133,6 @@ impl<M: Memory + Clone> Storage<M> {
         self.anchor_number_with_openid_credential(key).is_some()
     }
 
-    /// The SSO discovery domain the registered credential is stored under:
-    /// `Some(stamp)` when some anchor holds this credential (the stamp itself
-    /// is `None` for a configured-provider credential or one stored before the
-    /// stamp existed), `None` when no anchor holds it. Lets a caller whose
-    /// domain-scoped [`Self::lookup_anchor_with_openid_credential`] came up
-    /// empty tell "registered through another domain" apart from "not
-    /// registered at all".
-    pub fn openid_credential_sso_domain(
-        &self,
-        key: &OpenIdCredentialKey,
-    ) -> Option<Option<String>> {
-        let anchor_number = self.anchor_number_with_openid_credential(key)?;
-        let anchor = self.read(anchor_number).ok()?;
-        let (iss, sub, aud) = key;
-        anchor
-            .openid_credentials()
-            .iter()
-            .find(|cred| &cred.iss == iss && &cred.sub == sub && &cred.aud == aud)
-            .map(|cred| cred.sso_domain.clone())
-    }
-
     /// The `(iss, sub, aud)` index read behind both lookups above.
     fn anchor_number_with_openid_credential(
         &self,

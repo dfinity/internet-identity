@@ -10,7 +10,6 @@ import type {
   IdRegStartError,
   OpenIdCredentialAddError,
   OpenIdCredentialRemoveError,
-  OpenIdDelegationError,
 } from "$lib/generated/internet_identity_types";
 import { OAuthProviderError, isOpenIdCancelError } from "$lib/utils/openID";
 import {
@@ -59,7 +58,6 @@ export const handleError = (error: unknown) => {
       | CreateAccountError
       | OpenIdCredentialAddError
       | OpenIdCredentialRemoveError
-      | OpenIdDelegationError
       | AuthnMethodConfirmationError
       | AuthnMethodMetadataReplaceError
     >(error)
@@ -126,34 +124,6 @@ export const handleError = (error: unknown) => {
           title: "This account has already been unlinked",
         });
         break;
-      case "NoSuchAnchor":
-        // Normally handled up the stack (the auth flows turn it into the
-        // "not connected yet" sign-up prompt); reaching here means it wasn't.
-        toaster.error({
-          title: "This account isn't linked to an identity",
-        });
-        break;
-      case "NoSuchDelegation":
-        toaster.error({
-          title: "Something went wrong during sign-in",
-          description: "The delegation could not be found — please try again.",
-        });
-        break;
-      case "SsoDomainMismatch": {
-        // The credential is linked to an identity, but through another SSO
-        // domain than the one just entered; signing up would be rejected as a
-        // duplicate, so point the user at the domain it is linked through.
-        const registeredDomain = error.value(error.type)
-          .registered_sso_domain[0];
-        toaster.error({
-          title: "This account is linked through a different SSO domain",
-          description:
-            registeredDomain !== undefined
-              ? `Sign in with the domain it is linked through: ${registeredDomain}.`
-              : "Sign in with the domain it was originally linked through.",
-        });
-        break;
-      }
       case "RegistrationModeOff":
         toaster.error({
           title: "Device registration closed",
