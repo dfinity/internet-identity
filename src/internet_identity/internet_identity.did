@@ -1814,6 +1814,55 @@ type WebPushSubscriptionStatus = record {
     issued_at_ns : nat64;   // window i expires at issued_at_ns + (i + 1) * window
 };
 
+// ===== Notifications sent by an app =====
+
+// Scoped to (origin, recipient), and shared across the canisters sending for
+// one origin.
+type NotificationId = nat64;
+
+type Urgency = variant { VeryLow; Low; Normal; High };
+
+type Notification = record {
+    id : NotificationId;
+    recipient : principal;
+    // Null means II's default retention, which is also the ceiling.
+    expires_at : opt Timestamp;
+    // Null means Normal.
+    urgency : opt Urgency;
+};
+
+// Applies in order: a later entry for a (recipient, id) replaces an earlier
+// one, as a re-send replaces a notification that is still pending.
+type SendNotificationArg = record {
+    origin : FrontendHostname;
+    notifications : vec Notification;
+};
+
+type NotAcceptedReason = variant {
+    NoSuchRecipient;
+    NoChannel;
+    Deferred : record { retry_after : Timestamp };
+};
+
+type NotAccepted = record {
+    id : NotificationId;
+    recipient : principal;
+    reason : NotAcceptedReason;
+};
+
+// Anything not_accepted does not name was accepted.
+type SendNotificationResponse = record {
+    not_accepted : vec NotAccepted;
+};
+
+type SendNotificationError = variant {
+    // The origin lists no such sender: no file, an empty or unusable one, or
+    // one that does not name the caller.
+    NoSuchSender;
+    TooManyNotifications : record { limit : nat32 };
+    InternalCanisterError : text;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2299,4 +2348,8 @@ service : (opt InternetIdentityInit) -> {
     // Called by the identity, so one browser can silence another.
     remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
+
+    // Called by an app's backend canister for the origin it names. Not
+    // implemented yet: every call is refused.
+    app_send_notification : (SendNotificationArg) -> (variant { Ok : SendNotificationResponse; Err : SendNotificationError });
 };

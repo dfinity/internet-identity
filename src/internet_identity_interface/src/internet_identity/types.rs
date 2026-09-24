@@ -1052,3 +1052,90 @@ pub struct WebPushSubscriptionStatus {
     /// `issued_at_ns + (i + 1) * window`.
     pub issued_at_ns: Timestamp,
 }
+
+/// Scoped to `(origin, recipient)`: the same id sent to two recipients is two
+/// notifications. The canisters sending for one origin share its id space.
+pub type NotificationId = u64;
+
+/// Orders an origin's entries against its own only, so marking everything
+/// `High` gains nothing. Web Push's levels, forwarded as sent.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum Urgency {
+    VeryLow,
+    Low,
+    Normal,
+    High,
+}
+
+/// A content-free signal: the app holds the content, the recipient's device
+/// fetches it. A re-send means that content changed, and replaces the entry
+/// while it is still pending; once delivered the id is forgotten.
+///
+/// Acceptance is not a delivery guarantee — an entry may expire, be displaced
+/// by a more urgent one from the same origin, or fail at the channel.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct Notification {
+    pub id: NotificationId,
+    pub recipient: Principal,
+    /// Dropped undelivered once passed. `None` means II's default retention,
+    /// which is also the ceiling.
+    pub expires_at: Option<Timestamp>,
+    /// `None` means `Normal`.
+    pub urgency: Option<Urgency>,
+}
+
+/// Applies in order: a later entry for a `(recipient, id)` supersedes an
+/// earlier one, and the reply names each pair at most once.
+impl Notification {
+    /// A notification with no expiry and no urgency, which II reads as its
+    /// default retention and `Normal`.
+    pub fn new(id: NotificationId, recipient: Principal) -> Self {
+        Self {
+            id,
+            recipient,
+            expires_at: None,
+            urgency: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SendNotificationArg {
+    pub origin: FrontendHostname,
+    pub notifications: Vec<Notification>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum NotAcceptedReason {
+    /// No such recipient at this origin.
+    NoSuchRecipient,
+    /// The recipient has no notification channel enabled.
+    NoChannel,
+    /// No room. Send it again from `retry_after`.
+    Deferred { retry_after: Timestamp },
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotAccepted {
+    pub id: NotificationId,
+    pub recipient: Principal,
+    pub reason: NotAcceptedReason,
+}
+
+/// Anything `not_accepted` does not name was accepted.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SendNotificationResponse {
+    pub not_accepted: Vec<NotAccepted>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SendNotificationError {
+    /// The origin lists no such sender: no file, an empty or unusable one, or
+    /// one that does not name the caller.
+    NoSuchSender,
+    /// More entries than II will process in one call; nothing was enqueued.
+    /// `limit` is fixed and never below an origin's queue capacity.
+    TooManyNotifications { limit: u32 },
+    /// Also a malformed or non-canonical origin, carrying the reason.
+    InternalCanisterError(String),
+}
