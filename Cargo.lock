@@ -869,7 +869,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d162beedaa69905488a8da94f5ac3edb4dd4788b732fadb7bd120b2625c1976"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -1604,7 +1604,7 @@ dependencies = [
  "hex",
  "ic-certification 3.2.0",
  "ic-representation-independent-hash",
- "ic0 1.1.0",
+ "ic0 1.2.0",
  "lazy_static",
  "serde",
  "serde_bytes",
@@ -1928,9 +1928,9 @@ checksum = "8de254dd67bbd58073e23dc1c8553ba12fa1dc610a19de94ad2bbcd0460c067f"
 
 [[package]]
 name = "ic0"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c77c8932bff1f09502d0d8c079d5a206a06afe523e35e816162cf4d30b5bf80d"
+checksum = "f05349d5c51ab6cc962c8963f877f826997ee6b737c6be3aafc9779eb8a4dd05"
 
 [[package]]
 name = "ic_bls12_381"
@@ -2254,7 +2254,7 @@ dependencies = [
  "ic-response-verification",
  "ic-stable-structures",
  "ic-verifiable-credentials",
- "ic0 1.1.0",
+ "ic0 1.2.0",
  "identity_jose",
  "include_dir",
  "internet_identity_interface",
@@ -4074,7 +4074,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.52.0",
  "windows-sys 0.59.0",
 ]
 

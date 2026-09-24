@@ -65,7 +65,7 @@
     "lines-and-columns": "^2.0.4",
     "lit-analyzer": "^2.0.2",
     "magic-string": "^0.30.21",
-    "prettier": "3.9.6",
+    "prettier": "3.9.8",
     "prettier-plugin-organize-imports": "^4.3.0",
     "prettier-plugin-svelte": "^3.5.2",
     "prettier-plugin-tailwindcss": "^0.8.1",
