@@ -36,7 +36,7 @@ pub struct ValidatedNotificationConsentGrantedRequest {
 
 /// Bounds the work one message asks for, not what it could enqueue: a batch
 /// may name one pair many times. Fixed, never a capacity signal.
-pub const MAX_NOTIFICATIONS_PER_CALL: usize = 1_000;
+pub const MAX_NOTIFICATIONS_PER_APP_CALL: usize = 1_000;
 
 pub struct ValidatedSendNotificationArg {
     pub origin: FrontendHostname,
