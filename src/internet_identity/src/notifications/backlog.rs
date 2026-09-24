@@ -3,7 +3,7 @@
 // Used by the submission endpoint and dispatcher in follow-up PRs.
 #![allow(dead_code)]
 
-use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
+use super::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use crate::storage::storable::application::StorableOriginSha256;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 
@@ -89,7 +89,7 @@ const _: () =
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::admission_queue::{Admission, Admitted, Taken};
+    use crate::notifications::admission_queue::{Admission, Admitted, Taken};
 
     fn results<Key>(admitted: Vec<Admitted<Key>>) -> Vec<Admission> {
         admitted

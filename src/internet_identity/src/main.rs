@@ -54,7 +54,6 @@ use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
 mod account_management;
-mod admission_queue;
 mod anchor_management;
 mod archive;
 mod assets;
