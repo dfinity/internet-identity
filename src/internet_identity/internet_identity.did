@@ -1839,7 +1839,7 @@ type SendNotificationArg = record {
 };
 
 type NotAcceptedReason = variant {
-    UnknownRecipient;
+    NoSuchRecipient;
     NoChannel;
     Deferred : record { retry_after : Timestamp };
 };
@@ -1856,8 +1856,9 @@ type SendNotificationResponse = record {
 };
 
 type SendNotificationError = variant {
-    // The origin's sender list was read and does not list the caller.
-    SenderNotListed;
+    // The origin lists no such sender: no file, an empty or unusable one, or
+    // one that does not name the caller.
+    NoSuchSender;
     TooManyNotifications : record { limit : nat32 };
     InternalCanisterError : text;
 };

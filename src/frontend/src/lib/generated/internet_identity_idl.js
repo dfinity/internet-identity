@@ -185,7 +185,7 @@ export const idlFactory = ({ IDL }) => {
     'origin' : FrontendHostname,
   });
   const NotAcceptedReason = IDL.Variant({
-    'UnknownRecipient' : IDL.Null,
+    'NoSuchRecipient' : IDL.Null,
     'NoChannel' : IDL.Null,
     'Deferred' : IDL.Record({ 'retry_after' : Timestamp }),
   });
@@ -200,7 +200,7 @@ export const idlFactory = ({ IDL }) => {
   const SendNotificationError = IDL.Variant({
     'TooManyNotifications' : IDL.Record({ 'limit' : IDL.Nat32 }),
     'InternalCanisterError' : IDL.Text,
-    'SenderNotListed' : IDL.Null,
+    'NoSuchSender' : IDL.Null,
   });
   const IdentityNumber = IDL.Nat64;
   const AuthnMethodProtection = IDL.Variant({

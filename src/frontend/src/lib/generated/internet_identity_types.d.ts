@@ -1377,7 +1377,7 @@ export interface NotAccepted {
   'recipient' : Principal,
   'reason' : NotAcceptedReason,
 }
-export type NotAcceptedReason = { 'UnknownRecipient' : null } |
+export type NotAcceptedReason = { 'NoSuchRecipient' : null } |
   { 'NoChannel' : null } |
   { 'Deferred' : { 'retry_after' : Timestamp } };
 export interface Notification {
@@ -1842,9 +1842,10 @@ export type SendNotificationError = {
   { 'InternalCanisterError' : string } |
   {
     /**
-     * The origin's sender list was read and does not list the caller.
+     * The origin lists no such sender: no file, an empty or unusable one, or
+     * one that does not name the caller.
      */
-    'SenderNotListed' : null
+    'NoSuchSender' : null
   };
 /**
  * Anything not_accepted does not name was accepted.

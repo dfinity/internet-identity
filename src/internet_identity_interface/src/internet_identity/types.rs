@@ -1086,6 +1086,19 @@ pub struct Notification {
 
 /// Applies in order: a later entry for a `(recipient, id)` supersedes an
 /// earlier one, and the reply names each pair at most once.
+impl Notification {
+    /// A notification with no expiry and no urgency, which II reads as its
+    /// default retention and `Normal`.
+    pub fn new(id: NotificationId, recipient: Principal) -> Self {
+        Self {
+            id,
+            recipient,
+            expires_at: None,
+            urgency: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SendNotificationArg {
     pub origin: FrontendHostname,
@@ -1095,7 +1108,7 @@ pub struct SendNotificationArg {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum NotAcceptedReason {
     /// No such recipient at this origin.
-    UnknownRecipient,
+    NoSuchRecipient,
     /// The recipient has no notification channel enabled.
     NoChannel,
     /// No room. Send it again from `retry_after`.
@@ -1117,8 +1130,9 @@ pub struct SendNotificationResponse {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum SendNotificationError {
-    /// The origin's sender list was read and does not list the caller.
-    SenderNotListed,
+    /// The origin lists no such sender: no file, an empty or unusable one, or
+    /// one that does not name the caller.
+    NoSuchSender,
     /// More entries than II will process in one call; nothing was enqueued.
     /// `limit` is fixed and never below an origin's queue capacity.
     TooManyNotifications { limit: u32 },
