@@ -1448,7 +1448,19 @@ export type OpenIdCredentialKey = [Iss, Sub, Aud];
 export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
   { 'OpenIdCredentialNotFound' : null } |
   { 'Unauthorized' : Principal };
-export type OpenIdDelegationError = { 'NoSuchDelegation' : null } |
+export type OpenIdDelegationError = {
+    /**
+     * The credential is registered on an anchor, but through a different SSO
+     * discovery domain than the one this login was verified through, so the
+     * domain-scoped anchor lookup cannot resolve it. `registered_sso_domain` is
+     * the domain the credential is registered through (`null` for a credential
+     * stored without a domain stamp). A sign-up with the same credential would be
+     * rejected with `OpenIdCredentialAlreadyRegistered`, since registration
+     * uniqueness spans all discovery domains.
+     */
+    'SsoDomainMismatch' : { 'registered_sso_domain' : [] | [string] }
+  } |
+  { 'NoSuchDelegation' : null } |
   { 'NoSuchAnchor' : null } |
   { 'JwtExpired' : null } |
   { 'JwtVerificationFailed' : null };

@@ -762,6 +762,9 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
   });
   const OpenIdDelegationError = IDL.Variant({
+    'SsoDomainMismatch' : IDL.Record({
+      'registered_sso_domain' : IDL.Opt(IDL.Text),
+    }),
     'NoSuchDelegation' : IDL.Null,
     'NoSuchAnchor' : IDL.Null,
     'JwtExpired' : IDL.Null,
