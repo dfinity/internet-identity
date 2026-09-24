@@ -73,7 +73,8 @@ const PENDING_RETRY_AFTER_NS: u64 = 3 * 1_000_000_000;
 pub enum Senders {
     /// The list was read and names the caller.
     Listed,
-    /// The list was read and does not name the caller.
+    /// The origin lists no such sender: no file, an empty or unusable one, or
+    /// one that does not name the caller.
     NotListed,
     /// No list yet; come back at `retry_after`.
     Pending { retry_after: Timestamp },
@@ -114,20 +115,39 @@ struct SenderList {
     senders: Vec<String>,
 }
 
-fn parse_senders(body: &[u8], max_senders: usize) -> Result<Vec<Principal>, String> {
-    let list = serde_json::from_slice::<SenderList>(body)
-        .map_err(|_| "invalid ii-notification-senders JSON".to_string())?;
+const HTTP_STATUS_OK: u16 = 200;
+const HTTP_STATUS_NOT_FOUND: u16 = 404;
+
+/// What a response means for the origin's senders. An origin that serves no
+/// list, or one II cannot use, names no senders — that is the origin's own
+/// configuration and the answer does not change until it changes the file, so
+/// it fills successfully with an empty list. Only II's own trouble — a status
+/// it did not ask for, a transport failure, no consensus — is a failed fill,
+/// which the cache retries with backoff.
+fn senders_from_response(
+    status: u16,
+    body: &[u8],
+    max_senders: usize,
+) -> Result<Vec<Principal>, String> {
+    if status == HTTP_STATUS_NOT_FOUND {
+        return Ok(vec![]);
+    }
+    if status != HTTP_STATUS_OK {
+        return Err(format!("ii-notification-senders answered {status}"));
+    }
+    Ok(parse_senders(body, max_senders).unwrap_or_default())
+}
+
+/// The senders an origin lists, or `None` where the body is not a list II can
+/// use: unparsable, over the cap, or naming something that is not a principal.
+fn parse_senders(body: &[u8], max_senders: usize) -> Option<Vec<Principal>> {
+    let list = serde_json::from_slice::<SenderList>(body).ok()?;
     if list.senders.len() > max_senders {
-        return Err(format!(
-            "ii-notification-senders exceeds the {max_senders}-entry cap ({} entries)",
-            list.senders.len()
-        ));
+        return None;
     }
     list.senders
         .iter()
-        .map(|sender| {
-            Principal::from_text(sender).map_err(|_| format!("{sender} is not a principal"))
-        })
+        .map(|sender| Principal::from_text(sender).ok())
         .collect()
 }
 
@@ -184,7 +204,8 @@ async fn fetch_senders(origin: FrontendHostname) -> Result<Vec<Principal>, Strin
     let (response,) = http_request_with_closure(request, SENDERS_CALL_CYCLES, transform_senders)
         .await
         .map_err(|(_, err)| err)?;
-    parse_senders(&response.body, MAX_SENDERS)
+    let status = u16::try_from(response.status.0.clone()).unwrap_or_default();
+    senders_from_response(status, &response.body, MAX_SENDERS)
 }
 
 /// Narrows a response to the senders and nothing else, so what crosses
@@ -197,7 +218,6 @@ fn transform_senders(
     use candid::Nat;
     use ic_cdk::api::management_canister::http_request::HttpResponse;
 
-    const HTTP_STATUS_OK: u8 = 200;
     if response.status != HTTP_STATUS_OK {
         return HttpResponse {
             status: response.status,
@@ -359,7 +379,7 @@ mod tests {
     fn parses_a_published_list() {
         let body = br#"{"senders":["ryjl3-tyaaa-aaaaa-aaaba-cai","rrkah-fqaaa-aaaaa-aaaaq-cai"]}"#;
         assert_eq!(
-            parse_senders(body, 10).unwrap(),
+            senders_from_response(200, body, 10).unwrap(),
             vec![
                 principal("ryjl3-tyaaa-aaaaa-aaaba-cai"),
                 principal("rrkah-fqaaa-aaaaa-aaaaq-cai"),
@@ -369,42 +389,54 @@ mod tests {
 
     #[test]
     fn accepts_an_empty_list() {
-        assert_eq!(parse_senders(br#"{"senders":[]}"#, 10).unwrap(), vec![]);
-    }
-
-    #[test]
-    fn rejects_a_list_over_the_cap() {
-        let body = br#"{"senders":["ryjl3-tyaaa-aaaaa-aaaba-cai","rrkah-fqaaa-aaaaa-aaaaq-cai"]}"#;
-        assert!(parse_senders(body, 1).is_err());
-    }
-
-    #[test]
-    fn a_padded_body_narrows_to_the_senders_it_carries() {
-        let padded = br#"{"note":"ignored","senders":["ryjl3-tyaaa-aaaaa-aaaba-cai"]}"#;
-        let list = serde_json::from_slice::<SenderList>(padded).expect("the accepted shape");
-        let narrowed = serde_json::to_vec(&list).expect("re-serializing");
-
-        assert_eq!(narrowed, br#"{"senders":["ryjl3-tyaaa-aaaaa-aaaba-cai"]}"#);
         assert_eq!(
-            parse_senders(&narrowed, 10).unwrap(),
-            vec![principal("ryjl3-tyaaa-aaaaa-aaaba-cai")]
+            senders_from_response(200, br#"{"senders":[]}"#, 10).unwrap(),
+            vec![]
         );
     }
 
+    /// An origin serving no list names no senders, which is an answer about
+    /// its configuration rather than something for II to retry.
     #[test]
-    fn rejects_an_entry_that_is_not_a_principal() {
-        assert!(parse_senders(br#"{"senders":["not-a-principal"]}"#, 10).is_err());
+    fn a_missing_list_names_no_senders() {
+        assert_eq!(senders_from_response(404, b"", 10).unwrap(), vec![]);
+    }
+
+    /// Same for a list II cannot use: over the cap, unparsable, or naming
+    /// something that is not a principal. Never truncated to what parsed.
+    #[test]
+    fn an_unusable_list_names_no_senders() {
+        let over_cap =
+            br#"{"senders":["ryjl3-tyaaa-aaaaa-aaaba-cai","rrkah-fqaaa-aaaaa-aaaaq-cai"]}"#;
+        assert_eq!(senders_from_response(200, over_cap, 1).unwrap(), vec![]);
+        assert_eq!(
+            senders_from_response(200, br#"{"senders":["not-a-principal"]}"#, 10).unwrap(),
+            vec![]
+        );
+        assert_eq!(senders_from_response(200, b"not json", 10).unwrap(), vec![]);
+    }
+
+    /// II's own trouble is a failed fill, which the cache retries with
+    /// backoff rather than reporting as the origin's answer.
+    #[test]
+    fn a_status_ii_did_not_ask_for_is_a_failure() {
+        for status in [500, 503, 429, 301] {
+            assert!(
+                senders_from_response(status, b"", 10).is_err(),
+                "{status} must not be an answer about the origin's senders"
+            );
+        }
     }
 
     #[test]
-    fn rejects_a_body_that_is_not_the_expected_shape() {
+    fn reads_no_senders_from_a_body_of_the_wrong_shape() {
         for body in [
             &br#"["ryjl3-tyaaa-aaaaa-aaaba-cai"]"#[..],
             &br#"{"senders":"ryjl3-tyaaa-aaaaa-aaaba-cai"}"#[..],
             &br#"{}"#[..],
             &br#"not json"#[..],
         ] {
-            assert!(parse_senders(body, 10).is_err(), "must not be accepted");
+            assert!(parse_senders(body, 10).is_none(), "must not be read");
         }
     }
 }

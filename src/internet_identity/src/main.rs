@@ -431,7 +431,7 @@ fn app_send_notification(
     let request: ValidatedSendNotificationArg = request.try_into()?;
 
     match notifications::senders::authorize(&request, caller(), ic_cdk::api::time()) {
-        Senders::NotListed => Err(SendNotificationError::SenderNotListed),
+        Senders::NotListed => Err(SendNotificationError::NoSuchSender),
         Senders::Pending { retry_after } => {
             Ok(notifications::defer_whole_batch(request, retry_after))
         }

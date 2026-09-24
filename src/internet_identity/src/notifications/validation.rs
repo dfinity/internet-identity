@@ -89,9 +89,9 @@ impl TryFrom<SendNotificationArg> for ValidatedSendNotificationArg {
             notifications,
         }: SendNotificationArg,
     ) -> Result<Self, Self::Error> {
-        if notifications.len() > MAX_NOTIFICATIONS_PER_CALL {
+        if notifications.len() > MAX_NOTIFICATIONS_PER_APP_CALL {
             return Err(SendNotificationError::TooManyNotifications {
-                limit: MAX_NOTIFICATIONS_PER_CALL as u32,
+                limit: MAX_NOTIFICATIONS_PER_APP_CALL as u32,
             });
         }
         let origin = notifying_origin(&origin)
@@ -319,7 +319,7 @@ mod tests {
         let repeated = notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::Normal);
         let request = SendNotificationArg {
             origin: "https://app.example".to_string(),
-            notifications: vec![repeated; MAX_NOTIFICATIONS_PER_CALL + 1],
+            notifications: vec![repeated; MAX_NOTIFICATIONS_PER_APP_CALL + 1],
         };
 
         assert!(matches!(
