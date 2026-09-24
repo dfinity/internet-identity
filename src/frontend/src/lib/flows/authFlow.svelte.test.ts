@@ -405,6 +405,29 @@ describe("AuthFlow — continueWithOpenId disambiguation", () => {
     expect(flow.ssoDomainMismatch).toBeUndefined();
   });
 
+  it("leaves enteredDomain unset for a configured provider, which enters no domain", async () => {
+    requestJWTMock.mockResolvedValue("fake-jwt");
+    decodeJWTMock.mockReturnValue({
+      iss: testConfig.issuer,
+      sub: "user-1",
+      name: "Alice",
+      email: "alice@example.com",
+    });
+    authenticateWithJWTMock.mockRejectedValue(ssoDomainMismatchError);
+
+    const flow = new AuthFlow({ trackLastUsed: false });
+    const result = await flow.continueWithOpenId(testConfig);
+
+    expect(result).toBeUndefined();
+    expect(flow.view).toBe("ssoDomainMismatch");
+    expect(flow.ssoDomainMismatch).toEqual({
+      enteredDomain: undefined,
+      registeredDomain: "registered.example.com",
+    });
+    // The provider is still known for the view, just not as a domain.
+    expect(flow.configIssuer).toBe(testConfig.issuer);
+  });
+
   it("transitions to ssoDomainMismatch on an SSO sign-in in any mode, without a registered domain when the stored credential has no stamp", async () => {
     requestJWTMock.mockResolvedValue("fake-jwt");
     decodeJWTMock.mockReturnValue({

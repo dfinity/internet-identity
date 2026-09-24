@@ -9,8 +9,12 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   interface Props {
-    /** The discovery domain the user just signed in through. */
-    enteredDomain: string;
+    /**
+     * The discovery domain the user just signed in through; undefined for a
+     * configured provider (Google / Microsoft / Apple), where no domain was
+     * entered.
+     */
+    enteredDomain?: string;
     /**
      * The discovery domain the credential is registered through, as reported
      * by the canister (`SsoDomainMismatch.registered_sso_domain`). Undefined
@@ -45,7 +49,9 @@
     loading = false,
   }: Props = $props();
 
-  const providerName = $derived(providerNameProp ?? enteredDomain);
+  const providerName = $derived(
+    providerNameProp ?? enteredDomain ?? registeredDomain ?? "",
+  );
   const resolvedUserName = $derived(userName ?? userEmail ?? providerName);
   const resolvedUserEmail = $derived(
     userName !== undefined ? userEmail : undefined,
@@ -60,10 +66,14 @@
       {$t`Linked through another SSO domain`}
     </h2>
     <p class="text-text-tertiary mt-2 max-w-80 text-sm leading-5">
-      {#if registeredDomain !== undefined}
+      {#if registeredDomain !== undefined && enteredDomain !== undefined}
         {$t`This ${providerName} account is already linked to an Internet Identity, but through ${registeredDomain} rather than ${enteredDomain}.`}
-      {:else}
+      {:else if registeredDomain !== undefined}
+        {$t`This ${providerName} account is already linked to an Internet Identity through the SSO domain ${registeredDomain}.`}
+      {:else if enteredDomain !== undefined}
         {$t`This ${providerName} account is already linked to an Internet Identity, but through a different SSO domain than ${enteredDomain}.`}
+      {:else}
+        {$t`This ${providerName} account is already linked to an Internet Identity through an SSO domain.`}
       {/if}
     </p>
   </div>
@@ -143,7 +153,12 @@
     </summary>
     <div class="text-text-tertiary mt-3 text-sm leading-5">
       <p>
-        {$t`An SSO account signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one, but ${enteredDomain} isn't the domain it was linked through.`}
+        {$t`An account linked through SSO signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one.`}
+        {#if enteredDomain !== undefined}
+          {$t`${enteredDomain} isn't the domain it was linked through.`}
+        {:else}
+          {$t`Signing in with the provider directly doesn't reach it.`}
+        {/if}
       </p>
       <div
         class="border-border-secondary mt-3 flex items-center justify-between border-t pt-2.5"

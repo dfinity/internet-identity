@@ -94,12 +94,14 @@ export class AuthFlow {
   #sso = $state<{ origin: string }>();
   #mode = $state<AuthMode>("both");
   #pendingOpenIdSignIn = $state<bigint>();
-  // An SSO credential the canister does know, but stamped with another
-  // discovery domain than the one the user just signed in through
-  // (`SsoDomainMismatch`). `registeredDomain` is undefined when the stored
-  // credential carries no stamp at all.
+  // A credential the canister does know, but stamped with another discovery
+  // domain than the one the user just signed in through
+  // (`SsoDomainMismatch`). `enteredDomain` is undefined for a configured
+  // provider (Google / Microsoft / Apple: no domain was entered);
+  // `registeredDomain` is undefined when the stored credential carries no
+  // stamp at all.
   #ssoDomainMismatch = $state<{
-    enteredDomain: string;
+    enteredDomain?: string;
     registeredDomain?: string;
   }>();
   #pendingMethodSwitch = $state<{
@@ -596,10 +598,12 @@ export class AuthFlow {
     this.#configIssuer = config.issuer;
     this.#openIdDiscoveryDomain = discoveryDomain;
     if (result.type === "domainMismatch") {
-      // See `continueWithSso`; only reachable with a discovery domain, since a
-      // configured provider's credentials carry no domain stamp.
+      // See `continueWithSso`. A configured provider passes no discovery
+      // domain; the credential can still be stamped with one if an org's SSO
+      // well-known publishes the same client, so leave `enteredDomain` unset
+      // rather than passing the provider's name off as a domain.
       this.#ssoDomainMismatch = {
-        enteredDomain: discoveryDomain ?? config.name,
+        enteredDomain: discoveryDomain,
         registeredDomain: result.registeredDomain,
       };
       this.#view = "ssoDomainMismatch";
