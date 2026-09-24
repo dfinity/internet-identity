@@ -83,6 +83,7 @@ export const idlFactory = ({ IDL }) => {
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'mcp_official_url' : IDL.Opt(IDL.Opt(IDL.Text)),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
+    'notifications_allow_insecure_sender_list' : IDL.Opt(IDL.Bool),
     'sso_allow_insecure_discovery' : IDL.Opt(IDL.Bool),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
@@ -1778,6 +1779,7 @@ export const init = ({ IDL }) => {
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'mcp_official_url' : IDL.Opt(IDL.Opt(IDL.Text)),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
+    'notifications_allow_insecure_sender_list' : IDL.Opt(IDL.Bool),
     'sso_allow_insecure_discovery' : IDL.Opt(IDL.Bool),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });

@@ -4,10 +4,11 @@
 use crate::delegation::frontend_length_within_limit;
 use internet_identity_interface::internet_identity::types::attributes::remap_to_legacy_domain;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, FrontendHostname, NotificationConsentGrantedRequest,
+    AnchorNumber, FrontendHostname, Notification, NotificationConsentGrantedRequest,
     NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest,
+    NotificationRevokeConsentRequest, SendNotificationArg, SendNotificationError,
 };
+use std::collections::HashMap;
 use url::Url;
 
 /// Held by every validated request below. Private to this module, so the `TryFrom`
@@ -30,6 +31,16 @@ pub struct ValidatedNotificationRevokeConsentRequest {
 pub struct ValidatedNotificationConsentGrantedRequest {
     pub anchor_number: AnchorNumber,
     pub origin: FrontendHostname,
+    _validated: Validated,
+}
+
+/// Bounds the work one message asks for, not what it could enqueue: a batch
+/// may name one pair many times. Fixed, never a capacity signal.
+pub const MAX_NOTIFICATIONS_PER_APP_CALL: usize = 1_000;
+
+pub struct ValidatedSendNotificationArg {
+    pub origin: FrontendHostname,
+    pub notifications: Vec<Notification>,
     _validated: Validated,
 }
 
@@ -64,6 +75,31 @@ impl TryFrom<NotificationRevokeConsentRequest> for ValidatedNotificationRevokeCo
             anchor_number,
             origin: notifying_origin(&origin)
                 .map_err(NotificationRevokeConsentError::InternalCanisterError)?,
+            _validated: Validated,
+        })
+    }
+}
+
+impl TryFrom<SendNotificationArg> for ValidatedSendNotificationArg {
+    type Error = SendNotificationError;
+
+    fn try_from(
+        SendNotificationArg {
+            origin,
+            notifications,
+        }: SendNotificationArg,
+    ) -> Result<Self, Self::Error> {
+        if notifications.len() > MAX_NOTIFICATIONS_PER_APP_CALL {
+            return Err(SendNotificationError::TooManyNotifications {
+                limit: MAX_NOTIFICATIONS_PER_APP_CALL as u32,
+            });
+        }
+        let origin = notifying_origin(&origin)
+            .and_then(|origin| fetchable_origin(&origin).map(|()| origin))
+            .map_err(SendNotificationError::InternalCanisterError)?;
+        Ok(Self {
+            origin,
+            notifications: dedup_last_wins(notifications),
             _validated: Validated,
         })
     }
@@ -117,6 +153,57 @@ fn canonical_origin(origin: &str) -> Result<FrontendHostname, String> {
     Ok(origin.to_string())
 }
 
+/// Collapses each `(recipient, id)` to its last entry, in the place the first
+/// held: a re-send replaces a pending notification rather than queueing behind
+/// it.
+fn dedup_last_wins(notifications: Vec<Notification>) -> Vec<Notification> {
+    let mut placed = HashMap::new();
+    let mut kept: Vec<Notification> = Vec::with_capacity(notifications.len());
+    for notification in notifications {
+        let pair = (notification.recipient, notification.id);
+        match placed.get(&pair) {
+            Some(&index) => kept[index] = notification,
+            None => {
+                placed.insert(pair, kept.len());
+                kept.push(notification);
+            }
+        }
+    }
+    kept
+}
+
+/// Refuses an origin II will not fetch a sender list from: `notifying_origin`
+/// accepts any scheme, but a list read over plain `http` can be replaced in
+/// flight. As in SSO discovery, `http` needs a loopback host and the deploy
+/// flag.
+fn fetchable_origin(origin: &FrontendHostname) -> Result<(), String> {
+    let Ok(url) = Url::parse(origin) else {
+        return Err("origin is not a URL".to_string());
+    };
+    if url.scheme() == "https" {
+        return Ok(());
+    }
+    if url.scheme() == "http"
+        && allow_insecure_sender_list()
+        && crate::utils::is_loopback_host(url.host_str().unwrap_or_default())
+    {
+        return Ok(());
+    }
+    Err("origin must be https".to_string())
+}
+
+fn allow_insecure_sender_list() -> bool {
+    #[cfg(not(test))]
+    {
+        crate::state::persistent_state(|s| s.notifications_allow_insecure_sender_list)
+            .unwrap_or(false)
+    }
+    #[cfg(test)]
+    {
+        tests::TEST_ALLOW_INSECURE_SENDER_LIST.with_borrow(|allow| *allow)
+    }
+}
+
 /// Whether this deployment notifies at all. The Web Push channel is per browser rather
 /// than per app, so it turns on with the first app enabled rather than for one of them.
 pub fn notifications_enabled() -> bool {
@@ -150,11 +237,140 @@ fn enabled_for(origin: &FrontendHostname) -> Result<(), String> {
 mod tests {
     use super::*;
     use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
+    use internet_identity_interface::internet_identity::types::Urgency;
+    use std::cell::RefCell;
+
+    thread_local! {
+        pub(super) static TEST_ALLOW_INSECURE_SENDER_LIST: RefCell<bool> = const { RefCell::new(false) };
+    }
 
     fn enable(origins: &[&str]) {
         crate::state::persistent_state_mut(|s| {
             s.notifications_enabled_origins = Some(origins.iter().map(|o| o.to_string()).collect());
         });
+    }
+
+    fn allow_insecure(allow: bool) {
+        TEST_ALLOW_INSECURE_SENDER_LIST.with_borrow_mut(|flag| *flag = allow);
+    }
+
+    fn notification(id: u64, recipient: &str, urgency: Urgency) -> Notification {
+        Notification {
+            id,
+            recipient: candid::Principal::from_text(recipient).expect("a principal"),
+            expires_at: None,
+            urgency: Some(urgency),
+        }
+    }
+
+    fn validate(notifications: Vec<Notification>) -> ValidatedSendNotificationArg {
+        enable(&["https://app.example"]);
+        SendNotificationArg {
+            origin: "https://app.example".to_string(),
+            notifications,
+        }
+        .try_into()
+        .expect("a notifiable origin")
+    }
+
+    /// A batch applies in order, so a repeated (recipient, id) keeps the last
+    /// entry — the one that supersedes — and the pair appears once.
+    #[test]
+    fn a_repeated_recipient_and_id_keeps_the_last_entry() {
+        let request = validate(vec![
+            notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::Low),
+            notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::High),
+        ]);
+
+        assert_eq!(request.notifications.len(), 1);
+        assert_eq!(request.notifications[0].urgency, Some(Urgency::High));
+    }
+
+    /// One id sent to two recipients is two notifications, not a repeat.
+    #[test]
+    fn one_id_for_two_recipients_survives_as_two() {
+        let request = validate(vec![
+            notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::Normal),
+            notification(1, "rrkah-fqaaa-aaaaa-aaaaq-cai", Urgency::Normal),
+        ]);
+
+        assert_eq!(request.notifications.len(), 2);
+    }
+
+    /// Surviving entries keep the order they were submitted in.
+    #[test]
+    fn deduplication_keeps_the_submitted_order() {
+        let request = validate(vec![
+            notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::Normal),
+            notification(2, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::Normal),
+            notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::High),
+        ]);
+
+        let ids: Vec<u64> = request.notifications.iter().map(|n| n.id).collect();
+        assert_eq!(ids, vec![1, 2]);
+        assert_eq!(request.notifications[0].urgency, Some(Urgency::High));
+    }
+
+    /// The cap counts what was submitted, not what survives deduplication: a
+    /// batch naming one pair many times still costs a message that much work.
+    #[test]
+    fn the_cap_counts_submitted_entries() {
+        enable(&["https://app.example"]);
+        let repeated = notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::Normal);
+        let request = SendNotificationArg {
+            origin: "https://app.example".to_string(),
+            notifications: vec![repeated; MAX_NOTIFICATIONS_PER_APP_CALL + 1],
+        };
+
+        assert!(matches!(
+            ValidatedSendNotificationArg::try_from(request),
+            Err(SendNotificationError::TooManyNotifications { .. })
+        ));
+    }
+
+    /// The scheme decides where II sends an outcall, so a list that would be
+    /// fetched over plain http is refused however the origin is spelled.
+    #[test]
+    fn refuses_an_origin_whose_list_would_not_be_fetched_over_https() {
+        allow_insecure(false);
+        for origin in [
+            "http://app.example",
+            "http://localhost:5173",
+            "http://127.0.0.1:8080",
+        ] {
+            assert!(
+                fetchable_origin(&origin.to_string()).is_err(),
+                "{origin} must not be fetched"
+            );
+        }
+        assert!(fetchable_origin(&"https://app.example".to_string()).is_ok());
+    }
+
+    /// The flag reaches loopback only: a public host over http stays refused,
+    /// so a flagged deployment still cannot be pointed at a plaintext app.
+    #[test]
+    fn the_insecure_flag_reaches_loopback_only() {
+        allow_insecure(true);
+        assert!(fetchable_origin(&"http://localhost:5173".to_string()).is_ok());
+        assert!(fetchable_origin(&"http://127.0.0.1:8080".to_string()).is_ok());
+        assert!(fetchable_origin(&"http://localhost".to_string()).is_ok());
+        assert!(fetchable_origin(&"http://app.example".to_string()).is_err());
+        allow_insecure(false);
+    }
+
+    /// And it reaches `http` only. A scheme II cannot fetch would fail at the
+    /// outcall anyway, but the rule is what the guard states, not where the
+    /// call happens to break.
+    #[test]
+    fn the_insecure_flag_reaches_http_only() {
+        allow_insecure(true);
+        for origin in ["ftp://localhost", "ws://localhost:5173", "wss://localhost"] {
+            assert!(
+                fetchable_origin(&origin.to_string()).is_err(),
+                "{origin} must not be fetched"
+            );
+        }
+        allow_insecure(false);
     }
 
     #[test]

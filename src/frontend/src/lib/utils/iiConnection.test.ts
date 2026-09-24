@@ -43,6 +43,7 @@ const mockDelegationIdentity = {
 
 const DEFAULT_INIT: InternetIdentityInit = {
   notifications_enabled_origins: [],
+  notifications_allow_insecure_sender_list: [],
   mcp_official_url: [],
   analytics_config: [],
   archive_config: [],

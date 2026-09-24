@@ -125,6 +125,12 @@ pub struct PersistentState {
     // `Some(false)` (the default) require https for every discovery host;
     // non-loopback always requires https. See `sso::validate_discovery_domain`.
     pub sso_allow_insecure_discovery: Option<bool>,
+    // Deploy flag relaxing the `https` requirement for sender-list outcalls to
+    // loopback hosts (localhost/127.0.0.1) so e2e and local development can serve
+    // the list over http. `None`/`Some(false)` (the default) require https for every
+    // notifying origin; non-loopback always requires https. See
+    // `notifications::validation`.
+    pub notifications_allow_insecure_sender_list: Option<bool>,
     // SSO provider configs managed via add_discoverable_oidc_config update call.
     pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     // Configuration for Web Analytics tool
@@ -172,6 +178,7 @@ impl Default for PersistentState {
             new_flow_origins: None,
             openid_configs: None,
             sso_allow_insecure_discovery: None,
+            notifications_allow_insecure_sender_list: None,
             oidc_configs: None,
             analytics_config: None,
             event_stats_24h_start: None,
