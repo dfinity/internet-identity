@@ -1,17 +1,13 @@
-//! Notifications waiting for the dispatcher.
-//!
-//! Each app is a sender in [`crate::admission_queue`]. Notifications are identified
-//! by recipient and app-chosen ID, capped per recipient, and ordered by urgency.
-// The submission endpoint and dispatcher will use this in later PRs.
+//! Pending device wake-ups, grouped by app and limited per recipient.
+//! Deduplication uses (recipient, notification ID); urgency sets queue priority.
+// Used by the submission endpoint and dispatcher in follow-up PRs.
 #![allow(dead_code)]
 
 use crate::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use crate::storage::storable::application::StorableOriginSha256;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 
-/// RFC 8030 urgency levels. Variant order sets the queue priority, highest first,
-/// which also decides how many turns each level gets when notifications are taken.
-/// The dispatcher must convert these to the corresponding HTTP header strings.
+/// Variant order maps RFC 8030 urgency to queue priority, highest first.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Urgency {
     High,
@@ -20,26 +16,20 @@ pub(crate) enum Urgency {
     VeryLow,
 }
 
-/// A request to wake a recipient's devices, without notification content.
-///
-/// One wake-up carries one notification, so nothing stands in for a notification
-/// above a recipient's cap. The app has to send it again once the cap frees up.
+/// One device wake-up request per notification, without notification content.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct PendingNotification {
     pub(crate) recipient: AnchorNumber,
-    /// Chosen by the app and unique within that app and recipient.
+    /// App-chosen ID, unique per recipient within the app.
     pub(crate) notification_id: u64,
     pub(crate) urgency: Urgency,
-    /// When the app stops wanting this delivered. `None` leaves
-    /// `discard_entries_after_ns` in charge, and a later time is clamped to it.
+    /// Optional app deadline, capped by the queue expiry limit.
     pub(crate) expires_at_ns: Option<Timestamp>,
 }
 
 impl QueueItem for PendingNotification {
-    /// Different recipients may have the same notification ID.
     type Key = (AnchorNumber, u64);
 
-    /// Limit pending wake-ups per recipient within each app.
     type Group = AnchorNumber;
 
     const PRIORITY_LEVELS: usize = 4;
@@ -53,7 +43,7 @@ impl QueueItem for PendingNotification {
     }
 
     fn priority(&self) -> usize {
-        self.urgency as usize // Converts the enum variant order to a priority number, highest first.
+        self.urgency as usize
     }
 
     fn expires_at_ns(&self) -> Option<Timestamp> {
@@ -61,11 +51,8 @@ impl QueueItem for PendingNotification {
     }
 }
 
-/// Pending notifications grouped by the app that sent them.
-///
-/// The caller must authorize the app and hash its canonical origin after the
-/// legacy-domain remap. Otherwise, aliases such as `https://app.icp0.io` and
-/// `https://app.ic0.app` would receive separate queue allowances.
+/// Callers must authorize the app and hash its canonical origin after legacy-domain
+/// remapping so aliases share the same queue limits.
 pub(crate) type NotificationBacklog = AdmissionQueue<StorableOriginSha256, PendingNotification>;
 
 const SECOND_NS: u64 = 1_000_000_000;
@@ -73,13 +60,10 @@ const MINUTE_NS: u64 = 60 * SECOND_NS;
 
 pub(crate) const NOTIFICATION_BACKLOG: QueueConfig = QueueConfig {
     max_entries: 10_000,
-    // One app may not use every slot.
     max_entries_per_sender: 7_000,
     max_pending_per_group: 20,
     pressure_cleared_below: 8_000,
-    // Stop trying to wake devices for entries older than five minutes.
     discard_entries_after_ns: 5 * MINUTE_NS,
-    // An app resending keeps a notification alive, but never beyond this.
     max_lifetime_ns: 15 * MINUTE_NS,
     retry: RetryPolicy {
         base_ms: 5_000,
@@ -87,15 +71,13 @@ pub(crate) const NOTIFICATION_BACKLOG: QueueConfig = QueueConfig {
         when_stalled_ms: 600_000,
         doubles_every_ns: 30 * SECOND_NS,
         max_doublings: 6,
-        // Allow one minute without a successful take before reporting a stall.
         stalled_after_silence_ns: MINUTE_NS,
     },
 };
 
-// Reject invalid limits at compile time.
 const _: () = assert!(NOTIFICATION_BACKLOG.is_coherent());
 
-// One app alone must stay below the pressure reset threshold.
+// A single app must stay below the pressure reset threshold.
 const _: () = assert!(
     NOTIFICATION_BACKLOG.max_entries_per_sender < NOTIFICATION_BACKLOG.pressure_cleared_below
 );
@@ -109,7 +91,6 @@ mod tests {
     use super::*;
     use crate::admission_queue::{Admission, Admitted, Taken};
 
-    /// The outcomes without their keys, for assertions that only check what happened.
     fn results<Key>(admitted: Vec<Admitted<Key>>) -> Vec<Admission> {
         admitted
             .into_iter()
@@ -202,7 +183,6 @@ mod tests {
             }]
         );
 
-        // Taking one frees the recipient's slot, so the retry lands.
         take(&mut backlog, 1, 2);
         assert_eq!(
             results(backlog.admit(app, vec![notification(1, cap)], 2)),
@@ -244,7 +224,7 @@ mod tests {
             .collect();
         backlog.admit(origin("https://a.example"), queued, 1);
 
-        // Four levels, so High runs four turns and hands over to Normal with work left.
+        // High gets four turns before Normal, even with High entries remaining.
         assert_eq!(ids_taken(&mut backlog, 10, 2), vec![1, 2, 3, 4, 7, 8, 5, 6]);
     }
 
@@ -260,11 +240,10 @@ mod tests {
             0,
         );
 
-        // Well inside the five minutes the queue would otherwise allow.
+        // The app deadline expires before the queue limit of five minutes.
         assert!(take(&mut backlog, 10, 31 * SECOND_NS).is_empty());
     }
 
-    /// Takes a batch this caller always keeps.
     fn take(
         backlog: &mut NotificationBacklog,
         limit: usize,
