@@ -62,9 +62,6 @@ msgstr "Le SSO de {domainInput} a renvoyé « {0} » : {1}"
 msgid "{domainInput}'s SSO returned error \"{0}\"."
 msgstr "Le SSO de {domainInput} a renvoyé l’erreur « {0} »."
 
-msgid "{enteredDomain} isn't the domain it was linked through."
-msgstr ""
-
 msgid "{identityName} has been removed from this device."
 msgstr "{identityName} a été supprimée de cet appareil."
 
@@ -271,9 +268,6 @@ msgstr "Déjà connecté"
 
 msgid "Also makes changes on your behalf."
 msgstr "Effectue également des modifications en votre nom."
-
-msgid "An account linked through SSO signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one."
-msgstr ""
 
 msgid "Any local program can connect"
 msgstr "Tout programme local peut se connecter"
@@ -502,9 +496,6 @@ msgstr "Copier l'objet"
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Impossible de charger les paramètres SSO depuis {domainInput}. Demandez à votre administrateur SSO de vérifier que /.well-known/ii-openid-configuration est accessible."
-
-msgid "Couldn't load the SSO settings of {registeredDomain}. Try again later or use a different method."
-msgstr ""
 
 msgid "Couldn't remove the connector. Please try again."
 msgstr "Impossible de supprimer le connecteur. Veuillez réessayer."
@@ -1038,15 +1029,6 @@ msgstr "Limite atteinte"
 msgid "Link copied to clipboard"
 msgstr "Lien copié dans le presse-papiers"
 
-msgid "Linked through {registeredDomain}"
-msgstr ""
-
-msgid "Linked through another domain"
-msgstr ""
-
-msgid "Linked through another SSO domain"
-msgstr ""
-
 msgid "Linking Internet Identity"
 msgstr "Liaison d'Internet Identity"
 
@@ -1199,9 +1181,6 @@ msgstr "Un ou plusieurs mots sont incorrects ou dans le mauvais ordre."
 
 msgid "Only add trusted connectors"
 msgstr "N'ajoutez que des connecteurs approuvés"
-
-msgid "Only continue if you recognize these domains. If an app or a guide told you to enter a domain you don't know, stop here and use the domain your organization gave you."
-msgstr ""
 
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "N'activez ceci que pour l'<0>ICP CLI</0> officiel. En cas de doute, réinstallez-le depuis la <1>source officielle</1>."
@@ -1581,9 +1560,6 @@ msgstr "Se connecter avec des méthodes familières"
 msgid "Sign in with {name}"
 msgstr "Se connecter avec {name}"
 
-msgid "Sign in with {registeredDomain}"
-msgstr ""
-
 msgid "Sign in with another identity"
 msgstr "Se connecter avec une autre identité"
 
@@ -1640,9 +1616,6 @@ msgstr "Connexion en cours"
 
 msgid "Signing in securely"
 msgstr "Connexion sécurisée"
-
-msgid "Signing in with the provider directly doesn't reach it."
-msgstr ""
 
 msgid "Signing in..."
 msgstr "Connexion..."
@@ -1824,18 +1797,6 @@ msgstr "La phrase a été saisie correctement mais appartient à un produit autr
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Un problème est survenu lors de la connexion avec l’application. Essayez un autre navigateur ; si le problème persiste, contactez le développeur."
-
-msgid "This {providerName} account is already linked to an Internet Identity through an SSO domain."
-msgstr ""
-
-msgid "This {providerName} account is already linked to an Internet Identity through the SSO domain {registeredDomain}."
-msgstr ""
-
-msgid "This {providerName} account is already linked to an Internet Identity, but through {registeredDomain} rather than {enteredDomain}."
-msgstr ""
-
-msgid "This {providerName} account is already linked to an Internet Identity, but through a different SSO domain than {enteredDomain}."
-msgstr ""
 
 msgid "This {resolvedProviderName} account is already connected to an Internet Identity."
 msgstr "Ce compte {resolvedProviderName} est déjà connecté à une Internet Identity."
