@@ -1,5 +1,5 @@
 //! Pending device wake-ups, grouped by app and limited per identity.
-//! Deduplication uses (recipient, notification ID); urgency sets queue priority.
+//! Deduplication uses (recipient, notification ID); urgency sets the lane.
 // Used by the submission endpoint and dispatcher in follow-up PRs.
 #![allow(dead_code)]
 
@@ -42,7 +42,7 @@ impl QueueItem for PendingNotification {
     /// Lanes run most urgent first, which is the reverse of how the levels are
     /// declared. Written out rather than derived from the discriminant, so adding a
     /// level is a compile error here instead of a silent renumbering.
-    fn priority(&self) -> usize {
+    fn lane(&self) -> usize {
         match self.urgency {
             Urgency::High => 0,
             Urgency::Normal => 1,
@@ -141,7 +141,7 @@ mod tests {
                 urgency,
                 ..notification(1, 1)
             }
-            .priority()
+            .lane()
         })
         .collect();
 

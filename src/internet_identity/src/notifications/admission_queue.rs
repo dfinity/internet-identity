@@ -32,7 +32,7 @@ pub(crate) trait QueueItem: Clone {
     fn group(&self) -> Self::Group;
 
     /// Lane index into `TURNS`. Out of range uses the last lane.
-    fn priority(&self) -> usize;
+    fn lane(&self) -> usize;
 
     /// Optional submitter deadline, capped by the queue expiry limit.
     fn expires_at_ns(&self) -> Option<Timestamp> {
@@ -40,16 +40,16 @@ pub(crate) trait QueueItem: Clone {
     }
 }
 
-fn lanes<Item: QueueItem>() -> usize {
+fn lane_count<Item: QueueItem>() -> usize {
     Item::TURNS.len().max(1)
 }
 
-fn turns<Item: QueueItem>(lane: usize) -> usize {
+fn turns_for_lane<Item: QueueItem>(lane: usize) -> usize {
     Item::TURNS.get(lane).copied().unwrap_or(1).max(1)
 }
 
 fn lane_of<Item: QueueItem>(item: &Item) -> usize {
-    item.priority().min(lanes::<Item>() - 1)
+    item.lane().min(lane_count::<Item>() - 1)
 }
 
 #[derive(Clone, Debug)]
@@ -154,7 +154,7 @@ pub(crate) struct QueueStats {
     pub(crate) dropped_already_expired: u64,
 }
 
-/// Locates an entry by key without scanning the priority buckets.
+/// Locates an entry by key without scanning the lanes.
 #[derive(Clone, Copy, Debug)]
 struct Placed {
     priority: usize,
@@ -185,13 +185,13 @@ struct SenderQueue<Item: QueueItem> {
 impl<Item: QueueItem> SenderQueue<Item> {
     fn new() -> Self {
         Self {
-            entries_by_priority: (0..lanes::<Item>()).map(|_| BTreeMap::new()).collect(),
+            entries_by_priority: (0..lane_count::<Item>()).map(|_| BTreeMap::new()).collect(),
             placement: HashMap::new(),
             pending_per_group: HashMap::new(),
             serving_priority: 0,
-            turns_left: turns::<Item>(0),
+            turns_left: turns_for_lane::<Item>(0),
             at_cap_since_ns: None,
-            lane_full_since_ns: vec![None; lanes::<Item>()],
+            lane_full_since_ns: vec![None; lane_count::<Item>()],
         }
     }
 
@@ -203,12 +203,12 @@ impl<Item: QueueItem> SenderQueue<Item> {
         self.entries_by_priority.iter().all(BTreeMap::is_empty)
     }
 
-    fn depth(&self, lane: usize) -> usize {
+    fn lane_len(&self, lane: usize) -> usize {
         self.entries_by_priority.get(lane).map_or(0, BTreeMap::len)
     }
 
     /// Entries ordered before the given position, counted up to `limit`.
-    fn ahead_of(
+    fn count_due_before(
         &self,
         lane: usize,
         expires_at_ns: Timestamp,
@@ -223,14 +223,14 @@ impl<Item: QueueItem> SenderQueue<Item> {
         })
     }
 
-    fn pending(&self, group: &Item::Group) -> usize {
+    fn pending_in_group(&self, group: &Item::Group) -> usize {
         self.pending_per_group
             .get(group)
             .map_or(0, |state| state.pending)
     }
 
     /// Start group pressure on refusal, independent of entry age.
-    fn group_pressure_since(&mut self, group: &Item::Group, now_ns: Timestamp) -> Timestamp {
+    fn record_group_refusal(&mut self, group: &Item::Group, now_ns: Timestamp) -> Timestamp {
         *self
             .pending_per_group
             .entry(*group)
@@ -240,24 +240,24 @@ impl<Item: QueueItem> SenderQueue<Item> {
     }
 
     /// Start sender pressure on refusal, since its capacity share can change.
-    fn sender_pressure_since(&mut self, now_ns: Timestamp) -> Timestamp {
+    fn record_sender_refusal(&mut self, now_ns: Timestamp) -> Timestamp {
         *self.at_cap_since_ns.get_or_insert(now_ns)
     }
 
-    fn lane_pressure_since(&mut self, lane: usize, now_ns: Timestamp) -> Timestamp {
+    fn record_lane_refusal(&mut self, lane: usize, now_ns: Timestamp) -> Timestamp {
         self.lane_full_since_ns
             .get_mut(lane)
             .map_or(now_ns, |since| *since.get_or_insert(now_ns))
     }
 
-    fn insert(&mut self, entry: Entry<Item>) {
-        let lane = self.place(entry);
+    fn add_admitted_entry(&mut self, entry: Entry<Item>) {
+        let lane = self.add_entry(entry);
         self.at_cap_since_ns = None;
         self.lane_full_since_ns[lane] = None;
     }
 
     /// Store an entry without touching the admission clocks, returning its lane.
-    fn place(&mut self, entry: Entry<Item>) -> usize {
+    fn add_entry(&mut self, entry: Entry<Item>) -> usize {
         let priority = lane_of(&entry.item);
         let key = entry.item.key();
         let group = self
@@ -276,7 +276,7 @@ impl<Item: QueueItem> SenderQueue<Item> {
         priority
     }
 
-    fn remove(
+    fn remove_entry(
         &mut self,
         priority: usize,
         expires_at_ns: Timestamp,
@@ -301,7 +301,7 @@ impl<Item: QueueItem> SenderQueue<Item> {
     }
 
     /// Replace the queued item and deadline, keeping its original arrival time.
-    fn refresh(
+    fn replace_entry(
         &mut self,
         key: &Item::Key,
         item: Item,
@@ -333,16 +333,16 @@ impl<Item: QueueItem> SenderQueue<Item> {
         self.entries_by_priority[priority].insert((entry.expires_at_ns, key.clone()), entry);
     }
 
-    /// Advance priorities after their allotted turns, skipping empty buckets.
-    fn next_to_take(&mut self) -> Option<(usize, Timestamp, Item::Key)> {
+    /// Advance lanes after their allotted turns, skipping empty ones.
+    fn take_lane_turn(&mut self) -> Option<(usize, Timestamp, Item::Key)> {
         let levels = self.entries_by_priority.len().max(1);
-        // Include one extra pass when the current priority has no turns left.
+        // Include one extra pass when the current lane has no turns left.
         for _ in 0..=levels {
             if self.turns_left == 0 {
                 self.serving_priority = (self.serving_priority + 1) % levels;
-                self.turns_left = turns::<Item>(self.serving_priority);
+                self.turns_left = turns_for_lane::<Item>(self.serving_priority);
             }
-            match self.first_at(self.serving_priority) {
+            match self.first_in_lane(self.serving_priority) {
                 Some((expires_at_ns, key)) => {
                     self.turns_left = self.turns_left.saturating_sub(1);
                     return Some((self.serving_priority, expires_at_ns, key));
@@ -353,14 +353,14 @@ impl<Item: QueueItem> SenderQueue<Item> {
         None
     }
 
-    fn first_at(&self, priority: usize) -> Option<(Timestamp, Item::Key)> {
+    fn first_in_lane(&self, priority: usize) -> Option<(Timestamp, Item::Key)> {
         self.entries_by_priority
             .get(priority)?
             .first_key_value()
             .map(|((expires_at_ns, key), _)| (*expires_at_ns, key.clone()))
     }
 
-    fn next_expiry_ns(&self) -> Option<Timestamp> {
+    fn earliest_expiry_ns(&self) -> Option<Timestamp> {
         self.entries_by_priority
             .iter()
             .filter_map(|entries| entries.first_key_value().map(|((ts, _), _)| *ts))
@@ -421,7 +421,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             return Vec::new();
         }
         // Discard expired entries for this sender before admitting new ones, so they can take the turns.
-        self.discard_expired_for(&sender, now_ns);
+        self.discard_sender_expired(&sender, now_ns);
 
         let mut admissions = Vec::with_capacity(items.len());
         let mut swept = false; // Whether expired entries were discarded once for this admission call.
@@ -434,42 +434,42 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             };
 
             // Reject items that are already expired on arrival, even if the queue has room.
-            let expires_at_ns = self.expiry_for(now_ns, &item);
+            let expires_at_ns = self.capped_expiry_ns(now_ns, &item);
             if expires_at_ns <= now_ns {
                 self.dropped_already_expired += 1;
                 admissions.push(answer(Admission::Dropped));
                 continue;
             }
 
-            // Refuse duplicates, but refresh their deadline and item. Doesn't affect queue capacity, so it doesn't reset the pressure timer.
-            if self.holds(&sender, &key) {
+            // Fold duplicates: the resend replaces the queued item and deadline. Doesn't affect queue capacity, so it doesn't reset the pressure timer.
+            if self.sender_holds_key(&sender, &key) {
                 self.folded_duplicates += 1;
-                self.refresh(&sender, &key, item, expires_at_ns);
+                self.replace_queued_entry(&sender, &key, item, expires_at_ns);
                 admissions.push(answer(Admission::Folded));
                 continue;
             }
 
             // Reject items that would exceed the per-group pending limit, even if the queue has room.
-            if self.pending_for(&sender, &item.group()) >= self.config.max_pending_per_group {
+            if self.pending_in_group(&sender, &item.group()) >= self.config.max_pending_per_group {
                 self.rejected_group_full += 1;
-                let since_ns = self.group_pressure_since(&sender, &item.group(), now_ns);
+                let since_ns = self.record_group_refusal(&sender, &item.group(), now_ns);
                 let retry_after_ns = self.retry_after_ns(Some(since_ns), now_ns);
                 admissions.push(answer(Admission::Full { retry_after_ns }));
                 continue;
             }
 
             // Reclaim expired entries before refusing capacity, once per admission call.
-            if !swept && (self.is_full() || self.sender_at_cap(&sender)) {
-                self.discard_expired(now_ns);
+            if !swept && (self.queue_is_full() || self.sender_is_at_cap(&sender)) {
+                self.discard_all_expired(now_ns);
                 swept = true;
             }
 
             // Reject items if the queue or sender is at capacity.
-            if self.is_full() || self.sender_at_cap(&sender) {
+            if self.queue_is_full() || self.sender_is_at_cap(&sender) {
                 // Sender pressure can persist while the queue still has room.
                 let since_ns = match self.at_capacity_since_ns {
                     Some(since_ns) => since_ns,
-                    None => self.sender_pressure_since(&sender, now_ns),
+                    None => self.record_sender_refusal(&sender, now_ns),
                 };
                 let retry_after_ns = self.retry_after_ns(Some(since_ns), now_ns);
                 admissions.push(answer(Admission::Full { retry_after_ns }));
@@ -478,15 +478,15 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
 
             // Reject items if the lane is at capacity or cannot drain in time before the entry expires.
             let lane = lane_of(&item);
-            if !self.drains_in_time(&sender, lane, expires_at_ns, &key, now_ns) {
+            if !self.lane_has_room_for(&sender, lane, expires_at_ns, &key, now_ns) {
                 self.rejected_lane_full += 1;
-                let since_ns = self.lane_pressure_since(&sender, lane, now_ns);
+                let since_ns = self.record_lane_refusal(&sender, lane, now_ns);
                 let retry_after_ns = self.retry_after_ns(Some(since_ns), now_ns);
                 admissions.push(answer(Admission::Full { retry_after_ns }));
                 continue;
             }
 
-            self.insert(
+            self.add_admitted_entry(
                 &sender,
                 Entry {
                     received_at_ns: now_ns,
@@ -511,7 +511,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
     ) -> Result<T, E> {
         // Discard expired entries before taking, so they don't consume turns.
         if limit > 0 {
-            self.discard_expired(now_ns);
+            self.discard_all_expired(now_ns);
         }
         let nonempty_since_ns = self.nonempty_since_ns;
         let at_capacity_since_ns = self.at_capacity_since_ns;
@@ -523,7 +523,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             Ok(stored) => Ok(stored),
             Err(error) => {
                 for taken in batch {
-                    self.put_back(&taken.sender, taken.entry);
+                    self.put_back_entry(&taken.sender, taken.entry);
                 }
                 self.nonempty_since_ns = nonempty_since_ns;
                 self.at_capacity_since_ns = at_capacity_since_ns;
@@ -537,11 +537,11 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         let mut taken = Vec::new();
 
         while taken.len() < limit {
-            let Some(sender) = self.advance_cursor() else {
+            let Some(sender) = self.next_sender_in_rotation() else {
                 break;
             };
             // Each iteration takes an entry or removes a sender with no live entries.
-            if let Some(entry) = self.pop_live(&sender, now_ns) {
+            if let Some(entry) = self.take_live_entry(&sender, now_ns) {
                 taken.push(Taken { sender, entry });
             }
         }
@@ -560,7 +560,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             next_expiry_in_ns: self
                 .senders
                 .values()
-                .filter_map(SenderQueue::next_expiry_ns)
+                .filter_map(SenderQueue::earliest_expiry_ns)
                 .min()
                 .map(|nearest| nearest.saturating_sub(now_ns)),
             at_capacity_for_ns: self
@@ -575,32 +575,38 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         }
     }
 
-    fn expiry_for(&self, received_at_ns: Timestamp, item: &Item) -> Timestamp {
+    fn capped_expiry_ns(&self, received_at_ns: Timestamp, item: &Item) -> Timestamp {
         let limit = received_at_ns.saturating_add(self.config.discard_entries_after_ns);
         item.expires_at_ns()
             .map_or(limit, |chosen| chosen.min(limit))
     }
 
-    fn holds(&self, sender: &Sender, key: &Item::Key) -> bool {
+    fn sender_holds_key(&self, sender: &Sender, key: &Item::Key) -> bool {
         self.senders
             .get(sender)
             .is_some_and(|queue| queue.placement.contains_key(key))
     }
 
-    fn refresh(&mut self, sender: &Sender, key: &Item::Key, item: Item, candidate_ns: Timestamp) {
+    fn replace_queued_entry(
+        &mut self,
+        sender: &Sender,
+        key: &Item::Key,
+        item: Item,
+        candidate_ns: Timestamp,
+    ) {
         let max_lifetime_ns = self.config.max_lifetime_ns;
         if let Some(queue) = self.senders.get_mut(sender) {
-            queue.refresh(key, item, candidate_ns, max_lifetime_ns);
+            queue.replace_entry(key, item, candidate_ns, max_lifetime_ns);
         }
     }
 
-    fn pending_for(&self, sender: &Sender, group: &Item::Group) -> usize {
+    fn pending_in_group(&self, sender: &Sender, group: &Item::Group) -> usize {
         self.senders
             .get(sender)
-            .map_or(0, |queue| queue.pending(group))
+            .map_or(0, |queue| queue.pending_in_group(group))
     }
 
-    fn group_pressure_since(
+    fn record_group_refusal(
         &mut self,
         sender: &Sender,
         group: &Item::Group,
@@ -609,21 +615,21 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         self.senders
             .entry(sender.clone())
             .or_insert_with(SenderQueue::new)
-            .group_pressure_since(group, now_ns)
+            .record_group_refusal(group, now_ns)
     }
 
-    fn sender_pressure_since(&mut self, sender: &Sender, now_ns: Timestamp) -> Timestamp {
+    fn record_sender_refusal(&mut self, sender: &Sender, now_ns: Timestamp) -> Timestamp {
         self.senders
             .entry(sender.clone())
             .or_insert_with(SenderQueue::new)
-            .sender_pressure_since(now_ns)
+            .record_sender_refusal(now_ns)
     }
 
-    fn is_full(&self) -> bool {
+    fn queue_is_full(&self) -> bool {
         self.stored_total >= self.config.max_entries
     }
 
-    fn sender_at_cap(&self, sender: &Sender) -> bool {
+    fn sender_is_at_cap(&self, sender: &Sender) -> bool {
         let held = self.senders.get(sender).map_or(0, SenderQueue::len);
         held >= self.sender_cap()
     }
@@ -635,10 +641,10 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
             .min(self.config.max_entries / self.senders.len().max(1))
     }
 
-    fn depth(&self, sender: &Sender, lane: usize) -> usize {
+    fn lane_len(&self, sender: &Sender, lane: usize) -> usize {
         self.senders
             .get(sender)
-            .map_or(0, |queue| queue.depth(lane))
+            .map_or(0, |queue| queue.lane_len(lane))
     }
 
     /// Split the sender cap by turns across this lane and those that hold entries or held
@@ -646,21 +652,25 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
     fn lane_cap(&self, sender: &Sender, lane: usize, now_ns: Timestamp) -> usize {
         let window_ns = self.config.discard_entries_after_ns;
         let held_ns = self.lane_held_ns.get(sender);
-        let busy_turns: usize = (0..lanes::<Item>())
+        let busy_turns: usize = (0..lane_count::<Item>())
             .filter(|&other| {
                 other == lane
-                    || self.depth(sender, other) > 0
+                    || self.lane_len(sender, other) > 0
                     || held_ns
                         .and_then(|held| held[other])
                         .is_some_and(|at| now_ns.saturating_sub(at) < window_ns)
             })
-            .map(turns::<Item>)
+            .map(turns_for_lane::<Item>)
             .sum();
-        (self.sender_cap().saturating_mul(turns::<Item>(lane)) / busy_turns.max(1)).max(1)
+        (self
+            .sender_cap()
+            .saturating_mul(turns_for_lane::<Item>(lane))
+            / busy_turns.max(1))
+        .max(1)
     }
 
     /// Whether the lane has room, and drains what is due before the entry by its deadline.
-    fn drains_in_time(
+    fn lane_has_room_for(
         &self,
         sender: &Sender,
         lane: usize,
@@ -669,7 +679,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         now_ns: Timestamp,
     ) -> bool {
         let cap = self.lane_cap(sender, lane, now_ns);
-        let depth = self.depth(sender, lane);
+        let depth = self.lane_len(sender, lane);
         if depth >= cap {
             return false;
         }
@@ -678,14 +688,12 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         let in_time =
             ((cap as u64).saturating_mul(due_in_ns) / window_ns).clamp(1, cap as u64) as usize;
         depth < in_time
-            || self
-                .senders
-                .get(sender)
-                .map_or(0, |queue| queue.ahead_of(lane, expires_at_ns, key, in_time))
-                < in_time
+            || self.senders.get(sender).map_or(0, |queue| {
+                queue.count_due_before(lane, expires_at_ns, key, in_time)
+            }) < in_time
     }
 
-    fn lane_pressure_since(
+    fn record_lane_refusal(
         &mut self,
         sender: &Sender,
         lane: usize,
@@ -693,14 +701,14 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
     ) -> Timestamp {
         self.senders
             .get_mut(sender)
-            .map_or(now_ns, |queue| queue.lane_pressure_since(lane, now_ns))
+            .map_or(now_ns, |queue| queue.record_lane_refusal(lane, now_ns))
     }
 
-    fn note_held(&mut self, sender: &Sender, lane: usize, at_ns: Timestamp) {
+    fn record_lane_held(&mut self, sender: &Sender, lane: usize, at_ns: Timestamp) {
         let held = self
             .lane_held_ns
             .entry(sender.clone())
-            .or_insert_with(|| vec![None; lanes::<Item>()]);
+            .or_insert_with(|| vec![None; lane_count::<Item>()]);
         held[lane] = held[lane].max(Some(at_ns));
     }
 
@@ -716,7 +724,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         });
     }
 
-    fn insert(&mut self, sender: &Sender, entry: Entry<Item>) {
+    fn add_admitted_entry(&mut self, sender: &Sender, entry: Entry<Item>) {
         let received_at_ns = entry.received_at_ns;
         if self.stored_total == 0 {
             self.nonempty_since_ns = Some(received_at_ns);
@@ -724,67 +732,67 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         self.senders
             .entry(sender.clone())
             .or_insert_with(SenderQueue::new)
-            .insert(entry);
+            .add_admitted_entry(entry);
         self.stored_total += 1;
-        if self.is_full() {
+        if self.queue_is_full() {
             self.at_capacity_since_ns.get_or_insert(received_at_ns);
         }
     }
 
-    fn put_back(&mut self, sender: &Sender, entry: Entry<Item>) {
+    fn put_back_entry(&mut self, sender: &Sender, entry: Entry<Item>) {
         self.senders
             .entry(sender.clone())
             .or_insert_with(SenderQueue::new)
-            .place(entry);
+            .add_entry(entry);
         self.stored_total += 1;
     }
 
-    /// Discard expired entries before they consume priority turns.
-    fn pop_live(&mut self, sender: &Sender, now_ns: Timestamp) -> Option<Entry<Item>> {
-        self.discard_expired_for(sender, now_ns);
-        self.pop_front(sender, now_ns)
+    /// Discard expired entries before they consume lane turns.
+    fn take_live_entry(&mut self, sender: &Sender, now_ns: Timestamp) -> Option<Entry<Item>> {
+        self.discard_sender_expired(sender, now_ns);
+        self.take_next_entry(sender, now_ns)
     }
 
-    fn pop_front(&mut self, sender: &Sender, now_ns: Timestamp) -> Option<Entry<Item>> {
+    fn take_next_entry(&mut self, sender: &Sender, now_ns: Timestamp) -> Option<Entry<Item>> {
         let max_pending_per_group = self.config.max_pending_per_group;
         let queue = self.senders.get_mut(sender)?;
-        let (priority, expires_at_ns, key) = queue.next_to_take()?;
-        let entry = queue.remove(priority, expires_at_ns, &key, max_pending_per_group)?;
+        let (priority, expires_at_ns, key) = queue.take_lane_turn()?;
+        let entry = queue.remove_entry(priority, expires_at_ns, &key, max_pending_per_group)?;
         let emptied = queue.is_empty();
-        self.after_removal(sender, emptied);
-        self.note_held(sender, priority, now_ns);
+        self.account_for_removal(sender, emptied);
+        self.record_lane_held(sender, priority, now_ns);
         Some(entry)
     }
 
-    fn discard_expired(&mut self, now_ns: Timestamp) {
+    fn discard_all_expired(&mut self, now_ns: Timestamp) {
         for sender in self.senders.keys().cloned().collect::<Vec<_>>() {
-            self.discard_expired_for(&sender, now_ns);
+            self.discard_sender_expired(&sender, now_ns);
         }
     }
 
-    fn discard_expired_for(&mut self, sender: &Sender, now_ns: Timestamp) {
+    fn discard_sender_expired(&mut self, sender: &Sender, now_ns: Timestamp) {
         let max_pending_per_group = self.config.max_pending_per_group;
-        for priority in 0..lanes::<Item>() {
+        for priority in 0..lane_count::<Item>() {
             loop {
                 let Some(queue) = self.senders.get_mut(sender) else {
                     return;
                 };
-                let Some((expires_at_ns, key)) = queue.first_at(priority) else {
+                let Some((expires_at_ns, key)) = queue.first_in_lane(priority) else {
                     break;
                 };
                 if expires_at_ns > now_ns {
                     break;
                 }
-                queue.remove(priority, expires_at_ns, &key, max_pending_per_group);
+                queue.remove_entry(priority, expires_at_ns, &key, max_pending_per_group);
                 let emptied = queue.is_empty();
-                self.after_removal(sender, emptied);
-                self.note_held(sender, priority, expires_at_ns);
+                self.account_for_removal(sender, emptied);
+                self.record_lane_held(sender, priority, expires_at_ns);
                 self.discarded_expired += 1;
             }
         }
     }
 
-    fn after_removal(&mut self, sender: &Sender, emptied: bool) {
+    fn account_for_removal(&mut self, sender: &Sender, emptied: bool) {
         if emptied {
             self.senders.remove(sender);
         }
@@ -798,7 +806,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
     }
 
     /// Resume at the next remaining sender if the saved cursor was removed.
-    fn advance_cursor(&mut self) -> Option<Sender> {
+    fn next_sender_in_rotation(&mut self) -> Option<Sender> {
         if self.senders.is_empty() {
             self.next_sender = None;
             return None;
@@ -855,7 +863,7 @@ mod tests {
     struct TestItem {
         group: u8,
         id: u8,
-        priority: usize,
+        lane: usize,
         expires_at_ns: Option<Timestamp>,
     }
 
@@ -872,8 +880,8 @@ mod tests {
             self.group
         }
 
-        fn priority(&self) -> usize {
-            self.priority
+        fn lane(&self) -> usize {
+            self.lane
         }
 
         fn expires_at_ns(&self) -> Option<Timestamp> {
@@ -887,14 +895,14 @@ mod tests {
         TestItem {
             group,
             id,
-            priority: 0,
+            lane: 0,
             expires_at_ns: None,
         }
     }
 
-    fn at_priority(group: u8, id: u8, priority: usize) -> TestItem {
+    fn in_lane(group: u8, id: u8, lane: usize) -> TestItem {
         TestItem {
-            priority,
+            lane,
             ..item(group, id)
         }
     }
@@ -1066,11 +1074,11 @@ mod tests {
     #[test]
     fn a_resend_moves_the_entry_into_the_lane_it_now_asks_for() {
         let mut backlog = TestQueue::new(config(), 0);
-        backlog.admit(1, vec![at_priority(1, 1, 1)], 1);
-        backlog.admit(1, vec![at_priority(2, 2, 1)], 2);
+        backlog.admit(1, vec![in_lane(1, 1, 1)], 1);
+        backlog.admit(1, vec![in_lane(2, 2, 1)], 2);
 
         // Both sat in the same lane, (2, 2) ahead on the nearer deadline.
-        backlog.admit(1, vec![at_priority(1, 1, 0)], 3);
+        backlog.admit(1, vec![in_lane(1, 1, 0)], 3);
 
         assert_eq!(
             keys_taken(&backlog.remove_batch(2, 4)),
@@ -1109,7 +1117,7 @@ mod tests {
         assert_eq!(sender_hint_at(&mut backlog, 5), 1_000);
         assert_eq!(sender_hint_at(&mut backlog, 25), 4_000);
 
-        assert!(!backlog.is_full());
+        assert!(!backlog.queue_is_full());
         assert_eq!(backlog.stats(25).at_capacity_for_ns, None);
     }
 
@@ -1188,11 +1196,7 @@ mod tests {
         admit_each(
             &mut backlog,
             1,
-            vec![
-                at_priority(1, 1, 1),
-                at_priority(2, 2, 1),
-                at_priority(3, 3, 0),
-            ],
+            vec![in_lane(1, 1, 1), in_lane(2, 2, 1), in_lane(3, 3, 0)],
             1,
         );
 
@@ -1203,7 +1207,7 @@ mod tests {
 
     #[test]
     fn a_busy_high_priority_still_hands_turns_to_the_low_one() {
-        // Priority 0 gets two turns; priority 1 gets one.
+        // Lane 0 gets two turns; lane 1 gets one.
         let mut backlog = TestQueue::new(roomy_config(), 0);
         admit_each(
             &mut backlog,
@@ -1212,9 +1216,9 @@ mod tests {
                 item(1, 1),
                 item(2, 2),
                 item(3, 3),
-                at_priority(4, 4, 1),
-                at_priority(5, 5, 1),
-                at_priority(6, 6, 1),
+                in_lane(4, 4, 1),
+                in_lane(5, 5, 1),
+                in_lane(6, 6, 1),
             ],
             1,
         );
@@ -1229,7 +1233,7 @@ mod tests {
     #[test]
     fn a_lane_alone_may_hold_the_whole_sender_share() {
         let mut backlog = TestQueue::new(roomy_config(), 0);
-        let low: Vec<_> = (1..=9).map(|id| at_priority(id, id, 1)).collect();
+        let low: Vec<_> = (1..=9).map(|id| in_lane(id, id, 1)).collect();
 
         assert_eq!(
             results(backlog.admit(1, low, 1)),
@@ -1240,7 +1244,7 @@ mod tests {
     #[test]
     fn busy_lanes_split_the_sender_share_by_their_turns() {
         let mut backlog = TestQueue::new(roomy_config(), 0);
-        let low = (2..=5).map(|id| at_priority(id, id, 1));
+        let low = (2..=5).map(|id| in_lane(id, id, 1));
 
         // The high item lands first, so the low ones already see its lane busy.
         let admissions =
@@ -1269,7 +1273,7 @@ mod tests {
         backlog.remove_batch(10, 2);
         assert_eq!(backlog.stats(2).active_senders, 0);
 
-        let low: Vec<_> = (1..=4).map(|id| at_priority(id, id, 1)).collect();
+        let low: Vec<_> = (1..=4).map(|id| in_lane(id, id, 1)).collect();
         let admissions = results(backlog.admit(1, low, 3));
 
         assert_eq!(
@@ -1294,7 +1298,7 @@ mod tests {
         backlog.remove_batch(10, 102);
         assert!(backlog.lane_held_ns.is_empty());
 
-        let low: Vec<_> = (1..=9).map(|id| at_priority(id, id, 1)).collect();
+        let low: Vec<_> = (1..=9).map(|id| in_lane(id, id, 1)).collect();
         assert_eq!(
             results(backlog.admit(1, low, 102)),
             vec![Admission::Accepted; 9]
@@ -1307,8 +1311,8 @@ mod tests {
         backlog.admit(1, vec![expiring(1, 1, 10)], 1);
 
         // Discarded at 105, but it last held an entry at 10, a full window before 110.
-        backlog.admit(1, vec![at_priority(2, 2, 1)], 105);
-        let low: Vec<_> = (3..=10).map(|id| at_priority(id, id, 1)).collect();
+        backlog.admit(1, vec![in_lane(2, 2, 1)], 105);
+        let low: Vec<_> = (3..=10).map(|id| in_lane(id, id, 1)).collect();
 
         assert_eq!(
             results(backlog.admit(1, low, 110)),
@@ -1353,7 +1357,7 @@ mod tests {
         );
 
         assert_eq!(
-            results(backlog.admit(1, vec![item(1, 1), at_priority(2, 2, 1)], 1)),
+            results(backlog.admit(1, vec![item(1, 1), in_lane(2, 2, 1)], 1)),
             vec![Admission::Accepted; 2]
         );
     }
@@ -1361,11 +1365,11 @@ mod tests {
     #[test]
     fn a_full_lane_is_sent_away_for_longer_while_other_lanes_keep_admitting() {
         let mut backlog = TestQueue::new(roomy_config(), 0);
-        let low: Vec<_> = (1..=3).map(|id| at_priority(id, id, 1)).collect();
+        let low: Vec<_> = (1..=3).map(|id| in_lane(id, id, 1)).collect();
         backlog.admit(1, [vec![item(9, 9)], low].concat(), 1);
 
         let hint = |backlog: &mut TestQueue, now_ns| {
-            results(backlog.admit(1, vec![at_priority(4, 4, 1)], now_ns))
+            results(backlog.admit(1, vec![in_lane(4, 4, 1)], now_ns))
         };
         assert_eq!(
             hint(&mut backlog, 5),
@@ -1387,7 +1391,7 @@ mod tests {
     fn an_out_of_range_priority_is_clamped_rather_than_panicking() {
         let mut backlog = TestQueue::new(config(), 0);
 
-        backlog.admit(1, vec![at_priority(1, 1, 99)], 1);
+        backlog.admit(1, vec![in_lane(1, 1, 99)], 1);
 
         assert_eq!(keys_taken(&backlog.remove_batch(10, 2)), vec![(1, 1)]);
     }
@@ -1788,10 +1792,10 @@ mod tests {
     #[test]
     fn a_batch_the_caller_cannot_store_keeps_its_lanes_backoff_running() {
         let mut backlog = TestQueue::new(roomy_config(), 0);
-        let low: Vec<_> = (1..=3).map(|id| at_priority(id, id, 1)).collect();
+        let low: Vec<_> = (1..=3).map(|id| in_lane(id, id, 1)).collect();
         backlog.admit(1, [vec![item(9, 9)], low].concat(), 1);
         let refused = |backlog: &mut TestQueue, now_ns| {
-            results(backlog.admit(1, vec![at_priority(4, 4, 1)], now_ns))
+            results(backlog.admit(1, vec![in_lane(4, 4, 1)], now_ns))
         };
         assert_eq!(
             refused(&mut backlog, 5),
@@ -1963,7 +1967,7 @@ mod tests {
             fn group(&self) -> u8 {
                 self.0
             }
-            fn priority(&self) -> usize {
+            fn lane(&self) -> usize {
                 7
             }
         }
