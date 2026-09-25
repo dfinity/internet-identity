@@ -88,7 +88,7 @@ pub fn submit(
 
 /// The identity a principal names at `origin`. No such recipient when it names none
 /// there, or when none of its browsers was used within [`BROWSER_GONE_AFTER_NS`]. No
-/// channel when it has not allowed the app, or no live browser is registered for Web Push.
+/// channel when it has not allowed the app, or no browser can be woken now.
 fn resolve_recipient(
     recipient: Principal,
     origin: &FrontendHostname,
@@ -102,12 +102,11 @@ fn resolve_recipient(
         let anchor = storage
             .read(account.anchor_number)
             .map_err(|_| NotAcceptedReason::NoSuchRecipient)?;
-        let live: Vec<_> = anchor
+        let live = anchor
             .browsers()
             .iter()
-            .filter(|browser| now_ns.saturating_sub(browser.last_used) < BROWSER_GONE_AFTER_NS)
-            .collect();
-        if live.is_empty() {
+            .any(|browser| now_ns.saturating_sub(browser.last_used) < BROWSER_GONE_AFTER_NS);
+        if !live {
             return Err(NotAcceptedReason::NoSuchRecipient);
         }
         let consented = storage
@@ -115,9 +114,10 @@ fn resolve_recipient(
             .and_then(|config| config.notifications_consented_at_ns)
             .is_some();
         if !consented
-            || live
+            || !anchor
+                .browsers()
                 .iter()
-                .all(|browser| browser.webpush_subscription.is_none())
+                .any(|browser| dispatch::wake_up_jwt(browser, now_ns).is_some())
         {
             return Err(NotAcceptedReason::NoChannel);
         }
@@ -282,6 +282,19 @@ mod tests {
 
         assert_eq!(
             send(vec![notification(&recipient, 7)], NOW_NS),
+            vec![rejected(&recipient, 7, NotAcceptedReason::NoChannel)]
+        );
+    }
+
+    /// The pass would skip it, so the app would hear nothing of a notification never sent.
+    #[test]
+    fn an_identity_whose_browser_spent_its_signed_pool_has_no_channel() {
+        setup();
+        let recipient = reachable();
+        let spent = 3 * 24 * 60 * 60 * 1_000_000_000 + NOW_NS;
+
+        assert_eq!(
+            send(vec![notification(&recipient, 7)], spent),
             vec![rejected(&recipient, 7, NotAcceptedReason::NoChannel)]
         );
     }
