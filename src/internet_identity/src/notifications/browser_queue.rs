@@ -1,11 +1,11 @@
 //! What each browser's service worker has yet to show, one entry per wake-up sent.
-//! An entry is added before its wake-up is posted and the service worker takes the
-//! oldest on every wake-up, so wake-ups and shown notifications stay one to one. The
-//! queue lives on the browser entry, so it goes with the browser and its registration.
+//! An entry is added before its wake-up is posted, and the service worker removes the
+//! one it shows on every wake-up, so wake-ups and shown notifications stay one to one.
+//! The queue lives on the browser's Web Push subscription, so it goes with it.
 // Filled by the dispatcher, which the submission endpoint kicks in a follow-up PR.
 #![allow(dead_code)]
 
-use crate::state::storage_borrow_mut;
+use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, QueuedNotification};
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, FrontendHostname, NotificationToShow, Timestamp,
@@ -110,47 +110,62 @@ pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &FrontendHostname)
     });
 }
 
-/// Take the oldest entry still worth showing, dropping on the way what expired or
-/// belongs to an app that lost consent or that II no longer holds.
-pub(crate) fn take_next(
-    mut anchor: Anchor,
+/// What the browser has yet to show, oldest first, leaving out what expired or belongs
+/// to an app that lost consent or that II no longer holds.
+pub(crate) fn to_show(
+    anchor: &Anchor,
     browser_id: BrowserId,
     now_ns: Timestamp,
-) -> Result<Option<NotificationToShow>, String> {
+) -> Vec<NotificationToShow> {
     let anchor_number = anchor.anchor_number();
-    storage_borrow_mut(|storage| {
-        let Some(queue) = anchor.notifications_mut(browser_id) else {
-            return Ok(None);
-        };
-        if queue.is_empty() {
-            return Ok(None);
-        }
-        let mut shown = None;
-        while shown.is_none() && !queue.is_empty() {
-            let queued = queue.remove(0);
-            if queued.expires_at_ns <= now_ns {
-                continue;
-            }
-            let Some(origin) =
-                storage.lookup_origin_with_application_number(queued.application_number)
-            else {
-                continue;
-            };
-            let consented = storage
-                .read_anchor_application_config(anchor_number, &origin)
-                .and_then(|config| config.notifications_consented_at_ns)
-                .is_some();
-            if consented {
-                shown = Some(NotificationToShow {
+    storage_borrow(|storage| {
+        anchor
+            .notifications(browser_id)
+            .iter()
+            .filter(|queued| queued.expires_at_ns > now_ns)
+            .filter_map(|queued| {
+                let origin =
+                    storage.lookup_origin_with_application_number(queued.application_number)?;
+                let consented = storage
+                    .read_anchor_application_config(anchor_number, &origin)
+                    .and_then(|config| config.notifications_consented_at_ns)
+                    .is_some();
+                consented.then_some(NotificationToShow {
                     origin,
                     account_number: queued.account_number,
                     canister_id: queued.sender,
                     id: queued.notification_id,
-                });
-            }
-        }
-        storage.write(anchor).map_err(|err| format!("{err}"))?;
-        Ok(shown)
+                })
+            })
+            .collect()
+    })
+}
+
+/// Remove the entry the service worker shows. One already gone is no error: expiry, a
+/// full queue or a failed wake-up may have dropped it first.
+pub(crate) fn remove_shown(
+    mut anchor: Anchor,
+    browser_id: BrowserId,
+    shown: &NotificationToShow,
+) -> Result<(), String> {
+    storage_borrow_mut(|storage| {
+        let Some(application_number) = storage.lookup_application_number_with_origin(&shown.origin)
+        else {
+            return Ok(());
+        };
+        let Some(queue) = anchor.notifications_mut(browser_id) else {
+            return Ok(());
+        };
+        let Some(position) = queue.iter().position(|queued| {
+            queued.application_number == application_number
+                && queued.sender == shown.canister_id
+                && queued.notification_id == shown.id
+                && queued.account_number == shown.account_number
+        }) else {
+            return Ok(());
+        };
+        queue.remove(position);
+        storage.write(anchor).map_err(|err| format!("{err}"))
     })
 }
 
@@ -280,12 +295,19 @@ mod tests {
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }
 
-    fn take(
+    fn shown(anchor_number: AnchorNumber, browser_id: BrowserId, now_ns: Timestamp) -> Vec<u64> {
+        to_show(&anchor(anchor_number), browser_id, now_ns)
+            .iter()
+            .map(|one| one.id)
+            .collect()
+    }
+
+    fn remove(
         anchor_number: AnchorNumber,
         browser_id: BrowserId,
-        now_ns: Timestamp,
-    ) -> Option<NotificationToShow> {
-        take_next(anchor(anchor_number), browser_id, now_ns).expect("taking")
+        notification: &NotificationToShow,
+    ) {
+        remove_shown(anchor(anchor_number), browser_id, notification).expect("removing");
     }
 
     fn left_for(anchor_number: AnchorNumber, browser_id: BrowserId) -> Vec<u64> {
@@ -293,7 +315,7 @@ mod tests {
     }
 
     #[test]
-    fn the_service_worker_takes_the_oldest_first() {
+    fn the_service_worker_sees_the_oldest_first_and_nothing_is_removed() {
         let (anchor_number, browser_id) = signed_in();
         let for_account = QueuedNotification {
             account_number: Some(3),
@@ -305,29 +327,33 @@ mod tests {
             [for_account, from_app(8, 60 * SECOND_NS)],
         );
 
-        let first = take(anchor_number, browser_id, 2 * SECOND_NS).expect("nothing to take");
+        let listed = to_show(&anchor(anchor_number), browser_id, 2 * SECOND_NS);
 
         assert_eq!(
-            first,
-            NotificationToShow {
+            listed.first(),
+            Some(&NotificationToShow {
                 origin: ORIGIN.to_string(),
                 account_number: Some(3),
                 canister_id: Principal::from_slice(&[7; 10]),
                 id: 7,
-            }
+            })
         );
-        assert_eq!(left_for(anchor_number, browser_id), vec![8]);
+        assert_eq!(
+            listed.iter().map(|one| one.id).collect::<Vec<_>>(),
+            vec![7, 8]
+        );
+        assert_eq!(left_for(anchor_number, browser_id), vec![7, 8]);
     }
 
     #[test]
-    fn an_empty_queue_has_nothing_to_take() {
+    fn an_empty_queue_has_nothing_to_show() {
         let (anchor_number, browser_id) = signed_in();
 
-        assert_eq!(take(anchor_number, browser_id, SECOND_NS), None);
+        assert!(shown(anchor_number, browser_id, SECOND_NS).is_empty());
     }
 
     #[test]
-    fn taking_skips_what_expired() {
+    fn what_expired_is_not_shown() {
         let (anchor_number, browser_id) = signed_in();
         enqueue(
             anchor_number,
@@ -335,14 +361,11 @@ mod tests {
             [from_app(1, 2 * SECOND_NS), from_app(2, 60 * SECOND_NS)],
         );
 
-        let taken = take(anchor_number, browser_id, 3 * SECOND_NS).expect("nothing to take");
-
-        assert_eq!(taken.id, 2);
-        assert!(left_for(anchor_number, browser_id).is_empty());
+        assert_eq!(shown(anchor_number, browser_id, 3 * SECOND_NS), vec![2]);
     }
 
     #[test]
-    fn taking_skips_an_app_ii_no_longer_holds() {
+    fn an_app_ii_no_longer_holds_is_not_shown() {
         let (anchor_number, browser_id) = signed_in();
         let unknown = QueuedNotification {
             application_number: u64::MAX,
@@ -354,20 +377,17 @@ mod tests {
             [unknown, from_app(2, 60 * SECOND_NS)],
         );
 
-        let taken = take(anchor_number, browser_id, 2 * SECOND_NS).expect("nothing to take");
-
-        assert_eq!(taken.id, 2);
+        assert_eq!(shown(anchor_number, browser_id, 2 * SECOND_NS), vec![2]);
     }
 
     #[test]
-    fn taking_skips_an_app_that_lost_consent() {
+    fn an_app_that_lost_consent_is_not_shown() {
         let (anchor_number, browser_id) = signed_in();
         enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
         write_consent(anchor_number, &ORIGIN.to_string(), None, SECOND_NS)
             .expect("revoking consent");
 
-        assert_eq!(take(anchor_number, browser_id, 2 * SECOND_NS), None);
-        assert!(left_for(anchor_number, browser_id).is_empty());
+        assert!(shown(anchor_number, browser_id, 2 * SECOND_NS).is_empty());
     }
 
     #[test]
@@ -391,12 +411,12 @@ mod tests {
         )
         .expect("granting consent again");
 
-        assert_eq!(take(anchor_number, browser_id, 2 * SECOND_NS), None);
+        assert!(shown(anchor_number, browser_id, 2 * SECOND_NS).is_empty());
         assert!(left_for(anchor_number, browser_id).is_empty());
     }
 
     #[test]
-    fn a_signed_out_browser_takes_nothing() {
+    fn a_signed_out_browser_is_shown_nothing() {
         let (anchor_number, browser_id) = signed_in();
         enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
         storage_borrow_mut(|storage| {
@@ -404,7 +424,60 @@ mod tests {
         })
         .expect("signing the browser out");
 
-        assert_eq!(take(anchor_number, browser_id, 2 * SECOND_NS), None);
+        assert!(shown(anchor_number, browser_id, 2 * SECOND_NS).is_empty());
         assert!(left_for(anchor_number, browser_id).is_empty());
+    }
+
+    #[test]
+    fn removing_what_is_shown_leaves_the_rest() {
+        let (anchor_number, browser_id) = signed_in();
+        enqueue(
+            anchor_number,
+            browser_id,
+            [from_app(7, 60 * SECOND_NS), from_app(8, 60 * SECOND_NS)],
+        );
+        let listed = to_show(&anchor(anchor_number), browser_id, 2 * SECOND_NS);
+
+        remove(anchor_number, browser_id, &listed[1]);
+
+        assert_eq!(left_for(anchor_number, browser_id), vec![7]);
+    }
+
+    #[test]
+    fn removing_tells_accounts_apart() {
+        let (anchor_number, browser_id) = signed_in();
+        let for_account = QueuedNotification {
+            account_number: Some(3),
+            ..from_app(7, 60 * SECOND_NS)
+        };
+        enqueue(
+            anchor_number,
+            browser_id,
+            [from_app(7, 60 * SECOND_NS), for_account],
+        );
+        let listed = to_show(&anchor(anchor_number), browser_id, 2 * SECOND_NS);
+
+        remove(anchor_number, browser_id, &listed[1]);
+
+        assert_eq!(
+            anchor(anchor_number).notifications(browser_id),
+            [from_app(7, 60 * SECOND_NS)]
+        );
+    }
+
+    #[test]
+    fn removing_what_is_no_longer_queued_changes_nothing() {
+        let (anchor_number, browser_id) = signed_in();
+        enqueue(anchor_number, browser_id, [from_app(7, 60 * SECOND_NS)]);
+        let gone = NotificationToShow {
+            origin: ORIGIN.to_string(),
+            account_number: None,
+            canister_id: Principal::from_slice(&[7; 10]),
+            id: 8,
+        };
+
+        remove(anchor_number, browser_id, &gone);
+
+        assert_eq!(left_for(anchor_number, browser_id), vec![7]);
     }
 }

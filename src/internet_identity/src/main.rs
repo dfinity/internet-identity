@@ -45,10 +45,10 @@ use notifications::webpush::{
     ValidatedSetWebPushSubscriptionRequest,
 };
 use notifications::{
-    ValidatedGetNotificationDelegationRequest, ValidatedNotificationConsentGrantedRequest,
-    ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
-    ValidatedPrepareNotificationDelegationRequest, ValidatedSendNotificationArg,
-    ValidatedTakeNextNotificationRequest,
+    ValidatedGetNotificationDelegationRequest, ValidatedGetQueuedNotificationsRequest,
+    ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
+    ValidatedNotificationRevokeConsentRequest, ValidatedPrepareNotificationDelegationRequest,
+    ValidatedRemoveQueuedNotificationRequest, ValidatedSendNotificationArg,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -408,18 +408,34 @@ fn get_notification_delegation(
     notifications::delegation::get(request, &anchor, browser_id)
 }
 
-/// Authorized by the browser key the caller signs with: a service worker takes from its
-/// own browser's queue.
-#[update]
-fn take_next_notification(
-    request: TakeNextNotificationRequest,
-) -> Result<Option<NotificationToShow>, TakeNextNotificationError> {
-    let request: ValidatedTakeNextNotificationRequest = request.try_into()?;
+/// Authorized by the browser key the caller signs with: a service worker reads its own
+/// browser's queue.
+#[query]
+fn get_queued_notifications(
+    request: GetQueuedNotificationsRequest,
+) -> Result<Vec<NotificationToShow>, QueuedNotificationError> {
+    let request: ValidatedGetQueuedNotificationsRequest = request.try_into()?;
     let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
-        .map_err(|_| TakeNextNotificationError::InvalidBrowserKey)?;
+        .map_err(|_| QueuedNotificationError::InvalidBrowserKey)?;
 
-    notifications::browser_queue::take_next(anchor, browser_id, ic_cdk::api::time())
-        .map_err(TakeNextNotificationError::InternalCanisterError)
+    Ok(notifications::browser_queue::to_show(
+        &anchor,
+        browser_id,
+        ic_cdk::api::time(),
+    ))
+}
+
+/// Authorized by the browser key the caller signs with, like the read it follows.
+#[update]
+fn remove_queued_notification(
+    request: RemoveQueuedNotificationRequest,
+) -> Result<(), QueuedNotificationError> {
+    let request: ValidatedRemoveQueuedNotificationRequest = request.try_into()?;
+    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| QueuedNotificationError::InvalidBrowserKey)?;
+
+    notifications::browser_queue::remove_shown(anchor, browser_id, &request.notification)
+        .map_err(QueuedNotificationError::InternalCanisterError)
 }
 
 #[update]

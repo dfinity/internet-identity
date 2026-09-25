@@ -26,9 +26,10 @@ use internet_identity_interface::internet_identity::types::{
 };
 pub use validation::{
     notifications_enabled, ValidatedGetNotificationDelegationRequest,
-    ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
-    ValidatedNotificationRevokeConsentRequest, ValidatedPrepareNotificationDelegationRequest,
-    ValidatedSendNotificationArg, ValidatedTakeNextNotificationRequest,
+    ValidatedGetQueuedNotificationsRequest, ValidatedNotificationConsentGrantedRequest,
+    ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
+    ValidatedPrepareNotificationDelegationRequest, ValidatedRemoveQueuedNotificationRequest,
+    ValidatedSendNotificationArg,
 };
 
 /// Nothing was enqueued: the whole batch is the sender's to send again at

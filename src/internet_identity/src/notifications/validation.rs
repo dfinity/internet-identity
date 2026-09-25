@@ -4,12 +4,12 @@
 use crate::delegation::frontend_length_within_limit;
 use internet_identity_interface::internet_identity::types::attributes::remap_to_legacy_domain;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, FrontendHostname, GetNotificationDelegationRequest, Notification,
-    NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
-    NotificationGrantConsentRequest, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest, PrepareNotificationDelegationRequest, SendNotificationArg,
-    SendNotificationError, SessionKey, TakeNextNotificationError, TakeNextNotificationRequest,
-    Timestamp,
+    AccountNumber, AnchorNumber, FrontendHostname, GetNotificationDelegationRequest,
+    GetQueuedNotificationsRequest, Notification, NotificationConsentGrantedRequest,
+    NotificationDelegationError, NotificationGrantConsentError, NotificationGrantConsentRequest,
+    NotificationRevokeConsentError, NotificationRevokeConsentRequest, NotificationToShow,
+    PrepareNotificationDelegationRequest, QueuedNotificationError, RemoveQueuedNotificationRequest,
+    SendNotificationArg, SendNotificationError, SessionKey, Timestamp,
 };
 use std::collections::HashMap;
 use url::Url;
@@ -47,27 +47,56 @@ pub struct ValidatedSendNotificationArg {
     _validated: Validated,
 }
 
-pub struct ValidatedTakeNextNotificationRequest {
+pub struct ValidatedGetQueuedNotificationsRequest {
     pub anchor_number: AnchorNumber,
     _validated: Validated,
 }
 
-impl TryFrom<TakeNextNotificationRequest> for ValidatedTakeNextNotificationRequest {
-    type Error = TakeNextNotificationError;
+impl TryFrom<GetQueuedNotificationsRequest> for ValidatedGetQueuedNotificationsRequest {
+    type Error = QueuedNotificationError;
 
     fn try_from(
-        TakeNextNotificationRequest { anchor_number }: TakeNextNotificationRequest,
+        GetQueuedNotificationsRequest { anchor_number }: GetQueuedNotificationsRequest,
     ) -> Result<Self, Self::Error> {
-        if !notifications_enabled() {
-            return Err(TakeNextNotificationError::InternalCanisterError(
-                "notifications are not enabled".to_string(),
-            ));
-        }
+        ensure_notifications_enabled()?;
         Ok(Self {
             anchor_number,
             _validated: Validated,
         })
     }
+}
+
+pub struct ValidatedRemoveQueuedNotificationRequest {
+    pub anchor_number: AnchorNumber,
+    pub notification: NotificationToShow,
+    _validated: Validated,
+}
+
+impl TryFrom<RemoveQueuedNotificationRequest> for ValidatedRemoveQueuedNotificationRequest {
+    type Error = QueuedNotificationError;
+
+    fn try_from(
+        RemoveQueuedNotificationRequest {
+            anchor_number,
+            notification,
+        }: RemoveQueuedNotificationRequest,
+    ) -> Result<Self, Self::Error> {
+        ensure_notifications_enabled()?;
+        Ok(Self {
+            anchor_number,
+            notification,
+            _validated: Validated,
+        })
+    }
+}
+
+fn ensure_notifications_enabled() -> Result<(), QueuedNotificationError> {
+    if !notifications_enabled() {
+        return Err(QueuedNotificationError::InternalCanisterError(
+            "notifications are not enabled".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 impl TryFrom<NotificationGrantConsentRequest> for ValidatedNotificationGrantConsentRequest {

@@ -930,6 +930,7 @@ export interface GetNotificationDelegationResponse {
   'sender_info_signature' : Uint8Array | number[],
   'signed_delegation' : SignedDelegation,
 }
+export interface GetQueuedNotificationsRequest { 'anchor_number' : UserNumber }
 /**
  * Request for `get_sso_discovery_status`.
  */
@@ -1792,6 +1793,13 @@ export type PublicKey = Uint8Array | number[];
 export interface PublicKeyAuthn { 'pubkey' : PublicKey }
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
+export type QueuedNotificationError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
 /**
  * Rate limit configuration.
  * Currently only used for `register`.
@@ -1842,6 +1850,13 @@ export type RegistrationFlowNextStep = {
     'Finish' : null
   };
 export type RegistrationId = string;
+export interface RemoveQueuedNotificationRequest {
+  /**
+   * As get_queued_notifications listed it.
+   */
+  'notification' : NotificationToShow,
+  'anchor_number' : UserNumber,
+}
 export type RemoveWebPushSubscriptionError = {
     'InternalCanisterError' : string
   } |
@@ -2104,14 +2119,6 @@ export type StreamingStrategy = {
     'Callback' : { 'token' : Token, 'callback' : [Principal, string] }
   };
 export type Sub = string;
-export type TakeNextNotificationError = {
-    /**
-     * The caller signs with no key this identity is signed in from.
-     */
-    'InvalidBrowserKey' : null
-  } |
-  { 'InternalCanisterError' : string };
-export interface TakeNextNotificationRequest { 'anchor_number' : UserNumber }
 export type Timestamp = bigint;
 export type Token = {};
 export type UpdateAccountError = { 'AccountLimitReached' : null } |
@@ -2551,6 +2558,15 @@ export interface _SERVICE {
       { 'Err' : NotificationDelegationError }
   >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
+  /**
+   * Called by the service worker on a wake-up, signed with the browser key: what its
+   * browser has yet to show, oldest first. It shows one per wake-up.
+   */
+  'get_queued_notifications' : ActorMethod<
+    [GetQueuedNotificationsRequest],
+    { 'Ok' : Array<NotificationToShow> } |
+      { 'Err' : QueuedNotificationError }
+  >,
   'get_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, Timestamp],
     { 'Ok' : SignedDelegation } |
@@ -2901,6 +2917,14 @@ export interface _SERVICE {
   >,
   'remove' : ActorMethod<[UserNumber, DeviceKey], undefined>,
   /**
+   * Called by the service worker for the one it shows, while it fetches the content.
+   */
+  'remove_queued_notification' : ActorMethod<
+    [RemoveQueuedNotificationRequest],
+    { 'Ok' : null } |
+      { 'Err' : QueuedNotificationError }
+  >,
+  /**
    * Called by the identity, so one browser can silence another.
    */
   'remove_webpush_subscription' : ActorMethod<
@@ -2973,15 +2997,6 @@ export interface _SERVICE {
       { 'Pending' : null }
   >,
   'stats' : ActorMethod<[], InternetIdentityStats>,
-  /**
-   * Called by the service worker once per wake-up, signed with the browser key. Removes
-   * what it returns, so every wake-up shows exactly one notification.
-   */
-  'take_next_notification' : ActorMethod<
-    [TakeNextNotificationRequest],
-    { 'Ok' : [] | [NotificationToShow] } |
-      { 'Err' : TakeNextNotificationError }
-  >,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<
     [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],
