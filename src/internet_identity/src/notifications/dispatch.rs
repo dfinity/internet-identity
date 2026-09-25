@@ -439,7 +439,7 @@ mod tests {
         change(
             stored
                 .notifications_mut(browser_id)
-                .expect("a listed browser"),
+                .expect("a registered browser"),
         );
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }

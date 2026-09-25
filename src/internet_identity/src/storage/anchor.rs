@@ -102,9 +102,6 @@ pub struct Browser {
     pub session_count: u32,
     /// What this browser registered for Web Push, if anything.
     pub webpush_subscription: Option<WebPushSubscription>,
-    /// What its service worker has yet to show, oldest first. Goes with the
-    /// registration it was woken through.
-    pub notifications: Vec<QueuedNotification>,
 }
 
 /// A notification a browser's service worker has yet to take.
@@ -143,6 +140,9 @@ pub struct WebPushSubscription {
     /// Raw ECDSA P-256 signatures, in window order.
     pub jwt_signatures: Vec<Vec<u8>>,
     pub jwt_issued_at_ns: Timestamp,
+    /// What the service worker has yet to show, oldest first, each woken through this
+    /// registration.
+    pub notifications: Vec<QueuedNotification>,
 }
 
 impl From<StorableWebPushSubscription> for WebPushSubscription {
@@ -158,35 +158,6 @@ impl From<StorableWebPushSubscription> for WebPushSubscription {
                 .map(Vec::from)
                 .collect(),
             jwt_issued_at_ns: value.jwt_pool.issued_at_ns,
-        }
-    }
-}
-
-impl From<WebPushSubscription> for StorableWebPushSubscription {
-    fn from(value: WebPushSubscription) -> Self {
-        StorableWebPushSubscription {
-            endpoint: value.endpoint,
-            created_at_ns: value.created_at_ns,
-            vapid_public_key: value.vapid_public_key,
-            jwt_pool: StorableWebPushJwtPool {
-                signatures: value.jwt_signatures.into_iter().map(Into::into).collect(),
-                issued_at_ns: value.jwt_issued_at_ns,
-            },
-        }
-    }
-}
-
-impl From<StorableBrowser> for Browser {
-    fn from(value: StorableBrowser) -> Self {
-        Browser {
-            id: value.id,
-            current_browser_key: ByteBuf::from(value.current_browser_key),
-            next_browser_key: ByteBuf::from(value.next_browser_key),
-            description: BrowserDescription::from(value.description),
-            created_at: value.created_at,
-            last_used: value.last_used,
-            session_count: value.session_count,
-            webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
             notifications: value
                 .notifications
                 .unwrap_or_default()
@@ -205,6 +176,42 @@ impl From<StorableBrowser> for Browser {
     }
 }
 
+impl From<WebPushSubscription> for StorableWebPushSubscription {
+    fn from(value: WebPushSubscription) -> Self {
+        StorableWebPushSubscription {
+            endpoint: value.endpoint,
+            created_at_ns: value.created_at_ns,
+            vapid_public_key: value.vapid_public_key,
+            jwt_pool: StorableWebPushJwtPool {
+                signatures: value.jwt_signatures.into_iter().map(Into::into).collect(),
+                issued_at_ns: value.jwt_issued_at_ns,
+            },
+            notifications: (!value.notifications.is_empty()).then(|| {
+                value
+                    .notifications
+                    .into_iter()
+                    .map(StorableQueuedNotification::from)
+                    .collect()
+            }),
+        }
+    }
+}
+
+impl From<StorableBrowser> for Browser {
+    fn from(value: StorableBrowser) -> Self {
+        Browser {
+            id: value.id,
+            current_browser_key: ByteBuf::from(value.current_browser_key),
+            next_browser_key: ByteBuf::from(value.next_browser_key),
+            description: BrowserDescription::from(value.description),
+            created_at: value.created_at,
+            last_used: value.last_used,
+            session_count: value.session_count,
+            webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
+        }
+    }
+}
+
 impl From<Browser> for StorableBrowser {
     fn from(value: Browser) -> Self {
         StorableBrowser {
@@ -218,13 +225,6 @@ impl From<Browser> for StorableBrowser {
             webpush_subscription: value
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
-            notifications: (!value.notifications.is_empty()).then(|| {
-                value
-                    .notifications
-                    .into_iter()
-                    .map(StorableQueuedNotification::from)
-                    .collect()
-            }),
         }
     }
 }
@@ -872,29 +872,21 @@ impl Anchor {
     }
 
     /// Replaces what this browser registered. A browser the registry no longer lists
-    /// has nothing to register against, so the write is dropped. A new endpoint, or
-    /// none, empties the browser's queue, whose wake-ups went to the old one.
+    /// has nothing to register against, so the write is dropped.
     pub fn set_webpush_subscription(
         &mut self,
         browser_id: BrowserId,
         subscription: Option<WebPushSubscription>,
     ) {
         if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
-            let endpoint_changes = browser.webpush_subscription.as_ref().map(|s| &s.endpoint)
-                != subscription.as_ref().map(|s| &s.endpoint);
-            if endpoint_changes {
-                browser.notifications.clear();
-            }
             browser.webpush_subscription = subscription;
         }
     }
 
-    /// The browser's queue, empty for a browser the registry no longer lists.
+    /// The queue of the browser's registration, empty for one not registered.
     pub fn notifications(&self, browser_id: BrowserId) -> &[QueuedNotification] {
-        self.browsers
-            .iter()
-            .find(|browser| browser.id == browser_id)
-            .map_or(&[], |browser| &browser.notifications)
+        self.webpush_subscription(browser_id)
+            .map_or(&[], |subscription| &subscription.notifications)
     }
 
     pub fn notifications_mut(
@@ -904,7 +896,8 @@ impl Anchor {
         self.browsers
             .iter_mut()
             .find(|browser| browser.id == browser_id)
-            .map(|browser| &mut browser.notifications)
+            .and_then(|browser| browser.webpush_subscription.as_mut())
+            .map(|subscription| &mut subscription.notifications)
     }
 
     /// Moves each browser's session count by what a write added to or took from it.
@@ -1040,7 +1033,6 @@ impl Anchor {
             last_used: now,
             session_count: 0,
             webpush_subscription: None,
-            notifications: Vec::new(),
         });
 
         let mut dropped = vec![];

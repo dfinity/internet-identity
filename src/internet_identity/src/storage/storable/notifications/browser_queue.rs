@@ -1,5 +1,5 @@
-//! A notification a browser's service worker has yet to take, stored on the browser
-//! entry, so signing the browser out or letting the registry evict it takes it too.
+//! A notification a browser's service worker has yet to take, stored on the Web Push
+//! subscription it was woken through, so the registration going takes it too.
 
 use crate::storage::storable::timestamp::StorableTimestamp;
 use internet_identity_interface::internet_identity::types::{

@@ -52,6 +52,7 @@ mod tests {
             vapid_public_key: vec![4u8; 65],
             jwt_signatures: (0..windows).map(|window| vec![window as u8; 64]).collect(),
             jwt_issued_at_ns: issued_at_ns,
+            notifications: Vec::new(),
         }
     }
 
