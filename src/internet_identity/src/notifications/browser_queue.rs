@@ -110,34 +110,38 @@ pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &FrontendHostname)
     });
 }
 
-/// What the browser has yet to show, oldest first, leaving out what expired or belongs
-/// to an app that lost consent or that II no longer holds.
-pub(crate) fn to_show(
+/// The oldest entry the browser has yet to show, passing over what the service worker
+/// skips, what expired, and what belongs to an app that lost consent or that II no
+/// longer holds.
+pub(crate) fn next_to_show(
     anchor: &Anchor,
     browser_id: BrowserId,
+    skip: &[NotificationToShow],
     now_ns: Timestamp,
-) -> Vec<NotificationToShow> {
+) -> Option<NotificationToShow> {
     let anchor_number = anchor.anchor_number();
     storage_borrow(|storage| {
         anchor
             .notifications(browser_id)
             .iter()
             .filter(|queued| queued.expires_at_ns > now_ns)
-            .filter_map(|queued| {
+            .find_map(|queued| {
                 let origin =
                     storage.lookup_origin_with_application_number(queued.application_number)?;
-                let consented = storage
-                    .read_anchor_application_config(anchor_number, &origin)
-                    .and_then(|config| config.notifications_consented_at_ns)
-                    .is_some();
-                consented.then_some(NotificationToShow {
+                let notification = NotificationToShow {
                     origin,
                     account_number: queued.account_number,
                     canister_id: queued.sender,
                     id: queued.notification_id,
-                })
+                };
+                if skip.contains(&notification) {
+                    return None;
+                }
+                storage
+                    .read_anchor_application_config(anchor_number, &notification.origin)
+                    .and_then(|config| config.notifications_consented_at_ns)
+                    .map(|_| notification)
             })
-            .collect()
     })
 }
 
@@ -295,11 +299,21 @@ mod tests {
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }
 
-    fn shown(anchor_number: AnchorNumber, browser_id: BrowserId, now_ns: Timestamp) -> Vec<u64> {
-        to_show(&anchor(anchor_number), browser_id, now_ns)
-            .iter()
-            .map(|one| one.id)
-            .collect()
+    fn next(
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+        skip: &[NotificationToShow],
+        now_ns: Timestamp,
+    ) -> Option<NotificationToShow> {
+        next_to_show(&anchor(anchor_number), browser_id, skip, now_ns)
+    }
+
+    fn next_id(
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+        now_ns: Timestamp,
+    ) -> Option<u64> {
+        next(anchor_number, browser_id, &[], now_ns).map(|one| one.id)
     }
 
     fn remove(
@@ -315,7 +329,7 @@ mod tests {
     }
 
     #[test]
-    fn the_service_worker_sees_the_oldest_first_and_nothing_is_removed() {
+    fn the_next_is_the_oldest_and_nothing_is_removed() {
         let (anchor_number, browser_id) = signed_in();
         let for_account = QueuedNotification {
             account_number: Some(3),
@@ -327,33 +341,61 @@ mod tests {
             [for_account, from_app(8, 60 * SECOND_NS)],
         );
 
-        let listed = to_show(&anchor(anchor_number), browser_id, 2 * SECOND_NS);
-
         assert_eq!(
-            listed.first(),
-            Some(&NotificationToShow {
+            next(anchor_number, browser_id, &[], 2 * SECOND_NS),
+            Some(NotificationToShow {
                 origin: ORIGIN.to_string(),
                 account_number: Some(3),
                 canister_id: Principal::from_slice(&[7; 10]),
                 id: 7,
             })
         );
-        assert_eq!(
-            listed.iter().map(|one| one.id).collect::<Vec<_>>(),
-            vec![7, 8]
-        );
         assert_eq!(left_for(anchor_number, browser_id), vec![7, 8]);
     }
 
     #[test]
-    fn an_empty_queue_has_nothing_to_show() {
+    fn an_empty_queue_has_no_next() {
         let (anchor_number, browser_id) = signed_in();
 
-        assert!(shown(anchor_number, browser_id, SECOND_NS).is_empty());
+        assert_eq!(next_id(anchor_number, browser_id, SECOND_NS), None);
     }
 
     #[test]
-    fn what_expired_is_not_shown() {
+    fn what_the_service_worker_skips_is_passed_over() {
+        let (anchor_number, browser_id) = signed_in();
+        enqueue(
+            anchor_number,
+            browser_id,
+            [from_app(7, 60 * SECOND_NS), from_app(8, 60 * SECOND_NS)],
+        );
+        let showing = next(anchor_number, browser_id, &[], 2 * SECOND_NS).expect("a next one");
+
+        let after = next(anchor_number, browser_id, &[showing], 2 * SECOND_NS);
+
+        assert_eq!(after.map(|one| one.id), Some(8));
+    }
+
+    #[test]
+    fn skipping_one_account_passes_over_only_that_account() {
+        let (anchor_number, browser_id) = signed_in();
+        let for_account = QueuedNotification {
+            account_number: Some(3),
+            ..from_app(7, 60 * SECOND_NS)
+        };
+        enqueue(
+            anchor_number,
+            browser_id,
+            [from_app(7, 60 * SECOND_NS), for_account],
+        );
+        let showing = next(anchor_number, browser_id, &[], 2 * SECOND_NS).expect("a next one");
+
+        let after = next(anchor_number, browser_id, &[showing], 2 * SECOND_NS);
+
+        assert_eq!(after.and_then(|one| one.account_number), Some(3));
+    }
+
+    #[test]
+    fn what_expired_is_passed_over() {
         let (anchor_number, browser_id) = signed_in();
         enqueue(
             anchor_number,
@@ -361,11 +403,11 @@ mod tests {
             [from_app(1, 2 * SECOND_NS), from_app(2, 60 * SECOND_NS)],
         );
 
-        assert_eq!(shown(anchor_number, browser_id, 3 * SECOND_NS), vec![2]);
+        assert_eq!(next_id(anchor_number, browser_id, 3 * SECOND_NS), Some(2));
     }
 
     #[test]
-    fn an_app_ii_no_longer_holds_is_not_shown() {
+    fn an_app_ii_no_longer_holds_is_passed_over() {
         let (anchor_number, browser_id) = signed_in();
         let unknown = QueuedNotification {
             application_number: u64::MAX,
@@ -377,17 +419,17 @@ mod tests {
             [unknown, from_app(2, 60 * SECOND_NS)],
         );
 
-        assert_eq!(shown(anchor_number, browser_id, 2 * SECOND_NS), vec![2]);
+        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), Some(2));
     }
 
     #[test]
-    fn an_app_that_lost_consent_is_not_shown() {
+    fn an_app_that_lost_consent_is_passed_over() {
         let (anchor_number, browser_id) = signed_in();
         enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
         write_consent(anchor_number, &ORIGIN.to_string(), None, SECOND_NS)
             .expect("revoking consent");
 
-        assert!(shown(anchor_number, browser_id, 2 * SECOND_NS).is_empty());
+        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), None);
     }
 
     #[test]
@@ -411,12 +453,12 @@ mod tests {
         )
         .expect("granting consent again");
 
-        assert!(shown(anchor_number, browser_id, 2 * SECOND_NS).is_empty());
+        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), None);
         assert!(left_for(anchor_number, browser_id).is_empty());
     }
 
     #[test]
-    fn a_signed_out_browser_is_shown_nothing() {
+    fn a_signed_out_browser_has_no_next() {
         let (anchor_number, browser_id) = signed_in();
         enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
         storage_borrow_mut(|storage| {
@@ -424,7 +466,7 @@ mod tests {
         })
         .expect("signing the browser out");
 
-        assert!(shown(anchor_number, browser_id, 2 * SECOND_NS).is_empty());
+        assert_eq!(next_id(anchor_number, browser_id, 2 * SECOND_NS), None);
         assert!(left_for(anchor_number, browser_id).is_empty());
     }
 
@@ -436,9 +478,11 @@ mod tests {
             browser_id,
             [from_app(7, 60 * SECOND_NS), from_app(8, 60 * SECOND_NS)],
         );
-        let listed = to_show(&anchor(anchor_number), browser_id, 2 * SECOND_NS);
+        let eight = next(anchor_number, browser_id, &[], 2 * SECOND_NS)
+            .and_then(|seven| next(anchor_number, browser_id, &[seven], 2 * SECOND_NS))
+            .expect("a second one");
 
-        remove(anchor_number, browser_id, &listed[1]);
+        remove(anchor_number, browser_id, &eight);
 
         assert_eq!(left_for(anchor_number, browser_id), vec![7]);
     }
@@ -455,9 +499,11 @@ mod tests {
             browser_id,
             [from_app(7, 60 * SECOND_NS), for_account],
         );
-        let listed = to_show(&anchor(anchor_number), browser_id, 2 * SECOND_NS);
+        let for_account = next(anchor_number, browser_id, &[], 2 * SECOND_NS)
+            .and_then(|first| next(anchor_number, browser_id, &[first], 2 * SECOND_NS))
+            .expect("a second one");
 
-        remove(anchor_number, browser_id, &listed[1]);
+        remove(anchor_number, browser_id, &for_account);
 
         assert_eq!(
             anchor(anchor_number).notifications(browser_id),

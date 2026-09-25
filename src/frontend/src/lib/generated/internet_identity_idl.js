@@ -293,6 +293,31 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Opt(IDL.Text),
     'created_at' : IDL.Opt(Timestamp),
   });
+  const AccountNumber = IDL.Nat64;
+  const NotificationToShow = IDL.Record({
+    'id' : NotificationId,
+    'origin' : FrontendHostname,
+    'canister_id' : IDL.Principal,
+    'account_number' : IDL.Opt(AccountNumber),
+  });
+  const GetNextNotificationArg = IDL.Record({
+    'skip' : IDL.Vec(NotificationToShow),
+    'anchor_number' : UserNumber,
+  });
+  const GetNextNotificationResponse = IDL.Record({
+    'notification' : IDL.Opt(NotificationToShow),
+  });
+  const GetNextNotificationError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+  });
+  const RemoveNotificationArg = IDL.Record({
+    'notification' : NotificationToShow,
+    'anchor_number' : UserNumber,
+  });
+  const RemoveNotificationResponse = IDL.Record({});
+  const RemoveNotificationError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+  });
   const CheckCaptchaArg = IDL.Record({ 'solution' : IDL.Text });
   const RegistrationFlowNextStep = IDL.Variant({
     'CheckCaptcha' : IDL.Record({ 'captcha_png_base64' : IDL.Text }),
@@ -306,7 +331,6 @@ export const idlFactory = ({ IDL }) => {
     'UnexpectedCall' : IDL.Record({ 'next_step' : RegistrationFlowNextStep }),
     'WrongSolution' : IDL.Record({ 'new_captcha_png_base64' : IDL.Text }),
   });
-  const AccountNumber = IDL.Nat64;
   const AccountInfo = IDL.Record({
     'name' : IDL.Opt(IDL.Text),
     'origin' : IDL.Text,
@@ -596,19 +620,6 @@ export const idlFactory = ({ IDL }) => {
   const NotificationDelegationError = IDL.Variant({
     'NoNotificationAccess' : IDL.Null,
     'NoSuchDelegation' : IDL.Null,
-    'InternalCanisterError' : IDL.Text,
-  });
-  const GetQueuedNotificationsRequest = IDL.Record({
-    'anchor_number' : UserNumber,
-  });
-  const NotificationToShow = IDL.Record({
-    'id' : NotificationId,
-    'origin' : FrontendHostname,
-    'canister_id' : IDL.Principal,
-    'account_number' : IDL.Opt(AccountNumber),
-  });
-  const QueuedNotificationError = IDL.Variant({
-    'InvalidBrowserKey' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
   const SessionDelegationError = IDL.Variant({
@@ -952,10 +963,6 @@ export const idlFactory = ({ IDL }) => {
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
   });
-  const RemoveQueuedNotificationRequest = IDL.Record({
-    'notification' : NotificationToShow,
-    'anchor_number' : UserNumber,
-  });
   const RemoveWebPushSubscriptionRequest = IDL.Record({
     'browser_id' : IDL.Nat32,
     'anchor_number' : UserNumber,
@@ -1199,6 +1206,26 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'browser_get_next_notification' : IDL.Func(
+        [GetNextNotificationArg],
+        [
+          IDL.Variant({
+            'Ok' : GetNextNotificationResponse,
+            'Err' : GetNextNotificationError,
+          }),
+        ],
+        ['query'],
+      ),
+    'browser_remove_notification' : IDL.Func(
+        [RemoveNotificationArg],
+        [
+          IDL.Variant({
+            'Ok' : RemoveNotificationResponse,
+            'Err' : RemoveNotificationError,
+          }),
+        ],
+        [],
+      ),
     'check_captcha' : IDL.Func(
         [CheckCaptchaArg],
         [
@@ -1378,16 +1405,6 @@ export const idlFactory = ({ IDL }) => {
     'get_principal' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Principal],
-        ['query'],
-      ),
-    'get_queued_notifications' : IDL.Func(
-        [GetQueuedNotificationsRequest],
-        [
-          IDL.Variant({
-            'Ok' : IDL.Vec(NotificationToShow),
-            'Err' : QueuedNotificationError,
-          }),
-        ],
         ['query'],
       ),
     'get_session_delegation' : IDL.Func(
@@ -1691,11 +1708,6 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
-    'remove_queued_notification' : IDL.Func(
-        [RemoveQueuedNotificationRequest],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : QueuedNotificationError })],
-        [],
-      ),
     'remove_webpush_subscription' : IDL.Func(
         [RemoveWebPushSubscriptionRequest],
         [

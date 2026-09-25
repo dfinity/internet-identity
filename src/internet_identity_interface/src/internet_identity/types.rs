@@ -1193,8 +1193,10 @@ pub enum NotificationDelegationError {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct GetQueuedNotificationsRequest {
+pub struct GetNextNotificationArg {
     pub anchor_number: AnchorNumber,
+    /// What this service worker is still showing, whose removal has not landed yet.
+    pub skip: Vec<NotificationToShow>,
 }
 
 /// What a service worker shows for one wake-up: the app and account it is for, the
@@ -1208,16 +1210,31 @@ pub struct NotificationToShow {
     pub id: NotificationId,
 }
 
+/// `None` once nothing is left to show.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct RemoveQueuedNotificationRequest {
+pub struct GetNextNotificationResponse {
+    pub notification: Option<NotificationToShow>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum GetNextNotificationError {
+    /// Also a caller that is no browser of the identity, or a skip list longer than a
+    /// browser's queue.
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RemoveNotificationArg {
     pub anchor_number: AnchorNumber,
-    /// As `get_queued_notifications` listed it.
+    /// As `browser_get_next_notification` returned it.
     pub notification: NotificationToShow,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum QueuedNotificationError {
-    /// The caller signs with no key this identity is signed in from.
-    InvalidBrowserKey,
+pub struct RemoveNotificationResponse {}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum RemoveNotificationError {
+    /// Also a caller that is no browser of the identity.
     InternalCanisterError(String),
 }
