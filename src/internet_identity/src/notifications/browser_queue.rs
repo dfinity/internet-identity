@@ -5,6 +5,7 @@
 #![allow(dead_code)]
 
 use crate::state::storage_borrow_mut;
+use crate::storage::anchor::Anchor;
 use crate::storage::storable::notifications::browser_queue::{
     StorableBrowserNotification, StorableBrowserNotificationKey,
 };
@@ -70,13 +71,16 @@ pub(crate) fn add(
     })
 }
 
-/// Remove and return the oldest entry still worth showing. Expired ones, and ones whose
-/// account no longer resolves to this identity, are dropped on the way.
+/// Remove and return the oldest entry still worth showing. Expired ones, ones whose
+/// account no longer resolves to this identity, and ones whose app lost consent are
+/// dropped on the way. A browser no longer registered takes nothing.
 pub(crate) fn take_next(
-    anchor_number: AnchorNumber,
+    anchor: &Anchor,
     browser_id: BrowserId,
     now_ns: Timestamp,
 ) -> Option<NotificationToShow> {
+    anchor.webpush_subscription(browser_id)?;
+    let anchor_number = anchor.anchor_number();
     storage_borrow_mut(|storage| {
         for _ in 0..MAX_PER_BROWSER {
             let (key, entry) = storage
@@ -92,7 +96,11 @@ pub(crate) fn take_next(
             else {
                 continue;
             };
-            if account.anchor_number != anchor_number {
+            let consented = storage
+                .read_anchor_application_config(anchor_number, &account.origin)
+                .and_then(|config| config.notifications_consented_at_ns)
+                .is_some();
+            if account.anchor_number != anchor_number || !consented {
                 continue;
             }
             return Some(NotificationToShow {
@@ -169,6 +177,8 @@ fn next_sequence(newest: Option<u64>, now_ns: Timestamp) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::notifications::webpush::fixtures::{anchor, anchor_with_browsers, setup, subscribe};
+    use crate::notifications::write_consent;
     use crate::state::storage_borrow;
     use pretty_assertions::assert_eq;
 
@@ -334,25 +344,44 @@ mod tests {
     }
 
     const ORIGIN: &str = "https://app.example";
+    const RELAY: &str = "https://relay.example/a";
 
-    /// An identity signed in at `ORIGIN`, and the principal that app knows it by.
-    fn signed_in() -> (AnchorNumber, Principal) {
-        crate::notifications::test_setup();
-        storage_borrow_mut(|storage| {
+    /// An identity signed in at `ORIGIN` from a registered browser, the app allowed to
+    /// notify it, and the principal that app knows it by.
+    fn signed_in() -> (AnchorNumber, BrowserId, Principal) {
+        setup();
+        let anchor_number = storage_borrow_mut(|storage| {
             let anchor = storage.allocate_anchor(0).expect("allocating an anchor");
             let anchor_number = anchor.anchor_number();
             storage.write(anchor).expect("writing the anchor");
             storage.sign_in_for_testing(anchor_number, &ORIGIN.to_string());
-            let principal =
-                storage.default_account_principal_for_testing(anchor_number, &ORIGIN.to_string());
-            (anchor_number, principal)
-        })
+            anchor_number
+        });
+        let browser_id = anchor(anchor_number)
+            .browsers()
+            .first()
+            .expect("signing in registers the browser")
+            .id;
+        subscribe(anchor_number, browser_id, RELAY, 0);
+        write_consent(anchor_number, &ORIGIN.to_string(), Some(0), 0).expect("granting consent");
+        let principal = storage_borrow(|storage| {
+            storage.default_account_principal_for_testing(anchor_number, &ORIGIN.to_string())
+        });
+        (anchor_number, browser_id, principal)
     }
 
-    fn left_for(anchor_number: AnchorNumber) -> Vec<NotificationId> {
+    fn take(
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+        now_ns: Timestamp,
+    ) -> Option<NotificationToShow> {
+        take_next(&anchor(anchor_number), browser_id, now_ns)
+    }
+
+    fn left_for(anchor_number: AnchorNumber, browser_id: BrowserId) -> Vec<NotificationId> {
         storage_borrow(|storage| {
             storage
-                .browser_notifications(anchor_number, BROWSER, usize::MAX)
+                .browser_notifications(anchor_number, browser_id, usize::MAX)
                 .into_iter()
                 .map(|(_, entry)| entry.notification_id)
                 .collect()
@@ -361,11 +390,11 @@ mod tests {
 
     #[test]
     fn the_service_worker_takes_the_oldest_first() {
-        let (anchor_number, principal) = signed_in();
+        let (anchor_number, browser_id, principal) = signed_in();
         for id in [7, 8] {
             add(
                 anchor_number,
-                BROWSER,
+                browser_id,
                 principal,
                 id,
                 60 * SECOND_NS,
@@ -373,7 +402,7 @@ mod tests {
             );
         }
 
-        let first = take_next(anchor_number, BROWSER, 2 * SECOND_NS).expect("nothing to take");
+        let first = take(anchor_number, browser_id, 2 * SECOND_NS).expect("nothing to take");
 
         assert_eq!(
             first,
@@ -383,22 +412,22 @@ mod tests {
                 id: 7,
             }
         );
-        assert_eq!(left_for(anchor_number), vec![8]);
+        assert_eq!(left_for(anchor_number, browser_id), vec![8]);
     }
 
     #[test]
     fn an_empty_queue_has_nothing_to_take() {
-        let (anchor_number, _) = signed_in();
+        let (anchor_number, browser_id, _) = signed_in();
 
-        assert_eq!(take_next(anchor_number, BROWSER, SECOND_NS), None);
+        assert_eq!(take(anchor_number, browser_id, SECOND_NS), None);
     }
 
     #[test]
     fn taking_skips_what_expired() {
-        let (anchor_number, principal) = signed_in();
+        let (anchor_number, browser_id, principal) = signed_in();
         add(
             anchor_number,
-            BROWSER,
+            browser_id,
             principal,
             1,
             2 * SECOND_NS,
@@ -406,25 +435,25 @@ mod tests {
         );
         add(
             anchor_number,
-            BROWSER,
+            browser_id,
             principal,
             2,
             60 * SECOND_NS,
             SECOND_NS,
         );
 
-        let taken = take_next(anchor_number, BROWSER, 3 * SECOND_NS).expect("nothing to take");
+        let taken = take(anchor_number, browser_id, 3 * SECOND_NS).expect("nothing to take");
 
         assert_eq!(taken.id, 2);
-        assert!(left_for(anchor_number).is_empty());
+        assert!(left_for(anchor_number, browser_id).is_empty());
     }
 
     #[test]
     fn taking_skips_a_recipient_that_no_longer_resolves() {
-        let (anchor_number, principal) = signed_in();
+        let (anchor_number, browser_id, principal) = signed_in();
         add(
             anchor_number,
-            BROWSER,
+            browser_id,
             recipient(),
             1,
             60 * SECOND_NS,
@@ -432,24 +461,62 @@ mod tests {
         );
         add(
             anchor_number,
-            BROWSER,
+            browser_id,
             principal,
             2,
             60 * SECOND_NS,
             SECOND_NS,
         );
 
-        let taken = take_next(anchor_number, BROWSER, 2 * SECOND_NS).expect("nothing to take");
+        let taken = take(anchor_number, browser_id, 2 * SECOND_NS).expect("nothing to take");
 
         assert_eq!(taken.id, 2);
     }
 
     #[test]
-    fn one_browser_cannot_take_what_another_identity_was_sent() {
-        let (anchor_number, principal) = signed_in();
-        let other = anchor_number + 1;
-        add(other, BROWSER, principal, 1, 60 * SECOND_NS, SECOND_NS);
+    fn taking_skips_an_app_that_lost_consent() {
+        let (anchor_number, browser_id, principal) = signed_in();
+        add(
+            anchor_number,
+            browser_id,
+            principal,
+            1,
+            60 * SECOND_NS,
+            SECOND_NS,
+        );
+        write_consent(anchor_number, &ORIGIN.to_string(), None, SECOND_NS)
+            .expect("revoking consent");
 
-        assert_eq!(take_next(other, BROWSER, 2 * SECOND_NS), None);
+        assert_eq!(take(anchor_number, browser_id, 2 * SECOND_NS), None);
+        assert!(left_for(anchor_number, browser_id).is_empty());
+    }
+
+    #[test]
+    fn a_signed_out_browser_takes_nothing() {
+        let (anchor_number, browser_id, principal) = signed_in();
+        add(
+            anchor_number,
+            browser_id,
+            principal,
+            1,
+            60 * SECOND_NS,
+            SECOND_NS,
+        );
+        storage_borrow_mut(|storage| {
+            storage.revoke_browser_sessions(anchor_number, browser_id, SECOND_NS)
+        })
+        .expect("signing the browser out");
+
+        assert_eq!(take(anchor_number, browser_id, 2 * SECOND_NS), None);
+    }
+
+    #[test]
+    fn one_browser_cannot_take_what_another_identity_was_sent() {
+        let (_, _, principal) = signed_in();
+        let (other, browsers) = anchor_with_browsers(1);
+        subscribe(other, browsers[0], RELAY, 0);
+        add(other, browsers[0], principal, 1, 60 * SECOND_NS, SECOND_NS);
+
+        assert_eq!(take(other, browsers[0], 2 * SECOND_NS), None);
     }
 }
