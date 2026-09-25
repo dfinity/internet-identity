@@ -2980,6 +2980,21 @@ impl<M: Memory + Clone> Storage<M> {
             .expect("signing in stores the application")
     }
 
+    /// The principal an app knows `anchor_number`'s default account at `origin` by.
+    #[cfg(test)]
+    pub(crate) fn default_account_principal_for_testing(
+        &self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+    ) -> Principal {
+        let account = Account::new(anchor_number, origin.clone(), None, None);
+        let salt = self.salt().expect("the test storage has a salt");
+        delegation::canister_sig_principal(
+            canister_id(),
+            account.calculate_seed_with_salt(salt).to_vec(),
+        )
+    }
+
     /// Keeps the principal index in step with one reference-list write, deriving only the
     /// accounts the write moved.
     ///

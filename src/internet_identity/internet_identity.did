@@ -1907,6 +1907,26 @@ type NotificationDelegationError = variant {
     InternalCanisterError : text;
 };
 
+// ===== Notifications a browser has yet to show =====
+
+type TakeNextNotificationRequest = record {
+    anchor_number : UserNumber;
+};
+
+// What a service worker shows for one wake-up: the app to fetch the content from, as
+// which account, and which notification.
+type NotificationToShow = record {
+    origin : FrontendHostname;
+    account_number : opt AccountNumber;   // null = the unreserved default account
+    id : NotificationId;
+};
+
+type TakeNextNotificationError = variant {
+    // The caller signs with no key this identity is signed in from.
+    InvalidBrowserKey;
+    InternalCanisterError : text;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2390,6 +2410,10 @@ service : (opt InternetIdentityInit) -> {
     // Authorized by the browser key the caller signs with.
     prepare_notification_delegation : (PrepareNotificationDelegationRequest) -> (variant { Ok : PrepareNotificationDelegationResponse; Err : NotificationDelegationError });
     get_notification_delegation : (GetNotificationDelegationRequest) -> (variant { Ok : GetNotificationDelegationResponse; Err : NotificationDelegationError }) query;
+
+    // Called by the service worker once per wake-up, signed with the browser key. Removes
+    // what it returns, so every wake-up shows exactly one notification.
+    take_next_notification : (TakeNextNotificationRequest) -> (variant { Ok : opt NotificationToShow; Err : TakeNextNotificationError });
 
     // Called by the browser itself, signed with the browser key it signs in with.
     set_webpush_subscription : (SetWebPushSubscriptionRequest) -> (variant { Ok; Err : SetWebPushSubscriptionError });

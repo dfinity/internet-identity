@@ -1041,6 +1041,18 @@ export const idlFactory = ({ IDL }) => {
       IDL.Tuple(IDL.Text, IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat64)))
     ),
   });
+  const TakeNextNotificationRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const NotificationToShow = IDL.Record({
+    'id' : NotificationId,
+    'origin' : FrontendHostname,
+    'account_number' : IDL.Opt(AccountNumber),
+  });
+  const TakeNextNotificationError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+  });
   const AccountUpdate = IDL.Record({ 'name' : IDL.Opt(IDL.Text) });
   const UpdateAccountError = IDL.Variant({
     'AccountLimitReached' : IDL.Null,
@@ -1719,6 +1731,16 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
+    'take_next_notification' : IDL.Func(
+        [TakeNextNotificationRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Opt(NotificationToShow),
+            'Err' : TakeNextNotificationError,
+          }),
+        ],
+        [],
+      ),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'update_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), AccountUpdate],

@@ -10,7 +10,7 @@ use crate::storage::storable::notifications::browser_queue::{
 };
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, NotificationId, Timestamp,
+    AnchorNumber, BrowserId, NotificationId, NotificationToShow, Timestamp,
 };
 use std::cell::Cell;
 
@@ -67,6 +67,41 @@ pub(crate) fn add(
         } else {
             Added::Queued(key)
         }
+    })
+}
+
+/// Remove and return the oldest entry still worth showing. Expired ones, and ones whose
+/// account no longer resolves to this identity, are dropped on the way.
+pub(crate) fn take_next(
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+    now_ns: Timestamp,
+) -> Option<NotificationToShow> {
+    storage_borrow_mut(|storage| {
+        for _ in 0..MAX_PER_BROWSER {
+            let (key, entry) = storage
+                .browser_notifications(anchor_number, browser_id, 1)
+                .pop()?;
+            storage.remove_browser_notification(&key);
+            if entry.expires_at_ns <= now_ns {
+                continue;
+            }
+            let Some(account) = Principal::try_from_slice(&entry.recipient)
+                .ok()
+                .and_then(|recipient| storage.lookup_account_with_principal(recipient))
+            else {
+                continue;
+            };
+            if account.anchor_number != anchor_number {
+                continue;
+            }
+            return Some(NotificationToShow {
+                origin: account.origin,
+                account_number: account.account_number,
+                id: entry.notification_id,
+            });
+        }
+        None
     })
 }
 
@@ -269,5 +304,125 @@ mod tests {
             discard_expired(2 * SECOND_NS),
             3 * MAX_PER_BROWSER - MAX_PER_SWEEP
         );
+    }
+
+    const ORIGIN: &str = "https://app.example";
+
+    /// An identity signed in at `ORIGIN`, and the principal that app knows it by.
+    fn signed_in() -> (AnchorNumber, Principal) {
+        crate::notifications::test_setup();
+        storage_borrow_mut(|storage| {
+            let anchor = storage.allocate_anchor(0).expect("allocating an anchor");
+            let anchor_number = anchor.anchor_number();
+            storage.write(anchor).expect("writing the anchor");
+            storage.sign_in_for_testing(anchor_number, &ORIGIN.to_string());
+            let principal =
+                storage.default_account_principal_for_testing(anchor_number, &ORIGIN.to_string());
+            (anchor_number, principal)
+        })
+    }
+
+    fn left_for(anchor_number: AnchorNumber) -> Vec<NotificationId> {
+        storage_borrow(|storage| {
+            storage
+                .browser_notifications(anchor_number, BROWSER, usize::MAX)
+                .into_iter()
+                .map(|(_, entry)| entry.notification_id)
+                .collect()
+        })
+    }
+
+    #[test]
+    fn the_service_worker_takes_the_oldest_first() {
+        let (anchor_number, principal) = signed_in();
+        for id in [7, 8] {
+            add(
+                anchor_number,
+                BROWSER,
+                principal,
+                id,
+                60 * SECOND_NS,
+                SECOND_NS,
+            );
+        }
+
+        let first = take_next(anchor_number, BROWSER, 2 * SECOND_NS).expect("nothing to take");
+
+        assert_eq!(
+            first,
+            NotificationToShow {
+                origin: ORIGIN.to_string(),
+                account_number: None,
+                id: 7,
+            }
+        );
+        assert_eq!(left_for(anchor_number), vec![8]);
+    }
+
+    #[test]
+    fn an_empty_queue_has_nothing_to_take() {
+        let (anchor_number, _) = signed_in();
+
+        assert_eq!(take_next(anchor_number, BROWSER, SECOND_NS), None);
+    }
+
+    #[test]
+    fn taking_skips_what_expired() {
+        let (anchor_number, principal) = signed_in();
+        add(
+            anchor_number,
+            BROWSER,
+            principal,
+            1,
+            2 * SECOND_NS,
+            SECOND_NS,
+        );
+        add(
+            anchor_number,
+            BROWSER,
+            principal,
+            2,
+            60 * SECOND_NS,
+            SECOND_NS,
+        );
+
+        let taken = take_next(anchor_number, BROWSER, 3 * SECOND_NS).expect("nothing to take");
+
+        assert_eq!(taken.id, 2);
+        assert!(left_for(anchor_number).is_empty());
+    }
+
+    #[test]
+    fn taking_skips_a_recipient_that_no_longer_resolves() {
+        let (anchor_number, principal) = signed_in();
+        add(
+            anchor_number,
+            BROWSER,
+            recipient(),
+            1,
+            60 * SECOND_NS,
+            SECOND_NS,
+        );
+        add(
+            anchor_number,
+            BROWSER,
+            principal,
+            2,
+            60 * SECOND_NS,
+            SECOND_NS,
+        );
+
+        let taken = take_next(anchor_number, BROWSER, 2 * SECOND_NS).expect("nothing to take");
+
+        assert_eq!(taken.id, 2);
+    }
+
+    #[test]
+    fn one_browser_cannot_take_what_another_identity_was_sent() {
+        let (anchor_number, principal) = signed_in();
+        let other = anchor_number + 1;
+        add(other, BROWSER, principal, 1, 60 * SECOND_NS, SECOND_NS);
+
+        assert_eq!(take_next(other, BROWSER, 2 * SECOND_NS), None);
     }
 }

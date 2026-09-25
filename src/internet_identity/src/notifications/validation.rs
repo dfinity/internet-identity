@@ -8,7 +8,8 @@ use internet_identity_interface::internet_identity::types::{
     NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
     NotificationGrantConsentRequest, NotificationRevokeConsentError,
     NotificationRevokeConsentRequest, PrepareNotificationDelegationRequest, SendNotificationArg,
-    SendNotificationError, SessionKey, Timestamp,
+    SendNotificationError, SessionKey, TakeNextNotificationError, TakeNextNotificationRequest,
+    Timestamp,
 };
 use std::collections::HashMap;
 use url::Url;
@@ -44,6 +45,29 @@ pub struct ValidatedSendNotificationArg {
     pub origin: FrontendHostname,
     pub notifications: Vec<Notification>,
     _validated: Validated,
+}
+
+pub struct ValidatedTakeNextNotificationRequest {
+    pub anchor_number: AnchorNumber,
+    _validated: Validated,
+}
+
+impl TryFrom<TakeNextNotificationRequest> for ValidatedTakeNextNotificationRequest {
+    type Error = TakeNextNotificationError;
+
+    fn try_from(
+        TakeNextNotificationRequest { anchor_number }: TakeNextNotificationRequest,
+    ) -> Result<Self, Self::Error> {
+        if !notifications_enabled() {
+            return Err(TakeNextNotificationError::InternalCanisterError(
+                "notifications are not enabled".to_string(),
+            ));
+        }
+        Ok(Self {
+            anchor_number,
+            _validated: Validated,
+        })
+    }
 }
 
 impl TryFrom<NotificationGrantConsentRequest> for ValidatedNotificationGrantConsentRequest {

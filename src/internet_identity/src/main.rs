@@ -48,6 +48,7 @@ use notifications::{
     ValidatedGetNotificationDelegationRequest, ValidatedNotificationConsentGrantedRequest,
     ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
     ValidatedPrepareNotificationDelegationRequest, ValidatedSendNotificationArg,
+    ValidatedTakeNextNotificationRequest,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -405,6 +406,23 @@ fn get_notification_delegation(
         .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
 
     notifications::delegation::get(request, &anchor, browser_id)
+}
+
+/// Authorized by the browser key the caller signs with: a service worker takes from its
+/// own browser's queue.
+#[update]
+fn take_next_notification(
+    request: TakeNextNotificationRequest,
+) -> Result<Option<NotificationToShow>, TakeNextNotificationError> {
+    let request: ValidatedTakeNextNotificationRequest = request.try_into()?;
+    let (_, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| TakeNextNotificationError::InvalidBrowserKey)?;
+
+    Ok(notifications::browser_queue::take_next(
+        request.anchor_number,
+        browser_id,
+        ic_cdk::api::time(),
+    ))
 }
 
 #[update]

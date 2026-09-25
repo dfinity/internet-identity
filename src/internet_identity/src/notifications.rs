@@ -28,7 +28,7 @@ pub use validation::{
     notifications_enabled, ValidatedGetNotificationDelegationRequest,
     ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
     ValidatedNotificationRevokeConsentRequest, ValidatedPrepareNotificationDelegationRequest,
-    ValidatedSendNotificationArg,
+    ValidatedSendNotificationArg, ValidatedTakeNextNotificationRequest,
 };
 
 /// Nothing was enqueued: the whole batch is the sender's to send again at

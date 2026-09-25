@@ -1438,6 +1438,15 @@ export interface NotificationRevokeConsentRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
 }
+/**
+ * What a service worker shows for one wake-up: the app to fetch the content from, as
+ * which account, and which notification.
+ */
+export interface NotificationToShow {
+  'id' : NotificationId,
+  'origin' : FrontendHostname,
+  'account_number' : [] | [AccountNumber],
+}
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
@@ -2094,6 +2103,14 @@ export type StreamingStrategy = {
     'Callback' : { 'token' : Token, 'callback' : [Principal, string] }
   };
 export type Sub = string;
+export type TakeNextNotificationError = {
+    /**
+     * The caller signs with no key this identity is signed in from.
+     */
+    'InvalidBrowserKey' : null
+  } |
+  { 'InternalCanisterError' : string };
+export interface TakeNextNotificationRequest { 'anchor_number' : UserNumber }
 export type Timestamp = bigint;
 export type Token = {};
 export type UpdateAccountError = { 'AccountLimitReached' : null } |
@@ -2955,6 +2972,15 @@ export interface _SERVICE {
       { 'Pending' : null }
   >,
   'stats' : ActorMethod<[], InternetIdentityStats>,
+  /**
+   * Called by the service worker once per wake-up, signed with the browser key. Removes
+   * what it returns, so every wake-up shows exactly one notification.
+   */
+  'take_next_notification' : ActorMethod<
+    [TakeNextNotificationRequest],
+    { 'Ok' : [] | [NotificationToShow] } |
+      { 'Err' : TakeNextNotificationError }
+  >,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<
     [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],

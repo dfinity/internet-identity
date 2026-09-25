@@ -2,7 +2,7 @@
 
 use canister_tests::api::internet_identity::api_v2::prepare_account_session;
 use canister_tests::api::internet_identity::notifications::{
-    consent_granted, grant_consent, revoke_consent,
+    consent_granted, grant_consent, revoke_consent, take_next_notification,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
@@ -14,6 +14,7 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, NotificationGrantConsentError,
     NotificationRevokeConsentError, OperatingSystem, PrepareAccountSessionRequest,
+    TakeNextNotificationError,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -110,6 +111,10 @@ fn should_refuse_every_entry_point_while_no_origin_is_enabled() -> Result<(), Re
         anchor,
         ORIGIN.into()
     )?);
+    assert!(matches!(
+        take_next_notification(&env, canister_id, principal_1(), anchor)?,
+        Err(TakeNextNotificationError::InternalCanisterError(_))
+    ));
     Ok(())
 }
 
@@ -1206,6 +1211,37 @@ mod pull_delegation {
             )?,
             Err(NotificationDelegationError::NoSuchDelegation)
         ));
+        Ok(())
+    }
+}
+
+mod browser_queue {
+    use super::subscriptions::{install_with_browser, key_holder};
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn should_have_nothing_to_take_for_a_browser_nothing_was_sent_to() -> Result<(), RejectResponse>
+    {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+
+        assert_eq!(
+            take_next_notification(&env, canister_id, key_holder(&browser).principal(), anchor)?,
+            Ok(None)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_refuse_a_caller_that_is_no_browser_of_the_identity() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, _, _) = install_with_browser(&env);
+
+        assert_eq!(
+            take_next_notification(&env, canister_id, principal_2(), anchor)?,
+            Err(TakeNextNotificationError::InvalidBrowserKey)
+        );
         Ok(())
     }
 }

@@ -6,10 +6,10 @@ use internet_identity_interface::internet_identity::types::{
     GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
     NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
     NotificationGrantConsentRequest, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest, PrepareNotificationDelegationRequest,
+    NotificationRevokeConsentRequest, NotificationToShow, PrepareNotificationDelegationRequest,
     PrepareNotificationDelegationResponse, RemoveWebPushSubscriptionError,
     RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
-    WebPushSubscriptionStatus,
+    TakeNextNotificationError, TakeNextNotificationRequest, WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -163,6 +163,23 @@ pub fn get_notification_delegation(
         sender,
         "get_notification_delegation",
         (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn take_next_notification(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+) -> Result<Result<Option<NotificationToShow>, TakeNextNotificationError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "take_next_notification",
+        (TakeNextNotificationRequest { anchor_number },),
     )
     .map(|(x,)| x)
 }
