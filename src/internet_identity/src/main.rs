@@ -418,11 +418,8 @@ fn take_next_notification(
     let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
         .map_err(|_| TakeNextNotificationError::InvalidBrowserKey)?;
 
-    Ok(notifications::browser_queue::take_next(
-        &anchor,
-        browser_id,
-        ic_cdk::api::time(),
-    ))
+    notifications::browser_queue::take_next(anchor, browser_id, ic_cdk::api::time())
+        .map_err(TakeNextNotificationError::InternalCanisterError)
 }
 
 #[update]

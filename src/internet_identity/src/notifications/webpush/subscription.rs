@@ -4,7 +4,6 @@
 use super::validation::{
     ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
 };
-use crate::notifications::browser_queue;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
@@ -113,23 +112,13 @@ pub fn subscription_status(
         })
 }
 
-/// A new endpoint, or none, drops the browser's queue, whose wake-ups went to the old one.
 fn write_subscription(
     mut anchor: Anchor,
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
-    let anchor_number = anchor.anchor_number();
-    let endpoint_changes = anchor
-        .webpush_subscription(browser_id)
-        .map(|registered| &registered.endpoint)
-        != subscription.as_ref().map(|registered| &registered.endpoint);
     anchor.set_webpush_subscription(browser_id, subscription);
-    storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))?;
-    if endpoint_changes {
-        browser_queue::clear(anchor_number, browser_id);
-    }
-    Ok(())
+    storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
 }
 
 #[cfg(test)]
@@ -150,22 +139,21 @@ mod tests {
     }
 
     fn queue_one(anchor_number: AnchorNumber, browser_id: BrowserId) {
-        browser_queue::add(
-            anchor_number,
-            browser_id,
-            candid::Principal::from_slice(&[7; 29]),
-            1,
-            u64::MAX,
-            1_000,
-        );
+        let mut stored = anchor(anchor_number);
+        stored
+            .notifications_mut(browser_id)
+            .expect("a listed browser")
+            .push(crate::storage::anchor::QueuedNotification {
+                application_number: 1,
+                sender: candid::Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+            });
+        storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }
 
     fn queued(anchor_number: AnchorNumber, browser_id: BrowserId) -> usize {
-        storage_borrow(|storage| {
-            storage
-                .browser_notifications(anchor_number, browser_id, usize::MAX)
-                .len()
-        })
+        anchor(anchor_number).notifications(browser_id).len()
     }
 
     fn remove(anchor_number: AnchorNumber, browser_id: BrowserId) {
