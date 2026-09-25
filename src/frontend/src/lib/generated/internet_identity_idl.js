@@ -598,6 +598,19 @@ export const idlFactory = ({ IDL }) => {
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
   });
+  const GetQueuedNotificationsRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const NotificationToShow = IDL.Record({
+    'id' : NotificationId,
+    'origin' : FrontendHostname,
+    'canister_id' : IDL.Principal,
+    'account_number' : IDL.Opt(AccountNumber),
+  });
+  const QueuedNotificationError = IDL.Variant({
+    'InvalidBrowserKey' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+  });
   const SessionDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -939,6 +952,10 @@ export const idlFactory = ({ IDL }) => {
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
   });
+  const RemoveQueuedNotificationRequest = IDL.Record({
+    'notification' : NotificationToShow,
+    'anchor_number' : UserNumber,
+  });
   const RemoveWebPushSubscriptionRequest = IDL.Record({
     'browser_id' : IDL.Nat32,
     'anchor_number' : UserNumber,
@@ -1040,19 +1057,6 @@ export const idlFactory = ({ IDL }) => {
     'event_aggregations' : IDL.Vec(
       IDL.Tuple(IDL.Text, IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat64)))
     ),
-  });
-  const TakeNextNotificationRequest = IDL.Record({
-    'anchor_number' : UserNumber,
-  });
-  const NotificationToShow = IDL.Record({
-    'id' : NotificationId,
-    'origin' : FrontendHostname,
-    'canister_id' : IDL.Principal,
-    'account_number' : IDL.Opt(AccountNumber),
-  });
-  const TakeNextNotificationError = IDL.Variant({
-    'InvalidBrowserKey' : IDL.Null,
-    'InternalCanisterError' : IDL.Text,
   });
   const AccountUpdate = IDL.Record({ 'name' : IDL.Opt(IDL.Text) });
   const UpdateAccountError = IDL.Variant({
@@ -1376,6 +1380,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Principal],
         ['query'],
       ),
+    'get_queued_notifications' : IDL.Func(
+        [GetQueuedNotificationsRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Vec(NotificationToShow),
+            'Err' : QueuedNotificationError,
+          }),
+        ],
+        ['query'],
+      ),
     'get_session_delegation' : IDL.Func(
         [UserNumber, SessionKey, Timestamp],
         [
@@ -1677,6 +1691,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
+    'remove_queued_notification' : IDL.Func(
+        [RemoveQueuedNotificationRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : QueuedNotificationError })],
+        [],
+      ),
     'remove_webpush_subscription' : IDL.Func(
         [RemoveWebPushSubscriptionRequest],
         [
@@ -1732,16 +1751,6 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
-    'take_next_notification' : IDL.Func(
-        [TakeNextNotificationRequest],
-        [
-          IDL.Variant({
-            'Ok' : IDL.Opt(NotificationToShow),
-            'Err' : TakeNextNotificationError,
-          }),
-        ],
-        [],
-      ),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'update_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), AccountUpdate],

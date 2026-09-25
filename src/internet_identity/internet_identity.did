@@ -1909,7 +1909,7 @@ type NotificationDelegationError = variant {
 
 // ===== Notifications a browser has yet to show =====
 
-type TakeNextNotificationRequest = record {
+type GetQueuedNotificationsRequest = record {
     anchor_number : UserNumber;
 };
 
@@ -1922,7 +1922,13 @@ type NotificationToShow = record {
     id : NotificationId;
 };
 
-type TakeNextNotificationError = variant {
+type RemoveQueuedNotificationRequest = record {
+    anchor_number : UserNumber;
+    // As get_queued_notifications listed it.
+    notification : NotificationToShow;
+};
+
+type QueuedNotificationError = variant {
     // The caller signs with no key this identity is signed in from.
     InvalidBrowserKey;
     InternalCanisterError : text;
@@ -2412,9 +2418,11 @@ service : (opt InternetIdentityInit) -> {
     prepare_notification_delegation : (PrepareNotificationDelegationRequest) -> (variant { Ok : PrepareNotificationDelegationResponse; Err : NotificationDelegationError });
     get_notification_delegation : (GetNotificationDelegationRequest) -> (variant { Ok : GetNotificationDelegationResponse; Err : NotificationDelegationError }) query;
 
-    // Called by the service worker once per wake-up, signed with the browser key. Removes
-    // what it returns, so every wake-up shows exactly one notification.
-    take_next_notification : (TakeNextNotificationRequest) -> (variant { Ok : opt NotificationToShow; Err : TakeNextNotificationError });
+    // Called by the service worker on a wake-up, signed with the browser key: what its
+    // browser has yet to show, oldest first. It shows one per wake-up.
+    get_queued_notifications : (GetQueuedNotificationsRequest) -> (variant { Ok : vec NotificationToShow; Err : QueuedNotificationError }) query;
+    // Called by the service worker for the one it shows, while it fetches the content.
+    remove_queued_notification : (RemoveQueuedNotificationRequest) -> (variant { Ok; Err : QueuedNotificationError });
 
     // Called by the browser itself, signed with the browser key it signs in with.
     set_webpush_subscription : (SetWebPushSubscriptionRequest) -> (variant { Ok; Err : SetWebPushSubscriptionError });

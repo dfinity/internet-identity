@@ -3,13 +3,14 @@ use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, FrontendHostname, GetNotificationDelegationRequest,
-    GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
-    NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
-    NotificationGrantConsentRequest, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest, NotificationToShow, PrepareNotificationDelegationRequest,
-    PrepareNotificationDelegationResponse, RemoveWebPushSubscriptionError,
+    GetNotificationDelegationResponse, GetQueuedNotificationsRequest,
+    GetWebPushSubscriptionStatusRequest, NotificationConsentGrantedRequest,
+    NotificationDelegationError, NotificationGrantConsentError, NotificationGrantConsentRequest,
+    NotificationRevokeConsentError, NotificationRevokeConsentRequest, NotificationToShow,
+    PrepareNotificationDelegationRequest, PrepareNotificationDelegationResponse,
+    QueuedNotificationError, RemoveQueuedNotificationRequest, RemoveWebPushSubscriptionError,
     RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
-    TakeNextNotificationError, TakeNextNotificationRequest, WebPushSubscriptionStatus,
+    WebPushSubscriptionStatus,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
 use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
@@ -167,19 +168,35 @@ pub fn get_notification_delegation(
     .map(|(x,)| x)
 }
 
-pub fn take_next_notification(
+pub fn get_queued_notifications(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: AnchorNumber,
-) -> Result<Result<Option<NotificationToShow>, TakeNextNotificationError>, RejectResponse> {
+) -> Result<Result<Vec<NotificationToShow>, QueuedNotificationError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_queued_notifications",
+        (GetQueuedNotificationsRequest { anchor_number },),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn remove_queued_notification(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: RemoveQueuedNotificationRequest,
+) -> Result<Result<(), QueuedNotificationError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "take_next_notification",
-        (TakeNextNotificationRequest { anchor_number },),
+        "remove_queued_notification",
+        (request,),
     )
     .map(|(x,)| x)
 }

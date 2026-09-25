@@ -2,7 +2,8 @@
 
 use canister_tests::api::internet_identity::api_v2::prepare_account_session;
 use canister_tests::api::internet_identity::notifications::{
-    consent_granted, grant_consent, revoke_consent, take_next_notification,
+    consent_granted, get_queued_notifications, grant_consent, remove_queued_notification,
+    revoke_consent,
 };
 use canister_tests::flows;
 use canister_tests::framework::{
@@ -13,8 +14,8 @@ use canister_tests::framework::{
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, NotificationGrantConsentError,
-    NotificationRevokeConsentError, OperatingSystem, PrepareAccountSessionRequest,
-    TakeNextNotificationError,
+    NotificationRevokeConsentError, NotificationToShow, OperatingSystem,
+    PrepareAccountSessionRequest, QueuedNotificationError, RemoveQueuedNotificationRequest,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -112,8 +113,20 @@ fn should_refuse_every_entry_point_while_no_origin_is_enabled() -> Result<(), Re
         ORIGIN.into()
     )?);
     assert!(matches!(
-        take_next_notification(&env, canister_id, principal_1(), anchor)?,
-        Err(TakeNextNotificationError::InternalCanisterError(_))
+        get_queued_notifications(&env, canister_id, principal_1(), anchor)?,
+        Err(QueuedNotificationError::InternalCanisterError(_))
+    ));
+    assert!(matches!(
+        remove_queued_notification(
+            &env,
+            canister_id,
+            principal_1(),
+            RemoveQueuedNotificationRequest {
+                anchor_number: anchor,
+                notification: shown_elsewhere(),
+            }
+        )?,
+        Err(QueuedNotificationError::InternalCanisterError(_))
     ));
     Ok(())
 }
@@ -1221,14 +1234,34 @@ mod browser_queue {
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn should_have_nothing_to_take_for_a_browser_nothing_was_sent_to() -> Result<(), RejectResponse>
+    fn should_have_nothing_to_show_for_a_browser_nothing_was_sent_to() -> Result<(), RejectResponse>
     {
         let env = env();
         let (canister_id, anchor, browser, _) = install_with_browser(&env);
 
         assert_eq!(
-            take_next_notification(&env, canister_id, key_holder(&browser).principal(), anchor)?,
-            Ok(None)
+            get_queued_notifications(&env, canister_id, key_holder(&browser).principal(), anchor)?,
+            Ok(vec![])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_remove_nothing_for_a_notification_that_is_not_queued() -> Result<(), RejectResponse> {
+        let env = env();
+        let (canister_id, anchor, browser, _) = install_with_browser(&env);
+
+        assert_eq!(
+            remove_queued_notification(
+                &env,
+                canister_id,
+                key_holder(&browser).principal(),
+                RemoveQueuedNotificationRequest {
+                    anchor_number: anchor,
+                    notification: shown_elsewhere(),
+                }
+            )?,
+            Ok(())
         );
         Ok(())
     }
@@ -1239,9 +1272,30 @@ mod browser_queue {
         let (canister_id, anchor, _, _) = install_with_browser(&env);
 
         assert_eq!(
-            take_next_notification(&env, canister_id, principal_2(), anchor)?,
-            Err(TakeNextNotificationError::InvalidBrowserKey)
+            get_queued_notifications(&env, canister_id, principal_2(), anchor)?,
+            Err(QueuedNotificationError::InvalidBrowserKey)
+        );
+        assert_eq!(
+            remove_queued_notification(
+                &env,
+                canister_id,
+                principal_2(),
+                RemoveQueuedNotificationRequest {
+                    anchor_number: anchor,
+                    notification: shown_elsewhere(),
+                }
+            )?,
+            Err(QueuedNotificationError::InvalidBrowserKey)
         );
         Ok(())
+    }
+}
+
+fn shown_elsewhere() -> NotificationToShow {
+    NotificationToShow {
+        origin: ORIGIN.into(),
+        account_number: None,
+        canister_id: principal_2(),
+        id: 1,
     }
 }

@@ -1193,7 +1193,7 @@ pub enum NotificationDelegationError {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct TakeNextNotificationRequest {
+pub struct GetQueuedNotificationsRequest {
     pub anchor_number: AnchorNumber,
 }
 
@@ -1209,7 +1209,14 @@ pub struct NotificationToShow {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum TakeNextNotificationError {
+pub struct RemoveQueuedNotificationRequest {
+    pub anchor_number: AnchorNumber,
+    /// As `get_queued_notifications` listed it.
+    pub notification: NotificationToShow,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum QueuedNotificationError {
     /// The caller signs with no key this identity is signed in from.
     InvalidBrowserKey,
     InternalCanisterError(String),
