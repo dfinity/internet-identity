@@ -2,13 +2,13 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, FrontendHostname, GetNextNotificationArg, GetNextNotificationError,
-    GetNextNotificationResponse, GetNotificationDelegationRequest,
+    AnchorNumber, BrowserId, FrontendHostname, GetNextNotificationError,
+    GetNextNotificationRequest, GetNextNotificationResponse, GetNotificationDelegationRequest,
     GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
     NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
     NotificationGrantConsentRequest, NotificationRevokeConsentError,
     NotificationRevokeConsentRequest, PrepareNotificationDelegationRequest,
-    PrepareNotificationDelegationResponse, RemoveNotificationArg, RemoveNotificationError,
+    PrepareNotificationDelegationResponse, RemoveNotificationError, RemoveNotificationRequest,
     RemoveNotificationResponse, RemoveWebPushSubscriptionError, RemoveWebPushSubscriptionRequest,
     SetWebPushSubscriptionError, SetWebPushSubscriptionRequest, WebPushSubscriptionStatus,
 };
@@ -172,14 +172,14 @@ pub fn browser_get_next_notification(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    arg: GetNextNotificationArg,
+    request: GetNextNotificationRequest,
 ) -> Result<Result<GetNextNotificationResponse, GetNextNotificationError>, RejectResponse> {
     query_candid_as(
         env,
         canister_id,
         sender,
         "browser_get_next_notification",
-        (arg,),
+        (request,),
     )
     .map(|(x,)| x)
 }
@@ -188,7 +188,7 @@ pub fn browser_remove_notification(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    arg: RemoveNotificationArg,
+    request: RemoveNotificationRequest,
 ) -> Result<Result<RemoveNotificationResponse, RemoveNotificationError>, RejectResponse> {
     call_candid_as(
         env,
@@ -196,7 +196,7 @@ pub fn browser_remove_notification(
         RawEffectivePrincipal::None,
         sender,
         "browser_remove_notification",
-        (arg,),
+        (request,),
     )
     .map(|(x,)| x)
 }

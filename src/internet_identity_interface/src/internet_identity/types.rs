@@ -1193,7 +1193,7 @@ pub enum NotificationDelegationError {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct GetNextNotificationArg {
+pub struct GetNextNotificationRequest {
     pub anchor_number: AnchorNumber,
     /// What this service worker is still showing, whose removal has not landed yet.
     pub skip: Vec<NotificationToShow>,
@@ -1224,7 +1224,7 @@ pub enum GetNextNotificationError {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct RemoveNotificationArg {
+pub struct RemoveNotificationRequest {
     pub anchor_number: AnchorNumber,
     /// As `browser_get_next_notification` returned it.
     pub notification: NotificationToShow,
