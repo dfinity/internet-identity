@@ -6,6 +6,7 @@ use crate::storage::storable::browser::StorableBrowser;
 use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
+use crate::storage::storable::notifications::browser_queue::StorableQueuedNotification;
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
@@ -101,6 +102,30 @@ pub struct Browser {
     pub session_count: u32,
     /// What this browser registered for Web Push, if anything.
     pub webpush_subscription: Option<WebPushSubscription>,
+    /// What its service worker has yet to show, oldest first. Goes with the
+    /// registration it was woken through.
+    pub notifications: Vec<QueuedNotification>,
+}
+
+/// A notification a browser's service worker has yet to take.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QueuedNotification {
+    pub application_number: ApplicationNumber,
+    /// The app canister that sent it, which the service worker fetches it from.
+    pub sender: Principal,
+    pub notification_id: NotificationId,
+    pub expires_at_ns: Timestamp,
+}
+
+impl From<QueuedNotification> for StorableQueuedNotification {
+    fn from(value: QueuedNotification) -> Self {
+        StorableQueuedNotification {
+            application_number: value.application_number,
+            sender: value.sender.as_slice().to_vec(),
+            notification_id: value.notification_id,
+            expires_at_ns: value.expires_at_ns,
+        }
+    }
 }
 
 /// A browser's Web Push registration and the pool of VAPID JWTs it signed for it.
@@ -159,6 +184,19 @@ impl From<StorableBrowser> for Browser {
             last_used: value.last_used,
             session_count: value.session_count,
             webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
+            notifications: value
+                .notifications
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|queued| {
+                    Some(QueuedNotification {
+                        application_number: queued.application_number,
+                        sender: Principal::try_from_slice(&queued.sender).ok()?,
+                        notification_id: queued.notification_id,
+                        expires_at_ns: queued.expires_at_ns,
+                    })
+                })
+                .collect(),
         }
     }
 }
@@ -176,6 +214,13 @@ impl From<Browser> for StorableBrowser {
             webpush_subscription: value
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
+            notifications: (!value.notifications.is_empty()).then(|| {
+                value
+                    .notifications
+                    .into_iter()
+                    .map(StorableQueuedNotification::from)
+                    .collect()
+            }),
         }
     }
 }
@@ -823,15 +868,39 @@ impl Anchor {
     }
 
     /// Replaces what this browser registered. A browser the registry no longer lists
-    /// has nothing to register against, so the write is dropped.
+    /// has nothing to register against, so the write is dropped. A new endpoint, or
+    /// none, empties the browser's queue, whose wake-ups went to the old one.
     pub fn set_webpush_subscription(
         &mut self,
         browser_id: BrowserId,
         subscription: Option<WebPushSubscription>,
     ) {
         if let Some(browser) = self.browsers.iter_mut().find(|one| one.id == browser_id) {
+            let endpoint_changes = browser.webpush_subscription.as_ref().map(|s| &s.endpoint)
+                != subscription.as_ref().map(|s| &s.endpoint);
+            if endpoint_changes {
+                browser.notifications.clear();
+            }
             browser.webpush_subscription = subscription;
         }
+    }
+
+    /// The browser's queue, empty for a browser the registry no longer lists.
+    pub fn notifications(&self, browser_id: BrowserId) -> &[QueuedNotification] {
+        self.browsers
+            .iter()
+            .find(|browser| browser.id == browser_id)
+            .map_or(&[], |browser| &browser.notifications)
+    }
+
+    pub fn notifications_mut(
+        &mut self,
+        browser_id: BrowserId,
+    ) -> Option<&mut Vec<QueuedNotification>> {
+        self.browsers
+            .iter_mut()
+            .find(|browser| browser.id == browser_id)
+            .map(|browser| &mut browser.notifications)
     }
 
     /// Moves each browser's session count by what a write added to or took from it.
@@ -967,6 +1036,7 @@ impl Anchor {
             last_used: now,
             session_count: 0,
             webpush_subscription: None,
+            notifications: Vec::new(),
         });
 
         let mut dropped = vec![];

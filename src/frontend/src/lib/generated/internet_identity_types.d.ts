@@ -1439,13 +1439,13 @@ export interface NotificationRevokeConsentRequest {
   'anchor_number' : UserNumber,
 }
 /**
- * What a service worker shows for one wake-up: the app to fetch the content from, as
- * which account, and which notification.
+ * What a service worker shows for one wake-up: the app it came from, the canister
+ * holding its content, and which notification.
  */
 export interface NotificationToShow {
   'id' : NotificationId,
   'origin' : FrontendHostname,
-  'account_number' : [] | [AccountNumber],
+  'canister_id' : Principal,
 }
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,

@@ -7,23 +7,27 @@ use crate::state::{self, storage_borrow};
 use crate::storage::storable::application::StorableOriginSha256;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, FrontendHostname, NotAccepted, NotAcceptedReason, Notification,
-    SendNotificationResponse, Timestamp, Urgency,
+    AnchorNumber, ApplicationNumber, FrontendHostname, NotAccepted, NotAcceptedReason,
+    Notification, SendNotificationResponse, Timestamp, Urgency,
 };
 use std::collections::BTreeMap;
 
-/// Queue what can reach its recipient, and schedule a pass for it.
+/// Queue what can reach its recipient, and schedule a pass for it. `sender` is the app
+/// canister the service worker fetches the content from.
 pub fn submit(
     ValidatedSendNotificationArg {
         origin,
         notifications,
         ..
     }: ValidatedSendNotificationArg,
+    sender: Principal,
     now_ns: Timestamp,
 ) -> SendNotificationResponse {
     let mut not_accepted = Vec::new();
-    let mut resolved: BTreeMap<Principal, Result<AnchorNumber, NotAcceptedReason>> =
-        BTreeMap::new();
+    let mut resolved: BTreeMap<
+        Principal,
+        Result<(AnchorNumber, ApplicationNumber), NotAcceptedReason>,
+    > = BTreeMap::new();
     let mut reachable = Vec::new();
 
     for Notification {
@@ -38,9 +42,11 @@ pub fn submit(
             .or_insert_with(|| resolve_recipient(recipient, &origin, now_ns))
             .clone();
         match resolution {
-            Ok(anchor_number) => reachable.push(PendingNotification {
+            Ok((anchor_number, application_number)) => reachable.push(PendingNotification {
                 recipient,
                 anchor_number,
+                application_number,
+                sender,
                 notification_id: id,
                 urgency: urgency.unwrap_or(Urgency::Normal),
                 expires_at_ns: expires_at,
@@ -82,18 +88,22 @@ pub fn submit(
     SendNotificationResponse { not_accepted }
 }
 
-/// The identity a principal names at `origin`. No such recipient when it names none
+/// The identity a principal names at `origin`, and II's number for the app. No such
+/// recipient when it names none
 /// there, or when none of its browsers was used within [`BROWSER_GONE_AFTER_NS`]. No
 /// channel when it has not allowed the app, or no browser can be woken now.
 fn resolve_recipient(
     recipient: Principal,
     origin: &FrontendHostname,
     now_ns: Timestamp,
-) -> Result<AnchorNumber, NotAcceptedReason> {
+) -> Result<(AnchorNumber, ApplicationNumber), NotAcceptedReason> {
     storage_borrow(|storage| {
         let account = storage
             .lookup_account_with_principal(recipient)
             .filter(|account| account.origin == *origin)
+            .ok_or(NotAcceptedReason::NoSuchRecipient)?;
+        let application_number = storage
+            .lookup_application_number_with_origin(origin)
             .ok_or(NotAcceptedReason::NoSuchRecipient)?;
         let anchor = storage
             .read(account.anchor_number)
@@ -117,7 +127,7 @@ fn resolve_recipient(
         {
             return Err(NotAcceptedReason::NoChannel);
         }
-        Ok(account.anchor_number)
+        Ok((account.anchor_number, application_number))
     })
 }
 
@@ -133,6 +143,10 @@ mod tests {
     const APP: &str = "https://app.example";
     const RELAY: &str = "https://relay.example/wpush/abc";
     const NOW_NS: Timestamp = 1_000_000_000_000;
+
+    fn sender() -> Principal {
+        Principal::from_slice(&[7; 10])
+    }
 
     struct Recipient {
         anchor_number: AnchorNumber,
@@ -189,7 +203,7 @@ mod tests {
             notifications,
         })
         .expect("a valid batch");
-        submit(request, now_ns).not_accepted
+        submit(request, sender(), now_ns).not_accepted
     }
 
     fn queued(now_ns: Timestamp) -> Vec<PendingNotification> {
@@ -223,6 +237,11 @@ mod tests {
             vec![PendingNotification {
                 recipient: recipient.principal,
                 anchor_number: recipient.anchor_number,
+                application_number: storage_borrow(|storage| {
+                    storage.lookup_application_number_with_origin(&APP.to_string())
+                })
+                .expect("signing in stores the application"),
+                sender: sender(),
                 notification_id: 7,
                 urgency: Urgency::Normal,
                 expires_at_ns: None,
