@@ -421,18 +421,12 @@ fn is_bare_authority(domain: &str) -> bool {
     authority == domain.to_ascii_lowercase()
 }
 
-/// True if `host` (host or `host:port`) is loopback.
-fn is_loopback_host(host: &str) -> bool {
-    let bare = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
-    matches!(bare.as_str(), "localhost" | "127.0.0.1")
-}
-
 /// `http` discovery is permitted only for a loopback host, and only when the
 /// `sso_allow_insecure_discovery` deploy flag is set (e2e mock IdPs). Every
 /// other host — and everything in production, where the flag is off — requires
 /// `https`, so an un-flagged caller can never trigger an `http` outcall.
 fn allow_insecure_scheme(host: &str) -> bool {
-    sso_allow_insecure_discovery() && is_loopback_host(host)
+    sso_allow_insecure_discovery() && crate::utils::is_loopback_host(host)
 }
 
 // ---------------------------------------------------------------------------

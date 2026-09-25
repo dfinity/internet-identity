@@ -312,6 +312,17 @@ impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
         }
     }
 
+    /// A fresh success parks nothing (its `retry_at` is the freshness
+    /// deadline), so `failures` is what tells the two apart.
+    fn parked_until(&self, key: &K, now: u64) -> Option<u64> {
+        let entry = self.entries.get(key)?;
+        (entry.failures > 0
+            && entry.is_alive(now)
+            && entry.is_throttled(now)
+            && !self.in_flight.contains_key(key))
+        .then_some(entry.retry_at)
+    }
+
     /// Apply the outcome of the fill identified by `token`. `Ok` stores fresh
     /// and resets backoff; `Err` keeps any prior value for stale-serving and
     /// parks a backoff cooldown. A no-op if the marker is no longer ours (a
@@ -615,6 +626,23 @@ where
         .map_or(Cached::Pending, Cached::Ready)
 }
 
+/// When the cache will next attempt a fill for `key`, in absolute seconds, or
+/// `None` when nothing is parked. Read-only, like [`peek`], and the only way
+/// to tell a [`Cached::Pending`] that is parked in backoff from one whose fill
+/// is in flight.
+pub fn retry_at<K, V, E>(
+    cache: &'static LocalKey<RefCell<SingleFlightCache<K, V, E>>>,
+    key: &K,
+) -> Option<u64>
+where
+    K: Ord + Clone + 'static,
+    V: Clone + 'static,
+    E: 'static,
+{
+    let now = now();
+    cache.with_borrow(|c| c.parked_until(key, now))
+}
+
 /// Snapshot the cache's state for external observability (metrics). Read-only
 /// and non-blocking; uses the cache's own clock, like [`get`].
 pub fn stats<K, V, E>(cache: &'static LocalKey<RefCell<SingleFlightCache<K, V, E>>>) -> CacheStats
@@ -772,7 +800,10 @@ mod tests {
         let t2 = expect_fill(c.lookup(&"k", 120));
         c.abandon_fill(&"k", t2, 120);
         // The stale value is untouched and still served; nothing was penalised.
-        assert!(matches!(c.lookup(&"k", 120), Lookup::StartFill(_, Some("v"))));
+        assert!(matches!(
+            c.lookup(&"k", 120),
+            Lookup::StartFill(_, Some("v"))
+        ));
     }
 
     #[test]

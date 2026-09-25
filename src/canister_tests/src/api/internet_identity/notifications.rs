@@ -2,10 +2,12 @@
 use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, FrontendHostname, GetWebPushSubscriptionStatusRequest,
-    NotificationConsentGrantedRequest, NotificationGrantConsentError,
+    AnchorNumber, BrowserId, FrontendHostname, GetNotificationDelegationRequest,
+    GetNotificationDelegationResponse, GetWebPushSubscriptionStatusRequest,
+    NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
     NotificationGrantConsentRequest, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest, RemoveWebPushSubscriptionError,
+    NotificationRevokeConsentRequest, PrepareNotificationDelegationRequest,
+    PrepareNotificationDelegationResponse, RemoveWebPushSubscriptionError,
     RemoveWebPushSubscriptionRequest, SetWebPushSubscriptionError, SetWebPushSubscriptionRequest,
     WebPushSubscriptionStatus,
 };
@@ -124,6 +126,43 @@ pub fn get_webpush_subscription_status(
         sender,
         "get_webpush_subscription_status",
         (GetWebPushSubscriptionStatusRequest { anchor_number },),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn prepare_notification_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: PrepareNotificationDelegationRequest,
+) -> Result<
+    Result<PrepareNotificationDelegationResponse, NotificationDelegationError>,
+    RejectResponse,
+> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "prepare_notification_delegation",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_notification_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: GetNotificationDelegationRequest,
+) -> Result<Result<GetNotificationDelegationResponse, NotificationDelegationError>, RejectResponse>
+{
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_notification_delegation",
+        (request,),
     )
     .map(|(x,)| x)
 }

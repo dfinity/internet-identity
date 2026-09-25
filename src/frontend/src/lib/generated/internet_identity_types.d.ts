@@ -916,6 +916,20 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
+export interface GetNotificationDelegationRequest {
+  'session_key' : SessionKey,
+  'origin' : FrontendHostname,
+  'account_number' : [] | [AccountNumber],
+  'expiration' : Timestamp,
+  'anchor_number' : UserNumber,
+}
+export interface GetNotificationDelegationResponse {
+  /**
+   * Authenticates sender_info on those calls.
+   */
+  'sender_info_signature' : Uint8Array | number[],
+  'signed_delegation' : SignedDelegation,
+}
 /**
  * Request for `get_sso_discovery_status`.
  */
@@ -1245,6 +1259,13 @@ export interface InternetIdentityInit {
    */
   'dummy_auth' : [] | [[] | [DummyAuthConfig]],
   /**
+   * Deploy flag relaxing the https requirement for sender-list outcalls to
+   * loopback hosts (localhost / 127.0.0.1) so e2e tests and local development can
+   * serve the list over plain http. null / opt false (the default) require https
+   * for every notifying origin, and a non-loopback origin always requires https.
+   */
+  'notifications_allow_insecure_sender_list' : [] | [boolean],
+  /**
    * Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
    * loopback hosts (`localhost` / `127.0.0.1`) so e2e tests can point at local
    * mock IdPs served over plain `http`. Unset / `false` (the default) require
@@ -1360,10 +1381,39 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+export interface NotAccepted {
+  'id' : NotificationId,
+  'recipient' : Principal,
+  'reason' : NotAcceptedReason,
+}
+export type NotAcceptedReason = { 'NoSuchRecipient' : null } |
+  { 'NoChannel' : null } |
+  { 'Deferred' : { 'retry_after' : Timestamp } };
+export interface Notification {
+  'id' : NotificationId,
+  /**
+   * Null means Normal.
+   */
+  'urgency' : [] | [Urgency],
+  'recipient' : Principal,
+  /**
+   * Null means II's default retention, which is also the ceiling.
+   */
+  'expires_at' : [] | [Timestamp],
+}
 export interface NotificationConsentGrantedRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
 }
+export type NotificationDelegationError = {
+    /**
+     * The caller is no browser of this identity, that browser is not registered
+     * for Web Push, or the identity has not allowed this app to notify it.
+     */
+    'NoNotificationAccess' : null
+  } |
+  { 'NoSuchDelegation' : null } |
+  { 'InternalCanisterError' : string };
 /**
  * Why a notification call was refused.
  */
@@ -1375,6 +1425,11 @@ export interface NotificationGrantConsentRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
 }
+/**
+ * Scoped to (origin, recipient), and shared across the canisters sending for
+ * one origin.
+ */
+export type NotificationId = bigint;
 export type NotificationRevokeConsentError = {
     'InternalCanisterError' : string
   } |
@@ -1448,7 +1503,19 @@ export type OpenIdCredentialKey = [Iss, Sub, Aud];
 export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
   { 'OpenIdCredentialNotFound' : null } |
   { 'Unauthorized' : Principal };
-export type OpenIdDelegationError = { 'NoSuchDelegation' : null } |
+export type OpenIdDelegationError = {
+    /**
+     * The credential is registered on an anchor, but through a different SSO
+     * discovery domain than the one this login was verified through, so the
+     * domain-scoped anchor lookup cannot resolve it. `registered_sso_domain` is
+     * the domain the credential is registered through (`null` for a credential
+     * stored without a domain stamp). A sign-up with the same credential would be
+     * rejected with `OpenIdCredentialAlreadyRegistered`, since registration
+     * uniqueness spans all discovery domains.
+     */
+    'SsoDomainMismatch' : { 'registered_sso_domain' : [] | [string] }
+  } |
+  { 'NoSuchDelegation' : null } |
   { 'NoSuchAnchor' : null } |
   { 'JwtExpired' : null } |
   { 'JwtVerificationFailed' : null };
@@ -1678,6 +1745,21 @@ export interface PrepareMcpRegistrationDelegation {
   'trusted_url' : string,
   'expiration' : Timestamp,
 }
+export interface PrepareNotificationDelegationRequest {
+  'session_key' : SessionKey,
+  'origin' : FrontendHostname,
+  'account_number' : [] | [AccountNumber],
+  'anchor_number' : UserNumber,
+}
+export interface PrepareNotificationDelegationResponse {
+  'user_key' : UserKey,
+  'expiration' : Timestamp,
+  /**
+   * Goes in the sender_info field of every call made with this delegation;
+   * tells the app which account it is being called for.
+   */
+  'sender_info' : Uint8Array | number[],
+}
 export interface PrepareSessionDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
@@ -1778,6 +1860,31 @@ export interface Rrsig {
   'type_covered' : number,
 }
 export type Salt = Uint8Array | number[];
+/**
+ * Applies in order: a later entry for a (recipient, id) replaces an earlier
+ * one, as a re-send replaces a notification that is still pending.
+ */
+export interface SendNotificationArg {
+  'notifications' : Array<Notification>,
+  'origin' : FrontendHostname,
+}
+export type SendNotificationError = {
+    'TooManyNotifications' : { 'limit' : number }
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The origin lists no such sender: no file, an empty or unusable one, or
+     * one that does not name the caller.
+     */
+    'NoSuchSender' : null
+  };
+/**
+ * Anything not_accepted does not name was accepted.
+ */
+export interface SendNotificationResponse {
+  'not_accepted' : Array<NotAccepted>,
+}
 export type SessionDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -1993,6 +2100,10 @@ export type UpdateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
   { 'NameTooLong' : null };
+export type Urgency = { 'Low' : null } |
+  { 'High' : null } |
+  { 'VeryLow' : null } |
+  { 'Normal' : null };
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
 /**
@@ -2093,6 +2204,15 @@ export interface _SERVICE {
     [],
     { 'Ok' : null } |
       { 'Err' : AppSessionError }
+  >,
+  /**
+   * Called by an app's backend canister for the origin it names. Not
+   * implemented yet: every call is refused.
+   */
+  'app_send_notification' : ActorMethod<
+    [SendNotificationArg],
+    { 'Ok' : SendNotificationResponse } |
+      { 'Err' : SendNotificationError }
   >,
   /**
    * Adds a new authentication method to the identity.
@@ -2406,6 +2526,11 @@ export interface _SERVICE {
     [UserNumber, SessionKey, PublicKey, Timestamp],
     { 'Ok' : SignedDelegation } |
       { 'Err' : string }
+  >,
+  'get_notification_delegation' : ActorMethod<
+    [GetNotificationDelegationRequest],
+    { 'Ok' : GetNotificationDelegationResponse } |
+      { 'Err' : NotificationDelegationError }
   >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'get_session_delegation' : ActorMethod<
@@ -2738,6 +2863,14 @@ export interface _SERVICE {
     [UserNumber, SessionKey, [] | [Permissions], [] | [bigint]],
     { 'Ok' : PrepareMcpRegistrationDelegation } |
       { 'Err' : string }
+  >,
+  /**
+   * Authorized by the browser key the caller signs with.
+   */
+  'prepare_notification_delegation' : ActorMethod<
+    [PrepareNotificationDelegationRequest],
+    { 'Ok' : PrepareNotificationDelegationResponse } |
+      { 'Err' : NotificationDelegationError }
   >,
   'prepare_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, [] | [bigint]],

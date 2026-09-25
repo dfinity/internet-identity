@@ -17,13 +17,18 @@ REPO_ROOT="$PWD"
 
 # Match the e2e job in .github/workflows/canister-tests.yml
 LAUNCHER_TAG="v12.0.0-2026-04-16-04-20"
-OPENID_PORTS=(11105 11106 11107 11108)
+OPENID_PORTS=(11105 11106 11107 11108 11109)
 DIRECT_OPENID_PORTS=(11105 11106)
 # 11108 is an Entra-style provider: pairwise `sub` (per client) + a stable `oid`,
 # for the non-`sub` gating tests (see fixtures/sso.ts SSO_ENTRA_DISCOVERY_DOMAIN).
 # (127.0.0.1:11107 is the same provider under a distinct host, letting the gating
 # tests use a discovery-cache entry the un-gated tests never touch.)
 PAIRWISE_OPENID_PORT=11108
+# 11109 only serves a well-known that points at the 11107 IdP (OIDC_ISSUER): a
+# second SSO discovery domain for the *same* accounts, for the domain-mismatch
+# tests (see fixtures/sso.ts SSO_ALIAS_DISCOVERY_DOMAIN). Never gated.
+ALIAS_OPENID_PORT=11109
+ALIAS_OPENID_TARGET_PORT=11107
 
 STATE_DIR=".icp/cache/dev-e2e"
 LAUNCHER_DIR="$STATE_DIR/launcher-$LAUNCHER_TAG"
@@ -256,6 +261,12 @@ start_openid_providers() {
       # the e2e II origin is https://id.ai, so restrict to that one callback.
       OIDC_SUBJECT_TYPE=pairwise OIDC_SSO_NAME="Entra SSO" \
         OIDC_REDIRECT_URIS="https://id.ai/callback" \
+        npm start --silent --prefix ./src/test_openid_provider -- "$port" \
+        > "$LOG_DIR/openid-$port.log" 2>&1 &
+    elif [[ "$port" == "$ALIAS_OPENID_PORT" ]]; then
+      # Alias discovery domain: its well-known hands II the 11107 provider's
+      # OIDC configuration, so sign-ins through it hit the same IdP and accounts.
+      OIDC_ISSUER="http://localhost:$ALIAS_OPENID_TARGET_PORT" OIDC_SSO_NAME="Test SSO alias" \
         npm start --silent --prefix ./src/test_openid_provider -- "$port" \
         > "$LOG_DIR/openid-$port.log" 2>&1 &
     else

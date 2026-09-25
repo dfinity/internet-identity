@@ -39,13 +39,15 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     PrepareIdAliasRequest, PreparedIdAlias,
 };
 use internet_identity_interface::internet_identity::types::*;
+use notifications::senders::Senders;
 use notifications::webpush::{
     ValidatedGetWebPushSubscriptionStatusRequest, ValidatedRemoveWebPushSubscriptionRequest,
     ValidatedSetWebPushSubscriptionRequest,
 };
 use notifications::{
-    ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
-    ValidatedNotificationRevokeConsentRequest,
+    ValidatedGetNotificationDelegationRequest, ValidatedNotificationConsentGrantedRequest,
+    ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
+    ValidatedPrepareNotificationDelegationRequest, ValidatedSendNotificationArg,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -381,6 +383,30 @@ fn remove_webpush_subscription(
     notifications::webpush::remove_subscription(validated)
 }
 
+/// Authorized by the browser key the caller signs with.
+#[update]
+fn prepare_notification_delegation(
+    request: PrepareNotificationDelegationRequest,
+) -> Result<PrepareNotificationDelegationResponse, NotificationDelegationError> {
+    let request: ValidatedPrepareNotificationDelegationRequest = request.try_into()?;
+    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
+
+    notifications::delegation::prepare(request, &anchor, browser_id, ic_cdk::api::time())
+}
+
+/// Authorized by the browser key the caller signs with.
+#[query]
+fn get_notification_delegation(
+    request: GetNotificationDelegationRequest,
+) -> Result<GetNotificationDelegationResponse, NotificationDelegationError> {
+    let request: ValidatedGetNotificationDelegationRequest = request.try_into()?;
+    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
+        .map_err(|_| NotificationDelegationError::NoNotificationAccess)?;
+
+    notifications::delegation::get(request, &anchor, browser_id)
+}
+
 #[update]
 fn notification_grant_consent(
     request: NotificationGrantConsentRequest,
@@ -415,6 +441,29 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
     }
 
     notifications::consent_granted(validated)
+}
+
+// ---- Notifications: called by an app's backend ----
+
+/// Authorized by the origin listing the caller in the sender list it publishes. A
+/// caller II cannot judge yet has its batch deferred rather than refused.
+///
+/// The send path does not exist yet, so an authorized caller is still refused.
+#[update]
+fn app_send_notification(
+    request: SendNotificationArg,
+) -> Result<SendNotificationResponse, SendNotificationError> {
+    let request: ValidatedSendNotificationArg = request.try_into()?;
+
+    match notifications::senders::authorize(&request, caller(), ic_cdk::api::time()) {
+        Senders::NotListed => Err(SendNotificationError::NoSuchSender),
+        Senders::Pending { retry_after } => {
+            Ok(notifications::defer_whole_batch(request, retry_after))
+        }
+        Senders::Listed => Err(SendNotificationError::InternalCanisterError(
+            "Not enabled".to_string(),
+        )),
+    }
 }
 
 #[query]
@@ -926,6 +975,8 @@ fn config() -> InternetIdentityInit {
         new_flow_origins: persistent_state.new_flow_origins.clone(),
         openid_configs: persistent_state.openid_configs.clone(),
         sso_allow_insecure_discovery: persistent_state.sso_allow_insecure_discovery,
+        notifications_allow_insecure_sender_list: persistent_state
+            .notifications_allow_insecure_sender_list,
         analytics_config: Some(persistent_state.analytics_config.clone()),
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
         is_production: persistent_state.is_production,
@@ -1041,6 +1092,14 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(sso_allow_insecure_discovery) = arg.sso_allow_insecure_discovery {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.sso_allow_insecure_discovery = Some(sso_allow_insecure_discovery);
+            })
+        }
+        if let Some(notifications_allow_insecure_sender_list) =
+            arg.notifications_allow_insecure_sender_list
+        {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.notifications_allow_insecure_sender_list =
+                    Some(notifications_allow_insecure_sender_list);
             })
         }
         if let Some(new_flow_origins) = arg.new_flow_origins {
@@ -1694,13 +1753,10 @@ mod openid_api {
         // The verified credential already carries the SSO stable identifier, so
         // the anchor write below reconciles the stable-id index.
         let prepared: Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> = async {
-            let anchor_number = state::storage_borrow(|storage| {
-                storage.lookup_anchor_with_openid_credential(
-                    &openid_credential.key(),
-                    discovery_domain.as_deref(),
-                )
-            })
-            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            let anchor_number = openid::resolve_anchor_with_openid_credential(
+                &openid_credential.key(),
+                discovery_domain.as_deref(),
+            )?;
 
             // Update anchor with latest OpenID credential from JWT so latest information is stored,
             // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
@@ -1714,13 +1770,10 @@ mod openid_api {
                 openid_credential.prepare_jwt_delegation(session_key, anchor_number);
 
             // Checking again because the association could've changed during the .await
-            let still_anchor_number = state::storage_borrow(|storage| {
-                storage.lookup_anchor_with_openid_credential(
-                    &openid_credential.key(),
-                    discovery_domain.as_deref(),
-                )
-            })
-            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            let still_anchor_number = openid::resolve_anchor_with_openid_credential(
+                &openid_credential.key(),
+                discovery_domain.as_deref(),
+            )?;
 
             if anchor_number != still_anchor_number {
                 return Err(OpenIdDelegationError::NoSuchAnchor);
@@ -1759,17 +1812,13 @@ mod openid_api {
             Err(err) => return OpenIdResult::Err(err.into()),
         };
 
-        let delegation = match state::storage_borrow(|storage| {
-            storage.lookup_anchor_with_openid_credential(
-                &openid_credential.key(),
-                discovery_domain.as_deref(),
-            )
-        }) {
-            Some(anchor_number) => {
-                openid_credential.get_jwt_delegation(session_key, expiration, anchor_number)
-            }
-            None => Err(OpenIdDelegationError::NoSuchAnchor),
-        };
+        let delegation = openid::resolve_anchor_with_openid_credential(
+            &openid_credential.key(),
+            discovery_domain.as_deref(),
+        )
+        .and_then(|anchor_number| {
+            openid_credential.get_jwt_delegation(session_key, expiration, anchor_number)
+        });
 
         match delegation {
             Ok(signed) => OpenIdResult::Ok(signed),
@@ -1830,10 +1879,8 @@ mod openid_api {
 
         let prepared: Result<SsoPrepareDelegationResponse, OpenIdDelegationError> = async {
             let key = identity.credential.key();
-            let anchor_number = state::storage_borrow(|storage| {
-                storage.lookup_anchor_with_openid_credential(&key, Some(&discovery_domain))
-            })
-            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            let anchor_number =
+                openid::resolve_anchor_with_openid_credential(&key, Some(&discovery_domain))?;
 
             // Refresh the II-client credential's metadata from the token; never adds a per-app credential.
             let mut anchor = state::anchor(anchor_number);
@@ -1863,10 +1910,8 @@ mod openid_api {
             );
 
             // The association could change during the `.await`.
-            let still_anchor_number = state::storage_borrow(|storage| {
-                storage.lookup_anchor_with_openid_credential(&key, Some(&discovery_domain))
-            })
-            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            let still_anchor_number =
+                openid::resolve_anchor_with_openid_credential(&key, Some(&discovery_domain))?;
             if anchor_number != still_anchor_number {
                 // The credential re-associated to a different anchor during the
                 // `.await` (a concurrent account change). Deliberately reported
@@ -1914,11 +1959,11 @@ mod openid_api {
             Err(err) => return OpenIdResult::Err(err),
         };
         let key = identity.credential.key();
-        let Some(anchor_number) = state::storage_borrow(|storage| {
-            storage.lookup_anchor_with_openid_credential(&key, Some(&discovery_domain))
-        }) else {
-            return OpenIdResult::Err(OpenIdDelegationError::NoSuchAnchor);
-        };
+        let anchor_number =
+            match openid::resolve_anchor_with_openid_credential(&key, Some(&discovery_domain)) {
+                Ok(anchor_number) => anchor_number,
+                Err(err) => return OpenIdResult::Err(err),
+            };
         let signed_delegation =
             match identity
                 .credential
