@@ -1191,3 +1191,50 @@ pub enum NotificationDelegationError {
     NoSuchDelegation,
     InternalCanisterError(String),
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNextNotificationRequest {
+    pub anchor_number: AnchorNumber,
+    /// What this service worker is still showing, whose removal has not landed yet.
+    pub skip: Vec<NotificationToShow>,
+}
+
+/// What a service worker shows for one wake-up: the app and account it is for, the
+/// canister holding its content, and which notification.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationToShow {
+    pub origin: FrontendHostname,
+    /// `None` is the unreserved default account.
+    pub account_number: Option<AccountNumber>,
+    pub canister_id: Principal,
+    pub id: NotificationId,
+}
+
+/// `None` once nothing is left to show.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNextNotificationResponse {
+    pub notification: Option<NotificationToShow>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum GetNextNotificationError {
+    /// Also a caller that is no browser of the identity, or a skip list longer than a
+    /// browser's queue.
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RemoveNotificationRequest {
+    pub anchor_number: AnchorNumber,
+    /// As `browser_get_next_notification` returned it.
+    pub notification: NotificationToShow,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct RemoveNotificationResponse {}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum RemoveNotificationError {
+    /// Also a caller that is no browser of the identity.
+    InternalCanisterError(String),
+}

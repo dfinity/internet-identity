@@ -916,6 +916,26 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
+export type GetNextNotificationError = {
+    /**
+     * Also a caller that is no browser of the identity, or a skip list longer than a
+     * browser's queue.
+     */
+    'InternalCanisterError' : string
+  };
+export interface GetNextNotificationRequest {
+  /**
+   * What this service worker is still showing, whose removal has not landed yet.
+   */
+  'skip' : Array<NotificationToShow>,
+  'anchor_number' : UserNumber,
+}
+/**
+ * Null once nothing is left to show.
+ */
+export interface GetNextNotificationResponse {
+  'notification' : [] | [NotificationToShow],
+}
 export interface GetNotificationDelegationRequest {
   'session_key' : SessionKey,
   'origin' : FrontendHostname,
@@ -1438,6 +1458,16 @@ export interface NotificationRevokeConsentRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
 }
+/**
+ * What a service worker shows for one wake-up: the app and account it is for, the
+ * canister holding its content, and which notification.
+ */
+export interface NotificationToShow {
+  'id' : NotificationId,
+  'origin' : FrontendHostname,
+  'canister_id' : Principal,
+  'account_number' : [] | [AccountNumber],
+}
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
@@ -1832,6 +1862,20 @@ export type RegistrationFlowNextStep = {
     'Finish' : null
   };
 export type RegistrationId = string;
+export type RemoveNotificationError = {
+    /**
+     * Also a caller that is no browser of the identity.
+     */
+    'InternalCanisterError' : string
+  };
+export interface RemoveNotificationRequest {
+  /**
+   * As browser_get_next_notification returned it.
+   */
+  'notification' : NotificationToShow,
+  'anchor_number' : UserNumber,
+}
+export type RemoveNotificationResponse = {};
 export type RemoveWebPushSubscriptionError = {
     'InternalCanisterError' : string
   } |
@@ -2318,6 +2362,23 @@ export interface _SERVICE {
     [IdentityNumber],
     { 'Ok' : AuthnMethodConfirmationCode } |
       { 'Err' : AuthnMethodRegisterError }
+  >,
+  /**
+   * Called by the service worker on a wake-up, signed with the browser key: the oldest
+   * notification its browser has yet to show, passing over the ones it skips.
+   */
+  'browser_get_next_notification' : ActorMethod<
+    [GetNextNotificationRequest],
+    { 'Ok' : GetNextNotificationResponse } |
+      { 'Err' : GetNextNotificationError }
+  >,
+  /**
+   * Called by the service worker for the one it shows, while it fetches the content.
+   */
+  'browser_remove_notification' : ActorMethod<
+    [RemoveNotificationRequest],
+    { 'Ok' : RemoveNotificationResponse } |
+      { 'Err' : RemoveNotificationError }
   >,
   /**
    * Check the captcha challenge

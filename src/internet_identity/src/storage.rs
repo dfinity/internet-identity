@@ -1594,6 +1594,16 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&key.clone().into())
     }
 
+    /// The origin of an app II still holds.
+    pub fn lookup_origin_with_application_number(
+        &self,
+        application_number: ApplicationNumber,
+    ) -> Option<FrontendHostname> {
+        self.stable_application_memory
+            .get(&application_number)
+            .map(|application| application.origin)
+    }
+
     pub fn lookup_application_number_with_origin(
         &self,
         origin: &FrontendHostname,
