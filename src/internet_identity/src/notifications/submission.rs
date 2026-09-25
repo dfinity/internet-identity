@@ -63,11 +63,9 @@ pub fn submit(
             now_ns,
         )
     });
-    let mut queued = false;
     for admitted in admissions {
         match admitted.admission {
-            Admission::Accepted | Admission::Folded => queued = true,
-            Admission::Dropped => {}
+            Admission::Accepted | Admission::Folded | Admission::Dropped => {}
             Admission::Full { retry_after_ns } => {
                 let (recipient, id) = admitted.key;
                 not_accepted.push(NotAccepted {
@@ -80,9 +78,7 @@ pub fn submit(
             }
         }
     }
-    if queued {
-        dispatch::schedule_pass(now_ns);
-    }
+    dispatch::schedule_pass(now_ns);
     SendNotificationResponse { not_accepted }
 }
 
@@ -313,6 +309,28 @@ mod tests {
         };
         assert!(retry_after > NOW_NS);
         assert_eq!(queued(NOW_NS).len(), 20);
+    }
+
+    #[test]
+    fn a_batch_the_backlog_turned_away_still_schedules_a_pass() {
+        setup();
+        let recipient = reachable();
+        send(
+            (0..20).map(|id| notification(&recipient, id)).collect(),
+            NOW_NS,
+        );
+        dispatch::reset_pass_schedule_for_testing();
+
+        let answers = send(vec![notification(&recipient, 20)], NOW_NS);
+
+        assert!(matches!(
+            answers[..],
+            [NotAccepted {
+                reason: NotAcceptedReason::Deferred { .. },
+                ..
+            }]
+        ));
+        assert_eq!(dispatch::pass_due_at_for_testing(), Some(NOW_NS));
     }
 
     #[test]

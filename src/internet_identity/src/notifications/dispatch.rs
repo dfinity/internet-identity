@@ -131,6 +131,16 @@ pub(crate) fn schedule_pass(now_ns: Timestamp) {
     }
 }
 
+#[cfg(test)]
+pub(crate) fn pass_due_at_for_testing() -> Option<Timestamp> {
+    PASS_SCHEDULE.with(Cell::get).due_at_ns
+}
+
+#[cfg(test)]
+pub(crate) fn reset_pass_schedule_for_testing() {
+    PASS_SCHEDULE.with(|schedule| schedule.set(PassSchedule::default()));
+}
+
 fn delay_until_next_pass(last_started_ns: Option<Timestamp>, now_ns: Timestamp) -> Duration {
     let next_ns = last_started_ns.map_or(now_ns, |last| {
         last.saturating_add(INTERVAL.as_nanos() as u64)
