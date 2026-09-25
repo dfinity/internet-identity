@@ -8,6 +8,7 @@ use crate::notifications::browser_queue::{self, Added};
 use crate::notifications::webpush::{clear_gone_subscription, vapid_jwt};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow};
+use crate::storage::anchor::Browser;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::notifications::browser_queue::StorableBrowserNotificationKey;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
@@ -196,16 +197,9 @@ fn fan_out_to_browsers(
     let ttl_seconds = expires_at_ns.saturating_sub(now_ns) / SECOND_NS;
 
     for browser in anchor.browsers() {
-        if now_ns.saturating_sub(browser.last_used) >= BROWSER_GONE_AFTER_NS {
-            continue;
-        }
-        let Some(subscription) = &browser.webpush_subscription else {
-            continue;
-        };
-        let Some(relay_origin) = vapid_jwt::relay_origin_of(&subscription.endpoint) else {
-            continue;
-        };
-        let Some(jwt) = vapid_jwt::assemble(subscription, &relay_origin, now_ns) else {
+        let (Some(subscription), Some(jwt)) =
+            (&browser.webpush_subscription, wake_up_jwt(browser, now_ns))
+        else {
             continue;
         };
         let Added::Queued(entry) = browser_queue::add(
@@ -228,6 +222,17 @@ fn fan_out_to_browsers(
             ttl_seconds,
         });
     }
+}
+
+/// The authorization a wake-up to `browser` carries now: none unless it was used within
+/// [`BROWSER_GONE_AFTER_NS`], is registered, and its pool holds a signature for now.
+pub(crate) fn wake_up_jwt(browser: &Browser, now_ns: Timestamp) -> Option<String> {
+    if now_ns.saturating_sub(browser.last_used) >= BROWSER_GONE_AFTER_NS {
+        return None;
+    }
+    let subscription = browser.webpush_subscription.as_ref()?;
+    let relay_origin = vapid_jwt::relay_origin_of(&subscription.endpoint)?;
+    vapid_jwt::assemble(subscription, &relay_origin, now_ns)
 }
 
 /// Count the outcome and keep the browser's queue in step with the wake-ups on their
