@@ -420,10 +420,11 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         if items.is_empty() {
             return Vec::new();
         }
+        // Discard expired entries for this sender before admitting new ones, so they can take the turns.
         self.discard_expired_for(&sender, now_ns);
 
         let mut admissions = Vec::with_capacity(items.len());
-        let mut swept = false;
+        let mut swept = false; // Whether expired entries were discarded once for this admission call.
 
         for item in items {
             let key = item.key();
@@ -432,6 +433,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 admission,
             };
 
+            // Reject items that are already expired on arrival, even if the queue has room.
             let expires_at_ns = self.expiry_for(now_ns, &item);
             if expires_at_ns <= now_ns {
                 self.dropped_already_expired += 1;
@@ -439,6 +441,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 continue;
             }
 
+            // Refuse duplicates, but refresh their deadline and item. Doesn't affect queue capacity, so it doesn't reset the pressure timer.
             if self.holds(&sender, &key) {
                 self.folded_duplicates += 1;
                 self.refresh(&sender, &key, item, expires_at_ns);
@@ -446,6 +449,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 continue;
             }
 
+            // Reject items that would exceed the per-group pending limit, even if the queue has room.
             if self.pending_for(&sender, &item.group()) >= self.config.max_pending_per_group {
                 self.rejected_group_full += 1;
                 let since_ns = self.group_pressure_since(&sender, &item.group(), now_ns);
@@ -460,6 +464,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 swept = true;
             }
 
+            // Reject items if the queue or sender is at capacity.
             if self.is_full() || self.sender_at_cap(&sender) {
                 // Sender pressure can persist while the queue still has room.
                 let since_ns = match self.at_capacity_since_ns {
@@ -471,6 +476,7 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
                 continue;
             }
 
+            // Reject items if the lane is at capacity or cannot drain in time before the entry expires.
             let lane = lane_of(&item);
             if !self.drains_in_time(&sender, lane, expires_at_ns, &key, now_ns) {
                 self.rejected_lane_full += 1;
@@ -494,6 +500,39 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         admissions
     }
 
+    /// Remove up to `limit` live entries if synchronous `store` succeeds.
+    /// On error, entries go back with their timestamps and the queue's clocks are restored;
+    /// scheduling cursors, group clocks and the state of a sender the take emptied are not.
+    pub(crate) fn take_batch<T, E>(
+        &mut self,
+        limit: usize,
+        now_ns: Timestamp,
+        store: impl FnOnce(&[Taken<Sender, Item>]) -> Result<T, E>,
+    ) -> Result<T, E> {
+        // Discard expired entries before taking, so they don't consume turns.
+        if limit > 0 {
+            self.discard_expired(now_ns);
+        }
+        let nonempty_since_ns = self.nonempty_since_ns;
+        let at_capacity_since_ns = self.at_capacity_since_ns;
+        let last_taken_ns = self.last_taken_ns;
+
+        // Remove the batch before storing, so the store sees a consistent view of the queue.
+        let batch = self.remove_batch(limit, now_ns);
+        match store(&batch) {
+            Ok(stored) => Ok(stored),
+            Err(error) => {
+                for taken in batch {
+                    self.put_back(&taken.sender, taken.entry);
+                }
+                self.nonempty_since_ns = nonempty_since_ns;
+                self.at_capacity_since_ns = at_capacity_since_ns;
+                self.last_taken_ns = last_taken_ns;
+                Err(error)
+            }
+        }
+    }
+    // Remove up to `limit` live entries, advancing the sender cursor and recording the last take time.
     fn remove_batch(&mut self, limit: usize, now_ns: Timestamp) -> Vec<Taken<Sender, Item>> {
         let mut taken = Vec::new();
 
@@ -512,38 +551,6 @@ impl<Sender: Clone + Ord, Item: QueueItem> AdmissionQueue<Sender, Item> {
         }
         self.forget_quiet_lanes(now_ns);
         taken
-    }
-
-    /// Remove up to `limit` live entries if synchronous `store` succeeds. Expired entries
-    /// are discarded first and do not count toward the limit; zero skips queue processing.
-    /// On error, entries go back with their timestamps and the queue's clocks are restored;
-    /// scheduling cursors, group clocks and the state of a sender the take emptied are not.
-    pub(crate) fn take_batch<T, E>(
-        &mut self,
-        limit: usize,
-        now_ns: Timestamp,
-        store: impl FnOnce(&[Taken<Sender, Item>]) -> Result<T, E>,
-    ) -> Result<T, E> {
-        if limit > 0 {
-            self.discard_expired(now_ns);
-        }
-        let nonempty_since_ns = self.nonempty_since_ns;
-        let at_capacity_since_ns = self.at_capacity_since_ns;
-        let last_taken_ns = self.last_taken_ns;
-
-        let batch = self.remove_batch(limit, now_ns);
-        match store(&batch) {
-            Ok(stored) => Ok(stored),
-            Err(error) => {
-                for taken in batch {
-                    self.put_back(&taken.sender, taken.entry);
-                }
-                self.nonempty_since_ns = nonempty_since_ns;
-                self.at_capacity_since_ns = at_capacity_since_ns;
-                self.last_taken_ns = last_taken_ns;
-                Err(error)
-            }
-        }
     }
 
     pub(crate) fn stats(&self, now_ns: Timestamp) -> QueueStats {
