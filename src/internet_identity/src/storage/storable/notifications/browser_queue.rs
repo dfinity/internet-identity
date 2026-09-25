@@ -1,10 +1,10 @@
 //! A notification a browser's service worker has yet to take, stored on the Web Push
 //! subscription it was woken through, so the registration going takes it too.
 
+use crate::storage::storable::account_number::StorableAccountNumber;
+use crate::storage::storable::application_number::StorableApplicationNumber;
+use crate::storage::storable::notifications::notification_id::StorableNotificationId;
 use crate::storage::storable::timestamp::StorableTimestamp;
-use internet_identity_interface::internet_identity::types::{
-    AccountNumber, ApplicationNumber, NotificationId,
-};
 use minicbor::{Decode, Encode};
 
 /// What the service worker needs to fetch it: the app and account it is for, the
@@ -13,17 +13,17 @@ use minicbor::{Decode, Encode};
 #[cbor(map)]
 pub struct StorableQueuedNotification {
     #[n(0)]
-    pub application_number: ApplicationNumber,
+    pub application_number: StorableApplicationNumber,
     /// The app canister that sent it.
     #[cbor(n(1), with = "minicbor::bytes")]
     pub sender: Vec<u8>,
     #[n(2)]
-    pub notification_id: NotificationId,
+    pub notification_id: StorableNotificationId,
     #[n(3)]
     pub expires_at_ns: StorableTimestamp,
     /// `None` is the unreserved default account.
     #[n(4)]
-    pub account_number: Option<AccountNumber>,
+    pub account_number: Option<StorableAccountNumber>,
 }
 
 #[cfg(test)]
