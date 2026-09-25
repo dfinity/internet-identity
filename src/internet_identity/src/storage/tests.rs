@@ -7461,6 +7461,7 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
         sender: Principal::from_slice(&[7; 10]),
         notification_id,
         expires_at_ns: 100 * notification_id,
+        account_number: Some(notification_id),
     };
     anchor
         .notifications_mut(queued_on)

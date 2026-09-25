@@ -115,6 +115,8 @@ pub struct QueuedNotification {
     pub sender: Principal,
     pub notification_id: NotificationId,
     pub expires_at_ns: Timestamp,
+    /// `None` is the unreserved default account.
+    pub account_number: Option<AccountNumber>,
 }
 
 impl From<QueuedNotification> for StorableQueuedNotification {
@@ -124,6 +126,7 @@ impl From<QueuedNotification> for StorableQueuedNotification {
             sender: value.sender.as_slice().to_vec(),
             notification_id: value.notification_id,
             expires_at_ns: value.expires_at_ns,
+            account_number: value.account_number,
         }
     }
 }
@@ -194,6 +197,7 @@ impl From<StorableBrowser> for Browser {
                         sender: Principal::try_from_slice(&queued.sender).ok()?,
                         notification_id: queued.notification_id,
                         expires_at_ns: queued.expires_at_ns,
+                        account_number: queued.account_number,
                     })
                 })
                 .collect(),

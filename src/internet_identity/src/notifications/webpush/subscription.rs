@@ -148,6 +148,7 @@ mod tests {
                 sender: candid::Principal::from_slice(&[7; 10]),
                 notification_id: 1,
                 expires_at_ns: u64::MAX,
+                account_number: None,
             });
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }
