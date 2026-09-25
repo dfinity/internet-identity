@@ -26,10 +26,10 @@ use internet_identity_interface::internet_identity::types::{
     Timestamp,
 };
 pub use validation::{
-    notifications_enabled, ValidatedGetNotificationDelegationRequest,
-    ValidatedGetQueuedNotificationsRequest, ValidatedNotificationConsentGrantedRequest,
+    notifications_enabled, ValidatedGetNextNotificationArg,
+    ValidatedGetNotificationDelegationRequest, ValidatedNotificationConsentGrantedRequest,
     ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
-    ValidatedPrepareNotificationDelegationRequest, ValidatedRemoveQueuedNotificationRequest,
+    ValidatedPrepareNotificationDelegationRequest, ValidatedRemoveNotificationArg,
     ValidatedSendNotificationArg,
 };
 

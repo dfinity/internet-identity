@@ -2,14 +2,16 @@
 //! this deployment notifies for, spelled the one way it is keyed by.
 
 use crate::delegation::frontend_length_within_limit;
+use crate::notifications::browser_queue::MAX_PER_BROWSER;
 use internet_identity_interface::internet_identity::types::attributes::remap_to_legacy_domain;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, FrontendHostname, GetNotificationDelegationRequest,
-    GetQueuedNotificationsRequest, Notification, NotificationConsentGrantedRequest,
-    NotificationDelegationError, NotificationGrantConsentError, NotificationGrantConsentRequest,
-    NotificationRevokeConsentError, NotificationRevokeConsentRequest, NotificationToShow,
-    PrepareNotificationDelegationRequest, QueuedNotificationError, RemoveQueuedNotificationRequest,
-    SendNotificationArg, SendNotificationError, SessionKey, Timestamp,
+    AccountNumber, AnchorNumber, FrontendHostname, GetNextNotificationArg,
+    GetNextNotificationError, GetNotificationDelegationRequest, Notification,
+    NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
+    NotificationGrantConsentRequest, NotificationRevokeConsentError,
+    NotificationRevokeConsentRequest, NotificationToShow, PrepareNotificationDelegationRequest,
+    RemoveNotificationArg, RemoveNotificationError, SendNotificationArg, SendNotificationError,
+    SessionKey, Timestamp,
 };
 use std::collections::HashMap;
 use url::Url;
@@ -47,41 +49,59 @@ pub struct ValidatedSendNotificationArg {
     _validated: Validated,
 }
 
-pub struct ValidatedGetQueuedNotificationsRequest {
+pub struct ValidatedGetNextNotificationArg {
     pub anchor_number: AnchorNumber,
+    pub skip: Vec<NotificationToShow>,
     _validated: Validated,
 }
 
-impl TryFrom<GetQueuedNotificationsRequest> for ValidatedGetQueuedNotificationsRequest {
-    type Error = QueuedNotificationError;
+impl TryFrom<GetNextNotificationArg> for ValidatedGetNextNotificationArg {
+    type Error = GetNextNotificationError;
 
     fn try_from(
-        GetQueuedNotificationsRequest { anchor_number }: GetQueuedNotificationsRequest,
+        GetNextNotificationArg {
+            anchor_number,
+            skip,
+        }: GetNextNotificationArg,
     ) -> Result<Self, Self::Error> {
-        ensure_notifications_enabled()?;
+        if !notifications_enabled() {
+            return Err(GetNextNotificationError::InternalCanisterError(
+                NOT_ENABLED.to_string(),
+            ));
+        }
+        if skip.len() > MAX_PER_BROWSER {
+            return Err(GetNextNotificationError::InternalCanisterError(format!(
+                "skips more than the {MAX_PER_BROWSER} a browser holds"
+            )));
+        }
         Ok(Self {
             anchor_number,
+            skip,
             _validated: Validated,
         })
     }
 }
 
-pub struct ValidatedRemoveQueuedNotificationRequest {
+pub struct ValidatedRemoveNotificationArg {
     pub anchor_number: AnchorNumber,
     pub notification: NotificationToShow,
     _validated: Validated,
 }
 
-impl TryFrom<RemoveQueuedNotificationRequest> for ValidatedRemoveQueuedNotificationRequest {
-    type Error = QueuedNotificationError;
+impl TryFrom<RemoveNotificationArg> for ValidatedRemoveNotificationArg {
+    type Error = RemoveNotificationError;
 
     fn try_from(
-        RemoveQueuedNotificationRequest {
+        RemoveNotificationArg {
             anchor_number,
             notification,
-        }: RemoveQueuedNotificationRequest,
+        }: RemoveNotificationArg,
     ) -> Result<Self, Self::Error> {
-        ensure_notifications_enabled()?;
+        if !notifications_enabled() {
+            return Err(RemoveNotificationError::InternalCanisterError(
+                NOT_ENABLED.to_string(),
+            ));
+        }
         Ok(Self {
             anchor_number,
             notification,
@@ -90,14 +110,7 @@ impl TryFrom<RemoveQueuedNotificationRequest> for ValidatedRemoveQueuedNotificat
     }
 }
 
-fn ensure_notifications_enabled() -> Result<(), QueuedNotificationError> {
-    if !notifications_enabled() {
-        return Err(QueuedNotificationError::InternalCanisterError(
-            "notifications are not enabled".to_string(),
-        ));
-    }
-    Ok(())
-}
+const NOT_ENABLED: &str = "notifications are not enabled";
 
 impl TryFrom<NotificationGrantConsentRequest> for ValidatedNotificationGrantConsentRequest {
     type Error = NotificationGrantConsentError;
@@ -381,6 +394,27 @@ mod tests {
             expires_at: None,
             urgency: Some(urgency),
         }
+    }
+
+    #[test]
+    fn a_skip_list_longer_than_a_browsers_queue_is_refused() {
+        enable(&["https://app.example"]);
+        let skipped = NotificationToShow {
+            origin: "https://app.example".to_string(),
+            account_number: None,
+            canister_id: candid::Principal::anonymous(),
+            id: 1,
+        };
+        let arg = |skip_count| GetNextNotificationArg {
+            anchor_number: 1,
+            skip: vec![skipped.clone(); skip_count],
+        };
+
+        assert!(ValidatedGetNextNotificationArg::try_from(arg(MAX_PER_BROWSER)).is_ok());
+        assert!(matches!(
+            ValidatedGetNextNotificationArg::try_from(arg(MAX_PER_BROWSER + 1)),
+            Err(GetNextNotificationError::InternalCanisterError(_))
+        ));
     }
 
     fn validate(notifications: Vec<Notification>) -> ValidatedSendNotificationArg {

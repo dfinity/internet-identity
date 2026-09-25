@@ -9,7 +9,7 @@ use anchor_management::registration;
 use authz_utils::check_session_authorization;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
-    check_browser_authorization,
+    check_browser_authorization, AuthorizationError,
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
@@ -45,10 +45,10 @@ use notifications::webpush::{
     ValidatedSetWebPushSubscriptionRequest,
 };
 use notifications::{
-    ValidatedGetNotificationDelegationRequest, ValidatedGetQueuedNotificationsRequest,
+    ValidatedGetNextNotificationArg, ValidatedGetNotificationDelegationRequest,
     ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
     ValidatedNotificationRevokeConsentRequest, ValidatedPrepareNotificationDelegationRequest,
-    ValidatedRemoveQueuedNotificationRequest, ValidatedSendNotificationArg,
+    ValidatedRemoveNotificationArg, ValidatedSendNotificationArg,
 };
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -411,31 +411,45 @@ fn get_notification_delegation(
 /// Authorized by the browser key the caller signs with: a service worker reads its own
 /// browser's queue.
 #[query]
-fn get_queued_notifications(
-    request: GetQueuedNotificationsRequest,
-) -> Result<Vec<NotificationToShow>, QueuedNotificationError> {
-    let request: ValidatedGetQueuedNotificationsRequest = request.try_into()?;
-    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
-        .map_err(|_| QueuedNotificationError::InvalidBrowserKey)?;
+fn browser_get_next_notification(
+    arg: GetNextNotificationArg,
+) -> Result<GetNextNotificationResponse, GetNextNotificationError> {
+    let arg: ValidatedGetNextNotificationArg = arg.try_into()?;
+    let (anchor, browser_id) = check_browser_authorization(arg.anchor_number).map_err(
+        |AuthorizationError { principal }| {
+            GetNextNotificationError::InternalCanisterError(format!(
+                "{principal} is no browser of this identity"
+            ))
+        },
+    )?;
 
-    Ok(notifications::browser_queue::to_show(
-        &anchor,
-        browser_id,
-        ic_cdk::api::time(),
-    ))
+    Ok(GetNextNotificationResponse {
+        notification: notifications::browser_queue::next_to_show(
+            &anchor,
+            browser_id,
+            &arg.skip,
+            ic_cdk::api::time(),
+        ),
+    })
 }
 
 /// Authorized by the browser key the caller signs with, like the read it follows.
 #[update]
-fn remove_queued_notification(
-    request: RemoveQueuedNotificationRequest,
-) -> Result<(), QueuedNotificationError> {
-    let request: ValidatedRemoveQueuedNotificationRequest = request.try_into()?;
-    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
-        .map_err(|_| QueuedNotificationError::InvalidBrowserKey)?;
+fn browser_remove_notification(
+    arg: RemoveNotificationArg,
+) -> Result<RemoveNotificationResponse, RemoveNotificationError> {
+    let arg: ValidatedRemoveNotificationArg = arg.try_into()?;
+    let (anchor, browser_id) = check_browser_authorization(arg.anchor_number).map_err(
+        |AuthorizationError { principal }| {
+            RemoveNotificationError::InternalCanisterError(format!(
+                "{principal} is no browser of this identity"
+            ))
+        },
+    )?;
 
-    notifications::browser_queue::remove_shown(anchor, browser_id, &request.notification)
-        .map_err(QueuedNotificationError::InternalCanisterError)
+    notifications::browser_queue::remove_shown(anchor, browser_id, &arg.notification)
+        .map(|()| RemoveNotificationResponse {})
+        .map_err(RemoveNotificationError::InternalCanisterError)
 }
 
 #[update]
