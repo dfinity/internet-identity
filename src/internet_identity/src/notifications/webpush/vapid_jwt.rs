@@ -7,23 +7,28 @@ use base64::Engine;
 use internet_identity_interface::internet_identity::types::Timestamp;
 use url::Url;
 
-const WINDOW_NS: u64 = 24 * 60 * 60 * 1_000_000_000;
+const SECOND_NS: u64 = 1_000_000_000;
+const WINDOW_NS: u64 = 24 * 60 * 60 * SECOND_NS;
 /// Base64url of `{"typ":"JWT","alg":"ES256"}`.
 const HEADER_B64: &str = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9";
 /// Operator contact for the RFC 8292 `sub` claim.
 const VAPID_SUBJECT: &str = "https://id.ai";
 
 /// Build a JWT for the current window, or return `None` if no signature covers it.
-/// `relay_origin` must match the signed `aud` claim: `scheme://host[:port]`.
+/// `relay_origin` must match the signed `aud` claim: `scheme://host[:port]`. Windows
+/// are counted in whole seconds, as `exp` is, so a window's last partial second
+/// already uses the next signature.
 pub(crate) fn assemble(
     subscription: &WebPushSubscription,
     relay_origin: &str,
     now_ns: Timestamp,
 ) -> Option<String> {
     let issued_at_ns = subscription.jwt_issued_at_ns;
-    let index = (now_ns.checked_sub(issued_at_ns)? / WINDOW_NS) as usize;
+    now_ns.checked_sub(issued_at_ns)?;
+    let index =
+        ((now_ns / SECOND_NS - issued_at_ns / SECOND_NS) / (WINDOW_NS / SECOND_NS)) as usize;
     let signature = subscription.jwt_signatures.get(index)?;
-    let exp_secs = (issued_at_ns + (index as u64 + 1) * WINDOW_NS) / 1_000_000_000;
+    let exp_secs = (issued_at_ns + (index as u64 + 1) * WINDOW_NS) / SECOND_NS;
 
     let aud = serde_json::to_string(relay_origin).ok()?;
     let payload = format!(r#"{{"aud":{aud},"exp":{exp_secs},"sub":"{VAPID_SUBJECT}"}}"#);
@@ -99,6 +104,19 @@ mod tests {
         assert_eq!(claims["exp"], (issued + WINDOW_NS) / 1_000_000_000);
         assert_eq!(claims["aud"], "https://relay.example");
         assert_eq!(claims["sub"], VAPID_SUBJECT);
+    }
+
+    /// `exp` rounds down, so the old signature would already have expired.
+    #[test]
+    fn a_windows_last_partial_second_uses_the_next_signature() {
+        let issued = 1_000 * WINDOW_NS + 700_000_000;
+        let now = issued + WINDOW_NS - 200_000_000;
+
+        let (_, claims, signature) =
+            parts(&assemble(&subscription(3, issued), "https://relay.example", now).unwrap());
+
+        assert!(claims["exp"].as_u64().unwrap() > now / SECOND_NS);
+        assert_eq!(signature, vec![1u8; 64]);
     }
 
     #[test]
