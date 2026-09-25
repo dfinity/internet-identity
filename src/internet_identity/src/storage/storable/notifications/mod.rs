@@ -4,4 +4,5 @@
 //! adds a sibling. Consent is not here at all: it rides on the per-app config.
 
 pub mod browser_queue;
+pub mod notification_id;
 pub mod webpush;
