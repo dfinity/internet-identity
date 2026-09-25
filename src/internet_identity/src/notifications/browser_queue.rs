@@ -34,7 +34,7 @@ pub(crate) enum Added {
     ReplacedOldest(StorableBrowserNotificationKey),
 }
 
-/// Queue a notification for one browser.
+/// Queue a notification for one browser, behind its newest entry.
 pub(crate) fn add(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
@@ -43,13 +43,13 @@ pub(crate) fn add(
     expires_at_ns: Timestamp,
     now_ns: Timestamp,
 ) -> Added {
-    let key = StorableBrowserNotificationKey {
-        anchor_number,
-        browser_id,
-        sequence: next_sequence(now_ns),
-    };
     storage_borrow_mut(|storage| {
         let queued = storage.browser_notifications(anchor_number, browser_id, MAX_PER_BROWSER);
+        let key = StorableBrowserNotificationKey {
+            anchor_number,
+            browser_id,
+            sequence: next_sequence(queued.last().map(|(newest, _)| newest.sequence), now_ns),
+        };
         let full = queued.len() >= MAX_PER_BROWSER;
         if let (true, Some((oldest, _))) = (full, queued.first()) {
             storage.remove_browser_notification(oldest);
@@ -155,11 +155,12 @@ pub(crate) fn discard_expired(now_ns: Timestamp) -> usize {
     })
 }
 
-/// Canister time, bumped past the last one handed out, so sequences stay unique and
-/// ordered within a message and across upgrades.
-fn next_sequence(now_ns: Timestamp) -> u64 {
+/// Canister time, bumped past both the last sequence handed out, which resets on
+/// upgrade, and the browser's newest entry, which goes once taken.
+fn next_sequence(newest: Option<u64>, now_ns: Timestamp) -> u64 {
     LAST_SEQUENCE.with(|last| {
-        let next = now_ns.max(last.get().saturating_add(1));
+        let floor = last.get().max(newest.unwrap_or(0));
+        let next = now_ns.max(floor.saturating_add(1));
         last.set(next);
         next
     })
@@ -220,6 +221,25 @@ mod tests {
 
         assert!(sequences.windows(2).all(|pair| pair[0] < pair[1]));
         assert_eq!(queued(BROWSER), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn a_sequence_after_an_upgrade_follows_the_newest_entry() {
+        crate::notifications::test_setup();
+        let newest = add(
+            ANCHOR,
+            BROWSER,
+            recipient(),
+            1,
+            60 * SECOND_NS,
+            5 * SECOND_NS,
+        );
+        LAST_SEQUENCE.with(|last| last.set(0));
+
+        let next = add(ANCHOR, BROWSER, recipient(), 2, 60 * SECOND_NS, SECOND_NS);
+
+        assert_eq!(key_of(next).sequence, key_of(newest).sequence + 1);
+        assert_eq!(queued(BROWSER), vec![1, 2]);
     }
 
     #[test]
