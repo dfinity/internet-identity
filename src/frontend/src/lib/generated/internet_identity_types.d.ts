@@ -916,13 +916,6 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
-export interface GetNextNotificationArg {
-  /**
-   * What this service worker is still showing, whose removal has not landed yet.
-   */
-  'skip' : Array<NotificationToShow>,
-  'anchor_number' : UserNumber,
-}
 export type GetNextNotificationError = {
     /**
      * Also a caller that is no browser of the identity, or a skip list longer than a
@@ -930,6 +923,13 @@ export type GetNextNotificationError = {
      */
     'InternalCanisterError' : string
   };
+export interface GetNextNotificationRequest {
+  /**
+   * What this service worker is still showing, whose removal has not landed yet.
+   */
+  'skip' : Array<NotificationToShow>,
+  'anchor_number' : UserNumber,
+}
 /**
  * Null once nothing is left to show.
  */
@@ -1862,19 +1862,19 @@ export type RegistrationFlowNextStep = {
     'Finish' : null
   };
 export type RegistrationId = string;
-export interface RemoveNotificationArg {
-  /**
-   * As browser_get_next_notification returned it.
-   */
-  'notification' : NotificationToShow,
-  'anchor_number' : UserNumber,
-}
 export type RemoveNotificationError = {
     /**
      * Also a caller that is no browser of the identity.
      */
     'InternalCanisterError' : string
   };
+export interface RemoveNotificationRequest {
+  /**
+   * As browser_get_next_notification returned it.
+   */
+  'notification' : NotificationToShow,
+  'anchor_number' : UserNumber,
+}
 export type RemoveNotificationResponse = {};
 export type RemoveWebPushSubscriptionError = {
     'InternalCanisterError' : string
@@ -2367,7 +2367,7 @@ export interface _SERVICE {
    * notification its browser has yet to show, passing over the ones it skips.
    */
   'browser_get_next_notification' : ActorMethod<
-    [GetNextNotificationArg],
+    [GetNextNotificationRequest],
     { 'Ok' : GetNextNotificationResponse } |
       { 'Err' : GetNextNotificationError }
   >,
@@ -2375,7 +2375,7 @@ export interface _SERVICE {
    * Called by the service worker for the one it shows, while it fetches the content.
    */
   'browser_remove_notification' : ActorMethod<
-    [RemoveNotificationArg],
+    [RemoveNotificationRequest],
     { 'Ok' : RemoveNotificationResponse } |
       { 'Err' : RemoveNotificationError }
   >,

@@ -13,10 +13,10 @@ use canister_tests::framework::{
 };
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, GetNextNotificationArg,
-    GetNextNotificationError, GetNextNotificationResponse, NotificationGrantConsentError,
+    AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, GetNextNotificationError,
+    GetNextNotificationRequest, GetNextNotificationResponse, NotificationGrantConsentError,
     NotificationRevokeConsentError, NotificationToShow, OperatingSystem,
-    PrepareAccountSessionRequest, RemoveNotificationArg, RemoveNotificationError,
+    PrepareAccountSessionRequest, RemoveNotificationError, RemoveNotificationRequest,
     RemoveNotificationResponse,
 };
 use pocket_ic::{PocketIc, RejectResponse};
@@ -115,11 +115,11 @@ fn should_refuse_every_entry_point_while_no_origin_is_enabled() -> Result<(), Re
         ORIGIN.into()
     )?);
     assert!(matches!(
-        browser_get_next_notification(&env, canister_id, principal_1(), next_arg(anchor))?,
+        browser_get_next_notification(&env, canister_id, principal_1(), next_request(anchor))?,
         Err(GetNextNotificationError::InternalCanisterError(_))
     ));
     assert!(matches!(
-        browser_remove_notification(&env, canister_id, principal_1(), remove_arg(anchor))?,
+        browser_remove_notification(&env, canister_id, principal_1(), remove_request(anchor))?,
         Err(RemoveNotificationError::InternalCanisterError(_))
     ));
     Ok(())
@@ -1237,7 +1237,7 @@ mod browser_queue {
                 &env,
                 canister_id,
                 key_holder(&browser).principal(),
-                next_arg(anchor)
+                next_request(anchor)
             )?,
             Ok(GetNextNotificationResponse { notification: None })
         );
@@ -1254,7 +1254,7 @@ mod browser_queue {
                 &env,
                 canister_id,
                 key_holder(&browser).principal(),
-                remove_arg(anchor)
+                remove_request(anchor)
             )?,
             Ok(RemoveNotificationResponse {})
         );
@@ -1267,26 +1267,26 @@ mod browser_queue {
         let (canister_id, anchor, _, _) = install_with_browser(&env);
 
         assert!(matches!(
-            browser_get_next_notification(&env, canister_id, principal_2(), next_arg(anchor))?,
+            browser_get_next_notification(&env, canister_id, principal_2(), next_request(anchor))?,
             Err(GetNextNotificationError::InternalCanisterError(_))
         ));
         assert!(matches!(
-            browser_remove_notification(&env, canister_id, principal_2(), remove_arg(anchor))?,
+            browser_remove_notification(&env, canister_id, principal_2(), remove_request(anchor))?,
             Err(RemoveNotificationError::InternalCanisterError(_))
         ));
         Ok(())
     }
 }
 
-fn next_arg(anchor_number: AnchorNumber) -> GetNextNotificationArg {
-    GetNextNotificationArg {
+fn next_request(anchor_number: AnchorNumber) -> GetNextNotificationRequest {
+    GetNextNotificationRequest {
         anchor_number,
         skip: vec![],
     }
 }
 
-fn remove_arg(anchor_number: AnchorNumber) -> RemoveNotificationArg {
-    RemoveNotificationArg {
+fn remove_request(anchor_number: AnchorNumber) -> RemoveNotificationRequest {
+    RemoveNotificationRequest {
         anchor_number,
         notification: NotificationToShow {
             origin: ORIGIN.into(),

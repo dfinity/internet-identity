@@ -5,12 +5,12 @@ use crate::delegation::frontend_length_within_limit;
 use crate::notifications::browser_queue::MAX_PER_BROWSER;
 use internet_identity_interface::internet_identity::types::attributes::remap_to_legacy_domain;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, FrontendHostname, GetNextNotificationArg,
-    GetNextNotificationError, GetNotificationDelegationRequest, Notification,
+    AccountNumber, AnchorNumber, FrontendHostname, GetNextNotificationError,
+    GetNextNotificationRequest, GetNotificationDelegationRequest, Notification,
     NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
     NotificationGrantConsentRequest, NotificationRevokeConsentError,
     NotificationRevokeConsentRequest, NotificationToShow, PrepareNotificationDelegationRequest,
-    RemoveNotificationArg, RemoveNotificationError, SendNotificationArg, SendNotificationError,
+    RemoveNotificationError, RemoveNotificationRequest, SendNotificationArg, SendNotificationError,
     SessionKey, Timestamp,
 };
 use std::collections::HashMap;
@@ -49,20 +49,20 @@ pub struct ValidatedSendNotificationArg {
     _validated: Validated,
 }
 
-pub struct ValidatedGetNextNotificationArg {
+pub struct ValidatedGetNextNotificationRequest {
     pub anchor_number: AnchorNumber,
     pub skip: Vec<NotificationToShow>,
     _validated: Validated,
 }
 
-impl TryFrom<GetNextNotificationArg> for ValidatedGetNextNotificationArg {
+impl TryFrom<GetNextNotificationRequest> for ValidatedGetNextNotificationRequest {
     type Error = GetNextNotificationError;
 
     fn try_from(
-        GetNextNotificationArg {
+        GetNextNotificationRequest {
             anchor_number,
             skip,
-        }: GetNextNotificationArg,
+        }: GetNextNotificationRequest,
     ) -> Result<Self, Self::Error> {
         if !notifications_enabled() {
             return Err(GetNextNotificationError::InternalCanisterError(
@@ -82,20 +82,20 @@ impl TryFrom<GetNextNotificationArg> for ValidatedGetNextNotificationArg {
     }
 }
 
-pub struct ValidatedRemoveNotificationArg {
+pub struct ValidatedRemoveNotificationRequest {
     pub anchor_number: AnchorNumber,
     pub notification: NotificationToShow,
     _validated: Validated,
 }
 
-impl TryFrom<RemoveNotificationArg> for ValidatedRemoveNotificationArg {
+impl TryFrom<RemoveNotificationRequest> for ValidatedRemoveNotificationRequest {
     type Error = RemoveNotificationError;
 
     fn try_from(
-        RemoveNotificationArg {
+        RemoveNotificationRequest {
             anchor_number,
             notification,
-        }: RemoveNotificationArg,
+        }: RemoveNotificationRequest,
     ) -> Result<Self, Self::Error> {
         if !notifications_enabled() {
             return Err(RemoveNotificationError::InternalCanisterError(
@@ -405,14 +405,14 @@ mod tests {
             canister_id: candid::Principal::anonymous(),
             id: 1,
         };
-        let arg = |skip_count| GetNextNotificationArg {
+        let request = |skip_count| GetNextNotificationRequest {
             anchor_number: 1,
             skip: vec![skipped.clone(); skip_count],
         };
 
-        assert!(ValidatedGetNextNotificationArg::try_from(arg(MAX_PER_BROWSER)).is_ok());
+        assert!(ValidatedGetNextNotificationRequest::try_from(request(MAX_PER_BROWSER)).is_ok());
         assert!(matches!(
-            ValidatedGetNextNotificationArg::try_from(arg(MAX_PER_BROWSER + 1)),
+            ValidatedGetNextNotificationRequest::try_from(request(MAX_PER_BROWSER + 1)),
             Err(GetNextNotificationError::InternalCanisterError(_))
         ));
     }

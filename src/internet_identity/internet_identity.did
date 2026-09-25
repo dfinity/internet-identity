@@ -1909,7 +1909,7 @@ type NotificationDelegationError = variant {
 
 // ===== Notifications a browser has yet to show =====
 
-type GetNextNotificationArg = record {
+type GetNextNotificationRequest = record {
     anchor_number : UserNumber;
     // What this service worker is still showing, whose removal has not landed yet.
     skip : vec NotificationToShow;
@@ -1935,7 +1935,7 @@ type GetNextNotificationError = variant {
     InternalCanisterError : text;
 };
 
-type RemoveNotificationArg = record {
+type RemoveNotificationRequest = record {
     anchor_number : UserNumber;
     // As browser_get_next_notification returned it.
     notification : NotificationToShow;
@@ -2434,9 +2434,9 @@ service : (opt InternetIdentityInit) -> {
 
     // Called by the service worker on a wake-up, signed with the browser key: the oldest
     // notification its browser has yet to show, passing over the ones it skips.
-    browser_get_next_notification : (GetNextNotificationArg) -> (variant { Ok : GetNextNotificationResponse; Err : GetNextNotificationError }) query;
+    browser_get_next_notification : (GetNextNotificationRequest) -> (variant { Ok : GetNextNotificationResponse; Err : GetNextNotificationError }) query;
     // Called by the service worker for the one it shows, while it fetches the content.
-    browser_remove_notification : (RemoveNotificationArg) -> (variant { Ok : RemoveNotificationResponse; Err : RemoveNotificationError });
+    browser_remove_notification : (RemoveNotificationRequest) -> (variant { Ok : RemoveNotificationResponse; Err : RemoveNotificationError });
 
     // Called by the browser itself, signed with the browser key it signs in with.
     set_webpush_subscription : (SetWebPushSubscriptionRequest) -> (variant { Ok; Err : SetWebPushSubscriptionError });

@@ -300,7 +300,7 @@ export const idlFactory = ({ IDL }) => {
     'canister_id' : IDL.Principal,
     'account_number' : IDL.Opt(AccountNumber),
   });
-  const GetNextNotificationArg = IDL.Record({
+  const GetNextNotificationRequest = IDL.Record({
     'skip' : IDL.Vec(NotificationToShow),
     'anchor_number' : UserNumber,
   });
@@ -310,7 +310,7 @@ export const idlFactory = ({ IDL }) => {
   const GetNextNotificationError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
   });
-  const RemoveNotificationArg = IDL.Record({
+  const RemoveNotificationRequest = IDL.Record({
     'notification' : NotificationToShow,
     'anchor_number' : UserNumber,
   });
@@ -1207,7 +1207,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'browser_get_next_notification' : IDL.Func(
-        [GetNextNotificationArg],
+        [GetNextNotificationRequest],
         [
           IDL.Variant({
             'Ok' : GetNextNotificationResponse,
@@ -1217,7 +1217,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'browser_remove_notification' : IDL.Func(
-        [RemoveNotificationArg],
+        [RemoveNotificationRequest],
         [
           IDL.Variant({
             'Ok' : RemoveNotificationResponse,
