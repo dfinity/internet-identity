@@ -1,6 +1,5 @@
 use crate::storage::storable::browser_description::StorableBrowserDescription;
 use crate::storage::storable::browser_id::StorableBrowserId;
-use crate::storage::storable::notifications::browser_queue::StorableQueuedNotification;
 use crate::storage::storable::notifications::webpush::subscription::StorableWebPushSubscription;
 use internet_identity_interface::internet_identity::types::Timestamp;
 use minicbor::{Decode, Encode};
@@ -30,7 +29,4 @@ pub struct StorableBrowser {
     /// What this browser registered for Web Push, if anything.
     #[n(7)]
     pub webpush_subscription: Option<StorableWebPushSubscription>,
-    /// What its service worker has yet to show, oldest first.
-    #[n(8)]
-    pub notifications: Option<Vec<StorableQueuedNotification>>,
 }
