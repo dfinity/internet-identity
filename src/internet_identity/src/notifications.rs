@@ -6,6 +6,7 @@
 
 pub(crate) mod admission_queue;
 pub(crate) mod backlog;
+pub mod delegation;
 pub mod senders;
 mod validation;
 pub mod webpush;
@@ -18,8 +19,9 @@ use internet_identity_interface::internet_identity::types::{
     Timestamp,
 };
 pub use validation::{
-    notifications_enabled, ValidatedNotificationConsentGrantedRequest,
-    ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
+    notifications_enabled, ValidatedGetNotificationDelegationRequest,
+    ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
+    ValidatedNotificationRevokeConsentRequest, ValidatedPrepareNotificationDelegationRequest,
     ValidatedSendNotificationArg,
 };
 
@@ -74,6 +76,17 @@ pub fn revoke_consent(
 }
 
 /// Whether the request's origin may notify its identity.
+/// Whether `origin` may notify `anchor_number`, for callers that hold the
+/// origin already folded rather than a request to validate.
+pub fn consent_granted_for(anchor_number: AnchorNumber, origin: &FrontendHostname) -> bool {
+    storage_borrow(|storage| {
+        storage
+            .read_anchor_application_config(anchor_number, origin)
+            .and_then(|config| config.notifications_consented_at_ns)
+            .is_some()
+    })
+}
+
 pub fn consent_granted(
     ValidatedNotificationConsentGrantedRequest {
         anchor_number,
@@ -81,12 +94,7 @@ pub fn consent_granted(
         ..
     }: ValidatedNotificationConsentGrantedRequest,
 ) -> bool {
-    storage_borrow(|storage| {
-        storage
-            .read_anchor_application_config(anchor_number, &origin)
-            .and_then(|config| config.notifications_consented_at_ns)
-            .is_some()
-    })
+    consent_granted_for(anchor_number, &origin)
 }
 
 /// Moves the one field this owns, leaving the rest of the app's config as it stands.

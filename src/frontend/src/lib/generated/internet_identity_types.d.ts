@@ -773,14 +773,6 @@ export interface EmailChallengeSubmitDkimLeafArg {
   'hops' : Array<SignedRRset>,
   'nonce' : string,
 }
-/**
- * Email-recovery types
- * ====================
- * See `docs/ongoing/email-recovery.md` for the full design. Covers
- * both halves of the flow: setup (binding a recovery email to an
- * anchor) and recovery (proving control of a previously-bound
- * address to obtain a signed delegation).
- */
 export interface EmailRecoveryCredential {
   'created_at' : Timestamp,
   'address' : string,
@@ -924,6 +916,20 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
+export interface GetNotificationDelegationRequest {
+  'session_key' : SessionKey,
+  'origin' : FrontendHostname,
+  'account_number' : [] | [AccountNumber],
+  'expiration' : Timestamp,
+  'anchor_number' : UserNumber,
+}
+export interface GetNotificationDelegationResponse {
+  /**
+   * Authenticates sender_info on those calls.
+   */
+  'sender_info_signature' : Uint8Array | number[],
+  'signed_delegation' : SignedDelegation,
+}
 /**
  * Request for `get_sso_discovery_status`.
  */
@@ -948,10 +954,6 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
-/**
- * ICRC-3 attribute sharing types
- * ==============================
- */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -1403,6 +1405,15 @@ export interface NotificationConsentGrantedRequest {
   'origin' : string,
   'anchor_number' : UserNumber,
 }
+export type NotificationDelegationError = {
+    /**
+     * The caller is no browser of this identity, that browser is not registered
+     * for Web Push, or the identity has not allowed this app to notify it.
+     */
+    'NoNotificationAccess' : null
+  } |
+  { 'NoSuchDelegation' : null } |
+  { 'InternalCanisterError' : string };
 /**
  * Why a notification call was refused.
  */
@@ -1415,7 +1426,6 @@ export interface NotificationGrantConsentRequest {
   'anchor_number' : UserNumber,
 }
 /**
- * ===== Notifications sent by an app =====
  * Scoped to (origin, recipient), and shared across the canisters sending for
  * one origin.
  */
@@ -1735,6 +1745,21 @@ export interface PrepareMcpRegistrationDelegation {
   'trusted_url' : string,
   'expiration' : Timestamp,
 }
+export interface PrepareNotificationDelegationRequest {
+  'session_key' : SessionKey,
+  'origin' : FrontendHostname,
+  'account_number' : [] | [AccountNumber],
+  'anchor_number' : UserNumber,
+}
+export interface PrepareNotificationDelegationResponse {
+  'user_key' : UserKey,
+  'expiration' : Timestamp,
+  /**
+   * Goes in the sender_info field of every call made with this delegation;
+   * tells the app which account it is being called for.
+   */
+  'sender_info' : Uint8Array | number[],
+}
 export interface PrepareSessionDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
@@ -1904,18 +1929,9 @@ export type SetWebPushSubscriptionError = {
  */
 export interface SetWebPushSubscriptionRequest {
   'endpoint' : string,
-  /**
-   * uncompressed SEC1 P-256, echoed to the relay as k=
-   */
   'jwt_signatures' : Array<Uint8Array | number[]>,
-  /**
-   * one raw ECDSA signature per validity window
-   */
   'jwt_issued_at_ns' : bigint,
   'anchor_number' : UserNumber,
-  /**
-   * the relay URL the browser was issued
-   */
   'vapid_public_key' : Uint8Array | number[],
 }
 export interface SignedDelegation {
@@ -2154,13 +2170,7 @@ export interface WebAuthnCredential {
  */
 export interface WebPushSubscriptionStatus {
   'endpoint' : string,
-  /**
-   * windows covered, not a count of unused signatures
-   */
   'issued_at_ns' : bigint,
-  /**
-   * compared against the one the browser holds
-   */
   'pool_len' : number,
 }
 export interface _SERVICE {
@@ -2517,6 +2527,11 @@ export interface _SERVICE {
     { 'Ok' : SignedDelegation } |
       { 'Err' : string }
   >,
+  'get_notification_delegation' : ActorMethod<
+    [GetNotificationDelegationRequest],
+    { 'Ok' : GetNotificationDelegationResponse } |
+      { 'Err' : NotificationDelegationError }
+  >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'get_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, Timestamp],
@@ -2848,6 +2863,14 @@ export interface _SERVICE {
     [UserNumber, SessionKey, [] | [Permissions], [] | [bigint]],
     { 'Ok' : PrepareMcpRegistrationDelegation } |
       { 'Err' : string }
+  >,
+  /**
+   * Authorized by the browser key the caller signs with.
+   */
+  'prepare_notification_delegation' : ActorMethod<
+    [PrepareNotificationDelegationRequest],
+    { 'Ok' : PrepareNotificationDelegationResponse } |
+      { 'Err' : NotificationDelegationError }
   >,
   'prepare_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, [] | [bigint]],

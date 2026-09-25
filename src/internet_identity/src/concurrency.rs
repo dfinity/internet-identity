@@ -136,15 +136,23 @@ mod tests {
 
     #[test]
     fn acquires_up_to_the_budget_then_refuses() {
-        let mut l = ConcurrencyLimiter::new(LimiterConfig { max_concurrent: 3, max_age_secs: 100 });
-        let ids: Vec<_> = (0..3).map(|_| l.try_acquire(0).expect("within budget")).collect();
+        let mut l = ConcurrencyLimiter::new(LimiterConfig {
+            max_concurrent: 3,
+            max_age_secs: 100,
+        });
+        let ids: Vec<_> = (0..3)
+            .map(|_| l.try_acquire(0).expect("within budget"))
+            .collect();
         assert_eq!(ids.len(), 3);
         assert!(l.try_acquire(0).is_none(), "budget of 3 reached");
     }
 
     #[test]
     fn releasing_frees_a_slot() {
-        let mut l = ConcurrencyLimiter::new(LimiterConfig { max_concurrent: 2, max_age_secs: 100 });
+        let mut l = ConcurrencyLimiter::new(LimiterConfig {
+            max_concurrent: 2,
+            max_age_secs: 100,
+        });
         let a = l.try_acquire(0).unwrap();
         let _b = l.try_acquire(0).unwrap();
         assert!(l.try_acquire(0).is_none(), "saturated");
@@ -154,7 +162,10 @@ mod tests {
 
     #[test]
     fn a_stranded_permit_is_reclaimed_after_max_age() {
-        let mut l = ConcurrencyLimiter::new(LimiterConfig { max_concurrent: 2, max_age_secs: 100 });
+        let mut l = ConcurrencyLimiter::new(LimiterConfig {
+            max_concurrent: 2,
+            max_age_secs: 100,
+        });
         // Leak both slots: acquire and drop the ids without releasing.
         let _ = l.try_acquire(0).unwrap();
         let _ = l.try_acquire(0).unwrap();
@@ -167,7 +178,10 @@ mod tests {
 
     #[test]
     fn a_permit_younger_than_max_age_is_not_reclaimed() {
-        let mut l = ConcurrencyLimiter::new(LimiterConfig { max_concurrent: 1, max_age_secs: 100 });
+        let mut l = ConcurrencyLimiter::new(LimiterConfig {
+            max_concurrent: 1,
+            max_age_secs: 100,
+        });
         let _ = l.try_acquire(0).unwrap();
         assert!(
             l.try_acquire(99).is_none(),
@@ -183,7 +197,12 @@ mod tests {
     }
 
     fn reset_test_limiter() {
-        TEST_LIMITER.with_borrow_mut(|l| *l = ConcurrencyLimiter::new(LimiterConfig { max_concurrent: 2, max_age_secs: 100 }));
+        TEST_LIMITER.with_borrow_mut(|l| {
+            *l = ConcurrencyLimiter::new(LimiterConfig {
+                max_concurrent: 2,
+                max_age_secs: 100,
+            })
+        });
     }
 
     #[test]
@@ -191,7 +210,10 @@ mod tests {
         reset_test_limiter();
         let held: Vec<_> = std::iter::from_fn(|| acquire(&TEST_LIMITER)).collect();
         assert_eq!(held.len(), 2, "budget of 2");
-        assert!(acquire(&TEST_LIMITER).is_none(), "budget-plus-one is refused");
+        assert!(
+            acquire(&TEST_LIMITER).is_none(),
+            "budget-plus-one is refused"
+        );
     }
 
     #[test]
@@ -201,6 +223,9 @@ mod tests {
         assert!(acquire(&TEST_LIMITER).is_none(), "saturated");
         drop(held.pop()); // release one permit
         assert_eq!(TEST_LIMITER.with_borrow(ConcurrencyLimiter::in_use), 1);
-        assert!(acquire(&TEST_LIMITER).is_some(), "a freed slot is re-acquirable");
+        assert!(
+            acquire(&TEST_LIMITER).is_some(),
+            "a freed slot is re-acquirable"
+        );
     }
 }

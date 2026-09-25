@@ -62,6 +62,9 @@ msgstr "SSO домену {domainInput} повернув \"{0}\": {1}"
 msgid "{domainInput}'s SSO returned error \"{0}\"."
 msgstr "SSO домену {domainInput} повернув помилку \"{0}\"."
 
+msgid "{enteredDomain} isn't the domain it was linked through."
+msgstr "{enteredDomain} — це не той домен, через який було виконано прив'язку."
+
 msgid "{identityName} has been removed from this device."
 msgstr "{identityName} було видалено з цього пристрою."
 
@@ -268,6 +271,9 @@ msgstr "Вже увійшли"
 
 msgid "Also makes changes on your behalf."
 msgstr "Також вносить зміни від вашого імені."
+
+msgid "An account linked through SSO signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one."
+msgstr "Обліковий запис, прив'язаний через SSO, виконує вхід через домен, до якого його прив'язано. Цей обліковий запис пов'язано з ідентифікатором, тому його не можна використовувати для створення нового."
 
 msgid "Any local program can connect"
 msgstr "Будь-яка локальна програма може підключитися"
@@ -496,6 +502,9 @@ msgstr "Скопіювати тему"
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Не вдалося завантажити налаштування SSO з {domainInput}. Попросіть адміністратора SSO перевірити, що /.well-known/ii-openid-configuration доступний."
+
+msgid "Couldn't load the SSO settings of {registeredDomain}. Try again later or use a different method."
+msgstr "Не вдалося завантажити налаштування SSO для {registeredDomain}. Спробуйте пізніше або скористайтеся іншим методом."
 
 msgid "Couldn't remove the connector. Please try again."
 msgstr "Не вдалося видалити конектор. Будь ласка, спробуйте ще раз."
@@ -1029,6 +1038,15 @@ msgstr "Досягнуто ліміту"
 msgid "Link copied to clipboard"
 msgstr "Посилання скопійовано в буфер обміну"
 
+msgid "Linked through {registeredDomain}"
+msgstr "Прив'язано через {registeredDomain}"
+
+msgid "Linked through another domain"
+msgstr "Прив'язано через інший домен"
+
+msgid "Linked through another SSO domain"
+msgstr "Прив'язано через інший SSO-домен"
+
 msgid "Linking Internet Identity"
 msgstr "Підключення Internet Identity"
 
@@ -1181,6 +1199,9 @@ msgstr "Одне або кілька слів неправильні або в �
 
 msgid "Only add trusted connectors"
 msgstr "Додавайте лише довірені конектори"
+
+msgid "Only continue if you recognize these domains. If an app or a guide told you to enter a domain you don't know, stop here and use the domain your organization gave you."
+msgstr "Продовжуйте лише якщо ви впізнаєте ці домени. Якщо застосунок або інструкція попросили вас ввести незнайомий домен, зупиніться тут і скористайтеся доменом, наданим вашою організацією."
 
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "Вмикайте це лише для офіційного <0>ICP CLI</0>. Якщо ви не впевнені, перевстановіть його з <1>офіційного джерела</1>."
@@ -1560,6 +1581,9 @@ msgstr "Увійдіть за допомогою звичних методів"
 msgid "Sign in with {name}"
 msgstr "Увійти через {name}"
 
+msgid "Sign in with {registeredDomain}"
+msgstr "Увійти через {registeredDomain}"
+
 msgid "Sign in with another identity"
 msgstr "Увійти з іншим ідентифікатором"
 
@@ -1616,6 +1640,9 @@ msgstr "Виконується вхід"
 
 msgid "Signing in securely"
 msgstr "Безпечний вхід"
+
+msgid "Signing in with the provider directly doesn't reach it."
+msgstr "Прямий вхід через провайдера до нього не доходить."
 
 msgid "Signing in..."
 msgstr "Вхід..."
@@ -1797,6 +1824,18 @@ msgstr "Фразу введено правильно, але вона належ
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Виникла проблема з підключенням до застосунку. Спробуйте інший браузер; якщо проблема не зникне, зверніться до розробника."
+
+msgid "This {providerName} account is already linked to an Internet Identity through an SSO domain."
+msgstr "Цей обліковий запис {providerName} вже прив'язано до ідентифікатора Internet Identity через SSO-домен."
+
+msgid "This {providerName} account is already linked to an Internet Identity through the SSO domain {registeredDomain}."
+msgstr "Цей обліковий запис {providerName} вже прив'язано до ідентифікатора Internet Identity через SSO-домен {registeredDomain}."
+
+msgid "This {providerName} account is already linked to an Internet Identity, but through {registeredDomain} rather than {enteredDomain}."
+msgstr "Цей обліковий запис {providerName} вже прив'язано до ідентифікатора Internet Identity, але через {registeredDomain}, а не через {enteredDomain}."
+
+msgid "This {providerName} account is already linked to an Internet Identity, but through a different SSO domain than {enteredDomain}."
+msgstr "Цей обліковий запис {providerName} вже прив'язано до ідентифікатора Internet Identity, але через інший SSO-домен, відмінний від {enteredDomain}."
 
 msgid "This {resolvedProviderName} account is already connected to an Internet Identity."
 msgstr "Цей обліковий запис {resolvedProviderName} вже підключено до ідентифікатора Internet Identity."

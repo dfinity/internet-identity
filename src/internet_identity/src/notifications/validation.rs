@@ -4,9 +4,11 @@
 use crate::delegation::frontend_length_within_limit;
 use internet_identity_interface::internet_identity::types::attributes::remap_to_legacy_domain;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, FrontendHostname, Notification, NotificationConsentGrantedRequest,
-    NotificationGrantConsentError, NotificationGrantConsentRequest, NotificationRevokeConsentError,
-    NotificationRevokeConsentRequest, SendNotificationArg, SendNotificationError,
+    AccountNumber, AnchorNumber, FrontendHostname, GetNotificationDelegationRequest, Notification,
+    NotificationConsentGrantedRequest, NotificationDelegationError, NotificationGrantConsentError,
+    NotificationGrantConsentRequest, NotificationRevokeConsentError,
+    NotificationRevokeConsentRequest, PrepareNotificationDelegationRequest, SendNotificationArg,
+    SendNotificationError, SessionKey, Timestamp,
 };
 use std::collections::HashMap;
 use url::Url;
@@ -100,6 +102,71 @@ impl TryFrom<SendNotificationArg> for ValidatedSendNotificationArg {
         Ok(Self {
             origin,
             notifications: dedup_last_wins(notifications),
+            _validated: Validated,
+        })
+    }
+}
+
+pub struct ValidatedPrepareNotificationDelegationRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub session_key: SessionKey,
+    _validated: Validated,
+}
+
+pub struct ValidatedGetNotificationDelegationRequest {
+    pub anchor_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub session_key: SessionKey,
+    pub expiration: Timestamp,
+    _validated: Validated,
+}
+
+impl TryFrom<PrepareNotificationDelegationRequest>
+    for ValidatedPrepareNotificationDelegationRequest
+{
+    type Error = NotificationDelegationError;
+
+    fn try_from(
+        PrepareNotificationDelegationRequest {
+            anchor_number,
+            origin,
+            account_number,
+            session_key,
+        }: PrepareNotificationDelegationRequest,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            origin: notifying_origin(&origin)
+                .map_err(NotificationDelegationError::InternalCanisterError)?,
+            anchor_number,
+            account_number,
+            session_key,
+            _validated: Validated,
+        })
+    }
+}
+
+impl TryFrom<GetNotificationDelegationRequest> for ValidatedGetNotificationDelegationRequest {
+    type Error = NotificationDelegationError;
+
+    fn try_from(
+        GetNotificationDelegationRequest {
+            anchor_number,
+            origin,
+            account_number,
+            session_key,
+            expiration,
+        }: GetNotificationDelegationRequest,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            origin: notifying_origin(&origin)
+                .map_err(NotificationDelegationError::InternalCanisterError)?,
+            anchor_number,
+            account_number,
+            session_key,
+            expiration,
             _validated: Validated,
         })
     }
