@@ -2,11 +2,13 @@
 //! entry, so signing the browser out or letting the registry evict it takes it too.
 
 use crate::storage::storable::timestamp::StorableTimestamp;
-use internet_identity_interface::internet_identity::types::{ApplicationNumber, NotificationId};
+use internet_identity_interface::internet_identity::types::{
+    AccountNumber, ApplicationNumber, NotificationId,
+};
 use minicbor::{Decode, Encode};
 
-/// What the service worker needs to fetch it: the app, the canister to ask, and the
-/// app's own ID.
+/// What the service worker needs to fetch it: the app and account it is for, the
+/// canister to ask, and the app's own ID.
 #[derive(Encode, Decode, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 #[cbor(map)]
 pub struct StorableQueuedNotification {
@@ -19,6 +21,9 @@ pub struct StorableQueuedNotification {
     pub notification_id: NotificationId,
     #[n(3)]
     pub expires_at_ns: StorableTimestamp,
+    /// `None` is the unreserved default account.
+    #[n(4)]
+    pub account_number: Option<AccountNumber>,
 }
 
 #[cfg(test)]
@@ -34,11 +39,12 @@ mod tests {
             sender: vec![0xff; Principal::MAX_LENGTH_IN_BYTES],
             notification_id: u64::MAX,
             expires_at_ns: u64::MAX,
+            account_number: Some(u64::MAX),
         };
         let mut bytes = Vec::new();
         minicbor::encode(&queued, &mut bytes).expect("encoding a queued notification");
 
-        assert_eq!(bytes.len(), 1 + (1 + 9) + (1 + 2 + 29) + 2 * (1 + 9));
+        assert_eq!(bytes.len(), 1 + (1 + 9) + (1 + 2 + 29) + 3 * (1 + 9));
         assert_eq!(
             minicbor::decode::<StorableQueuedNotification>(&bytes).expect("decoding it"),
             queued

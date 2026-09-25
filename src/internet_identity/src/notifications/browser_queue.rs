@@ -140,6 +140,7 @@ mod tests {
             sender: Principal::from_slice(&[7; 10]),
             notification_id,
             expires_at_ns,
+            account_number: None,
         }
     }
 
