@@ -62,6 +62,9 @@ msgstr "SSO milik {domainInput} mengembalikan \"{0}\": {1}"
 msgid "{domainInput}'s SSO returned error \"{0}\"."
 msgstr "SSO milik {domainInput} mengembalikan kesalahan \"{0}\"."
 
+msgid "{enteredDomain} isn't the domain it was linked through."
+msgstr "{enteredDomain} bukan domain yang digunakan untuk menautkannya."
+
 msgid "{identityName} has been removed from this device."
 msgstr "{identityName} telah dihapus dari perangkat ini."
 
@@ -268,6 +271,9 @@ msgstr "Sudah masuk"
 
 msgid "Also makes changes on your behalf."
 msgstr "Juga melakukan perubahan atas nama Anda."
+
+msgid "An account linked through SSO signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one."
+msgstr "Akun yang ditautkan melalui SSO masuk melalui domain yang digunakan untuk menautkannya. Akun ini ditautkan ke sebuah identitas, sehingga tidak dapat digunakan untuk membuat identitas baru."
 
 msgid "Any local program can connect"
 msgstr "Program lokal apa pun dapat terhubung"
@@ -496,6 +502,9 @@ msgstr "Salin subjek"
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Tidak dapat memuat pengaturan SSO dari {domainInput}. Minta admin SSO Anda untuk memastikan bahwa /.well-known/ii-openid-configuration dapat diakses."
+
+msgid "Couldn't load the SSO settings of {registeredDomain}. Try again later or use a different method."
+msgstr "Tidak dapat memuat pengaturan SSO dari {registeredDomain}. Coba lagi nanti atau gunakan metode lain."
 
 msgid "Couldn't remove the connector. Please try again."
 msgstr "Tidak dapat menghapus konektor. Silakan coba lagi."
@@ -1029,6 +1038,15 @@ msgstr "Batas tercapai"
 msgid "Link copied to clipboard"
 msgstr "Tautan disalin ke papan klip"
 
+msgid "Linked through {registeredDomain}"
+msgstr "Ditautkan melalui {registeredDomain}"
+
+msgid "Linked through another domain"
+msgstr "Ditautkan melalui domain lain"
+
+msgid "Linked through another SSO domain"
+msgstr "Ditautkan melalui domain SSO lain"
+
 msgid "Linking Internet Identity"
 msgstr "Menautkan Internet Identity"
 
@@ -1181,6 +1199,9 @@ msgstr "Satu atau lebih kata salah atau urutannya tidak tepat."
 
 msgid "Only add trusted connectors"
 msgstr "Hanya tambahkan konektor tepercaya"
+
+msgid "Only continue if you recognize these domains. If an app or a guide told you to enter a domain you don't know, stop here and use the domain your organization gave you."
+msgstr "Lanjutkan hanya jika Anda mengenali domain-domain ini. Jika aplikasi atau panduan meminta Anda memasukkan domain yang tidak Anda ketahui, berhenti di sini dan gunakan domain yang diberikan oleh organisasi Anda."
 
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "Aktifkan ini hanya untuk <0>ICP CLI</0> resmi. Jika Anda tidak yakin, instal ulang dari <1>sumber resmi</1>."
@@ -1560,6 +1581,9 @@ msgstr "Masuk menggunakan metode yang dikenal"
 msgid "Sign in with {name}"
 msgstr "Masuk dengan {name}"
 
+msgid "Sign in with {registeredDomain}"
+msgstr "Masuk dengan {registeredDomain}"
+
 msgid "Sign in with another identity"
 msgstr "Masuk dengan identitas lain"
 
@@ -1616,6 +1640,9 @@ msgstr "Sedang masuk"
 
 msgid "Signing in securely"
 msgstr "Masuk dengan aman"
+
+msgid "Signing in with the provider directly doesn't reach it."
+msgstr "Masuk langsung ke penyedia tidak menjangkaunya."
 
 msgid "Signing in..."
 msgstr "Masuk..."
@@ -1797,6 +1824,18 @@ msgstr "Frasa dimasukkan dengan benar tetapi milik produk selain Internet Identi
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Terjadi masalah saat menyambung ke aplikasi. Coba peramban lain; jika masalah berlanjut, hubungi pengembang."
+
+msgid "This {providerName} account is already linked to an Internet Identity through an SSO domain."
+msgstr "Akun {providerName} ini sudah ditautkan ke Internet Identity melalui domain SSO."
+
+msgid "This {providerName} account is already linked to an Internet Identity through the SSO domain {registeredDomain}."
+msgstr "Akun {providerName} ini sudah ditautkan ke Internet Identity melalui domain SSO {registeredDomain}."
+
+msgid "This {providerName} account is already linked to an Internet Identity, but through {registeredDomain} rather than {enteredDomain}."
+msgstr "Akun {providerName} ini sudah ditautkan ke Internet Identity, tetapi melalui {registeredDomain} bukan {enteredDomain}."
+
+msgid "This {providerName} account is already linked to an Internet Identity, but through a different SSO domain than {enteredDomain}."
+msgstr "Akun {providerName} ini sudah ditautkan ke Internet Identity, tetapi melalui domain SSO yang berbeda dari {enteredDomain}."
 
 msgid "This {resolvedProviderName} account is already connected to an Internet Identity."
 msgstr "Akun {resolvedProviderName} ini sudah terhubung ke Internet Identity."
