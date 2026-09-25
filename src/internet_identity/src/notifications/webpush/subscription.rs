@@ -30,17 +30,17 @@ pub fn set_subscription(
     } = request;
 
     // The same endpoint means this replaces the pool on a registration that is still
-    // live, so the registration keeps its age and the pool has to move forward: one
-    // signature covers one elapsed window, and an older pool would shorten the coverage
-    // the browser believes it has. Any other endpoint is a new registration.
-    let created_at_ns = match anchor.webpush_subscription(browser_id) {
+    // live, so the registration keeps its age and its queue, and the pool has to move
+    // forward: one signature covers one elapsed window, and an older pool would shorten
+    // the coverage the browser believes it has. Any other endpoint is a new registration.
+    let (created_at_ns, notifications) = match anchor.webpush_subscription(browser_id) {
         Some(registered) if registered.endpoint == endpoint => {
             if jwt_issued_at_ns <= registered.jwt_issued_at_ns {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
-            registered.created_at_ns
+            (registered.created_at_ns, registered.notifications.clone())
         }
-        _ => now_ns,
+        _ => (now_ns, Vec::new()),
     };
 
     write_subscription(
@@ -52,6 +52,7 @@ pub fn set_subscription(
             vapid_public_key,
             jwt_signatures,
             jwt_issued_at_ns,
+            notifications,
         }),
     )
     .map_err(SetWebPushSubscriptionError::InternalCanisterError)
@@ -142,7 +143,7 @@ mod tests {
         let mut stored = anchor(anchor_number);
         stored
             .notifications_mut(browser_id)
-            .expect("a listed browser")
+            .expect("a registered browser")
             .push(crate::storage::anchor::QueuedNotification {
                 application_number: 1,
                 sender: candid::Principal::from_slice(&[7; 10]),

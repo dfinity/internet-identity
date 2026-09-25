@@ -69,6 +69,8 @@ struct PassSchedule {
     /// by an interval counts as lost and is armed again.
     due_at_ns: Option<Timestamp>,
     last_started_ns: Option<Timestamp>,
+    /// Counts every arming, so a timer armed before a re-arm runs no pass of its own.
+    armed: u64,
 }
 
 thread_local! {
@@ -122,14 +124,16 @@ pub(crate) fn schedule_pass(now_ns: Timestamp) {
             return None;
         }
         let delay = delay_until_next_pass(current.last_started_ns, now_ns);
+        let armed = current.armed.wrapping_add(1);
         schedule.set(PassSchedule {
             due_at_ns: Some(now_ns.saturating_add(delay.as_nanos() as u64)),
+            armed,
             ..current
         });
-        Some(delay)
+        Some((delay, armed))
     });
-    if let Some(delay) = delay {
-        outcalls::arm(delay);
+    if let Some((delay, armed)) = delay {
+        outcalls::arm(delay, armed);
     }
 }
 
@@ -151,13 +155,22 @@ fn delay_until_next_pass(last_started_ns: Option<Timestamp>, now_ns: Timestamp) 
 }
 
 /// Post this pass's wake-ups without waiting on them, then come back while work is left.
-fn run_pass(now_ns: Timestamp) {
-    PASS_SCHEDULE.with(|schedule| {
-        schedule.set(PassSchedule {
-            due_at_ns: None,
-            last_started_ns: Some(now_ns),
-        })
+/// A timer armed before the latest arming runs nothing.
+fn run_pass(armed: u64, now_ns: Timestamp) {
+    let is_latest = PASS_SCHEDULE.with(|schedule| {
+        let is_latest = schedule.get().armed == armed;
+        if is_latest {
+            schedule.set(PassSchedule {
+                due_at_ns: None,
+                last_started_ns: Some(now_ns),
+                armed,
+            });
+        }
+        is_latest
     });
+    if !is_latest {
+        return;
+    }
     for delivery in plan_pass(MAX_POSTS_PER_PASS, now_ns) {
         outcalls::spawn_post(delivery);
     }
@@ -323,7 +336,7 @@ mod outcalls {
     use super::Delivery;
     use std::time::Duration;
 
-    pub(super) fn arm(_delay: Duration) {}
+    pub(super) fn arm(_delay: Duration, _armed: u64) {}
 
     pub(super) fn spawn_post(_delivery: Delivery) {}
 }
@@ -353,8 +366,8 @@ mod outcalls {
         is_replicated: Option<bool>,
     }
 
-    pub(super) fn arm(delay: Duration) {
-        ic_cdk_timers::set_timer(delay, || run_pass(ic_cdk::api::time()));
+    pub(super) fn arm(delay: Duration, armed: u64) {
+        ic_cdk_timers::set_timer(delay, move || run_pass(armed, ic_cdk::api::time()));
     }
 
     pub(super) fn spawn_post(delivery: Delivery) {
@@ -454,7 +467,7 @@ mod tests {
         change(
             stored
                 .notifications_mut(browser_id)
-                .expect("a listed browser"),
+                .expect("a registered browser"),
         );
         storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
     }
@@ -885,6 +898,7 @@ mod tests {
             PassSchedule {
                 due_at_ns: Some(SECOND_NS),
                 last_started_ns: None,
+                armed: 1,
             }
         );
     }
@@ -899,6 +913,27 @@ mod tests {
         assert_eq!(PASS_SCHEDULE.with(Cell::get).due_at_ns, Some(3 * SECOND_NS));
     }
 
+    /// Otherwise a timer that was only late runs beside the one that replaced it, and
+    /// both keep arming.
+    #[test]
+    fn a_timer_armed_before_a_re_arm_runs_no_pass() {
+        setup();
+        PASS_SCHEDULE.with(|schedule| schedule.set(PassSchedule::default()));
+        let (recipient, _) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        schedule_pass(SECOND_NS);
+        schedule_pass(3 * SECOND_NS);
+
+        run_pass(1, 3 * SECOND_NS);
+
+        assert_eq!(still_in_backlog(3 * SECOND_NS), 1);
+        assert_eq!(PASS_SCHEDULE.with(Cell::get).due_at_ns, Some(3 * SECOND_NS));
+
+        run_pass(2, 3 * SECOND_NS);
+
+        assert_eq!(still_in_backlog(3 * SECOND_NS), 0);
+    }
+
     #[test]
     fn a_pass_that_leaves_work_behind_schedules_the_next_one() {
         setup();
@@ -910,13 +945,14 @@ mod tests {
             }
         }
 
-        run_pass(SECOND_NS);
+        run_pass(0, SECOND_NS);
 
         assert_eq!(
             PASS_SCHEDULE.with(Cell::get),
             PassSchedule {
                 due_at_ns: Some(2 * SECOND_NS),
                 last_started_ns: Some(SECOND_NS),
+                armed: 1,
             }
         );
     }
@@ -928,7 +964,7 @@ mod tests {
         let (recipient, _) = subscribed_recipient(1);
         submit(recipient, 7, 10 * SECOND_NS);
 
-        run_pass(SECOND_NS);
+        run_pass(0, SECOND_NS);
 
         assert_eq!(PASS_SCHEDULE.with(Cell::get).due_at_ns, None);
         assert_eq!(still_in_backlog(SECOND_NS), 0);

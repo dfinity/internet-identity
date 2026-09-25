@@ -6,7 +6,7 @@
 use crate::state::storage_borrow_mut;
 use crate::storage::anchor::{Anchor, QueuedNotification};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, BrowserId, NotificationToShow, Timestamp,
+    AnchorNumber, BrowserId, FrontendHostname, NotificationToShow, Timestamp,
 };
 
 /// Most entries one browser holds. A new one past it replaces the oldest.
@@ -79,6 +79,35 @@ pub(crate) fn remove_after_failed_wake_up(
     });
 }
 
+/// Drop what an app queued on every browser of the identity, so consent granted again
+/// later brings none of it back.
+pub(crate) fn remove_app(anchor_number: AnchorNumber, origin: &FrontendHostname) {
+    storage_borrow_mut(|storage| {
+        let Some(application_number) = storage.lookup_application_number_with_origin(origin) else {
+            return;
+        };
+        let Ok(mut anchor) = storage.read(anchor_number) else {
+            return;
+        };
+        let browser_ids: Vec<BrowserId> =
+            anchor.browsers().iter().map(|browser| browser.id).collect();
+        let mut removed = false;
+        for browser_id in browser_ids {
+            if let Some(queue) = anchor.notifications_mut(browser_id) {
+                let before = queue.len();
+                queue.retain(|queued| queued.application_number != application_number);
+                removed |= queue.len() < before;
+            }
+        }
+        if !removed {
+            return;
+        }
+        if let Err(err) = storage.write(anchor) {
+            ic_cdk::println!("Failed to drop what an app without consent queued: {err}");
+        }
+    });
+}
+
 /// Take the oldest entry still worth showing, dropping on the way what expired or
 /// belongs to an app that lost consent or that II no longer holds.
 pub(crate) fn take_next(
@@ -129,6 +158,7 @@ mod tests {
     use crate::notifications::webpush::fixtures::{anchor, setup, subscribe};
     use crate::notifications::write_consent;
     use candid::Principal;
+    use internet_identity_interface::internet_identity::types::NotificationRevokeConsentRequest;
     use pretty_assertions::assert_eq;
 
     const SECOND_NS: u64 = 1_000_000_000;
@@ -333,6 +363,31 @@ mod tests {
         enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
         write_consent(anchor_number, &ORIGIN.to_string(), None, SECOND_NS)
             .expect("revoking consent");
+
+        assert_eq!(take(anchor_number, browser_id, 2 * SECOND_NS), None);
+        assert!(left_for(anchor_number, browser_id).is_empty());
+    }
+
+    #[test]
+    fn consent_granted_again_brings_back_nothing_queued_before_it_was_revoked() {
+        let (anchor_number, browser_id) = signed_in();
+        enqueue(anchor_number, browser_id, [from_app(1, 60 * SECOND_NS)]);
+        let revoke = NotificationRevokeConsentRequest {
+            anchor_number,
+            origin: ORIGIN.to_string(),
+        };
+        crate::notifications::revoke_consent(
+            revoke.try_into().expect("a valid request"),
+            SECOND_NS,
+        )
+        .expect("revoking consent");
+        write_consent(
+            anchor_number,
+            &ORIGIN.to_string(),
+            Some(SECOND_NS),
+            SECOND_NS,
+        )
+        .expect("granting consent again");
 
         assert_eq!(take(anchor_number, browser_id, 2 * SECOND_NS), None);
         assert!(left_for(anchor_number, browser_id).is_empty());

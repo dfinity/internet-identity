@@ -7443,7 +7443,7 @@ mod browser_session_count_tests {
 
 #[test]
 fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
-    use crate::storage::anchor::QueuedNotification;
+    use crate::storage::anchor::{QueuedNotification, WebPushSubscription};
 
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
@@ -7463,9 +7463,22 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
         expires_at_ns: 100 * notification_id,
         account_number: Some(notification_id),
     };
+    for browser_id in [queued_on, left_empty] {
+        anchor.set_webpush_subscription(
+            browser_id,
+            Some(WebPushSubscription {
+                endpoint: "https://relay.example/a".to_string(),
+                created_at_ns: 0,
+                vapid_public_key: vec![4; 65],
+                jwt_signatures: vec![vec![3; 64]],
+                jwt_issued_at_ns: 0,
+                notifications: Vec::new(),
+            }),
+        );
+    }
     anchor
         .notifications_mut(queued_on)
-        .expect("a listed browser")
+        .expect("a registered browser")
         .extend([3, 1, 2].map(queued));
     storage.write(anchor).expect("writing the anchor");
 
