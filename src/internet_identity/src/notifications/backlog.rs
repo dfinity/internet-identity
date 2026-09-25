@@ -1,7 +1,5 @@
 //! Pending device wake-ups, grouped by app and limited per identity.
 //! Deduplication uses (recipient, notification ID); urgency sets the lane.
-// Used by the submission endpoint and dispatcher in follow-up PRs.
-#![allow(dead_code)]
 
 use super::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
 use super::dispatch;

@@ -589,6 +589,25 @@ mod tests {
     }
 
     #[test]
+    fn a_send_is_refused_while_nothing_is_configured() {
+        crate::state::persistent_state_mut(|s| s.notifications_enabled_origins = None);
+
+        let refused = ValidatedSendNotificationArg::try_from(SendNotificationArg {
+            origin: "https://app.example".to_string(),
+            notifications: vec![notification(
+                1,
+                "ryjl3-tyaaa-aaaaa-aaaba-cai",
+                Urgency::Normal,
+            )],
+        });
+
+        assert!(matches!(
+            refused,
+            Err(SendNotificationError::InternalCanisterError(_))
+        ));
+    }
+
+    #[test]
     fn refuses_every_origin_when_nothing_is_configured() {
         crate::state::persistent_state_mut(|s| s.notifications_enabled_origins = None);
         assert!(notifying_origin("https://allowed.example").is_err());

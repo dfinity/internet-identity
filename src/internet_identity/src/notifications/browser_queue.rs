@@ -2,8 +2,6 @@
 //! An entry is added before its wake-up is posted, and the service worker removes the
 //! one it shows on every wake-up, so wake-ups and shown notifications stay one to one.
 //! The queue lives on the browser's Web Push subscription, so it goes with it.
-// Filled by the dispatcher, which the submission endpoint kicks in a follow-up PR.
-#![allow(dead_code)]
 
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, QueuedNotification};
