@@ -7442,38 +7442,37 @@ mod browser_session_count_tests {
 }
 
 #[test]
-fn should_keep_browser_notifications_and_their_order_across_a_reload() {
-    use crate::storage::storable::notifications::browser_queue::{
-        StorableBrowserNotification, StorableBrowserNotificationKey,
-    };
+fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
+    use crate::storage::anchor::QueuedNotification;
 
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
     storage.flush();
-
-    let key = |sequence: u64| StorableBrowserNotificationKey {
-        anchor_number: 10_000,
-        browser_id: 3,
-        sequence,
-    };
-    let entry = |notification_id: u64| StorableBrowserNotification {
-        recipient: vec![7; 29],
+    let mut anchor = storage.allocate_anchor(0).expect("allocating an anchor");
+    let anchor_number = anchor.anchor_number();
+    let (queued_on, _) = anchor
+        .resolve_browser(browser_key(1, 0), browser_key(1, 1), description(1), 0)
+        .expect("registering a browser");
+    let (left_empty, _) = anchor
+        .resolve_browser(browser_key(2, 0), browser_key(2, 1), description(2), 0)
+        .expect("registering a browser");
+    let queued = |notification_id: u64| QueuedNotification {
+        application_number: 4,
+        sender: Principal::from_slice(&[7; 10]),
         notification_id,
         expires_at_ns: 100 * notification_id,
     };
-    for sequence in [3, 1, 2] {
-        storage.add_browser_notification(key(sequence), entry(sequence));
-    }
+    anchor
+        .notifications_mut(queued_on)
+        .expect("a listed browser")
+        .extend([3, 1, 2].map(queued));
+    storage.write(anchor).expect("writing the anchor");
 
     // Re-read from the same backing memory to simulate a canister upgrade.
-    let reloaded = Storage::from_memory(memory);
+    let reloaded = Storage::from_memory(memory)
+        .read(anchor_number)
+        .expect("reading the anchor");
 
-    assert_eq!(
-        reloaded.browser_notifications(10_000, 3, usize::MAX),
-        vec![(key(1), entry(1)), (key(2), entry(2)), (key(3), entry(3))]
-    );
-    assert_eq!(
-        reloaded.expired_browser_notifications(200, usize::MAX),
-        vec![key(1), key(2)]
-    );
+    assert_eq!(reloaded.notifications(queued_on), [3, 1, 2].map(queued));
+    assert!(reloaded.notifications(left_empty).is_empty());
 }
