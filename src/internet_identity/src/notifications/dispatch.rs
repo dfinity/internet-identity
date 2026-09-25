@@ -1,8 +1,6 @@
 //! Send content-free wake-ups for backlog notifications, one per registered browser.
 //! A pass queues each notification for the browser before posting its wake-up, and
 //! spawns the posts rather than awaiting them. Nothing is retried; every outcome is counted.
-// Kicked by the submission endpoint in a follow-up PR.
-#![allow(dead_code)]
 
 use crate::notifications::admission_queue::Taken;
 use crate::notifications::backlog::PendingNotification;
@@ -722,6 +720,41 @@ mod tests {
         schedule_pass(3 * SECOND_NS);
 
         assert_eq!(PASS_SCHEDULE.with(Cell::get).due_at_ns, Some(3 * SECOND_NS));
+    }
+
+    #[test]
+    fn a_pass_that_leaves_work_behind_schedules_the_next_one() {
+        setup();
+        PASS_SCHEDULE.with(|schedule| schedule.set(PassSchedule::default()));
+        for _ in 0..4 {
+            let (recipient, _) = subscribed_recipient(1);
+            for notification_id in 0..20 {
+                submit(recipient, notification_id, 10 * SECOND_NS);
+            }
+        }
+
+        run_pass(SECOND_NS);
+
+        assert_eq!(
+            PASS_SCHEDULE.with(Cell::get),
+            PassSchedule {
+                due_at_ns: Some(2 * SECOND_NS),
+                last_started_ns: Some(SECOND_NS),
+            }
+        );
+    }
+
+    #[test]
+    fn a_pass_that_empties_the_backlog_schedules_nothing() {
+        setup();
+        PASS_SCHEDULE.with(|schedule| schedule.set(PassSchedule::default()));
+        let (recipient, _) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+
+        run_pass(SECOND_NS);
+
+        assert_eq!(PASS_SCHEDULE.with(Cell::get).due_at_ns, None);
+        assert_eq!(still_in_backlog(SECOND_NS), 0);
     }
 
     #[test]

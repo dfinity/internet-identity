@@ -1141,7 +1141,7 @@ pub enum SendNotificationError {
     /// one that does not name the caller.
     NoSuchSender,
     /// More entries than II will process in one call; nothing was enqueued.
-    /// `limit` is fixed and never below an origin's queue capacity.
+    /// `limit` is fixed, not a measure of how much the queue holds.
     TooManyNotifications { limit: u32 },
     /// Also a malformed or non-canonical origin, carrying the reason.
     InternalCanisterError(String),

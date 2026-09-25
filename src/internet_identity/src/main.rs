@@ -465,8 +465,6 @@ fn notification_consent_granted(request: NotificationConsentGrantedRequest) -> b
 
 /// Authorized by the origin listing the caller in the sender list it publishes. A
 /// caller II cannot judge yet has its batch deferred rather than refused.
-///
-/// The send path does not exist yet, so an authorized caller is still refused.
 #[update]
 fn app_send_notification(
     request: SendNotificationArg,
@@ -478,8 +476,9 @@ fn app_send_notification(
         Senders::Pending { retry_after } => {
             Ok(notifications::defer_whole_batch(request, retry_after))
         }
-        Senders::Listed => Err(SendNotificationError::InternalCanisterError(
-            "Not enabled".to_string(),
+        Senders::Listed => Ok(notifications::submission::submit(
+            request,
+            ic_cdk::api::time(),
         )),
     }
 }

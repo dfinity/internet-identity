@@ -2421,7 +2421,6 @@ service : (opt InternetIdentityInit) -> {
     remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
 
-    // Called by an app's backend canister for the origin it names. Not
-    // implemented yet: every call is refused.
+    // Called by an app's backend canister for the origin it names.
     app_send_notification : (SendNotificationArg) -> (variant { Ok : SendNotificationResponse; Err : SendNotificationError });
 };

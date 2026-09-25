@@ -1,8 +1,6 @@
 //! What each browser's service worker has yet to show, one entry per wake-up sent.
 //! An entry is added before its wake-up is posted and the service worker takes the
 //! oldest on every wake-up, so wake-ups and shown notifications stay one to one.
-// Filled by the dispatcher, which the submission endpoint kicks in a follow-up PR.
-#![allow(dead_code)]
 
 use crate::state::storage_borrow_mut;
 use crate::storage::storable::notifications::browser_queue::{

@@ -9,8 +9,6 @@
 //! Deduplication covers queued entries only. Resends can extend a deadline up to
 //! the entry's maximum lifetime. Callers supply trusted canister time and handle
 //! authorization and delivery.
-// Used by the submission endpoint and dispatcher in follow-up PRs.
-#![allow(dead_code)]
 
 use internet_identity_interface::internet_identity::types::Timestamp;
 use std::collections::{BTreeMap, HashMap};

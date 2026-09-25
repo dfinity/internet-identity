@@ -2223,8 +2223,7 @@ export interface _SERVICE {
       { 'Err' : AppSessionError }
   >,
   /**
-   * Called by an app's backend canister for the origin it names. Not
-   * implemented yet: every call is refused.
+   * Called by an app's backend canister for the origin it names.
    */
   'app_send_notification' : ActorMethod<
     [SendNotificationArg],
