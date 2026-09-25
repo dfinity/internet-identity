@@ -7440,3 +7440,40 @@ mod browser_session_count_tests {
         assert_eq!(total as usize, MAX_BROWSERS);
     }
 }
+
+#[test]
+fn should_keep_browser_notifications_and_their_order_across_a_reload() {
+    use crate::storage::storable::notifications::browser_queue::{
+        StorableBrowserNotification, StorableBrowserNotificationKey,
+    };
+
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+    storage.flush();
+
+    let key = |sequence: u64| StorableBrowserNotificationKey {
+        anchor_number: 10_000,
+        browser_id: 3,
+        sequence,
+    };
+    let entry = |notification_id: u64| StorableBrowserNotification {
+        recipient: vec![7; 29],
+        notification_id,
+        expires_at_ns: 100 * notification_id,
+    };
+    for sequence in [3, 1, 2] {
+        storage.add_browser_notification(key(sequence), entry(sequence));
+    }
+
+    // Re-read from the same backing memory to simulate a canister upgrade.
+    let reloaded = Storage::from_memory(memory);
+
+    assert_eq!(
+        reloaded.browser_notifications(10_000, 3, usize::MAX),
+        vec![(key(1), entry(1)), (key(2), entry(2)), (key(3), entry(3))]
+    );
+    assert_eq!(
+        reloaded.expired_browser_notifications(200, usize::MAX),
+        vec![key(1), key(2)]
+    );
+}

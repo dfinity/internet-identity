@@ -121,6 +121,9 @@ use crate::storage::storable::accounts_counter::StorableAccountsCounter;
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
+use crate::storage::storable::notifications::browser_queue::{
+    StorableBrowserNotification, StorableBrowserNotificationExpiry, StorableBrowserNotificationKey,
+};
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::session_handle::StorableSessionHandle;
@@ -215,6 +218,8 @@ const NEXT_APPLICATION_NUMBER_MEMORY_INDEX: u8 = 33u8;
 const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 34u8;
 const LOOKUP_SESSION_WITH_PRINCIPAL_MEMORY_INDEX: u8 = 35u8;
 const NEXT_SESSION_ID_MEMORY_INDEX: u8 = 36u8;
+const NOTIFICATIONS_BROWSER_QUEUE_MEMORY_INDEX: u8 = 37u8;
+const NOTIFICATIONS_BROWSER_QUEUE_BY_EXPIRY_MEMORY_INDEX: u8 = 38u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -306,6 +311,14 @@ const LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID: MemoryId =
 /// Monotonic [`SessionId`] allocator. A revoked session's id is retired, never reissued,
 /// which is what makes the revocation final: the id is an input to the session seed.
 const NEXT_SESSION_ID_MEMORY_ID: MemoryId = MemoryId::new(NEXT_SESSION_ID_MEMORY_INDEX);
+
+/// Notifications each browser's service worker has yet to take, oldest first per browser.
+const NOTIFICATIONS_BROWSER_QUEUE_MEMORY_ID: MemoryId =
+    MemoryId::new(NOTIFICATIONS_BROWSER_QUEUE_MEMORY_INDEX);
+
+/// The same entries by deadline, so expired ones are swept without visiting each browser.
+const NOTIFICATIONS_BROWSER_QUEUE_BY_EXPIRY_MEMORY_ID: MemoryId =
+    MemoryId::new(NOTIFICATIONS_BROWSER_QUEUE_BY_EXPIRY_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -443,6 +456,16 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the session-id allocator.
     next_session_id_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     next_session_id_memory: StableCell<StorableSessionId, ManagedMemory<M>>,
+
+    notifications_browser_queue_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    notifications_browser_queue_memory: StableBTreeMap<
+        StorableBrowserNotificationKey,
+        StorableBrowserNotification,
+        ManagedMemory<M>,
+    >,
+    notifications_browser_queue_by_expiry_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    notifications_browser_queue_by_expiry_memory:
+        StableBTreeMap<StorableBrowserNotificationExpiry, (), ManagedMemory<M>>,
     lookup_account_with_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_account_with_principal_memory:
         StableBTreeMap<Principal, StorableAccountKey, ManagedMemory<M>>,
@@ -587,6 +610,10 @@ impl<M: Memory + Clone> Storage<M> {
         let stable_account_counter_memory = memory_manager.get(STABLE_ACCOUNT_COUNTER_MEMORY_ID);
         let next_application_number_memory = memory_manager.get(NEXT_APPLICATION_NUMBER_MEMORY_ID);
         let next_session_id_memory = memory_manager.get(NEXT_SESSION_ID_MEMORY_ID);
+        let notifications_browser_queue_memory =
+            memory_manager.get(NOTIFICATIONS_BROWSER_QUEUE_MEMORY_ID);
+        let notifications_browser_queue_by_expiry_memory =
+            memory_manager.get(NOTIFICATIONS_BROWSER_QUEUE_BY_EXPIRY_MEMORY_ID);
         let lookup_account_with_principal_memory =
             memory_manager.get(LOOKUP_ACCOUNT_WITH_PRINCIPAL_MEMORY_ID);
         let lookup_session_with_principal_memory =
@@ -679,6 +706,18 @@ impl<M: Memory + Clone> Storage<M> {
             next_session_id_memory_wrapper: MemoryWrapper::new(next_session_id_memory.clone()),
             next_session_id_memory: StableCell::init(next_session_id_memory, 0)
                 .expect("next_session_id_memory"),
+            notifications_browser_queue_memory_wrapper: MemoryWrapper::new(
+                notifications_browser_queue_memory.clone(),
+            ),
+            notifications_browser_queue_memory: StableBTreeMap::init(
+                notifications_browser_queue_memory,
+            ),
+            notifications_browser_queue_by_expiry_memory_wrapper: MemoryWrapper::new(
+                notifications_browser_queue_by_expiry_memory.clone(),
+            ),
+            notifications_browser_queue_by_expiry_memory: StableBTreeMap::init(
+                notifications_browser_queue_by_expiry_memory,
+            ),
             lookup_account_with_principal_memory_wrapper: MemoryWrapper::new(
                 lookup_account_with_principal_memory.clone(),
             ),
@@ -2848,6 +2887,72 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
+    /// Queue a notification for a browser, indexed by its deadline too.
+    pub fn add_browser_notification(
+        &mut self,
+        key: StorableBrowserNotificationKey,
+        entry: StorableBrowserNotification,
+    ) {
+        self.notifications_browser_queue_by_expiry_memory.insert(
+            StorableBrowserNotificationExpiry {
+                expires_at_ns: entry.expires_at_ns,
+                key,
+            },
+            (),
+        );
+        self.notifications_browser_queue_memory.insert(key, entry);
+    }
+
+    pub fn remove_browser_notification(
+        &mut self,
+        key: &StorableBrowserNotificationKey,
+    ) -> Option<StorableBrowserNotification> {
+        let entry = self.notifications_browser_queue_memory.remove(key)?;
+        self.notifications_browser_queue_by_expiry_memory.remove(
+            &StorableBrowserNotificationExpiry {
+                expires_at_ns: entry.expires_at_ns,
+                key: *key,
+            },
+        );
+        Some(entry)
+    }
+
+    /// Up to `limit` of one browser's queue, oldest first.
+    pub fn browser_notifications(
+        &self,
+        anchor_number: AnchorNumber,
+        browser_id: BrowserId,
+        limit: usize,
+    ) -> Vec<(StorableBrowserNotificationKey, StorableBrowserNotification)> {
+        let first = StorableBrowserNotificationKey {
+            anchor_number,
+            browser_id,
+            sequence: 0,
+        };
+        let last = StorableBrowserNotificationKey {
+            sequence: u64::MAX,
+            ..first
+        };
+        self.notifications_browser_queue_memory
+            .range(first..=last)
+            .take(limit)
+            .collect()
+    }
+
+    /// Up to `limit` queue keys whose deadline is at or before `now_ns`, soonest first.
+    pub fn expired_browser_notifications(
+        &self,
+        now_ns: Timestamp,
+        limit: usize,
+    ) -> Vec<StorableBrowserNotificationKey> {
+        self.notifications_browser_queue_by_expiry_memory
+            .iter()
+            .take_while(|(expiry, ())| expiry.expires_at_ns <= now_ns)
+            .take(limit)
+            .map(|(expiry, ())| expiry.key)
+            .collect()
+    }
+
     /// Signs `anchor_number` in at `origin` through the production write, which mints
     /// the application a consent hangs off.
     #[cfg(test)]
@@ -4083,6 +4188,15 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "next_session_id".to_string(),
                 self.next_session_id_memory_wrapper.size(),
+            ),
+            (
+                "notifications_browser_queue".to_string(),
+                self.notifications_browser_queue_memory_wrapper.size(),
+            ),
+            (
+                "notifications_browser_queue_by_expiry".to_string(),
+                self.notifications_browser_queue_by_expiry_memory_wrapper
+                    .size(),
             ),
             (
                 "stable_anchor_application_config".to_string(),

@@ -4,6 +4,7 @@
 #![allow(dead_code)]
 
 use super::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
+use super::dispatch;
 use crate::storage::storable::application::StorableOriginSha256;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
@@ -62,13 +63,19 @@ pub(crate) type NotificationBacklog = AdmissionQueue<StorableOriginSha256, Pendi
 
 const SECOND_NS: u64 = 1_000_000_000;
 const MINUTE_NS: u64 = 60 * SECOND_NS;
+const EXPIRY_NS: u64 = 5 * MINUTE_NS;
+
+/// What the dispatcher posts within one expiry window, one browser per recipient, so
+/// nothing admitted outlasts it.
+const DRAINED_PER_EXPIRY: usize =
+    dispatch::MAX_POSTS_PER_PASS * (EXPIRY_NS / dispatch::INTERVAL.as_nanos() as u64) as usize;
 
 pub(crate) const NOTIFICATION_BACKLOG: QueueConfig = QueueConfig {
-    max_entries: 10_000,
-    max_entries_per_sender: 7_000,
+    max_entries: DRAINED_PER_EXPIRY,
+    max_entries_per_sender: DRAINED_PER_EXPIRY * 7 / 10,
     max_pending_per_group: 20,
-    pressure_cleared_below: 8_000,
-    discard_entries_after_ns: 5 * MINUTE_NS,
+    pressure_cleared_below: DRAINED_PER_EXPIRY * 8 / 10,
+    discard_entries_after_ns: EXPIRY_NS,
     max_lifetime_ns: 15 * MINUTE_NS,
     retry: RetryPolicy {
         base_ns: 5 * SECOND_NS,
