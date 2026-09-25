@@ -4,6 +4,7 @@
 use super::validation::{
     ValidatedRemoveWebPushSubscriptionRequest, ValidatedSetWebPushSubscriptionRequest,
 };
+use crate::notifications::browser_queue;
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
@@ -73,13 +74,27 @@ pub fn remove_subscription(
         .map_err(RemoveWebPushSubscriptionError::InternalCanisterError)
 }
 
-/// Idempotently remove a registration reported gone by its relay.
-pub(crate) fn clear_subscription(
+fn clear_subscription(anchor_number: AnchorNumber, browser_id: BrowserId) -> Result<(), String> {
+    let anchor =
+        storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
+    write_subscription(anchor, browser_id, None)
+}
+
+/// Idempotently remove a registration its relay reported gone, unless the browser has
+/// registered another endpoint since the post went out.
+pub(crate) fn clear_gone_subscription(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
+    endpoint: &str,
 ) -> Result<(), String> {
     let anchor =
         storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
+    if anchor
+        .webpush_subscription(browser_id)
+        .is_none_or(|registered| registered.endpoint != endpoint)
+    {
+        return Ok(());
+    }
     write_subscription(anchor, browser_id, None)
 }
 
@@ -98,13 +113,23 @@ pub fn subscription_status(
         })
 }
 
+/// A new endpoint, or none, drops the browser's queue, whose wake-ups went to the old one.
 fn write_subscription(
     mut anchor: Anchor,
     browser_id: BrowserId,
     subscription: Option<WebPushSubscription>,
 ) -> Result<(), String> {
+    let anchor_number = anchor.anchor_number();
+    let endpoint_changes = anchor
+        .webpush_subscription(browser_id)
+        .map(|registered| &registered.endpoint)
+        != subscription.as_ref().map(|registered| &registered.endpoint);
     anchor.set_webpush_subscription(browser_id, subscription);
-    storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))
+    storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| format!("{err}"))?;
+    if endpoint_changes {
+        browser_queue::clear(anchor_number, browser_id);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -122,6 +147,25 @@ mod tests {
         browser_id: BrowserId,
     ) -> Option<WebPushSubscriptionStatus> {
         subscription_status(&anchor(anchor_number), browser_id)
+    }
+
+    fn queue_one(anchor_number: AnchorNumber, browser_id: BrowserId) {
+        browser_queue::add(
+            anchor_number,
+            browser_id,
+            candid::Principal::from_slice(&[7; 29]),
+            1,
+            u64::MAX,
+            1_000,
+        );
+    }
+
+    fn queued(anchor_number: AnchorNumber, browser_id: BrowserId) -> usize {
+        storage_borrow(|storage| {
+            storage
+                .browser_notifications(anchor_number, browser_id, usize::MAX)
+                .len()
+        })
     }
 
     fn remove(anchor_number: AnchorNumber, browser_id: BrowserId) {
@@ -262,6 +306,46 @@ mod tests {
         let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
         assert_eq!(stored.endpoint, ROTATED);
         assert_eq!(stored.created_at_ns, 1_000);
+    }
+
+    #[test]
+    fn removing_a_registration_takes_its_browser_queue_with_it() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(2);
+        for browser in &browsers {
+            subscribe(anchor_number, *browser, ENDPOINT, 1_000);
+            queue_one(anchor_number, *browser);
+        }
+
+        remove(anchor_number, browsers[0]);
+
+        assert_eq!(queued(anchor_number, browsers[0]), 0);
+        assert_eq!(queued(anchor_number, browsers[1]), 1);
+    }
+
+    /// Wake-ups for what was queued went to the old endpoint, so none reach the new one.
+    #[test]
+    fn a_rotated_endpoint_leaves_the_old_browser_queue_behind() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+        subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
+        queue_one(anchor_number, browsers[0]);
+
+        subscribe(anchor_number, browsers[0], ROTATED, 2_000);
+
+        assert_eq!(queued(anchor_number, browsers[0]), 0);
+    }
+
+    #[test]
+    fn topping_up_the_pool_keeps_the_browser_queue() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+        subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
+        queue_one(anchor_number, browsers[0]);
+
+        subscribe(anchor_number, browsers[0], ENDPOINT, 9_000);
+
+        assert_eq!(queued(anchor_number, browsers[0]), 1);
     }
 
     #[test]
