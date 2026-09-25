@@ -63,10 +63,14 @@ const SECOND_NS: u64 = 1_000_000_000;
 const MINUTE_NS: u64 = 60 * SECOND_NS;
 const EXPIRY_NS: u64 = 5 * MINUTE_NS;
 
-/// What the dispatcher posts within one expiry window, one browser per recipient, so
-/// nothing admitted outlasts it.
-const DRAINED_PER_EXPIRY: usize =
-    dispatch::MAX_POSTS_PER_PASS * (EXPIRY_NS / dispatch::INTERVAL.as_nanos() as u64) as usize;
+/// Browsers the sizing assumes each recipient has registered.
+const BROWSERS_PER_RECIPIENT: usize = 2;
+
+/// Notifications the dispatcher drains within one expiry window, so nothing admitted
+/// outlasts it while recipients keep to [`BROWSERS_PER_RECIPIENT`].
+const DRAINED_PER_EXPIRY: usize = dispatch::MAX_POSTS_PER_PASS
+    * (EXPIRY_NS / dispatch::INTERVAL.as_nanos() as u64) as usize
+    / BROWSERS_PER_RECIPIENT;
 
 pub(crate) const NOTIFICATION_BACKLOG: QueueConfig = QueueConfig {
     max_entries: DRAINED_PER_EXPIRY,

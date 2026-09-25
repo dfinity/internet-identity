@@ -415,11 +415,11 @@ fn take_next_notification(
     request: TakeNextNotificationRequest,
 ) -> Result<Option<NotificationToShow>, TakeNextNotificationError> {
     let request: ValidatedTakeNextNotificationRequest = request.try_into()?;
-    let (_, browser_id) = check_browser_authorization(request.anchor_number)
+    let (anchor, browser_id) = check_browser_authorization(request.anchor_number)
         .map_err(|_| TakeNextNotificationError::InvalidBrowserKey)?;
 
     Ok(notifications::browser_queue::take_next(
-        request.anchor_number,
+        &anchor,
         browser_id,
         ic_cdk::api::time(),
     ))

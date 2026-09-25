@@ -5,6 +5,7 @@ use crate::storage::anchor::WebPushSubscription;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use internet_identity_interface::internet_identity::types::Timestamp;
+use url::Url;
 
 const WINDOW_NS: u64 = 24 * 60 * 60 * 1_000_000_000;
 /// Base64url of `{"typ":"JWT","alg":"ES256"}`.
@@ -33,12 +34,10 @@ pub(crate) fn assemble(
     ))
 }
 
+/// The `aud` the browser signed: `new URL(endpoint).origin`, serialized the same way.
 pub(crate) fn relay_origin_of(endpoint: &str) -> Option<String> {
-    let scheme_end = endpoint.find("://")? + 3;
-    let host_len = endpoint[scheme_end..]
-        .find('/')
-        .unwrap_or(endpoint.len() - scheme_end);
-    (host_len > 0).then(|| endpoint[..scheme_end + host_len].to_string())
+    let origin = Url::parse(endpoint).ok()?.origin();
+    origin.is_tuple().then(|| origin.ascii_serialization())
 }
 
 #[cfg(test)]
@@ -130,7 +129,27 @@ mod tests {
             relay_origin_of("https://relay.example"),
             Some("https://relay.example".to_string())
         );
-        assert_eq!(relay_origin_of("https:///wpush"), None);
         assert_eq!(relay_origin_of("relay.example/wpush"), None);
+    }
+
+    /// Anything else would sign different bytes than the browser did.
+    #[test]
+    fn the_relay_origin_is_serialized_as_a_browser_does() {
+        for (endpoint, origin) in [
+            ("https://relay.example?token=x", "https://relay.example"),
+            ("https://relay.example#part", "https://relay.example"),
+            ("https://relay.example:443/wpush", "https://relay.example"),
+            ("https://Relay.EXAMPLE/wpush", "https://relay.example"),
+            (
+                "https://user:pass@relay.example/wpush",
+                "https://relay.example",
+            ),
+        ] {
+            assert_eq!(
+                relay_origin_of(endpoint),
+                Some(origin.to_string()),
+                "{endpoint}"
+            );
+        }
     }
 }
