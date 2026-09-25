@@ -7440,3 +7440,53 @@ mod browser_session_count_tests {
         assert_eq!(total as usize, MAX_BROWSERS);
     }
 }
+
+#[test]
+fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
+    use crate::storage::anchor::{QueuedNotification, WebPushSubscription};
+
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+    storage.flush();
+    let mut anchor = storage.allocate_anchor(0).expect("allocating an anchor");
+    let anchor_number = anchor.anchor_number();
+    let (queued_on, _) = anchor
+        .resolve_browser(browser_key(1, 0), browser_key(1, 1), description(1), 0)
+        .expect("registering a browser");
+    let (left_empty, _) = anchor
+        .resolve_browser(browser_key(2, 0), browser_key(2, 1), description(2), 0)
+        .expect("registering a browser");
+    let queued = |notification_id: u64| QueuedNotification {
+        application_number: 4,
+        sender: Principal::from_slice(&[7; 10]),
+        notification_id,
+        expires_at_ns: 100 * notification_id,
+        account_number: Some(notification_id),
+    };
+    for browser_id in [queued_on, left_empty] {
+        anchor.set_webpush_subscription(
+            browser_id,
+            Some(WebPushSubscription {
+                endpoint: "https://relay.example/a".to_string(),
+                created_at_ns: 0,
+                vapid_public_key: vec![4; 65],
+                jwt_signatures: vec![vec![3; 64]],
+                jwt_issued_at_ns: 0,
+                notifications: Vec::new(),
+            }),
+        );
+    }
+    anchor
+        .notifications_mut(queued_on)
+        .expect("a registered browser")
+        .extend([3, 1, 2].map(queued));
+    storage.write(anchor).expect("writing the anchor");
+
+    // Re-read from the same backing memory to simulate a canister upgrade.
+    let reloaded = Storage::from_memory(memory)
+        .read(anchor_number)
+        .expect("reading the anchor");
+
+    assert_eq!(reloaded.notifications(queued_on), [3, 1, 2].map(queued));
+    assert!(reloaded.notifications(left_empty).is_empty());
+}

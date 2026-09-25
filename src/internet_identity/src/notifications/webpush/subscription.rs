@@ -7,8 +7,8 @@ use super::validation::{
 use crate::state::{storage_borrow, storage_borrow_mut};
 use crate::storage::anchor::{Anchor, WebPushSubscription};
 use internet_identity_interface::internet_identity::types::{
-    BrowserId, RemoveWebPushSubscriptionError, SetWebPushSubscriptionError, Timestamp,
-    WebPushSubscriptionStatus,
+    AnchorNumber, BrowserId, RemoveWebPushSubscriptionError, SetWebPushSubscriptionError,
+    Timestamp, WebPushSubscriptionStatus,
 };
 
 /// Registers `browser_id` for Web Push, and is also how it replaces a pool that is
@@ -30,17 +30,17 @@ pub fn set_subscription(
     } = request;
 
     // The same endpoint means this replaces the pool on a registration that is still
-    // live, so the registration keeps its age and the pool has to move forward: one
-    // signature covers one elapsed window, and an older pool would shorten the coverage
-    // the browser believes it has. Any other endpoint is a new registration.
-    let created_at_ns = match anchor.webpush_subscription(browser_id) {
+    // live, so the registration keeps its age and its queue, and the pool has to move
+    // forward: one signature covers one elapsed window, and an older pool would shorten
+    // the coverage the browser believes it has. Any other endpoint is a new registration.
+    let (created_at_ns, notifications) = match anchor.webpush_subscription(browser_id) {
         Some(registered) if registered.endpoint == endpoint => {
             if jwt_issued_at_ns <= registered.jwt_issued_at_ns {
                 return Err(SetWebPushSubscriptionError::StaleJwtPool);
             }
-            registered.created_at_ns
+            (registered.created_at_ns, registered.notifications.clone())
         }
-        _ => now_ns,
+        _ => (now_ns, Vec::new()),
     };
 
     write_subscription(
@@ -52,6 +52,7 @@ pub fn set_subscription(
             vapid_public_key,
             jwt_signatures,
             jwt_issued_at_ns,
+            notifications,
         }),
     )
     .map_err(SetWebPushSubscriptionError::InternalCanisterError)
@@ -69,10 +70,32 @@ pub fn remove_subscription(
         ..
     }: ValidatedRemoveWebPushSubscriptionRequest,
 ) -> Result<(), RemoveWebPushSubscriptionError> {
-    let anchor = storage_borrow(|storage| storage.read(anchor_number))
-        .map_err(|err| RemoveWebPushSubscriptionError::InternalCanisterError(format!("{err}")))?;
-    write_subscription(anchor, browser_id, None)
+    clear_subscription(anchor_number, browser_id)
         .map_err(RemoveWebPushSubscriptionError::InternalCanisterError)
+}
+
+fn clear_subscription(anchor_number: AnchorNumber, browser_id: BrowserId) -> Result<(), String> {
+    let anchor =
+        storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
+    write_subscription(anchor, browser_id, None)
+}
+
+/// Idempotently remove a registration its relay reported gone, unless the browser has
+/// registered another endpoint since the post went out.
+pub(crate) fn clear_gone_subscription(
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+    endpoint: &str,
+) -> Result<(), String> {
+    let anchor =
+        storage_borrow(|storage| storage.read(anchor_number)).map_err(|err| format!("{err}"))?;
+    if anchor
+        .webpush_subscription(browser_id)
+        .is_none_or(|registered| registered.endpoint != endpoint)
+    {
+        return Ok(());
+    }
+    write_subscription(anchor, browser_id, None)
 }
 
 /// What this browser is registered with, and how much of the pool it signed is left
@@ -114,6 +137,25 @@ mod tests {
         browser_id: BrowserId,
     ) -> Option<WebPushSubscriptionStatus> {
         subscription_status(&anchor(anchor_number), browser_id)
+    }
+
+    fn queue_one(anchor_number: AnchorNumber, browser_id: BrowserId) {
+        let mut stored = anchor(anchor_number);
+        stored
+            .notifications_mut(browser_id)
+            .expect("a registered browser")
+            .push(crate::storage::anchor::QueuedNotification {
+                application_number: 1,
+                sender: candid::Principal::from_slice(&[7; 10]),
+                notification_id: 1,
+                expires_at_ns: u64::MAX,
+                account_number: None,
+            });
+        storage_borrow_mut(|storage| storage.write(stored)).expect("writing the anchor");
+    }
+
+    fn queued(anchor_number: AnchorNumber, browser_id: BrowserId) -> usize {
+        anchor(anchor_number).notifications(browser_id).len()
     }
 
     fn remove(anchor_number: AnchorNumber, browser_id: BrowserId) {
@@ -254,6 +296,46 @@ mod tests {
         let stored = stored_subscription(anchor_number, browsers[0]).expect("a subscription");
         assert_eq!(stored.endpoint, ROTATED);
         assert_eq!(stored.created_at_ns, 1_000);
+    }
+
+    #[test]
+    fn removing_a_registration_takes_its_browser_queue_with_it() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(2);
+        for browser in &browsers {
+            subscribe(anchor_number, *browser, ENDPOINT, 1_000);
+            queue_one(anchor_number, *browser);
+        }
+
+        remove(anchor_number, browsers[0]);
+
+        assert_eq!(queued(anchor_number, browsers[0]), 0);
+        assert_eq!(queued(anchor_number, browsers[1]), 1);
+    }
+
+    /// Wake-ups for what was queued went to the old endpoint, so none reach the new one.
+    #[test]
+    fn a_rotated_endpoint_leaves_the_old_browser_queue_behind() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+        subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
+        queue_one(anchor_number, browsers[0]);
+
+        subscribe(anchor_number, browsers[0], ROTATED, 2_000);
+
+        assert_eq!(queued(anchor_number, browsers[0]), 0);
+    }
+
+    #[test]
+    fn topping_up_the_pool_keeps_the_browser_queue() {
+        setup();
+        let (anchor_number, browsers) = anchor_with_browsers(1);
+        subscribe(anchor_number, browsers[0], ENDPOINT, 1_000);
+        queue_one(anchor_number, browsers[0]);
+
+        subscribe(anchor_number, browsers[0], ENDPOINT, 9_000);
+
+        assert_eq!(queued(anchor_number, browsers[0]), 1);
     }
 
     #[test]
