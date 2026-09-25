@@ -1048,6 +1048,7 @@ export const idlFactory = ({ IDL }) => {
     'id' : NotificationId,
     'origin' : FrontendHostname,
     'canister_id' : IDL.Principal,
+    'account_number' : IDL.Opt(AccountNumber),
   });
   const TakeNextNotificationError = IDL.Variant({
     'InvalidBrowserKey' : IDL.Null,

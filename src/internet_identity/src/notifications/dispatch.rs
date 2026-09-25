@@ -207,6 +207,7 @@ fn fan_out_to_browsers(
         sender: pending.sender,
         notification_id: pending.notification_id,
         expires_at_ns: taken.entry.expires_at_ns,
+        account_number: pending.account_number,
     };
     let ttl_seconds = queued.expires_at_ns.saturating_sub(now_ns) / SECOND_NS;
     storage_borrow_mut(|storage| {
@@ -421,6 +422,7 @@ mod tests {
                     recipient: Principal::from_slice(&anchor_number.to_be_bytes()),
                     anchor_number,
                     application_number: 1,
+                    account_number: Some(2),
                     sender: sender(),
                     notification_id,
                     urgency: Urgency::Normal,
@@ -616,6 +618,7 @@ mod tests {
                         sender: sender(),
                         notification_id,
                         expires_at_ns: 10 * SECOND_NS,
+                        account_number: Some(2),
                     }
                 }),
             )
@@ -669,6 +672,7 @@ mod tests {
                 sender: sender(),
                 notification_id: 7,
                 expires_at_ns: 10 * SECOND_NS,
+                account_number: Some(2),
             }
         );
     }

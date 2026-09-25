@@ -1913,10 +1913,11 @@ type TakeNextNotificationRequest = record {
     anchor_number : UserNumber;
 };
 
-// What a service worker shows for one wake-up: the app it came from, the canister
-// holding its content, and which notification.
+// What a service worker shows for one wake-up: the app and account it is for, the
+// canister holding its content, and which notification.
 type NotificationToShow = record {
     origin : FrontendHostname;
+    account_number : opt AccountNumber;   // null = the unreserved default account
     canister_id : principal;
     id : NotificationId;
 };

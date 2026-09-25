@@ -1197,11 +1197,13 @@ pub struct TakeNextNotificationRequest {
     pub anchor_number: AnchorNumber,
 }
 
-/// What a service worker shows for one wake-up: the app it came from, the canister
-/// holding its content, and which notification.
+/// What a service worker shows for one wake-up: the app and account it is for, the
+/// canister holding its content, and which notification.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct NotificationToShow {
     pub origin: FrontendHostname,
+    /// `None` is the unreserved default account.
+    pub account_number: Option<AccountNumber>,
     pub canister_id: Principal,
     pub id: NotificationId,
 }

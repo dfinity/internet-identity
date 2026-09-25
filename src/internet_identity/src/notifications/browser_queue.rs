@@ -112,6 +112,7 @@ pub(crate) fn take_next(
             if consented {
                 shown = Some(NotificationToShow {
                     origin,
+                    account_number: queued.account_number,
                     canister_id: queued.sender,
                     id: queued.notification_id,
                 });
@@ -138,6 +139,7 @@ mod tests {
             sender: Principal::from_slice(&[7; 10]),
             notification_id,
             expires_at_ns,
+            account_number: None,
         }
     }
 
@@ -261,10 +263,14 @@ mod tests {
     #[test]
     fn the_service_worker_takes_the_oldest_first() {
         let (anchor_number, browser_id) = signed_in();
+        let for_account = QueuedNotification {
+            account_number: Some(3),
+            ..from_app(7, 60 * SECOND_NS)
+        };
         enqueue(
             anchor_number,
             browser_id,
-            [from_app(7, 60 * SECOND_NS), from_app(8, 60 * SECOND_NS)],
+            [for_account, from_app(8, 60 * SECOND_NS)],
         );
 
         let first = take(anchor_number, browser_id, 2 * SECOND_NS).expect("nothing to take");
@@ -273,6 +279,7 @@ mod tests {
             first,
             NotificationToShow {
                 origin: ORIGIN.to_string(),
+                account_number: Some(3),
                 canister_id: Principal::from_slice(&[7; 10]),
                 id: 7,
             }
