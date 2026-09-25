@@ -2892,7 +2892,12 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: AnchorNumber,
         origin: &FrontendHostname,
     ) -> Principal {
-        let account = Account::new(anchor_number, origin.clone(), None, None);
+        self.account_principal_for_testing(&Account::new(anchor_number, origin.clone(), None, None))
+    }
+
+    /// The principal an app knows `account` by.
+    #[cfg(test)]
+    pub(crate) fn account_principal_for_testing(&self, account: &Account) -> Principal {
         let salt = self.salt().expect("the test storage has a salt");
         delegation::canister_sig_principal(
             canister_id(),

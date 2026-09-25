@@ -7,8 +7,8 @@ use crate::state::{self, storage_borrow};
 use crate::storage::storable::application::StorableOriginSha256;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, ApplicationNumber, FrontendHostname, NotAccepted, NotAcceptedReason,
-    Notification, SendNotificationResponse, Timestamp, Urgency,
+    AccountNumber, AnchorNumber, ApplicationNumber, FrontendHostname, NotAccepted,
+    NotAcceptedReason, Notification, SendNotificationResponse, Timestamp, Urgency,
 };
 use std::collections::BTreeMap;
 
@@ -24,10 +24,7 @@ pub fn submit(
     now_ns: Timestamp,
 ) -> SendNotificationResponse {
     let mut not_accepted = Vec::new();
-    let mut resolved: BTreeMap<
-        Principal,
-        Result<(AnchorNumber, ApplicationNumber), NotAcceptedReason>,
-    > = BTreeMap::new();
+    let mut resolved: BTreeMap<Principal, Result<Resolved, NotAcceptedReason>> = BTreeMap::new();
     let mut reachable = Vec::new();
 
     for Notification {
@@ -42,10 +39,15 @@ pub fn submit(
             .or_insert_with(|| resolve_recipient(recipient, &origin, now_ns))
             .clone();
         match resolution {
-            Ok((anchor_number, application_number)) => reachable.push(PendingNotification {
+            Ok(Resolved {
+                anchor_number,
+                application_number,
+                account_number,
+            }) => reachable.push(PendingNotification {
                 recipient,
                 anchor_number,
                 application_number,
+                account_number,
                 sender,
                 notification_id: id,
                 urgency: urgency.unwrap_or(Urgency::Normal),
@@ -88,15 +90,22 @@ pub fn submit(
     SendNotificationResponse { not_accepted }
 }
 
-/// The identity a principal names at `origin`, and II's number for the app. No such
-/// recipient when it names none
+/// Where a recipient principal points: its identity, the app, and its account there.
+#[derive(Clone)]
+struct Resolved {
+    anchor_number: AnchorNumber,
+    application_number: ApplicationNumber,
+    account_number: Option<AccountNumber>,
+}
+
+/// What a principal names at `origin`. No such recipient when it names none
 /// there, or when none of its browsers was used within [`BROWSER_GONE_AFTER_NS`]. No
 /// channel when it has not allowed the app, or no browser can be woken now.
 fn resolve_recipient(
     recipient: Principal,
     origin: &FrontendHostname,
     now_ns: Timestamp,
-) -> Result<(AnchorNumber, ApplicationNumber), NotAcceptedReason> {
+) -> Result<Resolved, NotAcceptedReason> {
     storage_borrow(|storage| {
         let account = storage
             .lookup_account_with_principal(recipient)
@@ -127,7 +136,11 @@ fn resolve_recipient(
         {
             return Err(NotAcceptedReason::NoChannel);
         }
-        Ok((account.anchor_number, application_number))
+        Ok(Resolved {
+            anchor_number: account.anchor_number,
+            application_number,
+            account_number: account.account_number,
+        })
     })
 }
 
@@ -241,11 +254,47 @@ mod tests {
                     storage.lookup_application_number_with_origin(&APP.to_string())
                 })
                 .expect("signing in stores the application"),
+                account_number: None,
                 sender: sender(),
                 notification_id: 7,
                 urgency: Urgency::Normal,
                 expires_at_ns: None,
             }]
+        );
+    }
+
+    #[test]
+    fn a_notification_for_a_named_account_is_queued_for_that_account() {
+        setup();
+        let recipient = reachable();
+        let (account_number, principal) = storage_borrow_mut(|storage| {
+            let account = storage
+                .create_account(
+                    recipient.anchor_number,
+                    APP.to_string(),
+                    "Work".to_string(),
+                    NOW_NS,
+                )
+                .expect("creating an account");
+            (
+                account.account_number,
+                storage.account_principal_for_testing(&account),
+            )
+        });
+        let named = Recipient {
+            anchor_number: recipient.anchor_number,
+            principal,
+        };
+
+        assert_eq!(send(vec![notification(&named, 7)], NOW_NS), vec![]);
+
+        assert!(account_number.is_some());
+        assert_eq!(
+            queued(NOW_NS)
+                .iter()
+                .map(|pending| pending.account_number)
+                .collect::<Vec<_>>(),
+            vec![account_number]
         );
     }
 
