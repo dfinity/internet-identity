@@ -105,11 +105,25 @@ pub(crate) fn take_next(
     })
 }
 
-/// A failed post means no wake-up is coming, so one entry goes with it: its own if the
-/// service worker has not taken it, otherwise the oldest.
-pub(crate) fn remove_after_failed_wake_up(key: StorableBrowserNotificationKey) {
+/// A failed post means no wake-up is coming, so one entry goes with it: its own, or the
+/// oldest if a wake-up already took it. Nothing goes once it expired or the browser
+/// registered elsewhere, since the sweep or the new registration may have dropped it.
+pub(crate) fn remove_after_failed_wake_up(
+    key: StorableBrowserNotificationKey,
+    expires_at_ns: Timestamp,
+    endpoint: &str,
+    now_ns: Timestamp,
+) {
     storage_borrow_mut(|storage| {
-        if storage.remove_browser_notification(&key).is_some() {
+        if storage.remove_browser_notification(&key).is_some() || expires_at_ns <= now_ns {
+            return;
+        }
+        let still_registered = storage.read(key.anchor_number).is_ok_and(|anchor| {
+            anchor
+                .webpush_subscription(key.browser_id)
+                .is_some_and(|registered| registered.endpoint == endpoint)
+        });
+        if !still_registered {
             return;
         }
         if let Some((oldest, _)) = storage
@@ -121,7 +135,7 @@ pub(crate) fn remove_after_failed_wake_up(key: StorableBrowserNotificationKey) {
     });
 }
 
-/// Drop a browser's whole queue, for a registration its relay no longer holds.
+/// Drop a browser's whole queue, for a registration that changed or went.
 pub(crate) fn clear(anchor_number: AnchorNumber, browser_id: BrowserId) {
     storage_borrow_mut(|storage| {
         for (key, _) in storage.browser_notifications(anchor_number, browser_id, MAX_PER_BROWSER) {
@@ -228,21 +242,14 @@ mod tests {
         crate::notifications::test_setup();
         let added = add_all(BROWSER, [1, 2]);
 
-        remove_after_failed_wake_up(key_of(added[1]));
+        remove_after_failed_wake_up(
+            key_of(added[1]),
+            60 * SECOND_NS,
+            "https://relay.example/a",
+            SECOND_NS,
+        );
 
         assert_eq!(queued(BROWSER), vec![1]);
-    }
-
-    #[test]
-    fn a_failed_wake_up_whose_entry_is_gone_removes_the_oldest() {
-        crate::notifications::test_setup();
-        let added = add_all(BROWSER, [1, 2, 3]);
-        let first = key_of(added[0]);
-        storage_borrow_mut(|storage| storage.remove_browser_notification(&first));
-
-        remove_after_failed_wake_up(first);
-
-        assert_eq!(queued(BROWSER), vec![3]);
     }
 
     #[test]

@@ -7,7 +7,7 @@
 use crate::notifications::admission_queue::Taken;
 use crate::notifications::backlog::PendingNotification;
 use crate::notifications::browser_queue::{self, Added};
-use crate::notifications::webpush::{clear_subscription, vapid_jwt};
+use crate::notifications::webpush::{clear_gone_subscription, vapid_jwt};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow};
 use crate::storage::storable::application::StorableOriginSha256;
@@ -25,6 +25,9 @@ pub(crate) const INTERVAL: Duration = Duration::from_secs(1);
 
 /// Wake-ups one pass posts. Only a pass's last recipient may take it over.
 pub(crate) const MAX_POSTS_PER_PASS: usize = 65;
+
+/// Notifications one pass takes, however few wake-ups they turn into.
+pub(crate) const MAX_TAKEN_PER_PASS: usize = 200;
 
 /// What became of one wake-up post.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -100,6 +103,7 @@ pub(crate) struct Delivery {
     pub(crate) vapid_public_key: Vec<u8>,
     pub(crate) jwt: String,
     pub(crate) urgency: Urgency,
+    pub(crate) expires_at_ns: Timestamp,
     /// Relay retention time, capped by the notification's remaining lifetime.
     pub(crate) ttl_seconds: u64,
 }
@@ -154,7 +158,8 @@ fn run_pass(now_ns: Timestamp) {
 }
 
 /// Take notifications in backlog order and queue each for its recipient's browsers,
-/// returning the wake-ups to post. Taken one at a time, so a pass stops at its budget.
+/// returning the wake-ups to post. Taken one at a time, so a pass stops at its budget,
+/// and never more than [`MAX_TAKEN_PER_PASS`], so ones that wake nothing cannot run on.
 pub(crate) fn plan_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Delivery> {
     if !notifications_enabled() {
         return Vec::new();
@@ -162,7 +167,10 @@ pub(crate) fn plan_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Delivery> {
     browser_queue::discard_expired(now_ns);
 
     let mut deliveries = Vec::new();
-    while deliveries.len() < max_posts {
+    for _ in 0..MAX_TAKEN_PER_PASS {
+        if deliveries.len() >= max_posts {
+            break;
+        }
         let taken = state::notification_backlog_mut(now_ns, |backlog| {
             backlog.take_batch(1, now_ns, |batch| Ok::<_, Infallible>(batch.to_vec()))
         })
@@ -218,6 +226,7 @@ fn fan_out_to_browsers(
             vapid_public_key: subscription.vapid_public_key.clone(),
             jwt,
             urgency: notification.urgency.clone(),
+            expires_at_ns,
             ttl_seconds,
         });
     }
@@ -226,7 +235,7 @@ fn fan_out_to_browsers(
 /// Count the outcome and keep the browser's queue in step with the wake-ups on their
 /// way: a relay that lost the subscription takes the registration and the queue with
 /// it, and any other failure removes an entry, since no wake-up is coming for it.
-pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
+pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestamp) {
     record_post_outcome(outcome);
     let StorableBrowserNotificationKey {
         anchor_number,
@@ -236,13 +245,18 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome) {
     match outcome {
         PostOutcome::Sent => {}
         PostOutcome::Gone => {
-            if let Err(err) = clear_subscription(anchor_number, browser_id) {
+            if let Err(err) = clear_gone_subscription(anchor_number, browser_id, &delivery.endpoint)
+            {
                 ic_cdk::println!("Failed to drop a push registration the relay called gone: {err}");
             }
-            browser_queue::clear(anchor_number, browser_id);
         }
         PostOutcome::RateLimited | PostOutcome::RelayError | PostOutcome::Rejected => {
-            browser_queue::remove_after_failed_wake_up(delivery.entry);
+            browser_queue::remove_after_failed_wake_up(
+                delivery.entry,
+                delivery.expires_at_ns,
+                &delivery.endpoint,
+                now_ns,
+            );
         }
     }
 }
@@ -317,7 +331,7 @@ mod outcalls {
     pub(super) fn spawn_post(delivery: Delivery) {
         ic_cdk::spawn(async move {
             let outcome = post_wake_up(&delivery).await;
-            settle(&delivery, outcome);
+            settle(&delivery, outcome, ic_cdk::api::time());
         });
     }
 
@@ -355,15 +369,18 @@ mod outcalls {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::notifications::backlog::NOTIFICATION_BACKLOG;
     use crate::notifications::webpush::fixtures::{
         anchor_with_browsers, setup, stored_subscription, subscribe,
     };
+    use crate::state::storage_borrow_mut;
     use candid::Principal;
     use internet_identity_interface::internet_identity::types::{AnchorNumber, BrowserId};
     use pretty_assertions::assert_eq;
 
     const APP: &str = "https://app.example";
     const RELAY: &str = "https://relay.example/wpush/abc";
+    const ROTATED: &str = "https://relay.example/wpush/def";
 
     fn submit(anchor_number: AnchorNumber, notification_id: u64, expires_at_ns: Timestamp) {
         state::notification_backlog_mut(0, |backlog| {
@@ -393,6 +410,16 @@ mod tests {
                 .map(|(_, entry)| entry.notification_id)
                 .collect()
         })
+    }
+
+    /// What the service worker does on a wake-up.
+    fn take_oldest(anchor_number: AnchorNumber, browser_id: BrowserId) {
+        storage_borrow_mut(|storage| {
+            let (oldest, _) = storage
+                .browser_notifications(anchor_number, browser_id, 1)
+                .remove(0);
+            storage.remove_browser_notification(&oldest);
+        });
     }
 
     /// An identity with `count` browsers, every one registered with the relay.
@@ -499,6 +526,26 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_pass_stops_taking_at_its_bound_when_nothing_is_woken() {
+        setup();
+        let per_recipient = NOTIFICATION_BACKLOG.max_pending_per_group as u64;
+        let recipients = MAX_TAKEN_PER_PASS as u64 / per_recipient + 1;
+        for _ in 0..recipients {
+            let (recipient, _) = anchor_with_browsers(1);
+            for notification_id in 0..per_recipient {
+                submit(recipient, notification_id, 10 * SECOND_NS);
+            }
+        }
+
+        assert!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).is_empty());
+
+        assert_eq!(
+            still_in_backlog(SECOND_NS) as u64,
+            recipients * per_recipient - MAX_TAKEN_PER_PASS as u64
+        );
+    }
+
     /// Otherwise a recipient with more browsers than the budget left is split across
     /// passes, and one with more than the whole budget is never served.
     #[test]
@@ -593,7 +640,7 @@ mod tests {
         submit(recipient, 7, 10 * SECOND_NS);
         let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
 
-        settle(&delivery, PostOutcome::Sent);
+        settle(&delivery, PostOutcome::Sent, SECOND_NS);
 
         assert_eq!(queued(recipient, browsers[0]), vec![7]);
     }
@@ -611,7 +658,7 @@ mod tests {
             submit(recipient, 8, 10 * SECOND_NS);
             let deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
 
-            settle(&deliveries[1], outcome);
+            settle(&deliveries[1], outcome, SECOND_NS);
 
             assert_eq!(queued(recipient, browsers[0]), vec![7], "{outcome:?}");
             assert!(stored_subscription(recipient, browsers[0]).is_some());
@@ -625,12 +672,72 @@ mod tests {
         submit(recipient, 7, 10 * SECOND_NS);
         let deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
 
-        settle(&deliveries[0], PostOutcome::Gone);
+        settle(&deliveries[0], PostOutcome::Gone, SECOND_NS);
 
         assert!(stored_subscription(recipient, browsers[0]).is_none());
         assert!(queued(recipient, browsers[0]).is_empty());
         assert!(stored_subscription(recipient, browsers[1]).is_some());
         assert_eq!(queued(recipient, browsers[1]), vec![7]);
+    }
+
+    #[test]
+    fn a_late_gone_for_an_old_endpoint_leaves_the_new_registration() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
+        subscribe(recipient, browsers[0], ROTATED, SECOND_NS);
+
+        settle(&delivery, PostOutcome::Gone, SECOND_NS);
+
+        assert_eq!(
+            stored_subscription(recipient, browsers[0]).map(|registered| registered.endpoint),
+            Some(ROTATED.to_string())
+        );
+    }
+
+    #[test]
+    fn a_failed_wake_up_whose_entry_was_taken_removes_the_oldest() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        for notification_id in [7, 8, 9] {
+            submit(recipient, notification_id, 10 * SECOND_NS);
+        }
+        let deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+        take_oldest(recipient, browsers[0]);
+
+        settle(&deliveries[0], PostOutcome::RelayError, SECOND_NS);
+
+        assert_eq!(queued(recipient, browsers[0]), vec![9]);
+    }
+
+    #[test]
+    fn a_failed_wake_up_past_its_deadline_removes_nothing_more() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        submit(recipient, 8, 20 * SECOND_NS);
+        let deliveries = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+        take_oldest(recipient, browsers[0]);
+
+        settle(&deliveries[0], PostOutcome::RelayError, 10 * SECOND_NS);
+
+        assert_eq!(queued(recipient, browsers[0]), vec![8]);
+    }
+
+    #[test]
+    fn a_failed_wake_up_for_an_old_endpoint_removes_nothing_from_the_new_one() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        let delivery = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).remove(0);
+        subscribe(recipient, browsers[0], ROTATED, SECOND_NS);
+        submit(recipient, 8, 10 * SECOND_NS);
+        plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+
+        settle(&delivery, PostOutcome::RelayError, SECOND_NS);
+
+        assert_eq!(queued(recipient, browsers[0]), vec![8]);
     }
 
     #[test]
