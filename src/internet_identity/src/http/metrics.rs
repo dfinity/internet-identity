@@ -126,6 +126,16 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "Number of active signatures issued by this canister.",
         )
     })?;
+    let posts = crate::notifications::dispatch::post_outcomes();
+    w.counter_vec(
+        "internet_identity_notification_wake_ups",
+        "Wake-up posts to push relays since the last upgrade, by outcome.",
+    )?
+    .value(&[("outcome", "sent")], posts.sent as f64)?
+    .value(&[("outcome", "gone")], posts.gone as f64)?
+    .value(&[("outcome", "rate_limited")], posts.rate_limited as f64)?
+    .value(&[("outcome", "relay_error")], posts.relay_error as f64)?
+    .value(&[("outcome", "rejected")], posts.rejected as f64)?;
     w.encode_gauge(
         "internet_identity_stable_memory_pages",
         stable_size() as f64,

@@ -1,3 +1,4 @@
+use crate::storage::storable::notifications::browser_queue::StorableQueuedNotification;
 use crate::storage::storable::notifications::webpush::jwt_pool::StorableWebPushJwtPool;
 use crate::storage::storable::timestamp::StorableTimestamp;
 use minicbor::{Decode, Encode};
@@ -25,4 +26,8 @@ pub struct StorableWebPushSubscription {
     pub vapid_public_key: Vec<u8>,
     #[n(3)]
     pub jwt_pool: StorableWebPushJwtPool,
+    /// What the service worker has yet to show, oldest first. Each was woken through
+    /// this registration, so a new one starts empty.
+    #[n(4)]
+    pub notifications: Option<Vec<StorableQueuedNotification>>,
 }

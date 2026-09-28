@@ -1,5 +1,4 @@
-//! Shared fixtures for the Web Push tests, used from the test modules in both
-//! `subscription.rs` and `validation.rs`.
+//! Shared Web Push registration and dispatch test fixtures.
 
 use super::validation::{ValidatedSetWebPushSubscriptionRequest, JWT_SIG_LEN};
 use crate::state::{storage_borrow, storage_borrow_mut};
@@ -11,7 +10,7 @@ use internet_identity_interface::internet_identity::types::{
 use serde_bytes::ByteBuf;
 
 /// One anchor with `count` browsers on it, as sign-ins leave them.
-pub(super) fn anchor_with_browsers(count: u8) -> (AnchorNumber, Vec<BrowserId>) {
+pub(crate) fn anchor_with_browsers(count: u8) -> (AnchorNumber, Vec<BrowserId>) {
     storage_borrow_mut(|storage| {
         let mut anchor = storage
             .allocate_anchor(0)
@@ -45,14 +44,14 @@ fn chrome_on_a_mac() -> BrowserDescription {
 
 /// An empty store on a deployment that notifies, which is the only state a Web Push
 /// request validates in.
-pub(super) fn setup() {
+pub(crate) fn setup() {
     crate::notifications::test_setup();
     crate::state::persistent_state_mut(|s| {
         s.notifications_enabled_origins = Some(vec!["https://app.example".to_string()]);
     });
 }
 
-pub(super) fn anchor(anchor_number: AnchorNumber) -> Anchor {
+pub(crate) fn anchor(anchor_number: AnchorNumber) -> Anchor {
     storage_borrow(|storage| storage.read(anchor_number)).expect("reading the test anchor")
 }
 
@@ -112,7 +111,7 @@ pub(super) fn try_subscribe(
     )
 }
 
-pub(super) fn subscribe(
+pub(crate) fn subscribe(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
     endpoint: &str,
@@ -121,7 +120,7 @@ pub(super) fn subscribe(
     try_subscribe(anchor_number, browser_id, endpoint, now_ns).expect("writing a subscription");
 }
 
-pub(super) fn stored_subscription(
+pub(crate) fn stored_subscription(
     anchor_number: AnchorNumber,
     browser_id: BrowserId,
 ) -> Option<WebPushSubscription> {

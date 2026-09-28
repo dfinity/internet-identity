@@ -4,10 +4,11 @@
 #![allow(dead_code)]
 
 use super::admission_queue::{AdmissionQueue, QueueConfig, QueueItem, RetryPolicy};
+use super::dispatch;
 use crate::storage::storable::application::StorableOriginSha256;
 use candid::Principal;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, NotificationId, Timestamp, Urgency,
+    AccountNumber, AnchorNumber, ApplicationNumber, NotificationId, Timestamp, Urgency,
 };
 
 /// One device wake-up request per notification, without notification content.
@@ -17,6 +18,12 @@ pub(crate) struct PendingNotification {
     pub(crate) recipient: Principal,
     /// The identity behind `recipient`, whose browsers are woken.
     pub(crate) anchor_number: AnchorNumber,
+    /// II's number for the app's origin, which the service worker is told.
+    pub(crate) application_number: ApplicationNumber,
+    /// The account at the app `recipient` is. `None` is the unreserved default account.
+    pub(crate) account_number: Option<AccountNumber>,
+    /// The app canister that sent it, which the service worker fetches it from.
+    pub(crate) sender: Principal,
     /// App-chosen ID, unique per recipient within the app.
     pub(crate) notification_id: NotificationId,
     pub(crate) urgency: Urgency,
@@ -62,13 +69,23 @@ pub(crate) type NotificationBacklog = AdmissionQueue<StorableOriginSha256, Pendi
 
 const SECOND_NS: u64 = 1_000_000_000;
 const MINUTE_NS: u64 = 60 * SECOND_NS;
+const EXPIRY_NS: u64 = 5 * MINUTE_NS;
+
+/// Browsers the sizing assumes each recipient has registered.
+const BROWSERS_PER_RECIPIENT: usize = 2;
+
+/// Notifications the dispatcher drains within one expiry window, so nothing admitted
+/// outlasts it while recipients keep to [`BROWSERS_PER_RECIPIENT`].
+const DRAINED_PER_EXPIRY: usize = dispatch::MAX_POSTS_PER_PASS
+    * (EXPIRY_NS / dispatch::INTERVAL.as_nanos() as u64) as usize
+    / BROWSERS_PER_RECIPIENT;
 
 pub(crate) const NOTIFICATION_BACKLOG: QueueConfig = QueueConfig {
-    max_entries: 10_000,
-    max_entries_per_sender: 7_000,
+    max_entries: DRAINED_PER_EXPIRY,
+    max_entries_per_sender: DRAINED_PER_EXPIRY * 7 / 10,
     max_pending_per_group: 20,
-    pressure_cleared_below: 8_000,
-    discard_entries_after_ns: 5 * MINUTE_NS,
+    pressure_cleared_below: DRAINED_PER_EXPIRY * 8 / 10,
+    discard_entries_after_ns: EXPIRY_NS,
     max_lifetime_ns: 15 * MINUTE_NS,
     retry: RetryPolicy {
         base_ns: 5 * SECOND_NS,
@@ -114,6 +131,9 @@ mod tests {
         PendingNotification {
             recipient: principal(anchor_number),
             anchor_number,
+            application_number: 1,
+            account_number: None,
+            sender: principal(u64::MAX),
             notification_id,
             urgency: Urgency::Normal,
             expires_at_ns: None,

@@ -135,6 +135,7 @@ fn ii_canister_serves_http_metrics() -> Result<(), RejectResponse> {
         "internet_identity_doh_cache_in_flight",
         "internet_identity_doh_cache_max_entries",
         "internet_identity_doh_cache_inconsistencies",
+        r#"internet_identity_notification_wake_ups{outcome="sent"}"#,
     ];
     let env = env();
     env.advance_time(Duration::from_secs(300)); // Advance time to see it reflected on the metrics endpoint
