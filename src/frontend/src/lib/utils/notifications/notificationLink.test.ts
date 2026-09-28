@@ -27,6 +27,28 @@ describe("allowedLink", () => {
     ).toBe("https://app.ic0.app/chats/7");
   });
 
+  it("keeps a canister's link on the gateway domain it is served on", () => {
+    const canister = "vt36r-2qaaa-aaaad-aad5a-cai";
+    expect(
+      allowedLink({
+        url: `https://${canister}.icp0.io/#chat`,
+        // The origin a notification carries has been remapped onto ic0.app.
+        origin: `https://${canister}.ic0.app`,
+        alternativeOrigins: [],
+      }),
+    ).toBe(`https://${canister}.icp0.io/#chat`);
+  });
+
+  it("replaces another canister's link with the app itself", () => {
+    expect(
+      allowedLink({
+        url: "https://un4fu-tqaaa-aaaab-qadjq-cai.icp0.io/#chat",
+        origin: "https://vt36r-2qaaa-aaaad-aad5a-cai.ic0.app",
+        alternativeOrigins: [],
+      }),
+    ).toBe("https://vt36r-2qaaa-aaaad-aad5a-cai.ic0.app");
+  });
+
   it("replaces a link the app does not vouch for with the app itself", () => {
     expect(
       allowedLink({

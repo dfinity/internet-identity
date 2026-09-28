@@ -6,7 +6,13 @@
  * its own in `/.well-known/ii-alternative-origins`. Anything else — and anything
  * missing or unparsable — becomes the sending origin itself, so acting on a
  * notification always lands on the app and never anywhere the app did not vouch for.
+ *
+ * The origin that sent it has been remapped onto `ic0.app`, and an app names its link
+ * on the domain it is actually served on, so both sides of that check are remapped the
+ * same way. What opens is the app's link as it wrote it.
  */
+
+import { remapToLegacyDomain } from "$lib/utils/urlUtils";
 
 const ALTERNATIVE_ORIGINS_PATH = "/.well-known/ii-alternative-origins";
 
@@ -34,8 +40,10 @@ export const allowedLink = ({
   } catch {
     return origin;
   }
-  const vouched = [origin, ...alternativeOrigins];
-  return vouched.includes(named.origin) ? named.toString() : origin;
+  const vouched = [origin, ...alternativeOrigins].map(remapToLegacyDomain);
+  return vouched.includes(remapToLegacyDomain(named.origin))
+    ? named.toString()
+    : origin;
 };
 
 /** The origins an app publishes as its own, or none where it publishes nothing we can
