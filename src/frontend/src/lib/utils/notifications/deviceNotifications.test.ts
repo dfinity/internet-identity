@@ -99,14 +99,28 @@ describe("reconcileDeviceNotifications", () => {
   });
 
   /**
-   * The pool is spent by elapsed time, not by use, so its length never changes and a
-   * count of unused signatures cannot say whether a top-up is due.
+   * Topping up a pool that is running out belongs to the service worker, which does it
+   * on every wake-up and reaches a browser whose user does not come back here.
    */
-  it("refreshes a pool that has nearly elapsed, though it is still full length", async () => {
+  it("leaves a pool that is merely running out to the service worker", async () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
     vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
     a.get_webpush_subscription_status.mockResolvedValue(pool(25));
+    await run(a);
+    expect(registerStoredDevice).not.toHaveBeenCalled();
+    expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A pool with nothing left is this page's to fix: the canister cannot wake a browser
+   * whose pool is spent, so the worker would never get the chance to sign another.
+   */
+  it("registers again where the pool has run out", async () => {
+    vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
+    vi.mocked(loadVapidKey).mockResolvedValue(key());
+    const a = actor();
+    a.get_webpush_subscription_status.mockResolvedValue(pool(30));
     await run(a);
     expect(registerStoredDevice).toHaveBeenCalledOnce();
     expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
