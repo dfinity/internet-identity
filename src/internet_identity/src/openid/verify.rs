@@ -194,10 +194,9 @@ pub(super) fn verify_and_build(
         .verify(&JwsVerifierFn::from(verify_signature), cert)
         .map_err(|_| OpenIDJWTVerificationError::GenericError("Invalid signature".to_string()))?;
 
-    // Destructure the verified claims. `aud` is intentionally dropped: it was
-    // only weakly checked (`AudClaim::matches` accepts a single value or any
-    // member of an array), so the canonical `descriptor.client_id` is stored on
-    // the credential instead. `nonce` / `exp` / `iat` were consumed by
+    // Destructure the verified claims. `aud` is intentionally dropped: it may be
+    // encoded as a string or an array, so the canonical `descriptor.client_id`
+    // is stored on the credential instead. `nonce` / `exp` / `iat` were consumed by
     // `verify_claims` and aren't persisted.
     let Claims {
         iss,

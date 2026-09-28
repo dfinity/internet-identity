@@ -270,9 +270,8 @@ struct PartialClaims {
     aud: AudClaim,
 }
 
-/// JWT `aud` claim — per RFC 7519 may be a single string or an array of strings
-/// (Microsoft sometimes ships it as an array). Matching treats an array as a
-/// set: any element equal to the provider's configured client id is accepted.
+/// JWT `aud` claim — per RFC 7519 may be a single string or an array of strings.
+/// It matches only when the client id is the sole audience, as either encoding.
 #[derive(Deserialize, Clone)]
 #[serde(untagged)]
 pub(super) enum AudClaim {
@@ -290,11 +289,11 @@ impl Display for AudClaim {
 }
 
 impl AudClaim {
-    /// Returns `true` if `expected` is the single value or contained in the array.
+    /// Returns `true` if `expected` is the single value or the array's only element.
     pub(super) fn matches(&self, expected: &str) -> bool {
         match self {
             AudClaim::Single(s) => s == expected,
-            AudClaim::Multiple(v) => v.iter().any(|s| s == expected),
+            AudClaim::Multiple(v) => matches!(v.as_slice(), [only] if only == expected),
         }
     }
 
@@ -606,6 +605,20 @@ mod tests {
             143, 79, 158, 224, 218, 125, 157, 169, 98, 43, 205, 227, 243, 123, 173, 255, 132, 83,
             81, 139, 161, 18, 224, 243, 4, 129, 26, 123, 229, 242, 200, 189,
         ]
+    }
+
+    #[test]
+    fn aud_claim_matches_only_a_sole_audience() {
+        let single = |s: &str| AudClaim::Single(s.to_string());
+        let multiple = |v: &[&str]| AudClaim::Multiple(v.iter().map(|s| s.to_string()).collect());
+
+        assert!(single(TEST_AUD).matches(TEST_AUD));
+        assert!(multiple(&[TEST_AUD]).matches(TEST_AUD));
+        assert!(!single("other").matches(TEST_AUD));
+        assert!(!multiple(&[]).matches(TEST_AUD));
+        assert!(!multiple(&["other"]).matches(TEST_AUD));
+        assert!(!multiple(&[TEST_AUD, "other"]).matches(TEST_AUD));
+        assert!(!multiple(&["other", TEST_AUD]).matches(TEST_AUD));
     }
 
     #[test]
