@@ -14,10 +14,10 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { throwCanisterError } from "$lib/utils/utils";
-import { relayOriginOf } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
 import {
   JWT_POOL_REFRESH_THRESHOLD,
+  relayOriginOf,
   signJwtPool,
   windowsRemaining,
 } from "./vapidPool";

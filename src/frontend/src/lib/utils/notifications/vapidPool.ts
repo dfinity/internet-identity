@@ -11,6 +11,10 @@ const HEADER_B64 = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9"; // {"typ":"JWT","alg"
 // payload, so a mismatch makes every signature fail at the relay.
 const VAPID_SUBJECT = "https://id.ai";
 
+/** `scheme://host[:port]` of a relay endpoint — the JWT `aud` the pool signs for. */
+export const relayOriginOf = (endpoint: string): string =>
+  new URL(endpoint).origin;
+
 /** One JWT per window; matches the canister's MAX_JWT_POOL_LEN (~30 days). */
 export const JWT_POOL_SIZE = 30;
 

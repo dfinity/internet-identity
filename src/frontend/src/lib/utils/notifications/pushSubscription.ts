@@ -68,6 +68,6 @@ export const currentDeviceSubscription = async (): Promise<
   return (await registration?.pushManager.getSubscription()) ?? undefined;
 };
 
-/** `scheme://host[:port]` of a relay endpoint — the JWT `aud` the pool signs for. */
-export const relayOriginOf = (endpoint: string): string =>
-  new URL(endpoint).origin;
+// Defined in `vapidPool`, where the claim it fills is, and re-exported here for the
+// callers that reach it through this module.
+export { relayOriginOf } from "./vapidPool";

@@ -28,6 +28,13 @@ jobs:
         run: npm run lint
       - name: Check formatting
         run: npm run format-check
+      # The worker bundle is loaded the way a worker loads it, with no document: an
+      # import that reaches page-only code throws at worker startup, where the only
+      # symptom is a push that shows nothing.
+      - name: Build the frontend
+        run: npm run build
+      - name: Check the service worker loads in a worker
+        run: node scripts/check-service-worker dist/service-worker.js
       - uses: ./.github/actions/setup-didc
       - name: Generate type interfaces
         run: npm run generate

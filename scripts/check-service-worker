@@ -1,0 +1,60 @@
+#!/usr/bin/env node
+// The service worker runs without a document. An import that reaches page-only code —
+// the canister id read off a script tag, an error template, a Svelte component — makes
+// the bundle throw `document is not defined` the moment the worker starts, and the
+// only symptom is a push that shows nothing.
+//
+// Source-level checks do not see it: the offending access is inside a function body,
+// and what breaks is module initialisation in the *bundled* worker. So this loads the
+// built bundle the way a worker does, with a worker's globals and no document, and
+// fails if that throws.
+//
+// Usage: node scripts/check-service-worker [path/to/service-worker.js]
+
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
+import { access } from "node:fs/promises";
+
+const bundle = resolve(process.argv[2] ?? "dist/service-worker.js");
+
+try {
+  await access(bundle);
+} catch {
+  console.error(`No service worker bundle at ${bundle} — build the frontend first.`);
+  process.exit(1);
+}
+
+// What a worker has in place of a window: listeners, a registration, a location.
+const location = {
+  search: "?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai",
+  hostname: "id.ai",
+  host: "id.ai",
+  protocol: "https:",
+  origin: "https://id.ai",
+  href: "https://id.ai/service-worker.js",
+};
+Object.assign(globalThis, {
+  self: {
+    addEventListener: () => undefined,
+    skipWaiting: () => undefined,
+    registration: {},
+    clients: {},
+    origin: location.origin,
+    location,
+  },
+  location,
+});
+
+try {
+  await import(pathToFileURL(bundle).href);
+} catch (error) {
+  console.error(
+    `The service worker bundle at ${bundle} does not load in a worker:\n  ${error instanceof Error ? error.message : String(error)}`,
+  );
+  console.error(
+    "Something it imports reaches page-only code. Import it from a module that does not.",
+  );
+  process.exit(1);
+}
+
+console.log(`${bundle} loads with no document.`);
