@@ -28,6 +28,7 @@ const OpenIdEmailVerificationIDL = IDL.Variant({
 
 const backendCanisterConfigIDL = IDL.Record({
   mcp_official_url: IDL.Opt(IDL.Text),
+  notifications_enabled: IDL.Opt(IDL.Bool),
   openid_configs: IDL.Opt(
     IDL.Vec(
       IDL.Record({
@@ -64,7 +65,15 @@ export interface OpenIdConfig {
 export type BackendCanisterConfig = {
   openid_configs: [] | [OpenIdConfig[]];
   mcp_official_url: [] | [string];
+  /** Whether the backend has any app enabled for notifications. Absent from a
+   *  canister older than the field. */
+  notifications_enabled: [] | [boolean];
 };
+
+/** Whether this deployment's backend notifies for any app at all. Its endpoints refuse
+ *  every notification call otherwise, so there is nothing for the frontend to offer. */
+export const notificationsEnabled = (): boolean =>
+  backendCanisterConfig?.notifications_enabled[0] === true;
 
 export let canisterId: Principal;
 export let frontendCanisterConfig: InternetIdentityFrontendInit;

@@ -1,6 +1,10 @@
 import { writable, type Writable } from "svelte/store";
 import { FeatureFlag } from "$lib/utils/featureFlags";
-import { getConfiguredFeatureFlag, getPrimaryOrigin } from "$lib/globals";
+import {
+  getConfiguredFeatureFlag,
+  getPrimaryOrigin,
+  notificationsEnabled,
+} from "$lib/globals";
 
 declare global {
   interface Window {
@@ -173,11 +177,18 @@ export const EMAIL_RECOVERY_SETUP = createFeatureFlagStore(
 /// field, regardless of agent language.
 export const READ_ONLY_MODE = createFeatureFlagStore("READ_ONLY_MODE", false);
 
-// Web Push. Needs the canister's own `notifications_enabled` install argument on too,
-// or every notification endpoint refuses.
+// Web Push. Follows the backend: it refuses every notification endpoint unless an
+// origin is enabled for it, and offering the feature against a backend that refuses it
+// is worse than not offering it. A value set by hand still wins, so a deployment that
+// notifies can be tested with the feature off and the other way round.
 export const PUSH_NOTIFICATIONS = createFeatureFlagStore(
   "PUSH_NOTIFICATIONS",
   false,
+  (featureFlag) => {
+    if (notificationsEnabled()) {
+      featureFlag.temporaryOverride(true);
+    }
+  },
 );
 
 export default {

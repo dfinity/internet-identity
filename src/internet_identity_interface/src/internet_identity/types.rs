@@ -358,6 +358,10 @@ pub struct InternetIdentityFrontendArgs {
 pub struct InternetIdentitySynchronizedConfig {
     pub openid_configs: Option<Vec<OpenIdConfig>>,
     pub mcp_official_url: Option<String>,
+    /// Whether this deployment notifies for any app. The canister refuses every
+    /// notification endpoint unless an origin is enabled for it, so the frontend has
+    /// no business offering the feature where this is false.
+    pub notifications_enabled: Option<bool>,
 }
 
 /// Init arguments of II which can be supplied on install and upgrade.
