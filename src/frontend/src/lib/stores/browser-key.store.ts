@@ -1,4 +1,9 @@
-import { createStore, get as idbGet, set as idbSet } from "idb-keyval";
+import {
+  createStore,
+  get as idbGet,
+  keys as idbKeys,
+  set as idbSet,
+} from "idb-keyval";
 import type { SignIdentity } from "@icp-sdk/core/agent";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import type { BrowserDescription } from "$lib/generated/internet_identity_types";
@@ -316,6 +321,27 @@ export const currentBrowserId = async (
  * recorded and the only slot it matches. `undefined` before any sign-in has completed,
  * when there is no entry to sign as.
  */
+/**
+ * The identities this browser holds a key for.
+ *
+ * A Web Push wake-up says nothing about which identity it is for, so the service
+ * worker asks after each of them.
+ */
+export const registeredIdentityNumbers = async (): Promise<bigint[]> => {
+  try {
+    const stored = await idbKeys(BROWSER_KEY_STORE);
+    return stored.flatMap((key) => {
+      try {
+        return [BigInt(String(key))];
+      } catch {
+        return [];
+      }
+    });
+  } catch {
+    return [];
+  }
+};
+
 export const browserKeyIdentity = async (
   identityNumber: bigint,
 ): Promise<SignIdentity | undefined> => {

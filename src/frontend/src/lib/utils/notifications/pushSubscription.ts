@@ -7,10 +7,15 @@
 // body to encrypt.
 
 import { bufFromBufLike } from "$lib/utils/utils";
+import { readCanisterId } from "$lib/utils/init";
 
 // SvelteKit bundles the worker here; it is registered on opt-in rather than on
 // every load (kit.serviceWorker.register is off).
-const SERVICE_WORKER_URL = "/service-worker.js";
+//
+// The canister id rides on the URL because a woken worker has no page to ask and no
+// document to read it from, and the registration keeps the URL it was made with.
+const serviceWorkerUrl = (): string =>
+  `/service-worker.js?canisterId=${encodeURIComponent(readCanisterId())}`;
 
 export const isPushSupported = (): boolean =>
   "serviceWorker" in navigator &&
@@ -23,7 +28,7 @@ export const requestNotificationPermission =
   (): Promise<NotificationPermission> => Notification.requestPermission();
 
 const registerServiceWorker = async (): Promise<ServiceWorkerRegistration> => {
-  await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
+  await navigator.serviceWorker.register(serviceWorkerUrl(), {
     type: "module",
   });
   return navigator.serviceWorker.ready;
