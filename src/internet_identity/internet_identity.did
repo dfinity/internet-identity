@@ -1907,6 +1907,47 @@ type NotificationDelegationError = variant {
     InternalCanisterError : text;
 };
 
+// ===== Notifications a browser has yet to show =====
+
+type GetNextNotificationRequest = record {
+    anchor_number : UserNumber;
+    // What this service worker is still showing, whose removal has not landed yet.
+    skip : vec NotificationToShow;
+};
+
+// What a service worker shows for one wake-up: the app and account it is for, the
+// canister holding its content, and which notification.
+type NotificationToShow = record {
+    origin : FrontendHostname;
+    account_number : opt AccountNumber;   // null = the unreserved default account
+    canister_id : principal;
+    id : NotificationId;
+};
+
+// Null once nothing is left to show.
+type GetNextNotificationResponse = record {
+    notification : opt NotificationToShow;
+};
+
+type GetNextNotificationError = variant {
+    // Also a caller that is no browser of the identity, or a skip list longer than a
+    // browser's queue.
+    InternalCanisterError : text;
+};
+
+type RemoveNotificationRequest = record {
+    anchor_number : UserNumber;
+    // As browser_get_next_notification returned it.
+    notification : NotificationToShow;
+};
+
+type RemoveNotificationResponse = record {};
+
+type RemoveNotificationError = variant {
+    // Also a caller that is no browser of the identity.
+    InternalCanisterError : text;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -2390,6 +2431,12 @@ service : (opt InternetIdentityInit) -> {
     // Authorized by the browser key the caller signs with.
     prepare_notification_delegation : (PrepareNotificationDelegationRequest) -> (variant { Ok : PrepareNotificationDelegationResponse; Err : NotificationDelegationError });
     get_notification_delegation : (GetNotificationDelegationRequest) -> (variant { Ok : GetNotificationDelegationResponse; Err : NotificationDelegationError }) query;
+
+    // Called by the service worker on a wake-up, signed with the browser key: the oldest
+    // notification its browser has yet to show, passing over the ones it skips.
+    browser_get_next_notification : (GetNextNotificationRequest) -> (variant { Ok : GetNextNotificationResponse; Err : GetNextNotificationError }) query;
+    // Called by the service worker for the one it shows, while it fetches the content.
+    browser_remove_notification : (RemoveNotificationRequest) -> (variant { Ok : RemoveNotificationResponse; Err : RemoveNotificationError });
 
     // Called by the browser itself, signed with the browser key it signs in with.
     set_webpush_subscription : (SetWebPushSubscriptionRequest) -> (variant { Ok; Err : SetWebPushSubscriptionError });

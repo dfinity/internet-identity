@@ -25,9 +25,10 @@ use internet_identity_interface::internet_identity::types::{
     Timestamp,
 };
 pub use validation::{
-    notifications_enabled, ValidatedGetNotificationDelegationRequest,
-    ValidatedNotificationConsentGrantedRequest, ValidatedNotificationGrantConsentRequest,
-    ValidatedNotificationRevokeConsentRequest, ValidatedPrepareNotificationDelegationRequest,
+    notifications_enabled, ValidatedGetNextNotificationRequest,
+    ValidatedGetNotificationDelegationRequest, ValidatedNotificationConsentGrantedRequest,
+    ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
+    ValidatedPrepareNotificationDelegationRequest, ValidatedRemoveNotificationRequest,
     ValidatedSendNotificationArg,
 };
 
@@ -65,8 +66,8 @@ pub fn grant_consent(
         .map_err(|err| NotificationGrantConsentError::InternalCanisterError(format!("{err}")))
 }
 
-/// Withdraws the origin's consent. Device subscriptions stay: they are shared across
-/// every consented app.
+/// Withdraws the origin's consent, and what it still has queued for the identity's
+/// browsers. Device subscriptions stay: they are shared across every consented app.
 pub fn revoke_consent(
     ValidatedNotificationRevokeConsentRequest {
         anchor_number,
@@ -78,6 +79,7 @@ pub fn revoke_consent(
     // Consent that cannot exist is already withdrawn, so an app the identity never
     // reached is nothing to report.
     let _ = write_consent(anchor_number, &origin, None, now_ns);
+    browser_queue::remove_app(anchor_number, &origin);
     Ok(())
 }
 
