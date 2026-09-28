@@ -58,6 +58,7 @@ mod tests {
             jwt_signatures: (0..windows).map(|window| vec![window as u8; 64]).collect(),
             jwt_issued_at_ns: issued_at_ns,
             notifications: Vec::new(),
+            woken_again_at_ns: None,
         }
     }
 

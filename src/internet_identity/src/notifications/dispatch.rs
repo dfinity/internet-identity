@@ -5,6 +5,7 @@
 use crate::notifications::admission_queue::Taken;
 use crate::notifications::backlog::PendingNotification;
 use crate::notifications::browser_queue::{self, Added};
+use crate::notifications::delegation::NOTIFICATION_DELEGATION_TTL_NS;
 use crate::notifications::webpush::{clear_gone_subscription, vapid_jwt};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow_mut};
@@ -268,19 +269,46 @@ fn fan_out_to_browsers(
 /// Post one more wake-up to a browser that already holds something to show, for when
 /// its service worker could not show it yet. Nothing is queued and nothing is taken:
 /// the entry is already there, so this only asks the worker to come back.
-pub(crate) fn wake_again(anchor: &Anchor, browser_id: BrowserId, now_ns: Timestamp) {
-    if let Some(delivery) = rewake_delivery(anchor, browser_id, now_ns) {
+pub(crate) fn wake_again(anchor_number: AnchorNumber, browser_id: BrowserId, now_ns: Timestamp) {
+    if let Some(delivery) = claim_rewake(anchor_number, browser_id, now_ns) {
         outcalls::spawn_post(delivery);
     }
 }
 
-/// The wake-up to post, or `None` where there is nothing left to show, the browser is
-/// not registered, or its signed pool has run out.
-pub(crate) fn rewake_delivery(
-    anchor: &Anchor,
+/// Takes the browser's one second wake-up per delegation lifetime, or `None` where it
+/// has nothing to come back for or has already had it.
+///
+/// The wake-up is posted at the browser's own asking, so it is rationed: without this,
+/// a browser asking for delegations in a loop would spend the canister's cycles on
+/// outcalls. One per [`NOTIFICATION_DELEGATION_TTL_NS`] is all a worker can need,
+/// since that is how long the delegation it just minted lasts.
+pub(crate) fn claim_rewake(
+    anchor_number: AnchorNumber,
     browser_id: BrowserId,
     now_ns: Timestamp,
 ) -> Option<Delivery> {
+    storage_borrow_mut(|storage| {
+        let mut anchor = storage.read(anchor_number).ok()?;
+        let subscription = anchor.webpush_subscription(browser_id)?;
+        if subscription
+            .woken_again_at_ns
+            .is_some_and(|last| now_ns.saturating_sub(last) < NOTIFICATION_DELEGATION_TTL_NS)
+        {
+            return None;
+        }
+
+        let delivery = rewake_delivery(&anchor, browser_id, now_ns)?;
+        let mut taken = subscription.clone();
+        taken.woken_again_at_ns = Some(now_ns);
+        anchor.set_webpush_subscription(browser_id, Some(taken));
+        storage.write(anchor).ok()?;
+        Some(delivery)
+    })
+}
+
+/// The wake-up to post, or `None` where there is nothing left to show, the browser is
+/// not registered, or its signed pool has run out.
+fn rewake_delivery(anchor: &Anchor, browser_id: BrowserId, now_ns: Timestamp) -> Option<Delivery> {
     let browser = anchor
         .browsers()
         .iter()
@@ -474,7 +502,18 @@ mod tests {
     }
 
     fn submit(anchor_number: AnchorNumber, notification_id: u64, expires_at_ns: Timestamp) {
-        state::notification_backlog_mut(0, |backlog| {
+        submit_at(anchor_number, notification_id, expires_at_ns, 0);
+    }
+
+    /// For a test whose clock has moved: the backlog drops what it has held too long,
+    /// so a notification admitted at zero is gone by the time such a test looks.
+    fn submit_at(
+        anchor_number: AnchorNumber,
+        notification_id: u64,
+        expires_at_ns: Timestamp,
+        now_ns: Timestamp,
+    ) {
+        state::notification_backlog_mut(now_ns, |backlog| {
             backlog.admit(
                 StorableOriginSha256::from_origin(&APP.to_string()),
                 vec![PendingNotification {
@@ -487,7 +526,7 @@ mod tests {
                     urgency: Urgency::Normal,
                     expires_at_ns: Some(expires_at_ns),
                 }],
-                0,
+                now_ns,
             );
         });
     }
@@ -613,8 +652,8 @@ mod tests {
         submit(recipient, 7, 10 * SECOND_NS);
         assert_eq!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).len(), 1);
 
-        let again = rewake_delivery(&anchor(recipient), browsers[0], SECOND_NS)
-            .expect("the entry is still queued");
+        let again =
+            claim_rewake(recipient, browsers[0], SECOND_NS).expect("the entry is still queued");
 
         assert_eq!(again.endpoint, RELAY);
         assert_eq!(
@@ -629,12 +668,12 @@ mod tests {
         setup();
         let (recipient, browsers) = subscribed_recipient(1);
 
-        assert!(rewake_delivery(&anchor(recipient), browsers[0], SECOND_NS).is_none());
+        assert!(claim_rewake(recipient, browsers[0], SECOND_NS).is_none());
 
         submit(recipient, 7, 10 * SECOND_NS);
         plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
         assert!(
-            rewake_delivery(&anchor(recipient), browsers[0], 20 * SECOND_NS).is_none(),
+            claim_rewake(recipient, browsers[0], 20 * SECOND_NS).is_none(),
             "what expired is nothing to come back for"
         );
     }
@@ -647,7 +686,7 @@ mod tests {
         let first = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS)
             .pop()
             .expect("a wake-up");
-        let again = rewake_delivery(&anchor(recipient), browsers[0], SECOND_NS).expect("a second");
+        let again = claim_rewake(recipient, browsers[0], SECOND_NS).expect("a second");
 
         settle(&again, PostOutcome::Rejected, 2 * SECOND_NS);
 
@@ -660,6 +699,36 @@ mod tests {
         settle(&first, PostOutcome::Rejected, 2 * SECOND_NS);
 
         assert!(queued(recipient, browsers[0]).is_empty());
+    }
+
+    #[test]
+    fn a_browser_is_woken_again_once_per_delegation_lifetime() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        let queue_one = |at: Timestamp| {
+            submit_at(recipient, 7, at + 10 * SECOND_NS, at);
+            plan_pass(MAX_POSTS_PER_PASS, at);
+        };
+
+        queue_one(SECOND_NS);
+        assert!(claim_rewake(recipient, browsers[0], SECOND_NS).is_some());
+        assert!(
+            claim_rewake(recipient, browsers[0], 2 * SECOND_NS).is_none(),
+            "the wake-up is posted at the browser's own asking, so it is rationed"
+        );
+
+        // A later notification of its own is no second wake-up either, while the
+        // delegation the first one earned still holds.
+        let almost = SECOND_NS + NOTIFICATION_DELEGATION_TTL_NS - SECOND_NS;
+        queue_one(almost);
+        assert!(claim_rewake(recipient, browsers[0], almost).is_none());
+
+        let after = SECOND_NS + NOTIFICATION_DELEGATION_TTL_NS;
+        queue_one(after);
+        assert!(
+            claim_rewake(recipient, browsers[0], after).is_some(),
+            "the delegation it was for has expired, so the next one earns a wake-up"
+        );
     }
 
     #[test]

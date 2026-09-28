@@ -7473,6 +7473,7 @@ fn should_keep_a_browsers_notification_queue_and_its_order_across_a_reload() {
                 jwt_signatures: vec![vec![3; 64]],
                 jwt_issued_at_ns: 0,
                 notifications: Vec::new(),
+                woken_again_at_ns: None,
             }),
         );
     }
