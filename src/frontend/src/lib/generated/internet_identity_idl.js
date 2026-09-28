@@ -293,16 +293,15 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Opt(IDL.Text),
     'created_at' : IDL.Opt(Timestamp),
   });
+  const GetNextNotificationRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
   const AccountNumber = IDL.Nat64;
   const NotificationToShow = IDL.Record({
     'id' : NotificationId,
     'origin' : FrontendHostname,
     'canister_id' : IDL.Principal,
     'account_number' : IDL.Opt(AccountNumber),
-  });
-  const GetNextNotificationRequest = IDL.Record({
-    'skip' : IDL.Vec(NotificationToShow),
-    'anchor_number' : UserNumber,
   });
   const GetNextNotificationResponse = IDL.Record({
     'notification' : IDL.Opt(NotificationToShow),

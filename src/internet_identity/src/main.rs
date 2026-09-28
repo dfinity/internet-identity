@@ -427,7 +427,6 @@ fn browser_get_next_notification(
         notification: notifications::browser_queue::next_to_show(
             &anchor,
             browser_id,
-            &request.skip,
             ic_cdk::api::time(),
         ),
     })

@@ -1911,8 +1911,6 @@ type NotificationDelegationError = variant {
 
 type GetNextNotificationRequest = record {
     anchor_number : UserNumber;
-    // What this service worker is still showing, whose removal has not landed yet.
-    skip : vec NotificationToShow;
 };
 
 // What a service worker shows for one wake-up: the app and account it is for, the
@@ -1930,8 +1928,7 @@ type GetNextNotificationResponse = record {
 };
 
 type GetNextNotificationError = variant {
-    // Also a caller that is no browser of the identity, or a skip list longer than a
-    // browser's queue.
+    // Also a caller that is no browser of the identity.
     InternalCanisterError : text;
 };
 

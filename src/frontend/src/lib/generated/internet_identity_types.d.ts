@@ -918,18 +918,11 @@ export interface GetIdAliasRequest {
 }
 export type GetNextNotificationError = {
     /**
-     * Also a caller that is no browser of the identity, or a skip list longer than a
-     * browser's queue.
+     * Also a caller that is no browser of the identity.
      */
     'InternalCanisterError' : string
   };
-export interface GetNextNotificationRequest {
-  /**
-   * What this service worker is still showing, whose removal has not landed yet.
-   */
-  'skip' : Array<NotificationToShow>,
-  'anchor_number' : UserNumber,
-}
+export interface GetNextNotificationRequest { 'anchor_number' : UserNumber }
 /**
  * Null once nothing is left to show.
  */

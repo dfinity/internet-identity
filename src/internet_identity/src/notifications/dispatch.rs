@@ -8,7 +8,7 @@ use crate::notifications::browser_queue::{self, Added};
 use crate::notifications::webpush::{clear_gone_subscription, vapid_jwt};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow_mut};
-use crate::storage::anchor::{Browser, QueuedNotification};
+use crate::storage::anchor::{Anchor, Browser, QueuedNotification};
 use crate::storage::storable::application::StorableOriginSha256;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -101,8 +101,9 @@ fn record_post_outcome(outcome: PostOutcome) {
 pub(crate) struct Delivery {
     pub(crate) anchor_number: AnchorNumber,
     pub(crate) browser_id: BrowserId,
-    /// The browser queue entry this wake-up announces.
-    pub(crate) notification: QueuedNotification,
+    /// The browser queue entry this wake-up announces, or `None` where it announces
+    /// nothing new: a second wake-up for an entry the service worker already has.
+    pub(crate) notification: Option<QueuedNotification>,
     pub(crate) endpoint: String,
     pub(crate) vapid_public_key: Vec<u8>,
     pub(crate) jwt: String,
@@ -236,7 +237,7 @@ fn fan_out_to_browsers(
                 Some(Delivery {
                     anchor_number: pending.anchor_number,
                     browser_id: browser.id,
-                    notification: queued.clone(),
+                    notification: Some(queued.clone()),
                     endpoint: subscription.endpoint.clone(),
                     vapid_public_key: subscription.vapid_public_key.clone(),
                     jwt,
@@ -262,6 +263,46 @@ fn fan_out_to_browsers(
             Err(err) => ic_cdk::println!("Failed to queue a notification for its browsers: {err}"),
         }
     });
+}
+
+/// Post one more wake-up to a browser that already holds something to show, for when
+/// its service worker could not show it yet. Nothing is queued and nothing is taken:
+/// the entry is already there, so this only asks the worker to come back.
+pub(crate) fn wake_again(anchor: &Anchor, browser_id: BrowserId, now_ns: Timestamp) {
+    if let Some(delivery) = rewake_delivery(anchor, browser_id, now_ns) {
+        outcalls::spawn_post(delivery);
+    }
+}
+
+/// The wake-up to post, or `None` where there is nothing left to show, the browser is
+/// not registered, or its signed pool has run out.
+pub(crate) fn rewake_delivery(
+    anchor: &Anchor,
+    browser_id: BrowserId,
+    now_ns: Timestamp,
+) -> Option<Delivery> {
+    let browser = anchor
+        .browsers()
+        .iter()
+        .find(|browser| browser.id == browser_id)?;
+    let subscription = browser.webpush_subscription.as_ref()?;
+    let oldest = subscription
+        .notifications
+        .iter()
+        .find(|queued| queued.expires_at_ns > now_ns)?;
+    let jwt = wake_up_jwt(browser, now_ns)?;
+
+    Some(Delivery {
+        anchor_number: anchor.anchor_number(),
+        browser_id,
+        notification: None,
+        endpoint: subscription.endpoint.clone(),
+        vapid_public_key: subscription.vapid_public_key.clone(),
+        jwt,
+        // What it is for is already queued; this says only that it is still waiting.
+        urgency: Urgency::Normal,
+        ttl_seconds: oldest.expires_at_ns.saturating_sub(now_ns) / SECOND_NS,
+    })
 }
 
 /// The authorization a wake-up to `browser` carries now: none unless it was used within
@@ -292,10 +333,15 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestam
             }
         }
         PostOutcome::RateLimited | PostOutcome::RelayError | PostOutcome::Rejected => {
+            // A wake-up that announced nothing new leaves the queue alone: the entry it
+            // was for is one the service worker has already been told about.
+            let Some(notification) = delivery.notification.as_ref() else {
+                return;
+            };
             browser_queue::remove_after_failed_wake_up(
                 delivery.anchor_number,
                 delivery.browser_id,
-                &delivery.notification,
+                notification,
                 &delivery.endpoint,
                 now_ns,
             );
@@ -561,6 +607,62 @@ mod tests {
     }
 
     #[test]
+    fn a_second_wake_up_goes_where_something_is_still_to_show() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        assert_eq!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).len(), 1);
+
+        let again = rewake_delivery(&anchor(recipient), browsers[0], SECOND_NS)
+            .expect("the entry is still queued");
+
+        assert_eq!(again.endpoint, RELAY);
+        assert_eq!(
+            again.notification, None,
+            "it announces nothing the browser has not been told about"
+        );
+        assert_eq!(queued(recipient, browsers[0]), vec![7]);
+    }
+
+    #[test]
+    fn nothing_is_woken_again_once_the_queue_has_run_dry() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+
+        assert!(rewake_delivery(&anchor(recipient), browsers[0], SECOND_NS).is_none());
+
+        submit(recipient, 7, 10 * SECOND_NS);
+        plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+        assert!(
+            rewake_delivery(&anchor(recipient), browsers[0], 20 * SECOND_NS).is_none(),
+            "what expired is nothing to come back for"
+        );
+    }
+
+    #[test]
+    fn a_second_wake_up_that_fails_leaves_the_queue_alone() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        let first = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS)
+            .pop()
+            .expect("a wake-up");
+        let again = rewake_delivery(&anchor(recipient), browsers[0], SECOND_NS).expect("a second");
+
+        settle(&again, PostOutcome::Rejected, 2 * SECOND_NS);
+
+        assert_eq!(
+            queued(recipient, browsers[0]),
+            vec![7],
+            "the entry is the first wake-up's to lose"
+        );
+
+        settle(&first, PostOutcome::Rejected, 2 * SECOND_NS);
+
+        assert!(queued(recipient, browsers[0]).is_empty());
+    }
+
+    #[test]
     fn a_pass_stops_once_its_budget_is_spent() {
         setup();
         // Spread over recipients to stay within the per-recipient cap.
@@ -680,13 +782,13 @@ mod tests {
 
         assert_eq!(
             delivery.notification,
-            QueuedNotification {
+            Some(QueuedNotification {
                 application_number: 1,
                 sender: sender(),
                 notification_id: 7,
                 expires_at_ns: 10 * SECOND_NS,
                 account_number: Some(2),
-            }
+            })
         );
     }
 

@@ -1195,8 +1195,6 @@ pub enum NotificationDelegationError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct GetNextNotificationRequest {
     pub anchor_number: AnchorNumber,
-    /// What this service worker is still showing, whose removal has not landed yet.
-    pub skip: Vec<NotificationToShow>,
 }
 
 /// What a service worker shows for one wake-up: the app and account it is for, the
@@ -1218,8 +1216,7 @@ pub struct GetNextNotificationResponse {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum GetNextNotificationError {
-    /// Also a caller that is no browser of the identity, or a skip list longer than a
-    /// browser's queue.
+    /// Also a caller that is no browser of the identity.
     InternalCanisterError(String),
 }
 
