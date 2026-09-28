@@ -10,6 +10,7 @@ pub(crate) mod browser_queue;
 pub mod delegation;
 pub(crate) mod dispatch;
 pub mod senders;
+pub mod submission;
 mod validation;
 pub mod webpush;
 

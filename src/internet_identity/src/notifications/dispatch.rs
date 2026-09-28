@@ -1,8 +1,6 @@
 //! Send content-free wake-ups for backlog notifications, one per registered browser.
 //! A pass queues each notification for the browser before posting its wake-up, and
 //! spawns the posts rather than awaiting them. Nothing is retried; every outcome is counted.
-// Kicked by the submission endpoint in a follow-up PR.
-#![allow(dead_code)]
 
 use crate::notifications::admission_queue::Taken;
 use crate::notifications::backlog::PendingNotification;
@@ -10,7 +8,7 @@ use crate::notifications::browser_queue::{self, Added};
 use crate::notifications::webpush::{clear_gone_subscription, vapid_jwt};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow_mut};
-use crate::storage::anchor::QueuedNotification;
+use crate::storage::anchor::{Browser, QueuedNotification};
 use crate::storage::storable::application::StorableOriginSha256;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -139,6 +137,16 @@ pub(crate) fn schedule_pass(now_ns: Timestamp) {
     }
 }
 
+#[cfg(test)]
+pub(crate) fn pass_due_at_for_testing() -> Option<Timestamp> {
+    PASS_SCHEDULE.with(Cell::get).due_at_ns
+}
+
+#[cfg(test)]
+pub(crate) fn reset_pass_schedule_for_testing() {
+    PASS_SCHEDULE.with(|schedule| schedule.set(PassSchedule::default()));
+}
+
 fn delay_until_next_pass(last_started_ns: Option<Timestamp>, now_ns: Timestamp) -> Duration {
     let next_ns = last_started_ns.map_or(now_ns, |last| {
         last.saturating_add(INTERVAL.as_nanos() as u64)
@@ -223,12 +231,8 @@ fn fan_out_to_browsers(
             .browsers()
             .iter()
             .filter_map(|browser| {
-                if now_ns.saturating_sub(browser.last_used) >= BROWSER_GONE_AFTER_NS {
-                    return None;
-                }
                 let subscription = browser.webpush_subscription.as_ref()?;
-                let relay_origin = vapid_jwt::relay_origin_of(&subscription.endpoint)?;
-                let jwt = vapid_jwt::assemble(subscription, &relay_origin, now_ns)?;
+                let jwt = wake_up_jwt(browser, now_ns)?;
                 Some(Delivery {
                     anchor_number: pending.anchor_number,
                     browser_id: browser.id,
@@ -258,6 +262,17 @@ fn fan_out_to_browsers(
             Err(err) => ic_cdk::println!("Failed to queue a notification for its browsers: {err}"),
         }
     });
+}
+
+/// The authorization a wake-up to `browser` carries now: none unless it was used within
+/// [`BROWSER_GONE_AFTER_NS`], is registered, and its pool holds a signature for now.
+pub(crate) fn wake_up_jwt(browser: &Browser, now_ns: Timestamp) -> Option<String> {
+    if now_ns.saturating_sub(browser.last_used) >= BROWSER_GONE_AFTER_NS {
+        return None;
+    }
+    let subscription = browser.webpush_subscription.as_ref()?;
+    let relay_origin = vapid_jwt::relay_origin_of(&subscription.endpoint)?;
+    vapid_jwt::assemble(subscription, &relay_origin, now_ns)
 }
 
 /// Count the outcome and keep the browser's queue in step with the wake-ups on their
@@ -917,6 +932,42 @@ mod tests {
         run_pass(2, 3 * SECOND_NS);
 
         assert_eq!(still_in_backlog(3 * SECOND_NS), 0);
+    }
+
+    #[test]
+    fn a_pass_that_leaves_work_behind_schedules_the_next_one() {
+        setup();
+        PASS_SCHEDULE.with(|schedule| schedule.set(PassSchedule::default()));
+        for _ in 0..4 {
+            let (recipient, _) = subscribed_recipient(1);
+            for notification_id in 0..20 {
+                submit(recipient, notification_id, 10 * SECOND_NS);
+            }
+        }
+
+        run_pass(0, SECOND_NS);
+
+        assert_eq!(
+            PASS_SCHEDULE.with(Cell::get),
+            PassSchedule {
+                due_at_ns: Some(2 * SECOND_NS),
+                last_started_ns: Some(SECOND_NS),
+                armed: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn a_pass_that_empties_the_backlog_schedules_nothing() {
+        setup();
+        PASS_SCHEDULE.with(|schedule| schedule.set(PassSchedule::default()));
+        let (recipient, _) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+
+        run_pass(0, SECOND_NS);
+
+        assert_eq!(PASS_SCHEDULE.with(Cell::get).due_at_ns, None);
+        assert_eq!(still_in_backlog(SECOND_NS), 0);
     }
 
     #[test]
