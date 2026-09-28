@@ -14,6 +14,10 @@ const VAPID_SUBJECT = "https://id.ai";
 /** One JWT per window; matches the canister's MAX_JWT_POOL_LEN (~30 days). */
 export const JWT_POOL_SIZE = 30;
 
+/** Windows left at which a pool is signed again, so it never runs out between one
+ *  look at it and the next. */
+export const JWT_POOL_REFRESH_THRESHOLD = 10;
+
 /**
  * Windows a stored pool still covers at `nowNs`.
  *

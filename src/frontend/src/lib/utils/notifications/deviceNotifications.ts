@@ -1,7 +1,7 @@
 // Keeps this browser's push registration healthy. The device toggle owns the
 // subscription; per-app consent is a separate list and is never touched here.
 
-import { windowsRemaining } from "./vapidPool";
+import { JWT_POOL_REFRESH_THRESHOLD, windowsRemaining } from "./vapidPool";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import {
   registerStoredDevice,
@@ -14,7 +14,6 @@ export { currentDeviceSubscription };
 
 // Windows left in the pool below which the reconcile tops it up. The pool covers 30
 // days, so this leaves a week of headroom.
-const JWT_POOL_REFRESH_THRESHOLD = 10;
 
 /**
  * Run on authenticated boot. Re-subscribes when the browser rotated or dropped
