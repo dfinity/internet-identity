@@ -17,7 +17,7 @@ const ref: NotificationRef = {
 
 describe("tagOf", () => {
   it("names one notification of one app and account", () => {
-    expect(tagOf(ref)).toBe("https://app.example|3|42");
+    expect(tagOf(ref)).toBe("10000|https://app.example|3|42");
   });
 
   it("tells the default account apart from a numbered one", () => {
@@ -26,6 +26,13 @@ describe("tagOf", () => {
 
   it("tells two notifications of the same app apart", () => {
     expect(tagOf({ ...ref, id: BigInt(43) })).not.toBe(tagOf(ref));
+  });
+
+  it("tells two identities on one browser apart", () => {
+    // An id is scoped to one recipient, so the same one reaches both.
+    expect(tagOf({ ...ref, identityNumber: BigInt(10_001) })).not.toBe(
+      tagOf(ref),
+    );
   });
 });
 

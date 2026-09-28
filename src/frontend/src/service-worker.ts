@@ -9,7 +9,7 @@
 // it is for is asked of the canister, and its content of the app that sent it. The
 // subscription is `userVisibleOnly`, which obliges a visible notification per push.
 
-import { onWakeUp } from "$lib/utils/notifications/wakeUp";
+import { onWakeUp, sequencer } from "$lib/utils/notifications/wakeUp";
 import { refOf } from "$lib/utils/notifications/shownNotification";
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
@@ -23,12 +23,17 @@ worker.addEventListener("activate", (event) => {
   event.waitUntil(worker.clients.claim());
 });
 
+// One wake-up at a time, whatever the browser delivers: see `sequencer`.
+const next = sequencer();
+
 worker.addEventListener("push", (event) => {
   event.waitUntil(
-    onWakeUp({
-      registration: worker.registration,
-      location: worker.location,
-    }),
+    next(() =>
+      onWakeUp({
+        registration: worker.registration,
+        location: worker.location,
+      }),
+    ),
   );
 });
 

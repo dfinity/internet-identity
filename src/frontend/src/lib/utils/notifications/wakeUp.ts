@@ -28,6 +28,7 @@ import {
   reportNotificationReceived,
 } from "./appNotifications";
 import { allowedLink, fetchAlternativeOrigins } from "./notificationLink";
+import { refillJwtPool } from "./poolRefill";
 import { loadPullIdentity, mintPullIdentity } from "./pullDelegation";
 import {
   dataOf,
@@ -40,23 +41,54 @@ import {
 const PLACEHOLDER_TITLE = "Internet Identity";
 const PLACEHOLDER_BODY = "You have a new notification.";
 
-/** Which Internet Identity this worker belongs to. The page cannot tell a woken worker
- *  anything, and there is no document to read it from, so it rides on the script URL
- *  the registration keeps. */
-export const internetIdentityCanisterId = (
-  search: string,
-): string | undefined =>
-  new URLSearchParams(search).get("canisterId") ?? undefined;
+/**
+ * Runs what it is given one at a time, in the order it was given them.
+ *
+ * `waitUntil` keeps a push handler alive but does not serialise handlers: two pushes
+ * arriving together would both take the same queue head, and the second wake-up would
+ * be spent showing what the first already showed instead of the entry behind it. A
+ * failed wake-up does not hold up the next one.
+ */
+export const sequencer = (): ((run: () => Promise<void>) => Promise<void>) => {
+  let last: Promise<void> = Promise.resolve();
+  return (run) => {
+    last = last.catch(() => undefined).then(run);
+    return last;
+  };
+};
+
+/** What the page knows and a woken worker cannot ask for: which canister this is, and
+ *  whether the deployment fetches the root key. Both ride on the script URL the
+ *  registration keeps. */
+export interface WorkerDeployment {
+  canisterId: string;
+  shouldFetchRootKey: boolean;
+}
+
+export const deploymentOf = (search: string): WorkerDeployment | undefined => {
+  const params = new URLSearchParams(search);
+  const canisterId = params.get("canisterId");
+  if (canisterId === null) {
+    return undefined;
+  }
+  return { canisterId, shouldFetchRootKey: params.get("fetchRootKey") === "1" };
+};
 
 export interface WakeUpContext {
   /** The worker's registration, which owns the notifications it shows. */
   registration: ServiceWorkerRegistration;
   location: AgentLocation & { search: string };
+  /** The canister, as this browser. Injected so a test can answer for it. */
+  internetIdentity?: (
+    identityNumber: bigint,
+    deployment: WorkerDeployment,
+    host: string,
+  ) => Promise<ActorSubclass<_SERVICE> | undefined>;
 }
 
 const internetIdentityActor = async (
   identityNumber: bigint,
-  canisterId: string,
+  { canisterId, shouldFetchRootKey }: WorkerDeployment,
   host: string,
 ): Promise<ActorSubclass<_SERVICE> | undefined> => {
   const identity = await browserKeyIdentity(identityNumber);
@@ -64,7 +96,12 @@ const internetIdentityActor = async (
     return undefined;
   }
   return Actor.createActor<_SERVICE>(internetIdentityIDL, {
-    agent: HttpAgent.createSync({ host, identity, retryTimes: 0 }),
+    agent: HttpAgent.createSync({
+      host,
+      identity,
+      shouldFetchRootKey,
+      retryTimes: 0,
+    }),
     canisterId: Principal.fromText(canisterId),
   });
 };
@@ -132,11 +169,15 @@ const showNextFor = async (
   context: WakeUpContext,
   {
     identityNumber,
-    canisterId,
+    deployment,
     host,
-  }: { identityNumber: bigint; canisterId: string; host: string },
+  }: { identityNumber: bigint; deployment: WorkerDeployment; host: string },
 ): Promise<boolean> => {
-  const actor = await internetIdentityActor(identityNumber, canisterId, host);
+  const actor = await (context.internetIdentity ?? internetIdentityActor)(
+    identityNumber,
+    deployment,
+    host,
+  );
   if (actor === undefined) {
     return false;
   }
@@ -159,7 +200,7 @@ const showNextFor = async (
   const held = await loadPullIdentity({
     identityNumber,
     target,
-    internetIdentityCanisterId: canisterId,
+    internetIdentityCanisterId: deployment.canisterId,
     nowMillis: Date.now(),
   });
 
@@ -176,7 +217,7 @@ const showNextFor = async (
       actor,
       identityNumber,
       target,
-      internetIdentityCanisterId: canisterId,
+      internetIdentityCanisterId: deployment.canisterId,
     });
     return true;
   }
@@ -186,6 +227,7 @@ const showNextFor = async (
     id: notification.id,
     identity: held,
     host,
+    shouldFetchRootKey: deployment.shouldFetchRootKey,
   });
   if (content === undefined) {
     // The app dismissed it, or it expired: there is nothing to show and nothing left
@@ -218,12 +260,38 @@ const showNextFor = async (
     id: notification.id,
     identity: held,
     host,
+    shouldFetchRootKey: deployment.shouldFetchRootKey,
   });
   await actor.browser_remove_notification({
     anchor_number: identityNumber,
     notification,
   });
   return true;
+};
+
+/** Signs a fresh pool of wake-up authorizations where the stored one is running out.
+ *  Nothing depends on it: the notification is already shown. */
+const topUpPool = async (
+  context: WakeUpContext,
+  {
+    identityNumber,
+    deployment,
+    host,
+  }: { identityNumber: bigint; deployment: WorkerDeployment; host: string },
+): Promise<void> => {
+  const actor = await (context.internetIdentity ?? internetIdentityActor)(
+    identityNumber,
+    deployment,
+    host,
+  );
+  if (actor === undefined) {
+    return;
+  }
+  await refillJwtPool({
+    actor,
+    identityNumber,
+    nowNs: BigInt(Date.now()) * BigInt(1_000_000),
+  }).catch(() => false);
 };
 
 /**
@@ -235,7 +303,7 @@ const showNextFor = async (
  */
 const closeDismissed = async (
   context: WakeUpContext,
-  { canisterId, host }: { canisterId: string; host: string },
+  { deployment, host }: { deployment: WorkerDeployment; host: string },
 ): Promise<void> => {
   for (const shown of await context.registration.getNotifications()) {
     const ref = refOf(shown.data);
@@ -245,7 +313,7 @@ const closeDismissed = async (
     const identity = await loadPullIdentity({
       identityNumber: ref.identityNumber,
       target: { origin: ref.origin, accountNumber: ref.accountNumber },
-      internetIdentityCanisterId: canisterId,
+      internetIdentityCanisterId: deployment.canisterId,
       nowMillis: Date.now(),
     });
     if (identity === undefined) {
@@ -256,6 +324,7 @@ const closeDismissed = async (
       id: ref.id,
       identity,
       host,
+      shouldFetchRootKey: deployment.shouldFetchRootKey,
     });
     if (content === undefined) {
       shown.close();
@@ -265,9 +334,9 @@ const closeDismissed = async (
 
 /** One wake-up: show what arrived, and clear what no longer matters. */
 export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
-  const canisterId = internetIdentityCanisterId(context.location.search);
+  const deployment = deploymentOf(context.location.search);
   const host = agentHost(context.location);
-  if (canisterId === undefined) {
+  if (deployment === undefined) {
     // Nothing can be fetched without knowing which canister to ask.
     await context.registration.showNotification(PLACEHOLDER_TITLE, {
       body: PLACEHOLDER_BODY,
@@ -279,11 +348,14 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
   let shown = false;
   for (const identityNumber of await registeredIdentityNumbers()) {
     shown =
-      (await showNextFor(context, { identityNumber, canisterId, host }).catch(
+      (await showNextFor(context, { identityNumber, deployment, host }).catch(
         () => false,
       )) || shown;
+    // The pool of signed wake-up authorizations is spent by elapsed time, and a
+    // browser whose user never opens the page again would let it run out.
+    await topUpPool(context, { identityNumber, deployment, host });
   }
-  await closeDismissed(context, { canisterId, host }).catch(() => undefined);
+  await closeDismissed(context, { deployment, host }).catch(() => undefined);
 
   if (!shown && (await context.registration.getNotifications()).length === 0) {
     // The subscription is `userVisibleOnly`: a wake-up that showed nothing and left

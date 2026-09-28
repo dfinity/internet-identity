@@ -19,6 +19,17 @@ export interface NotificationContent {
   url?: string;
 }
 
+/** One call to one app canister. `shouldFetchRootKey` is the deployment's: without it
+ *  a local replica's answers fail verification, which would read the same as an app
+ *  that dismissed the notification. */
+export interface AppCall {
+  canisterId: Principal;
+  id: bigint;
+  identity: Identity;
+  host: string;
+  shouldFetchRootKey: boolean;
+}
+
 const Content = IDL.Record({
   title: IDL.Text,
   body: IDL.Text,
@@ -42,13 +53,19 @@ interface AppNotificationService {
   _internet_identity_notification_received: (id: bigint) => Promise<void>;
 }
 
-const actorFor = (
-  canisterId: Principal,
-  identity: Identity,
-  host: string,
-): AppNotificationService =>
+const actorFor = ({
+  canisterId,
+  identity,
+  host,
+  shouldFetchRootKey,
+}: AppCall): AppNotificationService =>
   Actor.createActor<AppNotificationService>(idlFactory, {
-    agent: HttpAgent.createSync({ host, identity, retryTimes: 0 }),
+    agent: HttpAgent.createSync({
+      host,
+      identity,
+      shouldFetchRootKey,
+      retryTimes: 0,
+    }),
     canisterId,
   });
 
@@ -56,23 +73,13 @@ const actorFor = (
  * What the app says this notification is about, or `undefined` where it says nothing:
  * the app dismissed it, it expired, or the canister refused us.
  */
-export const fetchNotificationContent = async ({
-  canisterId,
-  id,
-  identity,
-  host,
-}: {
-  canisterId: Principal;
-  id: bigint;
-  identity: Identity;
-  host: string;
-}): Promise<NotificationContent | undefined> => {
+export const fetchNotificationContent = async (
+  call: AppCall,
+): Promise<NotificationContent | undefined> => {
   try {
-    const answer = await actorFor(
-      canisterId,
-      identity,
-      host,
-    )._internet_identity_notification_content(id);
+    const answer = await actorFor(call)._internet_identity_notification_content(
+      call.id,
+    );
     const content = answer[0];
     if (content === undefined) {
       return undefined;
@@ -84,23 +91,11 @@ export const fetchNotificationContent = async ({
 };
 
 /** Tells the app a channel showed it. Nothing depends on the answer. */
-export const reportNotificationReceived = async ({
-  canisterId,
-  id,
-  identity,
-  host,
-}: {
-  canisterId: Principal;
-  id: bigint;
-  identity: Identity;
-  host: string;
-}): Promise<void> => {
+export const reportNotificationReceived = async (
+  call: AppCall,
+): Promise<void> => {
   try {
-    await actorFor(
-      canisterId,
-      identity,
-      host,
-    )._internet_identity_notification_received(id);
+    await actorFor(call)._internet_identity_notification_received(call.id);
   } catch {
     // The notification is shown either way; the app learns of it on the next one.
   }

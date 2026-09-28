@@ -3,7 +3,9 @@
  *
  * The tag names the notification, which is what makes the real content replace the
  * placeholder shown before it and a repeat of the same notification replace itself
- * rather than pile up. The data carries what the canister calls need, since a worker
+ * rather than pile up. It names the identity as well: a notification id is scoped to
+ * one app and one recipient, so two identities signed in on one browser can be handed
+ * the same one. The data carries what the canister calls need, since a worker
  * woken later has nothing else to go on. Both are plain strings: notification data
  * goes through structured cloning, and `bigint` support for it is not everywhere.
  */
@@ -28,7 +30,7 @@ export interface ShownData {
 }
 
 export const tagOf = (ref: NotificationRef): string =>
-  `${ref.origin}|${ref.accountNumber ?? ""}|${ref.id}`;
+  `${ref.identityNumber}|${ref.origin}|${ref.accountNumber ?? ""}|${ref.id}`;
 
 export const dataOf = (ref: NotificationRef, url: string): ShownData => ({
   identityNumber: ref.identityNumber.toString(),
