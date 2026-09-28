@@ -146,12 +146,15 @@ describe("onWakeUp", () => {
       internetIdentity: ii.factory,
     });
 
-    expect(shown.showNotification).toHaveBeenCalledWith("New message", {
-      body: "See you at six\nExample App",
-      icon: undefined,
-      tag: `${IDENTITY}|${ORIGIN}||42`,
-      data: expect.objectContaining({ url: `${ORIGIN}/chats/7` }),
-    });
+    expect(shown.showNotification).toHaveBeenCalledWith(
+      "Example App · New message",
+      {
+        body: "See you at six",
+        icon: undefined,
+        tag: `${IDENTITY}|${ORIGIN}||42`,
+        data: expect.objectContaining({ url: `${ORIGIN}/chats/7` }),
+      },
+    );
     expect(reportNotificationReceived).toHaveBeenCalledOnce();
     expect(ii.removed).toHaveLength(1);
   });

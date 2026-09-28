@@ -245,8 +245,11 @@ const showNextFor = async (
     fetchAlternativeOrigins(notification.origin),
   ]);
   await show(context, ref, {
-    title: content.title,
-    body: `${content.body}\n${sender.name}`,
+    // The sender leads the title: an app's own title and body are its text to
+    // write, so the one line naming who sent it has to be somewhere the app
+    // cannot claim and a platform showing a single body line cannot drop.
+    title: `${sender.name} · ${content.title}`,
+    body: content.body,
     icon: sender.icon,
     url: allowedLink({
       url: content.url,
