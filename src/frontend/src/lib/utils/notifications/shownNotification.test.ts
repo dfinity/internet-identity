@@ -6,12 +6,13 @@ import {
   type NotificationRef,
 } from "$lib/utils/notifications/shownNotification";
 
+// The frontend targets ES2019, so no BigInt literals.
 const ref: NotificationRef = {
-  identityNumber: 10_000n,
+  identityNumber: BigInt(10_000),
   origin: "https://app.example",
-  accountNumber: 3n,
+  accountNumber: BigInt(3),
   canisterId: "un4fu-tqaaa-aaaab-qadjq-cai",
-  id: 42n,
+  id: BigInt(42),
 };
 
 describe("tagOf", () => {
@@ -24,7 +25,7 @@ describe("tagOf", () => {
   });
 
   it("tells two notifications of the same app apart", () => {
-    expect(tagOf({ ...ref, id: 43n })).not.toBe(tagOf(ref));
+    expect(tagOf({ ...ref, id: BigInt(43) })).not.toBe(tagOf(ref));
   });
 });
 
