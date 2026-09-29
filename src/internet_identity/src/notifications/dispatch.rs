@@ -16,7 +16,7 @@ use base64::Engine;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, Timestamp, Urgency,
 };
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::convert::Infallible;
 use std::time::Duration;
 
@@ -29,6 +29,34 @@ pub(crate) const MAX_POSTS_PER_PASS: usize = 65;
 
 /// Notifications one pass takes, however few wake-ups they turn into.
 pub(crate) const MAX_TAKEN_PER_PASS: usize = 200;
+
+/// Wake-up posts allowed in flight at once.
+///
+/// A pass spawns its posts rather than awaiting them, so without this the number in
+/// flight is bounded by how long a relay takes rather than by the pass budget: at
+/// [`MAX_POSTS_PER_PASS`] a second and a ~60s outcall timeout, a stalled relay would
+/// put thousands of outcalls in flight. At a healthy relay latency the ceiling is
+/// never approached — 65 posts a second each lasting 200ms is 13 in flight — so this
+/// engages only once relays slow past about a second, which is when a canister should
+/// stop adding to the pile.
+const MAX_WAKEUP_OUTCALLS: usize = 80;
+
+thread_local! {
+    /// The 90s reclaim age is above the ~60s outcall timeout, so a live call is never
+    /// reclaimed early.
+    static WAKEUP_OUTCALL_LIMIT: RefCell<crate::concurrency::ConcurrencyLimiter> =
+        RefCell::new(crate::concurrency::ConcurrencyLimiter::new(
+            crate::concurrency::LimiterConfig {
+                max_concurrent: MAX_WAKEUP_OUTCALLS,
+                max_age_secs: 90,
+            },
+        ));
+}
+
+/// How many more wake-ups may be posted before the budget is full.
+fn post_capacity() -> usize {
+    crate::concurrency::available(&WAKEUP_OUTCALL_LIMIT)
+}
 
 /// What became of one wake-up post.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -191,9 +219,13 @@ pub(crate) fn plan_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Delivery> {
         return Vec::new();
     }
 
+    // Planning past the outcall budget would queue entries for browsers whose wake-up
+    // is then refused a slot, so the pass takes on no more than it can post.
+    let budget = max_posts.min(post_capacity());
+
     let mut deliveries = Vec::new();
     for _ in 0..MAX_TAKEN_PER_PASS {
-        if deliveries.len() >= max_posts {
+        if deliveries.len() >= budget {
             break;
         }
         let taken = state::notification_backlog_mut(now_ns, |backlog| {
@@ -270,6 +302,11 @@ fn fan_out_to_browsers(
 /// its service worker could not show it yet. Nothing is queued and nothing is taken:
 /// the entry is already there, so this only asks the worker to come back.
 pub(crate) fn wake_again(anchor_number: AnchorNumber, browser_id: BrowserId, now_ns: Timestamp) {
+    // Claiming spends the browser's one wake-up per delegation lifetime, so a browser
+    // that finds the outcall budget full keeps its claim for when there is room.
+    if post_capacity() == 0 {
+        return;
+    }
     if let Some(delivery) = claim_rewake(anchor_number, browser_id, now_ns) {
         outcalls::spawn_post(delivery);
     }
@@ -445,7 +482,15 @@ mod outcalls {
     }
 
     pub(super) fn spawn_post(delivery: Delivery) {
+        // A pass plans within the budget and nothing runs between planning and here,
+        // so a refusal means the last recipient's browsers took the budget over. Its
+        // wake-up never leaves, which is what `Rejected` already stands for.
+        let Some(permit) = crate::concurrency::acquire(&WAKEUP_OUTCALL_LIMIT) else {
+            settle(&delivery, PostOutcome::Rejected, ic_cdk::api::time());
+            return;
+        };
         ic_cdk::spawn(async move {
+            let _permit = permit;
             let outcome = post_wake_up(&delivery).await;
             settle(&delivery, outcome, ic_cdk::api::time());
         });
@@ -751,6 +796,66 @@ mod tests {
         assert_eq!(
             plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).len(),
             80 - MAX_POSTS_PER_PASS
+        );
+    }
+
+    /// The slots a real pass's posts would be holding, so a test can put the outcall
+    /// budget under pressure without an outcall.
+    fn hold_outcall_slots(count: usize) -> Vec<crate::concurrency::Permit> {
+        (0..count)
+            .map(|_| crate::concurrency::acquire(&WAKEUP_OUTCALL_LIMIT).expect("a free slot"))
+            .collect()
+    }
+
+    #[test]
+    fn a_pass_plans_nothing_while_the_outcall_budget_is_full() {
+        setup();
+        let (recipient, _) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+
+        let held = hold_outcall_slots(MAX_WAKEUP_OUTCALLS);
+        assert!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).is_empty());
+        assert_eq!(
+            still_in_backlog(SECOND_NS),
+            1,
+            "it keeps its place rather than being queued for a wake-up with no slot to go out on"
+        );
+
+        drop(held);
+        assert_eq!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).len(), 1);
+    }
+
+    #[test]
+    fn a_pass_plans_no_more_than_the_outcall_budget_leaves() {
+        setup();
+        // Spread over recipients to stay within the per-recipient cap.
+        for _ in 0..4 {
+            let (recipient, _) = subscribed_recipient(1);
+            for notification_id in 0..20 {
+                submit(recipient, notification_id, 10 * SECOND_NS);
+            }
+        }
+
+        let _held = hold_outcall_slots(MAX_WAKEUP_OUTCALLS - 10);
+
+        assert_eq!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).len(), 10);
+        assert_eq!(still_in_backlog(SECOND_NS), 80 - 10);
+    }
+
+    #[test]
+    fn a_browser_keeps_its_rewake_claim_while_the_outcall_budget_is_full() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+
+        let held = hold_outcall_slots(MAX_WAKEUP_OUTCALLS);
+        wake_again(recipient, browsers[0], SECOND_NS);
+
+        drop(held);
+        assert!(
+            claim_rewake(recipient, browsers[0], SECOND_NS).is_some(),
+            "the claim is spent on a wake-up that goes out, not on one refused a slot"
         );
     }
 

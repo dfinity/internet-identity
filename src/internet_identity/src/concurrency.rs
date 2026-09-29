@@ -78,6 +78,13 @@ impl ConcurrencyLimiter {
         self.slots.remove(&id);
     }
 
+    /// Slots free right now. Sweeps stranded permits first, so this counts what
+    /// [`try_acquire`](Self::try_acquire) would actually hand out.
+    fn available(&mut self, now: u64) -> usize {
+        self.reclaim_stale(now);
+        self.config.max_concurrent.saturating_sub(self.slots.len())
+    }
+
     #[cfg(test)]
     fn in_use(&self) -> usize {
         self.slots.len()
@@ -109,6 +116,14 @@ pub fn acquire(limiter: Limiter) -> Option<Permit> {
     limiter
         .with_borrow_mut(|l| l.try_acquire(now))
         .map(|id| Permit { limiter, id })
+}
+
+/// Slots `limiter` has free right now. For a caller that commits state before it
+/// starts the guarded work: planning no more than this keeps it from committing
+/// work it will then be refused a slot for.
+pub fn available(limiter: Limiter) -> usize {
+    let now = now_secs();
+    limiter.with_borrow_mut(|l| l.available(now))
 }
 
 #[cfg(not(test))]
@@ -145,6 +160,34 @@ mod tests {
             .collect();
         assert_eq!(ids.len(), 3);
         assert!(l.try_acquire(0).is_none(), "budget of 3 reached");
+    }
+
+    #[test]
+    fn available_counts_what_try_acquire_would_hand_out() {
+        let mut l = ConcurrencyLimiter::new(LimiterConfig {
+            max_concurrent: 3,
+            max_age_secs: 100,
+        });
+        assert_eq!(l.available(0), 3);
+        let id = l.try_acquire(0).unwrap();
+        assert_eq!(l.available(0), 2);
+        l.release(id);
+        assert_eq!(l.available(0), 3);
+    }
+
+    #[test]
+    fn available_counts_a_stranded_slot_as_free() {
+        let mut l = ConcurrencyLimiter::new(LimiterConfig {
+            max_concurrent: 1,
+            max_age_secs: 100,
+        });
+        l.try_acquire(0).unwrap();
+        assert_eq!(l.available(50), 0);
+        assert_eq!(
+            l.available(100),
+            1,
+            "past the reclaim age the slot is handed out again"
+        );
     }
 
     #[test]
