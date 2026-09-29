@@ -252,6 +252,23 @@ describe("onWakeUp", () => {
     });
   });
 
+  it("shows one notification per wake-up, whatever is waiting elsewhere", async () => {
+    const shown = registration();
+    registeredIdentityNumbers.mockResolvedValue([IDENTITY, BigInt(10_001)]);
+    const ii = internetIdentity([notification]);
+
+    await onWakeUp({
+      registration: shown,
+      location: LOCATION,
+      internetIdentity: ii.factory,
+    });
+
+    // The canister queues a wake-up per notification, so the second identity's
+    // turn comes with its own.
+    expect(shown.showNotification).toHaveBeenCalledOnce();
+    expect(reportNotificationReceived).toHaveBeenCalledOnce();
+  });
+
   it("shows a placeholder where it cannot tell which canister to ask", async () => {
     const shown = registration();
 

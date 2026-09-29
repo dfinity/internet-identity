@@ -160,38 +160,77 @@ const senderOf = async (
 };
 
 /**
- * Show what this identity has waiting, and tell the canister and the app it was shown.
+ * Update calls the wake-up sets going without waiting for them.
  *
- * Answers whether anything was shown, which is what a `userVisibleOnly` subscription
- * obliges the worker to have done by the time it returns.
+ * Nothing on screen depends on their answers, and a notification that waits for one
+ * before it is shown is shown a consensus round late — late enough for iOS to hold the
+ * push against the worker. They are still settled before the handler returns, so the
+ * `waitUntil` around the wake-up keeps the worker alive for them.
  */
-const showNextFor = async (
+const sendAndForget = (
+  pending: Promise<unknown>[],
+  call: Promise<unknown>,
+): void => {
+  pending.push(call.catch(() => undefined));
+};
+
+interface Queued {
+  actor: ActorSubclass<_SERVICE>;
+  identityNumber: bigint;
+  notification: NotificationToShow;
+}
+
+/** What one identity has at the head of its queue. Reads only: a query, and nothing
+ *  the canister remembers having answered. */
+const nextFor = async (
   context: WakeUpContext,
   {
     identityNumber,
     deployment,
     host,
   }: { identityNumber: bigint; deployment: WorkerDeployment; host: string },
-): Promise<boolean> => {
+): Promise<Queued | undefined> => {
   const actor = await (context.internetIdentity ?? internetIdentityActor)(
     identityNumber,
     deployment,
     host,
   );
   if (actor === undefined) {
-    return false;
+    return undefined;
   }
   const next = await actor.browser_get_next_notification({
     anchor_number: identityNumber,
   });
   if ("Err" in next) {
-    return false;
+    return undefined;
   }
   const notification = next.Ok.notification[0];
   if (notification === undefined) {
-    return false;
+    return undefined;
   }
+  return { actor, identityNumber, notification };
+};
 
+/**
+ * Show what an identity has waiting, and tell the canister and the app it was shown.
+ *
+ * Answers whether anything was shown, which is what a `userVisibleOnly` subscription
+ * obliges the worker to have done by the time it returns. Everything the answer does
+ * not depend on is left in `pending`.
+ */
+const showQueued = async (
+  context: WakeUpContext,
+  { actor, identityNumber, notification }: Queued,
+  {
+    deployment,
+    host,
+    pending,
+  }: {
+    deployment: WorkerDeployment;
+    host: string;
+    pending: Promise<unknown>[];
+  },
+): Promise<boolean> => {
   const ref = refFor(identityNumber, notification);
   const target = {
     origin: notification.origin,
@@ -213,12 +252,15 @@ const showNextFor = async (
       body: PLACEHOLDER_BODY,
       url: notification.origin,
     });
-    await mintPullIdentity({
-      actor,
-      identityNumber,
-      target,
-      internetIdentityCanisterId: deployment.canisterId,
-    });
+    sendAndForget(
+      pending,
+      mintPullIdentity({
+        actor,
+        identityNumber,
+        target,
+        internetIdentityCanisterId: deployment.canisterId,
+      }),
+    );
     return true;
   }
 
@@ -233,10 +275,13 @@ const showNextFor = async (
     // The app dismissed it, or it expired: there is nothing to show and nothing left
     // for the canister to hold.
     await closeShown(context, ref);
-    await actor.browser_remove_notification({
-      anchor_number: identityNumber,
-      notification,
-    });
+    sendAndForget(
+      pending,
+      actor.browser_remove_notification({
+        anchor_number: identityNumber,
+        notification,
+      }),
+    );
     return false;
   }
 
@@ -258,17 +303,23 @@ const showNextFor = async (
     }),
   });
 
-  await reportNotificationReceived({
-    canisterId: notification.canister_id,
-    id: notification.id,
-    identity: held,
-    host,
-    shouldFetchRootKey: deployment.shouldFetchRootKey,
-  });
-  await actor.browser_remove_notification({
-    anchor_number: identityNumber,
-    notification,
-  });
+  sendAndForget(
+    pending,
+    reportNotificationReceived({
+      canisterId: notification.canister_id,
+      id: notification.id,
+      identity: held,
+      host,
+      shouldFetchRootKey: deployment.shouldFetchRootKey,
+    }),
+  );
+  sendAndForget(
+    pending,
+    actor.browser_remove_notification({
+      anchor_number: identityNumber,
+      notification,
+    }),
+  );
   return true;
 };
 
@@ -294,7 +345,7 @@ const topUpPool = async (
     actor,
     identityNumber,
     nowNs: BigInt(Date.now()) * BigInt(1_000_000),
-  }).catch(() => false);
+  });
 };
 
 /**
@@ -308,31 +359,34 @@ const closeDismissed = async (
   context: WakeUpContext,
   { deployment, host }: { deployment: WorkerDeployment; host: string },
 ): Promise<void> => {
-  for (const shown of await context.registration.getNotifications()) {
-    const ref = refOf(shown.data);
-    if (ref === undefined) {
-      continue;
-    }
-    const identity = await loadPullIdentity({
-      identityNumber: ref.identityNumber,
-      target: { origin: ref.origin, accountNumber: ref.accountNumber },
-      internetIdentityCanisterId: deployment.canisterId,
-      nowMillis: Date.now(),
-    });
-    if (identity === undefined) {
-      continue;
-    }
-    const content = await fetchNotificationContent({
-      canisterId: Principal.fromText(ref.canisterId),
-      id: ref.id,
-      identity,
-      host,
-      shouldFetchRootKey: deployment.shouldFetchRootKey,
-    });
-    if (content === undefined) {
-      shown.close();
-    }
-  }
+  const shown = await context.registration.getNotifications();
+  await Promise.all(
+    shown.map(async (one) => {
+      const ref = refOf(one.data);
+      if (ref === undefined) {
+        return;
+      }
+      const identity = await loadPullIdentity({
+        identityNumber: ref.identityNumber,
+        target: { origin: ref.origin, accountNumber: ref.accountNumber },
+        internetIdentityCanisterId: deployment.canisterId,
+        nowMillis: Date.now(),
+      });
+      if (identity === undefined) {
+        return;
+      }
+      const content = await fetchNotificationContent({
+        canisterId: Principal.fromText(ref.canisterId),
+        id: ref.id,
+        identity,
+        host,
+        shouldFetchRootKey: deployment.shouldFetchRootKey,
+      });
+      if (content === undefined) {
+        one.close();
+      }
+    }),
+  );
 };
 
 /** One wake-up: show what arrived, and clear what no longer matters. */
@@ -348,24 +402,60 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
     return;
   }
 
-  let shown = false;
-  for (const identityNumber of await registeredIdentityNumbers()) {
-    shown =
-      (await showNextFor(context, { identityNumber, deployment, host }).catch(
-        () => false,
-      )) || shown;
-    // The pool of signed wake-up authorizations is spent by elapsed time, and a
-    // browser whose user never opens the page again would let it run out.
-    await topUpPool(context, { identityNumber, deployment, host });
-  }
-  await closeDismissed(context, { deployment, host }).catch(() => undefined);
+  const identityNumbers = await registeredIdentityNumbers();
+  // One round trip each, side by side: a wake-up shows one notification, so asking
+  // the identities one after another would only make the screen wait on the answers
+  // it ends up throwing away.
+  const queued = await Promise.all(
+    identityNumbers.map((identityNumber) =>
+      nextFor(context, { identityNumber, deployment, host }).catch(
+        () => undefined,
+      ),
+    ),
+  );
 
-  if (!shown && (await context.registration.getNotifications()).length === 0) {
-    // The subscription is `userVisibleOnly`: a wake-up that showed nothing and left
-    // nothing on screen owes the user something.
-    await context.registration.showNotification(PLACEHOLDER_TITLE, {
-      body: PLACEHOLDER_BODY,
-      tag: "internet-identity",
-    });
+  const pending: Promise<unknown>[] = [];
+  let shown = false;
+  for (const entry of queued) {
+    if (entry === undefined) {
+      continue;
+    }
+    // The canister queues a wake-up per notification, so the ones passed over here
+    // keep their place and their own wake-up is still to come.
+    shown = await showQueued(context, entry, {
+      deployment,
+      host,
+      pending,
+    }).catch(() => false);
+    if (shown) {
+      break;
+    }
   }
+
+  // The pool of signed wake-up authorizations is spent by elapsed time, and a
+  // browser whose user never opens the page again would let it run out.
+  for (const identityNumber of identityNumbers) {
+    sendAndForget(
+      pending,
+      topUpPool(context, { identityNumber, deployment, host }),
+    );
+  }
+
+  if (shown) {
+    sendAndForget(pending, closeDismissed(context, { deployment, host }));
+  } else {
+    // Whether this wake-up still owes the user something depends on what is on
+    // screen, and an app may have dismissed what is on screen.
+    await closeDismissed(context, { deployment, host }).catch(() => undefined);
+    if ((await context.registration.getNotifications()).length === 0) {
+      // The subscription is `userVisibleOnly`: a wake-up that showed nothing and left
+      // nothing on screen owes the user something.
+      await context.registration.showNotification(PLACEHOLDER_TITLE, {
+        body: PLACEHOLDER_BODY,
+        tag: "internet-identity",
+      });
+    }
+  }
+
+  await Promise.all(pending);
 };
