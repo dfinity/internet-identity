@@ -35,11 +35,15 @@ pub(crate) const MAX_TAKEN_PER_PASS: usize = 200;
 /// A pass spawns its posts rather than awaiting them, so without this the number in
 /// flight is bounded by how long a relay takes rather than by the pass budget: at
 /// [`MAX_POSTS_PER_PASS`] a second and a ~60s outcall timeout, a stalled relay would
-/// put thousands of outcalls in flight. At a healthy relay latency the ceiling is
-/// never approached — 65 posts a second each lasting 200ms is 13 in flight — so this
-/// engages only once relays slow past about a second, which is when a canister should
-/// stop adding to the pile.
-const MAX_WAKEUP_OUTCALLS: usize = 80;
+/// put thousands of outcalls in flight.
+///
+/// Two passes' worth, because the budget a pass finds free is what trims it, and it
+/// trims in whole passes: a budget of one pass would halve the rate the moment relays
+/// hold a post past a single [`INTERVAL`], which is a large step for a small change
+/// in a relay. At two the first step waits until they hold one past two intervals,
+/// and takes the rate to a third rather than to a half. A healthy relay is nowhere
+/// near either — 65 posts a second each lasting 200ms is 13 in flight.
+const MAX_WAKEUP_OUTCALLS: usize = 2 * MAX_POSTS_PER_PASS;
 
 thread_local! {
     /// The 90s reclaim age is above the ~60s outcall timeout, so a live call is never
