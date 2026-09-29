@@ -155,18 +155,39 @@ fn validate_param_len(
 
 /// Length plus an absolute `https://` URL. The canister POSTs to this to wake the
 /// browser, so a value that is not one is a row nothing can ever be delivered to.
+///
+/// As with the sender list, a deployment whose relay is a local server says so with
+/// a deploy flag, and even then only a loopback host may be plain `http`: a wake-up
+/// carries the browser's authorization, and anywhere else it would be handed to
+/// whoever is on the path.
 fn validate_endpoint(endpoint: &str) -> Result<(), String> {
     validate_param_len(endpoint.len(), 1..=MAX_ENDPOINT_LEN, "endpoint")?;
     let Ok(url) = Url::parse(endpoint) else {
         return Err("endpoint is not a URL".to_string());
     };
-    if url.scheme() != "https" {
+    let local = url.scheme() == "http"
+        && allow_insecure_endpoint()
+        && crate::utils::is_loopback_host(url.host_str().unwrap_or_default());
+    if url.scheme() != "https" && !local {
         return Err("endpoint must be an https:// URL".to_string());
     }
     if url.host().is_none() {
         return Err("endpoint has no host".to_string());
     }
     Ok(())
+}
+
+/// Whether this deployment lets a browser register a plain-http endpoint, which only
+/// one whose relay is a local server ever should.
+fn allow_insecure_endpoint() -> bool {
+    #[cfg(not(test))]
+    {
+        crate::state::persistent_state(|s| s.notifications_allow_insecure_endpoint).unwrap_or(false)
+    }
+    #[cfg(test)]
+    {
+        tests::TEST_ALLOW_INSECURE_ENDPOINT.with_borrow(|allow| *allow)
+    }
 }
 
 /// Length plus curve validity. The key is echoed to the relay as VAPID `k=`, and a relay
@@ -200,8 +221,15 @@ fn validate_jwt_pool(signatures: &[Vec<u8>]) -> Result<(), String> {
 mod tests {
     use super::super::fixtures::*;
     use super::*;
+    use std::cell::RefCell;
 
     const ANCHOR: AnchorNumber = 10_000;
+
+    thread_local! {
+        /// What `notifications_allow_insecure_endpoint` says, for a test that is
+        /// about a deployment whose relay is a local server.
+        pub static TEST_ALLOW_INSECURE_ENDPOINT: RefCell<bool> = const { RefCell::new(false) };
+    }
 
     fn validate(
         request: SetWebPushSubscriptionRequest,
@@ -213,6 +241,25 @@ mod tests {
     fn accepts_what_a_browser_sends() {
         setup();
         assert!(validate(request(ANCHOR, "https://relay.example/a", 0)).is_ok());
+    }
+
+    #[test]
+    fn refuses_an_endpoint_nothing_can_be_sent_to_in_confidence() {
+        setup();
+        assert!(validate(request(ANCHOR, "http://relay.example/a", 0)).is_err());
+    }
+
+    /// A deployment whose relay is a local server has no certificate to offer.
+    #[test]
+    fn takes_a_loopback_one_where_the_deployment_says_it_has_no_relay() {
+        setup();
+        TEST_ALLOW_INSECURE_ENDPOINT.with_borrow_mut(|allow| *allow = true);
+        let loopback = validate(request(ANCHOR, "http://127.0.0.1:4711/push", 0));
+        let elsewhere = validate(request(ANCHOR, "http://relay.example/push", 0));
+        TEST_ALLOW_INSECURE_ENDPOINT.with_borrow_mut(|allow| *allow = false);
+
+        assert!(loopback.is_ok());
+        assert!(elsewhere.is_err(), "only a local relay, not any plain host");
     }
 
     /// The channel is off until an operator enables an origin, and nothing may be

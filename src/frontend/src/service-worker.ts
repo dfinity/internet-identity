@@ -53,7 +53,8 @@ worker.addEventListener("notificationclick", (event) => {
       // app's window cannot be focused instead — `matchAll` sees this origin only,
       // and the link is the app's.
       if (target !== undefined && url !== undefined) {
-        await worker.clients.openWindow(url);
+        // A refused window must not cost the app its report.
+        await worker.clients.openWindow(url).catch(() => undefined);
       } else {
         const clients = await worker.clients.matchAll({
           type: "window",

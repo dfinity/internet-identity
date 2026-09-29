@@ -17,7 +17,28 @@ pub fn sha256sum(slice: &[u8]) -> [u8; 32] {
 }
 
 /// True if `host` (host or `host:port`) is loopback.
+///
+/// Names under `.localhost` count: RFC 6761 reserves the whole domain for the
+/// loopback address, and a canister served by a local gateway is reached at one.
 pub fn is_loopback_host(host: &str) -> bool {
     let bare = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
-    matches!(bare.as_str(), "localhost" | "127.0.0.1")
+    matches!(bare.as_str(), "localhost" | "127.0.0.1") || bare.ends_with(".localhost")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_loopback_host;
+
+    #[test]
+    fn a_name_under_localhost_is_loopback_too() {
+        assert!(is_loopback_host("localhost"));
+        assert!(is_loopback_host("127.0.0.1:8000"));
+        assert!(is_loopback_host(
+            "t63gs-up777-77776-aaaba-cai.localhost:8000"
+        ));
+
+        assert!(!is_loopback_host("nice-name.com"));
+        assert!(!is_loopback_host("localhost.example.com"));
+        assert!(!is_loopback_host("notlocalhost"));
+    }
 }

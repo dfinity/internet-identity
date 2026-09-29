@@ -970,7 +970,7 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
         InternetIdentitySynchronizedConfig {
             openid_configs: Some(openid_configs),
             mcp_official_url: None,
-            notifications_enabled: Some(false),
+            notifications_enabled_origins: Some(vec![]),
         }
     );
 
@@ -982,15 +982,15 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
     Ok(())
 }
 
-/// Verifies that the frontend is told whether this deployment notifies: the canister
-/// refuses every notification endpoint unless an origin is enabled for it, and the
-/// frontend turns its own feature off by this rather than by a flag of its own.
+/// Verifies that the frontend is told which apps this deployment notifies for: the
+/// canister refuses an origin it does not hold, so the frontend has no business
+/// offering the feature to one — and none at all where the list is empty.
 #[test]
-fn ii_canister_serves_whether_notifications_are_enabled() -> Result<(), RejectResponse> {
+fn ii_canister_serves_the_origins_it_notifies_for() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), None);
 
-    let enabled = |canister_id| -> Result<Option<bool>, RejectResponse> {
+    let enabled = |canister_id| -> Result<Option<Vec<String>>, RejectResponse> {
         let response = http_request(
             &env,
             canister_id,
@@ -1004,12 +1004,12 @@ fn ii_canister_serves_whether_notifications_are_enabled() -> Result<(), RejectRe
         )?;
         let config: InternetIdentitySynchronizedConfig =
             candid::decode_one(&response.body).expect("the config decodes");
-        Ok(config.notifications_enabled)
+        Ok(config.notifications_enabled_origins)
     };
 
     assert_eq!(
         enabled(canister_id)?,
-        Some(false),
+        Some(vec![]),
         "a deployment with no app enabled notifies for nobody"
     );
 
@@ -1024,7 +1024,11 @@ fn ii_canister_serves_whether_notifications_are_enabled() -> Result<(), RejectRe
     )
     .expect("upgrading with an enabled origin");
 
-    assert_eq!(enabled(canister_id)?, Some(true));
+    assert_eq!(
+        enabled(canister_id)?,
+        Some(vec!["https://app.example".to_string()]),
+        "and names the app it does notify for"
+    );
 
     upgrade_ii_canister_with_arg(
         &env,
@@ -1039,7 +1043,7 @@ fn ii_canister_serves_whether_notifications_are_enabled() -> Result<(), RejectRe
 
     assert_eq!(
         enabled(canister_id)?,
-        Some(false),
+        Some(vec![]),
         "an empty list turns notifications off, so the frontend hears that too"
     );
 

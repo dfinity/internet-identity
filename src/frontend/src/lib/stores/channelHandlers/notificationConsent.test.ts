@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { METHOD_NOT_FOUND_ERROR_CODE } from "$lib/utils/transport/utils";
 import type { Writable } from "svelte/store";
 
 const ORIGIN = "https://app.example.com";
@@ -244,7 +245,7 @@ describe("handleNotificationConsentRequest", () => {
 
     const { sent, errors } = await run({ settle: false });
 
-    expect(sent[0].error?.code).toBe(-32601);
+    expect(sent[0].error).toMatchObject({ code: METHOD_NOT_FOUND_ERROR_CODE });
     expect(errors).toEqual([]);
     notifying.add(ORIGIN);
   });

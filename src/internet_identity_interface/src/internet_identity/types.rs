@@ -395,6 +395,7 @@ pub struct InternetIdentityInit {
     /// production — a non-loopback origin always requires `https` regardless of
     /// this flag.
     pub notifications_allow_insecure_sender_list: Option<bool>,
+    pub notifications_allow_insecure_endpoint: Option<bool>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,

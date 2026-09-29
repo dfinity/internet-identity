@@ -1215,6 +1215,13 @@ export interface InternetIdentityInit {
    */
   'dnssec_config' : [] | [[] | [DnssecConfig]],
   /**
+   * Deploy flag relaxing the https requirement for the Web Push endpoint a
+   * browser registers, for a deployment whose relay is a local server rather
+   * than a push service. As above, only loopback hosts (localhost / 127.0.0.1)
+   * may then be plain http; null / opt false (the default) require https.
+   */
+  'notifications_allow_insecure_endpoint' : [] | [boolean],
+  /**
    * Server-side kill switch for the notifications feature. null / `opt false`
    * (the default) disables every notification endpoint; `opt true` enables
    * them. Omitting it on upgrade keeps the stored value.

@@ -1,4 +1,5 @@
-import type { BrowserContext } from "@playwright/test";
+import { createServer } from "node:http";
+import { expect, type BrowserContext, type Page } from "@playwright/test";
 
 /**
  * Makes a browser look push-capable.
@@ -115,4 +116,142 @@ export const armPushNotifications = async (
       // localStorage may be locked in some test contexts.
     }
   });
+};
+
+/**
+ * A push service, on this machine.
+ *
+ * Headless Chromium ships the Push API with no push service behind it, so a real
+ * `subscribe` never resolves. This stands in for one: the browser is handed this
+ * server's URL as its endpoint, the canister's dispatch posts a wake-up to it for
+ * real over an HTTP outcall, and the caller turns each receipt into a push
+ * delivered to the worker — the one hop a test has to bridge.
+ *
+ * The deployment must carry `notifications_allow_insecure_endpoint`, since a local
+ * server has no certificate to offer.
+ */
+export interface PushRelay {
+  endpoint: string;
+  /** Resolves once the canister has posted at least `count` wake-ups. */
+  waitForWakeUps: (count: number) => Promise<void>;
+  received: () => number;
+  close: () => Promise<void>;
+}
+
+/// A fixed port, because the canister keeps the endpoint a browser registered:
+/// an ephemeral one leaves every stored subscription pointing at a relay that no
+/// longer exists, and its wake-up is refused rather than delivered.
+const RELAY_PORT = 11190;
+
+export const startPushRelay = async (): Promise<PushRelay> => {
+  let received = 0;
+  const server = createServer((request, response) => {
+    request.resume();
+    request.on("end", () => {
+      received += 1;
+      // A relay answers 201 with nothing in it.
+      response.writeHead(201).end();
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(RELAY_PORT, "127.0.0.1", () => resolve());
+  });
+
+  return {
+    endpoint: `http://127.0.0.1:${RELAY_PORT}/push`,
+    received: () => received,
+    waitForWakeUps: async (count) => {
+      await expect
+        .poll(() => received, {
+          message: `the canister sent fewer than ${count} wake-up(s)`,
+          timeout: 30_000,
+        })
+        .toBeGreaterThanOrEqual(count);
+    },
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
+};
+
+/**
+ * Makes a browser push-capable without taking its service worker away.
+ *
+ * Only `subscribe` is stubbed, to hand the canister an endpoint it can reach:
+ * everything else is the browser's own, so the worker registers, installs and
+ * handles what it is given.
+ */
+export const armRealWorkerPush = async (
+  context: BrowserContext,
+  origin: string,
+  endpoint: string,
+): Promise<void> => {
+  await context.grantPermissions(["notifications"], { origin });
+
+  await context.addInitScript((endpoint) => {
+    let subscription: unknown = null;
+    const fake = {
+      endpoint,
+      options: { userVisibleOnly: true },
+      unsubscribe: () => {
+        subscription = null;
+        return Promise.resolve(true);
+      },
+      getKey: () => null,
+      toJSON: () => ({ endpoint }),
+    };
+    PushManager.prototype.subscribe = () => {
+      subscription = fake;
+      return Promise.resolve(fake as unknown as PushSubscription);
+    };
+    PushManager.prototype.getSubscription = () =>
+      Promise.resolve(subscription as PushSubscription | null);
+  }, endpoint);
+
+  await context.addInitScript(() => {
+    try {
+      window.localStorage.setItem(
+        "ii-localstorage-feature-flags__PUSH_NOTIFICATIONS",
+        JSON.stringify(true),
+      );
+    } catch {
+      // localStorage may be locked in some test contexts.
+    }
+  });
+};
+
+/**
+ * Delivers a push to the worker registered for `origin`, the way the browser would
+ * on hearing from a push service. This is what DevTools' own Push button does, and
+ * it is the only way to reach a worker in a browser with no push service.
+ */
+export const deliverPush = async (
+  page: Page,
+  origin: string,
+): Promise<void> => {
+  const session = await page.context().newCDPSession(page);
+  const registrations: { registrationId: string; scopeURL: string }[] = [];
+  session.on(
+    "ServiceWorker.workerRegistrationUpdated",
+    ({ registrations: updated }) => {
+      registrations.push(...updated);
+    },
+  );
+  await session.send("ServiceWorker.enable");
+
+  await expect
+    .poll(() => registrations.some((one) => one.scopeURL.startsWith(origin)), {
+      message: `no service worker registered for ${origin}`,
+    })
+    .toBe(true);
+  const registration = registrations.find((one) =>
+    one.scopeURL.startsWith(origin),
+  );
+
+  await session.send("ServiceWorker.deliverPushMessage", {
+    origin,
+    registrationId: registration?.registrationId ?? "",
+    // A wake-up carries nothing: what it is for is asked of the canister.
+    data: "",
+  });
+  await session.detach();
 };

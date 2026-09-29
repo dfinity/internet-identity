@@ -132,6 +132,11 @@ pub struct PersistentState {
     // notifying origin; non-loopback always requires https. See
     // `notifications::validation`.
     pub notifications_allow_insecure_sender_list: Option<bool>,
+    /// Lets a browser register a plain-http push endpoint, for a deployment whose
+    /// relay is a local server rather than a push service. Never set in production:
+    /// a wake-up carries the browser's authorization, and http hands it to anyone
+    /// on the path.
+    pub notifications_allow_insecure_endpoint: Option<bool>,
     // SSO provider configs managed via add_discoverable_oidc_config update call.
     pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     // Configuration for Web Analytics tool
@@ -180,6 +185,7 @@ impl Default for PersistentState {
             openid_configs: None,
             sso_allow_insecure_discovery: None,
             notifications_allow_insecure_sender_list: None,
+            notifications_allow_insecure_endpoint: None,
             oidc_configs: None,
             analytics_config: None,
             event_stats_24h_start: None,
