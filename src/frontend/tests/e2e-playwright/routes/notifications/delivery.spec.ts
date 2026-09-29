@@ -108,7 +108,7 @@ const counted = async (): Promise<{ received: bigint; opened: bigint }> => {
 };
 
 /** The pull delegations this browser holds, as Internet Identity's own storage. */
-const delegationsHeld = async (page: Page): Promise<string[]> =>
+const delegationsHeld = (page: Page): Promise<string[]> =>
   page.evaluate(
     () =>
       new Promise<string[]>((resolve) => {
@@ -137,7 +137,7 @@ const shownByTheWorker = async (
   if (worker === undefined) {
     return [];
   }
-  return worker.evaluate(async () => {
+  return await worker.evaluate(async () => {
     const scope = self as unknown as ServiceWorkerGlobalScope;
     const shown = await scope.registration.getNotifications();
     return shown.map((one) => ({ title: one.title, body: one.body }));

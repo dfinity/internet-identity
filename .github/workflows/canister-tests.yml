@@ -539,7 +539,15 @@ jobs:
           # Derived fresh from the signer's seed so there's no hardcoded
           # digest to drift out of sync.
           dnssec_config="$(node src/frontend/tests/e2e-playwright/utils/renderDnssecTestAnchor.mjs)"
-          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --args "(opt record { mcp_official_url = opt opt \"https://official-mcp.id.ai/mcp\"; captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} }; sso_allow_insecure_discovery = opt true; enable_dnssec_email_recovery = opt true; notifications_enabled_origins = opt vec { \"https://nice-name.com\" }; dnssec_config = $dnssec_config })"
+          # The test app as the local gateway serves it, which is the one origin both
+          # a browser and the replica itself can reach: the notification delivery test
+          # has the canister read the app's sender list over an outcall, and
+          # `nice-name.com` resolves in the browser alone. A loopback origin means a
+          # loopback push endpoint and a plain-HTTP sender list, so both escapes are
+          # opened too (matches dev-e2e-setup).
+          TEST_APP_CANISTER_ID=$(icp canister status test_app --id-only)
+          TEST_APP_LOCAL_ORIGIN="http://$TEST_APP_CANISTER_ID.localhost:8000"
+          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --args "(opt record { mcp_official_url = opt opt \"https://official-mcp.id.ai/mcp\"; captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} }; sso_allow_insecure_discovery = opt true; enable_dnssec_email_recovery = opt true; notifications_enabled_origins = opt vec { \"https://nice-name.com\"; \"$TEST_APP_LOCAL_ORIGIN\" }; notifications_allow_insecure_endpoint = opt true; notifications_allow_insecure_sender_list = opt true; dnssec_config = $dnssec_config })"
           II_CANISTER_ID=$(icp canister status internet_identity --id-only)
           icp canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --args "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true; dev_csp = opt true })"
           # The e2e serves the test app from the nice-name.com alt-origin, so its
@@ -547,6 +555,12 @@ jobs:
           # canister-id gateway origins the app derives on its own — declare it
           # explicitly so II's allow-list check passes (matches dev-e2e-setup).
           icp canister install test_app --wasm .test-app/test_app.wasm --args "(opt record { auth_callbacks = vec { \"https://nice-name.com/callback\" } })"
+          # The test app's notification library reads where it is served and which
+          # Internet Identity to send through from the canister's environment. Without
+          # them it refuses to send at all.
+          icp canister settings update test_app \
+            --add-environment-variable "notification_origin=$TEST_APP_LOCAL_ORIGIN" \
+            --add-environment-variable "notification_sender=$II_CANISTER_ID"
 
       - name: Run dev server
         id: dev-server-start
