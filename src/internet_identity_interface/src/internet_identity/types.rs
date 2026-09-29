@@ -358,10 +358,6 @@ pub struct InternetIdentityFrontendArgs {
 pub struct InternetIdentitySynchronizedConfig {
     pub openid_configs: Option<Vec<OpenIdConfig>>,
     pub mcp_official_url: Option<String>,
-    /// The origins this deployment notifies for, as the canister holds them. Its
-    /// endpoints refuse an origin that is not among them, so the frontend has no
-    /// business offering the feature to one — and none at all where the list is
-    /// empty. Public by nature: it is the set of apps allowed to ask.
     pub notifications_enabled_origins: Option<Vec<FrontendHostname>>,
 }
 
