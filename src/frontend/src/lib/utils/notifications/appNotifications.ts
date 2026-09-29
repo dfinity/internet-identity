@@ -1,6 +1,6 @@
 /**
- * The two calls an app canister answers for a notification: the content to show, and
- * that a channel showed it.
+ * The calls an app canister answers for a notification: the content to show, that a
+ * channel showed it, and that somebody acted on it.
  *
  * The interface is declared here rather than generated, because it is the app's and
  * all of it is these two methods. `_internet_identity_notification_content` is a
@@ -44,6 +44,7 @@ const idlFactory = () =>
       ["query"],
     ),
     _internet_identity_notification_received: IDL.Func([IDL.Nat64], [], []),
+    _internet_identity_notification_opened: IDL.Func([IDL.Nat64], [], []),
   });
 
 interface AppNotificationService {
@@ -51,6 +52,7 @@ interface AppNotificationService {
     id: bigint,
   ) => Promise<[] | [{ title: string; body: string; url: [] | [string] }]>;
   _internet_identity_notification_received: (id: bigint) => Promise<void>;
+  _internet_identity_notification_opened: (id: bigint) => Promise<void>;
 }
 
 const actorFor = ({
@@ -98,5 +100,16 @@ export const reportNotificationReceived = async (
     await actorFor(call)._internet_identity_notification_received(call.id);
   } catch {
     // The notification is shown either way; the app learns of it on the next one.
+  }
+};
+
+/** Tells the app somebody acted on it. The app's window is already opening. */
+export const reportNotificationOpened = async (
+  call: AppCall,
+): Promise<void> => {
+  try {
+    await actorFor(call)._internet_identity_notification_opened(call.id);
+  } catch {
+    // Acting on a notification must not depend on the app being reachable.
   }
 };

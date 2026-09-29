@@ -9,6 +9,7 @@
 // it is for is asked of the canister, and its content of the app that sent it. The
 // subscription is `userVisibleOnly`, which obliges a visible notification per push.
 
+import { reportOpened } from "$lib/utils/notifications/notificationOpened";
 import { onWakeUp, sequencer } from "$lib/utils/notifications/wakeUp";
 import { refOf } from "$lib/utils/notifications/shownNotification";
 
@@ -38,6 +39,7 @@ worker.addEventListener("push", (event) => {
 });
 
 worker.addEventListener("notificationclick", (event) => {
+  // A click does not take the notification off the screen by itself.
   event.notification.close();
   const target = refOf(event.notification.data);
   const url =
@@ -46,24 +48,33 @@ worker.addEventListener("notificationclick", (event) => {
       : undefined;
   event.waitUntil(
     (async () => {
-      // The app's own link, already checked against the origins it publishes as its
-      // own. Anything else opens Internet Identity itself.
+      // Opening comes first: the click is what permits a worker to open a window,
+      // and that permission does not survive an await on a canister call. The
+      // app's window cannot be focused instead — `matchAll` sees this origin only,
+      // and the link is the app's.
       if (target !== undefined && url !== undefined) {
         await worker.clients.openWindow(url);
-        return;
+      } else {
+        const clients = await worker.clients.matchAll({
+          type: "window",
+          includeUncontrolled: true,
+        });
+        const open = clients.find((client) =>
+          client.url.startsWith(worker.origin),
+        );
+        if (open !== undefined) {
+          await open.focus();
+        } else {
+          await worker.clients.openWindow("/");
+        }
       }
-      const clients = await worker.clients.matchAll({
-        type: "window",
-        includeUncontrolled: true,
-      });
-      const open = clients.find((client) =>
-        client.url.startsWith(worker.origin),
-      );
-      if (open !== undefined) {
-        await open.focus();
-        return;
+
+      // Then the app learns its notification did its job.
+      if (target !== undefined) {
+        await reportOpened({ ref: target, location: worker.location }).catch(
+          () => undefined,
+        );
       }
-      await worker.clients.openWindow("/");
     })(),
   );
 });
