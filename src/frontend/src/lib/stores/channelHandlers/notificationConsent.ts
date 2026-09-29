@@ -2,6 +2,7 @@ import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 import {
   INTERACTION_REQUIRED_ERROR_CODE,
   INVALID_PARAMS_ERROR_CODE,
+  METHOD_NOT_FOUND_ERROR_CODE,
   OriginSchema,
 } from "$lib/utils/transport/utils";
 import {
@@ -20,6 +21,7 @@ import { waitForStore } from "$lib/utils/utils";
 import { serializeAuthorizationRequest } from "$lib/stores/channelHandlers/serialize";
 import { get } from "svelte/store";
 import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
+import { notificationsEnabledFor } from "$lib/globals";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 
@@ -102,6 +104,20 @@ export const handleNotificationConsentRequest =
         const effectiveOrigin = remapToLegacyDomain(
           params.icrc95DerivationOrigin ?? channel.origin,
         );
+
+        // The canister refuses an origin it does not notify for, so asking this
+        // user to allow notifications could only ever end in an error.
+        if (!notificationsEnabledFor(effectiveOrigin)) {
+          await channel.send({
+            jsonrpc: "2.0",
+            id: requestId,
+            error: {
+              code: METHOD_NOT_FOUND_ERROR_CODE,
+              message: "This Internet Identity does not notify for this app",
+            },
+          });
+          return;
+        }
 
         const granted = await runConsentCeremony(effectiveOrigin);
 
