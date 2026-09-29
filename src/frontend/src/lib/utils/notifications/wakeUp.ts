@@ -375,13 +375,20 @@ const closeDismissed = async (
       if (identity === undefined) {
         return;
       }
-      const content = await fetchNotificationContent({
-        canisterId: Principal.fromText(ref.canisterId),
-        id: ref.id,
-        identity,
-        host,
-        shouldFetchRootKey: deployment.shouldFetchRootKey,
-      });
+      // Only the app's own answer closes anything: an app that could not be asked
+      // has said nothing about what is on screen.
+      let content;
+      try {
+        content = await fetchNotificationContent({
+          canisterId: Principal.fromText(ref.canisterId),
+          id: ref.id,
+          identity,
+          host,
+          shouldFetchRootKey: deployment.shouldFetchRootKey,
+        });
+      } catch {
+        return;
+      }
       if (content === undefined) {
         one.close();
       }

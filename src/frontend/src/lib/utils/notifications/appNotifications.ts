@@ -72,24 +72,24 @@ const actorFor = ({
   });
 
 /**
- * What the app says this notification is about, or `undefined` where it says nothing:
- * the app dismissed it, it expired, or the canister refused us.
+ * What the app says this notification is about, or `undefined` where the app itself
+ * says there is nothing: it dismissed the notification, or the notification expired.
+ *
+ * Throws where the app could not be asked. A caller acts on `undefined` by dropping
+ * the notification, which cannot be undone, so a call that never reached the app must
+ * not look like an answer from it.
  */
 export const fetchNotificationContent = async (
   call: AppCall,
 ): Promise<NotificationContent | undefined> => {
-  try {
-    const answer = await actorFor(call)._internet_identity_notification_content(
-      call.id,
-    );
-    const content = answer[0];
-    if (content === undefined) {
-      return undefined;
-    }
-    return { title: content.title, body: content.body, url: content.url[0] };
-  } catch {
+  const answer = await actorFor(call)._internet_identity_notification_content(
+    call.id,
+  );
+  const content = answer[0];
+  if (content === undefined) {
     return undefined;
   }
+  return { title: content.title, body: content.body, url: content.url[0] };
 };
 
 /** Tells the app a channel showed it. Nothing depends on the answer. */

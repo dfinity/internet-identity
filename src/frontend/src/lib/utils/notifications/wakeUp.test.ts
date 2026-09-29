@@ -207,6 +207,49 @@ describe("onWakeUp", () => {
     ]);
   });
 
+  it("keeps the notification where the app could not be asked", async () => {
+    const shown = registration();
+    const ii = internetIdentity([notification]);
+    fetchNotificationContent.mockRejectedValue(new Error("unreachable"));
+
+    await onWakeUp({
+      registration: shown,
+      location: LOCATION,
+      internetIdentity: ii.factory,
+    });
+
+    // Dropping it is what an app's own "nothing" means, and cannot be undone.
+    expect(ii.removed).toHaveLength(0);
+    expect(reportNotificationReceived).not.toHaveBeenCalled();
+    // `userVisibleOnly` still has to be satisfied.
+    expect(shown.shown.map((entry) => entry.title)).toEqual([
+      "Internet Identity",
+    ]);
+  });
+
+  it("leaves what is on screen alone where the app could not be asked", async () => {
+    const shown = registration();
+    const ii = internetIdentity([notification]);
+    fetchAppMetadata.mockResolvedValue({ name: "Example App" });
+    await onWakeUp({
+      registration: shown,
+      location: LOCATION,
+      internetIdentity: ii.factory,
+    });
+    expect(shown.shown).toHaveLength(1);
+
+    fetchNotificationContent.mockRejectedValue(new Error("unreachable"));
+    await onWakeUp({
+      registration: shown,
+      location: LOCATION,
+      internetIdentity: ii.factory,
+    });
+
+    expect(shown.shown.map((entry) => entry.title)).toEqual([
+      "Example App · New message",
+    ]);
+  });
+
   it("closes what an app has dismissed since it was shown", async () => {
     const shown = registration();
     const ii = internetIdentity([notification]);
