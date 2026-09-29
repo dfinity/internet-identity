@@ -918,18 +918,11 @@ export interface GetIdAliasRequest {
 }
 export type GetNextNotificationError = {
     /**
-     * Also a caller that is no browser of the identity, or a skip list longer than a
-     * browser's queue.
+     * Also a caller that is no browser of the identity.
      */
     'InternalCanisterError' : string
   };
-export interface GetNextNotificationRequest {
-  /**
-   * What this service worker is still showing, whose removal has not landed yet.
-   */
-  'skip' : Array<NotificationToShow>,
-  'anchor_number' : UserNumber,
-}
+export interface GetNextNotificationRequest { 'anchor_number' : UserNumber }
 /**
  * Null once nothing is left to show.
  */
@@ -1221,6 +1214,13 @@ export interface InternetIdentityInit {
    * sets it to `c`.
    */
   'dnssec_config' : [] | [[] | [DnssecConfig]],
+  /**
+   * Deploy flag relaxing the https requirement for the Web Push endpoint a
+   * browser registers, for a deployment whose relay is a local server rather
+   * than a push service. As above, only loopback hosts (localhost / 127.0.0.1)
+   * may then be plain http; null / opt false (the default) require https.
+   */
+  'notifications_allow_insecure_endpoint' : [] | [boolean],
   /**
    * Server-side kill switch for the notifications feature. null / `opt false`
    * (the default) disables every notification endpoint; `opt true` enables

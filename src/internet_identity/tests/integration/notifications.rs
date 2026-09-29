@@ -1279,10 +1279,7 @@ mod browser_queue {
 }
 
 fn next_request(anchor_number: AnchorNumber) -> GetNextNotificationRequest {
-    GetNextNotificationRequest {
-        anchor_number,
-        skip: vec![],
-    }
+    GetNextNotificationRequest { anchor_number }
 }
 
 fn remove_request(anchor_number: AnchorNumber) -> RemoveNotificationRequest {

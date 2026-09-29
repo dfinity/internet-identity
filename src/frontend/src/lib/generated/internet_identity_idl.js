@@ -72,6 +72,7 @@ export const idlFactory = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'dnssec_config' : IDL.Opt(IDL.Opt(DnssecConfig)),
+    'notifications_allow_insecure_endpoint' : IDL.Opt(IDL.Bool),
     'notifications_enabled_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
@@ -293,16 +294,15 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Opt(IDL.Text),
     'created_at' : IDL.Opt(Timestamp),
   });
+  const GetNextNotificationRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
   const AccountNumber = IDL.Nat64;
   const NotificationToShow = IDL.Record({
     'id' : NotificationId,
     'origin' : FrontendHostname,
     'canister_id' : IDL.Principal,
     'account_number' : IDL.Opt(AccountNumber),
-  });
-  const GetNextNotificationRequest = IDL.Record({
-    'skip' : IDL.Vec(NotificationToShow),
-    'anchor_number' : UserNumber,
   });
   const GetNextNotificationResponse = IDL.Record({
     'notification' : IDL.Opt(NotificationToShow),
@@ -1859,6 +1859,7 @@ export const init = ({ IDL }) => {
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'dnssec_config' : IDL.Opt(IDL.Opt(DnssecConfig)),
+    'notifications_allow_insecure_endpoint' : IDL.Opt(IDL.Bool),
     'notifications_enabled_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),

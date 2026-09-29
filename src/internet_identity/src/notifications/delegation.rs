@@ -15,6 +15,7 @@ use crate::delegation::{
     add_delegation_signature, delegation_signature_msg_with_permissions,
     der_encode_canister_sig_key,
 };
+use crate::notifications::dispatch;
 use crate::notifications::{
     consent_granted_for, ValidatedGetNotificationDelegationRequest,
     ValidatedPrepareNotificationDelegationRequest,
@@ -135,6 +136,10 @@ pub fn prepare(
         });
     });
     update_root_hash();
+
+    // The service worker asks for a delegation because it could not show what it was
+    // woken for, so it needs waking again now that it can.
+    dispatch::wake_again(anchor_number, browser_id, now_ns);
 
     Ok(PrepareNotificationDelegationResponse {
         user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),

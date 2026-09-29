@@ -2,7 +2,6 @@
 //! this deployment notifies for, spelled the one way it is keyed by.
 
 use crate::delegation::frontend_length_within_limit;
-use crate::notifications::browser_queue::MAX_PER_BROWSER;
 use internet_identity_interface::internet_identity::types::attributes::remap_to_legacy_domain;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AnchorNumber, FrontendHostname, GetNextNotificationError,
@@ -51,7 +50,6 @@ pub struct ValidatedSendNotificationArg {
 
 pub struct ValidatedGetNextNotificationRequest {
     pub anchor_number: AnchorNumber,
-    pub skip: Vec<NotificationToShow>,
     _validated: Validated,
 }
 
@@ -59,24 +57,15 @@ impl TryFrom<GetNextNotificationRequest> for ValidatedGetNextNotificationRequest
     type Error = GetNextNotificationError;
 
     fn try_from(
-        GetNextNotificationRequest {
-            anchor_number,
-            skip,
-        }: GetNextNotificationRequest,
+        GetNextNotificationRequest { anchor_number }: GetNextNotificationRequest,
     ) -> Result<Self, Self::Error> {
         if !notifications_enabled() {
             return Err(GetNextNotificationError::InternalCanisterError(
                 NOT_ENABLED.to_string(),
             ));
         }
-        if skip.len() > MAX_PER_BROWSER {
-            return Err(GetNextNotificationError::InternalCanisterError(format!(
-                "skips more than the {MAX_PER_BROWSER} a browser holds"
-            )));
-        }
         Ok(Self {
             anchor_number,
-            skip,
             _validated: Validated,
         })
     }
@@ -326,15 +315,7 @@ fn fetchable_origin(origin: &FrontendHostname) -> Result<(), String> {
 }
 
 fn allow_insecure_sender_list() -> bool {
-    #[cfg(not(test))]
-    {
-        crate::state::persistent_state(|s| s.notifications_allow_insecure_sender_list)
-            .unwrap_or(false)
-    }
-    #[cfg(test)]
-    {
-        tests::TEST_ALLOW_INSECURE_SENDER_LIST.with_borrow(|allow| *allow)
-    }
+    crate::state::persistent_state(|s| s.notifications_allow_insecure_sender_list).unwrap_or(false)
 }
 
 /// Whether this deployment notifies at all. The Web Push channel is per browser rather
@@ -371,12 +352,6 @@ mod tests {
     use super::*;
     use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
     use internet_identity_interface::internet_identity::types::Urgency;
-    use std::cell::RefCell;
-
-    thread_local! {
-        pub(super) static TEST_ALLOW_INSECURE_SENDER_LIST: RefCell<bool> = const { RefCell::new(false) };
-    }
-
     fn enable(origins: &[&str]) {
         crate::state::persistent_state_mut(|s| {
             s.notifications_enabled_origins = Some(origins.iter().map(|o| o.to_string()).collect());
@@ -384,7 +359,9 @@ mod tests {
     }
 
     fn allow_insecure(allow: bool) {
-        TEST_ALLOW_INSECURE_SENDER_LIST.with_borrow_mut(|flag| *flag = allow);
+        crate::state::persistent_state_mut(|s| {
+            s.notifications_allow_insecure_sender_list = Some(allow);
+        });
     }
 
     fn notification(id: u64, recipient: &str, urgency: Urgency) -> Notification {
@@ -394,27 +371,6 @@ mod tests {
             expires_at: None,
             urgency: Some(urgency),
         }
-    }
-
-    #[test]
-    fn a_skip_list_longer_than_a_browsers_queue_is_refused() {
-        enable(&["https://app.example"]);
-        let skipped = NotificationToShow {
-            origin: "https://app.example".to_string(),
-            account_number: None,
-            canister_id: candid::Principal::anonymous(),
-            id: 1,
-        };
-        let request = |skip_count| GetNextNotificationRequest {
-            anchor_number: 1,
-            skip: vec![skipped.clone(); skip_count],
-        };
-
-        assert!(ValidatedGetNextNotificationRequest::try_from(request(MAX_PER_BROWSER)).is_ok());
-        assert!(matches!(
-            ValidatedGetNextNotificationRequest::try_from(request(MAX_PER_BROWSER + 1)),
-            Err(GetNextNotificationError::InternalCanisterError(_))
-        ));
     }
 
     fn validate(notifications: Vec<Notification>) -> ValidatedSendNotificationArg {

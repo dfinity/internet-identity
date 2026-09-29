@@ -5,17 +5,18 @@
 use crate::notifications::admission_queue::Taken;
 use crate::notifications::backlog::PendingNotification;
 use crate::notifications::browser_queue::{self, Added};
+use crate::notifications::delegation::NOTIFICATION_DELEGATION_TTL_NS;
 use crate::notifications::webpush::{clear_gone_subscription, vapid_jwt};
 use crate::notifications::{notifications_enabled, BROWSER_GONE_AFTER_NS};
 use crate::state::{self, storage_borrow_mut};
-use crate::storage::anchor::{Browser, QueuedNotification};
+use crate::storage::anchor::{Anchor, Browser, QueuedNotification};
 use crate::storage::storable::application::StorableOriginSha256;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserId, Timestamp, Urgency,
 };
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::convert::Infallible;
 use std::time::Duration;
 
@@ -28,6 +29,38 @@ pub(crate) const MAX_POSTS_PER_PASS: usize = 65;
 
 /// Notifications one pass takes, however few wake-ups they turn into.
 pub(crate) const MAX_TAKEN_PER_PASS: usize = 200;
+
+/// Wake-up posts allowed in flight at once.
+///
+/// A pass spawns its posts rather than awaiting them, so without this the number in
+/// flight is bounded by how long a relay takes rather than by the pass budget: at
+/// [`MAX_POSTS_PER_PASS`] a second and a ~60s outcall timeout, a stalled relay would
+/// put thousands of outcalls in flight.
+///
+/// Two passes' worth, because the budget a pass finds free is what trims it, and it
+/// trims in whole passes: a budget of one pass would halve the rate the moment relays
+/// hold a post past a single [`INTERVAL`], which is a large step for a small change
+/// in a relay. At two the first step waits until they hold one past two intervals,
+/// and takes the rate to a third rather than to a half. A healthy relay is nowhere
+/// near either — 65 posts a second each lasting 200ms is 13 in flight.
+const MAX_WAKEUP_OUTCALLS: usize = 2 * MAX_POSTS_PER_PASS;
+
+thread_local! {
+    /// The 90s reclaim age is above the ~60s outcall timeout, so a live call is never
+    /// reclaimed early.
+    static WAKEUP_OUTCALL_LIMIT: RefCell<crate::concurrency::ConcurrencyLimiter> =
+        RefCell::new(crate::concurrency::ConcurrencyLimiter::new(
+            crate::concurrency::LimiterConfig {
+                max_concurrent: MAX_WAKEUP_OUTCALLS,
+                max_age_secs: 90,
+            },
+        ));
+}
+
+/// How many more wake-ups may be posted before the budget is full.
+fn post_capacity() -> usize {
+    crate::concurrency::num_available_slots(&WAKEUP_OUTCALL_LIMIT)
+}
 
 /// What became of one wake-up post.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -101,8 +134,9 @@ fn record_post_outcome(outcome: PostOutcome) {
 pub(crate) struct Delivery {
     pub(crate) anchor_number: AnchorNumber,
     pub(crate) browser_id: BrowserId,
-    /// The browser queue entry this wake-up announces.
-    pub(crate) notification: QueuedNotification,
+    /// The browser queue entry this wake-up announces, or `None` where it announces
+    /// nothing new: a second wake-up for an entry the service worker already has.
+    pub(crate) notification: Option<QueuedNotification>,
     pub(crate) endpoint: String,
     pub(crate) vapid_public_key: Vec<u8>,
     pub(crate) jwt: String,
@@ -189,9 +223,13 @@ pub(crate) fn plan_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Delivery> {
         return Vec::new();
     }
 
+    // Planning past the outcall budget would queue entries for browsers whose wake-up
+    // is then refused a slot, so the pass takes on no more than it can post.
+    let budget = max_posts.min(post_capacity());
+
     let mut deliveries = Vec::new();
     for _ in 0..MAX_TAKEN_PER_PASS {
-        if deliveries.len() >= max_posts {
+        if deliveries.len() >= budget {
             break;
         }
         let taken = state::notification_backlog_mut(now_ns, |backlog| {
@@ -236,7 +274,7 @@ fn fan_out_to_browsers(
                 Some(Delivery {
                     anchor_number: pending.anchor_number,
                     browser_id: browser.id,
-                    notification: queued.clone(),
+                    notification: Some(queued.clone()),
                     endpoint: subscription.endpoint.clone(),
                     vapid_public_key: subscription.vapid_public_key.clone(),
                     jwt,
@@ -262,6 +300,78 @@ fn fan_out_to_browsers(
             Err(err) => ic_cdk::println!("Failed to queue a notification for its browsers: {err}"),
         }
     });
+}
+
+/// Post one more wake-up to a browser that already holds something to show, for when
+/// its service worker could not show it yet. Nothing is queued and nothing is taken:
+/// the entry is already there, so this only asks the worker to come back.
+pub(crate) fn wake_again(anchor_number: AnchorNumber, browser_id: BrowserId, now_ns: Timestamp) {
+    // Claiming spends the browser's one wake-up per delegation lifetime, so a browser
+    // that finds the outcall budget full keeps its claim for when there is room.
+    if post_capacity() == 0 {
+        return;
+    }
+    if let Some(delivery) = claim_rewake(anchor_number, browser_id, now_ns) {
+        outcalls::spawn_post(delivery);
+    }
+}
+
+/// Takes the browser's one second wake-up per delegation lifetime, or `None` where it
+/// has nothing to come back for or has already had it.
+///
+/// The wake-up is posted at the browser's own asking, so it is rationed: without this,
+/// a browser asking for delegations in a loop would spend the canister's cycles on
+/// outcalls. One per [`NOTIFICATION_DELEGATION_TTL_NS`] is all a worker can need,
+/// since that is how long the delegation it just minted lasts.
+pub(crate) fn claim_rewake(
+    anchor_number: AnchorNumber,
+    browser_id: BrowserId,
+    now_ns: Timestamp,
+) -> Option<Delivery> {
+    storage_borrow_mut(|storage| {
+        let mut anchor = storage.read(anchor_number).ok()?;
+        let subscription = anchor.webpush_subscription(browser_id)?;
+        if subscription
+            .woken_again_at_ns
+            .is_some_and(|last| now_ns.saturating_sub(last) < NOTIFICATION_DELEGATION_TTL_NS)
+        {
+            return None;
+        }
+
+        let delivery = rewake_delivery(&anchor, browser_id, now_ns)?;
+        let mut taken = subscription.clone();
+        taken.woken_again_at_ns = Some(now_ns);
+        anchor.set_webpush_subscription(browser_id, Some(taken));
+        storage.write(anchor).ok()?;
+        Some(delivery)
+    })
+}
+
+/// The wake-up to post, or `None` where there is nothing left to show, the browser is
+/// not registered, or its signed pool has run out.
+fn rewake_delivery(anchor: &Anchor, browser_id: BrowserId, now_ns: Timestamp) -> Option<Delivery> {
+    let browser = anchor
+        .browsers()
+        .iter()
+        .find(|browser| browser.id == browser_id)?;
+    let subscription = browser.webpush_subscription.as_ref()?;
+    let oldest = subscription
+        .notifications
+        .iter()
+        .find(|queued| queued.expires_at_ns > now_ns)?;
+    let jwt = wake_up_jwt(browser, now_ns)?;
+
+    Some(Delivery {
+        anchor_number: anchor.anchor_number(),
+        browser_id,
+        notification: None,
+        endpoint: subscription.endpoint.clone(),
+        vapid_public_key: subscription.vapid_public_key.clone(),
+        jwt,
+        // What it is for is already queued; this says only that it is still waiting.
+        urgency: Urgency::Normal,
+        ttl_seconds: oldest.expires_at_ns.saturating_sub(now_ns) / SECOND_NS,
+    })
 }
 
 /// The authorization a wake-up to `browser` carries now: none unless it was used within
@@ -292,10 +402,15 @@ pub(crate) fn settle(delivery: &Delivery, outcome: PostOutcome, now_ns: Timestam
             }
         }
         PostOutcome::RateLimited | PostOutcome::RelayError | PostOutcome::Rejected => {
+            // A wake-up that announced nothing new leaves the queue alone: the entry it
+            // was for is one the service worker has already been told about.
+            let Some(notification) = delivery.notification.as_ref() else {
+                return;
+            };
             browser_queue::remove_after_failed_wake_up(
                 delivery.anchor_number,
                 delivery.browser_id,
-                &delivery.notification,
+                notification,
                 &delivery.endpoint,
                 now_ns,
             );
@@ -371,7 +486,15 @@ mod outcalls {
     }
 
     pub(super) fn spawn_post(delivery: Delivery) {
+        // A pass plans within the budget and nothing runs between planning and here,
+        // so a refusal means the last recipient's browsers took the budget over. Its
+        // wake-up never leaves, which is what `Rejected` already stands for.
+        let Some(permit) = crate::concurrency::acquire(&WAKEUP_OUTCALL_LIMIT) else {
+            settle(&delivery, PostOutcome::Rejected, ic_cdk::api::time());
+            return;
+        };
         ic_cdk::spawn(async move {
+            let _permit = permit;
             let outcome = post_wake_up(&delivery).await;
             settle(&delivery, outcome, ic_cdk::api::time());
         });
@@ -428,7 +551,18 @@ mod tests {
     }
 
     fn submit(anchor_number: AnchorNumber, notification_id: u64, expires_at_ns: Timestamp) {
-        state::notification_backlog_mut(0, |backlog| {
+        submit_at(anchor_number, notification_id, expires_at_ns, 0);
+    }
+
+    /// For a test whose clock has moved: the backlog drops what it has held too long,
+    /// so a notification admitted at zero is gone by the time such a test looks.
+    fn submit_at(
+        anchor_number: AnchorNumber,
+        notification_id: u64,
+        expires_at_ns: Timestamp,
+        now_ns: Timestamp,
+    ) {
+        state::notification_backlog_mut(now_ns, |backlog| {
             backlog.admit(
                 StorableOriginSha256::from_origin(&APP.to_string()),
                 vec![PendingNotification {
@@ -441,7 +575,7 @@ mod tests {
                     urgency: Urgency::Normal,
                     expires_at_ns: Some(expires_at_ns),
                 }],
-                0,
+                now_ns,
             );
         });
     }
@@ -561,6 +695,92 @@ mod tests {
     }
 
     #[test]
+    fn a_second_wake_up_goes_where_something_is_still_to_show() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        assert_eq!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).len(), 1);
+
+        let again =
+            claim_rewake(recipient, browsers[0], SECOND_NS).expect("the entry is still queued");
+
+        assert_eq!(again.endpoint, RELAY);
+        assert_eq!(
+            again.notification, None,
+            "it announces nothing the browser has not been told about"
+        );
+        assert_eq!(queued(recipient, browsers[0]), vec![7]);
+    }
+
+    #[test]
+    fn nothing_is_woken_again_once_the_queue_has_run_dry() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+
+        assert!(claim_rewake(recipient, browsers[0], SECOND_NS).is_none());
+
+        submit(recipient, 7, 10 * SECOND_NS);
+        plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+        assert!(
+            claim_rewake(recipient, browsers[0], 20 * SECOND_NS).is_none(),
+            "what expired is nothing to come back for"
+        );
+    }
+
+    #[test]
+    fn a_second_wake_up_that_fails_leaves_the_queue_alone() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        let first = plan_pass(MAX_POSTS_PER_PASS, SECOND_NS)
+            .pop()
+            .expect("a wake-up");
+        let again = claim_rewake(recipient, browsers[0], SECOND_NS).expect("a second");
+
+        settle(&again, PostOutcome::Rejected, 2 * SECOND_NS);
+
+        assert_eq!(
+            queued(recipient, browsers[0]),
+            vec![7],
+            "the entry is the first wake-up's to lose"
+        );
+
+        settle(&first, PostOutcome::Rejected, 2 * SECOND_NS);
+
+        assert!(queued(recipient, browsers[0]).is_empty());
+    }
+
+    #[test]
+    fn a_browser_is_woken_again_once_per_delegation_lifetime() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        let queue_one = |at: Timestamp| {
+            submit_at(recipient, 7, at + 10 * SECOND_NS, at);
+            plan_pass(MAX_POSTS_PER_PASS, at);
+        };
+
+        queue_one(SECOND_NS);
+        assert!(claim_rewake(recipient, browsers[0], SECOND_NS).is_some());
+        assert!(
+            claim_rewake(recipient, browsers[0], 2 * SECOND_NS).is_none(),
+            "the wake-up is posted at the browser's own asking, so it is rationed"
+        );
+
+        // A later notification of its own is no second wake-up either, while the
+        // delegation the first one earned still holds.
+        let almost = SECOND_NS + NOTIFICATION_DELEGATION_TTL_NS - SECOND_NS;
+        queue_one(almost);
+        assert!(claim_rewake(recipient, browsers[0], almost).is_none());
+
+        let after = SECOND_NS + NOTIFICATION_DELEGATION_TTL_NS;
+        queue_one(after);
+        assert!(
+            claim_rewake(recipient, browsers[0], after).is_some(),
+            "the delegation it was for has expired, so the next one earns a wake-up"
+        );
+    }
+
+    #[test]
     fn a_pass_stops_once_its_budget_is_spent() {
         setup();
         // Spread over recipients to stay within the per-recipient cap.
@@ -580,6 +800,66 @@ mod tests {
         assert_eq!(
             plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).len(),
             80 - MAX_POSTS_PER_PASS
+        );
+    }
+
+    /// The slots a real pass's posts would be holding, so a test can put the outcall
+    /// budget under pressure without an outcall.
+    fn hold_outcall_slots(count: usize) -> Vec<crate::concurrency::Permit> {
+        (0..count)
+            .map(|_| crate::concurrency::acquire(&WAKEUP_OUTCALL_LIMIT).expect("a free slot"))
+            .collect()
+    }
+
+    #[test]
+    fn a_pass_plans_nothing_while_the_outcall_budget_is_full() {
+        setup();
+        let (recipient, _) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+
+        let held = hold_outcall_slots(MAX_WAKEUP_OUTCALLS);
+        assert!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).is_empty());
+        assert_eq!(
+            still_in_backlog(SECOND_NS),
+            1,
+            "it keeps its place rather than being queued for a wake-up with no slot to go out on"
+        );
+
+        drop(held);
+        assert_eq!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).len(), 1);
+    }
+
+    #[test]
+    fn a_pass_plans_no_more_than_the_outcall_budget_leaves() {
+        setup();
+        // Spread over recipients to stay within the per-recipient cap.
+        for _ in 0..4 {
+            let (recipient, _) = subscribed_recipient(1);
+            for notification_id in 0..20 {
+                submit(recipient, notification_id, 10 * SECOND_NS);
+            }
+        }
+
+        let _held = hold_outcall_slots(MAX_WAKEUP_OUTCALLS - 10);
+
+        assert_eq!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).len(), 10);
+        assert_eq!(still_in_backlog(SECOND_NS), 80 - 10);
+    }
+
+    #[test]
+    fn a_browser_keeps_its_rewake_claim_while_the_outcall_budget_is_full() {
+        setup();
+        let (recipient, browsers) = subscribed_recipient(1);
+        submit(recipient, 7, 10 * SECOND_NS);
+        plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+
+        let held = hold_outcall_slots(MAX_WAKEUP_OUTCALLS);
+        wake_again(recipient, browsers[0], SECOND_NS);
+
+        drop(held);
+        assert!(
+            claim_rewake(recipient, browsers[0], SECOND_NS).is_some(),
+            "the claim is spent on a wake-up that goes out, not on one refused a slot"
         );
     }
 
@@ -680,13 +960,13 @@ mod tests {
 
         assert_eq!(
             delivery.notification,
-            QueuedNotification {
+            Some(QueuedNotification {
                 application_number: 1,
                 sender: sender(),
                 notification_id: 7,
                 expires_at_ns: 10 * SECOND_NS,
                 account_number: Some(2),
-            }
+            })
         );
     }
 

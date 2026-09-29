@@ -64,17 +64,35 @@ const setupImageMock = ({
   );
   vi.stubGlobal("createImageBitmap", createImageBitmap);
   const drawImage = vi.fn();
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-    drawImage,
-  } as unknown as CanvasRenderingContext2D);
-  const toBlob = vi
-    .spyOn(HTMLCanvasElement.prototype, "toBlob")
-    .mockImplementation((callback, type) =>
-      callback(new Blob(["re-encoded"], { type: type ?? "image/png" })),
-    );
+  const convertToBlob = vi.fn(({ type }: { type: string }) =>
+    Promise.resolve(new Blob(["re-encoded"], { type })),
+  );
+  // jsdom has no `OffscreenCanvas`, which is what the re-encoding uses so that it
+  // runs in the service worker as well as in the page.
+  vi.stubGlobal(
+    "OffscreenCanvas",
+    class {
+      constructor(
+        public width: number,
+        public height: number,
+      ) {}
+      getContext() {
+        return { drawImage };
+      }
+      convertToBlob(options: { type: string }) {
+        return convertToBlob(options);
+      }
+    },
+  );
   const createObjectURL = vi.fn(() => LOGO_OBJECT_URL);
   URL.createObjectURL = createObjectURL;
-  return { createImageBitmap, drawImage, toBlob, createObjectURL, close };
+  return {
+    createImageBitmap,
+    drawImage,
+    convertToBlob,
+    createObjectURL,
+    close,
+  };
 };
 
 const imageResponse = (
@@ -121,7 +139,8 @@ test("should fetch a same-origin logo and render it from a blob url", async () =
     Response.json({ name: "Example App", logo: "/assets/logo.png" }),
     imageResponse(),
   );
-  const { createImageBitmap, createObjectURL, toBlob } = setupImageMock();
+  const { createImageBitmap, createObjectURL, convertToBlob } =
+    setupImageMock();
 
   const result = await fetchAppMetadata(ORIGIN);
 
@@ -134,7 +153,7 @@ test("should fetch a same-origin logo and render it from a blob url", async () =
   // The rendered bytes are II's own re-encoding, held in the browser's blob
   // store: no attacker-controlled payload reaches the DOM or the JS heap, as a
   // `data:` URL would.
-  expect(toBlob).toHaveBeenCalledOnce();
+  expect(convertToBlob).toHaveBeenCalledOnce();
   expect(createObjectURL).toHaveBeenCalledOnce();
   expect(fetchMock).toHaveBeenNthCalledWith(1, METADATA_URL, JSON_FETCH_OPTS);
   expect(fetchMock).toHaveBeenNthCalledWith(

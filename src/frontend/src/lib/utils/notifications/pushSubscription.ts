@@ -7,10 +7,23 @@
 // body to encrypt.
 
 import { bufFromBufLike } from "$lib/utils/utils";
+import { readCanisterId } from "$lib/utils/init";
+import { agentOptions } from "$lib/globals";
 
 // SvelteKit bundles the worker here; it is registered on opt-in rather than on
 // every load (kit.serviceWorker.register is off).
-const SERVICE_WORKER_URL = "/service-worker.js";
+//
+// The canister id and whether to fetch the root key ride on the URL: a woken worker
+// has no page to ask and no document to read them from, and the registration keeps the
+// URL it was made with. Without the second one, every call a worker makes against a
+// local replica fails certificate verification.
+const serviceWorkerUrl = (): string => {
+  const params = new URLSearchParams({ canisterId: readCanisterId() });
+  if (agentOptions.shouldFetchRootKey === true) {
+    params.set("fetchRootKey", "1");
+  }
+  return `/service-worker.js?${params.toString()}`;
+};
 
 export const isPushSupported = (): boolean =>
   "serviceWorker" in navigator &&
@@ -23,7 +36,7 @@ export const requestNotificationPermission =
   (): Promise<NotificationPermission> => Notification.requestPermission();
 
 const registerServiceWorker = async (): Promise<ServiceWorkerRegistration> => {
-  await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
+  await navigator.serviceWorker.register(serviceWorkerUrl(), {
     type: "module",
   });
   return navigator.serviceWorker.ready;
@@ -55,6 +68,6 @@ export const currentDeviceSubscription = async (): Promise<
   return (await registration?.pushManager.getSubscription()) ?? undefined;
 };
 
-/** `scheme://host[:port]` of a relay endpoint — the JWT `aud` the pool signs for. */
-export const relayOriginOf = (endpoint: string): string =>
-  new URL(endpoint).origin;
+// Defined in `vapidPool`, where the claim it fills is, and re-exported here for the
+// callers that reach it through this module.
+export { relayOriginOf } from "./vapidPool";

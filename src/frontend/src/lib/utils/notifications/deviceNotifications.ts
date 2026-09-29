@@ -12,15 +12,15 @@ import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 
 export { currentDeviceSubscription };
 
-// Windows left in the pool below which the reconcile tops it up. The pool covers 30
-// days, so this leaves a week of headroom.
-const JWT_POOL_REFRESH_THRESHOLD = 10;
-
 /**
- * Run on authenticated boot. Re-subscribes when the browser rotated or dropped
- * its subscription, so the canister stops knowing a dead endpoint, and tops up
- * the JWT pool before it runs out. No-op for a browser that never turned
- * notifications on.
+ * Run on authenticated boot. Re-subscribes when the browser rotated or dropped its
+ * subscription, so the canister stops knowing a dead endpoint. No-op for a browser
+ * that never turned notifications on.
+ *
+ * Keeping the JWT pool stocked is the service worker's, on every wake-up (see
+ * `poolRefill`). What is left here is the pool that has run out: the canister cannot
+ * wake a browser whose pool is spent, so the worker would never get the chance to
+ * sign another one.
  */
 export const reconcileDeviceNotifications = async (
   identityNumber: bigint,
@@ -63,8 +63,8 @@ export const reconcileDeviceNotifications = async (
   });
   // Nothing registered is what a second identity on this browser looks like, and a
   // different endpoint is what another identity's re-subscribe left behind. A pool
-  // running out wants the same call, which signs a fresh one. Either way, register
-  // what the browser already holds rather than rotating it away.
+  // with nothing left wants the same call, which signs a fresh one. Either way,
+  // register what the browser already holds rather than rotating it away.
   const needsRegistering =
     status === undefined ||
     status.endpoint !== stored.endpoint ||
@@ -72,7 +72,7 @@ export const reconcileDeviceNotifications = async (
       poolLen: status.pool_len,
       issuedAtNs: status.issued_at_ns,
       nowNs: BigInt(Date.now()) * BigInt(1_000_000),
-    }) < JWT_POOL_REFRESH_THRESHOLD;
+    }) === 0;
   if (needsRegistering) {
     await registerStoredDevice(identityNumber, stored);
   }

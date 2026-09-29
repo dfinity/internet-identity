@@ -21,6 +21,7 @@
     openid_configs: [],
     sso_allow_insecure_discovery: [],
     notifications_allow_insecure_sender_list: [],
+    notifications_allow_insecure_endpoint: [],
     backend_origin: [frontendCanisterConfig.backend_origin],
     captcha_config: [],
     dummy_auth: [],

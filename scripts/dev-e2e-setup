@@ -37,6 +37,8 @@ STATE_FILE="$STATE_DIR/state"
 II_ARGS_FILE="$STATE_DIR/ii-init-args.did"
 FE_ARGS_FILE="$STATE_DIR/fe-init-args.did"
 TEST_APP_ARGS_FILE="$STATE_DIR/test-app-init-args.did"
+TEST_APP_CANISTER_ID=""
+TEST_APP_LOCAL_ORIGIN=""
 mkdir -p "$STATE_DIR" "$LOG_DIR"
 
 log() { printf '\033[1;36m>>\033[0m %s\n' "$*"; }
@@ -339,7 +341,7 @@ write_install_args() {
   dnssec_config="$(node src/frontend/tests/e2e-playwright/utils/renderDnssecTestAnchor.mjs)"
 
   cat > "$II_ARGS_FILE" <<EOF
-(opt record { mcp_official_url = opt opt "https://official-mcp.id.ai/mcp"; captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { "https://id.ai"; "https://identity.ic0.app"; "https://identity.internetcomputer.org" }; new_flow_origins = opt vec { "https://id.ai" }; openid_configs = opt vec { $openid_configs }; sso_allow_insecure_discovery = opt true; enable_dnssec_email_recovery = opt true; notifications_enabled_origins = opt vec { "https://nice-name.com" }; dnssec_config = $dnssec_config })
+(opt record { mcp_official_url = opt opt "https://official-mcp.id.ai/mcp"; captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { "https://id.ai"; "https://identity.ic0.app"; "https://identity.internetcomputer.org" }; new_flow_origins = opt vec { "https://id.ai" }; openid_configs = opt vec { $openid_configs }; sso_allow_insecure_discovery = opt true; enable_dnssec_email_recovery = opt true; notifications_enabled_origins = opt vec { "https://nice-name.com"; "$TEST_APP_LOCAL_ORIGIN" }; notifications_allow_insecure_endpoint = opt true; notifications_allow_insecure_sender_list = opt true; dnssec_config = $dnssec_config })
 EOF
 
   # Declare the test app's ICRC-167 redirect callback on the e2e host so II's
@@ -369,6 +371,12 @@ create_canisters() {
     fi
   done
   II_CANISTER_ID="$(icp canister status internet_identity --id-only)"
+  TEST_APP_CANISTER_ID="$(icp canister status test_app --id-only)"
+  # The test app as the local gateway serves it, which is the one origin both a
+  # browser and the replica itself can reach: the notification e2e needs the
+  # canister to read the app's sender list, and `nice-name.com` resolves in the
+  # browser alone.
+  TEST_APP_LOCAL_ORIGIN="http://$TEST_APP_CANISTER_ID.localhost:8000"
 }
 
 # Per-canister install: skip if the wasm wasn't rebuilt this run AND a module
@@ -402,6 +410,14 @@ install_canisters() {
       icp canister install "$name" -y --mode "$mode" --wasm "$wasm"
     fi
   done
+
+  # The test app's notification library reads where it is served and which
+  # Internet Identity to send through from the canister's environment. Without
+  # them it refuses to send at all. A scenario can still point it at another
+  # Internet Identity through the frontend.
+  icp canister settings update test_app \
+    --add-environment-variable "notification_origin=$TEST_APP_LOCAL_ORIGIN" \
+    --add-environment-variable "notification_sender=$II_CANISTER_ID" >/dev/null
 }
 
 # The dev server returns HTTP 500 on a bare GET (no Host header matches the
@@ -449,8 +465,10 @@ do_setup() {
   build_canisters
   start_openid_providers
   start_network
-  write_install_args
+  # After creation: the install args name the canisters, including the origin
+  # the test app is served at locally.
   create_canisters
+  write_install_args
   write_fe_install_args
   install_canisters
   start_dev_server

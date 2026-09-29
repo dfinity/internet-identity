@@ -53,6 +53,8 @@ pub fn set_subscription(
             jwt_signatures,
             jwt_issued_at_ns,
             notifications,
+            // A re-subscribe has had no second wake-up of its own yet.
+            woken_again_at_ns: None,
         }),
     )
     .map_err(SetWebPushSubscriptionError::InternalCanisterError)

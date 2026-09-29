@@ -28,6 +28,8 @@ jobs:
         run: npm run lint
       - name: Check formatting
         run: npm run format-check
+      - name: Build the frontend
+        run: npm run build
       - uses: ./.github/actions/setup-didc
       - name: Generate type interfaces
         run: npm run generate

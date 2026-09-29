@@ -28,6 +28,14 @@ pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
     let synchronized = InternetIdentitySynchronizedConfig {
         openid_configs: config.openid_configs.clone(),
         mcp_official_url: config.mcp_official_url.clone().flatten(),
+        // `config` is rebuilt from the persistent state after the install argument was
+        // applied, so this is the list the endpoints themselves check against.
+        notifications_enabled_origins: Some(
+            config
+                .notifications_enabled_origins
+                .clone()
+                .unwrap_or_default(),
+        ),
     };
     let mut assets = vec![Asset {
         url_path: "/.config.did.bin".to_string(),

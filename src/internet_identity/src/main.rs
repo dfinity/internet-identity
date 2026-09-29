@@ -427,7 +427,6 @@ fn browser_get_next_notification(
         notification: notifications::browser_queue::next_to_show(
             &anchor,
             browser_id,
-            &request.skip,
             ic_cdk::api::time(),
         ),
     })
@@ -1022,6 +1021,8 @@ fn config() -> InternetIdentityInit {
         sso_allow_insecure_discovery: persistent_state.sso_allow_insecure_discovery,
         notifications_allow_insecure_sender_list: persistent_state
             .notifications_allow_insecure_sender_list,
+        notifications_allow_insecure_endpoint: persistent_state
+            .notifications_allow_insecure_endpoint,
         analytics_config: Some(persistent_state.analytics_config.clone()),
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
         is_production: persistent_state.is_production,
@@ -1145,6 +1146,14 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.notifications_allow_insecure_sender_list =
                     Some(notifications_allow_insecure_sender_list);
+            })
+        }
+        if let Some(notifications_allow_insecure_endpoint) =
+            arg.notifications_allow_insecure_endpoint
+        {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.notifications_allow_insecure_endpoint =
+                    Some(notifications_allow_insecure_endpoint);
             })
         }
         if let Some(new_flow_origins) = arg.new_flow_origins {

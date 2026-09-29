@@ -143,6 +143,8 @@ pub struct WebPushSubscription {
     /// What the service worker has yet to show, oldest first, each woken through this
     /// registration.
     pub notifications: Vec<QueuedNotification>,
+    /// When this browser was last woken again for something it could not show yet.
+    pub woken_again_at_ns: Option<Timestamp>,
 }
 
 impl From<StorableWebPushSubscription> for WebPushSubscription {
@@ -172,6 +174,7 @@ impl From<StorableWebPushSubscription> for WebPushSubscription {
                     })
                 })
                 .collect(),
+            woken_again_at_ns: value.woken_again_at_ns,
         }
     }
 }
@@ -193,6 +196,7 @@ impl From<WebPushSubscription> for StorableWebPushSubscription {
                     .map(StorableQueuedNotification::from)
                     .collect()
             }),
+            woken_again_at_ns: value.woken_again_at_ns,
         }
     }
 }

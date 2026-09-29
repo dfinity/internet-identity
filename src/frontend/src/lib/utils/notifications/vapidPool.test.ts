@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fromBase64URL } from "$lib/utils/utils";
 import {
-  JWT_POOL_SIZE,
+  JWT_POOL_SIZE_WINDOWS,
   generateVapidKeypair,
   signJwtPool,
   windowPayloadB64,
@@ -47,7 +47,7 @@ describe("generateVapidKeypair + signJwtPool", () => {
       "https://relay.example",
       BigInt(42),
     );
-    expect(signatures).toHaveLength(JWT_POOL_SIZE);
+    expect(signatures).toHaveLength(JWT_POOL_SIZE_WINDOWS);
     expect(signatures.every((sig) => sig.length === 64)).toBe(true);
   });
 });

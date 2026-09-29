@@ -1,6 +1,7 @@
 /**
  * This module contains everything related to connecting to the canister.
  */
+import { agentHost } from "$lib/utils/agentHost";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import type {
   _SERVICE,
@@ -1009,50 +1010,8 @@ export const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
 // Infer the host for the IC's HTTP api. II lives on a custom domain that may be different
 // from the domain where the api is served (agent-js otherwise infers the IC's HTTP URL from
 // the current window location)
-export const inferHost = (): string => {
-  // The domain used for the http api
-  const IC_API_DOMAIN = "icp-api.io";
-
-  const location = window?.location;
-  if (location === undefined) {
-    // If there is no location, then most likely this is a non-browser environment. All bets
-    // are off but we return something valid just in case.
-    return "https://" + IC_API_DOMAIN;
-  }
-
-  // Match a hostname against an official gateway domain by exact equality or
-  // by a dot boundary, so adversarial subdomains like `evil-ic0.app` are not
-  // treated as the IC.
-  const isGatewayDomain = (domain: string): boolean =>
-    location.hostname === domain || location.hostname.endsWith(`.${domain}`);
-
-  if (
-    isGatewayDomain("icp0.io") ||
-    isGatewayDomain("ic0.app") ||
-    isGatewayDomain("icp.net") ||
-    isGatewayDomain("internetcomputer.org")
-  ) {
-    // If this is a canister running on one of the official IC domains, then return the
-    // official API endpoint
-    return "https://" + IC_API_DOMAIN;
-  }
-
-  if (
-    location.host === "127.0.0.1" /* typical development */ ||
-    location.host ===
-      "0.0.0.0" /* typical development, though no secure context (only usable with builds with WebAuthn disabled) */ ||
-    location.hostname.endsWith(
-      "localhost",
-    ) /* local canisters from icx-proxy like rdmx6-....-foo.localhost */
-  ) {
-    // If this is a local deployment, then assume the api and assets are collocated
-    // and use this asset (page)'s URL.
-    return location.protocol + "//" + location.host;
-  }
-
-  // Otherwise assume it's a custom setup and use the host itself as API.
-  return location.protocol + "//" + location.host;
-};
+export const inferHost = (): string =>
+  agentHost(typeof window === "undefined" ? undefined : window.location);
 
 const mapRegFlowNextStep = (
   step: RegistrationFlowNextStep,

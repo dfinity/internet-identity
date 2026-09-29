@@ -5,6 +5,7 @@ import { Principal } from "@icp-sdk/core/principal";
 
 // See: https://www.jsonrpc.org/specification#error_object
 export const INVALID_PARAMS_ERROR_CODE = -32602;
+export const METHOD_NOT_FOUND_ERROR_CODE = -32601;
 // See: https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_25_signer_interaction_standard.md#errors-3
 /// Placed in ICRC-25's 3xxx "user action" range, so a client can tell a silent request
 /// that needs a ceremony apart from a real failure.

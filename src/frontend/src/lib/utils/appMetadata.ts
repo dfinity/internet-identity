@@ -196,7 +196,7 @@ type CappedFetch =
  * oversize response, enforced while streaming otherwise). Fails on a non-200
  * status or when the cap is exceeded; network errors propagate to the caller.
  */
-const fetchCapped = async (
+export const fetchCapped = async (
   url: URL,
   accept: string,
   maxBytes: number,
@@ -437,8 +437,7 @@ const validatePolicyUrl = (
 };
 
 /**
- * Re-encode the downloaded bytes as an image II has produced itself, and hand
- * back a `blob:` URL for it.
+ * Re-encode the downloaded bytes as an image II has produced itself.
  *
  * `createImageBitmap` rejects anything that isn't an image the browser can
  * decode, so the content-type header is never taken on trust. The bitmap is
@@ -446,15 +445,11 @@ const validatePolicyUrl = (
  * to its first frame, drops whatever else rode along in the original container,
  * and scales the result down to what the screens actually render.
  *
- * The result is handed over as a `blob:` URL rather than a `data:` URL so the
- * bytes stay in the browser's blob store instead of being copied into the DOM
- * and the JS heap as a base64 string. The URL lives as long as the page: the
- * metadata store fetches once per origin and nothing supersedes the value, so
- * there is no point at which it could be revoked while still in use.
+ * An `OffscreenCanvas` rather than an element, so this runs in the service
+ * worker as well as in the page, and the caller decides how the bytes are
+ * addressed ({@link logoAsObjectUrl}, {@link logoAsDataUrl}).
  */
-const transcodeToObjectUrl = async (
-  blob: Blob,
-): Promise<string | undefined> => {
+const transcodeLogo = async (blob: Blob): Promise<Blob | undefined> => {
   // The blob goes to the decoder as it came off the network, so the encoded
   // image is never a JS buffer either.
   const bitmap = await createImageBitmap(blob);
@@ -471,31 +466,45 @@ const transcodeToObjectUrl = async (
       1,
       APP_LOGO_RENDER_SIZE / Math.max(bitmap.width, bitmap.height),
     );
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = new OffscreenCanvas(
+      Math.max(1, Math.round(bitmap.width * scale)),
+      Math.max(1, Math.round(bitmap.height * scale)),
+    );
     const context = canvas.getContext("2d");
     if (context === null) {
       return undefined;
     }
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((resolve) =>
-      // WebP keeps logos small and preserves transparency; browsers that
-      // can't encode it fall back to PNG on their own, which does too.
-      canvas.toBlob(resolve, "image/webp"),
-    );
-    return blob === null ? undefined : URL.createObjectURL(blob);
+    // WebP keeps logos small and preserves transparency.
+    return await canvas.convertToBlob({ type: "image/webp" });
   } finally {
     bitmap.close();
   }
 };
 
+/** How a page addresses the re-encoded logo: the bytes stay in the browser's blob
+ *  store rather than being copied into the DOM and the JS heap as base64. The URL
+ *  lives as long as the page, which fetches once per origin and never supersedes the
+ *  value, so there is no point at which it could be revoked while still in use. */
+export const logoAsObjectUrl = (blob: Blob): Promise<string> =>
+  Promise.resolve(URL.createObjectURL(blob));
+
+/** How a service worker addresses it: `URL.createObjectURL` is not available there,
+ *  and a notification's icon outlives the worker that showed it. */
+export const logoAsDataUrl = async (blob: Blob): Promise<string> => {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return `data:${blob.type};base64,${btoa(binary)}`;
+};
+
 /**
  * Download the logo asset, check it against the content-type allowlist and the
- * size cap, and return a `blob:` URL for II's own re-encoding of it (see
- * {@link transcodeToObjectUrl}).
+ * size cap, and return II's own re-encoding of it (see {@link transcodeLogo}).
  */
-const fetchLogoObjectUrl = async (url: URL): Promise<string | undefined> => {
+const fetchLogoBlob = async (url: URL): Promise<Blob | undefined> => {
   const result = await fetchCapped(url, "image/*", MAX_APP_LOGO_SIZE);
   if (!result.ok) {
     return undefined;
@@ -510,7 +519,7 @@ const fetchLogoObjectUrl = async (url: URL): Promise<string | undefined> => {
   if (result.blob.size === 0) {
     return undefined;
   }
-  return await transcodeToObjectUrl(result.blob);
+  return await transcodeLogo(result.blob);
 };
 
 /**
@@ -540,9 +549,10 @@ const fetchLogoObjectUrl = async (url: URL): Promise<string | undefined> => {
  */
 export const fetchAppMetadata = async (
   origin: string,
+  addressLogo: (logo: Blob) => Promise<string> = logoAsObjectUrl,
 ): Promise<AppMetadata | undefined> => {
   for (const candidate of appMetadataOrigins(origin)) {
-    const attempt = await fetchAppMetadataFrom(candidate);
+    const attempt = await fetchAppMetadataFrom(candidate, addressLogo);
     if (attempt.served) {
       return attempt.metadata;
     }
@@ -567,6 +577,7 @@ type MetadataAttempt =
 
 const fetchAppMetadataFrom = async (
   origin: string,
+  addressLogo: (logo: Blob) => Promise<string>,
 ): Promise<MetadataAttempt> => {
   let result: CappedFetch;
   try {
@@ -640,7 +651,9 @@ const fetchAppMetadataFrom = async (
       // document its failures aren't necessarily authoring mistakes (a 500 or
       // a dropped connection is transient). Losing just the logo is the better
       // outcome here: the name and description still render.
-      metadata.logo = await fetchLogoObjectUrl(logoUrl).catch(() => undefined);
+      metadata.logo = await fetchLogoBlob(logoUrl)
+        .then((logo) => (logo === undefined ? undefined : addressLogo(logo)))
+        .catch(() => undefined);
       if (metadata.logo === undefined) {
         console.warn(
           `Ignoring the \`logo\` in ${APP_METADATA_PATH}: it could not be decoded as a still image of an allowed type, within ${MAX_APP_LOGO_SIZE} bytes and ${MAX_APP_LOGO_DIMENSION} pixels per axis.`,

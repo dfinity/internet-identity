@@ -1,3 +1,5 @@
+import { promiseQueue } from "$lib/utils/promiseQueue";
+
 /**
  * Runs authorization-bearing requests one at a time.
  *
@@ -6,12 +8,4 @@
  * race them against each other and have the user approve a screen naming one origin
  * while another is answered.
  */
-let queueTail: Promise<unknown> = Promise.resolve();
-
-export const serializeAuthorizationRequest = <T>(
-  run: () => Promise<T>,
-): Promise<T> => {
-  const next = queueTail.then(run);
-  queueTail = next.catch(() => {});
-  return next;
-};
+export const serializeAuthorizationRequest = promiseQueue();

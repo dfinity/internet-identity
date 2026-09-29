@@ -11,8 +11,17 @@ const HEADER_B64 = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9"; // {"typ":"JWT","alg"
 // payload, so a mismatch makes every signature fail at the relay.
 const VAPID_SUBJECT = "https://id.ai";
 
-/** One JWT per window; matches the canister's MAX_JWT_POOL_LEN (~30 days). */
-export const JWT_POOL_SIZE = 30;
+/** `scheme://host[:port]` of a relay endpoint — the JWT `aud` the pool signs for. */
+export const relayOriginOf = (endpoint: string): string =>
+  new URL(endpoint).origin;
+
+/** Windows a pool covers, one JWT signed per window, so a pool of 30 is spent 30
+ *  days after it was signed; matches the canister's MAX_JWT_POOL_LEN. */
+export const JWT_POOL_SIZE_WINDOWS = 30;
+
+/** Windows left at which a pool is signed again, so it never runs out between one
+ *  look at it and the next. */
+export const JWT_POOL_REFRESH_THRESHOLD_WINDOWS = 10;
 
 /**
  * Windows a stored pool still covers at `nowNs`.
@@ -69,7 +78,7 @@ export const signJwtPool = async (
   issuedAtNs: bigint,
 ): Promise<Uint8Array[]> => {
   const signatures: Uint8Array[] = [];
-  for (let window = 0; window < JWT_POOL_SIZE; window++) {
+  for (let window = 0; window < JWT_POOL_SIZE_WINDOWS; window++) {
     signatures.push(
       await signWindow(privateKey, relayOrigin, issuedAtNs, window),
     );

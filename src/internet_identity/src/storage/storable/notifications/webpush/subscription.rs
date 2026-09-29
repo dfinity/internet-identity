@@ -30,4 +30,9 @@ pub struct StorableWebPushSubscription {
     /// this registration, so a new one starts empty.
     #[n(4)]
     pub notifications: Option<Vec<StorableQueuedNotification>>,
+    /// When this browser was last woken a second time for a notification it could not
+    /// show yet. The wake-up is posted at the browser's own asking, so it is allowed
+    /// again only once the delegation it was for has expired.
+    #[n(5)]
+    pub woken_again_at_ns: Option<StorableTimestamp>,
 }

@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { METHOD_NOT_FOUND_ERROR_CODE } from "$lib/utils/transport/utils";
 import type { Writable } from "svelte/store";
 
 const ORIGIN = "https://app.example.com";
+
+/// Which origins the deployment notifies for, as `globals` reads them off the
+/// canister's published config. A scenario changes it to be an app this
+/// Internet Identity does not notify for.
+const notifying = new Set([ORIGIN]);
 
 vi.mock("$lib/globals", async () => {
   const { Principal } = await import("@icp-sdk/core/principal");
@@ -10,6 +16,7 @@ vi.mock("$lib/globals", async () => {
     canisterId: Principal.fromText("rwlgt-iiaaa-aaaaa-aaaaa-cai"),
     backendCanisterConfig: { openid_configs: [] },
     frontendCanisterConfig: { related_origins: [], dev_csp: [] },
+    notificationsEnabledFor: (origin: string) => notifying.has(origin),
   };
 });
 vi.mock("$lib/state/featureFlags", async () => {
@@ -231,6 +238,16 @@ describe("handleNotificationConsentRequest", () => {
 
     expect(sent[0].error).toBeDefined();
     expect(errors).toEqual([]);
+  });
+
+  it("refuses an app this Internet Identity does not notify for", async () => {
+    notifying.delete(ORIGIN);
+
+    const { sent, errors } = await run({ settle: false });
+
+    expect(sent[0].error).toMatchObject({ code: METHOD_NOT_FOUND_ERROR_CODE });
+    expect(errors).toEqual([]);
+    notifying.add(ORIGIN);
   });
 
   it("refuses an unverified derivation origin without answering", async () => {

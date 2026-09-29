@@ -1,4 +1,5 @@
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
+import { MAX_ALTERNATIVE_ORIGINS } from "$lib/utils/urlUtils";
 import { Principal } from "@icp-sdk/core/principal";
 import { expect } from "vitest";
 
@@ -156,7 +157,6 @@ test("should not validate if canister id resolution fails", async () => {
 
 // Spelled out rather than imported from the implementation so that lowering
 // the limit there makes these boundary tests fail instead of following along.
-const MAX_ALTERNATIVE_ORIGINS = 100;
 
 // A list of the given length whose last entry is the request origin used by
 // the boundary tests below, so that only the number of entries decides the

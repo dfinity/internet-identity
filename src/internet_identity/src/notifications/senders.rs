@@ -26,8 +26,13 @@ const WELL_KNOWN_PATH: &str = "/.well-known/ii-notification-senders";
 #[cfg(not(test))]
 const MAX_SENDERS: usize = 10;
 
+/// Counted against headers too, and a gateway answers a certified asset with a
+/// response certificate of a few kilobytes, so the list's own handful of bytes
+/// is the smaller part of what has to fit. Nothing this size is kept: the
+/// transform narrows the response to the senders, and the cache holds the
+/// principals it parsed from them.
 #[cfg(not(test))]
-const SENDERS_MAX_RESPONSE_BYTES: u64 = 4 * 1024;
+const SENDERS_MAX_RESPONSE_BYTES: u64 = 8 * 1024;
 
 #[cfg(not(test))]
 const SENDERS_CALL_CYCLES: u128 = 30_000_000_000;
@@ -67,6 +72,40 @@ fn new_senders_cache() -> SendersCache {
 
 /// A little over one outcall round trip.
 const PENDING_RETRY_AFTER_NS: u64 = 3 * 1_000_000_000;
+
+/// The canister gateway domains an origin may name.
+const GATEWAY_DOMAINS: &[&str] = &["ic0.app", "icp0.io", "icp.net"];
+
+/// The gateway every canister is served through, so one request settles the question.
+const FETCH_DOMAIN: &str = "icp.net";
+
+/// Where the list is read from.
+///
+/// The origin reaching this module has been folded to `ic0.app`, the spelling consent
+/// is keyed by — and one a canister need not be served on: a boundary node answers
+/// `400 client_domain_canister_mismatch` where it is not, and the list would never be
+/// read. The gateway domains resolve to the same canister and serve the same file, so a
+/// gateway origin is read through [`FETCH_DOMAIN`]. Anything else — a custom domain,
+/// localhost — is read as it stands.
+fn fetch_origin(origin: &FrontendHostname) -> String {
+    origin
+        .strip_prefix("https://")
+        .and_then(|rest| {
+            GATEWAY_DOMAINS
+                .iter()
+                .find_map(|domain| rest.strip_suffix(&format!(".{domain}")))
+        })
+        .filter(|subdomain| {
+            !subdomain.is_empty()
+                && subdomain
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric() || character == '-')
+        })
+        .map_or_else(
+            || origin.clone(),
+            |subdomain| format!("https://{subdomain}.{FETCH_DOMAIN}"),
+        )
+}
 
 /// What the origin's list says about a caller.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -184,7 +223,7 @@ async fn fetch_senders(origin: FrontendHostname) -> Result<Vec<Principal>, Strin
     };
 
     let request = CanisterHttpRequestArgument {
-        url: format!("{origin}{WELL_KNOWN_PATH}"),
+        url: format!("{}{WELL_KNOWN_PATH}", fetch_origin(&origin)),
         method: HttpMethod::GET,
         body: None,
         max_response_bytes: Some(SENDERS_MAX_RESPONSE_BYTES),
@@ -254,6 +293,39 @@ async fn senders_fill(origin: FrontendHostname) -> FillOutcome<Vec<Principal>, S
 
 #[cfg(test)]
 mod tests {
+    use super::fetch_origin;
+
+    #[test]
+    fn a_gateway_origin_is_read_through_the_gateway_that_serves_every_canister() {
+        // The folded spelling consent is keyed by, which the canister may not be
+        // served on: that is the bug this exists for.
+        assert_eq!(
+            fetch_origin(&"https://vt36r-2qaaa-aaaad-aad5a-cai.ic0.app".to_string()),
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net"
+        );
+        assert_eq!(
+            fetch_origin(&"https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io".to_string()),
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net"
+        );
+        assert_eq!(
+            fetch_origin(&"https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net".to_string()),
+            "https://vt36r-2qaaa-aaaad-aad5a-cai.icp.net"
+        );
+    }
+
+    #[test]
+    fn anything_that_is_no_gateway_origin_is_read_as_it_stands() {
+        for origin in [
+            "https://app.example",
+            "https://nice-name.com",
+            "http://127.0.0.1:4943",
+            // A gateway domain with nothing before it names no canister.
+            "https://icp.net",
+        ] {
+            assert_eq!(fetch_origin(&origin.to_string()), origin);
+        }
+    }
+
     use super::*;
     use std::collections::HashMap;
 

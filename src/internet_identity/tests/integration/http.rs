@@ -970,6 +970,7 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
         InternetIdentitySynchronizedConfig {
             openid_configs: Some(openid_configs),
             mcp_official_url: None,
+            notifications_enabled_origins: Some(vec![]),
         }
     );
 
@@ -977,6 +978,74 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
 
     let result = verify_response_certification(&env, canister_id, request, http_response, 2);
     assert_eq!(result.verification_version, 2);
+
+    Ok(())
+}
+
+/// Verifies that the frontend is told which apps this deployment notifies for: the
+/// canister refuses an origin it does not hold, so the frontend has no business
+/// offering the feature to one — and none at all where the list is empty.
+#[test]
+fn ii_canister_serves_the_origins_it_notifies_for() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), None);
+
+    let enabled = |canister_id| -> Result<Option<Vec<String>>, RejectResponse> {
+        let response = http_request(
+            &env,
+            canister_id,
+            &HttpRequest {
+                method: "GET".to_string(),
+                url: "/.config.did.bin".to_string(),
+                headers: vec![],
+                body: ByteBuf::new(),
+                certificate_version: Some(2),
+            },
+        )?;
+        let config: InternetIdentitySynchronizedConfig =
+            candid::decode_one(&response.body).expect("the config decodes");
+        Ok(config.notifications_enabled_origins)
+    };
+
+    assert_eq!(
+        enabled(canister_id)?,
+        Some(vec![]),
+        "a deployment with no app enabled notifies for nobody"
+    );
+
+    upgrade_ii_canister_with_arg(
+        &env,
+        canister_id,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            notifications_enabled_origins: Some(vec!["https://app.example".to_string()]),
+            ..Default::default()
+        }),
+    )
+    .expect("upgrading with an enabled origin");
+
+    assert_eq!(
+        enabled(canister_id)?,
+        Some(vec!["https://app.example".to_string()]),
+        "and names the app it does notify for"
+    );
+
+    upgrade_ii_canister_with_arg(
+        &env,
+        canister_id,
+        II_WASM.clone(),
+        Some(InternetIdentityInit {
+            notifications_enabled_origins: Some(vec![]),
+            ..Default::default()
+        }),
+    )
+    .expect("upgrading with the list emptied");
+
+    assert_eq!(
+        enabled(canister_id)?,
+        Some(vec![]),
+        "an empty list turns notifications off, so the frontend hears that too"
+    );
 
     Ok(())
 }
