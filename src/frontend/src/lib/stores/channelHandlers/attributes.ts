@@ -5,6 +5,7 @@ import {
   INVALID_PARAMS_ERROR_CODE,
 } from "$lib/utils/transport/utils";
 import { frontendCanisterConfig } from "$lib/globals";
+import { promiseQueue } from "$lib/utils/promiseQueue";
 import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
@@ -49,14 +50,7 @@ export const extractScope = (key: string): string | undefined => {
  *  one silently receives their approval. The legacy and 1-click OpenID
  *  handlers don't touch `attributeConsentStore`, so only the consent
  *  handler needs this lock. */
-let consentQueueTail: Promise<unknown> = Promise.resolve();
-const serializeConsentRequest = <T>(fn: () => Promise<T>): Promise<T> => {
-  const prev = consentQueueTail;
-  const next = prev.then(fn);
-  // Don't let a rejection from an earlier call block the queue.
-  consentQueueTail = next.catch(() => {});
-  return next;
-};
+const serializeConsentRequest = promiseQueue();
 
 /** Whether a scoped key is in the 1-click OpenID auto-approve allowlist
  *  for the given issuer — these keys skip the consent screen because the

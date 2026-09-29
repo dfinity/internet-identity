@@ -196,7 +196,7 @@ type CappedFetch =
  * oversize response, enforced while streaming otherwise). Fails on a non-200
  * status or when the cap is exceeded; network errors propagate to the caller.
  */
-const fetchCapped = async (
+export const fetchCapped = async (
   url: URL,
   accept: string,
   maxBytes: number,

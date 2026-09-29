@@ -10,7 +10,8 @@
 // subscription is `userVisibleOnly`, which obliges a visible notification per push.
 
 import { reportOpened } from "$lib/utils/notifications/notificationOpened";
-import { onWakeUp, sequencer } from "$lib/utils/notifications/wakeUp";
+import { onWakeUp } from "$lib/utils/notifications/wakeUp";
+import { promiseQueue } from "$lib/utils/promiseQueue";
 import { refOf } from "$lib/utils/notifications/shownNotification";
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
@@ -24,12 +25,15 @@ worker.addEventListener("activate", (event) => {
   event.waitUntil(worker.clients.claim());
 });
 
-// One wake-up at a time, whatever the browser delivers: see `sequencer`.
-const next = sequencer();
+// One wake-up at a time, whatever the browser delivers. `browser_get_next_notification`
+// is a query and claims nothing, so two pushes handled at once would both read the same
+// head, show the same notification, and leave the one behind it with no wake-up coming.
+// `waitUntil` extends this worker's life; it does not serialise its handlers.
+const enqueue = promiseQueue();
 
 worker.addEventListener("push", (event) => {
   event.waitUntil(
-    next(() =>
+    enqueue(() =>
       onWakeUp({
         registration: worker.registration,
         location: worker.location,
@@ -70,7 +74,10 @@ worker.addEventListener("notificationclick", (event) => {
         }
       }
 
-      // Then the app learns its notification did its job.
+      // Then the app learns its notification did its job. Nothing can act on a
+      // failure here: a click has no caller to answer and nothing to come back for,
+      // the window is open and the notification closed either way, and the queue
+      // entry went when it was shown. It costs the app a count, not the user.
       if (target !== undefined) {
         await reportOpened({ ref: target, location: worker.location }).catch(
           () => undefined,

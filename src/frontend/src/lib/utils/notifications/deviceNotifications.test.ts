@@ -28,6 +28,7 @@ import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { reconcileDeviceNotifications } from "./deviceNotifications";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
+import { JWT_POOL_SIZE_WINDOWS } from "./vapidPool";
 import {
   registerStoredDevice,
   subscribeAndRegisterDevice,
@@ -37,12 +38,14 @@ import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 const ENDPOINT = "https://relay.example/abc";
 const DAY_NS = BigInt(24 * 60 * 60) * BigInt(1_000_000_000);
 /** A registration on `endpoint` whose pool of 30 windows was minted `daysAgo` ago. */
-const pool = (daysAgo: number, endpoint = ENDPOINT) => [
+/** A registered pool with `left` of its windows still to come. */
+const poolWithWindowsLeft = (left: number, endpoint = ENDPOINT) => [
   {
     endpoint,
-    pool_len: 30,
+    pool_len: JWT_POOL_SIZE_WINDOWS,
     issued_at_ns:
-      BigInt(Date.now()) * BigInt(1_000_000) - BigInt(daysAgo) * DAY_NS,
+      BigInt(Date.now()) * BigInt(1_000_000) -
+      BigInt(JWT_POOL_SIZE_WINDOWS - left) * DAY_NS,
   },
 ];
 
@@ -93,7 +96,9 @@ describe("reconcileDeviceNotifications", () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
     vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
-    a.get_webpush_subscription_status.mockResolvedValue(pool(1));
+    a.get_webpush_subscription_status.mockResolvedValue(
+      poolWithWindowsLeft(29),
+    );
     await run(a);
     expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
   });
@@ -106,7 +111,7 @@ describe("reconcileDeviceNotifications", () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
     vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
-    a.get_webpush_subscription_status.mockResolvedValue(pool(25));
+    a.get_webpush_subscription_status.mockResolvedValue(poolWithWindowsLeft(5));
     await run(a);
     expect(registerStoredDevice).not.toHaveBeenCalled();
     expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
@@ -120,7 +125,7 @@ describe("reconcileDeviceNotifications", () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
     vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
-    a.get_webpush_subscription_status.mockResolvedValue(pool(30));
+    a.get_webpush_subscription_status.mockResolvedValue(poolWithWindowsLeft(0));
     await run(a);
     expect(registerStoredDevice).toHaveBeenCalledOnce();
     expect(subscribeAndRegisterDevice).not.toHaveBeenCalled();
@@ -151,7 +156,7 @@ describe("reconcileDeviceNotifications", () => {
     vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
     a.get_webpush_subscription_status.mockResolvedValue(
-      pool(1, "https://relay.example/someone-else"),
+      poolWithWindowsLeft(29, "https://relay.example/someone-else"),
     );
     await run(a);
     expect(registerStoredDevice).toHaveBeenCalledOnce();
@@ -175,7 +180,9 @@ describe("reconcileDeviceNotifications", () => {
     vi.mocked(currentDeviceSubscription).mockResolvedValue(sub());
     vi.mocked(loadVapidKey).mockResolvedValue(key());
     const a = actor();
-    a.get_webpush_subscription_status.mockResolvedValue(pool(1));
+    a.get_webpush_subscription_status.mockResolvedValue(
+      poolWithWindowsLeft(29),
+    );
     await run(a);
     expect(browserKeyActor).toHaveBeenCalledWith(BigInt(1));
     expect(a.get_webpush_subscription_status).toHaveBeenCalledWith({

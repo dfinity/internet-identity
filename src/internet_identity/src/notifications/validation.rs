@@ -315,15 +315,7 @@ fn fetchable_origin(origin: &FrontendHostname) -> Result<(), String> {
 }
 
 fn allow_insecure_sender_list() -> bool {
-    #[cfg(not(test))]
-    {
-        crate::state::persistent_state(|s| s.notifications_allow_insecure_sender_list)
-            .unwrap_or(false)
-    }
-    #[cfg(test)]
-    {
-        tests::TEST_ALLOW_INSECURE_SENDER_LIST.with_borrow(|allow| *allow)
-    }
+    crate::state::persistent_state(|s| s.notifications_allow_insecure_sender_list).unwrap_or(false)
 }
 
 /// Whether this deployment notifies at all. The Web Push channel is per browser rather
@@ -360,12 +352,6 @@ mod tests {
     use super::*;
     use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
     use internet_identity_interface::internet_identity::types::Urgency;
-    use std::cell::RefCell;
-
-    thread_local! {
-        pub(super) static TEST_ALLOW_INSECURE_SENDER_LIST: RefCell<bool> = const { RefCell::new(false) };
-    }
-
     fn enable(origins: &[&str]) {
         crate::state::persistent_state_mut(|s| {
             s.notifications_enabled_origins = Some(origins.iter().map(|o| o.to_string()).collect());
@@ -373,7 +359,9 @@ mod tests {
     }
 
     fn allow_insecure(allow: bool) {
-        TEST_ALLOW_INSECURE_SENDER_LIST.with_borrow_mut(|flag| *flag = allow);
+        crate::state::persistent_state_mut(|s| {
+            s.notifications_allow_insecure_sender_list = Some(allow);
+        });
     }
 
     fn notification(id: u64, recipient: &str, urgency: Urgency) -> Notification {

@@ -1,9 +1,9 @@
 import { resolveCanisterId as resolveCanisterIdFn } from "$lib/utils/canisterIdResolution";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
+import { MAX_ALTERNATIVE_ORIGINS } from "$lib/utils/urlUtils";
 import { wrapError } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
 
-const MAX_ALTERNATIVE_ORIGINS = 100;
 type ValidationResult =
   { result: "valid" } | { result: "invalid"; message: string };
 

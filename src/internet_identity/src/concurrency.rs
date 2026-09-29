@@ -121,7 +121,7 @@ pub fn acquire(limiter: Limiter) -> Option<Permit> {
 /// Slots `limiter` has free right now. For a caller that commits state before it
 /// starts the guarded work: planning no more than this keeps it from committing
 /// work it will then be refused a slot for.
-pub fn available(limiter: Limiter) -> usize {
+pub fn num_available_slots(limiter: Limiter) -> usize {
     let now = now_secs();
     limiter.with_borrow_mut(|l| l.available(now))
 }

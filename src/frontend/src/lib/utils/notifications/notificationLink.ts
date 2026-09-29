@@ -12,14 +12,14 @@
  * same way. What opens is the app's link as it wrote it.
  */
 
-import { remapToLegacyDomain } from "$lib/utils/urlUtils";
+import { fetchCapped } from "$lib/utils/appMetadata";
+import {
+  MAX_ALTERNATIVE_ORIGINS,
+  remapToLegacyDomain,
+} from "$lib/utils/urlUtils";
 
 const ALTERNATIVE_ORIGINS_PATH = "/.well-known/ii-alternative-origins";
-
-/** As many as II accepts elsewhere for the same document. */
-const MAX_ALTERNATIVE_ORIGINS = 100;
 const MAX_DOCUMENT_SIZE = 8_192;
-const FETCH_TIMEOUT_MILLIS = 10_000;
 
 /** The link to open, given the origins the app vouches for. */
 export const allowedLink = ({
@@ -47,35 +47,23 @@ export const allowedLink = ({
 };
 
 /** The origins an app publishes as its own, or none where it publishes nothing we can
- *  use. Read the same way II reads the app's other well-known documents: no
- *  credentials, no redirects, a size cap and a timeout. */
+ *  use. Read through the same capped fetch as the app's metadata document, which
+ *  stops the download at the cap rather than buffering whatever the origin sends. */
 export const fetchAlternativeOrigins = async (
   origin: string,
 ): Promise<string[]> => {
-  const abort = new AbortController();
-  const timeout = setTimeout(() => abort.abort(), FETCH_TIMEOUT_MILLIS);
   try {
-    const response = await fetch(`${origin}${ALTERNATIVE_ORIGINS_PATH}`, {
-      credentials: "omit",
-      redirect: "error",
-      signal: abort.signal,
-    });
-    if (!response.ok) {
+    const result = await fetchCapped(
+      new URL(`${origin}${ALTERNATIVE_ORIGINS_PATH}`),
+      "application/json",
+      MAX_DOCUMENT_SIZE,
+    );
+    if (!result.ok) {
       return [];
     }
-    const length = Number(response.headers.get("content-length") ?? 0);
-    if (length > MAX_DOCUMENT_SIZE) {
-      return [];
-    }
-    const body = await response.text();
-    if (body.length > MAX_DOCUMENT_SIZE) {
-      return [];
-    }
-    return parseAlternativeOrigins(body);
+    return parseAlternativeOrigins(await result.blob.text());
   } catch {
     return [];
-  } finally {
-    clearTimeout(timeout);
   }
 };
 

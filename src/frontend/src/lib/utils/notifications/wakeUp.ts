@@ -41,22 +41,6 @@ import {
 const PLACEHOLDER_TITLE = "Internet Identity";
 const PLACEHOLDER_BODY = "You have a new notification.";
 
-/**
- * Runs what it is given one at a time, in the order it was given them.
- *
- * `waitUntil` keeps a push handler alive but does not serialise handlers: two pushes
- * arriving together would both take the same queue head, and the second wake-up would
- * be spent showing what the first already showed instead of the entry behind it. A
- * failed wake-up does not hold up the next one.
- */
-export const sequencer = (): ((run: () => Promise<void>) => Promise<void>) => {
-  let last: Promise<void> = Promise.resolve();
-  return (run) => {
-    last = last.catch(() => undefined).then(run);
-    return last;
-  };
-};
-
 /** What the page knows and a woken worker cannot ask for: which canister this is, and
  *  whether the deployment fetches the root key. Both ride on the script URL the
  *  registration keeps. */

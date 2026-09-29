@@ -16,7 +16,7 @@ import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { throwCanisterError } from "$lib/utils/utils";
 import { loadVapidKey } from "./vapidKeyStore";
 import {
-  JWT_POOL_REFRESH_THRESHOLD,
+  JWT_POOL_REFRESH_THRESHOLD_WINDOWS,
   relayOriginOf,
   signJwtPool,
   windowsRemaining,
@@ -55,7 +55,7 @@ export const refillJwtPool = async ({
     issuedAtNs: status.issued_at_ns,
     nowNs,
   });
-  if (remaining >= JWT_POOL_REFRESH_THRESHOLD) {
+  if (remaining >= JWT_POOL_REFRESH_THRESHOLD_WINDOWS) {
     return false;
   }
 

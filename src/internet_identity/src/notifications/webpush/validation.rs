@@ -180,14 +180,7 @@ fn validate_endpoint(endpoint: &str) -> Result<(), String> {
 /// Whether this deployment lets a browser register a plain-http endpoint, which only
 /// one whose relay is a local server ever should.
 fn allow_insecure_endpoint() -> bool {
-    #[cfg(not(test))]
-    {
-        crate::state::persistent_state(|s| s.notifications_allow_insecure_endpoint).unwrap_or(false)
-    }
-    #[cfg(test)]
-    {
-        tests::TEST_ALLOW_INSECURE_ENDPOINT.with_borrow(|allow| *allow)
-    }
+    crate::state::persistent_state(|s| s.notifications_allow_insecure_endpoint).unwrap_or(false)
 }
 
 /// Length plus curve validity. The key is echoed to the relay as VAPID `k=`, and a relay
@@ -221,14 +214,14 @@ fn validate_jwt_pool(signatures: &[Vec<u8>]) -> Result<(), String> {
 mod tests {
     use super::super::fixtures::*;
     use super::*;
-    use std::cell::RefCell;
-
     const ANCHOR: AnchorNumber = 10_000;
 
-    thread_local! {
-        /// What `notifications_allow_insecure_endpoint` says, for a test that is
-        /// about a deployment whose relay is a local server.
-        pub static TEST_ALLOW_INSECURE_ENDPOINT: RefCell<bool> = const { RefCell::new(false) };
+    /// What `notifications_allow_insecure_endpoint` says, for a test that is about a
+    /// deployment whose relay is a local server.
+    fn allow_insecure(allow: bool) {
+        crate::state::persistent_state_mut(|s| {
+            s.notifications_allow_insecure_endpoint = Some(allow);
+        });
     }
 
     fn validate(
@@ -253,10 +246,10 @@ mod tests {
     #[test]
     fn takes_a_loopback_one_where_the_deployment_says_it_has_no_relay() {
         setup();
-        TEST_ALLOW_INSECURE_ENDPOINT.with_borrow_mut(|allow| *allow = true);
+        allow_insecure(true);
         let loopback = validate(request(ANCHOR, "http://127.0.0.1:4711/push", 0));
         let elsewhere = validate(request(ANCHOR, "http://relay.example/push", 0));
-        TEST_ALLOW_INSECURE_ENDPOINT.with_borrow_mut(|allow| *allow = false);
+        allow_insecure(false);
 
         assert!(loopback.is_ok());
         assert!(elsewhere.is_err(), "only a local relay, not any plain host");

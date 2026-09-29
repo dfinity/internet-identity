@@ -44,7 +44,7 @@ vi.mock("$lib/utils/notifications/notificationLink", async (importOriginal) => {
   };
 });
 
-const { onWakeUp, sequencer } = await import("$lib/utils/notifications/wakeUp");
+const { onWakeUp } = await import("$lib/utils/notifications/wakeUp");
 
 const IDENTITY = BigInt(10_000);
 const ORIGIN = "https://app.example";
@@ -350,48 +350,5 @@ describe("topping up the wake-up pool", () => {
     });
 
     expect(shown.shown).toHaveLength(1);
-  });
-});
-
-describe("sequencer", () => {
-  it("runs wake-ups one at a time, in order", async () => {
-    const order: string[] = [];
-    const settle: (() => void)[] = [];
-    const run = (name: string) => () =>
-      new Promise<void>((resolve) => {
-        order.push(`start ${name}`);
-        settle.push(() => {
-          order.push(`end ${name}`);
-          resolve();
-        });
-      });
-    const next = sequencer();
-
-    const first = next(run("first"));
-    const second = next(run("second"));
-
-    // The chain starts its next link in a microtask, so let those run first.
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(order).toEqual(["start first"]);
-    settle[0]();
-    await first;
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    settle[1]();
-    await second;
-
-    expect(order).toEqual([
-      "start first",
-      "end first",
-      "start second",
-      "end second",
-    ]);
-  });
-
-  it("does not let a failed wake-up hold up the next", async () => {
-    const next = sequencer();
-    const failed = next(() => Promise.reject(new Error("no")));
-
-    await expect(failed).rejects.toThrow("no");
-    await expect(next(() => Promise.resolve())).resolves.toBeUndefined();
   });
 });

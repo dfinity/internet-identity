@@ -19,9 +19,17 @@ export interface NotificationContent {
   url?: string;
 }
 
-/** One call to one app canister. `shouldFetchRootKey` is the deployment's: without it
- *  a local replica's answers fail verification, which would read the same as an app
- *  that dismissed the notification. */
+/**
+ * One call to one app canister.
+ *
+ * `shouldFetchRootKey` is the deployment's, and arrives by way of the worker's own
+ * registration script URL — a woken worker has no page to ask and cannot import the
+ * page's agent, which is bootstrapped from injected config. It is not derived from the
+ * location either: the e2e serves Internet Identity on a public name against a local
+ * replica, so "fetch it only on a loopback host" would be wrong there. Without it a
+ * local replica's answers fail verification, which reads the same as an app that
+ * dismissed the notification.
+ */
 export interface AppCall {
   canisterId: Principal;
   id: bigint;

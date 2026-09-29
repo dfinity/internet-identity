@@ -59,7 +59,7 @@ thread_local! {
 
 /// How many more wake-ups may be posted before the budget is full.
 fn post_capacity() -> usize {
-    crate::concurrency::available(&WAKEUP_OUTCALL_LIMIT)
+    crate::concurrency::num_available_slots(&WAKEUP_OUTCALL_LIMIT)
 }
 
 /// What became of one wake-up post.
