@@ -92,14 +92,17 @@ export const fetchNotificationContent = async (
   return { title: content.title, body: content.body, url: content.url[0] };
 };
 
-/** Tells the app a channel showed it. Nothing depends on the answer. */
+/** Tells the app a channel showed it. Nothing depends on the answer: the entry leaves
+ *  the browser's queue either way, so that an app which cannot answer cannot hold on
+ *  to a place in it. An app that was unreachable counts the notification among the
+ *  ones it never saw shown. */
 export const reportNotificationReceived = async (
   call: AppCall,
 ): Promise<void> => {
   try {
     await actorFor(call)._internet_identity_notification_received(call.id);
   } catch {
-    // The notification is shown either way; the app learns of it on the next one.
+    // Nothing to do about it here.
   }
 };
 
