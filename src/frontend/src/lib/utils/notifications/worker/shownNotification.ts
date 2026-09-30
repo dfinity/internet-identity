@@ -15,7 +15,7 @@ export interface NotificationRef {
   origin: string;
   /** `undefined` is the unreserved default account. */
   accountNumber?: bigint;
-  canisterId: string;
+  appCanisterId: string;
   id: bigint;
 }
 
@@ -23,7 +23,7 @@ export interface ShownData {
   identityNumber: string;
   origin: string;
   accountNumber: string;
-  canisterId: string;
+  appCanisterId: string;
   id: string;
   /** Where a click goes, already checked against the app's own origins. */
   url: string;
@@ -36,7 +36,7 @@ export const dataOf = (ref: NotificationRef, url: string): ShownData => ({
   identityNumber: ref.identityNumber.toString(),
   origin: ref.origin,
   accountNumber: ref.accountNumber?.toString() ?? "",
-  canisterId: ref.canisterId,
+  appCanisterId: ref.appCanisterId,
   id: ref.id.toString(),
   url,
 });
@@ -47,13 +47,13 @@ export const refOf = (data: unknown): NotificationRef | undefined => {
   if (typeof data !== "object" || data === null) {
     return undefined;
   }
-  const { identityNumber, origin, accountNumber, canisterId, id } =
+  const { identityNumber, origin, accountNumber, appCanisterId, id } =
     data as Partial<ShownData>;
   if (
     typeof identityNumber !== "string" ||
     typeof origin !== "string" ||
     typeof accountNumber !== "string" ||
-    typeof canisterId !== "string" ||
+    typeof appCanisterId !== "string" ||
     typeof id !== "string"
   ) {
     return undefined;
@@ -63,7 +63,7 @@ export const refOf = (data: unknown): NotificationRef | undefined => {
       identityNumber: BigInt(identityNumber),
       origin,
       accountNumber: accountNumber === "" ? undefined : BigInt(accountNumber),
-      canisterId,
+      appCanisterId,
       id: BigInt(id),
     };
   } catch {

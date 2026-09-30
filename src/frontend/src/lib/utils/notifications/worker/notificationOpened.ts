@@ -8,28 +8,19 @@
  */
 
 import { Principal } from "@icp-sdk/core/principal";
-import { agentHost, type AgentLocation } from "$lib/utils/agentHost";
 import { reportNotificationOpened } from "./appNotifications";
 import { loadPullIdentity } from "./pullDelegation";
 import type { NotificationRef } from "./shownNotification";
-import { deploymentOf } from "./wakeUp";
 
 /** Answers whether the app was told, which is what a test has to go on. */
 export const reportOpened = async ({
   ref,
-  location,
 }: {
   ref: NotificationRef;
-  location: AgentLocation & { search: string };
 }): Promise<boolean> => {
-  const deployment = deploymentOf(location.search);
-  if (deployment === undefined) {
-    return false;
-  }
   const identity = await loadPullIdentity({
     identityNumber: ref.identityNumber,
     target: { origin: ref.origin, accountNumber: ref.accountNumber },
-    internetIdentityCanisterId: deployment.canisterId,
     nowMillis: Date.now(),
   });
   if (identity === undefined) {
@@ -39,11 +30,9 @@ export const reportOpened = async ({
   }
 
   await reportNotificationOpened({
-    canisterId: Principal.fromText(ref.canisterId),
+    appCanisterId: Principal.fromText(ref.appCanisterId),
     id: ref.id,
     identity,
-    host: agentHost(location),
-    shouldFetchRootKey: deployment.shouldFetchRootKey,
   });
   return true;
 };

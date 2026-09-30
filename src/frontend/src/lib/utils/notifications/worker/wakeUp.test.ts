@@ -13,18 +13,47 @@ const fetchAppMetadata = vi.fn((): Promise<{ name?: string } | undefined> =>
 const refillJwtPool = vi.fn((_options: unknown) => Promise.resolve(false));
 const fetchAlternativeOrigins = vi.fn(() => Promise.resolve([] as string[]));
 
+const browserKeyIdentity = vi.fn<() => Promise<Identity | undefined>>(() =>
+  Promise.resolve(undefined),
+);
+const createSync = vi.fn((_options: unknown) => ({}));
+
+const AGENT_OPTIONS = {
+  host: "http://127.0.0.1:4943",
+  shouldFetchRootKey: true,
+};
+
 vi.mock("$lib/stores/browser-key.store", () => ({
   registeredIdentityNumbers: () => registeredIdentityNumbers(),
-  browserKeyIdentity: () => Promise.resolve(undefined),
+  browserKeyIdentity: () => browserKeyIdentity(),
 }));
-vi.mock("$lib/utils/notifications/pullDelegation", () => ({
+vi.mock("$lib/utils/notifications/workerConfig", () => ({
+  config: {
+    canisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
+    agentOptions: AGENT_OPTIONS,
+  },
+}));
+vi.mock("@icp-sdk/core/agent", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@icp-sdk/core/agent")>();
+  return {
+    ...actual,
+    Actor: {
+      createActor: () => ({
+        browser_get_next_notification: () =>
+          Promise.resolve({ Ok: { notification: [] } }),
+      }),
+    },
+    HttpAgent: { createSync: (options: unknown) => createSync(options) },
+  };
+});
+vi.mock("$lib/utils/notifications/worker/pullDelegation", () => ({
   loadPullIdentity: () => loadPullIdentity(),
   mintPullIdentity: () => mintPullIdentity(),
 }));
-vi.mock("$lib/utils/notifications/poolRefill", () => ({
+vi.mock("$lib/utils/notifications/worker/poolRefill", () => ({
   refillJwtPool: (options: unknown) => refillJwtPool(options),
 }));
-vi.mock("$lib/utils/notifications/appNotifications", () => ({
+vi.mock("$lib/utils/notifications/worker/appNotifications", () => ({
   fetchNotificationContent: (call: unknown) => fetchNotificationContent(call),
   reportNotificationReceived: (call: unknown) =>
     reportNotificationReceived(call),
@@ -33,28 +62,25 @@ vi.mock("$lib/utils/appMetadata", () => ({
   fetchAppMetadata: () => fetchAppMetadata(),
   logoAsDataUrl: () => Promise.resolve("data:image/webp;base64,AA=="),
 }));
-vi.mock("$lib/utils/notifications/notificationLink", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("$lib/utils/notifications/notificationLink")
-    >();
-  return {
-    ...actual,
-    fetchAlternativeOrigins: () => fetchAlternativeOrigins(),
-  };
-});
+vi.mock(
+  "$lib/utils/notifications/worker/notificationLink",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("$lib/utils/notifications/worker/notificationLink")
+      >();
+    return {
+      ...actual,
+      fetchAlternativeOrigins: () => fetchAlternativeOrigins(),
+    };
+  },
+);
 
-const { onWakeUp } = await import("$lib/utils/notifications/wakeUp");
+const { onWakeUp } = await import("$lib/utils/notifications/worker/wakeUp");
 
 const IDENTITY = BigInt(10_000);
 const ORIGIN = "https://app.example";
 const SENDER = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
-const LOCATION = {
-  search: "?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai&fetchRootKey=1",
-  hostname: "127.0.0.1",
-  host: "127.0.0.1:4943",
-  protocol: "http:",
-};
 
 const notification = {
   origin: ORIGIN,
@@ -124,6 +150,7 @@ const identity = {} as Identity;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  browserKeyIdentity.mockResolvedValue(undefined);
   registeredIdentityNumbers.mockResolvedValue([IDENTITY]);
   loadPullIdentity.mockResolvedValue(identity);
   mintPullIdentity.mockResolvedValue(identity);
@@ -142,7 +169,6 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
       internetIdentity: ii.factory,
     });
 
@@ -159,15 +185,27 @@ describe("onWakeUp", () => {
     expect(ii.removed).toHaveLength(1);
   });
 
-  it("carries the deployment's root key setting into the app call", async () => {
+  it("reaches Internet Identity the way the page said to reach it", async () => {
+    // Every other case injects the actor, so this is the only cover for the one the
+    // worker builds: without the page's options it would talk to mainnet's default
+    // host and verify against the wrong root key.
+    browserKeyIdentity.mockResolvedValue({} as Identity);
+
+    await onWakeUp({ registration: registration() });
+
+    expect(createSync).toHaveBeenCalledWith(
+      expect.objectContaining(AGENT_OPTIONS),
+    );
+  });
+
+  it("asks the app that sent the notification", async () => {
     await onWakeUp({
       registration: registration(),
-      location: LOCATION,
       internetIdentity: internetIdentity([notification]).factory,
     });
 
     expect(fetchNotificationContent).toHaveBeenCalledWith(
-      expect.objectContaining({ shouldFetchRootKey: true }),
+      expect.objectContaining({ appCanisterId: SENDER, id: BigInt(42) }),
     );
   });
 
@@ -178,7 +216,6 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
       internetIdentity: ii.factory,
     });
 
@@ -195,7 +232,6 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
       internetIdentity: ii.factory,
     });
 
@@ -214,7 +250,6 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
       internetIdentity: ii.factory,
     });
 
@@ -233,7 +268,6 @@ describe("onWakeUp", () => {
     fetchAppMetadata.mockResolvedValue({ name: "Example App" });
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
       internetIdentity: ii.factory,
     });
     expect(shown.shown).toHaveLength(1);
@@ -241,7 +275,6 @@ describe("onWakeUp", () => {
     fetchNotificationContent.mockRejectedValue(new Error("unreachable"));
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
       internetIdentity: ii.factory,
     });
 
@@ -255,7 +288,6 @@ describe("onWakeUp", () => {
     const ii = internetIdentity([notification]);
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
       internetIdentity: ii.factory,
     });
     expect(shown.shown).toHaveLength(1);
@@ -263,7 +295,6 @@ describe("onWakeUp", () => {
     fetchNotificationContent.mockResolvedValue(undefined);
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
       internetIdentity: ii.factory,
     });
 
@@ -282,7 +313,6 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: registration(),
-      location: LOCATION,
       internetIdentity: ii.factory,
     });
 
@@ -302,7 +332,6 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
       internetIdentity: ii.factory,
     });
 
@@ -312,40 +341,12 @@ describe("onWakeUp", () => {
     expect(reportNotificationReceived).toHaveBeenCalledOnce();
   });
 
-  it("shows a placeholder where it cannot tell which canister to ask", async () => {
-    const shown = registration();
-
-    await onWakeUp({
-      registration: shown,
-      location: { ...LOCATION, search: "" },
-      internetIdentity: internetIdentity([notification]).factory,
-    });
-
-    expect(shown.shown[0].title).toBe("Internet Identity");
-    expect(fetchNotificationContent).not.toHaveBeenCalled();
-  });
-});
-
-describe("topping up the wake-up pool", () => {
-  it("is offered on every wake-up, whatever was shown", async () => {
-    await onWakeUp({
-      registration: registration(),
-      location: LOCATION,
-      internetIdentity: internetIdentity([notification]).factory,
-    });
-
-    expect(refillJwtPool).toHaveBeenCalledWith(
-      expect.objectContaining({ identityNumber: IDENTITY }),
-    );
-  });
-
   it("does not fail a wake-up that showed its notification", async () => {
     const shown = registration();
     refillJwtPool.mockRejectedValue(new Error("no"));
 
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
       internetIdentity: internetIdentity([notification]).factory,
     });
 

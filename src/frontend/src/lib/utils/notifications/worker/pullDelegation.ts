@@ -18,6 +18,7 @@ import {
 import { Principal } from "@icp-sdk/core/principal";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { transformSignedDelegation } from "$lib/utils/utils";
+import { config } from "../workerConfig";
 
 const PULL_STORE = createStore("ii-notification-pull", "delegations");
 
@@ -49,10 +50,7 @@ const isUsable = (stored: StoredPull, nowMillis: number): boolean =>
   nowMillis;
 
 /** What a stored pull becomes: an identity whose calls carry II's `sender_info`. */
-const identityOf = async (
-  stored: StoredPull,
-  internetIdentityCanisterId: string,
-): Promise<Identity> =>
+const identityOf = async (stored: StoredPull): Promise<Identity> =>
   new AttributesIdentity({
     inner: DelegationIdentity.fromDelegation(
       await ECDSAKeyIdentity.fromKeyPair(stored.keyPair),
@@ -62,7 +60,7 @@ const identityOf = async (
       data: stored.senderInfo,
       signature: stored.senderInfoSignature,
     },
-    signer: { canisterId: Principal.fromText(internetIdentityCanisterId) },
+    signer: { canisterId: Principal.fromText(config.canisterId) },
   });
 
 /** The delegation held for this app and account, or `undefined` where there is none
@@ -70,12 +68,10 @@ const identityOf = async (
 export const loadPullIdentity = async ({
   identityNumber,
   target,
-  internetIdentityCanisterId,
   nowMillis,
 }: {
   identityNumber: bigint;
   target: PullTarget;
-  internetIdentityCanisterId: string;
   nowMillis: number;
 }): Promise<Identity | undefined> => {
   const stored = await idbGet<StoredPull>(
@@ -85,7 +81,7 @@ export const loadPullIdentity = async ({
   if (stored === undefined || !isUsable(stored, nowMillis)) {
     return undefined;
   }
-  return identityOf(stored, internetIdentityCanisterId);
+  return identityOf(stored);
 };
 
 /**
@@ -98,12 +94,10 @@ export const mintPullIdentity = async ({
   actor,
   identityNumber,
   target,
-  internetIdentityCanisterId,
 }: {
   actor: ActorSubclass<_SERVICE>;
   identityNumber: bigint;
   target: PullTarget;
-  internetIdentityCanisterId: string;
 }): Promise<Identity | undefined> => {
   const session = await ECDSAKeyIdentity.generate({ extractable: false });
   const sessionKey = new Uint8Array(session.getPublicKey().toDer());
@@ -148,5 +142,5 @@ export const mintPullIdentity = async ({
     },
   );
 
-  return identityOf(stored, internetIdentityCanisterId);
+  return identityOf(stored);
 };

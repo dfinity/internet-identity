@@ -3,6 +3,19 @@ import { Principal } from "@icp-sdk/core/principal";
 import type { Identity } from "@icp-sdk/core/agent";
 
 const notificationContent = vi.fn();
+const createSync = vi.fn((_options: unknown) => ({}));
+
+const AGENT_OPTIONS = {
+  host: "http://127.0.0.1:4943",
+  shouldFetchRootKey: true,
+};
+
+vi.mock("$lib/utils/notifications/workerConfig", () => ({
+  config: {
+    canisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
+    agentOptions: AGENT_OPTIONS,
+  },
+}));
 
 vi.mock("@icp-sdk/core/agent", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@icp-sdk/core/agent")>();
@@ -14,19 +27,17 @@ vi.mock("@icp-sdk/core/agent", async (importOriginal) => {
           notificationContent(id),
       }),
     },
-    HttpAgent: { createSync: () => ({}) },
+    HttpAgent: { createSync: (options: unknown) => createSync(options) },
   };
 });
 
 const { fetchNotificationContent } =
-  await import("$lib/utils/notifications/appNotifications");
+  await import("$lib/utils/notifications/worker/appNotifications");
 
 const call = {
-  canisterId: Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai"),
+  appCanisterId: Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai"),
   id: BigInt(42),
   identity: {} as Identity,
-  host: "https://icp-api.io",
-  shouldFetchRootKey: false,
 };
 
 beforeEach(() => {
@@ -34,6 +45,16 @@ beforeEach(() => {
 });
 
 describe("fetchNotificationContent", () => {
+  it("reaches the app the way the page said to reach the canister", async () => {
+    notificationContent.mockResolvedValue([]);
+
+    await fetchNotificationContent(call);
+
+    expect(createSync).toHaveBeenCalledWith(
+      expect.objectContaining(AGENT_OPTIONS),
+    );
+  });
+
   it("reads what the app answered", async () => {
     notificationContent.mockResolvedValue([
       { title: "New message", body: "See you at six", url: ["/chats/7"] },

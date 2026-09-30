@@ -11,6 +11,7 @@
 import { Actor, HttpAgent, type Identity } from "@icp-sdk/core/agent";
 import { IDL } from "@icp-sdk/core/candid";
 import type { Principal } from "@icp-sdk/core/principal";
+import { config } from "../workerConfig";
 
 export interface NotificationContent {
   title: string;
@@ -31,11 +32,9 @@ export interface NotificationContent {
  * dismissed the notification.
  */
 export interface AppCall {
-  canisterId: Principal;
+  appCanisterId: Principal;
   id: bigint;
   identity: Identity;
-  host: string;
-  shouldFetchRootKey: boolean;
 }
 
 const Content = IDL.Record({
@@ -64,19 +63,16 @@ interface AppNotificationService {
 }
 
 const actorFor = ({
-  canisterId,
+  appCanisterId,
   identity,
-  host,
-  shouldFetchRootKey,
 }: AppCall): AppNotificationService =>
   Actor.createActor<AppNotificationService>(idlFactory, {
     agent: HttpAgent.createSync({
-      host,
+      ...config.agentOptions,
       identity,
-      shouldFetchRootKey,
       retryTimes: 0,
     }),
-    canisterId,
+    canisterId: appCanisterId,
   });
 
 /**

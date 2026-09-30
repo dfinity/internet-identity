@@ -4,14 +4,14 @@ import {
   refOf,
   tagOf,
   type NotificationRef,
-} from "$lib/utils/notifications/shownNotification";
+} from "$lib/utils/notifications/worker/shownNotification";
 
 // The frontend targets ES2019, so no BigInt literals.
 const ref: NotificationRef = {
   identityNumber: BigInt(10_000),
   origin: "https://app.example",
   accountNumber: BigInt(3),
-  canisterId: "un4fu-tqaaa-aaaab-qadjq-cai",
+  appCanisterId: "un4fu-tqaaa-aaaab-qadjq-cai",
   id: BigInt(42),
 };
 

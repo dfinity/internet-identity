@@ -2,13 +2,9 @@ import { Principal } from "@icp-sdk/core/principal";
 import { type _SERVICE } from "$lib/generated/internet_identity_types";
 import { type InternetIdentityFrontendInit } from "$lib/generated/internet_identity_frontend_types";
 import { readCanisterId } from "$lib/utils/init";
-import {
-  Actor,
-  ActorSubclass,
-  HttpAgent,
-  HttpAgentOptions,
-} from "@icp-sdk/core/agent";
+import { Actor, ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import { inferHost, remapToLegacyDomain } from "$lib/utils/iiConnection";
+import type { AgentOptions } from "$lib/utils/notifications/workerConfig";
 import { idlFactory as internetIdentityIDL } from "$lib/generated/internet_identity_idl";
 import { init as internetIdentityFrontendInit } from "$lib/generated/internet_identity_frontend_idl";
 import { IDL } from "@icp-sdk/core/candid";
@@ -88,7 +84,7 @@ export const notificationsEnabledFor = (origin: string): boolean =>
 export let canisterId: Principal;
 export let frontendCanisterConfig: InternetIdentityFrontendInit;
 export let backendCanisterConfig: BackendCanisterConfig;
-export let agentOptions: HttpAgentOptions;
+export let agentOptions: AgentOptions;
 export let anonymousAgent: HttpAgent;
 export let anonymousActor: ActorSubclass<_SERVICE>;
 
