@@ -8,18 +8,11 @@
 
 import { bufFromBufLike } from "$lib/utils/utils";
 import { agentOptions, canisterId } from "$lib/globals";
-import { encodeWorkerConfig } from "./workerConfig";
+import { workerConfigUrl } from "./workerConfig";
 
-// SvelteKit bundles the worker here; it is registered on opt-in rather than on
-// every load (kit.serviceWorker.register is off). What rides on the URL, and why, is
-// `workerConfig`.
-const serviceWorkerUrl = (): string => {
-  const { host, shouldFetchRootKey } = agentOptions;
-  return `/service-worker.js?${encodeWorkerConfig({
-    canisterId: canisterId.toText(),
-    agentOptions: { host, shouldFetchRootKey },
-  })}`;
-};
+// Registered on opt-in rather than on every load (kit.serviceWorker.register is off).
+const serviceWorkerUrl = (): string =>
+  workerConfigUrl({ canisterId: canisterId.toText(), agentOptions });
 
 export const isPushSupported = (): boolean =>
   "serviceWorker" in navigator &&

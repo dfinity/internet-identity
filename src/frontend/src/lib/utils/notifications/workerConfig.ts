@@ -31,14 +31,18 @@ const schema = z.object({
   }),
 }) satisfies z.ZodType<WorkerConfig>;
 
-export const encodeWorkerConfig = (config: WorkerConfig): string =>
-  new URLSearchParams({ config: JSON.stringify(config) }).toString();
+/** SvelteKit bundles the worker here. */
+const WORKER_PATH = "/service-worker.js";
+
+/** Where to register the worker, carrying what it will need. */
+export const workerConfigUrl = (config: WorkerConfig): string => {
+  const url = new URL(WORKER_PATH, self.location.origin);
+  url.searchParams.set("config", JSON.stringify(config));
+  return url.toString();
+};
 
 /**
  * What the page put on the URL, or nothing where it cannot be read.
- *
- * Validated rather than trusted: `shouldFetchRootKey` decides whether a local
- * replica's answers are accepted, so it counts only as the boolean the page wrote.
  */
 export const decodeWorkerConfig = (
   search: string,

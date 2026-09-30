@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   decodeWorkerConfig,
-  encodeWorkerConfig,
+  workerConfigUrl,
   type WorkerConfig,
 } from "$lib/utils/notifications/workerConfig";
 
@@ -17,7 +17,7 @@ const CONFIG: WorkerConfig = {
  */
 describe("the worker's config", () => {
   it("round trips what the page put on it", () => {
-    expect(decodeWorkerConfig(`?${encodeWorkerConfig(CONFIG)}`)).toEqual(
+    expect(decodeWorkerConfig(new URL(workerConfigUrl(CONFIG)).search)).toEqual(
       CONFIG,
     );
   });
@@ -28,9 +28,9 @@ describe("the worker's config", () => {
       agentOptions: { host: "https://icp-api.io", shouldFetchRootKey: false },
     };
 
-    expect(decodeWorkerConfig(`?${encodeWorkerConfig(mainnet)}`)).toEqual(
-      mainnet,
-    );
+    expect(
+      decodeWorkerConfig(new URL(workerConfigUrl(mainnet)).search),
+    ).toEqual(mainnet);
   });
 
   it("answers nothing for a search that carries neither", () => {
