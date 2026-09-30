@@ -8,14 +8,14 @@
 
 import { bufFromBufLike } from "$lib/utils/utils";
 import { agentOptions, canisterId } from "$lib/globals";
-import { registrationSearch } from "./registrationUrl";
+import { encodeWorkerConfig } from "./workerConfig";
 
 // SvelteKit bundles the worker here; it is registered on opt-in rather than on
 // every load (kit.serviceWorker.register is off). What rides on the URL, and why, is
-// `registrationUrl`.
+// `workerConfig`.
 const serviceWorkerUrl = (): string => {
   const { host, shouldFetchRootKey } = agentOptions;
-  return `/service-worker.js?${registrationSearch({
+  return `/service-worker.js?${encodeWorkerConfig({
     canisterId: canisterId.toText(),
     agentOptions: { host, shouldFetchRootKey },
   })}`;

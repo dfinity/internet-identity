@@ -21,7 +21,7 @@ import {
   browserKeyIdentity,
   registeredIdentityNumbers,
 } from "$lib/stores/browser-key.store";
-import type { WorkerRegistration } from "./registrationUrl";
+import { config } from "./workerConfig";
 import { fetchAppMetadata, logoAsDataUrl } from "$lib/utils/appMetadata";
 import {
   fetchNotificationContent,
@@ -54,26 +54,25 @@ export const showPlaceholder = (
 export interface WakeUpContext {
   /** The worker's registration, which owns the notifications it shows. */
   registration: ServiceWorkerRegistration;
-  /** What the page put on this worker's registration URL. */
-  worker: WorkerRegistration;
   /** The canister, as this browser. Injected so a test can answer for it. */
   internetIdentity?: (
     identityNumber: bigint,
-    worker: WorkerRegistration,
   ) => Promise<ActorSubclass<_SERVICE> | undefined>;
 }
 
 const internetIdentityActor = async (
   identityNumber: bigint,
-  { canisterId, agentOptions }: WorkerRegistration,
 ): Promise<ActorSubclass<_SERVICE> | undefined> => {
   const identity = await browserKeyIdentity(identityNumber);
   if (identity === undefined) {
     return undefined;
   }
   return Actor.createActor<_SERVICE>(internetIdentityIDL, {
-    agent: HttpAgent.createSync({ ...agentOptions, identity, retryTimes: 0 }),
-    canisterId: Principal.fromText(canisterId),
+    agent: HttpAgent.createSync({
+      identity,
+      retryTimes: 0,
+    }),
+    canisterId: Principal.fromText(config.canisterId),
   });
 };
 
@@ -84,7 +83,7 @@ const refFor = (
   identityNumber,
   origin: notification.origin,
   accountNumber: notification.account_number[0],
-  canisterId: notification.canister_id.toText(),
+  appCanisterId: notification.canister_id.toText(),
   id: notification.id,
 });
 
@@ -155,14 +154,10 @@ interface Queued {
  *  the canister remembers having answered. */
 const nextFor = async (
   context: WakeUpContext,
-  {
-    identityNumber,
-    worker,
-  }: { identityNumber: bigint; worker: WorkerRegistration },
+  { identityNumber }: { identityNumber: bigint },
 ): Promise<Queued | undefined> => {
   const actor = await (context.internetIdentity ?? internetIdentityActor)(
     identityNumber,
-    worker,
   );
   if (actor === undefined) {
     return undefined;
@@ -191,10 +186,8 @@ const showQueued = async (
   context: WakeUpContext,
   { actor, identityNumber, notification }: Queued,
   {
-    worker,
     pending,
   }: {
-    worker: WorkerRegistration;
     pending: Promise<unknown>[];
   },
 ): Promise<boolean> => {
@@ -206,7 +199,7 @@ const showQueued = async (
   const held = await loadPullIdentity({
     identityNumber,
     target,
-    internetIdentityCanisterId: worker.canisterId,
+
     nowMillis: Date.now(),
   });
 
@@ -225,17 +218,15 @@ const showQueued = async (
         actor,
         identityNumber,
         target,
-        internetIdentityCanisterId: worker.canisterId,
       }),
     );
     return true;
   }
 
   const content = await fetchNotificationContent({
-    canisterId: notification.canister_id,
+    appCanisterId: notification.canister_id,
     id: notification.id,
     identity: held,
-    ...worker.agentOptions,
   });
   if (content === undefined) {
     // The app dismissed it, or it expired: there is nothing to show and nothing left
@@ -272,10 +263,9 @@ const showQueued = async (
   sendAndForget(
     pending,
     reportNotificationReceived({
-      canisterId: notification.canister_id,
+      appCanisterId: notification.canister_id,
       id: notification.id,
       identity: held,
-      ...worker.agentOptions,
     }),
   );
   sendAndForget(
@@ -292,14 +282,10 @@ const showQueued = async (
  *  Nothing depends on it: the notification is already shown. */
 const topUpPool = async (
   context: WakeUpContext,
-  {
-    identityNumber,
-    worker,
-  }: { identityNumber: bigint; worker: WorkerRegistration },
+  { identityNumber }: { identityNumber: bigint },
 ): Promise<void> => {
   const actor = await (context.internetIdentity ?? internetIdentityActor)(
     identityNumber,
-    worker,
   );
   if (actor === undefined) {
     return;
@@ -318,10 +304,7 @@ const topUpPool = async (
  * and a pull then answers with nothing — the same answer as for something expired, and
  * the same thing to do about it.
  */
-const closeDismissed = async (
-  context: WakeUpContext,
-  { worker }: { worker: WorkerRegistration },
-): Promise<void> => {
+const closeDismissed = async (context: WakeUpContext): Promise<void> => {
   const shown = await context.registration.getNotifications();
   await Promise.all(
     shown.map(async (one) => {
@@ -332,7 +315,7 @@ const closeDismissed = async (
       const identity = await loadPullIdentity({
         identityNumber: ref.identityNumber,
         target: { origin: ref.origin, accountNumber: ref.accountNumber },
-        internetIdentityCanisterId: worker.canisterId,
+
         nowMillis: Date.now(),
       });
       if (identity === undefined) {
@@ -343,10 +326,9 @@ const closeDismissed = async (
       let content;
       try {
         content = await fetchNotificationContent({
-          canisterId: Principal.fromText(ref.canisterId),
+          appCanisterId: Principal.fromText(ref.appCanisterId),
           id: ref.id,
           identity,
-          ...worker.agentOptions,
         });
       } catch {
         return;
@@ -360,14 +342,13 @@ const closeDismissed = async (
 
 /** One wake-up: show what arrived, and clear what no longer matters. */
 export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
-  const { worker } = context;
   const identityNumbers = await registeredIdentityNumbers();
   // One round trip each, side by side: a wake-up shows one notification, so asking
   // the identities one after another would only make the screen wait on the answers
   // it ends up throwing away.
   const queued = await Promise.all(
     identityNumbers.map((identityNumber) =>
-      nextFor(context, { identityNumber, worker }).catch(() => undefined),
+      nextFor(context, { identityNumber }).catch(() => undefined),
     ),
   );
 
@@ -380,7 +361,6 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
     // The canister queues a wake-up per notification, so the ones passed over here
     // keep their place and their own wake-up is still to come.
     shown = await showQueued(context, entry, {
-      worker,
       pending,
     }).catch(() => false);
     if (shown) {
@@ -391,15 +371,15 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
   // The pool of signed wake-up authorizations is spent by elapsed time, and a
   // browser whose user never opens the page again would let it run out.
   for (const identityNumber of identityNumbers) {
-    sendAndForget(pending, topUpPool(context, { identityNumber, worker }));
+    sendAndForget(pending, topUpPool(context, { identityNumber }));
   }
 
   if (shown) {
-    sendAndForget(pending, closeDismissed(context, { worker }));
+    sendAndForget(pending, closeDismissed(context));
   } else {
     // Whether this wake-up still owes the user something depends on what is on
     // screen, and an app may have dismissed what is on screen.
-    await closeDismissed(context, { worker }).catch(() => undefined);
+    await closeDismissed(context).catch(() => undefined);
     if ((await context.registration.getNotifications()).length === 0) {
       // The subscription is `userVisibleOnly`: a wake-up that showed nothing and left
       // nothing on screen owes the user something.

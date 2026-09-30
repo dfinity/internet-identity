@@ -15,8 +15,8 @@ vi.mock("$lib/globals", () => ({
 
 const { subscribeToPush } =
   await import("$lib/utils/notifications/pushSubscription");
-const { registrationFrom } =
-  await import("$lib/utils/notifications/registrationUrl");
+const { decodeWorkerConfig } =
+  await import("$lib/utils/notifications/workerConfig");
 
 const register = vi.fn((_url: string, _options?: unknown) => Promise.resolve());
 
@@ -33,7 +33,9 @@ const serviceWorker = () => {
 
 /** What the worker will read back out of the URL it was registered with. */
 const registeredWith = () =>
-  registrationFrom(new URL(register.mock.calls[0][0], "https://id.ai").search);
+  decodeWorkerConfig(
+    new URL(register.mock.calls[0][0], "https://id.ai").search,
+  );
 
 beforeEach(() => {
   vi.clearAllMocks();

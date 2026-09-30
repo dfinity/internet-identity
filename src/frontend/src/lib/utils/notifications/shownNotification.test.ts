@@ -11,7 +11,7 @@ const ref: NotificationRef = {
   identityNumber: BigInt(10_000),
   origin: "https://app.example",
   accountNumber: BigInt(3),
-  canisterId: "un4fu-tqaaa-aaaab-qadjq-cai",
+  appCanisterId: "un4fu-tqaaa-aaaab-qadjq-cai",
   id: BigInt(42),
 };
 

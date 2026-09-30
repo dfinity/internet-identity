@@ -17,6 +17,12 @@ vi.mock("$lib/stores/browser-key.store", () => ({
   registeredIdentityNumbers: () => registeredIdentityNumbers(),
   browserKeyIdentity: () => Promise.resolve(undefined),
 }));
+vi.mock("$lib/utils/notifications/workerConfig", () => ({
+  config: {
+    appCanisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
+    agentOptions: { host: "http://127.0.0.1:4943", shouldFetchRootKey: true },
+  },
+}));
 vi.mock("$lib/utils/notifications/pullDelegation", () => ({
   loadPullIdentity: () => loadPullIdentity(),
   mintPullIdentity: () => mintPullIdentity(),
@@ -49,10 +55,6 @@ const { onWakeUp } = await import("$lib/utils/notifications/wakeUp");
 const IDENTITY = BigInt(10_000);
 const ORIGIN = "https://app.example";
 const SENDER = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
-const WORKER = {
-  canisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
-  agentOptions: { host: "http://127.0.0.1:4943", shouldFetchRootKey: true },
-};
 
 const notification = {
   origin: ORIGIN,
@@ -140,7 +142,6 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -157,15 +158,14 @@ describe("onWakeUp", () => {
     expect(ii.removed).toHaveLength(1);
   });
 
-  it("carries the deployment's root key setting into the app call", async () => {
+  it("asks the app that sent the notification", async () => {
     await onWakeUp({
       registration: registration(),
-      worker: WORKER,
       internetIdentity: internetIdentity([notification]).factory,
     });
 
     expect(fetchNotificationContent).toHaveBeenCalledWith(
-      expect.objectContaining({ shouldFetchRootKey: true }),
+      expect.objectContaining({ appCanisterId: SENDER, id: BigInt(42) }),
     );
   });
 
@@ -176,7 +176,6 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -193,7 +192,6 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -212,7 +210,6 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -231,7 +228,6 @@ describe("onWakeUp", () => {
     fetchAppMetadata.mockResolvedValue({ name: "Example App" });
     await onWakeUp({
       registration: shown,
-      worker: WORKER,
       internetIdentity: ii.factory,
     });
     expect(shown.shown).toHaveLength(1);
@@ -239,7 +235,6 @@ describe("onWakeUp", () => {
     fetchNotificationContent.mockRejectedValue(new Error("unreachable"));
     await onWakeUp({
       registration: shown,
-      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -253,7 +248,6 @@ describe("onWakeUp", () => {
     const ii = internetIdentity([notification]);
     await onWakeUp({
       registration: shown,
-      worker: WORKER,
       internetIdentity: ii.factory,
     });
     expect(shown.shown).toHaveLength(1);
@@ -261,7 +255,6 @@ describe("onWakeUp", () => {
     fetchNotificationContent.mockResolvedValue(undefined);
     await onWakeUp({
       registration: shown,
-      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -280,7 +273,6 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: registration(),
-      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -300,7 +292,6 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -316,7 +307,6 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      worker: WORKER,
       internetIdentity: internetIdentity([notification]).factory,
     });
 

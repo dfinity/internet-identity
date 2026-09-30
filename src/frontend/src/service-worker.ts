@@ -11,7 +11,7 @@
 
 import { reportOpened } from "$lib/utils/notifications/notificationOpened";
 import { onWakeUp, showPlaceholder } from "$lib/utils/notifications/wakeUp";
-import { registrationFrom } from "$lib/utils/notifications/registrationUrl";
+import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
 import { refOf } from "$lib/utils/notifications/shownNotification";
 
@@ -20,7 +20,7 @@ const worker = self as unknown as ServiceWorkerGlobalScope;
 // What the page put on this worker's registration URL, read once. A woken worker has
 // no page to ask and no document to read, and the registration keeps the URL it was
 // made with — so this is the whole of what the worker is told.
-const registered = registrationFrom(worker.location.search);
+const configured = initWorkerConfig(worker.location.search);
 
 worker.addEventListener("install", () => {
   // Nothing is cached, so an older worker has nothing this one needs to inherit.
@@ -40,16 +40,13 @@ const enqueue = promiseQueue();
 worker.addEventListener("push", (event) => {
   event.waitUntil(
     enqueue(async () => {
-      if (registered === undefined) {
+      if (!configured) {
         // Nothing can be asked of anyone without knowing which canister to ask, and
         // the subscription still owes the user a notification.
         await showPlaceholder(worker.registration);
         return;
       }
-      await onWakeUp({
-        registration: worker.registration,
-        worker: registered,
-      });
+      await onWakeUp({ registration: worker.registration });
     }),
   );
 });
@@ -90,10 +87,8 @@ worker.addEventListener("notificationclick", (event) => {
       // failure here: a click has no caller to answer and nothing to come back for,
       // the window is open and the notification closed either way, and the queue
       // entry went when it was shown. It costs the app a count, not the user.
-      if (target !== undefined && registered !== undefined) {
-        await reportOpened({ ref: target, worker: registered }).catch(
-          () => undefined,
-        );
+      if (target !== undefined && configured) {
+        await reportOpened({ ref: target }).catch(() => undefined);
       }
     })(),
   );

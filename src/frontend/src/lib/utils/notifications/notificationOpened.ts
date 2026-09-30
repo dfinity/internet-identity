@@ -8,7 +8,6 @@
  */
 
 import { Principal } from "@icp-sdk/core/principal";
-import type { WorkerRegistration } from "./registrationUrl";
 import { reportNotificationOpened } from "./appNotifications";
 import { loadPullIdentity } from "./pullDelegation";
 import type { NotificationRef } from "./shownNotification";
@@ -16,15 +15,12 @@ import type { NotificationRef } from "./shownNotification";
 /** Answers whether the app was told, which is what a test has to go on. */
 export const reportOpened = async ({
   ref,
-  worker,
 }: {
   ref: NotificationRef;
-  worker: WorkerRegistration;
 }): Promise<boolean> => {
   const identity = await loadPullIdentity({
     identityNumber: ref.identityNumber,
     target: { origin: ref.origin, accountNumber: ref.accountNumber },
-    internetIdentityCanisterId: worker.canisterId,
     nowMillis: Date.now(),
   });
   if (identity === undefined) {
@@ -34,10 +30,9 @@ export const reportOpened = async ({
   }
 
   await reportNotificationOpened({
-    canisterId: Principal.fromText(ref.canisterId),
+    appCanisterId: Principal.fromText(ref.appCanisterId),
     id: ref.id,
     identity,
-    ...worker.agentOptions,
   });
   return true;
 };

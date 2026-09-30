@@ -5,6 +5,12 @@ import type { Identity } from "@icp-sdk/core/agent";
 const loadPullIdentity = vi.fn<() => Promise<Identity | undefined>>();
 const reportNotificationOpened = vi.fn((_call: unknown) => Promise.resolve());
 
+vi.mock("$lib/utils/notifications/workerConfig", () => ({
+  config: {
+    appCanisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
+    agentOptions: { host: "http://127.0.0.1:4943", shouldFetchRootKey: true },
+  },
+}));
 vi.mock("$lib/utils/notifications/pullDelegation", () => ({
   loadPullIdentity: () => loadPullIdentity(),
 }));
@@ -20,12 +26,8 @@ const REF = {
   identityNumber: BigInt(10_000),
   origin: "https://app.example",
   accountNumber: undefined,
-  canisterId: SENDER,
+  appCanisterId: SENDER,
   id: BigInt(42),
-};
-const WORKER = {
-  canisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
-  agentOptions: { host: "http://127.0.0.1:4943", shouldFetchRootKey: true },
 };
 
 beforeEach(() => {
@@ -36,14 +38,11 @@ describe("reportOpened", () => {
   it("tells the app which of its notifications was acted on", async () => {
     loadPullIdentity.mockResolvedValue({} as Identity);
 
-    await expect(reportOpened({ ref: REF, worker: WORKER })).resolves.toBe(
-      true,
-    );
+    await expect(reportOpened({ ref: REF })).resolves.toBe(true);
     expect(reportNotificationOpened).toHaveBeenCalledWith(
       expect.objectContaining({
-        canisterId: Principal.fromText(SENDER),
+        appCanisterId: Principal.fromText(SENDER),
         id: BigInt(42),
-        shouldFetchRootKey: true,
       }),
     );
   });
@@ -51,9 +50,7 @@ describe("reportOpened", () => {
   it("says nothing where the delegation has expired since it was shown", async () => {
     loadPullIdentity.mockResolvedValue(undefined);
 
-    await expect(reportOpened({ ref: REF, worker: WORKER })).resolves.toBe(
-      false,
-    );
+    await expect(reportOpened({ ref: REF })).resolves.toBe(false);
     expect(reportNotificationOpened).not.toHaveBeenCalled();
   });
 });
