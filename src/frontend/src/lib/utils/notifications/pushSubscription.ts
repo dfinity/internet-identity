@@ -7,22 +7,18 @@
 // body to encrypt.
 
 import { bufFromBufLike } from "$lib/utils/utils";
-import { readCanisterId } from "$lib/utils/init";
-import { agentOptions } from "$lib/globals";
+import { agentOptions, canisterId } from "$lib/globals";
+import { registrationSearch } from "./registrationUrl";
 
 // SvelteKit bundles the worker here; it is registered on opt-in rather than on
-// every load (kit.serviceWorker.register is off).
-//
-// The canister id and whether to fetch the root key ride on the URL: a woken worker
-// has no page to ask and no document to read them from, and the registration keeps the
-// URL it was made with. Without the second one, every call a worker makes against a
-// local replica fails certificate verification.
+// every load (kit.serviceWorker.register is off). What rides on the URL, and why, is
+// `registrationUrl`.
 const serviceWorkerUrl = (): string => {
-  const params = new URLSearchParams({ canisterId: readCanisterId() });
-  if (agentOptions.shouldFetchRootKey === true) {
-    params.set("fetchRootKey", "1");
-  }
-  return `/service-worker.js?${params.toString()}`;
+  const { host, shouldFetchRootKey } = agentOptions;
+  return `/service-worker.js?${registrationSearch({
+    canisterId: canisterId.toText(),
+    agentOptions: { host, shouldFetchRootKey },
+  })}`;
 };
 
 export const isPushSupported = (): boolean =>

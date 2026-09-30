@@ -21,7 +21,7 @@ import {
   browserKeyIdentity,
   registeredIdentityNumbers,
 } from "$lib/stores/browser-key.store";
-import { agentHost, type AgentLocation } from "$lib/utils/agentHost";
+import { registrationFrom, type WorkerRegistration } from "./registrationUrl";
 import { fetchAppMetadata, logoAsDataUrl } from "$lib/utils/appMetadata";
 import {
   fetchNotificationContent,
@@ -41,51 +41,27 @@ import {
 const PLACEHOLDER_TITLE = "Internet Identity";
 const PLACEHOLDER_BODY = "You have a new notification.";
 
-/** What the page knows and a woken worker cannot ask for: which canister this is, and
- *  whether the deployment fetches the root key. Both ride on the script URL the
- *  registration keeps. */
-export interface WorkerDeployment {
-  canisterId: string;
-  shouldFetchRootKey: boolean;
-}
-
-export const deploymentOf = (search: string): WorkerDeployment | undefined => {
-  const params = new URLSearchParams(search);
-  const canisterId = params.get("canisterId");
-  if (canisterId === null) {
-    return undefined;
-  }
-  return { canisterId, shouldFetchRootKey: params.get("fetchRootKey") === "1" };
-};
-
 export interface WakeUpContext {
   /** The worker's registration, which owns the notifications it shows. */
   registration: ServiceWorkerRegistration;
-  location: AgentLocation & { search: string };
+  location: { search: string };
   /** The canister, as this browser. Injected so a test can answer for it. */
   internetIdentity?: (
     identityNumber: bigint,
-    deployment: WorkerDeployment,
-    host: string,
+    worker: WorkerRegistration,
   ) => Promise<ActorSubclass<_SERVICE> | undefined>;
 }
 
 const internetIdentityActor = async (
   identityNumber: bigint,
-  { canisterId, shouldFetchRootKey }: WorkerDeployment,
-  host: string,
+  { canisterId, agentOptions }: WorkerRegistration,
 ): Promise<ActorSubclass<_SERVICE> | undefined> => {
   const identity = await browserKeyIdentity(identityNumber);
   if (identity === undefined) {
     return undefined;
   }
   return Actor.createActor<_SERVICE>(internetIdentityIDL, {
-    agent: HttpAgent.createSync({
-      host,
-      identity,
-      shouldFetchRootKey,
-      retryTimes: 0,
-    }),
+    agent: HttpAgent.createSync({ ...agentOptions, identity, retryTimes: 0 }),
     canisterId: Principal.fromText(canisterId),
   });
 };
@@ -170,14 +146,12 @@ const nextFor = async (
   context: WakeUpContext,
   {
     identityNumber,
-    deployment,
-    host,
-  }: { identityNumber: bigint; deployment: WorkerDeployment; host: string },
+    worker,
+  }: { identityNumber: bigint; worker: WorkerRegistration },
 ): Promise<Queued | undefined> => {
   const actor = await (context.internetIdentity ?? internetIdentityActor)(
     identityNumber,
-    deployment,
-    host,
+    worker,
   );
   if (actor === undefined) {
     return undefined;
@@ -206,12 +180,10 @@ const showQueued = async (
   context: WakeUpContext,
   { actor, identityNumber, notification }: Queued,
   {
-    deployment,
-    host,
+    worker,
     pending,
   }: {
-    deployment: WorkerDeployment;
-    host: string;
+    worker: WorkerRegistration;
     pending: Promise<unknown>[];
   },
 ): Promise<boolean> => {
@@ -223,7 +195,7 @@ const showQueued = async (
   const held = await loadPullIdentity({
     identityNumber,
     target,
-    internetIdentityCanisterId: deployment.canisterId,
+    internetIdentityCanisterId: worker.canisterId,
     nowMillis: Date.now(),
   });
 
@@ -242,7 +214,7 @@ const showQueued = async (
         actor,
         identityNumber,
         target,
-        internetIdentityCanisterId: deployment.canisterId,
+        internetIdentityCanisterId: worker.canisterId,
       }),
     );
     return true;
@@ -252,8 +224,7 @@ const showQueued = async (
     canisterId: notification.canister_id,
     id: notification.id,
     identity: held,
-    host,
-    shouldFetchRootKey: deployment.shouldFetchRootKey,
+    ...worker.agentOptions,
   });
   if (content === undefined) {
     // The app dismissed it, or it expired: there is nothing to show and nothing left
@@ -293,8 +264,7 @@ const showQueued = async (
       canisterId: notification.canister_id,
       id: notification.id,
       identity: held,
-      host,
-      shouldFetchRootKey: deployment.shouldFetchRootKey,
+      ...worker.agentOptions,
     }),
   );
   sendAndForget(
@@ -313,14 +283,12 @@ const topUpPool = async (
   context: WakeUpContext,
   {
     identityNumber,
-    deployment,
-    host,
-  }: { identityNumber: bigint; deployment: WorkerDeployment; host: string },
+    worker,
+  }: { identityNumber: bigint; worker: WorkerRegistration },
 ): Promise<void> => {
   const actor = await (context.internetIdentity ?? internetIdentityActor)(
     identityNumber,
-    deployment,
-    host,
+    worker,
   );
   if (actor === undefined) {
     return;
@@ -341,7 +309,7 @@ const topUpPool = async (
  */
 const closeDismissed = async (
   context: WakeUpContext,
-  { deployment, host }: { deployment: WorkerDeployment; host: string },
+  { worker }: { worker: WorkerRegistration },
 ): Promise<void> => {
   const shown = await context.registration.getNotifications();
   await Promise.all(
@@ -353,7 +321,7 @@ const closeDismissed = async (
       const identity = await loadPullIdentity({
         identityNumber: ref.identityNumber,
         target: { origin: ref.origin, accountNumber: ref.accountNumber },
-        internetIdentityCanisterId: deployment.canisterId,
+        internetIdentityCanisterId: worker.canisterId,
         nowMillis: Date.now(),
       });
       if (identity === undefined) {
@@ -367,8 +335,7 @@ const closeDismissed = async (
           canisterId: Principal.fromText(ref.canisterId),
           id: ref.id,
           identity,
-          host,
-          shouldFetchRootKey: deployment.shouldFetchRootKey,
+          ...worker.agentOptions,
         });
       } catch {
         return;
@@ -382,9 +349,8 @@ const closeDismissed = async (
 
 /** One wake-up: show what arrived, and clear what no longer matters. */
 export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
-  const deployment = deploymentOf(context.location.search);
-  const host = agentHost(context.location);
-  if (deployment === undefined) {
+  const worker = registrationFrom(context.location.search);
+  if (worker === undefined) {
     // Nothing can be fetched without knowing which canister to ask.
     await context.registration.showNotification(PLACEHOLDER_TITLE, {
       body: PLACEHOLDER_BODY,
@@ -399,9 +365,7 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
   // it ends up throwing away.
   const queued = await Promise.all(
     identityNumbers.map((identityNumber) =>
-      nextFor(context, { identityNumber, deployment, host }).catch(
-        () => undefined,
-      ),
+      nextFor(context, { identityNumber, worker }).catch(() => undefined),
     ),
   );
 
@@ -414,8 +378,7 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
     // The canister queues a wake-up per notification, so the ones passed over here
     // keep their place and their own wake-up is still to come.
     shown = await showQueued(context, entry, {
-      deployment,
-      host,
+      worker,
       pending,
     }).catch(() => false);
     if (shown) {
@@ -426,18 +389,15 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
   // The pool of signed wake-up authorizations is spent by elapsed time, and a
   // browser whose user never opens the page again would let it run out.
   for (const identityNumber of identityNumbers) {
-    sendAndForget(
-      pending,
-      topUpPool(context, { identityNumber, deployment, host }),
-    );
+    sendAndForget(pending, topUpPool(context, { identityNumber, worker }));
   }
 
   if (shown) {
-    sendAndForget(pending, closeDismissed(context, { deployment, host }));
+    sendAndForget(pending, closeDismissed(context, { worker }));
   } else {
     // Whether this wake-up still owes the user something depends on what is on
     // screen, and an app may have dismissed what is on screen.
-    await closeDismissed(context, { deployment, host }).catch(() => undefined);
+    await closeDismissed(context, { worker }).catch(() => undefined);
     if ((await context.registration.getNotifications()).length === 0) {
       // The subscription is `userVisibleOnly`: a wake-up that showed nothing and left
       // nothing on screen owes the user something.

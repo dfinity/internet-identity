@@ -45,15 +45,17 @@ vi.mock("$lib/utils/notifications/notificationLink", async (importOriginal) => {
 });
 
 const { onWakeUp } = await import("$lib/utils/notifications/wakeUp");
+const { registrationSearch } =
+  await import("$lib/utils/notifications/registrationUrl");
 
 const IDENTITY = BigInt(10_000);
 const ORIGIN = "https://app.example";
 const SENDER = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
 const LOCATION = {
-  search: "?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai&fetchRootKey=1",
-  hostname: "127.0.0.1",
-  host: "127.0.0.1:4943",
-  protocol: "http:",
+  search: registrationSearch({
+    canisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
+    agentOptions: { host: "http://127.0.0.1:4943", shouldFetchRootKey: true },
+  }),
 };
 
 const notification = {

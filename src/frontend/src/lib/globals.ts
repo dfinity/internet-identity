@@ -88,7 +88,10 @@ export const notificationsEnabledFor = (origin: string): boolean =>
 export let canisterId: Principal;
 export let frontendCanisterConfig: InternetIdentityFrontendInit;
 export let backendCanisterConfig: BackendCanisterConfig;
-export let agentOptions: HttpAgentOptions;
+/** Both fields are always set by `initGlobals`, unlike the optional ones the agent's
+ *  own option type allows. */
+export let agentOptions: HttpAgentOptions &
+  Required<Pick<HttpAgentOptions, "host" | "shouldFetchRootKey">>;
 export let anonymousAgent: HttpAgent;
 export let anonymousActor: ActorSubclass<_SERVICE>;
 

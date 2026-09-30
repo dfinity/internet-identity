@@ -14,6 +14,8 @@ vi.mock("$lib/utils/notifications/appNotifications", () => ({
 
 const { reportOpened } =
   await import("$lib/utils/notifications/notificationOpened");
+const { registrationSearch } =
+  await import("$lib/utils/notifications/registrationUrl");
 
 const SENDER = "un4fu-tqaaa-aaaab-qadjq-cai";
 const REF = {
@@ -24,10 +26,10 @@ const REF = {
   id: BigInt(42),
 };
 const LOCATION = {
-  search: "?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai&fetchRootKey=1",
-  hostname: "127.0.0.1",
-  host: "127.0.0.1:4943",
-  protocol: "http:",
+  search: registrationSearch({
+    canisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
+    agentOptions: { host: "http://127.0.0.1:4943", shouldFetchRootKey: true },
+  }),
 };
 
 beforeEach(() => {
