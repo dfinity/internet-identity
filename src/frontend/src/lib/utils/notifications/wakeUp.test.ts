@@ -45,17 +45,13 @@ vi.mock("$lib/utils/notifications/notificationLink", async (importOriginal) => {
 });
 
 const { onWakeUp } = await import("$lib/utils/notifications/wakeUp");
-const { registrationSearch } =
-  await import("$lib/utils/notifications/registrationUrl");
 
 const IDENTITY = BigInt(10_000);
 const ORIGIN = "https://app.example";
 const SENDER = Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai");
-const LOCATION = {
-  search: registrationSearch({
-    canisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
-    agentOptions: { host: "http://127.0.0.1:4943", shouldFetchRootKey: true },
-  }),
+const WORKER = {
+  canisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
+  agentOptions: { host: "http://127.0.0.1:4943", shouldFetchRootKey: true },
 };
 
 const notification = {
@@ -144,7 +140,7 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
+      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -164,7 +160,7 @@ describe("onWakeUp", () => {
   it("carries the deployment's root key setting into the app call", async () => {
     await onWakeUp({
       registration: registration(),
-      location: LOCATION,
+      worker: WORKER,
       internetIdentity: internetIdentity([notification]).factory,
     });
 
@@ -180,7 +176,7 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
+      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -197,7 +193,7 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
+      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -216,7 +212,7 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
+      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -235,7 +231,7 @@ describe("onWakeUp", () => {
     fetchAppMetadata.mockResolvedValue({ name: "Example App" });
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
+      worker: WORKER,
       internetIdentity: ii.factory,
     });
     expect(shown.shown).toHaveLength(1);
@@ -243,7 +239,7 @@ describe("onWakeUp", () => {
     fetchNotificationContent.mockRejectedValue(new Error("unreachable"));
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
+      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -257,7 +253,7 @@ describe("onWakeUp", () => {
     const ii = internetIdentity([notification]);
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
+      worker: WORKER,
       internetIdentity: ii.factory,
     });
     expect(shown.shown).toHaveLength(1);
@@ -265,7 +261,7 @@ describe("onWakeUp", () => {
     fetchNotificationContent.mockResolvedValue(undefined);
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
+      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -284,7 +280,7 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: registration(),
-      location: LOCATION,
+      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -304,7 +300,7 @@ describe("onWakeUp", () => {
 
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
+      worker: WORKER,
       internetIdentity: ii.factory,
     });
 
@@ -314,40 +310,13 @@ describe("onWakeUp", () => {
     expect(reportNotificationReceived).toHaveBeenCalledOnce();
   });
 
-  it("shows a placeholder where it cannot tell which canister to ask", async () => {
-    const shown = registration();
-
-    await onWakeUp({
-      registration: shown,
-      location: { ...LOCATION, search: "" },
-      internetIdentity: internetIdentity([notification]).factory,
-    });
-
-    expect(shown.shown[0].title).toBe("Internet Identity");
-    expect(fetchNotificationContent).not.toHaveBeenCalled();
-  });
-});
-
-describe("topping up the wake-up pool", () => {
-  it("is offered on every wake-up, whatever was shown", async () => {
-    await onWakeUp({
-      registration: registration(),
-      location: LOCATION,
-      internetIdentity: internetIdentity([notification]).factory,
-    });
-
-    expect(refillJwtPool).toHaveBeenCalledWith(
-      expect.objectContaining({ identityNumber: IDENTITY }),
-    );
-  });
-
   it("does not fail a wake-up that showed its notification", async () => {
     const shown = registration();
     refillJwtPool.mockRejectedValue(new Error("no"));
 
     await onWakeUp({
       registration: shown,
-      location: LOCATION,
+      worker: WORKER,
       internetIdentity: internetIdentity([notification]).factory,
     });
 

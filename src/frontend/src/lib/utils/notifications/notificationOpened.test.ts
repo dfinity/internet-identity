@@ -14,8 +14,6 @@ vi.mock("$lib/utils/notifications/appNotifications", () => ({
 
 const { reportOpened } =
   await import("$lib/utils/notifications/notificationOpened");
-const { registrationSearch } =
-  await import("$lib/utils/notifications/registrationUrl");
 
 const SENDER = "un4fu-tqaaa-aaaab-qadjq-cai";
 const REF = {
@@ -25,11 +23,9 @@ const REF = {
   canisterId: SENDER,
   id: BigInt(42),
 };
-const LOCATION = {
-  search: registrationSearch({
-    canisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
-    agentOptions: { host: "http://127.0.0.1:4943", shouldFetchRootKey: true },
-  }),
+const WORKER = {
+  canisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
+  agentOptions: { host: "http://127.0.0.1:4943", shouldFetchRootKey: true },
 };
 
 beforeEach(() => {
@@ -40,7 +36,7 @@ describe("reportOpened", () => {
   it("tells the app which of its notifications was acted on", async () => {
     loadPullIdentity.mockResolvedValue({} as Identity);
 
-    await expect(reportOpened({ ref: REF, location: LOCATION })).resolves.toBe(
+    await expect(reportOpened({ ref: REF, worker: WORKER })).resolves.toBe(
       true,
     );
     expect(reportNotificationOpened).toHaveBeenCalledWith(
@@ -55,18 +51,9 @@ describe("reportOpened", () => {
   it("says nothing where the delegation has expired since it was shown", async () => {
     loadPullIdentity.mockResolvedValue(undefined);
 
-    await expect(reportOpened({ ref: REF, location: LOCATION })).resolves.toBe(
+    await expect(reportOpened({ ref: REF, worker: WORKER })).resolves.toBe(
       false,
     );
-    expect(reportNotificationOpened).not.toHaveBeenCalled();
-  });
-
-  it("says nothing where the worker cannot tell which canister to ask", async () => {
-    loadPullIdentity.mockResolvedValue({} as Identity);
-
-    await expect(
-      reportOpened({ ref: REF, location: { ...LOCATION, search: "" } }),
-    ).resolves.toBe(false);
     expect(reportNotificationOpened).not.toHaveBeenCalled();
   });
 });

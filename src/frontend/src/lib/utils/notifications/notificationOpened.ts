@@ -8,7 +8,7 @@
  */
 
 import { Principal } from "@icp-sdk/core/principal";
-import { registrationFrom } from "./registrationUrl";
+import type { WorkerRegistration } from "./registrationUrl";
 import { reportNotificationOpened } from "./appNotifications";
 import { loadPullIdentity } from "./pullDelegation";
 import type { NotificationRef } from "./shownNotification";
@@ -16,15 +16,11 @@ import type { NotificationRef } from "./shownNotification";
 /** Answers whether the app was told, which is what a test has to go on. */
 export const reportOpened = async ({
   ref,
-  location,
+  worker,
 }: {
   ref: NotificationRef;
-  location: { search: string };
+  worker: WorkerRegistration;
 }): Promise<boolean> => {
-  const worker = registrationFrom(location.search);
-  if (worker === undefined) {
-    return false;
-  }
   const identity = await loadPullIdentity({
     identityNumber: ref.identityNumber,
     target: { origin: ref.origin, accountNumber: ref.accountNumber },

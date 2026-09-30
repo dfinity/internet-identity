@@ -21,7 +21,7 @@ import {
   browserKeyIdentity,
   registeredIdentityNumbers,
 } from "$lib/stores/browser-key.store";
-import { registrationFrom, type WorkerRegistration } from "./registrationUrl";
+import type { WorkerRegistration } from "./registrationUrl";
 import { fetchAppMetadata, logoAsDataUrl } from "$lib/utils/appMetadata";
 import {
   fetchNotificationContent,
@@ -41,10 +41,21 @@ import {
 const PLACEHOLDER_TITLE = "Internet Identity";
 const PLACEHOLDER_BODY = "You have a new notification.";
 
+/** What a `userVisibleOnly` subscription owes the user where nothing better can be
+ *  shown. */
+export const showPlaceholder = (
+  registration: ServiceWorkerRegistration,
+): Promise<void> =>
+  registration.showNotification(PLACEHOLDER_TITLE, {
+    body: PLACEHOLDER_BODY,
+    tag: "internet-identity",
+  });
+
 export interface WakeUpContext {
   /** The worker's registration, which owns the notifications it shows. */
   registration: ServiceWorkerRegistration;
-  location: { search: string };
+  /** What the page put on this worker's registration URL. */
+  worker: WorkerRegistration;
   /** The canister, as this browser. Injected so a test can answer for it. */
   internetIdentity?: (
     identityNumber: bigint,
@@ -349,16 +360,7 @@ const closeDismissed = async (
 
 /** One wake-up: show what arrived, and clear what no longer matters. */
 export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
-  const worker = registrationFrom(context.location.search);
-  if (worker === undefined) {
-    // Nothing can be fetched without knowing which canister to ask.
-    await context.registration.showNotification(PLACEHOLDER_TITLE, {
-      body: PLACEHOLDER_BODY,
-      tag: "internet-identity",
-    });
-    return;
-  }
-
+  const { worker } = context;
   const identityNumbers = await registeredIdentityNumbers();
   // One round trip each, side by side: a wake-up shows one notification, so asking
   // the identities one after another would only make the screen wait on the answers
@@ -401,10 +403,7 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
     if ((await context.registration.getNotifications()).length === 0) {
       // The subscription is `userVisibleOnly`: a wake-up that showed nothing and left
       // nothing on screen owes the user something.
-      await context.registration.showNotification(PLACEHOLDER_TITLE, {
-        body: PLACEHOLDER_BODY,
-        tag: "internet-identity",
-      });
+      await showPlaceholder(context.registration);
     }
   }
 
