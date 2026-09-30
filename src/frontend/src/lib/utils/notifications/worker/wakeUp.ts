@@ -69,6 +69,7 @@ const internetIdentityActor = async (
   }
   return Actor.createActor<_SERVICE>(internetIdentityIDL, {
     agent: HttpAgent.createSync({
+      ...config.agentOptions,
       identity,
       retryTimes: 0,
     }),

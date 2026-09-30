@@ -13,16 +13,39 @@ const fetchAppMetadata = vi.fn((): Promise<{ name?: string } | undefined> =>
 const refillJwtPool = vi.fn((_options: unknown) => Promise.resolve(false));
 const fetchAlternativeOrigins = vi.fn(() => Promise.resolve([] as string[]));
 
+const browserKeyIdentity = vi.fn<() => Promise<Identity | undefined>>(() =>
+  Promise.resolve(undefined),
+);
+const createSync = vi.fn((_options: unknown) => ({}));
+
+const AGENT_OPTIONS = {
+  host: "http://127.0.0.1:4943",
+  shouldFetchRootKey: true,
+};
+
 vi.mock("$lib/stores/browser-key.store", () => ({
   registeredIdentityNumbers: () => registeredIdentityNumbers(),
-  browserKeyIdentity: () => Promise.resolve(undefined),
+  browserKeyIdentity: () => browserKeyIdentity(),
 }));
 vi.mock("$lib/utils/notifications/workerConfig", () => ({
   config: {
-    appCanisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
-    agentOptions: { host: "http://127.0.0.1:4943", shouldFetchRootKey: true },
+    canisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
+    agentOptions: AGENT_OPTIONS,
   },
 }));
+vi.mock("@icp-sdk/core/agent", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@icp-sdk/core/agent")>();
+  return {
+    ...actual,
+    Actor: {
+      createActor: () => ({
+        browser_get_next_notification: () =>
+          Promise.resolve({ Ok: { notification: [] } }),
+      }),
+    },
+    HttpAgent: { createSync: (options: unknown) => createSync(options) },
+  };
+});
 vi.mock("$lib/utils/notifications/worker/pullDelegation", () => ({
   loadPullIdentity: () => loadPullIdentity(),
   mintPullIdentity: () => mintPullIdentity(),
@@ -127,6 +150,7 @@ const identity = {} as Identity;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  browserKeyIdentity.mockResolvedValue(undefined);
   registeredIdentityNumbers.mockResolvedValue([IDENTITY]);
   loadPullIdentity.mockResolvedValue(identity);
   mintPullIdentity.mockResolvedValue(identity);
@@ -159,6 +183,19 @@ describe("onWakeUp", () => {
     );
     expect(reportNotificationReceived).toHaveBeenCalledOnce();
     expect(ii.removed).toHaveLength(1);
+  });
+
+  it("reaches Internet Identity the way the page said to reach it", async () => {
+    // Every other case injects the actor, so this is the only cover for the one the
+    // worker builds: without the page's options it would talk to mainnet's default
+    // host and verify against the wrong root key.
+    browserKeyIdentity.mockResolvedValue({} as Identity);
+
+    await onWakeUp({ registration: registration() });
+
+    expect(createSync).toHaveBeenCalledWith(
+      expect.objectContaining(AGENT_OPTIONS),
+    );
   });
 
   it("asks the app that sent the notification", async () => {
