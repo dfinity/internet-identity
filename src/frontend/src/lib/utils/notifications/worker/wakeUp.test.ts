@@ -23,14 +23,14 @@ vi.mock("$lib/utils/notifications/workerConfig", () => ({
     agentOptions: { host: "http://127.0.0.1:4943", shouldFetchRootKey: true },
   },
 }));
-vi.mock("$lib/utils/notifications/pullDelegation", () => ({
+vi.mock("$lib/utils/notifications/worker/pullDelegation", () => ({
   loadPullIdentity: () => loadPullIdentity(),
   mintPullIdentity: () => mintPullIdentity(),
 }));
-vi.mock("$lib/utils/notifications/poolRefill", () => ({
+vi.mock("$lib/utils/notifications/worker/poolRefill", () => ({
   refillJwtPool: (options: unknown) => refillJwtPool(options),
 }));
-vi.mock("$lib/utils/notifications/appNotifications", () => ({
+vi.mock("$lib/utils/notifications/worker/appNotifications", () => ({
   fetchNotificationContent: (call: unknown) => fetchNotificationContent(call),
   reportNotificationReceived: (call: unknown) =>
     reportNotificationReceived(call),
@@ -39,18 +39,21 @@ vi.mock("$lib/utils/appMetadata", () => ({
   fetchAppMetadata: () => fetchAppMetadata(),
   logoAsDataUrl: () => Promise.resolve("data:image/webp;base64,AA=="),
 }));
-vi.mock("$lib/utils/notifications/notificationLink", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("$lib/utils/notifications/notificationLink")
-    >();
-  return {
-    ...actual,
-    fetchAlternativeOrigins: () => fetchAlternativeOrigins(),
-  };
-});
+vi.mock(
+  "$lib/utils/notifications/worker/notificationLink",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("$lib/utils/notifications/worker/notificationLink")
+      >();
+    return {
+      ...actual,
+      fetchAlternativeOrigins: () => fetchAlternativeOrigins(),
+    };
+  },
+);
 
-const { onWakeUp } = await import("$lib/utils/notifications/wakeUp");
+const { onWakeUp } = await import("$lib/utils/notifications/worker/wakeUp");
 
 const IDENTITY = BigInt(10_000);
 const ORIGIN = "https://app.example";

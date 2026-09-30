@@ -14,13 +14,13 @@
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { throwCanisterError } from "$lib/utils/utils";
-import { loadVapidKey } from "./vapidKeyStore";
+import { loadVapidKey } from "../vapidKeyStore";
 import {
   JWT_POOL_REFRESH_THRESHOLD_WINDOWS,
   relayOriginOf,
   signJwtPool,
   windowsRemaining,
-} from "./vapidPool";
+} from "../vapidPool";
 
 /**
  * Signs and registers a fresh pool where the stored one is running out. Answers

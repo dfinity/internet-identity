@@ -32,7 +32,7 @@ vi.mock("@icp-sdk/core/agent", async (importOriginal) => {
 });
 
 const { fetchNotificationContent } =
-  await import("$lib/utils/notifications/appNotifications");
+  await import("$lib/utils/notifications/worker/appNotifications");
 
 const call = {
   appCanisterId: Principal.fromText("un4fu-tqaaa-aaaab-qadjq-cai"),

@@ -42,6 +42,35 @@ export default ts.config(
     },
   },
   {
+    // The service worker and what it reaches. A worker has no document, so an import
+    // that lands on page-only code throws at worker startup, where the only symptom
+    // is a push that shows nothing. `globals` is bootstrapped from a page and
+    // `iiConnection` imports it, so neither may be reached from here.
+    files: [
+      "src/frontend/src/service-worker.ts",
+      "src/frontend/src/lib/utils/notifications/worker/**/*.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "$lib/globals",
+              message:
+                "Page-only: bootstrapped from the page. A worker reads what it needs from workerConfig.",
+            },
+            {
+              name: "$lib/utils/iiConnection",
+              message:
+                "Page-only: it imports $lib/globals. Take urlUtils or agentHost-free helpers instead.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     rules: {
       "@typescript-eslint/strict-boolean-expressions": [
         2,

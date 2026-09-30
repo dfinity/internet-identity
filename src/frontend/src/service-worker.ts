@@ -9,11 +9,14 @@
 // it is for is asked of the canister, and its content of the app that sent it. The
 // subscription is `userVisibleOnly`, which obliges a visible notification per push.
 
-import { reportOpened } from "$lib/utils/notifications/notificationOpened";
-import { onWakeUp, showPlaceholder } from "$lib/utils/notifications/wakeUp";
+import { reportOpened } from "$lib/utils/notifications/worker/notificationOpened";
+import {
+  onWakeUp,
+  showPlaceholder,
+} from "$lib/utils/notifications/worker/wakeUp";
 import { initWorkerConfig } from "$lib/utils/notifications/workerConfig";
 import { promiseQueue } from "$lib/utils/promiseQueue";
-import { refOf } from "$lib/utils/notifications/shownNotification";
+import { refOf } from "$lib/utils/notifications/worker/shownNotification";
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
 

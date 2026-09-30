@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   allowedLink,
   parseAlternativeOrigins,
-} from "$lib/utils/notifications/notificationLink";
+} from "$lib/utils/notifications/worker/notificationLink";
 
 const APP = "https://app.example";
 

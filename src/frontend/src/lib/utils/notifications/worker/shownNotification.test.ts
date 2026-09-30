@@ -4,7 +4,7 @@ import {
   refOf,
   tagOf,
   type NotificationRef,
-} from "$lib/utils/notifications/shownNotification";
+} from "$lib/utils/notifications/worker/shownNotification";
 
 // The frontend targets ES2019, so no BigInt literals.
 const ref: NotificationRef = {

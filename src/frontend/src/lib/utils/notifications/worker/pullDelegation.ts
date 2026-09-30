@@ -18,7 +18,7 @@ import {
 import { Principal } from "@icp-sdk/core/principal";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { transformSignedDelegation } from "$lib/utils/utils";
-import { config } from "./workerConfig";
+import { config } from "../workerConfig";
 
 const PULL_STORE = createStore("ii-notification-pull", "delegations");
 

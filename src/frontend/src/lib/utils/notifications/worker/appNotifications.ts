@@ -11,7 +11,7 @@
 import { Actor, HttpAgent, type Identity } from "@icp-sdk/core/agent";
 import { IDL } from "@icp-sdk/core/candid";
 import type { Principal } from "@icp-sdk/core/principal";
-import { config } from "./workerConfig";
+import { config } from "../workerConfig";
 
 export interface NotificationContent {
   title: string;

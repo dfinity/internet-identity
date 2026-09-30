@@ -11,15 +11,15 @@ vi.mock("$lib/utils/notifications/workerConfig", () => ({
     agentOptions: { host: "http://127.0.0.1:4943", shouldFetchRootKey: true },
   },
 }));
-vi.mock("$lib/utils/notifications/pullDelegation", () => ({
+vi.mock("$lib/utils/notifications/worker/pullDelegation", () => ({
   loadPullIdentity: () => loadPullIdentity(),
 }));
-vi.mock("$lib/utils/notifications/appNotifications", () => ({
+vi.mock("$lib/utils/notifications/worker/appNotifications", () => ({
   reportNotificationOpened: (call: unknown) => reportNotificationOpened(call),
 }));
 
 const { reportOpened } =
-  await import("$lib/utils/notifications/notificationOpened");
+  await import("$lib/utils/notifications/worker/notificationOpened");
 
 const SENDER = "un4fu-tqaaa-aaaab-qadjq-cai";
 const REF = {

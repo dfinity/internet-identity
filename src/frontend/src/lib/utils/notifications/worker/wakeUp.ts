@@ -21,7 +21,7 @@ import {
   browserKeyIdentity,
   registeredIdentityNumbers,
 } from "$lib/stores/browser-key.store";
-import { config } from "./workerConfig";
+import { config } from "../workerConfig";
 import { fetchAppMetadata, logoAsDataUrl } from "$lib/utils/appMetadata";
 import {
   fetchNotificationContent,
