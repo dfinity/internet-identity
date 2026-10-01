@@ -25,6 +25,8 @@
   interface Props {
     /** dApp name for the copy, or undefined when it isn't known. */
     appName: string | undefined;
+    /** Its published logo, for the notifications the enable screen previews. */
+    appLogo: string | undefined;
     identityNumber: bigint;
     origin: string;
     /** The authenticated actor for this identity. */
@@ -42,6 +44,7 @@
 
   const {
     appName,
+    appLogo,
     identityNumber,
     origin,
     actor,
@@ -140,6 +143,7 @@
 {#if variant === "enable"}
   <NotifEnablePitch
     {appName}
+    {appLogo}
     {origin}
     {busy}
     onEnable={() => void runEnable(device)}

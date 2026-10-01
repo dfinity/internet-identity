@@ -665,6 +665,7 @@
     {#key $notificationConsentStore}
       <NotifOptInView
         appName={dapp.name}
+        appLogo={dapp.logo}
         identityNumber={$notificationConsentStore.identityNumber}
         origin={$notificationConsentStore.effectiveOrigin}
         actor={$notificationConsentStore.actor}

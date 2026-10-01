@@ -5,83 +5,178 @@
     /** dApp name for the copy, or undefined when it isn't known. */
     appName: string | undefined;
     /** The app the notifications would come from. Its hostname stands in for the
-     * name where the app has not published one, which is what a delivered
+     * name where the app has published none, which is what a delivered
      * notification does too. */
     origin: string;
+    /** Its published logo. The placeholder stands in where an app has none, as the
+     * hostname stands in where it has published no name. */
+    appLogo: string | undefined;
     /** True while the request is in flight. */
     busy: boolean;
     onEnable: () => void;
     onSkip: () => void;
   }
 
-  const { appName, origin, busy, onEnable, onSkip }: Props = $props();
+  const { appName, appLogo, origin, busy, onEnable, onSkip }: Props = $props();
 
   const app = $derived(appName ?? $t`this app`);
-  /** What a delivered notification leads its title with: the published name, or the
-   *  hostname where there is none. See `senderOf` in the worker's wake-up. */
+  /** What a delivered notification leads its title with. See `senderOf` in the
+   *  worker's wake-up, which resolves the same two in the same order. */
   const sender = $derived(appName ?? new URL(origin).hostname);
-
-  const samples = $derived([
-    {
-      title: $t`Reminder`,
-      body: $t`Your event starts in 15 minutes.`,
-      at: $t`5m`,
-    },
-    {
-      title: $t`Request approved`,
-      body: $t`Your request was approved.`,
-      at: $t`2m`,
-    },
-    { title: $t`New message`, body: $t`You have 1 new message.`, at: $t`now` },
-  ]);
 </script>
 
 <div
   class="flex flex-1 flex-col items-stretch p-4 sm:max-w-100 sm:justify-center sm:self-center"
 >
-  <!-- Notification previews. Hidden from assistive technology: the messages in them
-       are made up, and a screen reader would read them ahead of the heading as
-       though they were real. -->
-  <div class="flex flex-col gap-2.5 pt-2 pb-6" aria-hidden="true">
-    {#each samples as sample, index (sample.title)}
+  <!-- Ported from the design. Hidden from assistive technology: the messages are
+       made up, and a screen reader would read them ahead of the heading as though
+       they were real. -->
+  <div aria-hidden="true" class="relative h-[113px]">
+    <div
+      class="absolute top-0 right-0 left-0 z-1 h-[66px] origin-top scale-[0.84]"
+    >
+      <div class="absolute inset-0 rounded-2xl backdrop-blur-sm"></div>
       <div
-        class={[
-          "border-border-tertiary flex items-start gap-3 rounded-2xl border bg-white/3 p-3",
-          index === samples.length - 1
-            ? "border-border-secondary bg-white/8 shadow-lg backdrop-blur-sm"
-            : "opacity-90",
-        ]}
+        class="border-border-secondary relative h-full rounded-2xl border bg-white/8 opacity-30 shadow-lg"
       >
-        <span
-          class="border-border-tertiary bg-bg-tertiary size-8 shrink-0 rounded-lg border"
-        ></span>
-        <div class="min-w-0 flex-1">
-          <div class="flex items-baseline justify-between gap-2">
-            <span class="text-text-primary truncate text-[13px] font-semibold">
-              {sender} · {sample.title}
-            </span>
-            <span class="text-text-tertiary shrink-0 text-[11px]"
-              >{sample.at}</span
-            >
+        <div class="p-3 flex items-start gap-3">
+          <span
+            class="border-border-tertiary bg-bg-tertiary text-fg-primary flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-lg border"
+            >{#if appLogo === undefined}<svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><circle cx="12" cy="12" r="10"></circle><path
+                  d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"
+                ></path><path d="M2 12h20"></path></svg
+              >{:else}<img
+                src={appLogo}
+                alt=""
+                class="h-full w-full rounded-lg object-contain"
+              />{/if}</span
+          >
+          <div class="min-w-0 flex-1">
+            <div class="flex items-baseline justify-between gap-2">
+              <span
+                class="text-text-primary min-w-0 overflow-hidden text-[13px] font-semibold text-ellipsis whitespace-nowrap"
+                >{sender} • {$t`Reminder`}</span
+              >
+              <span class="text-text-tertiary text-[11px]">5m</span>
+            </div>
+            <div class="text-text-secondary text-[13px]">
+              {$t`Your event starts in 15 minutes.`}
+            </div>
           </div>
-          <div class="text-text-secondary text-[13px]">{sample.body}</div>
         </div>
       </div>
-    {/each}
+    </div>
+    <div
+      class="absolute top-[21px] right-0 left-0 z-2 h-[66px] origin-top scale-[0.92]"
+    >
+      <div class="absolute inset-0 rounded-2xl backdrop-blur-sm"></div>
+      <div
+        class="border-border-secondary relative h-full rounded-2xl border bg-white/8 opacity-60 shadow-lg"
+      >
+        <div class="p-3 flex items-start gap-3">
+          <span
+            class="border-border-tertiary bg-bg-tertiary text-fg-primary flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-lg border"
+            >{#if appLogo === undefined}<svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><circle cx="12" cy="12" r="10"></circle><path
+                  d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"
+                ></path><path d="M2 12h20"></path></svg
+              >{:else}<img
+                src={appLogo}
+                alt=""
+                class="h-full w-full rounded-lg object-contain"
+              />{/if}</span
+          >
+          <div class="min-w-0 flex-1">
+            <div class="flex items-baseline justify-between gap-2">
+              <span
+                class="text-text-primary min-w-0 overflow-hidden text-[13px] font-semibold text-ellipsis whitespace-nowrap"
+                >{sender} • {$t`Request approved`}</span
+              >
+              <span class="text-text-tertiary text-[11px]">2m</span>
+            </div>
+            <div class="text-text-secondary text-[13px]">
+              {$t`Your request was approved.`}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
+      class="absolute top-[47px] right-0 left-0 z-3 h-[66px] origin-top scale-100"
+    >
+      <div class="absolute inset-0 rounded-2xl backdrop-blur-sm"></div>
+      <div
+        class="border-border-secondary relative h-full rounded-2xl border bg-white/8 opacity-100 shadow-lg"
+      >
+        <div class="p-3 flex items-start gap-3">
+          <span
+            class="border-border-tertiary bg-bg-tertiary text-fg-primary flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-lg border"
+            >{#if appLogo === undefined}<svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><circle cx="12" cy="12" r="10"></circle><path
+                  d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"
+                ></path><path d="M2 12h20"></path></svg
+              >{:else}<img
+                src={appLogo}
+                alt=""
+                class="h-full w-full rounded-lg object-contain"
+              />{/if}</span
+          >
+          <div class="min-w-0 flex-1">
+            <div class="flex items-baseline justify-between gap-2">
+              <span
+                class="text-text-primary min-w-0 overflow-hidden text-[13px] font-semibold text-ellipsis whitespace-nowrap"
+                >{sender} • {$t`New message`}</span
+              >
+              <span class="text-text-tertiary text-[11px]">now</span>
+            </div>
+            <div class="text-text-secondary text-[13px]">
+              {$t`You have 1 new message.`}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <h1 class="text-text-primary text-2xl font-medium text-balance">
+  <h1
+    class="text-text-primary mt-6 text-2xl leading-8 font-medium text-balance"
+  >
     {$t`Let ${app} notify you`}
   </h1>
-  <p class="text-text-secondary mt-2 text-sm">
+  <p class="text-text-secondary mt-2 text-sm leading-5 text-pretty">
     {$t`Get notifications from ${app} when something needs your attention. You can turn them off anytime.`}
   </p>
 
   <div class="mt-7 flex flex-col gap-2.5">
-    <button class="btn btn-primary" onclick={onEnable} disabled={busy}>
+    <button class="btn btn-primary btn-xl" onclick={onEnable} disabled={busy}>
       {busy ? $t`Setting up…` : $t`Allow`}
     </button>
-    <button class="btn btn-tertiary" onclick={onSkip} disabled={busy}>
+    <button class="btn btn-tertiary btn-xl" onclick={onSkip} disabled={busy}>
       {$t`Not now`}
     </button>
   </div>
