@@ -1,4 +1,4 @@
-import { type Readable, writable } from "svelte/store";
+import { get, type Readable, writable } from "svelte/store";
 
 /** A single available attribute option resolved from the canister. */
 export interface AvailableAttribute {
@@ -32,6 +32,7 @@ const contextInternal = writable<
   Promise<AttributeConsentContext> | undefined
 >();
 const consentInternal = writable<AttributeConsent | undefined>();
+const resolvedInternal = writable(false);
 
 export const attributeConsentStore = {
   /** Set a promise that resolves with the consent context once attributes
@@ -39,7 +40,17 @@ export const attributeConsentStore = {
    *  prior request can't be reused by the next one. */
   setContext: (context: Promise<AttributeConsentContext>): void => {
     consentInternal.set(undefined);
+    resolvedInternal.set(false);
     contextInternal.set(context);
+    // Settled either way: the flow holds the screen the user is on until this
+    // context can be rendered, and a context that failed is no reason to hold it
+    // any longer. Guarded against a later request having replaced this one.
+    const settled = () => {
+      if (get(contextInternal) === context) {
+        resolvedInternal.set(true);
+      }
+    };
+    void context.then(settled, settled);
   },
   setConsent: (consent: AttributeConsent): void => {
     consentInternal.set(consent);
@@ -49,6 +60,7 @@ export const attributeConsentStore = {
   clear: (): void => {
     contextInternal.set(undefined);
     consentInternal.set(undefined);
+    resolvedInternal.set(false);
   },
   subscribe: contextInternal.subscribe,
 };
@@ -57,4 +69,10 @@ export const attributeConsentResultStore: Readable<
   AttributeConsent | undefined
 > = {
   subscribe: consentInternal.subscribe,
+};
+
+/** Whether the current context has settled, so the screen can be rendered with
+ *  what it asks about rather than as a skeleton. */
+export const attributeConsentResolvedStore: Readable<boolean> = {
+  subscribe: resolvedInternal.subscribe,
 };

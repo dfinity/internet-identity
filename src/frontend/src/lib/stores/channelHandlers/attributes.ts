@@ -28,6 +28,7 @@ import {
   attributeConsentResultStore,
   attributeConsentStore,
 } from "$lib/stores/attributeConsent.store";
+import { claimScreen } from "$lib/stores/pendingScreen.store";
 
 /** Extract the attribute name from a fully scoped key.
  *  e.g., "openid:https://accounts.google.com:email" → "email" */
@@ -642,6 +643,7 @@ export const handleIcrc3ConsentAttributes =
 
     const requestedKeys = paramsResult.data.keys;
 
+    let releaseScreen: (() => void) | undefined;
     await serializeConsentRequest(async () => {
       try {
         // Bail out as soon as we know one of the 1-click handlers will take this request.
@@ -659,6 +661,11 @@ export const handleIcrc3ConsentAttributes =
         if (oneClickHandlerWillHandle) {
           return;
         }
+
+        // Held until this request has a screen of its own or nothing to show, so
+        // authorizing does not take the screen the user is on while the pipeline
+        // is still reading what this app may ask for.
+        releaseScreen = claimScreen();
 
         // Only unscoped email/verified_email; scoped keys are pinned to
         // a source that the inline verify wizard can't satisfy.
@@ -748,6 +755,7 @@ export const handleIcrc3ConsentAttributes =
           return;
         }
       } finally {
+        releaseScreen?.();
         // Always reset consent state so the next request on this channel
         // starts from a clean slate (no leftover context/result from us).
         attributeConsentStore.clear();

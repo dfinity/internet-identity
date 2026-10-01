@@ -290,9 +290,11 @@
         selectedMaxTimeToLive,
       );
     } catch (error) {
-      handleError(error);
-    } finally {
+      // Left busy on the way out: this view stays up while a request that still owes
+      // the flow a screen works out what to show, and the button the user pressed is
+      // where that wait belongs. Cleared only here, where they stay and can retry.
       isAuthenticatingDefault = false;
+      handleError(error);
     }
   };
   const handleContinueAs = async (
@@ -313,9 +315,9 @@
         selectedMaxTimeToLive,
       );
     } catch (error) {
-      handleError(error);
-    } finally {
+      // See `handleContinueDefault`: the busy state outlives a successful authorize.
       isAuthenticatingDefault = false;
+      handleError(error);
     }
   };
   const loadAccountsViaActor = async (

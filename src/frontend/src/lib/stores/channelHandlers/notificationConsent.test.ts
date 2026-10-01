@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { METHOD_NOT_FOUND_ERROR_CODE } from "$lib/utils/transport/utils";
-import type { Writable } from "svelte/store";
+import { get, type Writable } from "svelte/store";
 
 const ORIGIN = "https://app.example.com";
 
@@ -60,6 +60,7 @@ import {
 } from "$lib/stores/notificationConsent.store";
 import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
 import { INTERACTION_REQUIRED_ERROR_CODE } from "$lib/utils/transport/utils";
+import { pendingScreenStore } from "$lib/stores/pendingScreen.store";
 import { waitForStore } from "$lib/utils/utils";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { resolveOptIn } from "$lib/utils/notifications/notificationState";
@@ -234,6 +235,43 @@ describe("handleNotificationConsentRequest", () => {
     unsubscribe();
     expect(opened?.screen).toBe("blocked");
     expect(sent[0].result).toEqual({ granted: true });
+  });
+
+  /** Authorizing is what replaces the screen the user is on, so this request has to
+   *  own one from the moment it is accepted until it has answered: long enough that
+   *  the flow keeps their screen instead of passing through a half-built one. */
+  it("owns the screen from acceptance until it has answered", async () => {
+    const sent: Record<string, unknown>[] = [];
+    const channel = {
+      origin: ORIGIN,
+      send: (message: Record<string, unknown>) => {
+        sent.push(message);
+        return Promise.resolve();
+      },
+    } as unknown as Channel;
+    const running = handleNotificationConsentRequest(channel, () => {})({
+      jsonrpc: "2.0",
+      id: 1,
+      method: NOTIFICATION_CONSENT_METHOD,
+      params: {},
+    } as unknown as JsonRequest);
+
+    await waitForStore(notificationConsentStore);
+    expect(get(pendingScreenStore)).toBe(true);
+
+    notificationConsentStore.settle();
+    await running;
+
+    expect(get(pendingScreenStore)).toBe(false);
+  });
+
+  it("releases the screen for a request it refuses", async () => {
+    const { sent } = await run({
+      settle: false,
+      origin: "https://other.example",
+    });
+    expect(sent[0].error).toMatchObject({ code: METHOD_NOT_FOUND_ERROR_CODE });
+    expect(get(pendingScreenStore)).toBe(false);
   });
 
   it("reports what the canister recorded", async () => {

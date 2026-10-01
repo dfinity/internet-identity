@@ -20,6 +20,7 @@ import {
   resolveOptIn,
   type BrowserPushState,
 } from "$lib/utils/notifications/notificationState";
+import { claimScreen } from "$lib/stores/pendingScreen.store";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { remapToLegacyDomain } from "$lib/utils/urlUtils";
 import { waitForStore } from "$lib/utils/utils";
@@ -99,6 +100,10 @@ export const handleNotificationConsentRequest =
     // Answers rather than rejects, so a request that returns below only drops it.
     const browser = readBrowserPushState();
 
+    // Held from here until this request has answered for itself, so authorizing does
+    // not take the screen the user is on before we know whether we need it.
+    const releaseScreen = claimScreen();
+
     await serializeAuthorizationRequest(async () => {
       try {
         const params = parsed.data;
@@ -140,6 +145,7 @@ export const handleNotificationConsentRequest =
         console.error(error);
         onError("notification-consent-failed");
       } finally {
+        releaseScreen();
         notificationConsentStore.clear();
       }
     });

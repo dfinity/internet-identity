@@ -33,8 +33,10 @@
   import {
     type AttributeConsent,
     attributeConsentStore,
+    attributeConsentResolvedStore,
     attributeConsentResultStore,
   } from "$lib/stores/attributeConsent.store";
+  import { pendingScreenStore } from "$lib/stores/pendingScreen.store";
   import {
     notificationConsentSettledStore,
     notificationConsentStore,
@@ -75,6 +77,10 @@
 
   // --- Local state ---
   let upgradeSuccess = $state(false);
+  // Whether a request was still working out its screen when the user authorized.
+  // Only then is there a screen of theirs worth keeping: the 1-click flows and an
+  // identity switch authorize without one, and their redirect animation stands.
+  let heldAtAuthorize = $state(false);
   // The 1-click OpenID resume load shows the redirect animation from its very
   // first frame. `resumeOpenId` runs in `onMount`, i.e. *after* that first
   // render, so starting at `false` renders the returning-user account picker
@@ -126,6 +132,9 @@
 
   // --- View selection ---
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
+  // Keeps the screen the user authorized from until the request that owes us one
+  // has it, so the flow never passes through a half-built screen to get there.
+  const holdingScreen = $derived(heldAtAuthorize && $pendingScreenStore);
 
   // --- Handlers ---
   const handleAuthWizardSignIn = (identityNumber: bigint): Promise<void> => {
@@ -196,6 +205,10 @@
     accessLevel: AccessLevel,
     maxTimeToLive?: bigint,
   ) => {
+    // Read before authorizing, because authorizing is what would otherwise replace
+    // this screen: a request that already owed us one gets to keep it, and one that
+    // arrives after this point has nothing of the user's to keep.
+    heldAtAuthorize = get(pendingScreenStore);
     authorizationStore.authorize(accountNumber, accessLevel, maxTimeToLive);
   };
 
@@ -609,13 +622,13 @@
 
 {#if data.flow === "openid-init" || data.flow === "sso-init"}
   <!-- OpenID/SSO init — nothing to render, onMount redirects to provider. -->
-{:else if $attributeConsentStore !== undefined && $attributeConsentResultStore === undefined && ($authorizedStore !== undefined || data.flow === "openid-resume")}
-  <!-- Consent needed (or loading) — consent view handles its own loading state. -->
+{:else if $attributeConsentStore !== undefined && $attributeConsentResolvedStore && $attributeConsentResultStore === undefined && ($authorizedStore !== undefined || data.flow === "openid-resume")}
+  <!-- Consent needed — what it asks about has been read, so it paints in full. -->
   {@render panelWrapper(attributeConsentContent)}
 {:else if $notificationConsentStore !== undefined && $notificationConsentSettledStore === undefined}
   <!-- Notification consent — runs after authorize, before the redirect. -->
   {@render panelWrapper(notificationConsentContent)}
-{:else if $authorizedStore !== undefined || (data.flow === "openid-resume" && openIdResumeProcessing)}
+{:else if (!holdingScreen && $authorizedStore !== undefined) || (data.flow === "openid-resume" && openIdResumeProcessing)}
   <!-- Authorized or OpenID callback processing — show redirect animation. -->
   <RedirectAnimationView />
 {:else if upgradeSuccess && $isAuthenticatedStore}
