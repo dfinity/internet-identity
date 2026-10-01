@@ -65,7 +65,7 @@
     "lines-and-columns": "^2.0.4",
     "lit-analyzer": "^2.0.2",
     "magic-string": "^0.30.21",
-    "prettier": "3.9.8",
+    "prettier": "3.9.9",
     "prettier-plugin-organize-imports": "^4.3.0",
     "prettier-plugin-svelte": "^3.5.2",
     "prettier-plugin-tailwindcss": "^0.8.1",
@@ -74,7 +74,7 @@
     "tailwindcss": "^4.2.1",
     "ts-node": "^10.9.2",
     "typescript": "5.9.3",
-    "typescript-eslint": "^8.70.0",
+    "typescript-eslint": "^8.70.1",
     "vite": "^7.3.6",
     "vite-plugin-node-polyfills": "^0.28.0",
     "vitest": "^4.1.8"
