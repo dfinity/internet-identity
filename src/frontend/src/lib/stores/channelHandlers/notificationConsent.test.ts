@@ -30,8 +30,12 @@ vi.mock("$lib/utils/validateDerivationOrigin", () => ({
 /// of. What it resolves to is this suite's subject: whether a question opens a
 /// screen, and whether nothing to ask answers the app without one.
 vi.mock("$lib/utils/notifications/notificationState", () => ({
+  notificationsUnavailableHere: vi.fn(() => false),
   readBrowserPushState: vi.fn(() => Promise.resolve({})),
-  resolveOptIn: vi.fn(() => Promise.resolve({ screen: "first-time" })),
+  readGranted: vi.fn(() => Promise.resolve(true)),
+  resolveOptIn: vi.fn(() =>
+    Promise.resolve({ screen: "enable", state: {}, consented: false }),
+  ),
 }));
 vi.mock("$lib/stores/authentication.store", async () => {
   const { writable } = await import("svelte/store");
@@ -64,7 +68,9 @@ import { pendingScreenStore } from "$lib/stores/pendingScreen.store";
 import { waitForStore } from "$lib/utils/utils";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import {
+  notificationsUnavailableHere,
   readBrowserPushState,
+  readGranted,
   resolveOptIn,
 } from "$lib/utils/notifications/notificationState";
 import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
@@ -130,7 +136,13 @@ beforeEach(async () => {
   vi.clearAllMocks();
   consentStatus.mockResolvedValue(true);
   vi.mocked(validateDerivationOrigin).mockResolvedValue({ result: "valid" });
-  vi.mocked(resolveOptIn).mockResolvedValue({ screen: "first-time" });
+  vi.mocked(resolveOptIn).mockResolvedValue({
+    screen: "enable",
+    state: {} as never,
+    consented: false,
+  });
+  vi.mocked(readGranted).mockResolvedValue(true);
+  vi.mocked(notificationsUnavailableHere).mockReturnValue(false);
   notificationConsentStore.clear();
   (PUSH_NOTIFICATIONS as unknown as Writable<boolean>).set(true);
   const { authorizationPromptStore, authorizedStore } =
@@ -194,10 +206,12 @@ describe("handleNotificationConsentRequest", () => {
     notificationConsentStore.settle();
     await running;
 
-    expect(consentStatus).not.toHaveBeenCalled();
-    expect(switchedStatus).toHaveBeenCalledWith({
-      anchor_number: BigInt(20_000),
+    // Read for the identity the user ended on, not the one the screen opened for.
+    expect(readGranted).toHaveBeenCalledTimes(1);
+    expect(readGranted).toHaveBeenCalledWith({
+      identityNumber: BigInt(20_000),
       origin: ORIGIN,
+      actor: { notification_consent_granted: switchedStatus },
     });
     expect(sent[0].result).toEqual({ granted: true });
   });
@@ -207,7 +221,7 @@ describe("handleNotificationConsentRequest", () => {
   it("answers without a screen where there is nothing to ask", async () => {
     vi.mocked(resolveOptIn).mockResolvedValue({
       screen: "skip",
-      consented: true,
+      granted: true,
     });
     const opened = vi.fn();
     const unsubscribe = notificationConsentStore.subscribe((context) => {
@@ -222,12 +236,16 @@ describe("handleNotificationConsentRequest", () => {
     expect(opened).not.toHaveBeenCalled();
     expect(sent[0].result).toEqual({ granted: true });
     expect(errors).toEqual([]);
-    // The answer is the one the resolution already read, not a second query.
-    expect(consentStatus).not.toHaveBeenCalled();
+    // The answer is the one the resolution already read, not a second pair of reads.
+    expect(readGranted).not.toHaveBeenCalled();
   });
 
   it("opens the screen on the question it resolved", async () => {
-    vi.mocked(resolveOptIn).mockResolvedValue({ screen: "blocked" });
+    vi.mocked(resolveOptIn).mockResolvedValue({
+      screen: "blocked",
+      state: {} as never,
+      consented: false,
+    });
     let opened: NotificationConsentContext | undefined;
     const unsubscribe = notificationConsentStore.subscribe((context) => {
       opened ??= context;
@@ -311,13 +329,36 @@ describe("handleNotificationConsentRequest", () => {
     expect(readBrowserPushState).toHaveBeenCalledTimes(3);
   });
 
+  /** iOS delivers notifications only to a Home Screen app, which is not built, so
+   *  nothing is offered there. The method exists, so this is an answer and not a
+   *  refusal: the app is told plainly that it may not notify here. */
+  it("answers no on iOS without opening a screen", async () => {
+    vi.mocked(notificationsUnavailableHere).mockReturnValue(true);
+    const opened = vi.fn();
+    const unsubscribe = notificationConsentStore.subscribe((context) => {
+      if (context !== undefined) {
+        opened();
+      }
+    });
+
+    const { sent, errors } = await run({ settle: false });
+
+    unsubscribe();
+    expect(opened).not.toHaveBeenCalled();
+    expect(sent[0].result).toEqual({ granted: false });
+    expect(errors).toEqual([]);
+    expect(resolveOptIn).not.toHaveBeenCalled();
+    expect(readGranted).not.toHaveBeenCalled();
+  });
+
   it("reports what the canister recorded", async () => {
     const { sent } = await run();
     expect(sent).toHaveLength(1);
     expect(sent[0].result).toEqual({ granted: true });
-    expect(consentStatus).toHaveBeenCalledWith({
-      anchor_number: BigInt(10_000),
+    expect(readGranted).toHaveBeenCalledWith({
+      identityNumber: BigInt(10_000),
       origin: ORIGIN,
+      actor: { notification_consent_granted: consentStatus },
     });
   });
 
@@ -328,7 +369,7 @@ describe("handleNotificationConsentRequest", () => {
   });
 
   it("reports a refusal rather than failing", async () => {
-    consentStatus.mockResolvedValue(false);
+    vi.mocked(readGranted).mockResolvedValue(false);
     const { sent, errors } = await run();
     expect(sent[0].result).toEqual({ granted: false });
     expect(errors).toEqual([]);

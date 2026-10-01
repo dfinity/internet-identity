@@ -1,9 +1,5 @@
 <script lang="ts">
-  import {
-    BellOffIcon,
-    SmartphoneIcon,
-    TriangleAlertIcon,
-  } from "@lucide/svelte";
+  import { BellOffIcon } from "@lucide/svelte";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
   import type { _SERVICE } from "$lib/generated/internet_identity_types";
   import { t } from "$lib/stores/locale.store";
@@ -11,20 +7,20 @@
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
   import NotifUnblockSteps from "$lib/components/notifications/NotifUnblockSteps.svelte";
-  import {
-    enableNotifications,
-    allowApp,
-  } from "$lib/utils/notifications/enableNotifications";
+  import { turnOnNotifications } from "$lib/utils/notifications/enableNotifications";
   import {
     readBrowserPushState,
     readDeviceState,
+    type DeviceNotificationState,
     type OptInQuestion,
   } from "$lib/utils/notifications/notificationState";
   import {
     clearFailure,
-    recordDeclined,
     recordFailure,
   } from "$lib/utils/notifications/notificationDiagnostics";
+  import { handleError } from "$lib/components/utils/error";
+  import { toaster } from "$lib/components/utils/toaster";
+  import { isCanisterError } from "$lib/utils/utils";
   import { describeBrowser } from "$lib/utils/describeBrowser";
   import type { BrowserDescription } from "$lib/generated/internet_identity_types";
 
@@ -37,56 +33,71 @@
     actor: ActorSubclass<_SERVICE>;
     /** The question to ask, resolved before this screen was rendered. */
     screen: OptInQuestion;
+    /** This browser as the resolution found it, so answering only does what is left.
+     *  Not named `state`, which would read as the `$state` rune in this file. */
+    device: DeviceNotificationState;
+    /** Whether this app already holds consent from this identity. */
+    consented: boolean;
     /** Continues sign-in: after enabling, allowing or skipping. */
     onDone: () => void;
   }
 
-  const { appName, identityNumber, origin, actor, screen, onDone }: Props =
-    $props();
+  const {
+    appName,
+    identityNumber,
+    origin,
+    actor,
+    screen,
+    device,
+    consented,
+    onDone,
+  }: Props = $props();
 
-  const app = $derived(appName ?? $t`this app`);
-
-  // Opens on the resolved question and moves on from there: an answered prompt or
-  // a failed attempt replaces it with the screen that outcome needs. A new request
-  // arrives as a new context, which remounts this component.
+  // Opens on the resolved question and moves on from there: a refused prompt replaces
+  // it with the unblock guidance. A new request arrives as a new context, which
+  // remounts this component.
   let variant = $state<OptInQuestion>(screen);
   let busy = $state(false);
   let browser = $state<BrowserDescription | undefined>(undefined);
-  // A retry from the failed screen sets this device up, or only records consent
-  // when the device is already registered. Read by the failed screen's copy.
-  let retrySubscribes = $state(screen !== "allow-app");
 
   // Only the unblock guidance reads this, so it is fetched alongside the screen
   // rather than ahead of it: its steps appear once it lands.
   void describeBrowser().then((description) => (browser = description));
 
-  const messageOf = (err: unknown): string =>
-    err instanceof Error ? err.message : String(err);
-
-  /** Whether this device is set up and registered for this identity. Best effort:
-   *  a probe that fails must not keep the failed screen from appearing. */
-  const deviceIsReady = async (): Promise<boolean> => {
-    // Read again rather than reused: the attempt this follows is what changed the
-    // permission and the subscription.
-    const pushState = await readBrowserPushState();
-    if (pushState === undefined) {
-      return false;
+  /**
+   * Reports a failure and leaves the user where they are, with the button live again.
+   *
+   * A canister refusal goes to the shared handler, which knows how to word one.
+   * Anything else is the browser's own: the service worker, the push subscription, a
+   * key or the store it lives in. Those carry no wording we could improve on, so the
+   * message is shown as it came, which makes a screenshot enough to act on.
+   */
+  const reportFailure = (error: unknown) => {
+    if (isCanisterError(error)) {
+      recordFailure("register-failed", messageOf(error));
+      handleError(error);
+      return;
     }
-    try {
-      const state = await readDeviceState(identityNumber, pushState);
-      return state.subscribed && state.registered;
-    } catch {
-      return false;
-    }
+    recordFailure("subscribe-failed", messageOf(error));
+    toaster.error({
+      title: $t`Notifications unavailable`,
+      description: messageOf(error),
+    });
   };
 
-  const runSubscribe = async (): Promise<void> => {
+  const messageOf = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error);
+
+  /** Runs what is left to do for `current`, which a retry reads afresh. */
+  const runEnable = async (current: DeviceNotificationState): Promise<void> => {
     busy = true;
     try {
-      const result = await enableNotifications({
+      const result = await turnOnNotifications({
         identityNumber,
         origin,
         actor,
+        device: current,
+        consented,
       });
       if (result.status === "denied") {
         recordFailure("permission-denied");
@@ -95,62 +106,51 @@
       }
       if (result.status === "dismissed") {
         // The permission is still `default`, so the prompt can be raised again.
-        // Stay where the user is, with Enable still in front of them.
+        // Stay where the user is, with Allow still in front of them.
         return;
       }
       clearFailure();
       onDone();
-    } catch (err) {
-      const message = messageOf(err);
-      recordFailure("subscribe-failed", message);
-      // Only the consent is left to retry where the device came out of this both
-      // subscribed and registered. Anything short of that, including a probe we
-      // could not make, is retried in full.
-      retrySubscribes = !(await deviceIsReady());
-      variant = "failed";
+    } catch (error) {
+      reportFailure(error);
     } finally {
       busy = false;
     }
   };
 
-  const runAllow = async (): Promise<void> => {
+  /**
+   * Picks up a permission the user changed in browser settings.
+   *
+   * Nothing here can re-raise a refused prompt, so this reads the permission again
+   * and carries on where it has changed: the user reached this screen by asking for
+   * notifications, so a retry continues that rather than asking again. A permission
+   * still refused leaves them on the guidance.
+   */
+  const handleRetry = async (): Promise<void> => {
     busy = true;
     try {
-      await allowApp({
-        identityNumber,
-        origin,
-        actor,
-      });
-      clearFailure();
-      onDone();
-    } catch (err) {
-      const message = messageOf(err);
-      recordFailure("register-failed", message);
-      variant = "failed";
+      const pushState = await readBrowserPushState();
+      if (pushState === undefined || pushState.permission === "denied") {
+        return;
+      }
+      const current = await readDeviceState(identityNumber, pushState);
+      busy = false;
+      await runEnable(current);
+    } catch (error) {
+      reportFailure(error);
     } finally {
       busy = false;
     }
-  };
-
-  /** Answering "not now" to an offer. Quiets this app for a while, which is not
-   *  what dismissing the unblock guidance means. */
-  const handleSkip = () => {
-    recordDeclined(origin);
-    onDone();
-  };
-
-  const handleRetry = () => {
-    void (retrySubscribes ? runSubscribe() : runAllow());
   };
 </script>
 
-{#if variant === "first-time"}
+{#if variant === "enable"}
   <NotifEnablePitch
     {appName}
     {origin}
     {busy}
-    onEnable={() => void runSubscribe()}
-    onSkip={handleSkip}
+    onEnable={() => void runEnable(device)}
+    onSkip={onDone}
   />
 {:else}
   <div
@@ -158,115 +158,33 @@
   >
     <AuthorizeHeader {origin} />
     <div class="flex flex-col justify-center">
-      {#if variant === "new-device"}
-        <span
-          class="border-border-secondary bg-bg-secondary text-text-primary mb-6 flex size-12 items-center justify-center rounded-full border"
-        >
-          <SmartphoneIcon class="size-6" aria-hidden="true" />
-        </span>
-        <h1 class="text-text-primary text-2xl font-medium text-balance">
-          {$t`Get ${app} notifications on this device`}
-        </h1>
-        <p class="text-text-secondary mt-2 text-sm">
-          <Trans>
-            You allowed this app on another device. Turn this device on to
-            receive them here too.
-          </Trans>
-        </p>
-      {:else if variant === "allow-app"}
-        <span
-          class="border-border-secondary bg-bg-secondary text-text-primary mb-6 flex size-12 items-center justify-center rounded-full border"
-        >
-          <SmartphoneIcon class="size-6" aria-hidden="true" />
-        </span>
-        <h1 class="text-text-primary text-2xl font-medium text-balance">
-          {$t`Turn on notifications from ${app}?`}
-        </h1>
-        <p class="text-text-secondary mt-2 text-sm">
-          <Trans>
-            This device is already set up for notifications. Allow this app to
-            send them too.
-          </Trans>
-        </p>
-      {:else if variant === "blocked"}
-        <span
-          class="border-border-secondary bg-bg-secondary text-text-primary mb-6 flex size-12 items-center justify-center rounded-full border"
-        >
-          <BellOffIcon class="size-6" aria-hidden="true" />
-        </span>
-        <h1 class="text-text-primary text-2xl font-medium text-balance">
-          {$t`Notifications are turned off for Internet Identity`}
-        </h1>
-        <p class="text-text-secondary mt-2 mb-4 text-sm">
-          <Trans>
-            Your browser is blocking notifications for this site, so this app
-            can't reach you here. Turn them back on in your browser settings,
-            then try again.
-          </Trans>
-        </p>
-        {#if browser !== undefined}
-          <NotifUnblockSteps {browser} />
-        {/if}
-      {:else if variant === "failed"}
-        <span
-          class="border-border-secondary bg-bg-secondary text-text-primary mb-6 flex size-12 items-center justify-center rounded-full border"
-        >
-          <TriangleAlertIcon class="size-6" aria-hidden="true" />
-        </span>
-        <h1 class="text-text-primary text-2xl font-medium text-balance">
-          {$t`Couldn't turn on notifications`}
-        </h1>
-        <p class="text-text-secondary mt-2 text-sm">
-          {#if retrySubscribes}
-            <Trans>
-              Something went wrong setting up this device. You can try again
-              now, or set it up later in Settings.
-            </Trans>
-          {:else}
-            <Trans>
-              Something went wrong allowing this app. You can try again now, or
-              allow it later in Settings.
-            </Trans>
-          {/if}
-        </p>
+      <span
+        class="border-border-secondary bg-bg-secondary text-text-primary mb-6 flex size-12 items-center justify-center rounded-full border"
+      >
+        <BellOffIcon class="size-6" aria-hidden="true" />
+      </span>
+      <h1 class="text-text-primary text-2xl font-medium text-balance">
+        {$t`Notifications are blocked`}
+      </h1>
+      <p class="text-text-secondary mt-2 mb-4 text-sm">
+        <Trans>Follow these steps to turn them back on:</Trans>
+      </p>
+      {#if browser !== undefined}
+        <NotifUnblockSteps {browser} open />
       {/if}
     </div>
 
     <div class="mt-7 flex flex-col gap-2.5">
-      {#if variant === "new-device"}
-        <button
-          class="btn btn-primary"
-          onclick={() => void runSubscribe()}
-          disabled={busy}
-        >
-          {busy ? $t`Setting up…` : $t`Enable on this device`}
-        </button>
-        <button class="btn btn-tertiary" onclick={handleSkip} disabled={busy}>
-          {$t`Maybe later`}
-        </button>
-      {:else if variant === "allow-app"}
-        <button
-          class="btn btn-primary"
-          onclick={() => void runAllow()}
-          disabled={busy}
-        >
-          {busy ? $t`Setting up…` : $t`Allow ${app}`}
-        </button>
-        <button class="btn btn-tertiary" onclick={handleSkip} disabled={busy}>
-          {$t`Not now`}
-        </button>
-      {:else if variant === "blocked"}
-        <button class="btn btn-tertiary" onclick={onDone}>
-          {$t`Continue without`}
-        </button>
-      {:else if variant === "failed"}
-        <button class="btn btn-primary" onclick={handleRetry} disabled={busy}>
-          {busy ? $t`Setting up…` : $t`Try again`}
-        </button>
-        <button class="btn btn-tertiary" onclick={onDone} disabled={busy}>
-          {$t`Continue`}
-        </button>
-      {/if}
+      <button
+        class="btn btn-primary"
+        onclick={() => void handleRetry()}
+        disabled={busy}
+      >
+        {busy ? $t`Setting up…` : $t`Try again`}
+      </button>
+      <button class="btn btn-tertiary" onclick={onDone} disabled={busy}>
+        {$t`Not now`}
+      </button>
     </div>
   </div>
 {/if}

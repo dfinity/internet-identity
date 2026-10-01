@@ -16,7 +16,9 @@ import {
   notificationConsentStore,
 } from "$lib/stores/notificationConsent.store";
 import {
+  notificationsUnavailableHere,
   readBrowserPushState,
+  readGranted,
   resolveOptIn,
   type BrowserPushState,
 } from "$lib/utils/notifications/notificationState";
@@ -133,6 +135,18 @@ export const handleNotificationConsentRequest =
           params.icrc95DerivationOrigin ?? channel.origin,
         );
 
+        // No notifications on iOS yet, so nothing is offered and the app is told
+        // plainly that it may not notify here rather than being refused outright:
+        // the method exists, this browser just has no answer but no.
+        if (notificationsUnavailableHere()) {
+          await channel.send({
+            jsonrpc: "2.0",
+            id: requestId,
+            result: { granted: false },
+          });
+          return;
+        }
+
         // The canister refuses an origin it does not notify for, so asking this
         // user to allow notifications could only ever end in an error.
         if (!notificationsEnabledFor(effectiveOrigin)) {
@@ -218,7 +232,7 @@ const askUntilSettled = async (
       browser,
     });
     if (resolution.screen === "skip") {
-      return resolution.consented;
+      return resolution.granted;
     }
 
     notificationConsentStore.setContext({
@@ -226,6 +240,8 @@ const askUntilSettled = async (
       identityNumber: authenticated.identityNumber,
       actor: authenticated.actor,
       screen: resolution.screen,
+      device: resolution.state,
+      consented: resolution.consented,
     });
 
     // The header keeps the identity switcher up for this screen, and switching
@@ -245,9 +261,12 @@ const askUntilSettled = async (
       continue;
     }
 
-    return authenticated.actor.notification_consent_granted({
-      anchor_number: authenticated.identityNumber,
+    // What the app is told is read back rather than reported from the screen, and it
+    // is both halves: the consent this identity holds, and a browser that delivers.
+    return readGranted({
+      identityNumber: authenticated.identityNumber,
       origin: effectiveOrigin,
+      actor: authenticated.actor,
     });
   }
 };

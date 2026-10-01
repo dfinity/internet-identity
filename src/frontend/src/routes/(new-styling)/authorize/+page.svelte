@@ -669,6 +669,8 @@
         origin={$notificationConsentStore.effectiveOrigin}
         actor={$notificationConsentStore.actor}
         screen={$notificationConsentStore.screen}
+        device={$notificationConsentStore.device}
+        consented={$notificationConsentStore.consented}
         onDone={() => notificationConsentStore.settle()}
       />
     {/key}

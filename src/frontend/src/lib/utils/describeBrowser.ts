@@ -218,12 +218,30 @@ const highEntropyHints = async (): Promise<{
   }
 };
 
+/**
+ * The brand and system, which the user agent alone answers.
+ *
+ * Separate from {@link describeBrowser} because the client hints the rest needs are a
+ * promise, and a screen choosing which browser's instructions to show has to make that
+ * choice on its first frame rather than paint twice.
+ */
+export const browserAndSystem = (): Pick<
+  BrowserDescription,
+  "brand" | "os"
+> => {
+  const agent = navigator.userAgent;
+  return {
+    brand: brandOf(agent),
+    os: systemOf(agent, navigator.maxTouchPoints),
+  };
+};
+
 export const describeBrowser = async (): Promise<BrowserDescription> => {
   const agent = navigator.userAgent;
   const hints = await highEntropyHints();
-  const os = systemOf(agent, navigator.maxTouchPoints);
+  const { brand, os } = browserAndSystem();
   return {
-    brand: brandOf(agent),
+    brand,
     os,
     form_factor: formFactorOf(agent, os, hints),
     model: hints.model === undefined ? [] : [capped(hints.model)],

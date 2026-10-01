@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // vapidKeyStore opens an IndexedDB store at import; the resolver under test
 // never touches it. The decline cooldown is mocked so the logic stays pure.
 vi.mock("./vapidKeyStore", () => ({ loadVapidKey: vi.fn() }));
-vi.mock("./notificationDiagnostics", () => ({
-  wasDeclinedRecently: vi.fn(() => false),
-  recordPermission: vi.fn(),
-  recordFailure: vi.fn(),
+vi.mock("./notificationDiagnostics", () => ({ recordPermission: vi.fn() }));
+vi.mock("$lib/utils/describeBrowser", () => ({
+  browserAndSystem: vi.fn(() => ({
+    os: { Macos: null },
+    brand: { Chrome: null },
+  })),
 }));
 vi.mock("./browserActor", () => {
   class UnregisteredBrowserError extends Error {}
@@ -19,19 +21,20 @@ vi.mock("./pushSubscription", () => ({
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import {
+  notificationsUnavailableHere,
   readBrowserPushState,
   readDeviceState,
+  readGranted,
   resolveOptIn,
   resolveOptInScreen,
   type BrowserPushState,
   type DeviceNotificationState,
 } from "./notificationState";
-import { wasDeclinedRecently } from "./notificationDiagnostics";
+import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 
-const declined = vi.mocked(wasDeclinedRecently);
 const ORIGIN = "https://app.example";
 const IDENTITY = BigInt(10_000);
 
@@ -46,75 +49,67 @@ const state = (
 });
 
 describe("resolveOptInScreen", () => {
-  beforeEach(() => declined.mockReturnValue(false));
-
-  it("skips when notifications aren't supported", () => {
-    expect(resolveOptInScreen(state({ supported: false }), ORIGIN, false)).toBe(
-      "skip",
-    );
+  it("skips a browser that cannot do notifications at all", () => {
+    expect(resolveOptInScreen(state({ supported: false }), false)).toBe("skip");
   });
 
-  it("skips when already fully on for this app", () => {
+  it("skips where this app is allowed and this browser delivers", () => {
     expect(
       resolveOptInScreen(
         state({ permission: "granted", subscribed: true, registered: true }),
-        ORIGIN,
         true,
       ),
     ).toBe("skip");
   });
 
-  it("skips an app declined recently", () => {
-    declined.mockReturnValue(true);
-    expect(resolveOptInScreen(state({}), ORIGIN, false)).toBe("skip");
-  });
-
-  it("shows guidance when blocked", () => {
-    expect(
-      resolveOptInScreen(state({ permission: "denied" }), ORIGIN, false),
-    ).toBe("blocked");
-  });
-
-  it("asks only for this app's consent when the browser is subscribed", () => {
-    expect(
-      resolveOptInScreen(
-        state({ permission: "granted", subscribed: true, registered: true }),
-        ORIGIN,
-        false,
-      ),
-    ).toBe("allow-app");
-  });
-
-  it("offers to enable this device when the app is allowed elsewhere", () => {
-    expect(resolveOptInScreen(state({ registered: false }), ORIGIN, true)).toBe(
-      "new-device",
-    );
-  });
-
-  it("offers to enable this device for an identity the canister has no row for", () => {
-    expect(
-      resolveOptInScreen(
-        state({ permission: "granted", subscribed: true, registered: false }),
-        ORIGIN,
-        true,
-      ),
-    ).toBe("new-device");
-  });
-
-  /// `allow-app` never asks the browser for permission, so a registration whose
-  /// permission was reset would report success while nothing can be delivered.
-  it("asks for permission again when a registered browser had it reset", () => {
+  /** A permission reset to "default" leaves the rows in place while the browser shows
+   *  nothing, so the registration alone is not delivery. */
+  it("asks again where the permission was reset but the rows remain", () => {
     expect(
       resolveOptInScreen(
         state({ permission: "default", subscribed: true, registered: true }),
-        ORIGIN,
-        false,
+        true,
       ),
-    ).toBe("first-time");
+    ).toBe("enable");
   });
 
-  it("shows the full pitch to a first-timer", () => {
-    expect(resolveOptInScreen(state({}), ORIGIN, false)).toBe("first-time");
+  it("asks where this browser is not registered, however the app stands", () => {
+    expect(resolveOptInScreen(state({ registered: false }), true)).toBe(
+      "enable",
+    );
+    expect(resolveOptInScreen(state({ registered: false }), false)).toBe(
+      "enable",
+    );
+  });
+
+  it("asks where the browser delivers but this app is not allowed", () => {
+    expect(
+      resolveOptInScreen(
+        state({ permission: "granted", subscribed: true, registered: true }),
+        false,
+      ),
+    ).toBe("enable");
+  });
+
+  /** No prompt can lift a refusal, so this asks the user to lift it in settings. */
+  it("offers the unblock guidance for a refused permission", () => {
+    expect(resolveOptInScreen(state({ permission: "denied" }), false)).toBe(
+      "blocked",
+    );
+  });
+});
+
+describe("notificationsUnavailableHere", () => {
+  it("is false where the browser can deliver notifications", () => {
+    expect(notificationsUnavailableHere()).toBe(false);
+  });
+
+  it.each([["Ios"], ["Ipados"]])("is true on %s", (os) => {
+    vi.mocked(browserAndSystem).mockReturnValue({
+      os: { [os]: null },
+      brand: { Safari: null },
+    } as never);
+    expect(notificationsUnavailableHere()).toBe(true);
   });
 });
 
@@ -245,7 +240,6 @@ describe("resolveOptIn", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    declined.mockReturnValue(false);
     vi.stubGlobal("Notification", { permission: "granted" });
     vi.mocked(isPushSupported).mockReturnValue(true);
     vi.mocked(currentDeviceSubscription).mockResolvedValue({
@@ -265,8 +259,15 @@ describe("resolveOptIn", () => {
     } as unknown as ActorSubclass<_SERVICE>);
   });
 
-  /** The skip answer is what the app is told, so it carries the consent this
-   *  already read instead of costing a second query for the same fact. */
+  const ready = {
+    supported: true,
+    permission: "granted" as NotificationPermission,
+    subscribed: true,
+    registered: true,
+  };
+
+  /** The skip answer is what the app is told, so it carries both halves this already
+   *  read instead of costing a second pair of reads for the same facts. */
   it("answers from what it read where there is nothing to ask", async () => {
     await expect(
       resolveOptIn({
@@ -275,10 +276,10 @@ describe("resolveOptIn", () => {
         actor: actorGranting(true),
         browser: readBrowserPushState(),
       }),
-    ).resolves.toEqual({ screen: "skip", consented: true });
+    ).resolves.toEqual({ screen: "skip", granted: true });
   });
 
-  it("asks this app for consent on a browser that is already set up", async () => {
+  it("asks a set-up browser whose app is not allowed, carrying what it found", async () => {
     await expect(
       resolveOptIn({
         identityNumber: IDENTITY,
@@ -286,12 +287,12 @@ describe("resolveOptIn", () => {
         actor: actorGranting(false),
         browser: readBrowserPushState(),
       }),
-    ).resolves.toEqual({ screen: "allow-app" });
+    ).resolves.toEqual({ screen: "enable", state: ready, consented: false });
   });
 
-  /** A browser that could not be read is not a browser with nothing to ask: the
-   *  user gets the screen they can retry from. */
-  it("offers the failed screen where the browser could not be read", async () => {
+  /** A browser that could not be read is not a browser with nothing to ask. The
+   *  question is offered, and answering it reads everything again. */
+  it("asks anyway where the browser could not be read", async () => {
     await expect(
       resolveOptIn({
         identityNumber: IDENTITY,
@@ -299,10 +300,15 @@ describe("resolveOptIn", () => {
         actor: actorGranting(false),
         browser: Promise.resolve(undefined),
       }),
-    ).resolves.toEqual({ screen: "failed" });
+    ).resolves.toMatchObject({
+      screen: "enable",
+      state: { registered: false },
+    });
   });
 
-  it("offers the failed screen where the registration read throws", async () => {
+  /** An error is an error whenever it arrives: the caller shows the same toast for
+   *  one raised here as for one raised while the user answers. */
+  it("lets a failed registration read through to the caller", async () => {
     vi.mocked(browserKeyActor).mockRejectedValue(new Error("query refused"));
     await expect(
       resolveOptIn({
@@ -311,7 +317,7 @@ describe("resolveOptIn", () => {
         actor: actorGranting(false),
         browser: readBrowserPushState(),
       }),
-    ).resolves.toEqual({ screen: "failed" });
+    ).rejects.toThrow("query refused");
   });
 
   /** The app's consent and this browser's state need nothing from each other, so
@@ -337,7 +343,7 @@ describe("resolveOptIn", () => {
         actor,
         browser,
       }),
-    ).resolves.toEqual({ screen: "allow-app" });
+    ).resolves.toMatchObject({ screen: "enable" });
   });
 
   /** A consent query that fails reads as "not allowed yet", which asks a question
@@ -355,6 +361,107 @@ describe("resolveOptIn", () => {
         actor,
         browser: readBrowserPushState(),
       }),
-    ).resolves.toEqual({ screen: "allow-app" });
+    ).resolves.toMatchObject({ screen: "enable", consented: false });
+  });
+});
+
+describe("readGranted", () => {
+  const ENDPOINT = "https://relay.example/held";
+
+  const actorGranting = (granted: boolean) =>
+    ({
+      notification_consent_granted: vi.fn(() => Promise.resolve(granted)),
+    }) as unknown as ActorSubclass<_SERVICE>;
+
+  const registeredOn = (endpoint?: string) =>
+    vi.mocked(browserKeyActor).mockResolvedValue({
+      get_webpush_subscription_status: vi.fn(() =>
+        Promise.resolve(
+          endpoint === undefined
+            ? []
+            : [{ endpoint, pool_len: 30, issued_at_ns: BigInt(0) }],
+        ),
+      ),
+    } as unknown as ActorSubclass<_SERVICE>);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal("Notification", { permission: "granted" });
+    vi.mocked(isPushSupported).mockReturnValue(true);
+    vi.mocked(currentDeviceSubscription).mockResolvedValue({
+      endpoint: ENDPOINT,
+    } as PushSubscription);
+    vi.mocked(loadVapidKey).mockResolvedValue({
+      endpoint: ENDPOINT,
+      privateKey: {} as CryptoKey,
+      publicKeyRaw: new Uint8Array(),
+    });
+    registeredOn(ENDPOINT);
+  });
+
+  it("is granted where the app is allowed and this browser delivers", async () => {
+    await expect(
+      readGranted({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor: actorGranting(true),
+      }),
+    ).resolves.toBe(true);
+  });
+
+  it("is not granted where the app is not allowed", async () => {
+    await expect(
+      readGranted({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor: actorGranting(false),
+      }),
+    ).resolves.toBe(false);
+  });
+
+  /** Consent is per identity and delivery is per browser, so an app allowed on
+   *  another device is not an app that may notify the user here. */
+  it("is not granted where this browser holds no registration", async () => {
+    registeredOn();
+    await expect(
+      readGranted({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor: actorGranting(true),
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("is not granted on a browser without push support", async () => {
+    vi.mocked(isPushSupported).mockReturnValue(false);
+    await expect(
+      readGranted({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor: actorGranting(true),
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("is not granted where the permission was reset to default", async () => {
+    vi.stubGlobal("Notification", { permission: "default" });
+    await expect(
+      readGranted({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor: actorGranting(true),
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("is not granted where the browser could not be read", async () => {
+    vi.mocked(currentDeviceSubscription).mockRejectedValue(new Error("gone"));
+    await expect(
+      readGranted({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor: actorGranting(true),
+      }),
+    ).resolves.toBe(false);
   });
 });

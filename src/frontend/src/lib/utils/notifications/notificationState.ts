@@ -11,11 +11,8 @@ import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
-import {
-  recordFailure,
-  recordPermission,
-  wasDeclinedRecently,
-} from "./notificationDiagnostics";
+import { recordPermission } from "./notificationDiagnostics";
+import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
 
 /** What this browser can do, and what it is subscribed with. */
@@ -114,22 +111,45 @@ const isRegisteredHere = async (
   return status?.endpoint === endpoint;
 };
 
-export type OptInScreen =
-  "first-time" | "allow-app" | "new-device" | "blocked" | "skip";
+/**
+ * Whether notifications reach this identity in this browser right now.
+ *
+ * The permission as well as the registration: a permission reset to "default" leaves
+ * the rows in place while the browser shows nothing, so a registration alone is not
+ * delivery. `registered` already implies supported and subscribed.
+ */
+const deliversHere = (state: DeviceNotificationState): boolean =>
+  state.permission === "granted" && state.registered;
 
-/** What the opt-in screen asks, where there is anything to ask at all. */
-export type OptInQuestion = Exclude<OptInScreen, "skip"> | "failed";
+/** iOS has no notifications yet: Safari delivers them only to a Home Screen app, and
+ *  that is not built. Nothing is offered there and no app is told otherwise. */
+export const notificationsUnavailableHere = (): boolean => {
+  const { os } = browserAndSystem();
+  return "Ios" in os || "Ipados" in os;
+};
 
-/** Nothing to ask, so the answer is already known, or a question to put on screen. */
+export type OptInScreen = "enable" | "blocked" | "skip";
+
+/** What the opt-in asks, where there is anything to ask. */
+export type OptInQuestion = Exclude<OptInScreen, "skip">;
+
+/** Nothing to ask, so the answer is already known, or a question and what answering
+ *  it still has to do. */
 export type OptInResolution =
-  { screen: "skip"; consented: boolean } | { screen: OptInQuestion };
+  | { screen: "skip"; granted: boolean }
+  | {
+      screen: OptInQuestion;
+      state: DeviceNotificationState;
+      consented: boolean;
+    };
 
 /**
- * Which screen this app and identity need, resolved before anything renders.
+ * Which screen this app and identity need.
  *
  * The app's consent and this browser's state are independent, so they are read at
  * once; only the registration has to wait, since it is read against the endpoint the
- * browser turns out to hold.
+ * browser turns out to hold. A failure is left to the caller: it shows the same toast
+ * whenever it happens, and the screen it lands on is the one that asks.
  */
 export const resolveOptIn = async ({
   identityNumber,
@@ -142,58 +162,73 @@ export const resolveOptIn = async ({
   actor: ActorSubclass<_SERVICE>;
   browser: Promise<BrowserPushState | undefined>;
 }): Promise<OptInResolution> => {
-  try {
-    const [consented, browserState] = await Promise.all([
-      actor
-        .notification_consent_granted({ anchor_number: identityNumber, origin })
-        .catch(() => false),
-      browser,
-    ]);
-    if (browserState === undefined) {
-      recordFailure("subscribe-failed", "could not read this browser's state");
-      return { screen: "failed" };
-    }
-    const state = await readDeviceState(identityNumber, browserState);
-    recordPermission(state.permission);
-    const screen = resolveOptInScreen(state, origin, consented);
-    return screen === "skip" ? { screen, consented } : { screen };
-  } catch (error) {
-    // The request is waiting on this window, so a rejection here has to land on a
-    // screen the user can answer rather than on nothing at all.
-    recordFailure(
-      "subscribe-failed",
-      error instanceof Error ? error.message : String(error),
-    );
-    return { screen: "failed" };
-  }
+  const [consented, browserState] = await Promise.all([
+    actor
+      .notification_consent_granted({ anchor_number: identityNumber, origin })
+      .catch(() => false),
+    browser,
+  ]);
+  // A browser we could not read is not one with nothing to ask. Offer the question
+  // and let answering it read everything again.
+  const state =
+    browserState === undefined
+      ? {
+          supported: true,
+          permission: "default" as NotificationPermission,
+          subscribed: false,
+          registered: false,
+        }
+      : await readDeviceState(identityNumber, browserState);
+  recordPermission(state.permission);
+  const screen = resolveOptInScreen(state, consented);
+  return screen === "skip"
+    ? { screen, granted: consented && deliversHere(state) }
+    : { screen, state, consented };
 };
 
-/** Picks the opt-in screen for `origin` from device state and existing consent. */
+/**
+ * What an app is told: this identity allowed it, and this browser delivers.
+ *
+ * Read again rather than carried over from the resolution, because the user has
+ * acted on the screen since.
+ */
+export const readGranted = async ({
+  identityNumber,
+  origin,
+  actor,
+}: {
+  identityNumber: bigint;
+  origin: string;
+  actor: ActorSubclass<_SERVICE>;
+}): Promise<boolean> => {
+  const browserState = await readBrowserPushState();
+  if (browserState === undefined) {
+    return false;
+  }
+  const [consented, state] = await Promise.all([
+    actor
+      .notification_consent_granted({ anchor_number: identityNumber, origin })
+      .catch(() => false),
+    readDeviceState(identityNumber, browserState),
+  ]);
+  return consented && deliversHere(state);
+};
+
+/** Picks the opt-in screen from device state and existing consent. */
 export const resolveOptInScreen = (
   state: DeviceNotificationState,
-  origin: string,
   allowed: boolean,
 ): OptInScreen => {
   if (!state.supported) {
     return "skip";
   }
-  if (state.permission === "granted" && state.registered && allowed) {
+  if (allowed && deliversHere(state)) {
     return "skip";
   }
-  if (wasDeclinedRecently(origin)) {
-    return "skip";
-  }
+  // A refusal stands until the user changes it in browser settings, which no prompt
+  // can do, so this asks for that instead of for a permission it cannot get.
   if (state.permission === "denied") {
     return "blocked";
   }
-  // Only where the browser can already deliver: this screen asks for the app's
-  // consent and nothing else, so a permission that was reset to "default" has to
-  // fall through to one that asks for it back.
-  if (state.permission === "granted" && state.registered && !allowed) {
-    return "allow-app";
-  }
-  if (!state.registered && allowed) {
-    return "new-device";
-  }
-  return "first-time";
+  return "enable";
 };
