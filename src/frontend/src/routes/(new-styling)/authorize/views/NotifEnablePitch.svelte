@@ -27,6 +27,24 @@
   const sender = $derived(appName ?? new URL(origin).hostname);
 </script>
 
+<!-- The tile an app's logo sits in. The border and fill are what make the globe
+     read as one when an app has published no logo; a logo of its own fills the
+     tile, and ringing it would be drawing on the app's artwork. -->
+{#snippet icon()}
+  {#if appLogo === undefined}
+    <span
+      class="border-border-tertiary bg-bg-tertiary text-fg-primary flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-lg border"
+      ><GlobeIcon class="size-4" /></span
+    >
+  {:else}
+    <img
+      src={appLogo}
+      alt=""
+      class="h-[39px] w-[39px] shrink-0 rounded-lg object-contain"
+    />
+  {/if}
+{/snippet}
+
 <div class="flex min-w-0 flex-col items-stretch">
   <!-- Ported from the design. Hidden from assistive technology: the messages are
        made up, and a screen reader would read them ahead of the heading as though
@@ -40,14 +58,7 @@
         class="border-border-secondary relative h-full rounded-2xl border bg-white/8 opacity-30 shadow-lg"
       >
         <div class="flex items-start gap-3 p-3">
-          <span
-            class="border-border-tertiary bg-bg-tertiary text-fg-primary flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-lg border"
-            >{#if appLogo === undefined}<GlobeIcon class="size-4" />{:else}<img
-                src={appLogo}
-                alt=""
-                class="h-full w-full rounded-lg object-contain"
-              />{/if}</span
-          >
+          {@render icon()}
           <div class="min-w-0 flex-1">
             <div class="flex items-baseline justify-between gap-2">
               <span
@@ -71,14 +82,7 @@
         class="border-border-secondary relative h-full rounded-2xl border bg-white/8 opacity-60 shadow-lg"
       >
         <div class="flex items-start gap-3 p-3">
-          <span
-            class="border-border-tertiary bg-bg-tertiary text-fg-primary flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-lg border"
-            >{#if appLogo === undefined}<GlobeIcon class="size-4" />{:else}<img
-                src={appLogo}
-                alt=""
-                class="h-full w-full rounded-lg object-contain"
-              />{/if}</span
-          >
+          {@render icon()}
           <div class="min-w-0 flex-1">
             <div class="flex items-baseline justify-between gap-2">
               <span
@@ -102,14 +106,7 @@
         class="border-border-secondary relative h-full rounded-2xl border bg-white/8 opacity-100 shadow-lg"
       >
         <div class="flex items-start gap-3 p-3">
-          <span
-            class="border-border-tertiary bg-bg-tertiary text-fg-primary flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-lg border"
-            >{#if appLogo === undefined}<GlobeIcon class="size-4" />{:else}<img
-                src={appLogo}
-                alt=""
-                class="h-full w-full rounded-lg object-contain"
-              />{/if}</span
-          >
+          {@render icon()}
           <div class="min-w-0 flex-1">
             <div class="flex items-baseline justify-between gap-2">
               <span
