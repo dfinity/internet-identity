@@ -46,4 +46,3 @@ export const clearFailure = (): void => {
 export const recordPermission = (permission: NotificationPermission): void => {
   write({ ...read(), permission });
 };
-

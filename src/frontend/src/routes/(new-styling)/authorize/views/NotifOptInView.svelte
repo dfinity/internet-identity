@@ -152,9 +152,7 @@
 {:else}
   <!-- No app header: this screen is about the browser's own settings, not about the
        app that asked, and the design gives it the panel to itself. -->
-  <div
-    class="flex flex-col items-stretch min-w-0"
-  >
+  <div class="flex min-w-0 flex-col items-stretch">
     <FeaturedIcon size="lg" class="mb-4 self-start">
       <BellOffIcon class="size-6" aria-hidden="true" />
     </FeaturedIcon>
