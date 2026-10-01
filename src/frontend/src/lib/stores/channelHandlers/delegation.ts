@@ -21,6 +21,7 @@ import {
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 import { authenticationStore } from "$lib/stores/authentication.store";
+import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import {
   attributeConsentResultStore,
   attributeConsentStore,
@@ -184,6 +185,13 @@ export const handleDelegationRequest =
           jsonrpc: "2.0",
           id: requestId,
           result: DelegationResultSchema.encode(delegationChain),
+        });
+        // Only once the app holds its delegation, so a sign-in that failed lists no app
+        // on the Applications page. The canister keeps no list of an identity's apps.
+        lastUsedIdentitiesStore.addLastUsedAccount({
+          identityNumber,
+          accountNumber,
+          origin: effectiveOrigin,
         });
       } catch (error) {
         console.error(error);

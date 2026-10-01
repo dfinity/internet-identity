@@ -5,6 +5,7 @@
     ChevronDownIcon,
     HouseIcon,
     KeyRoundIcon,
+    LayoutGridIcon,
     MenuIcon,
     MonitorSmartphoneIcon,
     XIcon,
@@ -375,6 +376,15 @@
           >
             <BriefcaseMedicalIcon class="size-5 sm:max-md:mx-auto" />
             <span class="sm:max-md:hidden">{$t`Recovery`}</span>
+          </NavItem>
+        </li>
+        <li class="contents">
+          <NavItem
+            href="/manage/applications"
+            current={page.url.pathname === "/manage/applications"}
+          >
+            <LayoutGridIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Applications`}</span>
           </NavItem>
         </li>
         <li class="contents">

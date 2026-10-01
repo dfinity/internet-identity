@@ -14,6 +14,7 @@ import {
   authorizedStore,
 } from "$lib/stores/authorization.store";
 import { authenticationStore } from "$lib/stores/authentication.store";
+import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import {
   appSessionsForOrigin,
   rememberAppAccount,
@@ -281,6 +282,13 @@ export const handleSessionDelegationRequest =
               chain,
             }),
           });
+          // A resumed session is a visit too, so "Last visited" keeps up with an app
+          // that never shows a sign-in screen again.
+          lastUsedIdentitiesStore.addLastUsedAccount({
+            identityNumber: usable.identityNumber,
+            accountNumber: usable.accountNumber,
+            origin: effectiveOrigin,
+          });
           return;
         }
 
@@ -306,6 +314,9 @@ export const handleSessionDelegationRequest =
             chain,
           }),
         });
+        // Only once the app holds its chain, so a sign-in that failed lists no app on
+        // the Applications page. The canister keeps no list of an identity's apps.
+        lastUsedIdentitiesStore.addLastUsedAccount(created.visit);
       } catch (error) {
         console.error(error);
         if (isSilent) {
@@ -333,7 +344,16 @@ const createSession = async (
   requestedMaxTimeToLive: bigint | undefined,
   requestedMaxTimeToIdle: bigint | undefined,
   resumable: boolean,
-): Promise<{ record: AppSessionRecord }> => {
+): Promise<{
+  record: AppSessionRecord;
+  /** Which account signed in to the app, for the caller to remember once the app has
+   *  its chain. */
+  visit: {
+    identityNumber: bigint;
+    accountNumber: bigint | undefined;
+    origin: string;
+  };
+}> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
   let authorized = await waitForStore(authorizedStore);
   // Switching identity on a consent screen authorizes again; mint for the
@@ -473,5 +493,5 @@ const createSession = async (
   if (resumable) {
     await storeAppSession(recordKey, record);
   }
-  return { record };
+  return { record, visit: recordKey };
 };

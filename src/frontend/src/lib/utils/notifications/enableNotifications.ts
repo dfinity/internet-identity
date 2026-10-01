@@ -56,6 +56,21 @@ export const allowApp = ({
   actor: ActorSubclass<_SERVICE>;
 }): Promise<void> => grantConsent({ identityNumber, origin, actor });
 
+/**
+ * Withdraws an app's consent, which also drops what it has queued for every browser.
+ * The subscription stays: it belongs to the browser, and the identity's other apps
+ * still reach it.
+ */
+export const disallowApp = ({
+  identityNumber,
+  origin,
+  actor,
+}: GrantArgs): Promise<void> =>
+  actor
+    .notification_revoke_consent({ anchor_number: identityNumber, origin })
+    .then(throwCanisterError)
+    .then(() => undefined);
+
 /** Records consent for the app. The canister mints the application it hangs off. */
 const grantConsent = ({
   identityNumber,
