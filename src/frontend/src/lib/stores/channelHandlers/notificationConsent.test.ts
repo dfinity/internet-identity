@@ -286,9 +286,9 @@ describe("handleNotificationConsentRequest", () => {
   });
 
   /** Authorizing is what replaces the screen the user is on, so this request has to
-   *  own one from the moment it is accepted until it has answered: long enough that
-   *  the flow keeps their screen instead of passing through a half-built one. */
-  it("owns the screen from acceptance until it has answered", async () => {
+   *  own one from the moment it is accepted until it has asked: long enough that the
+   *  flow keeps their screen instead of passing through a half-built one. */
+  it("owns the screen from acceptance until the user has answered", async () => {
     const sent: Record<string, unknown>[] = [];
     const channel = {
       origin: ORIGIN,
@@ -310,6 +310,52 @@ describe("handleNotificationConsentRequest", () => {
     notificationConsentStore.settle();
     await running;
 
+    expect(get(pendingScreenStore)).toBe(false);
+  });
+
+  /** Reading the answer back takes two canister calls, and the screen the user came
+   *  from is not what belongs in front of them while that runs — the redirect is. */
+  it("releases the screen before reading the answer back", async () => {
+    let answer: (granted: boolean) => void;
+    vi.mocked(readGranted).mockReturnValueOnce(
+      new Promise((resolve) => (answer = resolve)),
+    );
+    const sent: Record<string, unknown>[] = [];
+    const channel = {
+      origin: ORIGIN,
+      send: (message: Record<string, unknown>) => {
+        sent.push(message);
+        return Promise.resolve();
+      },
+    } as unknown as Channel;
+    const running = handleNotificationConsentRequest(channel, () => {})({
+      jsonrpc: "2.0",
+      id: 1,
+      method: NOTIFICATION_CONSENT_METHOD,
+      params: {},
+    } as unknown as JsonRequest);
+
+    await waitForStore(notificationConsentStore);
+    notificationConsentStore.settle();
+    await vi.waitFor(() => expect(readGranted).toHaveBeenCalled());
+
+    expect(get(pendingScreenStore)).toBe(false);
+    expect(sent).toEqual([]);
+
+    answer!(true);
+    await running;
+    expect(sent[0].result).toEqual({ granted: true });
+  });
+
+  /** Nothing left to ask puts no screen in front of the user, so the hold it took on
+   *  acceptance goes the moment it knows that. */
+  it("releases the screen where there is nothing to ask", async () => {
+    vi.mocked(resolveOptIn).mockResolvedValueOnce({
+      screen: "skip",
+      granted: true,
+    });
+    const { sent } = await run({ settle: false });
+    expect(sent[0].result).toEqual({ granted: true });
     expect(get(pendingScreenStore)).toBe(false);
   });
 

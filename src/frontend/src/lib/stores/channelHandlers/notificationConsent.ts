@@ -181,6 +181,7 @@ export const handleNotificationConsentRequest =
           effectiveOrigin,
           browser,
           probedAt,
+          releaseScreen,
         );
 
         await channel.send({
@@ -211,6 +212,7 @@ const runConsentCeremony = async (
   effectiveOrigin: string,
   probedBrowser: Promise<BrowserPushState | undefined>,
   probedAt: number,
+  releaseScreen: () => void,
 ): Promise<boolean> => {
   // The probe stands only where no ceremony has run since it was taken. Read again
   // rather than ask about a browser one of them may have set up in the meantime.
@@ -219,7 +221,7 @@ const runConsentCeremony = async (
 
   authorizationStore.setRequestOrigin(effectiveOrigin);
   try {
-    return await askUntilSettled(effectiveOrigin, browser);
+    return await askUntilSettled(effectiveOrigin, browser, releaseScreen);
   } finally {
     // Whatever came of it, a ceremony that has run is one that may have subscribed
     // this browser, so every probe taken before now is suspect.
@@ -231,6 +233,10 @@ const runConsentCeremony = async (
 const askUntilSettled = async (
   effectiveOrigin: string,
   browser: Promise<BrowserPushState | undefined>,
+  /** Called as soon as this request will put nothing more on screen, which is
+   *  before the answer is read back: the redirect is what belongs on screen for
+   *  that, not the screen the user came from. */
+  releaseScreen: () => void,
 ): Promise<boolean> => {
   for (;;) {
     // Awaited for its ordering and not its value: the user has to have chosen an
@@ -248,6 +254,7 @@ const askUntilSettled = async (
       browser,
     });
     if (resolution.screen === "skip") {
+      releaseScreen();
       return resolution.granted;
     }
 
@@ -275,6 +282,7 @@ const askUntilSettled = async (
     if (outcome === "switched") {
       continue;
     }
+    releaseScreen();
 
     // What the app is told is read back rather than reported from the screen, and it
     // is both halves: the consent this identity holds, and a browser that delivers.
