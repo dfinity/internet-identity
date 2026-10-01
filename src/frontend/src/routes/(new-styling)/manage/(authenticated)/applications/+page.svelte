@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
@@ -45,12 +46,17 @@
   $effect(() => {
     const { actor, identityNumber } = $authenticatedStore;
     for (const origin of notifying) {
+      // Each app is read once, and an answer never replaces one already here: a read
+      // still out when the list changes could otherwise land after a switch the user
+      // has since flipped, and put the old answer back.
+      if (untrack(() => allowed.has(origin))) {
+        continue;
+      }
       void actor
         .notification_consent_granted({ anchor_number: identityNumber, origin })
         .then(
           (granted) => {
-            // A late read must not undo a switch the user has just flipped.
-            if (!saving.has(origin)) {
+            if (!allowed.has(origin)) {
               allowed.set(origin, granted);
             }
           },
@@ -62,11 +68,15 @@
   // Only an app sign-in through a session gives this browser a key for the identity,
   // and without one it cannot be registered for Web Push. Read ahead, since anything
   // awaited before the permission prompt takes it out of the user's click.
+  // Tracked apart from the answer, which is `undefined` for a browser with no key: a
+  // switch flipped before the read is in would take that for one.
   let browserId = $state<number | undefined>(undefined);
+  let browserIdRead = $state(false);
   $effect(() => {
-    void currentBrowserId($authenticatedStore.identityNumber).then(
-      (id) => (browserId = id),
-    );
+    void currentBrowserId($authenticatedStore.identityNumber).then((id) => {
+      browserId = id;
+      browserIdRead = true;
+    });
   });
 
   const setAllowed = async (origin: string, next: boolean) => {
@@ -115,6 +125,7 @@
     $formatRelative(new Date(app.lastVisitedMillis), { style: "long" });
 
   let selected = $state<App | undefined>(undefined);
+  const dialogTitleId = $props.id();
 </script>
 
 <header class="flex flex-col gap-3">
@@ -168,13 +179,17 @@
 
 {#if selected !== undefined}
   {@const app = selected}
-  <Dialog onClose={() => (selected = undefined)}>
+  <Dialog
+    onClose={() => (selected = undefined)}
+    aria-labelledby={dialogTitleId}
+  >
     <AppDetails
+      titleId={dialogTitleId}
       origin={app.origin}
       displayOrigin={app.displayOrigin}
       canNotify={canNotify(app.origin)}
       allowed={allowed.get(app.origin)}
-      saving={saving.has(app.origin)}
+      busy={saving.has(app.origin) || !browserIdRead}
       onAllowedChange={(next) => void setAllowed(app.origin, next)}
     />
   </Dialog>

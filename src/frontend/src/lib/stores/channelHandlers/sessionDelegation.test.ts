@@ -321,6 +321,9 @@ describe("ii_session_delegation", () => {
     const { authorizationPromptStore } =
       await import("$lib/stores/authorization.store");
     authorizationPromptStore.set({ prompt: "none" });
+    const { lastUsedIdentitiesStore } =
+      await import("$lib/stores/last-used-identities.store");
+    const recordAppVisit = vi.spyOn(lastUsedIdentitiesStore, "recordAppVisit");
     const { channel, sent } = channelWith();
     const onError = vi.fn();
 
@@ -344,6 +347,17 @@ describe("ii_session_delegation", () => {
       "publicKey",
       "signerDelegation",
     ]);
+    // A resumed session lists the app too, recorded before the reply for the same
+    // reason a new one is.
+    expect(recordAppVisit).toHaveBeenCalledWith({
+      identityNumber: BigInt(10_000),
+      origin: ORIGIN,
+      displayOrigin: ORIGIN,
+    });
+    expect(recordAppVisit.mock.invocationCallOrder[0]).toBeLessThan(
+      channel.send.mock.invocationCallOrder[0],
+    );
+    recordAppVisit.mockRestore();
   });
 
   it("restricts the session chain to the II canister", async () => {

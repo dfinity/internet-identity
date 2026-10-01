@@ -7,6 +7,8 @@
   import AppLogo from "./AppLogo.svelte";
 
   interface Props {
+    /** For the app's name, which is what names the dialog. */
+    titleId: string;
     /** The origin the app's identity is derived for: what its metadata is published
      *  on and its consent is keyed by. */
     origin: string;
@@ -17,16 +19,19 @@
     canNotify: boolean;
     /** `undefined` while still being read, which holds the switch until it is known. */
     allowed: boolean | undefined;
-    saving: boolean;
+    /** Holds the switch: a save is in flight, or something it decides on is still
+     *  being read. */
+    busy: boolean;
     onAllowedChange: (allowed: boolean) => void;
   }
 
   const {
+    titleId,
     origin,
     displayOrigin,
     canNotify,
     allowed,
-    saving,
+    busy,
     onAllowedChange,
   }: Props = $props();
 
@@ -37,8 +42,8 @@
   const label = $derived(originLabel(displayOrigin));
   const name = $derived(metadata.name ?? label);
 
-  const titleId = $props.id();
-  const hintId = `${titleId}-hint`;
+  const switchId = $props.id();
+  const hintId = `${switchId}-hint`;
 </script>
 
 <div class="flex flex-col">
@@ -46,7 +51,9 @@
   <div class="flex flex-row items-center gap-4 pe-8">
     <AppLogo logo={metadata.logo} size="lg" />
     <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-      <h2 class="text-text-primary truncate text-xl font-medium">{name}</h2>
+      <h2 id={titleId} class="text-text-primary truncate text-xl font-medium">
+        {name}
+      </h2>
       <a
         href={displayOrigin}
         target="_blank"
@@ -68,7 +75,7 @@
     <div aria-hidden="true" class="border-border-tertiary my-6 border-t"></div>
     <div class="flex flex-row items-center gap-4">
       <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span id={titleId} class="text-text-primary text-sm font-semibold">
+        <span id={switchId} class="text-text-primary text-sm font-semibold">
           {$t`Notifications`}
         </span>
         <span id={hintId} class="text-text-tertiary text-sm text-pretty">
@@ -80,9 +87,9 @@
              it on can raise runs inside the user's gesture. -->
         <Toggle
           checked={allowed === true}
-          disabled={allowed === undefined || saving}
+          disabled={allowed === undefined || busy}
           onclick={(event) => onAllowedChange(event.currentTarget.checked)}
-          aria-labelledby={titleId}
+          aria-labelledby={switchId}
           aria-describedby={hintId}
         />
       </div>
