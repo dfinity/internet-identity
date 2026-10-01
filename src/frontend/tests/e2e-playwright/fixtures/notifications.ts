@@ -25,6 +25,18 @@ export interface PushBrowserOptions {
   permission?: "default" | "denied";
 }
 
+/** Where the stub keeps what a real browser would keep for the origin, so a window
+ *  opened later finds the subscription and the permission an earlier one left. */
+const STATE_KEY = "ii-e2e-push-state";
+
+/** How many times II asked for the permission, read back by the scenarios that turn
+ *  on the one thing a prompt cannot fix. */
+export const promptCount = (page: Page): Promise<number> =>
+  page.evaluate(
+    () =>
+      (window as unknown as { __iiPromptCount?: number }).__iiPromptCount ?? 0,
+  );
+
 /**
  * Installs the stub and turns the feature flag on, for every page this context opens.
  * Context-wide rather than page-wide, because the ceremony happens in a window the test
@@ -35,10 +47,32 @@ export const armPushNotifications = async (
   options: PushBrowserOptions = {},
 ): Promise<void> => {
   await context.addInitScript(
-    ({ endpoint, initialPermission }) => {
-      let permission: NotificationPermission =
-        initialPermission as NotificationPermission;
-      let subscription: { endpoint: string } | null = null;
+    ({ endpoint, initialPermission, stateKey }) => {
+      // A real browser keeps both for the origin, not for the page, and the ceremony
+      // runs in a window opened after the scenario starts. Kept where that window
+      // finds them, so "this browser is already set up" is reachable.
+      const stored = ((): { permission?: string; endpoint?: string } => {
+        try {
+          return JSON.parse(window.localStorage.getItem(stateKey) ?? "{}");
+        } catch {
+          return {};
+        }
+      })();
+      let permission: NotificationPermission = (stored.permission ??
+        initialPermission) as NotificationPermission;
+      let subscription: { endpoint: string } | null =
+        stored.endpoint === undefined ? null : { endpoint: stored.endpoint };
+
+      const remember = () => {
+        try {
+          window.localStorage.setItem(
+            stateKey,
+            JSON.stringify({ permission, endpoint: subscription?.endpoint }),
+          );
+        } catch {
+          // Locked storage only costs the scenario its memory of this browser.
+        }
+      };
 
       const pushManager = {
         getSubscription: () => Promise.resolve(subscription),
@@ -54,9 +88,11 @@ export const armPushNotifications = async (
             endpoint,
             unsubscribe: () => {
               subscription = null;
+              remember();
               return Promise.resolve(true);
             },
           } as unknown as { endpoint: string };
+          remember();
           return Promise.resolve(subscription);
         },
       };
@@ -87,11 +123,14 @@ export const armPushNotifications = async (
             return permission;
           },
           requestPermission: () => {
+            const counted = window as unknown as { __iiPromptCount?: number };
+            counted.__iiPromptCount = (counted.__iiPromptCount ?? 0) + 1;
             // A browser only prompts from `default`; a refusal stands until the
             // user changes it in browser settings, which no prompt can do.
             if (permission === "default") {
               permission = "granted";
             }
+            remember();
             return Promise.resolve(permission);
           },
         },
@@ -100,6 +139,7 @@ export const armPushNotifications = async (
     {
       endpoint: RELAY_ENDPOINT,
       initialPermission: options.permission ?? "default",
+      stateKey: STATE_KEY,
     },
   );
 
