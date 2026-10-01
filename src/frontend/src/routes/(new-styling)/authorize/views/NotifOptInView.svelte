@@ -6,7 +6,7 @@
   import { Trans } from "$lib/components/locale";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
-  import NotifUnblockSteps from "$lib/components/notifications/NotifUnblockSteps.svelte";
+  import NotifBlockedSteps from "./notifBlocked/NotifBlockedSteps.svelte";
   import { turnOnNotifications } from "$lib/utils/notifications/enableNotifications";
   import {
     readBrowserPushState,
@@ -21,8 +21,6 @@
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { isCanisterError } from "$lib/utils/utils";
-  import { describeBrowser } from "$lib/utils/describeBrowser";
-  import type { BrowserDescription } from "$lib/generated/internet_identity_types";
 
   interface Props {
     /** dApp name for the copy, or undefined when it isn't known. */
@@ -58,11 +56,6 @@
   // remounts this component.
   let variant = $state<OptInQuestion>(screen);
   let busy = $state(false);
-  let browser = $state<BrowserDescription | undefined>(undefined);
-
-  // Only the unblock guidance reads this, so it is fetched alongside the screen
-  // rather than ahead of it: its steps appear once it lands.
-  void describeBrowser().then((description) => (browser = description));
 
   /**
    * Reports a failure and leaves the user where they are, with the button live again.
@@ -169,9 +162,7 @@
       <p class="text-text-secondary mt-2 mb-4 text-sm">
         <Trans>Follow these steps to turn them back on:</Trans>
       </p>
-      {#if browser !== undefined}
-        <NotifUnblockSteps {browser} open />
-      {/if}
+      <NotifBlockedSteps />
     </div>
 
     <div class="mt-7 flex flex-col gap-2.5">
