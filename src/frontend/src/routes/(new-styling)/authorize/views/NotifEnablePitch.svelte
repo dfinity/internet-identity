@@ -1,6 +1,7 @@
 <script lang="ts">
   import GlobeIcon from "@lucide/svelte/icons/globe";
   import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
 
   interface Props {
     /** dApp name for the copy, or undefined when it isn't known. */
@@ -118,7 +119,7 @@
               <span class="text-text-tertiary text-[11px]">now</span>
             </div>
             <div class="text-text-secondary text-[13px]">
-              {$t`You have 1 new message.`}
+              <Trans>You have 1 new message.</Trans>
             </div>
           </div>
         </div>
@@ -132,7 +133,10 @@
     {$t`Let ${app} notify you`}
   </h1>
   <p class="text-text-secondary mt-2 text-sm leading-5 text-pretty">
-    {$t`Get notifications from ${app} when something needs your attention. You can turn them off anytime.`}
+    <Trans>
+      Get notifications from this app when something needs your attention. You
+      can turn them off anytime.
+    </Trans>
   </p>
 
   <div class="mt-7 flex flex-col gap-2.5">
