@@ -26,6 +26,13 @@ vi.mock("$lib/state/featureFlags", async () => {
 vi.mock("$lib/utils/validateDerivationOrigin", () => ({
   validateDerivationOrigin: vi.fn(() => Promise.resolve({ result: "valid" })),
 }));
+/// The probe reads a service worker and an IndexedDB store this suite has neither
+/// of. What it resolves to is this suite's subject: whether a question opens a
+/// screen, and whether nothing to ask answers the app without one.
+vi.mock("$lib/utils/notifications/notificationState", () => ({
+  readBrowserPushState: vi.fn(() => Promise.resolve({})),
+  resolveOptIn: vi.fn(() => Promise.resolve({ screen: "first-time" })),
+}));
 vi.mock("$lib/stores/authentication.store", async () => {
   const { writable } = await import("svelte/store");
   return { authenticationStore: writable<unknown>(undefined) };
@@ -47,11 +54,15 @@ import {
   handleNotificationConsentRequest,
   NOTIFICATION_CONSENT_METHOD,
 } from "./notificationConsent";
-import { notificationConsentStore } from "$lib/stores/notificationConsent.store";
+import {
+  notificationConsentStore,
+  type NotificationConsentContext,
+} from "$lib/stores/notificationConsent.store";
 import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
 import { INTERACTION_REQUIRED_ERROR_CODE } from "$lib/utils/transport/utils";
 import { waitForStore } from "$lib/utils/utils";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
+import { resolveOptIn } from "$lib/utils/notifications/notificationState";
 import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 
 const consentStatus = vi.fn(() => Promise.resolve(true));
@@ -115,6 +126,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   consentStatus.mockResolvedValue(true);
   vi.mocked(validateDerivationOrigin).mockResolvedValue({ result: "valid" });
+  vi.mocked(resolveOptIn).mockResolvedValue({ screen: "first-time" });
   notificationConsentStore.clear();
   (PUSH_NOTIFICATIONS as unknown as Writable<boolean>).set(true);
   const { authorizationPromptStore, authorizedStore } =
@@ -183,6 +195,44 @@ describe("handleNotificationConsentRequest", () => {
       anchor_number: BigInt(20_000),
       origin: ORIGIN,
     });
+    expect(sent[0].result).toEqual({ granted: true });
+  });
+
+  /** The screen existed only to work out there was nothing to ask. Resolving that
+   *  before the context is set is what keeps a spinner out of the sign-in. */
+  it("answers without a screen where there is nothing to ask", async () => {
+    vi.mocked(resolveOptIn).mockResolvedValue({
+      screen: "skip",
+      consented: true,
+    });
+    const opened = vi.fn();
+    const unsubscribe = notificationConsentStore.subscribe((context) => {
+      if (context !== undefined) {
+        opened();
+      }
+    });
+
+    const { sent, errors } = await run({ settle: false });
+
+    unsubscribe();
+    expect(opened).not.toHaveBeenCalled();
+    expect(sent[0].result).toEqual({ granted: true });
+    expect(errors).toEqual([]);
+    // The answer is the one the resolution already read, not a second query.
+    expect(consentStatus).not.toHaveBeenCalled();
+  });
+
+  it("opens the screen on the question it resolved", async () => {
+    vi.mocked(resolveOptIn).mockResolvedValue({ screen: "blocked" });
+    let opened: NotificationConsentContext | undefined;
+    const unsubscribe = notificationConsentStore.subscribe((context) => {
+      opened ??= context;
+    });
+
+    const { sent } = await run();
+
+    unsubscribe();
+    expect(opened?.screen).toBe("blocked");
     expect(sent[0].result).toEqual({ granted: true });
   });
 

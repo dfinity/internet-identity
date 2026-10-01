@@ -15,6 +15,11 @@ import {
   notificationConsentSettledStore,
   notificationConsentStore,
 } from "$lib/stores/notificationConsent.store";
+import {
+  readBrowserPushState,
+  resolveOptIn,
+  type BrowserPushState,
+} from "$lib/utils/notifications/notificationState";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { remapToLegacyDomain } from "$lib/utils/urlUtils";
 import { waitForStore } from "$lib/utils/utils";
@@ -89,6 +94,11 @@ export const handleNotificationConsentRequest =
       return;
     }
 
+    // Started here rather than from the screen: it needs no identity, so it runs
+    // while this request waits its turn behind a sign-in instead of after one.
+    // Answers rather than rejects, so a request that returns below only drops it.
+    const browser = readBrowserPushState();
+
     await serializeAuthorizationRequest(async () => {
       try {
         const params = parsed.data;
@@ -119,7 +129,7 @@ export const handleNotificationConsentRequest =
           return;
         }
 
-        const granted = await runConsentCeremony(effectiveOrigin);
+        const granted = await runConsentCeremony(effectiveOrigin, browser);
 
         await channel.send({
           jsonrpc: "2.0",
@@ -146,6 +156,7 @@ export const handleNotificationConsentRequest =
  */
 const runConsentCeremony = async (
   effectiveOrigin: string,
+  browser: Promise<BrowserPushState | undefined>,
 ): Promise<boolean> => {
   authorizationStore.setRequestOrigin(effectiveOrigin);
   for (;;) {
@@ -154,10 +165,24 @@ const runConsentCeremony = async (
     await waitForStore(authorizedStore);
     const authenticated = await waitForStore(authenticationStore);
 
+    // Resolved before the context is set, so the screen opens on the question it
+    // will ask. Nothing left to ask answers from what this already read, and puts
+    // no screen between the sign-in and the app.
+    const resolution = await resolveOptIn({
+      identityNumber: authenticated.identityNumber,
+      origin: effectiveOrigin,
+      actor: authenticated.actor,
+      browser,
+    });
+    if (resolution.screen === "skip") {
+      return resolution.consented;
+    }
+
     notificationConsentStore.setContext({
       effectiveOrigin,
       identityNumber: authenticated.identityNumber,
       actor: authenticated.actor,
+      screen: resolution.screen,
     });
 
     // The header keeps the identity switcher up for this screen, and switching

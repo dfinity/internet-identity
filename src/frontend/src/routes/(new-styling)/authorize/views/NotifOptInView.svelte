@@ -1,10 +1,8 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import {
     BellOffIcon,
     SmartphoneIcon,
     TriangleAlertIcon,
-    Loader2Icon,
   } from "@lucide/svelte";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
   import type { _SERVICE } from "$lib/generated/internet_identity_types";
@@ -18,15 +16,14 @@
     allowApp,
   } from "$lib/utils/notifications/enableNotifications";
   import {
+    readBrowserPushState,
     readDeviceState,
-    resolveOptInScreen,
-    type OptInScreen,
+    type OptInQuestion,
   } from "$lib/utils/notifications/notificationState";
   import {
     clearFailure,
     recordDeclined,
     recordFailure,
-    recordPermission,
   } from "$lib/utils/notifications/notificationDiagnostics";
   import { describeBrowser } from "$lib/utils/describeBrowser";
   import type { BrowserDescription } from "$lib/generated/internet_identity_types";
@@ -38,51 +35,30 @@
     origin: string;
     /** The authenticated actor for this identity. */
     actor: ActorSubclass<_SERVICE>;
-    /** Continues sign-in: after enabling, allowing, skipping, or when there is
-     * nothing worth showing. */
+    /** The question to ask, resolved before this screen was rendered. */
+    screen: OptInQuestion;
+    /** Continues sign-in: after enabling, allowing or skipping. */
     onDone: () => void;
   }
 
-  const { appName, identityNumber, origin, actor, onDone }: Props = $props();
+  const { appName, identityNumber, origin, actor, screen, onDone }: Props =
+    $props();
 
   const app = $derived(appName ?? $t`this app`);
 
-  type Variant = "loading" | OptInScreen | "failed";
-  let variant = $state<Variant>("loading");
+  // Opens on the resolved question and moves on from there: an answered prompt or
+  // a failed attempt replaces it with the screen that outcome needs. A new request
+  // arrives as a new context, which remounts this component.
+  let variant = $state<OptInQuestion>(screen);
   let busy = $state(false);
   let browser = $state<BrowserDescription | undefined>(undefined);
   // A retry from the failed screen sets this device up, or only records consent
   // when the device is already registered. Read by the failed screen's copy.
-  let retrySubscribes = $state(true);
+  let retrySubscribes = $state(screen !== "allow-app");
 
-  onMount(() => {
-    void (async () => {
-      try {
-        const consented = await actor
-          .notification_consent_granted({
-            anchor_number: identityNumber,
-            origin,
-          })
-          .catch(() => false);
-        const state = await readDeviceState(identityNumber);
-        recordPermission(state.permission);
-        const screen = resolveOptInScreen(state, origin, consented);
-        if (screen === "skip") {
-          onDone();
-          return;
-        }
-        browser = await describeBrowser();
-        retrySubscribes = screen !== "allow-app";
-        variant = screen;
-      } catch (err) {
-        // The request is waiting on this window, so a rejection here has to land
-        // on a screen the user can answer rather than leaving it spinning.
-        const message = messageOf(err);
-        recordFailure("subscribe-failed", message);
-        variant = "failed";
-      }
-    })();
-  });
+  // Only the unblock guidance reads this, so it is fetched alongside the screen
+  // rather than ahead of it: its steps appear once it lands.
+  void describeBrowser().then((description) => (browser = description));
 
   const messageOf = (err: unknown): string =>
     err instanceof Error ? err.message : String(err);
@@ -90,8 +66,14 @@
   /** Whether this device is set up and registered for this identity. Best effort:
    *  a probe that fails must not keep the failed screen from appearing. */
   const deviceIsReady = async (): Promise<boolean> => {
+    // Read again rather than reused: the attempt this follows is what changed the
+    // permission and the subscription.
+    const pushState = await readBrowserPushState();
+    if (pushState === undefined) {
+      return false;
+    }
     try {
-      const state = await readDeviceState(identityNumber);
+      const state = await readDeviceState(identityNumber, pushState);
       return state.subscribed && state.registered;
     } catch {
       return false;
@@ -108,7 +90,6 @@
       });
       if (result.status === "denied") {
         recordFailure("permission-denied");
-        browser = await describeBrowser();
         variant = "blocked";
         return;
       }
@@ -163,14 +144,7 @@
   };
 </script>
 
-{#if variant === "loading"}
-  <div class="flex flex-1 items-center justify-center p-4">
-    <Loader2Icon
-      class="text-text-tertiary size-6 animate-spin"
-      aria-label={$t`Loading`}
-    />
-  </div>
-{:else if variant === "first-time"}
+{#if variant === "first-time"}
   <NotifEnablePitch
     {appName}
     {origin}

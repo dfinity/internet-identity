@@ -655,6 +655,7 @@
         identityNumber={$notificationConsentStore.identityNumber}
         origin={$notificationConsentStore.effectiveOrigin}
         actor={$notificationConsentStore.actor}
+        screen={$notificationConsentStore.screen}
         onDone={() => notificationConsentStore.settle()}
       />
     {/key}
