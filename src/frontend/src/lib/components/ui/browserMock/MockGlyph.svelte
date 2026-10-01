@@ -8,11 +8,12 @@
   }: SvelteHTMLElements["div"] = $props();
 </script>
 
-<!-- A browser's own panel: a settings pane, a dropdown, a site-info popover. -->
+<!-- The round well a browser gives the control a step points at, which is what the
+     highlight rings are drawn around. -->
 <div
   {...props}
   class={[
-    "bg-surface-light-50 dark:bg-surface-dark-900 pointer-events-none flex flex-col rounded-xl p-2 text-[10px]",
+    "bg-surface-light-300 dark:bg-surface-dark-600 flex size-7 items-center justify-center rounded-full",
     className,
   ]}
 >

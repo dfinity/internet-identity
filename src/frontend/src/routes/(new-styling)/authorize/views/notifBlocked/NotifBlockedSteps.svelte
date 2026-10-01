@@ -12,18 +12,21 @@
   const { brand, os } = browserAndSystem();
   const variant = blockedStepsVariant(brand, os);
 
-  const host = window.location.hostname;
+  // What a browser puts in each place: the address bar carries the path, the site
+  // panels name the host on its own.
+  const host = window.location.host;
+  const address = `${window.location.host}${window.location.pathname}`;
 </script>
 
 <ol class="flex flex-col gap-3">
   {#if variant === "chrome"}
-    <ChromeDesktopSteps {host} />
+    <ChromeDesktopSteps {host} {address} />
   {:else if variant === "chrome-android"}
-    <ChromeAndroidSteps {host} />
+    <ChromeAndroidSteps {host} {address} />
   {:else if variant === "firefox"}
-    <FirefoxDesktopSteps {host} />
+    <FirefoxDesktopSteps {host} {address} />
   {:else if variant === "firefox-android"}
-    <FirefoxAndroidSteps {host} />
+    <FirefoxAndroidSteps {host} {address} />
   {:else}
     <SafariMacosSteps {host} />
   {/if}

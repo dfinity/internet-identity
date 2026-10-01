@@ -4,7 +4,7 @@
   import type { _SERVICE } from "$lib/generated/internet_identity_types";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
-  import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
+  import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
   import NotifBlockedSteps from "./notifBlocked/NotifBlockedSteps.svelte";
   import { turnOnNotifications } from "$lib/utils/notifications/enableNotifications";
@@ -146,34 +146,32 @@
     onSkip={onDone}
   />
 {:else}
+  <!-- No app header: this screen is about the browser's own settings, not about the
+       app that asked, and the design gives it the panel to itself. -->
   <div
     class="flex flex-1 flex-col items-stretch p-4 sm:max-w-100 sm:justify-center sm:self-center"
   >
-    <AuthorizeHeader {origin} />
-    <div class="flex flex-col justify-center">
-      <span
-        class="border-border-secondary bg-bg-secondary text-text-primary mb-6 flex size-12 items-center justify-center rounded-full border"
-      >
-        <BellOffIcon class="size-6" aria-hidden="true" />
-      </span>
-      <h1 class="text-text-primary text-2xl font-medium text-balance">
-        {$t`Notifications are blocked`}
-      </h1>
-      <p class="text-text-secondary mt-2 mb-4 text-sm">
-        <Trans>Follow these steps to turn them back on:</Trans>
-      </p>
-      <NotifBlockedSteps />
-    </div>
+    <FeaturedIcon size="lg" class="mb-4 self-start">
+      <BellOffIcon class="size-6" aria-hidden="true" />
+    </FeaturedIcon>
+    <h1 class="text-text-primary mb-3 text-2xl font-medium">
+      {$t`Notifications are blocked`}
+    </h1>
+    <p class="text-text-tertiary mb-5 text-base">
+      <Trans>Follow these steps to turn them back on:</Trans>
+    </p>
+
+    <NotifBlockedSteps />
 
     <div class="mt-7 flex flex-col gap-2.5">
       <button
-        class="btn btn-primary"
+        class="btn btn-primary btn-xl"
         onclick={() => void handleRetry()}
         disabled={busy}
       >
         {busy ? $t`Setting up…` : $t`Try again`}
       </button>
-      <button class="btn btn-tertiary" onclick={onDone} disabled={busy}>
+      <button class="btn btn-tertiary btn-xl" onclick={onDone} disabled={busy}>
         {$t`Not now`}
       </button>
     </div>
