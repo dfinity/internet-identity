@@ -63,7 +63,10 @@ import { INTERACTION_REQUIRED_ERROR_CODE } from "$lib/utils/transport/utils";
 import { pendingScreenStore } from "$lib/stores/pendingScreen.store";
 import { waitForStore } from "$lib/utils/utils";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
-import { resolveOptIn } from "$lib/utils/notifications/notificationState";
+import {
+  readBrowserPushState,
+  resolveOptIn,
+} from "$lib/utils/notifications/notificationState";
 import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 
 const consentStatus = vi.fn(() => Promise.resolve(true));
@@ -272,6 +275,40 @@ describe("handleNotificationConsentRequest", () => {
     });
     expect(sent[0].error).toMatchObject({ code: METHOD_NOT_FOUND_ERROR_CODE });
     expect(get(pendingScreenStore)).toBe(false);
+  });
+
+  /** The probe is taken when a request is accepted, so a ceremony that runs before
+   *  this one's turn can subscribe the browser it found bare. Asking from that
+   *  snapshot would offer to set up a device that is already set up. */
+  it("probes again where a ceremony ran between the probe and its turn", async () => {
+    const channel = {
+      origin: ORIGIN,
+      send: () => Promise.resolve(),
+    } as unknown as Channel;
+    const ask = (id: number) =>
+      handleNotificationConsentRequest(channel, () => {})({
+        jsonrpc: "2.0",
+        id,
+        method: NOTIFICATION_CONSENT_METHOD,
+        params: {},
+      } as unknown as JsonRequest);
+
+    // Both accepted, so both probe, before either holds the queue.
+    const first = ask(1);
+    const second = ask(2);
+    expect(readBrowserPushState).toHaveBeenCalledTimes(2);
+
+    // The first holds the queue. It reused its own probe, taken a moment earlier.
+    await waitForStore(notificationConsentStore);
+    notificationConsentStore.settle();
+    await first;
+    expect(readBrowserPushState).toHaveBeenCalledTimes(2);
+
+    // The second's turn, with its probe now predating a ceremony.
+    await waitForStore(notificationConsentStore);
+    notificationConsentStore.settle();
+    await second;
+    expect(readBrowserPushState).toHaveBeenCalledTimes(3);
   });
 
   it("reports what the canister recorded", async () => {

@@ -33,6 +33,17 @@ import type { ChannelError } from "$lib/stores/channelStore";
 
 export const NOTIFICATION_CONSENT_METHOD = "ii_notification_consent";
 
+/**
+ * Ceremonies that have run.
+ *
+ * A request probes this browser as soon as it is accepted, which is a head start and
+ * not a cache: a ceremony ahead of it in the queue can subscribe the browser its probe
+ * found without a subscription, and the screen would then ask for a device that is
+ * already set up. Counting them is what tells the two apart. Only a ceremony can come
+ * between a probe and its use, because the queue runs them one at a time.
+ */
+let ceremoniesRun = 0;
+
 const NotificationConsentParamsCodec = z.object({
   icrc95DerivationOrigin: z.optional(OriginSchema),
 });
@@ -100,6 +111,8 @@ export const handleNotificationConsentRequest =
     // Answers rather than rejects, so a request that returns below only drops it.
     const browser = readBrowserPushState();
 
+    const probedAt = ceremoniesRun;
+
     // Held from here until this request has answered for itself, so authorizing does
     // not take the screen the user is on before we know whether we need it.
     const releaseScreen = claimScreen();
@@ -134,7 +147,11 @@ export const handleNotificationConsentRequest =
           return;
         }
 
-        const granted = await runConsentCeremony(effectiveOrigin, browser);
+        const granted = await runConsentCeremony(
+          effectiveOrigin,
+          browser,
+          probedAt,
+        );
 
         await channel.send({
           jsonrpc: "2.0",
@@ -162,9 +179,29 @@ export const handleNotificationConsentRequest =
  */
 const runConsentCeremony = async (
   effectiveOrigin: string,
+  probedBrowser: Promise<BrowserPushState | undefined>,
+  probedAt: number,
+): Promise<boolean> => {
+  // The probe stands only where no ceremony has run since it was taken. Read again
+  // rather than ask about a browser one of them may have set up in the meantime.
+  const browser =
+    probedAt === ceremoniesRun ? probedBrowser : readBrowserPushState();
+
+  authorizationStore.setRequestOrigin(effectiveOrigin);
+  try {
+    return await askUntilSettled(effectiveOrigin, browser);
+  } finally {
+    // Whatever came of it, a ceremony that has run is one that may have subscribed
+    // this browser, so every probe taken before now is suspect.
+    ceremoniesRun += 1;
+  }
+};
+
+/** Opens the screen for each identity the user settles on, until one answers. */
+const askUntilSettled = async (
+  effectiveOrigin: string,
   browser: Promise<BrowserPushState | undefined>,
 ): Promise<boolean> => {
-  authorizationStore.setRequestOrigin(effectiveOrigin);
   for (;;) {
     // Awaited for its ordering and not its value: the user has to have chosen an
     // identity before a screen can ask them about notifying it.

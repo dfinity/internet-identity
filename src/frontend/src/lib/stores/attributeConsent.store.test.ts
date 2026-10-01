@@ -8,6 +8,7 @@ import {
 
 const context = (): AttributeConsentContext => ({
   groups: [],
+  ssoNames: {},
   effectiveOrigin: "https://app.example",
   requestedKeys: [],
   recoveryAddresses: [],

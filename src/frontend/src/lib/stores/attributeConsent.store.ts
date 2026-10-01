@@ -17,6 +17,9 @@ export interface AttributeGroup {
 
 export interface AttributeConsentContext {
   groups: AttributeGroup[];
+  /** The published name for each `sso:<domain>` the groups carry, by domain. Resolved
+   *  with the context so the first paint has them, rather than by the screen. */
+  ssoNames: Record<string, string>;
   effectiveOrigin: string;
   requestedKeys: string[];
   recoveryAddresses: string[];
