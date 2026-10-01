@@ -21,7 +21,6 @@ import {
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 import { authenticationStore } from "$lib/stores/authentication.store";
-import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import {
   attributeConsentResultStore,
   attributeConsentStore,
@@ -181,14 +180,6 @@ export const handleDelegationRequest =
             ),
         );
 
-        // For the Applications page, once the delegation exists so a failed sign-in
-        // lists nothing. Before the reply, because over a redirect sending it leaves
-        // the page and never returns.
-        lastUsedIdentitiesStore.recordAppVisit({
-          identityNumber,
-          origin: effectiveOrigin,
-          displayOrigin: channel.origin,
-        });
         await channel.send({
           jsonrpc: "2.0",
           id: requestId,

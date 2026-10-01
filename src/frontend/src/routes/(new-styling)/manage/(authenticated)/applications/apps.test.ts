@@ -1,78 +1,46 @@
 import { describe, expect, it } from "vitest";
+import type { ApplicationInfo } from "$lib/generated/internet_identity_types";
 import { appsFrom } from "./apps";
 
+const millis = (value: number): bigint => BigInt(value) * BigInt(1_000_000);
+
+const application = (
+  origin: string,
+  last_used: bigint,
+  notifications_allowed = false,
+): ApplicationInfo => ({ origin, last_used, notifications_allowed });
+
 describe("appsFrom", () => {
-  it("lists nothing for an identity with no recorded sign-ins", () => {
-    expect(appsFrom(undefined)).toEqual([]);
-    expect(appsFrom({})).toEqual([]);
+  it("lists nothing for an identity with no applications", () => {
+    expect(appsFrom([])).toEqual([]);
   });
 
-  it("lists the most recently visited app first", () => {
+  it("lists the most recently used app first", () => {
     expect(
-      appsFrom({
-        "https://older.example": {
-          displayOrigin: "https://older.example",
-          lastVisitedMillis: 1_000,
-        },
-        "https://newer.example": {
-          displayOrigin: "https://newer.example",
-          lastVisitedMillis: 5_000,
-        },
-      }),
+      appsFrom([
+        application("https://older.example", millis(1_000)),
+        application("https://newer.example", millis(5_000), true),
+      ]),
     ).toEqual([
       {
         origin: "https://newer.example",
-        displayOrigin: "https://newer.example",
-        lastVisitedMillis: 5_000,
+        lastUsedMillis: 5_000,
+        notificationsAllowed: true,
       },
       {
         origin: "https://older.example",
-        displayOrigin: "https://older.example",
-        lastVisitedMillis: 1_000,
+        lastUsedMillis: 1_000,
+        notificationsAllowed: false,
       },
     ]);
   });
 
-  it("orders apps visited at the same time by origin, so the list holds still", () => {
-    const at = (origin: string) => ({
-      displayOrigin: origin,
-      lastVisitedMillis: 1_000,
-    });
-
+  it("orders apps used at the same time by origin, so the list holds still", () => {
     expect(
-      appsFrom({
-        "https://b.example": at("https://b.example"),
-        "https://a.example": at("https://a.example"),
-      }).map(({ origin }) => origin),
+      appsFrom([
+        application("https://b.example", millis(1_000)),
+        application("https://a.example", millis(1_000)),
+      ]).map(({ origin }) => origin),
     ).toEqual(["https://a.example", "https://b.example"]);
   });
-
-  // An app deriving its identity from another origin is known by the one it is used on.
-  it("keeps the origin the user signed in from apart from the derivation origin", () => {
-    expect(
-      appsFrom({
-        "https://auth.app.example": {
-          displayOrigin: "https://www.app.example",
-          lastVisitedMillis: 1_000,
-        },
-      }),
-    ).toEqual([
-      {
-        origin: "https://auth.app.example",
-        displayOrigin: "https://www.app.example",
-        lastVisitedMillis: 1_000,
-      },
-    ]);
-  });
-
-  it.each(["javascript:alert(1)", "https://app.example/path", "not a url"])(
-    "falls back to the derivation origin for a display origin of %s",
-    (displayOrigin) => {
-      expect(
-        appsFrom({
-          "https://app.example": { displayOrigin, lastVisitedMillis: 1_000 },
-        })[0].displayOrigin,
-      ).toEqual("https://app.example");
-    },
-  );
 });

@@ -9,32 +9,22 @@
     /** The origin the app's identity is derived for: what its metadata is published
      *  on and its consent is keyed by. */
     origin: string;
-    /** Where the user signs in to it from, which is what they know it by. */
-    displayOrigin: string;
     /** Already formatted: a relative time. */
     lastVisited: string;
-    /** Whether the app may notify, or `undefined` while that is still being read and
-     *  for an app this Internet Identity does not notify for. */
+    /** Whether the app may notify, or `undefined` for an app this Internet Identity
+     *  does not notify for. */
     allowed: boolean | undefined;
     /** Keeps the notifications column, empty or not, so the rows line up. */
     showNotifications: boolean;
     onOpen: () => void;
   }
 
-  const {
-    origin,
-    displayOrigin,
-    lastVisited,
-    allowed,
-    showNotifications,
-    onOpen,
-  }: Props = $props();
+  const { origin, lastVisited, allowed, showNotifications, onOpen }: Props =
+    $props();
 
-  // As the sign-in screens ask, so an app whose curated entry names only the origin
-  // it is used on still resolves.
-  const metadataStore = $derived(getAppMetadataStore(origin, displayOrigin));
+  const metadataStore = $derived(getAppMetadataStore(origin));
   const metadata = $derived($metadataStore);
-  const label = $derived(originLabel(displayOrigin));
+  const label = $derived(originLabel(origin));
 </script>
 
 <!-- Switches on the card's width, not the page's, as the devices list does. -->

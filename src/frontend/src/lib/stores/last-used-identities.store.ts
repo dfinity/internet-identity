@@ -19,13 +19,6 @@ export type LastUsedAccounts = {
     [accountNumber: string]: LastUsedAccount;
   };
 };
-/** An app this browser signed an identity in to. */
-export type VisitedApp = {
-  /** The origin the user signed in from, which is what they know the app by. It
-   *  differs from the key when the app derives its identity from another origin. */
-  displayOrigin: string;
-  lastVisitedMillis: number;
-};
 export type LastUsedIdentity = {
   identityNumber: bigint;
   name?: string;
@@ -64,11 +57,6 @@ export type LastUsedIdentity = {
    *  page shows it for a browser the canister holds no record of yet — one signed in to
    *  Internet Identity but to no app. Written once and left alone afterwards. */
   firstSeenTimestampMillis?: number;
-  /** The apps this browser signed the identity in to, keyed by the origin the app's
-   *  identity is derived for, as consent is. Written only once an app holds its
-   *  delegation, so it lists sign-ins rather than sign-in screens. The canister keeps
-   *  no list of an identity's apps. */
-  visitedApps?: { [origin: string]: VisitedApp };
 };
 export type LastUsedIdentities = {
   [identityNumber: string]: LastUsedIdentity;
@@ -92,11 +80,6 @@ type LastUsedIdentitiesStore = Readable<{
   addLastUsedAccount: (
     params: Omit<LastUsedAccount, "lastUsedTimestampMillis">,
   ) => void;
-  recordAppVisit: (params: {
-    identityNumber: bigint;
-    origin: string;
-    displayOrigin: string;
-  }) => void;
   restoreIdentity: (identity: LastUsedIdentity) => void;
   removeIdentity: (identityNumber: bigint) => void;
   syncLastUsedAccounts: (
@@ -115,9 +98,6 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
     key: storeLocalStorageKey.LastUsedIdentities,
     defaultValue: {},
     version: 4,
-    // Apps are recorded from the sign-in window, so a manage tab that is already
-    // open would otherwise miss them, and erase them with its next write.
-    syncAcrossTabs: true,
   });
   const selectedStore = writable<bigint | undefined>(
     Object.values(get(lastUsedStore)).sort(
@@ -144,7 +124,6 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
         const identity = lastUsedIdentities[params.identityNumber.toString()];
         lastUsedIdentities[params.identityNumber.toString()] = {
           accounts: identity?.accounts,
-          visitedApps: identity?.visitedApps,
           ...params,
           lastUsedTimestampMillis: Date.now(),
           // Kept from the first time this browser saw the identity, so it does not
@@ -189,20 +168,6 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
         ] = {
           ...params,
           lastUsedTimestampMillis: Date.now(),
-        };
-        return lastUsedIdentities;
-      });
-    },
-    recordAppVisit: ({ identityNumber, origin, displayOrigin }) => {
-      lastUsedStore.update((lastUsedIdentities) => {
-        const identity = lastUsedIdentities[identityNumber.toString()];
-        // Never brings back an identity that was removed from this browser.
-        if (identity === undefined) {
-          return lastUsedIdentities;
-        }
-        identity.visitedApps = {
-          ...identity.visitedApps,
-          [origin]: { displayOrigin, lastVisitedMillis: Date.now() },
         };
         return lastUsedIdentities;
       });

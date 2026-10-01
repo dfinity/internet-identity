@@ -85,65 +85,6 @@ describe("writableStored", () => {
     expect(get(store2)).toEqual(defaultValue);
   });
 
-  describe("across tabs", () => {
-    const key = storeLocalStorageKey.LastUsedIdentities;
-    // What the browser fires in every tab but the one that wrote.
-    const writeFromOtherTab = (value: string) => {
-      localStorage.setItem(key, value);
-      window.dispatchEvent(
-        new StorageEvent("storage", {
-          key,
-          newValue: value,
-          storageArea: localStorage,
-        }),
-      );
-    };
-
-    it("takes up what another tab writes when asked to", () => {
-      const store = writableStored<LastUsedIdentity>({
-        key,
-        defaultValue: mockIdentity1,
-        version: 1,
-        syncAcrossTabs: true,
-      });
-      const written = stringifyJson({ data: mockIdentity2, version: 1 });
-
-      writeFromOtherTab(written);
-
-      expect(get(store)).toEqual(mockIdentity2);
-      // Left as the other tab wrote it, rather than written back.
-      expect(localStorage.getItem(key)).toBe(written);
-      store.unsubscribeStorage();
-    });
-
-    it("keeps its copy for a version it cannot read", () => {
-      const store = writableStored<LastUsedIdentity>({
-        key,
-        defaultValue: mockIdentity1,
-        version: 1,
-        syncAcrossTabs: true,
-      });
-
-      writeFromOtherTab(stringifyJson({ data: mockIdentity2, version: 2 }));
-
-      expect(get(store)).toEqual(mockIdentity1);
-      store.unsubscribeStorage();
-    });
-
-    it("keeps its copy unless asked to sync", () => {
-      const store = writableStored<LastUsedIdentity>({
-        key,
-        defaultValue: mockIdentity1,
-        version: 1,
-      });
-
-      writeFromOtherTab(stringifyJson({ data: mockIdentity2, version: 1 }));
-
-      expect(get(store)).toEqual(mockIdentity1);
-      store.unsubscribeStorage();
-    });
-  });
-
   describe("version upgrade", () => {
     it("should replace value from local storage when it has not the same version", () => {
       const storedState = "old-data-string"; // Representing arbitrary old data

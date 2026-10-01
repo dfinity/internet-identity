@@ -244,6 +244,11 @@ impl TryFrom<NotificationConsentGrantedRequest> for ValidatedNotificationConsent
     }
 }
 
+/// Whether this deployment notifies for `origin`, as a request naming it would be told.
+pub fn notifies_for(origin: &str) -> bool {
+    notifying_origin(origin).is_ok()
+}
+
 /// Folds `origin` to the spelling consent is keyed by, and refuses one this deployment
 /// does not notify for.
 fn notifying_origin(origin: &str) -> Result<FrontendHostname, String> {

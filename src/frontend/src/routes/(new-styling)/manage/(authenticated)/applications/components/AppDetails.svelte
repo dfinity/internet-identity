@@ -12,34 +12,22 @@
     /** The origin the app's identity is derived for: what its metadata is published
      *  on and its consent is keyed by. */
     origin: string;
-    /** Where the user signs in to it from, which is what they know it by. */
-    displayOrigin: string;
     /** Whether this Internet Identity notifies for the app at all. Without it there
      *  is nothing to switch, so the switch is left out. */
     canNotify: boolean;
-    /** `undefined` while still being read, which holds the switch until it is known. */
-    allowed: boolean | undefined;
+    allowed: boolean;
     /** Holds the switch: a save is in flight, or something it decides on is still
      *  being read. */
     busy: boolean;
     onAllowedChange: (allowed: boolean) => void;
   }
 
-  const {
-    titleId,
-    origin,
-    displayOrigin,
-    canNotify,
-    allowed,
-    busy,
-    onAllowedChange,
-  }: Props = $props();
+  const { titleId, origin, canNotify, allowed, busy, onAllowedChange }: Props =
+    $props();
 
-  // As the sign-in screens ask, so an app whose curated entry names only the origin
-  // it is used on still resolves.
-  const metadataStore = $derived(getAppMetadataStore(origin, displayOrigin));
+  const metadataStore = $derived(getAppMetadataStore(origin));
   const metadata = $derived($metadataStore);
-  const label = $derived(originLabel(displayOrigin));
+  const label = $derived(originLabel(origin));
   const name = $derived(metadata.name ?? label);
 
   const switchId = $props.id();
@@ -55,7 +43,7 @@
         {name}
       </h2>
       <a
-        href={displayOrigin}
+        href={origin}
         target="_blank"
         rel="noopener noreferrer"
         class="text-text-tertiary self-start text-sm hover:underline focus-visible:underline"
@@ -86,8 +74,8 @@
         <!-- `onclick` rather than `onchange`, so the permission prompt that turning
              it on can raise runs inside the user's gesture. -->
         <Toggle
-          checked={allowed === true}
-          disabled={allowed === undefined || busy}
+          checked={allowed}
+          disabled={busy}
           onclick={(event) => onAllowedChange(event.currentTarget.checked)}
           aria-labelledby={switchId}
           aria-describedby={hintId}
@@ -97,7 +85,7 @@
   {/if}
 
   <a
-    href={displayOrigin}
+    href={origin}
     target="_blank"
     rel="noopener noreferrer"
     class="btn btn-primary btn-xl mt-10 w-full"

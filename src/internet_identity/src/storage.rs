@@ -2814,6 +2814,45 @@ impl<M: Memory + Clone> Storage<M> {
             .collect()
     }
 
+    /// Every app this identity has signed in to: its origin, the latest sign-in to any of
+    /// the identity's accounts there, and whether it holds consent to notify.
+    ///
+    /// Only where some account was used. Granting consent, naming an account and choosing
+    /// a default each store a list at an app the identity may never have signed in to,
+    /// and a tombstone holds no account at all.
+    pub fn list_applications(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> Vec<(FrontendHostname, Timestamp, bool)> {
+        self.stable_account_reference_list_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .filter_map(|((_, application_number), list)| {
+                let last_used = Vec::<AccountReference>::from(list)
+                    .iter()
+                    .filter_map(|reference| reference.last_used)
+                    .max()?;
+                // Illegal, as `account_state` explains, and skipped for the same reason:
+                // one bad list must not hide the identity's other apps.
+                let Some(application) = self.stable_application_memory.get(&application_number)
+                else {
+                    ic_cdk::println!(
+                        "ERROR: account reference list invariant violated: identity \
+                         {anchor_number} holds a list for application {application_number}, \
+                         which is not stored."
+                    );
+                    return None;
+                };
+                let consented = self
+                    .anchor_application_config(anchor_number, application_number)
+                    .and_then(|config| config.notifications_consented_at_ns)
+                    .is_some();
+                Some((application.origin, last_used, consented))
+            })
+            .collect()
+    }
+
     fn anchor_application_config(
         &self,
         anchor_number: AnchorNumber,

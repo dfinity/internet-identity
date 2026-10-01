@@ -14,7 +14,6 @@ import {
   authorizedStore,
 } from "$lib/stores/authorization.store";
 import { authenticationStore } from "$lib/stores/authentication.store";
-import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import {
   appSessionsForOrigin,
   rememberAppAccount,
@@ -275,13 +274,6 @@ export const handleSessionDelegationRequest =
             usable.record,
             params.sessionPublicKey,
           );
-          // A resumed session is a visit too, so "Last visited" keeps up with an app
-          // that never shows a sign-in screen again.
-          lastUsedIdentitiesStore.recordAppVisit({
-            identityNumber: usable.identityNumber,
-            origin: effectiveOrigin,
-            displayOrigin: channel.origin,
-          });
           await channel.send({
             jsonrpc: "2.0",
             id: requestId,
@@ -307,14 +299,6 @@ export const handleSessionDelegationRequest =
           created.record,
           params.sessionPublicKey,
         );
-        // For the Applications page, once the chain exists so a failed sign-in lists
-        // nothing. Before the reply, because over a redirect sending it leaves the
-        // page and never returns.
-        lastUsedIdentitiesStore.recordAppVisit({
-          identityNumber: created.identityNumber,
-          origin: effectiveOrigin,
-          displayOrigin: channel.origin,
-        });
         await channel.send({
           jsonrpc: "2.0",
           id: requestId,
@@ -349,11 +333,7 @@ const createSession = async (
   requestedMaxTimeToLive: bigint | undefined,
   requestedMaxTimeToIdle: bigint | undefined,
   resumable: boolean,
-): Promise<{
-  record: AppSessionRecord;
-  /** The identity the user ended on, which may not be the one they started with. */
-  identityNumber: bigint;
-}> => {
+): Promise<{ record: AppSessionRecord }> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
   let authorized = await waitForStore(authorizedStore);
   // Switching identity on a consent screen authorizes again; mint for the
@@ -493,5 +473,5 @@ const createSession = async (
   if (resumable) {
     await storeAppSession(recordKey, record);
   }
-  return { record, identityNumber };
+  return { record };
 };

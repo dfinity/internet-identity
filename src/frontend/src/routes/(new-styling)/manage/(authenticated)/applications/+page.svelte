@@ -1,8 +1,6 @@
 <script lang="ts">
-  import { untrack } from "svelte";
   import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { authenticatedStore } from "$lib/stores/authentication.store";
-  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { currentBrowserId } from "$lib/stores/browser-key.store";
   import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
   import { notificationsEnabledFor } from "$lib/globals";
@@ -19,17 +17,13 @@
   import AppRow from "./components/AppRow.svelte";
   import AppDetails from "./components/AppDetails.svelte";
   import { appsFrom, type App } from "./apps";
+  import type { PageProps } from "./$types";
 
-  const apps = $derived(
-    appsFrom(
-      $lastUsedIdentitiesStore.identities[
-        $authenticatedStore.identityNumber.toString()
-      ]?.visitedApps,
-    ),
-  );
+  const { data }: PageProps = $props();
 
-  // Anywhere else the canister refuses the grant and reads the app as not allowed, so
-  // a switch there could only fail.
+  const apps = $derived(appsFrom(data.applications));
+
+  // Anywhere else the canister refuses the grant, so a switch there could only fail.
   const canNotify = (origin: string): boolean =>
     $PUSH_NOTIFICATIONS && notificationsEnabledFor(origin);
 
@@ -37,33 +31,12 @@
     apps.map(({ origin }) => origin).filter(canNotify),
   );
 
-  // Read one app at a time, which is all the canister answers. An app is missing here
-  // until its answer is in, and stays missing if the read fails: that holds its
-  // switch rather than reading as not allowed.
-  const allowed = new SvelteMap<string, boolean>();
+  // What the user has switched since the canister answered, which wins over it.
+  const switched = new SvelteMap<string, boolean>();
+  const allowedOf = (app: App): boolean =>
+    switched.get(app.origin) ?? app.notificationsAllowed;
   // Per app, so one app's save finishing does not free another's switch mid-save.
   const saving = new SvelteSet<string>();
-  $effect(() => {
-    const { actor, identityNumber } = $authenticatedStore;
-    for (const origin of notifying) {
-      // Each app is read once, and an answer never replaces one already here: a read
-      // still out when the list changes could otherwise land after a switch the user
-      // has since flipped, and put the old answer back.
-      if (untrack(() => allowed.has(origin))) {
-        continue;
-      }
-      void actor
-        .notification_consent_granted({ anchor_number: identityNumber, origin })
-        .then(
-          (granted) => {
-            if (!allowed.has(origin)) {
-              allowed.set(origin, granted);
-            }
-          },
-          () => {},
-        );
-    }
-  });
 
   // Only an app sign-in through a session gives this browser a key for the identity,
   // and without one it cannot be registered for Web Push. Read ahead, since anything
@@ -79,10 +52,11 @@
     });
   });
 
-  const setAllowed = async (origin: string, next: boolean) => {
+  const setAllowed = async (app: App, next: boolean) => {
     const { actor, identityNumber } = $authenticatedStore;
-    const previous = allowed.get(origin) ?? !next;
-    allowed.set(origin, next);
+    const { origin } = app;
+    const previous = allowedOf(app);
+    switched.set(origin, next);
     saving.add(origin);
     try {
       if (!next) {
@@ -101,7 +75,7 @@
           actor,
         });
         if (status !== "enabled") {
-          allowed.set(origin, previous);
+          switched.set(origin, previous);
         }
         if (status === "denied") {
           toaster.error({
@@ -111,7 +85,7 @@
         }
       }
     } catch {
-      allowed.set(origin, previous);
+      switched.set(origin, previous);
       toaster.error({
         title: $t`Couldn't save your change. Please try again.`,
         duration: 4000,
@@ -122,7 +96,7 @@
   };
 
   const lastVisitedOf = (app: App): string =>
-    $formatRelative(new Date(app.lastVisitedMillis), { style: "long" });
+    $formatRelative(new Date(app.lastUsedMillis), { style: "long" });
 
   let selected = $state<App | undefined>(undefined);
   const dialogTitleId = $props.id();
@@ -132,12 +106,9 @@
   <h1 class="text-text-primary text-3xl font-medium">{$t`Applications`}</h1>
   <p class="text-text-tertiary text-base">
     {#if notifying.length > 0}
-      <Trans>
-        Apps you've signed in to from this browser. Choose which ones can notify
-        you.
-      </Trans>
+      <Trans>Apps you've signed in to. Choose which ones can notify you.</Trans>
     {:else}
-      <Trans>Apps you've signed in to from this browser.</Trans>
+      <Trans>Apps you've signed in to.</Trans>
     {/if}
   </p>
 </header>
@@ -157,11 +128,8 @@
         <li>
           <AppRow
             origin={app.origin}
-            displayOrigin={app.displayOrigin}
             lastVisited={lastVisitedOf(app)}
-            allowed={canNotify(app.origin)
-              ? allowed.get(app.origin)
-              : undefined}
+            allowed={canNotify(app.origin) ? allowedOf(app) : undefined}
             showNotifications={notifying.length > 0}
             onOpen={() => (selected = app)}
           />
@@ -172,7 +140,7 @@
     <p
       class="border-border-secondary text-text-tertiary rounded-xl border border-dashed p-6 text-center text-sm"
     >
-      {$t`Apps you sign in to from this browser will show up here.`}
+      {$t`Apps you sign in to will show up here.`}
     </p>
   {/if}
 </div>
@@ -186,11 +154,10 @@
     <AppDetails
       titleId={dialogTitleId}
       origin={app.origin}
-      displayOrigin={app.displayOrigin}
       canNotify={canNotify(app.origin)}
-      allowed={allowed.get(app.origin)}
+      allowed={allowedOf(app)}
       busy={saving.has(app.origin) || !browserIdRead}
-      onAllowedChange={(next) => void setAllowed(app.origin, next)}
+      onAllowedChange={(next) => void setAllowed(app, next)}
     />
   </Dialog>
 {/if}
