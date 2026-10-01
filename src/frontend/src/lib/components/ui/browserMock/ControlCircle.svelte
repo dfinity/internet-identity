@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { SvelteHTMLElements } from "svelte/elements";
-  import Surface from "./Surface.svelte";
 
   const {
     children,
@@ -9,6 +8,12 @@
   }: SvelteHTMLElements["div"] = $props();
 </script>
 
-<Surface {...props} class={["flex flex-row gap-2 p-2.5", className]}>
+<div
+  {...props}
+  class={[
+    "bg-surface-light-300 dark:bg-surface-dark-600 flex items-center justify-center rounded-full",
+    className,
+  ]}
+>
   {@render children?.()}
-</Surface>
+</div>
