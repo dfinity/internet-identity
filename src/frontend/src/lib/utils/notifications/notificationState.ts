@@ -250,13 +250,6 @@ export const watchNotificationPermission = (
   }
   let stopped = false;
   let detach = () => {};
-  let timer: ReturnType<typeof setInterval>;
-
-  const stop = () => {
-    stopped = true;
-    clearInterval(timer);
-    detach();
-  };
 
   const check = () => {
     if (stopped || Notification.permission === "denied") {
@@ -266,7 +259,14 @@ export const watchNotificationPermission = (
     onAllowed();
   };
 
-  timer = setInterval(check, PERMISSION_POLL_MS);
+  const timer = setInterval(check, PERMISSION_POLL_MS);
+
+  const stop = () => {
+    stopped = true;
+    clearInterval(timer);
+    detach();
+  };
+
   void navigator.permissions
     ?.query({ name: "notifications" as PermissionName })
     .then((status) => {
