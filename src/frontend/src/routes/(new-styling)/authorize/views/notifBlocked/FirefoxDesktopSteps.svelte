@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Settings2Icon from "@lucide/svelte/icons/settings-2";
+  import ShieldCheckIcon from "@lucide/svelte/icons/shield-check";
+  import XIcon from "@lucide/svelte/icons/x";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
 
@@ -34,40 +37,12 @@
       <div
         class="bg-surface-light-200 dark:bg-surface-dark-700 text-text-primary flex h-9 items-center rounded-full pr-3 pl-2.5"
       >
-        <svg
-          viewBox="0 0 24 24"
-          width="14"
-          height="14"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="shrink-0"
-          ><path
-            d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
-          ></path><path d="m9 12 2 2 4-4"></path></svg
-        >
+        <ShieldCheckIcon class="size-3.5 shrink-0" />
         <div class="relative ml-2">
           <div
             class="bg-surface-light-300 dark:bg-surface-dark-600 flex h-7 items-center gap-1.5 rounded-full px-2"
           >
-            <svg
-              viewBox="0 0 24 24"
-              width="13"
-              height="13"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="shrink-0"
-              ><path d="M20 7h-9"></path><path d="M14 17H5"></path><circle
-                cx="17"
-                cy="17"
-                r="3"
-              ></circle><circle cx="7" cy="7" r="3"></circle></svg
-            ><svg
+            <Settings2Icon class="size-[13px] shrink-0" /><svg
               viewBox="0 0 24 24"
               width="13"
               height="13"
@@ -122,7 +97,7 @@
       aria-hidden="true"
       class="bg-surface-light-50 dark:bg-surface-dark-900 text-text-primary pointer-events-none rounded-xl px-3.5 pt-3 pb-3.5"
     >
-      <div class="px-0.5 pb-2.5 text-center text-xs font-semibold">
+      <div class="px-0.5 pb-2.5 text-center text-[12px] font-semibold">
         Permissions for {host}
       </div>
       <div
@@ -149,18 +124,7 @@
           <div
             class="border-surface-light-300 dark:border-surface-dark-600 flex h-[22px] items-center gap-1 rounded-full border pr-1.5 pl-[9px] text-[10px]"
           >
-            Blocked<svg
-              viewBox="0 0 24 24"
-              width="10"
-              height="10"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="shrink-0"
-              ><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg
-            >
+            Blocked<XIcon class="size-2.5 shrink-0" />
           </div>
           <div
             class="absolute -inset-[5px] rounded-full border border-blue-700 dark:border-blue-300"

@@ -1,4 +1,11 @@
 <script lang="ts">
+  import BellIcon from "@lucide/svelte/icons/bell";
+  import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
+  import GlobeIcon from "@lucide/svelte/icons/globe";
+  import HandIcon from "@lucide/svelte/icons/hand";
+  import ShieldHalfIcon from "@lucide/svelte/icons/shield-half";
+  import UserRoundIcon from "@lucide/svelte/icons/user-round";
+  import VideoIcon from "@lucide/svelte/icons/video";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
 
@@ -92,20 +99,7 @@
           ></div>
         </div>
         <div class="flex items-center gap-1.5 px-[5px] py-1 text-[10px]">
-          <svg
-            viewBox="0 0 24 24"
-            width="11"
-            height="11"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="shrink-0"
-            ><path
-              d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
-            ></path><path d="M12 22V2"></path></svg
-          >Privacy Report…
+          <ShieldHalfIcon class="size-[11px] shrink-0" />Privacy Report…
         </div>
         <div
           class="bg-surface-light-300 dark:bg-surface-dark-600 mx-[5px] my-[3px] h-px"
@@ -153,42 +147,13 @@
           ><span>General</span>
         </div>
         <div class="flex flex-col items-center gap-[3px] text-[9px] opacity-45">
-          <svg
-            viewBox="0 0 24 24"
-            width="14"
-            height="14"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="shrink-0"
-            ><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"></path><path
-              d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"
-            ></path><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"
-            ></path><path
-              d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"
-            ></path></svg
-          ><span>Privacy</span>
+          <HandIcon class="size-3.5 shrink-0" /><span>Privacy</span>
         </div>
         <div class="relative">
           <div
             class="bg-surface-light-300 dark:bg-surface-dark-600 flex flex-col items-center gap-0.5 rounded-full px-3 py-1 text-[9px]"
           >
-            <svg
-              viewBox="0 0 24 24"
-              width="14"
-              height="14"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="shrink-0"
-              ><circle cx="12" cy="12" r="10"></circle><path
-                d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"
-              ></path><path d="M2 12h20"></path></svg
-            ><span>Websites</span>
+            <GlobeIcon class="size-3.5 shrink-0" /><span>Websites</span>
           </div>
           <div
             class="absolute -inset-[5px] rounded-full border border-blue-700 dark:border-blue-300"
@@ -204,20 +169,7 @@
           ></div>
         </div>
         <div class="flex flex-col items-center gap-[3px] text-[9px] opacity-45">
-          <svg
-            viewBox="0 0 24 24"
-            width="14"
-            height="14"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="shrink-0"
-            ><circle cx="12" cy="8" r="5"></circle><path
-              d="M20 21a8 8 0 0 0-16 0"
-            ></path></svg
-          ><span>Profiles</span>
+          <UserRoundIcon class="size-3.5 shrink-0" /><span>Profiles</span>
         </div>
       </div>
     </div>
@@ -246,39 +198,12 @@
       <div class="flex gap-2.5">
         <div class="flex w-24 shrink-0 flex-col gap-0.5 text-[10px]">
           <div class="flex items-center gap-1.5 px-1.5 py-[5px] opacity-45">
-            <svg
-              viewBox="0 0 24 24"
-              width="11"
-              height="11"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="shrink-0"
-              ><path
-                d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"
-              ></path><rect x="2" y="6" width="14" height="12" rx="2"
-              ></rect></svg
-            >Camera
+            <VideoIcon class="size-[11px] shrink-0" />Camera
           </div>
           <div
             class="bg-surface-light-300 dark:bg-surface-dark-600 flex items-center gap-1.5 rounded-md px-1.5 py-[5px]"
           >
-            <svg
-              viewBox="0 0 24 24"
-              width="11"
-              height="11"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="shrink-0"
-              ><path d="M10.268 21a2 2 0 0 0 3.464 0"></path><path
-                d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"
-              ></path></svg
-            >Notifications
+            <BellIcon class="size-[11px] shrink-0" />Notifications
           </div>
         </div>
         <div
@@ -293,19 +218,7 @@
                 ><span class="xb-out [grid-area:1/1]">Deny</span><span
                   class="xb-in opacity-0 [grid-area:1/1]">Allow</span
                 ></span
-              ><svg
-                viewBox="0 0 24 24"
-                width="9"
-                height="9"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="shrink-0"
-                ><path d="m7 15 5 5 5-5"></path><path d="m7 9 5-5 5 5"
-                ></path></svg
-              >
+              ><ChevronsUpDownIcon class="size-[9px] shrink-0" />
             </div>
             <div
               class="absolute -inset-[5px] rounded-full border border-blue-700 dark:border-blue-300"

@@ -1,4 +1,9 @@
 <script lang="ts">
+  import EllipsisVerticalIcon from "@lucide/svelte/icons/ellipsis-vertical";
+  import LockIcon from "@lucide/svelte/icons/lock";
+  import PlusIcon from "@lucide/svelte/icons/plus";
+  import ShieldCheckIcon from "@lucide/svelte/icons/shield-check";
+  import SquareIcon from "@lucide/svelte/icons/square";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
 
@@ -39,20 +44,7 @@
             <div
               class="bg-surface-light-300 dark:bg-surface-dark-600 flex h-7 w-7 items-center justify-center rounded-full"
             >
-              <svg
-                viewBox="0 0 24 24"
-                width="14"
-                height="14"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="shrink-0"
-                ><path
-                  d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
-                ></path><path d="m9 12 2 2 4-4"></path></svg
-              >
+              <ShieldCheckIcon class="size-3.5 shrink-0" />
             </div>
             <div
               class="absolute -inset-[5px] rounded-full border border-blue-700 dark:border-blue-300"
@@ -69,50 +61,9 @@
           </div>
           <span class="ml-5 text-[10px] whitespace-nowrap">{address}</span>
         </div>
-        <svg
-          viewBox="0 0 24 24"
-          width="14"
-          height="14"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="shrink-0"
-          ><path d="M5 12h14"></path><path d="M12 5v14"></path></svg
-        ><svg
-          viewBox="0 0 24 24"
-          width="14"
-          height="14"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="shrink-0"
-          ><rect width="18" height="18" x="3" y="3" rx="2"></rect><text
-            x="12"
-            y="16.5"
-            text-anchor="middle"
-            font-size="12"
-            font-weight="700"
-            fill="currentColor"
-            stroke="none"
-            font-family="Inter, system-ui, sans-serif">2</text
-          ></svg
-        ><svg
-          viewBox="0 0 24 24"
-          width="14"
-          height="14"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="mr-1 shrink-0"
-          ><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"
-          ></circle><circle cx="12" cy="19" r="1"></circle></svg
-        >
+        <PlusIcon class="size-3.5 shrink-0" /><SquareIcon
+          class="size-3.5 shrink-0"
+        /><EllipsisVerticalIcon class="mr-1 size-3.5 shrink-0" />
       </div>
     </div>
   </li>
@@ -164,20 +115,9 @@
       <div
         class="bg-surface-light-200 dark:bg-surface-dark-700 flex items-center gap-2.5 rounded-xl px-2.5 py-2 opacity-45"
       >
-        <svg
-          viewBox="0 0 24 24"
-          width="13"
-          height="13"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="shrink-0"
-          ><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path
-            d="M7 11V7a5 5 0 0 1 10 0v4"
-          ></path></svg
-        ><span class="flex-1 text-[11px]">Secure connection</span>
+        <LockIcon class="size-[13px] shrink-0" /><span
+          class="flex-1 text-[11px]">Secure connection</span
+        >
       </div>
       <div class="px-0.5 pt-3 pb-1.5 text-[10px] font-semibold">
         Permissions

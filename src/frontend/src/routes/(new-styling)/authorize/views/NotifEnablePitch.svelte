@@ -1,4 +1,5 @@
 <script lang="ts">
+  import GlobeIcon from "@lucide/svelte/icons/globe";
   import { t } from "$lib/stores/locale.store";
 
   interface Props {
@@ -25,9 +26,7 @@
   const sender = $derived(appName ?? new URL(origin).hostname);
 </script>
 
-<div
-  class="flex flex-1 flex-col items-stretch p-4 sm:max-w-100 sm:justify-center sm:self-center"
->
+<div class="flex min-w-0 flex-col items-stretch">
   <!-- Ported from the design. Hidden from assistive technology: the messages are
        made up, and a screen reader would read them ahead of the heading as though
        they were real. -->
@@ -39,22 +38,10 @@
       <div
         class="border-border-secondary relative h-full rounded-2xl border bg-white/8 opacity-30 shadow-lg"
       >
-        <div class="p-3 flex items-start gap-3">
+        <div class="flex items-start gap-3 p-3">
           <span
             class="border-border-tertiary bg-bg-tertiary text-fg-primary flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-lg border"
-            >{#if appLogo === undefined}<svg
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><circle cx="12" cy="12" r="10"></circle><path
-                  d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"
-                ></path><path d="M2 12h20"></path></svg
-              >{:else}<img
+            >{#if appLogo === undefined}<GlobeIcon class="size-4" />{:else}<img
                 src={appLogo}
                 alt=""
                 class="h-full w-full rounded-lg object-contain"
@@ -82,22 +69,10 @@
       <div
         class="border-border-secondary relative h-full rounded-2xl border bg-white/8 opacity-60 shadow-lg"
       >
-        <div class="p-3 flex items-start gap-3">
+        <div class="flex items-start gap-3 p-3">
           <span
             class="border-border-tertiary bg-bg-tertiary text-fg-primary flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-lg border"
-            >{#if appLogo === undefined}<svg
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><circle cx="12" cy="12" r="10"></circle><path
-                  d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"
-                ></path><path d="M2 12h20"></path></svg
-              >{:else}<img
+            >{#if appLogo === undefined}<GlobeIcon class="size-4" />{:else}<img
                 src={appLogo}
                 alt=""
                 class="h-full w-full rounded-lg object-contain"
@@ -125,22 +100,10 @@
       <div
         class="border-border-secondary relative h-full rounded-2xl border bg-white/8 opacity-100 shadow-lg"
       >
-        <div class="p-3 flex items-start gap-3">
+        <div class="flex items-start gap-3 p-3">
           <span
             class="border-border-tertiary bg-bg-tertiary text-fg-primary flex h-[39px] w-[39px] shrink-0 items-center justify-center rounded-lg border"
-            >{#if appLogo === undefined}<svg
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><circle cx="12" cy="12" r="10"></circle><path
-                  d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"
-                ></path><path d="M2 12h20"></path></svg
-              >{:else}<img
+            >{#if appLogo === undefined}<GlobeIcon class="size-4" />{:else}<img
                 src={appLogo}
                 alt=""
                 class="h-full w-full rounded-lg object-contain"

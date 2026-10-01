@@ -1,4 +1,11 @@
 <script lang="ts">
+  import Settings2Icon from "@lucide/svelte/icons/settings-2";
+  import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+  import BellOffIcon from "@lucide/svelte/icons/bell-off";
+  import EllipsisVerticalIcon from "@lucide/svelte/icons/ellipsis-vertical";
+  import HistoryIcon from "@lucide/svelte/icons/history";
+  import LockIcon from "@lucide/svelte/icons/lock";
+  import SquareIcon from "@lucide/svelte/icons/square";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
 
@@ -39,22 +46,7 @@
             <div
               class="bg-surface-light-300 dark:bg-surface-dark-600 flex h-7 w-7 items-center justify-center rounded-full"
             >
-              <svg
-                viewBox="0 0 24 24"
-                width="14"
-                height="14"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="shrink-0"
-                ><path d="M20 7h-9"></path><path d="M14 17H5"></path><circle
-                  cx="17"
-                  cy="17"
-                  r="3"
-                ></circle><circle cx="7" cy="7" r="3"></circle></svg
-              >
+              <Settings2Icon class="size-3.5 shrink-0" />
             </div>
             <div
               class="absolute -inset-[5px] rounded-full border border-blue-700 dark:border-blue-300"
@@ -71,39 +63,9 @@
           </div>
           <span class="ml-5 text-[10px] whitespace-nowrap">{address}</span>
         </div>
-        <svg
-          viewBox="0 0 24 24"
-          width="14"
-          height="14"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="shrink-0"
-          ><rect width="18" height="18" x="3" y="3" rx="2"></rect><text
-            x="12"
-            y="16.5"
-            text-anchor="middle"
-            font-size="12"
-            font-weight="700"
-            fill="currentColor"
-            stroke="none"
-            font-family="Inter, system-ui, sans-serif">2</text
-          ></svg
-        ><svg
-          viewBox="0 0 24 24"
-          width="14"
-          height="14"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="mr-1 shrink-0"
-          ><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"
-          ></circle><circle cx="12" cy="19" r="1"></circle></svg
-        >
+        <SquareIcon class="size-3.5 shrink-0" /><EllipsisVerticalIcon
+          class="mr-1 size-3.5 shrink-0"
+        />
       </div>
     </div>
   </li>
@@ -129,23 +91,10 @@
       class="bg-surface-light-50 dark:bg-surface-dark-900 text-text-primary pointer-events-none rounded-xl px-3.5 pt-3 pb-3.5"
     >
       <div class="flex items-center justify-center px-0.5 pb-2">
-        <span class="text-xs font-semibold">{host}</span>
+        <span class="text-[12px] font-semibold">{host}</span>
       </div>
       <div class="flex items-center gap-2.5 px-2.5 py-2 opacity-45">
-        <svg
-          viewBox="0 0 24 24"
-          width="13"
-          height="13"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="shrink-0"
-          ><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path
-            d="M7 11V7a5 5 0 0 1 10 0v4"
-          ></path></svg
-        >
+        <LockIcon class="size-[13px] shrink-0" />
         <div class="flex min-w-0 flex-1 flex-col">
           <span class="text-[11px]">Connection is secure</span>
         </div>
@@ -212,19 +161,7 @@
         class="bg-surface-light-200 dark:bg-surface-dark-700 my-1 h-px"
       ></div>
       <div class="flex items-center gap-2.5 px-2.5 py-2 opacity-45">
-        <svg
-          viewBox="0 0 24 24"
-          width="13"
-          height="13"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="shrink-0"
-          ><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
-          ></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg
-        >
+        <HistoryIcon class="size-[13px] shrink-0" />
         <div class="flex min-w-0 flex-1 flex-col">
           <span class="text-[11px]">Last visited yesterday</span>
         </div>
@@ -253,39 +190,15 @@
       class="bg-surface-light-50 dark:bg-surface-dark-900 text-text-primary pointer-events-none rounded-xl px-3.5 pt-3 pb-3.5"
     >
       <div class="flex items-center justify-center px-0.5 pb-2">
-        <span class="text-xs font-semibold">{host}</span>
+        <span class="text-[12px] font-semibold">{host}</span>
       </div>
       <div class="flex items-center gap-2.5 px-0.5 pt-1 pb-2">
-        <svg
-          viewBox="0 0 24 24"
-          width="13"
-          height="13"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="shrink-0"
-          ><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg
-        ><span class="text-[11px]">Permissions</span>
+        <ArrowLeftIcon class="size-[13px] shrink-0" /><span class="text-[11px]"
+          >Permissions</span
+        >
       </div>
       <div class="flex items-center gap-2.5 px-0.5 py-2">
-        <svg
-          viewBox="0 0 24 24"
-          width="13"
-          height="13"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="shrink-0"
-          ><path d="M10.268 21a2 2 0 0 0 3.464 0"></path><path
-            d="M17 17H4a1 1 0 0 1-.74-1.673C4.59 13.956 6 12.499 6 8a6 6 0 0 1 .258-1.742"
-          ></path><path d="m2 2 20 20"></path><path
-            d="M8.668 3.01A6 6 0 0 1 18 8c0 2.687.77 4.653 1.707 6.05"
-          ></path></svg
-        >
+        <BellOffIcon class="size-[13px] shrink-0" />
         <div class="flex min-w-0 flex-1 flex-col">
           <span class="text-[11px]">Notifications</span><span
             class="text-text-tertiary text-[10px]">Not allowed</span
@@ -348,18 +261,9 @@
       class="bg-surface-light-50 dark:bg-surface-dark-900 text-text-primary pointer-events-none rounded-xl px-3.5 pt-3 pb-3.5"
     >
       <div class="flex items-center gap-2.5 px-0.5 pb-2.5">
-        <svg
-          viewBox="0 0 24 24"
-          width="13"
-          height="13"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="shrink-0"
-          ><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg
-        ><span class="text-xs font-semibold">{host}</span>
+        <ArrowLeftIcon class="size-[13px] shrink-0" /><span
+          class="text-[12px] font-semibold">{host}</span
+        >
       </div>
       <div class="flex items-center gap-2.5 pt-2 pr-2 pb-2 pl-0.5">
         <span class="flex-1 text-[11px]">Show notifications</span>

@@ -153,7 +153,7 @@
   <!-- No app header: this screen is about the browser's own settings, not about the
        app that asked, and the design gives it the panel to itself. -->
   <div
-    class="flex flex-1 flex-col items-stretch p-4 sm:max-w-100 sm:justify-center sm:self-center"
+    class="flex flex-col items-stretch min-w-0"
   >
     <FeaturedIcon size="lg" class="mb-4 self-start">
       <BellOffIcon class="size-6" aria-hidden="true" />
