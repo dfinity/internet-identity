@@ -128,17 +128,14 @@ export const notificationsUnavailableHere = (): boolean => {
   return "Ios" in os || "Ipados" in os;
 };
 
-export type OptInScreen = "enable" | "blocked" | "skip";
+export type OptInScreen = "enable" | "skip";
 
-/** What the opt-in asks, where there is anything to ask. */
-export type OptInQuestion = Exclude<OptInScreen, "skip">;
-
-/** Nothing to ask, so the answer is already known, or a question and what answering
+/** Nothing to ask, so the answer is already known, or the question and what answering
  *  it still has to do. */
 export type OptInResolution =
   | { screen: "skip"; granted: boolean }
   | {
-      screen: OptInQuestion;
+      screen: "enable";
       state: DeviceNotificationState;
       consented: boolean;
     };
@@ -225,10 +222,65 @@ export const resolveOptInScreen = (
   if (allowed && deliversHere(state)) {
     return "skip";
   }
-  // A refusal stands until the user changes it in browser settings, which no prompt
-  // can do, so this asks for that instead of for a permission it cannot get.
-  if (state.permission === "denied") {
-    return "blocked";
-  }
+  // A refused permission is asked for here too. No prompt can lift a refusal, so
+  // answering leads to the unblock guidance rather than to a prompt, and the user
+  // reaches that guidance from the screen that explains why they are being asked.
   return "enable";
 };
+
+/**
+ * Calls back once this browser's notification permission stops being refused.
+ *
+ * The unblock steps send the user into browser settings, and nothing in the page can
+ * raise the prompt again, so the screen waits for the setting itself to change rather
+ * than for the user to come back and press something.
+ *
+ * `PermissionStatus` reports the change where the browser delivers it, which is
+ * immediate and covers a toggle thrown in a site-settings bubble over the page. Not
+ * every browser delivers it for notifications, and a settings window on another
+ * screen may never return focus here, so the permission is also read on a timer.
+ *
+ * Returns the function that stops watching, which also runs before the callback.
+ */
+export const watchNotificationPermission = (
+  onAllowed: () => void,
+): (() => void) => {
+  if (typeof Notification === "undefined") {
+    return () => {};
+  }
+  let stopped = false;
+  let detach = () => {};
+  let timer: ReturnType<typeof setInterval>;
+
+  const stop = () => {
+    stopped = true;
+    clearInterval(timer);
+    detach();
+  };
+
+  const check = () => {
+    if (stopped || Notification.permission === "denied") {
+      return;
+    }
+    stop();
+    onAllowed();
+  };
+
+  timer = setInterval(check, PERMISSION_POLL_MS);
+  void navigator.permissions
+    ?.query({ name: "notifications" as PermissionName })
+    .then((status) => {
+      if (stopped) {
+        return;
+      }
+      status.addEventListener("change", check);
+      detach = () => status.removeEventListener("change", check);
+    })
+    // Not every browser knows the `notifications` permission name, and the ones that
+    // do not reject the query. The timer covers them.
+    .catch(() => undefined);
+
+  return stop;
+};
+
+const PERMISSION_POLL_MS = 1000;

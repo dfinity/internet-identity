@@ -259,10 +259,16 @@ describe("handleNotificationConsentRequest", () => {
     expect(readGranted).not.toHaveBeenCalled();
   });
 
-  it("opens the screen on the question it resolved", async () => {
+  it("opens the screen on the state the resolution read", async () => {
+    const state = {
+      supported: true,
+      permission: "denied" as NotificationPermission,
+      subscribed: false,
+      registered: false,
+    };
     vi.mocked(resolveOptIn).mockResolvedValue({
-      screen: "blocked",
-      state: {} as never,
+      screen: "enable",
+      state,
       consented: false,
     });
     let opened: NotificationConsentContext | undefined;
@@ -273,7 +279,9 @@ describe("handleNotificationConsentRequest", () => {
     const { sent } = await run();
 
     unsubscribe();
-    expect(opened?.screen).toBe("blocked");
+    // Carried over rather than read again, so answering only does what is left.
+    expect(opened?.device).toBe(state);
+    expect(opened?.consented).toBe(false);
     expect(sent[0].result).toEqual({ granted: true });
   });
 

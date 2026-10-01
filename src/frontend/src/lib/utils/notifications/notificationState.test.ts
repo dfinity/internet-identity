@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // vapidKeyStore opens an IndexedDB store at import; the resolver under test
 // never touches it. The decline cooldown is mocked so the logic stays pure.
 vi.mock("./vapidKeyStore", () => ({ loadVapidKey: vi.fn() }));
@@ -27,6 +27,7 @@ import {
   readGranted,
   resolveOptIn,
   resolveOptInScreen,
+  watchNotificationPermission,
   type BrowserPushState,
   type DeviceNotificationState,
 } from "./notificationState";
@@ -91,10 +92,11 @@ describe("resolveOptInScreen", () => {
     ).toBe("enable");
   });
 
-  /** No prompt can lift a refusal, so this asks the user to lift it in settings. */
-  it("offers the unblock guidance for a refused permission", () => {
+  /** The guidance for a refusal is reached by asking, so that the user sees what the
+   *  question was before being sent to browser settings. */
+  it("asks where the permission was refused", () => {
     expect(resolveOptInScreen(state({ permission: "denied" }), false)).toBe(
-      "blocked",
+      "enable",
     );
   });
 });
@@ -463,5 +465,116 @@ describe("readGranted", () => {
         actor: actorGranting(true),
       }),
     ).resolves.toBe(false);
+  });
+});
+
+describe("watchNotificationPermission", () => {
+  let permission: NotificationPermission;
+
+  beforeEach(() => {
+    permission = "denied";
+    vi.stubGlobal(
+      "Notification",
+      Object.defineProperty(function () {} as never, "permission", {
+        get: () => permission,
+      }),
+    );
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("waits while the permission is still refused", async () => {
+    const onAllowed = vi.fn();
+    const stop = watchNotificationPermission(onAllowed);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(onAllowed).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("carries on once the permission is lifted", async () => {
+    const onAllowed = vi.fn();
+    watchNotificationPermission(onAllowed);
+
+    permission = "default";
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(onAllowed).toHaveBeenCalledTimes(1);
+  });
+
+  /** A browser that has to be asked again is one the enable step can ask, so the
+   *  watcher hands back on anything that is no longer a refusal. */
+  it("carries on for a permission that was granted outright", async () => {
+    const onAllowed = vi.fn();
+    watchNotificationPermission(onAllowed);
+
+    permission = "granted";
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(onAllowed).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls back once and stops watching", async () => {
+    const onAllowed = vi.fn();
+    watchNotificationPermission(onAllowed);
+
+    permission = "granted";
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(onAllowed).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops watching when told to", async () => {
+    const onAllowed = vi.fn();
+    const stop = watchNotificationPermission(onAllowed);
+    stop();
+
+    permission = "granted";
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(onAllowed).not.toHaveBeenCalled();
+  });
+
+  it("reports a permission change as soon as the browser does", async () => {
+    const listeners: (() => void)[] = [];
+    const status = {
+      addEventListener: (_: string, fn: () => void) => listeners.push(fn),
+      removeEventListener: vi.fn(),
+    };
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      permissions: { query: () => Promise.resolve(status) },
+    });
+    const onAllowed = vi.fn();
+    watchNotificationPermission(onAllowed);
+    await vi.advanceTimersByTimeAsync(0);
+
+    permission = "granted";
+    listeners.forEach((fn) => fn());
+
+    expect(onAllowed).toHaveBeenCalledTimes(1);
+    expect(status.removeEventListener).toHaveBeenCalled();
+  });
+
+  /** Firefox rejects a query for a permission name it does not know, which must not
+   *  take the timer down with it. */
+  it("keeps watching where the browser cannot report changes", async () => {
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      permissions: { query: () => Promise.reject(new TypeError()) },
+    });
+    const onAllowed = vi.fn();
+    watchNotificationPermission(onAllowed);
+    await vi.advanceTimersByTimeAsync(0);
+
+    permission = "granted";
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(onAllowed).toHaveBeenCalledTimes(1);
   });
 });

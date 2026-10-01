@@ -255,7 +255,6 @@ const askUntilSettled = async (
       effectiveOrigin,
       identityNumber: authenticated.identityNumber,
       actor: authenticated.actor,
-      screen: resolution.screen,
       device: resolution.state,
       consented: resolution.consented,
     });

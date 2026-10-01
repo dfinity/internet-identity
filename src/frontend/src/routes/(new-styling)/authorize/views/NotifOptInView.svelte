@@ -11,8 +11,8 @@
   import {
     readBrowserPushState,
     readDeviceState,
+    watchNotificationPermission,
     type DeviceNotificationState,
-    type OptInQuestion,
   } from "$lib/utils/notifications/notificationState";
   import {
     clearFailure,
@@ -31,8 +31,6 @@
     origin: string;
     /** The authenticated actor for this identity. */
     actor: ActorSubclass<_SERVICE>;
-    /** The question to ask, resolved before this screen was rendered. */
-    screen: OptInQuestion;
     /** This browser as the resolution found it, so answering only does what is left.
      *  Not named `state`, which would read as the `$state` rune in this file. */
     device: DeviceNotificationState;
@@ -48,16 +46,15 @@
     identityNumber,
     origin,
     actor,
-    screen,
     device,
     consented,
     onDone,
   }: Props = $props();
 
-  // Opens on the resolved question and moves on from there: a refused prompt replaces
-  // it with the unblock guidance. A new request arrives as a new context, which
-  // remounts this component.
-  let variant = $state<OptInQuestion>(screen);
+  // Always opens on the ask, so the unblock guidance is only ever reached by asking
+  // and being refused, with the reason for the question already on screen. A new
+  // request arrives as a new context, which remounts this component.
+  let variant = $state<"enable" | "blocked">("enable");
   let busy = $state(false);
 
   /**
@@ -115,14 +112,13 @@
   };
 
   /**
-   * Picks up a permission the user changed in browser settings.
+   * Carries on once the user has lifted the block in browser settings.
    *
-   * Nothing here can re-raise a refused prompt, so this reads the permission again
-   * and carries on where it has changed: the user reached this screen by asking for
-   * notifications, so a retry continues that rather than asking again. A permission
-   * still refused leaves them on the guidance.
+   * The user reached this screen by asking for notifications, so the rest of that
+   * is finished for them rather than asked again. A permission that reads as refused
+   * after all leaves them on the guidance, where the watcher is still running.
    */
-  const handleRetry = async (): Promise<void> => {
+  const resumeAfterUnblock = async (): Promise<void> => {
     busy = true;
     try {
       const pushState = await readBrowserPushState();
@@ -138,6 +134,16 @@
       busy = false;
     }
   };
+
+  // Watches only while the guidance is up, and only for as long as it is: the enable
+  // screen raises the prompt itself, and a watcher left running would answer for a
+  // screen the user has already left.
+  $effect(() => {
+    if (variant !== "blocked") {
+      return;
+    }
+    return watchNotificationPermission(() => void resumeAfterUnblock());
+  });
 </script>
 
 {#if variant === "enable"}
@@ -166,13 +172,6 @@
     <NotifBlockedSteps />
 
     <div class="mt-7 flex flex-col gap-2.5">
-      <button
-        class="btn btn-primary btn-xl"
-        onclick={() => void handleRetry()}
-        disabled={busy}
-      >
-        {busy ? $t`Setting up…` : $t`Try again`}
-      </button>
       <button class="btn btn-tertiary btn-xl" onclick={onDone} disabled={busy}>
         {$t`Not now`}
       </button>

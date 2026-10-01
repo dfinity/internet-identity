@@ -1,10 +1,7 @@
 import { type Readable, writable } from "svelte/store";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import type {
-  DeviceNotificationState,
-  OptInQuestion,
-} from "$lib/utils/notifications/notificationState";
+import type { DeviceNotificationState } from "$lib/utils/notifications/notificationState";
 
 /** What the consent screen needs to run, once the user is authenticated. */
 export interface NotificationConsentContext {
@@ -12,10 +9,6 @@ export interface NotificationConsentContext {
   effectiveOrigin: string;
   identityNumber: bigint;
   actor: ActorSubclass<_SERVICE>;
-  /** Which question to put on screen, resolved before the context is set. An
-   *  identity and browser with nothing left to ask set no context at all, so the
-   *  screen has nothing to resolve and never renders a spinner of its own. */
-  screen: OptInQuestion;
   /** This browser as the resolution found it, so answering the question only does
    *  what is left to do. */
   device: DeviceNotificationState;
