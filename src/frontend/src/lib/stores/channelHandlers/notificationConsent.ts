@@ -63,12 +63,28 @@ export const handleNotificationConsentRequest =
   async (request: JsonRequest) => {
     if (
       request.id === undefined ||
-      request.method !== NOTIFICATION_CONSENT_METHOD ||
-      !get(PUSH_NOTIFICATIONS)
+      request.method !== NOTIFICATION_CONSENT_METHOD
     ) {
       return;
     }
     const requestId = request.id;
+
+    // Answered rather than dropped. This deployment notifies for nothing at all, so
+    // the method is one it does not have, which is what the code says; an app that
+    // asked anyway gets that back instead of waiting on a reply that never comes.
+    // Ahead of the silent check, because a request that cannot be served is not a
+    // request that needed the user.
+    if (!get(PUSH_NOTIFICATIONS)) {
+      await channel.send({
+        jsonrpc: "2.0",
+        id: requestId,
+        error: {
+          code: METHOD_NOT_FOUND_ERROR_CODE,
+          message: "This Internet Identity does not send notifications",
+        },
+      });
+      return;
+    }
 
     const isSilent = get(authorizationPromptStore).prompt === "none";
 

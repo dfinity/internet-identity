@@ -159,13 +159,32 @@ describe("handleNotificationConsentRequest", () => {
     expect(errors).toEqual([]);
   });
 
-  /** The canister refuses every notification endpoint while its own install
-   *  argument is off, so a ceremony offered here could only fail. */
-  it("ignores the request while the feature is off", async () => {
+  /**
+   * The canister refuses every notification endpoint while its own install argument is
+   * off, so a ceremony offered here could only fail. The request is still answered:
+   * dropped, it left the app waiting on a reply that was never coming, which hung the
+   * sign-in it was part of. `icrc25_supported_standards` leaves the method out in this
+   * state, so an app that asked was not told it could.
+   */
+  it("refuses the request while the feature is off", async () => {
     (PUSH_NOTIFICATIONS as unknown as Writable<boolean>).set(false);
     const { sent, errors } = await run({ settle: false });
-    expect(sent).toEqual([]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].error).toMatchObject({ code: METHOD_NOT_FOUND_ERROR_CODE });
     expect(errors).toEqual([]);
+  });
+
+  /** A silent request is refused the same way: what it asked for is absent here, which
+   *  is not something showing the user a screen could have fixed. */
+  it("refuses a silent request while the feature is off", async () => {
+    (PUSH_NOTIFICATIONS as unknown as Writable<boolean>).set(false);
+    const { authorizationPromptStore } =
+      await import("$lib/stores/authorization.store");
+    (authorizationPromptStore as Writable<unknown>).set({ prompt: "none" });
+
+    const { sent } = await run({ settle: false });
+
+    expect(sent[0].error).toMatchObject({ code: METHOD_NOT_FOUND_ERROR_CODE });
   });
 
   /** The identity switcher stays up during this screen. A switch used to leave the
