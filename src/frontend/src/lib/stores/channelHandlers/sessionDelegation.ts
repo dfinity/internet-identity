@@ -275,19 +275,19 @@ export const handleSessionDelegationRequest =
             usable.record,
             params.sessionPublicKey,
           );
+          // A resumed session is a visit too, so "Last visited" keeps up with an app
+          // that never shows a sign-in screen again.
+          lastUsedIdentitiesStore.recordAppVisit({
+            identityNumber: usable.identityNumber,
+            origin: effectiveOrigin,
+            displayOrigin: channel.origin,
+          });
           await channel.send({
             jsonrpc: "2.0",
             id: requestId,
             result: SessionResultSchema.encode({
               chain,
             }),
-          });
-          // A resumed session is a visit too, so "Last visited" keeps up with an app
-          // that never shows a sign-in screen again.
-          lastUsedIdentitiesStore.addLastUsedAccount({
-            identityNumber: usable.identityNumber,
-            accountNumber: usable.accountNumber,
-            origin: effectiveOrigin,
           });
           return;
         }
@@ -307,6 +307,14 @@ export const handleSessionDelegationRequest =
           created.record,
           params.sessionPublicKey,
         );
+        // For the Applications page, once the chain exists so a failed sign-in lists
+        // nothing. Before the reply, because over a redirect sending it leaves the
+        // page and never returns.
+        lastUsedIdentitiesStore.recordAppVisit({
+          identityNumber: created.identityNumber,
+          origin: effectiveOrigin,
+          displayOrigin: channel.origin,
+        });
         await channel.send({
           jsonrpc: "2.0",
           id: requestId,
@@ -314,9 +322,6 @@ export const handleSessionDelegationRequest =
             chain,
           }),
         });
-        // Only once the app holds its chain, so a sign-in that failed lists no app on
-        // the Applications page. The canister keeps no list of an identity's apps.
-        lastUsedIdentitiesStore.addLastUsedAccount(created.visit);
       } catch (error) {
         console.error(error);
         if (isSilent) {
@@ -346,13 +351,8 @@ const createSession = async (
   resumable: boolean,
 ): Promise<{
   record: AppSessionRecord;
-  /** Which account signed in to the app, for the caller to remember once the app has
-   *  its chain. */
-  visit: {
-    identityNumber: bigint;
-    accountNumber: bigint | undefined;
-    origin: string;
-  };
+  /** The identity the user ended on, which may not be the one they started with. */
+  identityNumber: bigint;
 }> => {
   authorizationStore.setRequestContext(effectiveOrigin, requestedMaxTimeToLive);
   let authorized = await waitForStore(authorizedStore);
@@ -493,5 +493,5 @@ const createSession = async (
   if (resumable) {
     await storeAppSession(recordKey, record);
   }
-  return { record, visit: recordKey };
+  return { record, identityNumber };
 };

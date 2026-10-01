@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { SvelteMap } from "svelte/reactivity";
+  import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { currentBrowserId } from "$lib/stores/browser-key.store";
   import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
   import { notificationsEnabledFor } from "$lib/globals";
   import { Trans } from "$lib/components/locale";
@@ -22,7 +23,7 @@
     appsFrom(
       $lastUsedIdentitiesStore.identities[
         $authenticatedStore.identityNumber.toString()
-      ]?.accounts,
+      ]?.visitedApps,
     ),
   );
 
@@ -36,39 +37,54 @@
   );
 
   // Read one app at a time, which is all the canister answers. An app is missing here
-  // until its answer is in.
+  // until its answer is in, and stays missing if the read fails: that holds its
+  // switch rather than reading as not allowed.
   const allowed = new SvelteMap<string, boolean>();
-  let saving = $state<string | undefined>(undefined);
+  // Per app, so one app's save finishing does not free another's switch mid-save.
+  const saving = new SvelteSet<string>();
   $effect(() => {
     const { actor, identityNumber } = $authenticatedStore;
     for (const origin of notifying) {
       void actor
         .notification_consent_granted({ anchor_number: identityNumber, origin })
-        .catch(() => false)
-        .then((granted) => {
-          // A late read must not undo a switch the user has just flipped.
-          if (saving !== origin) {
-            allowed.set(origin, granted);
-          }
-        });
+        .then(
+          (granted) => {
+            // A late read must not undo a switch the user has just flipped.
+            if (!saving.has(origin)) {
+              allowed.set(origin, granted);
+            }
+          },
+          () => {},
+        );
     }
+  });
+
+  // Only an app sign-in through a session gives this browser a key for the identity,
+  // and without one it cannot be registered for Web Push. Read ahead, since anything
+  // awaited before the permission prompt takes it out of the user's click.
+  let browserId = $state<number | undefined>(undefined);
+  $effect(() => {
+    void currentBrowserId($authenticatedStore.identityNumber).then(
+      (id) => (browserId = id),
+    );
   });
 
   const setAllowed = async (origin: string, next: boolean) => {
     const { actor, identityNumber } = $authenticatedStore;
     const previous = allowed.get(origin) ?? !next;
     allowed.set(origin, next);
-    saving = origin;
+    saving.add(origin);
     try {
       if (!next) {
         await disallowApp({ identityNumber, origin, actor });
-      } else if (!isPushSupported()) {
-        // Consent belongs to the identity, so it still reaches its other browsers.
+      } else if (!isPushSupported() || browserId === undefined) {
+        // This browser cannot be registered, but consent belongs to the identity, so
+        // it still reaches the browsers that can show it.
         await allowApp({ identityNumber, origin, actor });
       } else {
-        // Called before anything is awaited, so the permission prompt it opens with
-        // stays inside the click. It subscribes this browser before granting, so a
-        // refusal at the prompt records nothing.
+        // Nothing is awaited before it, so the permission prompt it opens with stays
+        // inside the click. It subscribes this browser before granting, so a refusal
+        // at the prompt records nothing.
         const { status } = await enableNotifications({
           identityNumber,
           origin,
@@ -91,14 +107,12 @@
         duration: 4000,
       });
     } finally {
-      saving = undefined;
+      saving.delete(origin);
     }
   };
 
   const lastVisitedOf = (app: App): string =>
-    app.lastUsedMillis === undefined
-      ? $t`n/a`
-      : $formatRelative(new Date(app.lastUsedMillis), { style: "long" });
+    $formatRelative(new Date(app.lastVisitedMillis), { style: "long" });
 
   let selected = $state<App | undefined>(undefined);
 </script>
@@ -132,6 +146,7 @@
         <li>
           <AppRow
             origin={app.origin}
+            displayOrigin={app.displayOrigin}
             lastVisited={lastVisitedOf(app)}
             allowed={canNotify(app.origin)
               ? allowed.get(app.origin)
@@ -156,9 +171,10 @@
   <Dialog onClose={() => (selected = undefined)}>
     <AppDetails
       origin={app.origin}
+      displayOrigin={app.displayOrigin}
       canNotify={canNotify(app.origin)}
       allowed={allowed.get(app.origin)}
-      saving={saving === app.origin}
+      saving={saving.has(app.origin)}
       onAllowedChange={(next) => void setAllowed(app.origin, next)}
     />
   </Dialog>

@@ -181,17 +181,18 @@ export const handleDelegationRequest =
             ),
         );
 
+        // For the Applications page, once the delegation exists so a failed sign-in
+        // lists nothing. Before the reply, because over a redirect sending it leaves
+        // the page and never returns.
+        lastUsedIdentitiesStore.recordAppVisit({
+          identityNumber,
+          origin: effectiveOrigin,
+          displayOrigin: channel.origin,
+        });
         await channel.send({
           jsonrpc: "2.0",
           id: requestId,
           result: DelegationResultSchema.encode(delegationChain),
-        });
-        // Only once the app holds its delegation, so a sign-in that failed lists no app
-        // on the Applications page. The canister keeps no list of an identity's apps.
-        lastUsedIdentitiesStore.addLastUsedAccount({
-          identityNumber,
-          accountNumber,
-          origin: effectiveOrigin,
         });
       } catch (error) {
         console.error(error);

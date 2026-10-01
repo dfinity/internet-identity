@@ -170,7 +170,7 @@ const runCeremony = async (
     await whileRunning();
   }
   await pending;
-  return { sent, prepared };
+  return { sent, prepared, channel };
 };
 
 const channelWith = () => {
@@ -181,10 +181,10 @@ const channelWith = () => {
       closed: false,
       resumeToken: "token",
       addEventListener: () => () => {},
-      send: (response: unknown) => {
+      send: vi.fn((response: unknown) => {
         sent.push(response);
         return Promise.resolve();
-      },
+      }),
       close: async () => {},
     },
     sent,
@@ -731,6 +731,34 @@ describe("keeping a session for later", () => {
     await expect(appAccountsForOrigin(ORIGIN)).resolves.toMatchObject([
       { record: { accountPrincipal: "2vxsx-fae" } },
     ]);
+  });
+
+  /// Before the reply rather than after it: over a redirect, sending the reply leaves the
+  /// page, and the promise it returns never settles.
+  it("lists the app on the Applications page before replying", async () => {
+    const { lastUsedIdentitiesStore } =
+      await import("$lib/stores/last-used-identities.store");
+    lastUsedIdentitiesStore.reset();
+    lastUsedIdentitiesStore.addLastUsedIdentity({
+      identityNumber: BigInt(10_000),
+      authMethod: { passkey: { credentialId: new Uint8Array() } },
+    });
+    const recordAppVisit = vi.spyOn(lastUsedIdentitiesStore, "recordAppVisit");
+
+    const { channel } = await runCeremony();
+
+    expect(recordAppVisit).toHaveBeenCalledWith({
+      identityNumber: BigInt(10_000),
+      origin: ORIGIN,
+      displayOrigin: ORIGIN,
+    });
+    expect(recordAppVisit.mock.invocationCallOrder[0]).toBeLessThan(
+      channel.send.mock.invocationCallOrder[0],
+    );
+    expect(
+      get(lastUsedIdentitiesStore).identities["10000"].visitedApps,
+    ).toHaveProperty([ORIGIN]);
+    recordAppVisit.mockRestore();
   });
 });
 

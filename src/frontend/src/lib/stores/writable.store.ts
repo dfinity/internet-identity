@@ -167,10 +167,14 @@ export const writableStored = <T>({
   key,
   defaultValue,
   version: defaultVersion,
+  syncAcrossTabs = false,
 }: {
   key: StoreLocalStorageKey;
   defaultValue: T;
   version?: number;
+  /** Takes up what another tab writes. Without it, each tab keeps the copy it loaded
+   *  and its next write puts that copy back over the other tab's. */
+  syncAcrossTabs?: boolean;
 }): WritableStored<T> => {
   const getInitialValue = (): VersionedData<T> => {
     if (!browser) {
@@ -192,13 +196,35 @@ export const writableStored = <T>({
   const initialValue = getInitialValue();
   const store = writable<T>(initialValue.data);
 
+  // Set while applying another tab's write, which is already in storage.
+  let fromOtherTab = false;
   const unsubscribeStorage = store.subscribe((store: T) => {
-    if (!browser) {
+    if (!browser || fromOtherTab) {
       return;
     }
 
     writeData({ key, data: store, version: initialValue.version });
   });
+
+  if (browser && syncAcrossTabs) {
+    // Fired in every tab but the one that wrote.
+    window.addEventListener("storage", (event) => {
+      if (event.storageArea !== localStorage || event.key !== key) {
+        return;
+      }
+      const stored = readData<T>(key);
+      // Cleared, or written by a version this tab cannot read: keep what is here.
+      if (stored.data === undefined || stored.version !== defaultVersion) {
+        return;
+      }
+      fromOtherTab = true;
+      try {
+        store.set(stored.data);
+      } finally {
+        fromOtherTab = false;
+      }
+    });
+  }
 
   return {
     ...store,

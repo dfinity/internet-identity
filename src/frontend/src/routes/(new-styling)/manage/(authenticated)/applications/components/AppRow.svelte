@@ -6,8 +6,12 @@
   import AppLogo from "./AppLogo.svelte";
 
   interface Props {
+    /** The origin the app's identity is derived for: what its metadata is published
+     *  on and its consent is keyed by. */
     origin: string;
-    /** Already formatted: a relative time, or a placeholder when none is known. */
+    /** Where the user signs in to it from, which is what they know it by. */
+    displayOrigin: string;
+    /** Already formatted: a relative time. */
     lastVisited: string;
     /** Whether the app may notify, or `undefined` while that is still being read and
      *  for an app this Internet Identity does not notify for. */
@@ -17,12 +21,20 @@
     onOpen: () => void;
   }
 
-  const { origin, lastVisited, allowed, showNotifications, onOpen }: Props =
-    $props();
+  const {
+    origin,
+    displayOrigin,
+    lastVisited,
+    allowed,
+    showNotifications,
+    onOpen,
+  }: Props = $props();
 
-  const metadataStore = $derived(getAppMetadataStore(origin));
+  // As the sign-in screens ask, so an app whose curated entry names only the origin
+  // it is used on still resolves.
+  const metadataStore = $derived(getAppMetadataStore(origin, displayOrigin));
   const metadata = $derived($metadataStore);
-  const label = $derived(originLabel(origin));
+  const label = $derived(originLabel(displayOrigin));
 </script>
 
 <!-- Switches on the card's width, not the page's, as the devices list does. -->
@@ -81,6 +93,6 @@
 
   <ChevronRightIcon
     aria-hidden="true"
-    class="text-fg-tertiary col-start-3 row-span-2 row-start-1 size-5 @min-[560px]/apps:col-start-4 @min-[560px]/apps:row-span-1"
+    class="text-fg-tertiary col-start-3 row-span-2 row-start-1 size-5 @min-[560px]/apps:col-start-4 @min-[560px]/apps:row-span-1 rtl:-scale-x-100"
   />
 </button>

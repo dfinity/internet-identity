@@ -7,7 +7,11 @@
   import AppLogo from "./AppLogo.svelte";
 
   interface Props {
+    /** The origin the app's identity is derived for: what its metadata is published
+     *  on and its consent is keyed by. */
     origin: string;
+    /** Where the user signs in to it from, which is what they know it by. */
+    displayOrigin: string;
     /** Whether this Internet Identity notifies for the app at all. Without it there
      *  is nothing to switch, so the switch is left out. */
     canNotify: boolean;
@@ -17,12 +21,20 @@
     onAllowedChange: (allowed: boolean) => void;
   }
 
-  const { origin, canNotify, allowed, saving, onAllowedChange }: Props =
-    $props();
+  const {
+    origin,
+    displayOrigin,
+    canNotify,
+    allowed,
+    saving,
+    onAllowedChange,
+  }: Props = $props();
 
-  const metadataStore = $derived(getAppMetadataStore(origin));
+  // As the sign-in screens ask, so an app whose curated entry names only the origin
+  // it is used on still resolves.
+  const metadataStore = $derived(getAppMetadataStore(origin, displayOrigin));
   const metadata = $derived($metadataStore);
-  const label = $derived(originLabel(origin));
+  const label = $derived(originLabel(displayOrigin));
   const name = $derived(metadata.name ?? label);
 
   const titleId = $props.id();
@@ -36,7 +48,7 @@
     <div class="flex min-w-0 flex-1 flex-col gap-0.5">
       <h2 class="text-text-primary truncate text-xl font-medium">{name}</h2>
       <a
-        href={origin}
+        href={displayOrigin}
         target="_blank"
         rel="noopener noreferrer"
         class="text-text-tertiary self-start text-sm hover:underline focus-visible:underline"
@@ -78,7 +90,7 @@
   {/if}
 
   <a
-    href={origin}
+    href={displayOrigin}
     target="_blank"
     rel="noopener noreferrer"
     class="btn btn-primary btn-xl mt-10 w-full"
