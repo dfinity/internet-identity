@@ -34,7 +34,12 @@ vi.mock("$lib/utils/notifications/notificationState", () => ({
   readBrowserPushState: vi.fn(() => Promise.resolve({})),
   readGranted: vi.fn(() => Promise.resolve(true)),
   resolveOptIn: vi.fn(() =>
-    Promise.resolve({ screen: "enable", state: {}, consented: false }),
+    Promise.resolve({
+      screen: "enable",
+      state: {},
+      consented: false,
+      installFirst: false,
+    }),
   ),
 }));
 vi.mock("$lib/stores/authentication.store", async () => {
@@ -140,6 +145,7 @@ beforeEach(async () => {
     screen: "enable",
     state: {} as never,
     consented: false,
+    installFirst: false,
   });
   vi.mocked(readGranted).mockResolvedValue(true);
   vi.mocked(notificationsUnavailableHere).mockReturnValue(false);
@@ -270,6 +276,7 @@ describe("handleNotificationConsentRequest", () => {
       screen: "enable",
       state,
       consented: false,
+      installFirst: false,
     });
     let opened: NotificationConsentContext | undefined;
     const unsubscribe = notificationConsentStore.subscribe((context) => {
