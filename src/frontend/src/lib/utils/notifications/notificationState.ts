@@ -14,6 +14,7 @@ import { loadVapidKey } from "./vapidKeyStore";
 import { recordPermission } from "./notificationDiagnostics";
 import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
+import { saidAlreadyInstalled } from "./alreadyInstalled";
 
 /** What this browser can do, and what it is subscribed with. */
 export interface BrowserPushState {
@@ -242,8 +243,16 @@ export const resolveOptIn = async ({
   // any of this existed.
   const installFirst = notificationsNeedInstallHere();
   if (installFirst) {
-    const delivers = await notificationAppDelivers(identityNumber);
-    return consented && delivers
+    // Two ways this browser can know the user is covered, and it needs both. Its own
+    // linked app it can see. An app installed from another browser on the same device
+    // it cannot: the canister records which browser installed one, and asking
+    // anchor-wide instead would stop the same user's second device being offered the
+    // install at all. So the user's own word counts, given on the install steps.
+    const [delivers, saidSo] = await Promise.all([
+      notificationAppDelivers(identityNumber),
+      saidAlreadyInstalled(identityNumber),
+    ]);
+    return consented && (delivers || saidSo)
       ? { screen: "skip", granted: true }
       : { screen: "enable", state, consented, installFirst };
   }

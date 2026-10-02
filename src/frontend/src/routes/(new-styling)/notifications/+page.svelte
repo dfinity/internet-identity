@@ -15,6 +15,7 @@
   import InstallSteps from "./installSteps/InstallSteps.svelte";
   import IosAppSteps from "./blockedSteps/IosAppSteps.svelte";
   import { NOTIFICATION_APP_NAME } from "./appName";
+  import { recordAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
   import { watchForInstall } from "./watchInstall";
 
   /** What this page is doing, which is settled on mount and not before: the answer
@@ -115,6 +116,24 @@
     return watchForInstall(token.identityNumber, () => window.close());
   });
 
+  /**
+   * Takes the user's word that this device already has the app, so this browser stops
+   * offering the install.
+   *
+   * It is the only party that knows: the app runs in a partition of its own and the
+   * canister records which browser installed it, so a second browser on the same phone
+   * sees nothing and would keep asking. Recorded before the tab closes, because closing
+   * is the part that may be refused — a tab the user opened from a link rather than
+   * from the sign-in is not one this document may close.
+   */
+  const stopAsking = async () => {
+    const token = decodeLinkToken(window.location.hash);
+    if (token !== undefined) {
+      await recordAlreadyInstalled(token.identityNumber);
+    }
+    window.close();
+  };
+
   /** Picks up a permission the user changed in Settings, which is the only place a
    *  refusal can be lifted. One still refused leaves them on the steps. */
   const retryFromSettings = async () => {
@@ -167,6 +186,21 @@
             <Trans>Follow these steps to get notifications:</Trans>
           </p>
           <InstallSteps host={window.location.host} />
+
+          <div class="mt-7 flex flex-col gap-2.5">
+            <button
+              class="btn btn-primary btn-xl"
+              onclick={() => void stopAsking()}
+            >
+              {$t`I've already added it`}
+            </button>
+            <button
+              class="btn btn-tertiary btn-xl"
+              onclick={() => window.close()}
+            >
+              {$t`Not now`}
+            </button>
+          </div>
         </div>
       {:else if screen.kind === "ask"}
         <div class="flex min-w-0 flex-1 flex-col items-stretch justify-end">
