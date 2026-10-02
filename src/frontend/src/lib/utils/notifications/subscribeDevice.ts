@@ -15,6 +15,8 @@ import {
   storeVapidKey,
   type StoredVapidKey,
 } from "./vapidKeyStore";
+import type { ActorSubclass } from "@icp-sdk/core/agent";
+import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { browserKeyActor } from "./browserActor";
 
 /**
@@ -28,6 +30,9 @@ import { browserKeyActor } from "./browserActor";
 export const registerStoredDevice = async (
   identityNumber: bigint,
   { endpoint, privateKey, publicKeyRaw }: StoredVapidKey,
+  /** Who to call as. A Home Screen app signs as its own linked entry; everyone else
+   *  signs as the browser key this sign-in registered. */
+  caller?: ActorSubclass<_SERVICE>,
 ): Promise<string> => {
   const issuedAtNs = BigInt(Date.now()) * BigInt(1_000_000);
   const signatures = await signJwtPool(
@@ -35,7 +40,7 @@ export const registerStoredDevice = async (
     relayOriginOf(endpoint),
     issuedAtNs,
   );
-  const actor = await browserKeyActor(identityNumber);
+  const actor = caller ?? (await browserKeyActor(identityNumber));
   await actor
     .set_webpush_subscription({
       anchor_number: identityNumber,
@@ -57,11 +62,12 @@ export const registerStoredDevice = async (
  */
 export const subscribeAndRegisterDevice = async (
   identityNumber: bigint,
+  caller?: ActorSubclass<_SERVICE>,
 ): Promise<string> => {
   const { publicKeyRaw, privateKey } = await generateVapidKeypair();
   const endpoint = await subscribeToPush(publicKeyRaw);
   const stored = { endpoint, privateKey, publicKeyRaw };
-  await registerStoredDevice(identityNumber, stored);
+  await registerStoredDevice(identityNumber, stored, caller);
   await storeVapidKey(stored);
   return endpoint;
 };
@@ -73,12 +79,13 @@ export const subscribeAndRegisterDevice = async (
  */
 export const ensureRegisteredDevice = async (
   identityNumber: bigint,
+  caller?: ActorSubclass<_SERVICE>,
 ): Promise<string> => {
   const stored = await loadVapidKey();
   const subscription = await currentDeviceSubscription();
   return stored !== undefined &&
     subscription !== undefined &&
     stored.endpoint === subscription.endpoint
-    ? registerStoredDevice(identityNumber, stored)
-    : subscribeAndRegisterDevice(identityNumber);
+    ? registerStoredDevice(identityNumber, stored, caller)
+    : subscribeAndRegisterDevice(identityNumber, caller);
 };
