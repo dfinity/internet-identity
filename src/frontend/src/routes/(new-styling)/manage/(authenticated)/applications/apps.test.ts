@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ApplicationInfo } from "$lib/generated/internet_identity_types";
-import { appsFrom } from "./apps";
+import { appUrl, appsFrom } from "./apps";
 
 const millis = (value: number): bigint => BigInt(value) * BigInt(1_000_000);
 
@@ -55,5 +55,27 @@ describe("appsFrom", () => {
         application("https://a.example", millis(1_000)),
       ]).map(({ origin }) => origin),
     ).toEqual(["https://a.example", "https://b.example"]);
+  });
+});
+
+describe("appUrl", () => {
+  it("moves a canister on any gateway domain to icp.net", () => {
+    for (const origin of [
+      "https://2vxsx-fae.ic0.app",
+      "https://2vxsx-fae.icp0.io",
+      "https://2vxsx-fae.icp.net",
+    ]) {
+      expect(appUrl(origin)).toBe("https://2vxsx-fae.icp.net");
+    }
+  });
+
+  it("keeps the raw label", () => {
+    expect(appUrl("https://2vxsx-fae.raw.ic0.app")).toBe(
+      "https://2vxsx-fae.raw.icp.net",
+    );
+  });
+
+  it("leaves a custom domain alone", () => {
+    expect(appUrl("https://oisy.com")).toBe("https://oisy.com");
   });
 });

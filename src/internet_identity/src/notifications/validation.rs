@@ -244,16 +244,13 @@ impl TryFrom<NotificationConsentGrantedRequest> for ValidatedNotificationConsent
     }
 }
 
-/// Whether this deployment notifies for `origin`, as a request naming it would be told.
-pub fn notifies_for(origin: &str) -> bool {
-    notifying_origin(origin).is_ok()
-}
-
-/// Folds `origin` to the spelling consent is keyed by, and refuses one this deployment
-/// does not notify for.
+/// Folds `origin` to the spelling consent is keyed by, and refuses every origin while
+/// this deployment does not notify.
 fn notifying_origin(origin: &str) -> Result<FrontendHostname, String> {
     let origin = remap_to_legacy_domain(&canonical_origin(origin)?);
-    enabled_for(&origin)?;
+    if !notifications_enabled() {
+        return Err(NOT_ENABLED.to_string());
+    }
     Ok(origin)
 }
 
@@ -323,33 +320,9 @@ fn allow_insecure_sender_list() -> bool {
     crate::state::persistent_state(|s| s.notifications_allow_insecure_sender_list).unwrap_or(false)
 }
 
-/// Whether this deployment notifies at all. The Web Push channel is per browser rather
-/// than per app, so it turns on with the first app enabled rather than for one of them.
+/// Whether this deployment notifies, for every app at once.
 pub fn notifications_enabled() -> bool {
-    crate::state::persistent_state(|s| {
-        s.notifications_enabled_origins
-            .as_ref()
-            .is_some_and(|origins| !origins.is_empty())
-    })
-}
-
-/// Whether this deployment notifies for `origin`. Configured origins are folded the same
-/// way the request's is, so an operator may list any spelling of a gateway twin.
-fn enabled_for(origin: &FrontendHostname) -> Result<(), String> {
-    let enabled = crate::state::persistent_state(|s| {
-        s.notifications_enabled_origins
-            .as_ref()
-            .is_some_and(|origins| {
-                origins
-                    .iter()
-                    .any(|enabled| &remap_to_legacy_domain(enabled) == origin)
-            })
-    });
-    if enabled {
-        Ok(())
-    } else {
-        Err(format!("notifications are not enabled for {origin}"))
-    }
+    crate::state::persistent_state(|s| s.notifications_enabled).unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -357,10 +330,8 @@ mod tests {
     use super::*;
     use crate::delegation::FRONTEND_HOSTNAME_LIMIT;
     use internet_identity_interface::internet_identity::types::Urgency;
-    fn enable(origins: &[&str]) {
-        crate::state::persistent_state_mut(|s| {
-            s.notifications_enabled_origins = Some(origins.iter().map(|o| o.to_string()).collect());
-        });
+    fn set_enabled(enabled: Option<bool>) {
+        crate::state::persistent_state_mut(|s| s.notifications_enabled = enabled);
     }
 
     fn allow_insecure(allow: bool) {
@@ -379,7 +350,7 @@ mod tests {
     }
 
     fn validate(notifications: Vec<Notification>) -> ValidatedSendNotificationArg {
-        enable(&["https://app.example"]);
+        set_enabled(Some(true));
         SendNotificationArg {
             origin: "https://app.example".to_string(),
             notifications,
@@ -430,7 +401,7 @@ mod tests {
     /// batch naming one pair many times still costs a message that much work.
     #[test]
     fn the_cap_counts_submitted_entries() {
-        enable(&["https://app.example"]);
+        set_enabled(Some(true));
         let repeated = notification(1, "ryjl3-tyaaa-aaaaa-aaaba-cai", Urgency::Normal);
         let request = SendNotificationArg {
             origin: "https://app.example".to_string(),
@@ -490,7 +461,7 @@ mod tests {
 
     #[test]
     fn canonicalizes_every_gateway_to_the_legacy_one() {
-        enable(&["https://abc-cai.ic0.app"]);
+        set_enabled(Some(true));
         for origin in [
             "https://abc-cai.icp0.io",
             "https://abc-cai.icp.net",
@@ -500,17 +471,9 @@ mod tests {
         }
     }
 
-    /// An operator listing a modern gateway still enables the row the sign-in created
-    /// under the legacy one.
-    #[test]
-    fn an_enabled_origin_matches_its_gateway_twins() {
-        enable(&["https://abc-cai.icp0.io"]);
-        assert!(notifying_origin("https://abc-cai.ic0.app").is_ok());
-    }
-
     #[test]
     fn leaves_a_custom_domain_alone() {
-        enable(&["https://oisy.com"]);
+        set_enabled(Some(true));
         assert_eq!(
             notifying_origin("https://oisy.com").unwrap(),
             "https://oisy.com"
@@ -521,7 +484,7 @@ mod tests {
     /// different origin to it and must stay a different consent row here.
     #[test]
     fn leaves_a_deeper_subdomain_alone() {
-        enable(&["https://foo.bar.icp0.io"]);
+        set_enabled(Some(true));
         assert_eq!(
             notifying_origin("https://foo.bar.icp0.io").unwrap(),
             "https://foo.bar.icp0.io"
@@ -530,7 +493,7 @@ mod tests {
 
     #[test]
     fn keeps_the_raw_label_the_frontend_keeps() {
-        enable(&["https://abc-cai.raw.ic0.app"]);
+        set_enabled(Some(true));
         assert_eq!(
             notifying_origin("https://abc-cai.raw.icp0.io").unwrap(),
             "https://abc-cai.raw.ic0.app"
@@ -538,20 +501,20 @@ mod tests {
     }
 
     #[test]
-    fn refuses_an_origin_this_deployment_does_not_notify_for() {
-        enable(&["https://allowed.example"]);
-        assert!(notifying_origin("https://other.example").is_err());
+    fn accepts_any_origin_while_enabled() {
+        set_enabled(Some(true));
+        assert!(notifying_origin("https://any.example").is_ok());
     }
 
     #[test]
-    fn refuses_every_origin_when_the_list_is_empty() {
-        enable(&[]);
-        assert!(notifying_origin("https://allowed.example").is_err());
+    fn refuses_every_origin_while_disabled() {
+        set_enabled(Some(false));
+        assert!(notifying_origin("https://any.example").is_err());
     }
 
     #[test]
     fn a_send_is_refused_while_nothing_is_configured() {
-        crate::state::persistent_state_mut(|s| s.notifications_enabled_origins = None);
+        set_enabled(None);
 
         let refused = ValidatedSendNotificationArg::try_from(SendNotificationArg {
             origin: "https://app.example".to_string(),
@@ -570,7 +533,7 @@ mod tests {
 
     #[test]
     fn refuses_every_origin_when_nothing_is_configured() {
-        crate::state::persistent_state_mut(|s| s.notifications_enabled_origins = None);
+        set_enabled(None);
         assert!(notifying_origin("https://allowed.example").is_err());
     }
 

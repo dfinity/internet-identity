@@ -4,7 +4,7 @@ import { Principal } from "@icp-sdk/core/principal";
 import { init as internetIdentityFrontendInit } from "$lib/generated/internet_identity_frontend_idl";
 import type { InternetIdentityFrontendInit } from "$lib/generated/internet_identity_frontend_types";
 import { toBase64 } from "$lib/utils/utils";
-import { initGlobals, notificationsEnabledFor } from "./globals";
+import { initGlobals, notificationsEnabled } from "./globals";
 
 const CANISTER_ID = "rdmx6-jaaaa-aaaaa-aaadq-cai";
 const BACKEND_ORIGIN = "https://backend.example.com";
@@ -21,18 +21,16 @@ const FRONTEND_INIT: InternetIdentityFrontendInit = {
   feature_flags: [],
 };
 
-/// Serves `origins` as the backend's `.config.did.bin` does: the list exactly as the
-/// operator configured it, since the canister stores its init arg verbatim.
-const serveNotifyingOrigins = (origins: string[]) => {
+/// Serves the backend's `.config.did.bin`, with `notifications_enabled` left out
+/// where `enabled` is `undefined`, as a canister older than the field does.
+const serveConfig = (enabled: boolean | undefined) => {
   const config = new Uint8Array(
-    IDL.encode(
-      [
-        IDL.Record({
-          notifications_enabled_origins: IDL.Opt(IDL.Vec(IDL.Text)),
-        }),
-      ],
-      [{ notifications_enabled_origins: [origins] }],
-    ),
+    enabled === undefined
+      ? IDL.encode([IDL.Record({})], [{}])
+      : IDL.encode(
+          [IDL.Record({ notifications_enabled: IDL.Opt(IDL.Bool) })],
+          [{ notifications_enabled: [enabled] }],
+        ),
   );
   vi.stubGlobal(
     "fetch",
@@ -44,7 +42,7 @@ const serveNotifyingOrigins = (origins: string[]) => {
   );
 };
 
-describe("notificationsEnabledFor", () => {
+describe("notificationsEnabled", () => {
   beforeEach(() => {
     document.body.dataset.canisterId = CANISTER_ID;
     document.body.dataset.canisterConfig = toBase64(
@@ -61,20 +59,24 @@ describe("notificationsEnabledFor", () => {
     vi.restoreAllMocks();
   });
 
-  it("matches an icp0.io entry by every gateway spelling of the app", async () => {
-    serveNotifyingOrigins(["https://2vxsx-fae.icp0.io"]);
+  it("is on where the backend notifies", async () => {
+    serveConfig(true);
     await initGlobals();
 
-    expect(notificationsEnabledFor("https://2vxsx-fae.ic0.app")).toBe(true);
-    expect(notificationsEnabledFor("https://2vxsx-fae.icp0.io")).toBe(true);
-    expect(notificationsEnabledFor("https://2vxsx-fae.icp.net")).toBe(true);
+    expect(notificationsEnabled()).toBe(true);
   });
 
-  it("does not match another canister on the same gateway", async () => {
-    serveNotifyingOrigins(["https://2vxsx-fae.icp0.io"]);
+  it("is off where the backend does not", async () => {
+    serveConfig(false);
     await initGlobals();
 
-    expect(notificationsEnabledFor("https://aaaaa-aa.icp0.io")).toBe(false);
-    expect(notificationsEnabledFor("https://aaaaa-aa.ic0.app")).toBe(false);
+    expect(notificationsEnabled()).toBe(false);
+  });
+
+  it("is off against a backend older than the field", async () => {
+    serveConfig(undefined);
+    await initGlobals();
+
+    expect(notificationsEnabled()).toBe(false);
   });
 });

@@ -358,7 +358,7 @@ pub struct InternetIdentityFrontendArgs {
 pub struct InternetIdentitySynchronizedConfig {
     pub openid_configs: Option<Vec<OpenIdConfig>>,
     pub mcp_official_url: Option<String>,
-    pub notifications_enabled_origins: Option<Vec<FrontendHostname>>,
+    pub notifications_enabled: Option<bool>,
 }
 
 /// Init arguments of II which can be supplied on install and upgrade.
@@ -425,9 +425,9 @@ pub struct InternetIdentityInit {
     /// (the deployment then has no official connector), `Some(Some(url))`
     /// points it at `url`.
     pub mcp_official_url: Option<Option<String>>,
-    /// Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
-    /// turns notifications off, and entries enable them for those origins only.
-    pub notifications_enabled_origins: Option<Vec<FrontendHostname>>,
+    /// Server-side switch for the notifications feature, for every app at once.
+    /// Omitted on upgrade keeps the stored value; never stored means disabled.
+    pub notifications_enabled: Option<bool>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

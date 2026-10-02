@@ -7,12 +7,13 @@ use canister_tests::api::internet_identity::init_salt;
 use canister_tests::api::internet_identity::notifications::grant_consent;
 use canister_tests::flows;
 use canister_tests::framework::{
-    arg_with_notifications_enabled_for, env, install_ii_canister_with_arg, principal_1,
-    principal_2, time, upgrade_ii_canister_with_arg, II_WASM,
+    arg_with_notifications_enabled, env, install_ii_canister_with_arg, principal_1, principal_2,
+    time, upgrade_ii_canister_with_arg, II_WASM,
 };
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, ApplicationInfo, ListApplicationsError, Timestamp,
+    AccountNumber, AnchorNumber, ApplicationInfo, InternetIdentityInit, ListApplicationsError,
+    Timestamp,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -22,13 +23,10 @@ use std::time::Duration;
 const NOTIFYING: &str = "https://notifying.example";
 const QUIET: &str = "https://quiet.example";
 
-/// A canister notifying for `NOTIFYING` alone, with the salt that account sign-ins need.
+/// A canister that notifies, with the salt that account sign-ins need.
 fn install(env: &PocketIc) -> CanisterId {
-    let canister_id = install_ii_canister_with_arg(
-        env,
-        II_WASM.clone(),
-        arg_with_notifications_enabled_for(&[NOTIFYING]),
-    );
+    let canister_id =
+        install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
     init_salt(env, canister_id).expect("failed to initialize the salt");
     canister_id
 }
@@ -190,8 +188,7 @@ fn should_report_which_apps_may_notify() -> Result<(), RejectResponse> {
 /// Consent the deployment no longer acts on is not reported as allowed, as
 /// `notification_consent_granted` does not report it either.
 #[test]
-fn should_not_report_consent_for_an_app_the_deployment_stopped_notifying_for(
-) -> Result<(), RejectResponse> {
+fn should_not_report_consent_once_notifications_are_disabled() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install(&env);
     let anchor = flows::register_anchor(&env, canister_id);
@@ -209,7 +206,10 @@ fn should_not_report_consent_for_an_app_the_deployment_stopped_notifying_for(
         &env,
         canister_id,
         II_WASM.clone(),
-        arg_with_notifications_enabled_for(&[QUIET]),
+        Some(InternetIdentityInit {
+            notifications_enabled: Some(false),
+            ..Default::default()
+        }),
     )?;
 
     let listed = applications(&env, canister_id, anchor);

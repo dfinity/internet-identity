@@ -1248,13 +1248,12 @@ export interface InternetIdentityInit {
    */
   'notifications_allow_insecure_endpoint' : [] | [boolean],
   /**
-   * Server-side kill switch for the notifications feature. null / `opt false`
-   * (the default) disables every notification endpoint; `opt true` enables
-   * them. Omitting it on upgrade keeps the stored value.
-   * Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
-   * turns notifications off, and entries enable them for those origins only.
+   * Server-side switch for the notifications feature. `opt true` enables every
+   * notification endpoint, for any app; `opt false` disables them. Omitting it on
+   * upgrade keeps the stored value, and a canister that never stored one has them
+   * disabled.
    */
-  'notifications_enabled_origins' : [] | [Array<string>],
+  'notifications_enabled' : [] | [boolean],
   /**
    * Configuration parameters related to the II archive.
    * Note: some parameters changes (like the polling interval) will only take effect after an archive deployment.
