@@ -415,11 +415,21 @@ export interface BrowserInfo {
    */
   'session_count' : number,
   /**
+   * Whether notifications reach this entry, which is what the settings switch
+   * reports and what turning it off takes away.
+   */
+  'notifications_on' : boolean,
+  /**
    * Fixed at registration. A sign-in reporting something else registers its own entry,
    * so this describes a registration rather than the last sign-in.
    */
   'description' : BrowserDescription,
   'created_at' : Timestamp,
+  /**
+   * The browser that installed this entry, where it is a notification app rather
+   * than a browser of its own.
+   */
+  'linked_from_browser' : [] | [number],
   /**
    * Advanced by a sign-in from this browser and by every session refresh it drives.
    */

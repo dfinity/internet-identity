@@ -3,7 +3,10 @@
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { fromCanisterMcpConfig } from "$lib/utils/mcpConfig";
+  import { currentBrowserId } from "$lib/stores/browser-key.store";
+  import { saidAlreadyInstalled } from "$lib/utils/notifications/alreadyInstalled";
   import CliAccessSection from "./components/CliAccessSection.svelte";
+  import NotificationsSection from "./components/NotificationsSection.svelte";
   import McpTrustedServersSection from "./components/McpTrustedServersSection.svelte";
   import type { PageProps } from "./$types";
 
@@ -15,6 +18,22 @@
   const mcpConfig = $derived(
     fromCanisterMcpConfig(data.identityInfo.mcp_config),
   );
+
+  // Which entry this browser is, and what the user told it about their own device.
+  // Both are this browser's own storage rather than the identity's, so they are read
+  // here and handed down: the section renders from `identity_info` like the others.
+  const browsers = $derived(data.identityInfo.browsers[0] ?? []);
+  let browserId = $state<number | undefined>(undefined);
+  let saidInstalled = $state(false);
+  $effect(() => {
+    const identityNumber = $authenticatedStore.identityNumber;
+    void currentBrowserId(identityNumber).then((id) => {
+      browserId = id;
+    });
+    void saidAlreadyInstalled(identityNumber).then((said) => {
+      saidInstalled = said;
+    });
+  });
 </script>
 
 <header class="flex flex-col gap-3">
@@ -27,6 +46,12 @@
 </header>
 
 <div class="mt-10 flex max-w-3xl flex-col gap-5">
+  <NotificationsSection
+    identityNumber={$authenticatedStore.identityNumber}
+    {browsers}
+    {browserId}
+    saidAlreadyInstalled={saidInstalled}
+  />
   <CliAccessSection identityNumber={$authenticatedStore.identityNumber} />
   <McpTrustedServersSection
     identityNumber={$authenticatedStore.identityNumber}

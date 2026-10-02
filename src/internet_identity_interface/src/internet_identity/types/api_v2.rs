@@ -88,6 +88,13 @@ pub struct BrowserInfo {
     pub last_used: Timestamp,
     /// Sessions this browser holds, counted from the stored records.
     pub session_count: u32,
+    /// Whether notifications reach this entry, which is what the settings switch
+    /// reports and what turning it off takes away.
+    pub notifications_on: bool,
+    /// The browser that installed this entry, where it is a notification app rather
+    /// than a browser of its own. Without it the two are indistinguishable here, and a
+    /// Home Screen app is listed as a browser the user never signed in from.
+    pub linked_from_browser: Option<BrowserId>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

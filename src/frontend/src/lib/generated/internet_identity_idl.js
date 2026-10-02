@@ -721,8 +721,10 @@ export const idlFactory = ({ IDL }) => {
   const BrowserInfo = IDL.Record({
     'id' : IDL.Nat32,
     'session_count' : IDL.Nat32,
+    'notifications_on' : IDL.Bool,
     'description' : BrowserDescription,
     'created_at' : Timestamp,
+    'linked_from_browser' : IDL.Opt(IDL.Nat32),
     'last_used' : Timestamp,
   });
   const McpConfig = IDL.Record({

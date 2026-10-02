@@ -1072,6 +1072,12 @@ type BrowserInfo = record {
     last_used : Timestamp;
     // Sessions this browser holds. Zero means it is signed in to nothing.
     session_count : nat32;
+    // Whether notifications reach this entry, which is what the settings switch
+    // reports and what turning it off takes away.
+    notifications_on : bool;
+    // The browser that installed this entry, where it is a notification app rather
+    // than a browser of its own.
+    linked_from_browser : opt nat32;
 };
 
 type PrepareAccountSessionRequest = record {
