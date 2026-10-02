@@ -1,10 +1,7 @@
-// How notifications last went, so the next screen can be specific: which failure
-// happened and which apps the user recently declined. Kept in localStorage and never
-// sent anywhere.
+// How notifications last went, so the next screen can be specific about which failure
+// happened. Kept in localStorage and never sent anywhere.
 
 const STORE_KEY = "ii-notification-diagnostics";
-// How long a "Maybe later" quiets the opt-in for one app.
-const DECLINE_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
 
 export type FailureReason =
   "permission-denied" | "subscribe-failed" | "register-failed" | "unsupported";
@@ -12,7 +9,6 @@ export type FailureReason =
 export interface NotificationDiagnostics {
   lastFailure?: { reason: FailureReason; message?: string; at: number };
   permission?: NotificationPermission;
-  declinedFor?: Record<string, number>;
 }
 
 const read = (): NotificationDiagnostics => {
@@ -49,17 +45,4 @@ export const clearFailure = (): void => {
 
 export const recordPermission = (permission: NotificationPermission): void => {
   write({ ...read(), permission });
-};
-
-export const recordDeclined = (origin: string): void => {
-  const current = read();
-  write({
-    ...current,
-    declinedFor: { ...current.declinedFor, [origin]: Date.now() },
-  });
-};
-
-export const wasDeclinedRecently = (origin: string): boolean => {
-  const at = read().declinedFor?.[origin];
-  return at !== undefined && Date.now() - at < DECLINE_COOLDOWN_MS;
 };

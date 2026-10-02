@@ -16,7 +16,9 @@ import {
   notificationConsentStore,
 } from "$lib/stores/notificationConsent.store";
 import {
+  notificationsUnavailableHere,
   readBrowserPushState,
+  readGranted,
   resolveOptIn,
   type BrowserPushState,
 } from "$lib/utils/notifications/notificationState";
@@ -61,12 +63,28 @@ export const handleNotificationConsentRequest =
   async (request: JsonRequest) => {
     if (
       request.id === undefined ||
-      request.method !== NOTIFICATION_CONSENT_METHOD ||
-      !get(PUSH_NOTIFICATIONS)
+      request.method !== NOTIFICATION_CONSENT_METHOD
     ) {
       return;
     }
     const requestId = request.id;
+
+    // Answered rather than dropped. This deployment notifies for nothing at all, so
+    // the method is one it does not have, which is what the code says; an app that
+    // asked anyway gets that back instead of waiting on a reply that never comes.
+    // Ahead of the silent check, because a request that cannot be served is not a
+    // request that needed the user.
+    if (!get(PUSH_NOTIFICATIONS)) {
+      await channel.send({
+        jsonrpc: "2.0",
+        id: requestId,
+        error: {
+          code: METHOD_NOT_FOUND_ERROR_CODE,
+          message: "This Internet Identity does not send notifications",
+        },
+      });
+      return;
+    }
 
     const isSilent = get(authorizationPromptStore).prompt === "none";
 
@@ -133,6 +151,18 @@ export const handleNotificationConsentRequest =
           params.icrc95DerivationOrigin ?? channel.origin,
         );
 
+        // No notifications on iOS yet, so nothing is offered and the app is told
+        // plainly that it may not notify here rather than being refused outright:
+        // the method exists, this browser just has no answer but no.
+        if (notificationsUnavailableHere()) {
+          await channel.send({
+            jsonrpc: "2.0",
+            id: requestId,
+            result: { granted: false },
+          });
+          return;
+        }
+
         // The canister refuses an origin it does not notify for, so asking this
         // user to allow notifications could only ever end in an error.
         if (!notificationsEnabledFor(effectiveOrigin)) {
@@ -151,6 +181,7 @@ export const handleNotificationConsentRequest =
           effectiveOrigin,
           browser,
           probedAt,
+          releaseScreen,
         );
 
         await channel.send({
@@ -181,6 +212,7 @@ const runConsentCeremony = async (
   effectiveOrigin: string,
   probedBrowser: Promise<BrowserPushState | undefined>,
   probedAt: number,
+  releaseScreen: () => void,
 ): Promise<boolean> => {
   // The probe stands only where no ceremony has run since it was taken. Read again
   // rather than ask about a browser one of them may have set up in the meantime.
@@ -189,7 +221,7 @@ const runConsentCeremony = async (
 
   authorizationStore.setRequestOrigin(effectiveOrigin);
   try {
-    return await askUntilSettled(effectiveOrigin, browser);
+    return await askUntilSettled(effectiveOrigin, browser, releaseScreen);
   } finally {
     // Whatever came of it, a ceremony that has run is one that may have subscribed
     // this browser, so every probe taken before now is suspect.
@@ -201,6 +233,10 @@ const runConsentCeremony = async (
 const askUntilSettled = async (
   effectiveOrigin: string,
   browser: Promise<BrowserPushState | undefined>,
+  /** Called as soon as this request will put nothing more on screen, which is
+   *  before the answer is read back: the redirect is what belongs on screen for
+   *  that, not the screen the user came from. */
+  releaseScreen: () => void,
 ): Promise<boolean> => {
   for (;;) {
     // Awaited for its ordering and not its value: the user has to have chosen an
@@ -218,14 +254,16 @@ const askUntilSettled = async (
       browser,
     });
     if (resolution.screen === "skip") {
-      return resolution.consented;
+      releaseScreen();
+      return resolution.granted;
     }
 
     notificationConsentStore.setContext({
       effectiveOrigin,
       identityNumber: authenticated.identityNumber,
       actor: authenticated.actor,
-      screen: resolution.screen,
+      device: resolution.state,
+      consented: resolution.consented,
     });
 
     // The header keeps the identity switcher up for this screen, and switching
@@ -244,10 +282,14 @@ const askUntilSettled = async (
     if (outcome === "switched") {
       continue;
     }
+    releaseScreen();
 
-    return authenticated.actor.notification_consent_granted({
-      anchor_number: authenticated.identityNumber,
+    // What the app is told is read back rather than reported from the screen, and it
+    // is both halves: the consent this identity holds, and a browser that delivers.
+    return readGranted({
+      identityNumber: authenticated.identityNumber,
       origin: effectiveOrigin,
+      actor: authenticated.actor,
     });
   }
 };

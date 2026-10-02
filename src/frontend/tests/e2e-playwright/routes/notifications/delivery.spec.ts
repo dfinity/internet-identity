@@ -187,7 +187,7 @@ test.describe("a notification the app sent", () => {
     await testApp.askToNotify(async (authPage: Page) => {
       await authenticate(authPage);
       await authPage
-        .getByRole("button", { name: "Enable notifications" })
+        .getByRole("button", { name: "Allow", exact: true })
         .click();
     });
     await testApp.expectMayNotify();

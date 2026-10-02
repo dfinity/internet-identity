@@ -1,13 +1,18 @@
-// Opt-in orchestration: ask for permission, subscribe the device with a fresh
-// VAPID key + signed JWT pool, then record consent for the app. Subscribing
-// first so a refusal at the browser prompt leaves no consent row behind for a
-// browser that cannot receive anything.
+// Opt-in orchestration: ask for permission where it is not granted, subscribe and
+// register the device where it is not registered, then record consent where the app
+// does not have it. Each step is skipped when the resolved state says it is already
+// done, so an app allowed elsewhere only costs this browser its registration and a
+// browser already set up only costs the consent.
+//
+// Subscribing before recording consent, so a refusal at the browser prompt leaves no
+// consent row behind for a browser that cannot receive anything.
 
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { throwCanisterError } from "$lib/utils/utils";
 import { requestNotificationPermission } from "./pushSubscription";
 import { ensureRegisteredDevice } from "./subscribeDevice";
+import type { DeviceNotificationState } from "./notificationState";
 
 type GrantArgs = {
   identityNumber: bigint;
@@ -21,22 +26,37 @@ export type EnableNotificationsResult = {
   status: "enabled" | "denied" | "dismissed";
 };
 
-export const enableNotifications = async ({
+export const turnOnNotifications = async ({
   identityNumber,
   origin,
   actor,
+  device,
+  consented,
 }: {
   identityNumber: bigint;
   origin: string;
   actor: ActorSubclass<_SERVICE>;
+  /** This browser as the opt-in resolved it, which is what each step reads to know
+   *  whether it has anything to do. */
+  device: DeviceNotificationState;
+  consented: boolean;
 }): Promise<EnableNotificationsResult> => {
-  const permission = await requestNotificationPermission();
-  if (permission !== "granted") {
-    return { status: permission === "denied" ? "denied" : "dismissed" };
+  if (device.permission !== "granted") {
+    const permission = await requestNotificationPermission();
+    if (permission !== "granted") {
+      return { status: permission === "denied" ? "denied" : "dismissed" };
+    }
   }
 
-  await ensureRegisteredDevice(identityNumber);
-  await grantConsent({ identityNumber, origin, actor });
+  if (!device.registered) {
+    // Subscribing drops the endpoint every other identity here is registered with, so
+    // this is the one call that must not run for a browser already registered.
+    await ensureRegisteredDevice(identityNumber);
+  }
+
+  if (!consented) {
+    await grantConsent({ identityNumber, origin, actor });
+  }
 
   return { status: "enabled" };
 };
