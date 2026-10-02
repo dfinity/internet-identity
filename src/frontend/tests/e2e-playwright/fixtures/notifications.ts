@@ -38,6 +38,28 @@ export const promptCount = (page: Page): Promise<number> =>
   );
 
 /**
+ * Lifts a refusal the way browser settings do, which no prompt can. Nothing in the
+ * page triggers it, so a screen that carries on afterwards did so by watching.
+ *
+ * Where it lands differs by browser, and so does what the screen may then do:
+ * Chrome's switch grants outright, while Firefox's route is to clear the block,
+ * which returns the permission to `default` and leaves a prompt still to be raised.
+ */
+export const liftPermissionInSettings = (
+  page: Page,
+  to: "granted" | "default" = "granted",
+): Promise<void> =>
+  page.evaluate(
+    (permission) =>
+      (
+        window as unknown as {
+          __iiLiftPermission: (to: string) => void;
+        }
+      ).__iiLiftPermission(permission),
+    to,
+  );
+
+/**
  * Installs the stub and turns the feature flag on, for every page this context opens.
  * Context-wide rather than page-wide, because the ceremony happens in a window the test
  * app opens after the scenario starts.
@@ -133,6 +155,15 @@ export const armPushNotifications = async (
             remember();
             return Promise.resolve(permission);
           },
+        },
+      });
+      // What a test uses in place of the browser's settings UI, which it cannot
+      // reach. Only the setting changes: nothing here notifies the page.
+      Object.defineProperty(window, "__iiLiftPermission", {
+        configurable: true,
+        value: (to: string) => {
+          permission = to as NotificationPermission;
+          remember();
         },
       });
     },

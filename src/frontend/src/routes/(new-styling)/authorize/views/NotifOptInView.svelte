@@ -112,11 +112,16 @@
   };
 
   /**
-   * Carries on once the user has lifted the block in browser settings.
+   * Picks up a block the user has lifted in browser settings.
    *
-   * The user reached this screen by asking for notifications, so the rest of that
-   * is finished for them rather than asked again. A permission that reads as refused
-   * after all leaves them on the guidance, where the watcher is still running.
+   * Which way out depends on what they lifted it to. Chrome's switch grants outright,
+   * and there is nothing left to ask, so the rest is finished for them. Firefox's
+   * route is to clear the block, which returns the permission to `default`: a prompt
+   * can be raised again, but only off a gesture, so they land back on the ask with
+   * Allow in front of them rather than on a prompt they never asked for.
+   *
+   * Either way this leaves the guidance, so a refusal from here installs a fresh
+   * watcher through the screen it lands on.
    */
   const resumeAfterUnblock = async (): Promise<void> => {
     busy = true;
@@ -126,7 +131,11 @@
         return;
       }
       const current = await readDeviceState(identityNumber, pushState);
+      variant = "enable";
       busy = false;
+      if (pushState.permission !== "granted") {
+        return;
+      }
       await runEnable(current);
     } catch (error) {
       reportFailure(error);
@@ -137,7 +146,9 @@
 
   // Watches only while the guidance is up, and only for as long as it is: the enable
   // screen raises the prompt itself, and a watcher left running would answer for a
-  // screen the user has already left.
+  // screen the user has already left. Keyed on the variant, so landing back on the
+  // guidance after a refusal installs a watcher again rather than stranding the user
+  // there with nothing but "Not now".
   $effect(() => {
     if (variant !== "blocked") {
       return;

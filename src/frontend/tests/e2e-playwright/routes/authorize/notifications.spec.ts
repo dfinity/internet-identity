@@ -3,6 +3,7 @@ import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
 import {
   armPushNotifications,
+  liftPermissionInSettings,
   promptCount,
 } from "../../fixtures/notifications";
 import { continueAs } from "./app-sessions/helpers";
@@ -164,9 +165,9 @@ test.describe("notification consent", () => {
   });
 
   /**
-   * A refusal stands until the user lifts it in browser settings, which no prompt can
-   * do. So this screen raises none, and shows the route through this browser's own
-   * settings instead of a button that cannot work.
+   * A refusal is asked about like any other, so the user sees what they are being
+   * asked before being sent to settings. The browser answers without prompting, and
+   * the guidance is what that answer leads to.
    */
   test("a browser whose permission was refused is shown how to unblock", async ({
     context,
@@ -186,6 +187,8 @@ test.describe("notification consent", () => {
 
     await testApp.askToNotify(async (authPage: Page) => {
       await authenticate(authPage);
+      await authPage.getByRole("button", { name: "Allow" }).click();
+
       await expect(
         authPage.getByRole("heading", { name: "Notifications are blocked" }),
       ).toBeVisible();
@@ -193,10 +196,85 @@ test.describe("notification consent", () => {
       await expect(
         authPage.getByRole("heading", { name: "Open site settings" }),
       ).toBeVisible();
-      expect(await promptCount(authPage)).toBe(0);
+      // Asked once. The browser answers a refusal without showing anything, and
+      // nothing on the guidance asks again.
+      expect(await promptCount(authPage)).toBe(1);
       await authPage.getByRole("button", { name: "Not now" }).click();
     });
 
     await testApp.expectMayNotNotify();
+  });
+
+  /** The guidance has no way back: nothing in the page can lift a refusal, so the
+   *  screen watches the permission and finishes what the user started. */
+  test("a permission lifted in settings carries on without being pressed", async ({
+    context,
+    testApp,
+    identities,
+    signInWithIdentity,
+  }) => {
+    await armPushNotifications(context, { permission: "denied" });
+    const authenticate = continueAs(
+      identities[0].identityNumber,
+      signInWithIdentity,
+    );
+
+    await testApp.open();
+    await testApp.signIn(authenticate);
+    await testApp.waitUntilSignedIn();
+
+    await testApp.askToNotify(async (authPage: Page) => {
+      await authenticate(authPage);
+      await authPage.getByRole("button", { name: "Allow" }).click();
+      await expect(
+        authPage.getByRole("heading", { name: "Notifications are blocked" }),
+      ).toBeVisible();
+
+      // Nothing is pressed after this: the window closing is the flow finishing.
+      await liftPermissionInSettings(authPage);
+    });
+
+    await testApp.expectMayNotify();
+  });
+
+  /**
+   * Firefox's route is to clear the block, which returns the permission to `default`
+   * rather than granting it. A prompt can be raised again, but only off a gesture,
+   * so the user lands back on the ask instead of on a prompt they did not ask for.
+   */
+  test("a block cleared rather than granted lands back on the ask", async ({
+    context,
+    testApp,
+    identities,
+    signInWithIdentity,
+  }) => {
+    await armPushNotifications(context, { permission: "denied" });
+    const authenticate = continueAs(
+      identities[0].identityNumber,
+      signInWithIdentity,
+    );
+
+    await testApp.open();
+    await testApp.signIn(authenticate);
+    await testApp.waitUntilSignedIn();
+
+    await testApp.askToNotify(async (authPage: Page) => {
+      await authenticate(authPage);
+      await authPage.getByRole("button", { name: "Allow" }).click();
+      await expect(
+        authPage.getByRole("heading", { name: "Notifications are blocked" }),
+      ).toBeVisible();
+
+      await liftPermissionInSettings(authPage, "default");
+
+      // Back on the ask, with a button that now works, rather than stranded on the
+      // guidance with only "Not now".
+      await expect(
+        authPage.getByRole("button", { name: "Allow" }),
+      ).toBeVisible();
+      await authPage.getByRole("button", { name: "Allow" }).click();
+    });
+
+    await testApp.expectMayNotify();
   });
 });

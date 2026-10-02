@@ -113,7 +113,7 @@
                 class="text-text-primary min-w-0 overflow-hidden text-[13px] font-semibold text-ellipsis whitespace-nowrap"
                 >{sender} • {$t`New message`}</span
               >
-              <span class="text-text-tertiary text-[11px]">now</span>
+              <span class="text-text-tertiary text-[11px]">{$t`now`}</span>
             </div>
             <div class="text-text-secondary text-[13px]">
               <Trans>You have 1 new message.</Trans>
