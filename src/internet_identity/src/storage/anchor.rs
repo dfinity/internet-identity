@@ -87,6 +87,8 @@ pub enum BrowserError {
     /// it here would turn that key into a session, which is the one thing linking it must
     /// never be able to grant.
     NotificationAppKey,
+    /// This browser already has a notification app linked.
+    AlreadyLinked,
 }
 
 /// A browser this anchor has signed in from, as it described itself when it registered.
@@ -909,6 +911,16 @@ impl Anchor {
             return Err(BrowserError::NotificationAppKey);
         }
         let description = parent_browser.description.clone();
+        // One app per browser, which is one per device. It is also what stops a link
+        // token being spent twice while it is still inside its expiry, so nothing has to
+        // be stored to make the token single-use.
+        if self
+            .browsers
+            .iter()
+            .any(|browser| browser.linked_from_browser == Some(parent))
+        {
+            return Err(BrowserError::AlreadyLinked);
+        }
 
         let id = self.next_browser_id;
         self.next_browser_id = self.next_browser_id.saturating_add(1);
@@ -924,6 +936,37 @@ impl Anchor {
             linked_from_browser: Some(parent),
         });
         Ok(id)
+    }
+
+    /// The browser of this anchor that signed a link token, if any still holds the key
+    /// it was signed with.
+    ///
+    /// Both slots are tried, because a browser announces a successor at every sign-in and
+    /// the token may have been signed on either side of one. A browser that has signed in
+    /// twice since has rotated past both, and its token is no longer accepted: the user
+    /// starts the install again, which is a step they are already standing in front of.
+    pub fn browser_that_signed_link(
+        &self,
+        signature: &[u8],
+        anchor_number: AnchorNumber,
+        expires_at_ns: Timestamp,
+    ) -> Option<BrowserId> {
+        self.browsers
+            .iter()
+            .filter(|browser| browser.linked_from_browser.is_none())
+            .find(|browser| {
+                [&browser.current_browser_key, &browser.next_browser_key]
+                    .iter()
+                    .any(|key| {
+                        crate::browser_key::verify_notification_app_link(
+                            key,
+                            signature,
+                            anchor_number,
+                            expires_at_ns,
+                        )
+                    })
+            })
+            .map(|browser| browser.id)
     }
 
     pub fn browser_by_principal(&self, principal: Principal) -> Option<BrowserId> {
