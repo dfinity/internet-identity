@@ -29,4 +29,10 @@ pub struct StorableBrowser {
     /// What this browser registered for Web Push, if anything.
     #[n(7)]
     pub webpush_subscription: Option<StorableWebPushSubscription>,
+    /// The browser that linked this entry, where it is a notification app rather than a
+    /// browser of its own. Absent for every browser that reached its entry by signing
+    /// in, which is what tells the two apart: a linked entry holds a key that may only
+    /// carry notifications, and the sign-in path refuses it.
+    #[n(8)]
+    pub linked_from_browser: Option<StorableBrowserId>,
 }

@@ -79,6 +79,14 @@ pub enum BrowserError {
     /// response into a second list for one browser, and accepting it would leave a leaked
     /// key useful for longer than the one sign-in rotation allows it.
     StaleBrowserKey,
+    /// The presented key belongs to a linked notification app, which may carry
+    /// notifications and nothing else.
+    ///
+    /// Such an entry is created on another browser's authority rather than by a sign-in,
+    /// and its key lives in a Home Screen app that never authenticated anyone. Advancing
+    /// it here would turn that key into a session, which is the one thing linking it must
+    /// never be able to grant.
+    NotificationAppKey,
 }
 
 /// A browser this anchor has signed in from, as it described itself when it registered.
@@ -102,6 +110,15 @@ pub struct Browser {
     pub session_count: u32,
     /// What this browser registered for Web Push, if anything.
     pub webpush_subscription: Option<WebPushSubscription>,
+    /// The browser that linked this entry, where it is a notification app rather than a
+    /// browser of its own.
+    ///
+    /// A Home Screen app on iOS gets its own storage partition, so it cannot reach the
+    /// key or the session the browser that installed it holds: to this anchor it is a
+    /// browser that has never signed in. It is given an entry of its own on the
+    /// authority of the browser that installed it, and that entry carries notifications
+    /// and nothing else. `None` for every browser that reached its entry by signing in.
+    pub linked_from_browser: Option<BrowserId>,
 }
 
 /// A notification a browser's service worker has yet to take.
@@ -212,6 +229,7 @@ impl From<StorableBrowser> for Browser {
             last_used: value.last_used,
             session_count: value.session_count,
             webpush_subscription: value.webpush_subscription.map(WebPushSubscription::from),
+            linked_from_browser: value.linked_from_browser,
         }
     }
 }
@@ -229,6 +247,7 @@ impl From<Browser> for StorableBrowser {
             webpush_subscription: value
                 .webpush_subscription
                 .map(StorableWebPushSubscription::from),
+            linked_from_browser: value.linked_from_browser,
         }
     }
 }
@@ -860,6 +879,53 @@ impl Anchor {
     /// successor as soon as a sign-in is accepted, so the retired key in the other slot
     /// is one no browser still holds, and matching it would keep a copied key usable
     /// until the next sign-in.
+    /// Gives a notification app an entry of its own, on the authority of the browser
+    /// that installed it.
+    ///
+    /// The app holds one key and never signs in, so both slots carry it: the entry is
+    /// reached by `next_browser_key` like any other, and `resolve_browser` refuses the
+    /// key in either slot, so nothing here can become a session.
+    ///
+    /// The description is the installing browser's own. What the app runs in is that
+    /// browser's engine on that browser's device, and the app cannot describe itself in
+    /// terms the devices page would recognise.
+    pub fn link_notification_app(
+        &mut self,
+        parent: BrowserId,
+        app_key: PublicKey,
+        now: Timestamp,
+    ) -> Result<BrowserId, BrowserError> {
+        if self.browsers.iter().any(|browser| {
+            browser.current_browser_key == app_key || browser.next_browser_key == app_key
+        }) {
+            return Err(BrowserError::SuccessorAlreadyInUse);
+        }
+        let Some(parent_browser) = self.browsers.iter().find(|browser| browser.id == parent) else {
+            return Err(BrowserError::StaleBrowserKey);
+        };
+        // Only a browser that signs in may link one, so a linked app cannot link another
+        // and the chain is one deep by construction.
+        if parent_browser.linked_from_browser.is_some() {
+            return Err(BrowserError::NotificationAppKey);
+        }
+        let description = parent_browser.description.clone();
+
+        let id = self.next_browser_id;
+        self.next_browser_id = self.next_browser_id.saturating_add(1);
+        self.browsers.push(Browser {
+            id,
+            current_browser_key: app_key.clone(),
+            next_browser_key: app_key,
+            description,
+            created_at: now,
+            last_used: now,
+            session_count: 0,
+            webpush_subscription: None,
+            linked_from_browser: Some(parent),
+        });
+        Ok(id)
+    }
+
     pub fn browser_by_principal(&self, principal: Principal) -> Option<BrowserId> {
         self.browsers
             .iter()
@@ -1004,6 +1070,14 @@ impl Anchor {
             })
         };
 
+        // Checked before anything is advanced or created: a key a linked entry holds is
+        // answered the same way whichever slot it sits in, so no sign-in can reach one.
+        if let Some(index) = entry_holding(&current_browser_key) {
+            if self.browsers[index].linked_from_browser.is_some() {
+                return Err(BrowserError::NotificationAppKey);
+            }
+        }
+
         let advances = entry_awaiting(&current_browser_key);
         // The entry this request belongs to, which is not always one it can advance: a
         // browser retrying a lost sign-in still belongs to the entry that retired its key,
@@ -1037,6 +1111,7 @@ impl Anchor {
             last_used: now,
             session_count: 0,
             webpush_subscription: None,
+            linked_from_browser: None,
         });
 
         let mut dropped = vec![];
