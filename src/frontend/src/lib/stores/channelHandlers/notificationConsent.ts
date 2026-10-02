@@ -264,25 +264,38 @@ const askUntilSettled = async (
       actor: authenticated.actor,
       device: resolution.state,
       consented: resolution.consented,
+      installFirst: resolution.installFirst,
     });
 
     // The header keeps the identity switcher up for this screen, and switching
     // leaves it holding the identity it opened for, so a grant would land on one
     // identity while the answer was read for another. Start it again instead.
+    // Tagged, not bare: one arm resolves to a store's value and the other to a
+    // sentinel, and telling those apart by identity would rest on what the store
+    // happens to hold.
     const outcome = await Promise.race([
-      waitForStore(notificationConsentSettledStore).then(
-        () => "settled" as const,
-      ),
+      waitForStore(notificationConsentSettledStore).then((settled) => ({
+        settled,
+      })),
       waitForStore(authenticationStore, (current) =>
         current?.identityNumber !== authenticated.identityNumber
-          ? ("switched" as const)
+          ? ({ switched: true } as const)
           : undefined,
       ),
     ]);
-    if (outcome === "switched") {
+    if ("switched" in outcome) {
       continue;
     }
     releaseScreen();
+
+    // A browser that answers by installing an app has nothing to read back: the app
+    // holds an entry of its own and has not been opened yet, so this browser cannot
+    // see a subscription for it however long it waits. The app is told yes on the
+    // strength of the user having asked for it, which is the answer that leaves them
+    // able to finish, and the install is the only thing left to do.
+    if (outcome.settled.installStarted) {
+      return true;
+    }
 
     // What the app is told is read back rather than reported from the screen, and it
     // is both halves: the consent this identity holds, and a browser that delivers.

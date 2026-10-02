@@ -6,6 +6,11 @@
   import { Trans } from "$lib/components/locale";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import NotifEnablePitch from "./NotifEnablePitch.svelte";
+  import NotifInstallHandoff from "./NotifInstallHandoff.svelte";
+  import {
+    openInstallTab,
+    prepareInstallUrl,
+  } from "./startNotificationInstall";
   import NotifBlockedSteps from "./notifBlocked/NotifBlockedSteps.svelte";
   import { turnOnNotifications } from "$lib/utils/notifications/enableNotifications";
   import {
@@ -21,6 +26,7 @@
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { isCanisterError } from "$lib/utils/utils";
+  import type { NotificationConsentOutcome } from "$lib/stores/notificationConsent.store";
 
   interface Props {
     /** dApp name for the copy, or undefined when it isn't known. */
@@ -36,8 +42,12 @@
     device: DeviceNotificationState;
     /** Whether this app already holds consent from this identity. */
     consented: boolean;
-    /** Continues sign-in: after enabling, allowing or skipping. */
-    onDone: () => void;
+    /** Answering sends the user to install the app that carries notifications, because
+     *  this browser has no prompt to raise. The screen is the same; Allow differs. */
+    installFirst: boolean;
+    /** Continues sign-in: after enabling, allowing, skipping, or handing the user to
+     *  the install. The outcome is only carried where the canister cannot be asked. */
+    onDone: (outcome?: NotificationConsentOutcome) => void;
   }
 
   const {
@@ -48,13 +58,47 @@
     actor,
     device,
     consented,
+    installFirst,
     onDone,
   }: Props = $props();
 
   // Always opens on the ask, so the unblock guidance is only ever reached by asking
   // and being refused, with the reason for the question already on screen. A new
   // request arrives as a new context, which remounts this component.
-  let variant = $state<"enable" | "blocked">("enable");
+  let variant = $state<"enable" | "blocked" | "handoff">("enable");
+
+  /** Signed while this screen renders, because `window.open` needs the click's own
+   *  gesture and an await between the two loses it. */
+  let installUrl = $state<string | undefined>(undefined);
+  $effect(() => {
+    if (!installFirst) {
+      return;
+    }
+    void prepareInstallUrl(identityNumber).then((url) => {
+      installUrl = url;
+    });
+  });
+
+  /**
+   * Hands the user to the install, and settles either way.
+   *
+   * A tab the browser would not open is not a failure: the design answers it by showing
+   * the link, which the user follows themselves. Both roads lead to the same place, so
+   * both report the install as started.
+   */
+  /** The install is under way, which is as much as this browser can know. */
+  const onInstallStarted = () => onDone({ installStarted: true });
+
+  const startInstall = () => {
+    if (installUrl === undefined) {
+      reportFailure(new Error("this browser has not completed a sign-in"));
+      return;
+    }
+    variant = "handoff";
+    if (openInstallTab(installUrl)) {
+      onInstallStarted();
+    }
+  };
   let busy = $state(false);
 
   /**
@@ -163,9 +207,11 @@
     {appLogo}
     {origin}
     {busy}
-    onEnable={() => void runEnable(device)}
-    onSkip={onDone}
+    onEnable={installFirst ? startInstall : () => void runEnable(device)}
+    onSkip={() => onDone()}
   />
+{:else if variant === "handoff"}
+  <NotifInstallHandoff url={installUrl} onDone={onInstallStarted} />
 {:else}
   <!-- No app header: this screen is about the browser's own settings, not about the
        app that asked, and the design gives it the panel to itself. -->
@@ -183,7 +229,11 @@
     <NotifBlockedSteps />
 
     <div class="mt-7 flex flex-col gap-2.5">
-      <button class="btn btn-tertiary btn-xl" onclick={onDone} disabled={busy}>
+      <button
+        class="btn btn-tertiary btn-xl"
+        onclick={() => onDone()}
+        disabled={busy}
+      >
         {$t`Not now`}
       </button>
     </div>
