@@ -260,12 +260,11 @@ fn should_fold_the_gateway_twins_of_one_app_into_one_consent() -> Result<(), Rej
 }
 
 #[test]
-fn should_reject_an_origin_that_is_not_a_bare_https_authority() -> Result<(), RejectResponse> {
+fn should_reject_an_origin_that_is_not_a_bare_authority() -> Result<(), RejectResponse> {
     let env = env();
     let (canister_id, anchor) = install_with_anchor(&env);
 
     for origin in [
-        "http://some-dapp.com",
         "https://some-dapp.com/path",
         "https://some-dapp.com?query",
         "https://some-dapp.com#fragment",
@@ -290,6 +289,26 @@ fn should_reject_an_origin_that_is_not_a_bare_https_authority() -> Result<(), Re
         principal_1(),
         anchor,
         ORIGIN.into()
+    )?);
+    Ok(())
+}
+
+/// Consent is only the key an app's notifications are filed under, so any scheme may
+/// hold it. Whether the app can send is decided when it does.
+#[test]
+fn should_grant_consent_at_a_plain_http_origin() -> Result<(), RejectResponse> {
+    let env = env();
+    let (canister_id, anchor) = install_with_anchor(&env);
+    let origin = "http://some-dapp.com";
+
+    grant_consent(&env, canister_id, principal_1(), anchor, origin.into())?
+        .expect("consent refused");
+    assert!(consent_granted(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        origin.into()
     )?);
     Ok(())
 }
