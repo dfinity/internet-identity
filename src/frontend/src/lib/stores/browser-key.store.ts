@@ -50,6 +50,10 @@ const BROWSER_KEY_STORE = createStore("ii-browser-keys", "keys");
 
 /** Must match the domains the canister verifies the two signatures under. */
 const SIGNATURE_DOMAIN = new TextEncoder().encode("ii-session-browser-key");
+/** Must match `NOTIFICATION_APP_LINK_SIGNATURE_DOMAIN` in `browser_key.rs`. */
+const LINK_SIGNATURE_DOMAIN = new TextEncoder().encode(
+  "ii-notification-app-link",
+);
 const SUCCESSOR_SIGNATURE_DOMAIN = new TextEncoder().encode(
   "ii-session-browser-successor",
 );
@@ -340,6 +344,56 @@ export const registeredIdentityNumbers = async (): Promise<bigint[]> => {
   } catch {
     return [];
   }
+};
+
+/**
+ * The message a link token is signed over: the domain, then the anchor number and the
+ * expiry as big-endian `u64`s.
+ *
+ * Must match `link_token_message` in `browser_key.rs` byte for byte. Both sides assert
+ * the same bytes for the same inputs, so a change to either layout fails a test rather
+ * than producing tokens the canister quietly refuses.
+ */
+export const notificationAppLinkMessage = (
+  identityNumber: bigint,
+  expiresAtNs: bigint,
+): Uint8Array<ArrayBuffer> => {
+  const message = new Uint8Array(LINK_SIGNATURE_DOMAIN.length + 16);
+  message.set(LINK_SIGNATURE_DOMAIN);
+  const numbers = new DataView(
+    message.buffer,
+    message.byteOffset + LINK_SIGNATURE_DOMAIN.length,
+  );
+  numbers.setBigUint64(0, identityNumber, false);
+  numbers.setBigUint64(8, expiresAtNs, false);
+  return message;
+};
+
+/**
+ * Signs the token a Home Screen app spends to claim an entry of its own.
+ *
+ * Signed with the key this browser holds, which is the one the canister keeps as the
+ * entry's successor, so the signature is found in the slot it looks in first. A browser
+ * with no key here has never signed in and has no authority to lend.
+ */
+export const signNotificationAppLink = async ({
+  identityNumber,
+  expiresAtNs,
+}: {
+  identityNumber: bigint;
+  expiresAtNs: bigint;
+}): Promise<Uint8Array | undefined> => {
+  const stored = await read(identityNumber);
+  if (stored === undefined) {
+    return undefined;
+  }
+  return new Uint8Array(
+    await crypto.subtle.sign(
+      { name: "ECDSA", hash: "SHA-256" },
+      stored.keyPair.privateKey,
+      notificationAppLinkMessage(identityNumber, expiresAtNs),
+    ),
+  );
 };
 
 export const browserKeyIdentity = async (

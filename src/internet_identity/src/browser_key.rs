@@ -476,6 +476,20 @@ mod tests {
         ));
     }
 
+    /// The exact bytes a link token is signed over, for anchor 10000 expiring at 5000.
+    ///
+    /// Asserted identically in `browser-key.store.ts`. The browser signs this message
+    /// and the canister rebuilds it, so the two layouts have to agree byte for byte:
+    /// pinning the bytes on both sides turns a change to either into a failing test
+    /// rather than tokens this canister quietly refuses.
+    #[test]
+    fn the_link_token_message_is_the_bytes_the_frontend_signs() {
+        assert_eq!(
+            hex::encode(link_token_message(10_000, 5_000)),
+            "69692d6e6f74696669636174696f6e2d6170702d6c696e6b00000000000027100000000000001388"
+        );
+    }
+
     /// A signature a browser produced for signing in is not accepted as a link token,
     /// which is what stops every sign-in from being a linkable capability.
     ///
