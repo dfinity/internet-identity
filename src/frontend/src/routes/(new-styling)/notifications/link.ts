@@ -16,14 +16,6 @@ import type { LinkToken } from "./linkToken";
 
 export type LinkOutcome =
   | { status: "linked"; identityNumber: bigint }
-  /**
-   * This device already has an app receiving notifications, and it is not this one.
-   *
-   * One app per browser is what keeps a token from being spent twice, so a second
-   * install from the same browser is refused here — by design, and not a failure the
-   * user has to act on: the first app still works.
-   */
-  | { status: "already-linked" }
   /** The token was refused for any other reason, which a fresh one fixes. Starting the
    *  install again issues one, and that is a step the user has already seen. */
   | { status: "token-refused"; reason: string }
@@ -42,12 +34,6 @@ const describe = (error: unknown): string => {
   }
   return error instanceof Error ? error.message : String(error);
 };
-
-/** Whether the canister refused the claim because this browser already has an app.
- *  Read off the variant the error carries rather than out of its message. */
-const isAlreadyLinked = (error: unknown): boolean =>
-  isCanisterError<LinkNotificationAppError>(error) &&
-  error.type === "AlreadyLinked";
 
 /** The identity this app is already linked to, where a previous launch linked it. */
 export const linkedIdentity = (): Promise<bigint | undefined> =>
@@ -82,9 +68,6 @@ export const linkAndRegister = async (
     await ensureRegisteredDevice(token.identityNumber, actor);
     return { status: "linked", identityNumber: token.identityNumber };
   } catch (error) {
-    if (isAlreadyLinked(error)) {
-      return { status: "already-linked" };
-    }
     const reason = describe(error);
     return isCanisterError(error)
       ? { status: "token-refused", reason }

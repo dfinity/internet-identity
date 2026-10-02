@@ -818,7 +818,6 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'CallerIsNotTheApp' : IDL.Principal,
     'LinkTokenExpired' : IDL.Null,
-    'AlreadyLinked' : IDL.Null,
     'KeyAlreadyInUse' : IDL.Null,
   });
   const ListApplicationsRequest = IDL.Record({ 'anchor_number' : UserNumber });

@@ -440,7 +440,6 @@ fn link_notification_app(
     anchor
         .link_notification_app(parent, request.app_key.clone(), now)
         .map_err(|err| match err {
-            storage::anchor::BrowserError::AlreadyLinked => LinkNotificationAppError::AlreadyLinked,
             storage::anchor::BrowserError::SuccessorAlreadyInUse => {
                 LinkNotificationAppError::KeyAlreadyInUse
             }
