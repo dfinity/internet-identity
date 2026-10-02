@@ -74,8 +74,11 @@
     }
 
     const landed = settle(await linkAndRegister(token));
-    // The token is spent. Taking it out of the URL keeps a reload from presenting it
-    // again, and keeps it out of what the Home Screen entry holds from here on.
+    // Keeps a reload from presenting a spent token. It does not take it out of the
+    // Home Screen entry, which captured the URL as it was at install: every launch
+    // from there carries the token again. Harmless, because it expires in half an
+    // hour and a second claim is refused once a browser has an app, but it is in the
+    // bookmark either way.
     history.replaceState(null, "", window.location.pathname);
     return landed;
   };
