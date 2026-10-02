@@ -8,6 +8,8 @@
   import SquarePlusIcon from "@lucide/svelte/icons/square-plus";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
+  import Logo from "$lib/components/ui/Logo.svelte";
+  import { NOTIFICATION_APP_NAME } from "../appName";
   import ControlCircle from "$lib/components/ui/browserMock/ControlCircle.svelte";
   import Step from "$lib/components/ui/browserMock/Step.svelte";
   import Steps from "$lib/components/ui/browserMock/Steps.svelte";
@@ -117,6 +119,12 @@
     {#snippet instruction()}
       <Trans>Open it from your <b>Home Screen</b>.</Trans>
     {/snippet}
-    <HomeScreenGrid />
+    <HomeScreenGrid label={NOTIFICATION_APP_NAME} blanks={6}>
+      {#snippet icon()}<Logo
+          width="24"
+          height="12"
+          class="shrink-0"
+        />{/snippet}
+    </HomeScreenGrid>
   </Step>
 </Steps>

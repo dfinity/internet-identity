@@ -13,6 +13,8 @@
   import { decodeLinkToken } from "./linkToken";
   import { linkAndRegister, linkedIdentity, type LinkOutcome } from "./link";
   import InstallSteps from "./installSteps/InstallSteps.svelte";
+  import IosAppSteps from "./blockedSteps/IosAppSteps.svelte";
+  import { NOTIFICATION_APP_NAME } from "./appName";
   import { watchForInstall } from "./watchInstall";
 
   /** What this page is doing, which is settled on mount and not before: the answer
@@ -23,6 +25,9 @@
     | { kind: "install" }
     /** The app, with no token to claim with and nothing claimed before. */
     | { kind: "nothing-to-claim" }
+    /** The app, with the permission still to ask for. iOS raises the prompt only from
+     *  a gesture, so there is a button and not a call on mount. */
+    | { kind: "ask" }
     /** The app, with the permission refused. Only iOS Settings can lift it. */
     | { kind: "blocked" }
     | { kind: "ready"; identityNumber: bigint }
@@ -42,31 +47,57 @@
         return;
       }
 
-      // Asked before anything is claimed: a refused permission is the one thing this
-      // app cannot do anything about, and claiming an entry it cannot deliver to would
-      // leave a row behind that reaches nothing.
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        screen = { kind: "blocked" };
-        return;
-      }
-
-      const token = decodeLinkToken(window.location.hash);
-      if (token === undefined) {
-        const linked = await linkedIdentity();
-        screen =
-          linked === undefined
-            ? { kind: "nothing-to-claim" }
-            : { kind: "ready", identityNumber: linked };
-        return;
-      }
-
-      screen = settle(await linkAndRegister(token));
-      // The token is spent. Taking it out of the URL keeps a reload from presenting it
-      // again, and keeps it out of what the Home Screen entry holds from here on.
-      history.replaceState(null, "", window.location.pathname);
+      // Read, never asked for, on the way in. iOS raises the prompt only from a user
+      // gesture: asking here answers `default` without showing anything, and treating
+      // that as a refusal told the user they were blocked when they had not been asked.
+      screen = await resolve(Notification.permission);
     })();
   });
+
+  /** Where this launch lands, for a permission in whichever state it is in. */
+  const resolve = async (
+    permission: NotificationPermission,
+  ): Promise<Screen> => {
+    if (permission === "denied") {
+      return { kind: "blocked" };
+    }
+    if (permission === "default") {
+      return { kind: "ask" };
+    }
+
+    const token = decodeLinkToken(window.location.hash);
+    if (token === undefined) {
+      const linked = await linkedIdentity();
+      return linked === undefined
+        ? { kind: "nothing-to-claim" }
+        : { kind: "ready", identityNumber: linked };
+    }
+
+    const landed = settle(await linkAndRegister(token));
+    // The token is spent. Taking it out of the URL keeps a reload from presenting it
+    // again, and keeps it out of what the Home Screen entry holds from here on.
+    history.replaceState(null, "", window.location.pathname);
+    return landed;
+  };
+
+  /**
+   * Raises the prompt, which only a gesture may do, and goes where the answer leads.
+   *
+   * All three answers mean something different. `granted` carries on; `denied` cannot
+   * be undone from here and becomes the Settings steps; a prompt dismissed without an
+   * answer leaves the permission at `default`, so it can be raised again and the user
+   * stays where they are with the button still in front of them.
+   */
+  const askForPermission = async () => {
+    const asking = screen;
+    screen = { kind: "working" };
+    try {
+      screen = await resolve(await Notification.requestPermission());
+    } catch (error) {
+      console.error(error);
+      screen = asking;
+    }
+  };
 
   // Only while the steps are up, and only for the identity whose token brought the user
   // here: the tab goes when the app it is telling them to install has arrived.
@@ -81,32 +112,31 @@
     return watchForInstall(token.identityNumber, () => window.close());
   });
 
+  /** Picks up a permission the user changed in Settings, which is the only place a
+   *  refusal can be lifted. One still refused leaves them on the steps. */
   const retryFromSettings = async () => {
     screen = { kind: "working" };
     const pushState = await readBrowserPushState();
-    if (pushState === undefined || pushState.permission === "denied") {
-      screen = { kind: "blocked" };
-      return;
-    }
-    const linked = await linkedIdentity();
-    const token = decodeLinkToken(window.location.hash);
-    if (token !== undefined) {
-      screen = settle(await linkAndRegister(token));
-      return;
-    }
-    screen =
-      linked === undefined
-        ? { kind: "nothing-to-claim" }
-        : { kind: "ready", identityNumber: linked };
+    screen = await resolve(pushState?.permission ?? "denied");
   };
 </script>
 
 <svelte:head>
   <title>Internet Identity Notifications</title>
   <link rel="manifest" href="/notifications.webmanifest" />
+  <!-- iOS takes the Home Screen icon from here, not from the manifest, so without it
+       the tile is a screenshot of the page. 180px is what it asks for. -->
+  <link
+    rel="apple-touch-icon"
+    sizes="180x180"
+    href="/notifications-icon-180.png"
+  />
   <!-- What iOS read before it supported a manifest, and still honours. -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="II Notifications" />
+  <meta
+    name="apple-mobile-web-app-title"
+    content="Internet Identity Notifications"
+  />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
@@ -135,8 +165,30 @@
           </p>
           <InstallSteps host={window.location.host} />
         </div>
+      {:else if screen.kind === "ask"}
+        <div class="flex min-w-0 flex-1 flex-col items-stretch justify-end">
+          <FeaturedIcon size="lg" class="mb-4 self-start">
+            <BellIcon class="size-6" aria-hidden="true" />
+          </FeaturedIcon>
+          <h1 class="text-text-primary mb-3 text-2xl font-medium">
+            {$t`Turn on notifications`}
+          </h1>
+          <p class="text-text-tertiary mb-5 text-base">
+            <Trans>
+              This is the last step. Your apps' notifications arrive here.
+            </Trans>
+          </p>
+          <div class="mt-7 flex flex-col gap-2.5">
+            <button
+              class="btn btn-primary btn-xl"
+              onclick={() => void askForPermission()}
+            >
+              {$t`Allow`}
+            </button>
+          </div>
+        </div>
       {:else if screen.kind === "blocked"}
-        <div class="flex min-w-0 flex-col items-stretch">
+        <div class="flex min-w-0 flex-1 flex-col items-stretch justify-end">
           <FeaturedIcon size="lg" class="mb-4 self-start">
             <BellOffIcon class="size-6" aria-hidden="true" />
           </FeaturedIcon>
@@ -146,6 +198,7 @@
           <p class="text-text-tertiary mb-5 text-base">
             <Trans>Follow these steps to turn them back on:</Trans>
           </p>
+          <IosAppSteps appName={NOTIFICATION_APP_NAME} />
           <div class="mt-7 flex flex-col gap-2.5">
             <button
               class="btn btn-primary btn-xl"
