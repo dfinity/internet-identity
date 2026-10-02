@@ -2,6 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // vapidKeyStore opens an IndexedDB store at import; the resolver under test
 // never touches it. The decline cooldown is mocked so the logic stays pure.
 vi.mock("./vapidKeyStore", () => ({ loadVapidKey: vi.fn() }));
+/// What the user told this browser about their own device. Opens an IndexedDB store at
+/// import, and whether it was told anything is its own scenario below.
+vi.mock("./alreadyInstalled", () => ({
+  saidAlreadyInstalled: vi.fn(() => Promise.resolve(false)),
+  recordAlreadyInstalled: vi.fn(),
+}));
 vi.mock("./notificationDiagnostics", () => ({ recordPermission: vi.fn() }));
 vi.mock("$lib/utils/describeBrowser", () => ({
   browserAndSystem: vi.fn(() => ({
@@ -33,6 +39,7 @@ import {
   type DeviceNotificationState,
 } from "./notificationState";
 import { browserAndSystem } from "$lib/utils/describeBrowser";
+import { saidAlreadyInstalled } from "./alreadyInstalled";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
@@ -746,6 +753,77 @@ describe("resolveOptIn where notifications need an app", () => {
           supported: false,
           permission: "default" as NotificationPermission,
         }),
+      }),
+    ).resolves.toMatchObject({ screen: "enable", installFirst: true });
+  });
+});
+
+describe("resolveOptIn where the user says the device already has the app", () => {
+  const actorGranting = (granted: boolean) =>
+    ({
+      notification_consent_granted: vi.fn(() => Promise.resolve(granted)),
+    }) as unknown as Parameters<typeof resolveOptIn>[0]["actor"];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(browserAndSystem).mockReturnValue({
+      os: { Ios: null },
+      brand: { Safari: null },
+    });
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    vi.stubGlobal("Notification", { permission: "default" });
+    // No app of this browser's own, which is the case the user's word is for.
+    vi.mocked(browserKeyActor).mockResolvedValue({
+      get_notification_app_status: vi.fn(() => Promise.resolve([])),
+    } as never);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /**
+   * A second browser on the same phone sees no app of its own, because the canister
+   * records which browser installed one. Asking anchor-wide instead would deny the
+   * same user's second device, so the user's own word is what settles it.
+   */
+  it("does not ask again once the user has said so", async () => {
+    vi.mocked(saidAlreadyInstalled).mockResolvedValue(true);
+
+    await expect(
+      resolveOptIn({
+        identityNumber: BigInt(10_000),
+        origin: "https://app.example",
+        actor: actorGranting(true),
+        browser: Promise.resolve(undefined),
+      }),
+    ).resolves.toEqual({ screen: "skip", granted: true });
+  });
+
+  /** Their word is about the device, not about this app: an identity that has not
+   *  allowed it is still asked. */
+  it("still asks an identity that has not allowed the app", async () => {
+    vi.mocked(saidAlreadyInstalled).mockResolvedValue(true);
+
+    await expect(
+      resolveOptIn({
+        identityNumber: BigInt(10_000),
+        origin: "https://app.example",
+        actor: actorGranting(false),
+        browser: Promise.resolve(undefined),
+      }),
+    ).resolves.toMatchObject({ screen: "enable", installFirst: true });
+  });
+
+  it("asks where the user has said nothing", async () => {
+    vi.mocked(saidAlreadyInstalled).mockResolvedValue(false);
+
+    await expect(
+      resolveOptIn({
+        identityNumber: BigInt(10_000),
+        origin: "https://app.example",
+        actor: actorGranting(true),
+        browser: Promise.resolve(undefined),
       }),
     ).resolves.toMatchObject({ screen: "enable", installFirst: true });
   });
