@@ -10,7 +10,7 @@ import {
   ensureAppKey,
   readAppKey,
   rememberLinked,
-} from "./appKey";
+} from "$lib/utils/notifications/notificationAppKey";
 import type { LinkNotificationAppError } from "$lib/generated/internet_identity_types";
 import type { LinkToken } from "./linkToken";
 

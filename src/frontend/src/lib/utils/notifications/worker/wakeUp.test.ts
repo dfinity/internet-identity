@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Principal } from "@icp-sdk/core/principal";
 import type { Identity } from "@icp-sdk/core/agent";
 
-const registeredIdentityNumbers = vi.fn<() => Promise<bigint[]>>();
+const signing =
+  vi.fn<() => Promise<{ identityNumber: bigint; identity: Identity }[]>>();
 const loadPullIdentity = vi.fn<() => Promise<Identity | undefined>>();
 const mintPullIdentity = vi.fn<() => Promise<Identity | undefined>>();
 const fetchNotificationContent = vi.fn();
@@ -13,9 +14,6 @@ const fetchAppMetadata = vi.fn((): Promise<{ name?: string } | undefined> =>
 const refillJwtPool = vi.fn((_options: unknown) => Promise.resolve(false));
 const fetchAlternativeOrigins = vi.fn(() => Promise.resolve([] as string[]));
 
-const browserKeyIdentity = vi.fn<() => Promise<Identity | undefined>>(() =>
-  Promise.resolve(undefined),
-);
 const createSync = vi.fn((_options: unknown) => ({}));
 
 const AGENT_OPTIONS = {
@@ -23,9 +21,8 @@ const AGENT_OPTIONS = {
   shouldFetchRootKey: true,
 };
 
-vi.mock("$lib/stores/browser-key.store", () => ({
-  registeredIdentityNumbers: () => registeredIdentityNumbers(),
-  browserKeyIdentity: () => browserKeyIdentity(),
+vi.mock("$lib/utils/notifications/signingIdentities", () => ({
+  signingIdentities: () => signing(),
 }));
 vi.mock("$lib/utils/notifications/workerConfig", () => ({
   config: {
@@ -148,10 +145,12 @@ const internetIdentity = (queue: (typeof notification)[]) => {
 
 const identity = {} as Identity;
 
+/** An entry this storage can sign for, as `signingIdentities` answers them. */
+const signs = (identityNumber: bigint) => ({ identityNumber, identity });
+
 beforeEach(() => {
   vi.clearAllMocks();
-  browserKeyIdentity.mockResolvedValue(undefined);
-  registeredIdentityNumbers.mockResolvedValue([IDENTITY]);
+  signing.mockResolvedValue([signs(IDENTITY)]);
   loadPullIdentity.mockResolvedValue(identity);
   mintPullIdentity.mockResolvedValue(identity);
   fetchNotificationContent.mockResolvedValue({
@@ -189,8 +188,6 @@ describe("onWakeUp", () => {
     // Every other case injects the actor, so this is the only cover for the one the
     // worker builds: without the page's options it would talk to mainnet's default
     // host and verify against the wrong root key.
-    browserKeyIdentity.mockResolvedValue({} as Identity);
-
     await onWakeUp({ registration: registration() });
 
     expect(createSync).toHaveBeenCalledWith(
@@ -303,9 +300,9 @@ describe("onWakeUp", () => {
     ]);
   });
 
-  it("asks for every identity this browser holds a key for", async () => {
+  it("asks for every entry this storage holds a key for", async () => {
     const second = BigInt(10_001);
-    registeredIdentityNumbers.mockResolvedValue([IDENTITY, second]);
+    signing.mockResolvedValue([signs(IDENTITY), signs(second)]);
     const ii = internetIdentity([
       notification,
       { ...notification, id: BigInt(43) },
@@ -327,7 +324,7 @@ describe("onWakeUp", () => {
 
   it("shows one notification per wake-up, whatever is waiting elsewhere", async () => {
     const shown = registration();
-    registeredIdentityNumbers.mockResolvedValue([IDENTITY, BigInt(10_001)]);
+    signing.mockResolvedValue([signs(IDENTITY), signs(BigInt(10_001))]);
     const ii = internetIdentity([notification]);
 
     await onWakeUp({

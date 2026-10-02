@@ -17,10 +17,7 @@ import type {
   _SERVICE,
   NotificationToShow,
 } from "$lib/generated/internet_identity_types";
-import {
-  browserKeyIdentity,
-  registeredIdentityNumbers,
-} from "$lib/stores/browser-key.store";
+import { signingIdentities, type SigningIdentity } from "../signingIdentities";
 import { config } from "../workerConfig";
 import { fetchAppMetadata, logoAsDataUrl } from "$lib/utils/appMetadata";
 import {
@@ -54,28 +51,27 @@ export const showPlaceholder = (
 export interface WakeUpContext {
   /** The worker's registration, which owns the notifications it shows. */
   registration: ServiceWorkerRegistration;
-  /** The canister, as this browser. Injected so a test can answer for it. */
+  /** What this storage can sign for. Injected so a test can answer for it. */
+  signing?: () => Promise<SigningIdentity[]>;
+  /** The canister, as one of them. Injected so a test can answer for it. */
   internetIdentity?: (
-    identityNumber: bigint,
-  ) => Promise<ActorSubclass<_SERVICE> | undefined>;
+    signing: SigningIdentity,
+  ) => Promise<ActorSubclass<_SERVICE>>;
 }
 
-const internetIdentityActor = async (
-  identityNumber: bigint,
-): Promise<ActorSubclass<_SERVICE> | undefined> => {
-  const identity = await browserKeyIdentity(identityNumber);
-  if (identity === undefined) {
-    return undefined;
-  }
-  return Actor.createActor<_SERVICE>(internetIdentityIDL, {
-    agent: HttpAgent.createSync({
-      ...config.agentOptions,
-      identity,
-      retryTimes: 0,
+const internetIdentityActor = ({
+  identity,
+}: SigningIdentity): Promise<ActorSubclass<_SERVICE>> =>
+  Promise.resolve(
+    Actor.createActor<_SERVICE>(internetIdentityIDL, {
+      agent: HttpAgent.createSync({
+        ...config.agentOptions,
+        identity,
+        retryTimes: 0,
+      }),
+      canisterId: Principal.fromText(config.canisterId),
     }),
-    canisterId: Principal.fromText(config.canisterId),
-  });
-};
+  );
 
 const refFor = (
   identityNumber: bigint,
@@ -155,14 +151,12 @@ interface Queued {
  *  the canister remembers having answered. */
 const nextFor = async (
   context: WakeUpContext,
-  { identityNumber }: { identityNumber: bigint },
+  signing: SigningIdentity,
 ): Promise<Queued | undefined> => {
+  const { identityNumber } = signing;
   const actor = await (context.internetIdentity ?? internetIdentityActor)(
-    identityNumber,
+    signing,
   );
-  if (actor === undefined) {
-    return undefined;
-  }
   const next = await actor.browser_get_next_notification({
     anchor_number: identityNumber,
   });
@@ -283,17 +277,14 @@ const showQueued = async (
  *  Nothing depends on it: the notification is already shown. */
 const topUpPool = async (
   context: WakeUpContext,
-  { identityNumber }: { identityNumber: bigint },
+  signing: SigningIdentity,
 ): Promise<void> => {
   const actor = await (context.internetIdentity ?? internetIdentityActor)(
-    identityNumber,
+    signing,
   );
-  if (actor === undefined) {
-    return;
-  }
   await refillJwtPool({
     actor,
-    identityNumber,
+    identityNumber: signing.identityNumber,
     nowNs: BigInt(Date.now()) * BigInt(1_000_000),
   });
 };
@@ -343,14 +334,12 @@ const closeDismissed = async (context: WakeUpContext): Promise<void> => {
 
 /** One wake-up: show what arrived, and clear what no longer matters. */
 export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
-  const identityNumbers = await registeredIdentityNumbers();
+  const signing = await (context.signing ?? signingIdentities)();
   // One round trip each, side by side: a wake-up shows one notification, so asking
-  // the identities one after another would only make the screen wait on the answers
-  // it ends up throwing away.
+  // the entries one after another would only make the screen wait on the answers it
+  // ends up throwing away.
   const queued = await Promise.all(
-    identityNumbers.map((identityNumber) =>
-      nextFor(context, { identityNumber }).catch(() => undefined),
-    ),
+    signing.map((one) => nextFor(context, one).catch(() => undefined)),
   );
 
   const pending: Promise<unknown>[] = [];
@@ -371,8 +360,8 @@ export const onWakeUp = async (context: WakeUpContext): Promise<void> => {
 
   // The pool of signed wake-up authorizations is spent by elapsed time, and a
   // browser whose user never opens the page again would let it run out.
-  for (const identityNumber of identityNumbers) {
-    sendAndForget(pending, topUpPool(context, { identityNumber }));
+  for (const one of signing) {
+    sendAndForget(pending, topUpPool(context, one));
   }
 
   if (shown) {
