@@ -66,10 +66,13 @@ export type BackendCanisterConfig = {
   notifications_enabled_origins: [] | [string[]];
 };
 
-/** The origins this deployment notifies for, as the canister holds them: already
- *  folded onto the spelling consent is keyed by. */
+/** The origins this deployment notifies for, folded onto the spelling consent is
+ *  keyed by. The canister holds the list as its operator wrote it, which may be any
+ *  gateway spelling of an app, and folds each entry before comparing; so must we. */
 const notifyingOrigins = (): string[] =>
-  backendCanisterConfig?.notifications_enabled_origins[0] ?? [];
+  (backendCanisterConfig?.notifications_enabled_origins[0] ?? []).map(
+    remapToLegacyDomain,
+  );
 
 /** Whether this deployment's backend notifies for any app at all. Its endpoints refuse
  *  every notification call otherwise, so there is nothing for the frontend to offer. */
