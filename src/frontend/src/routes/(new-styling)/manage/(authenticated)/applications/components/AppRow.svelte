@@ -1,7 +1,7 @@
 <script lang="ts">
   import { ChevronRightIcon } from "@lucide/svelte";
   import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
-  import { t } from "$lib/stores/locale.store";
+  import { formatRelative, t } from "$lib/stores/locale.store";
   import { originLabel } from "$lib/utils/urlUtils";
   import AppLogo from "./AppLogo.svelte";
 
@@ -9,13 +9,13 @@
     /** The origin the app's identity is derived for: what its metadata is published
      *  on and its consent is keyed by. */
     origin: string;
-    /** Already formatted: a relative time. */
-    lastVisited: string;
+    /** The latest sign-in at the app, in milliseconds. */
+    lastUsedMillis: number;
     /** Whether the app may notify. An app this Internet Identity does not notify for
      *  may not. */
     allowed: boolean;
-    /** Already formatted: a relative time, or `undefined` where the app never has. */
-    lastNotified: string | undefined;
+    /** When the app last notified, in milliseconds, or `undefined` where it never has. */
+    lastNotifiedMillis: number | undefined;
     /** Off where this Internet Identity notifies for no app at all. */
     showNotifications: boolean;
     onOpen: () => void;
@@ -23,9 +23,9 @@
 
   const {
     origin,
-    lastVisited,
+    lastUsedMillis,
     allowed,
-    lastNotified,
+    lastNotifiedMillis,
     showNotifications,
     onOpen,
   }: Props = $props();
@@ -59,7 +59,9 @@
       <span class="text-text-tertiary text-xs font-semibold">
         {$t`Last visited`}
       </span>
-      <span class="text-text-primary text-xs">{lastVisited}</span>
+      <span class="text-text-primary text-xs">
+        {$formatRelative(new Date(lastUsedMillis), { style: "long" })}
+      </span>
     </span>
     {#if showNotifications}
       <span
@@ -83,8 +85,8 @@
           ></span>
           {#if !allowed}
             {$t`Not allowed`}
-          {:else if lastNotified !== undefined}
-            {lastNotified}
+          {:else if lastNotifiedMillis !== undefined}
+            {$formatRelative(new Date(lastNotifiedMillis), { style: "long" })}
           {:else}
             {$t`None yet`}
           {/if}

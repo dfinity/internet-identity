@@ -3,7 +3,7 @@
   import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
   import { notificationsEnabledFor } from "$lib/globals";
   import { Trans } from "$lib/components/locale";
-  import { formatRelative, t } from "$lib/stores/locale.store";
+  import { t } from "$lib/stores/locale.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { handleError } from "$lib/components/utils/error";
   import {
@@ -48,9 +48,6 @@
     }
   };
 
-  const formatAgo = (millis: number): string =>
-    $formatRelative(new Date(millis), { style: "long" });
-
   const allowedOf = (app: App): boolean =>
     canNotify(app.origin) && app.notificationsAllowed;
 
@@ -88,11 +85,9 @@
         <li>
           <AppRow
             origin={app.origin}
-            lastVisited={formatAgo(app.lastUsedMillis)}
+            lastUsedMillis={app.lastUsedMillis}
             allowed={allowedOf(app)}
-            lastNotified={app.lastNotifiedMillis !== undefined
-              ? formatAgo(app.lastNotifiedMillis)
-              : undefined}
+            lastNotifiedMillis={app.lastNotifiedMillis}
             showNotifications={$PUSH_NOTIFICATIONS}
             onOpen={() => (selectedOrigin = app.origin)}
           />
