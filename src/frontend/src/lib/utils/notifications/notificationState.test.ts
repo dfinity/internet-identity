@@ -674,7 +674,15 @@ describe("resolveOptIn where notifications need an app", () => {
     ).resolves.toMatchObject({ screen: "enable", installFirst: true });
   });
 
-  it("does not ask an identity that has allowed it before", async () => {
+  /** Both halves: the identity allowed the app, and an app exists that can be
+   *  delivered to. */
+  it("does not ask where the app is linked and can be delivered to", async () => {
+    vi.mocked(browserKeyActor).mockResolvedValue({
+      get_notification_app_status: vi.fn(() =>
+        Promise.resolve([{ browser_id: 1, subscribed: true }]),
+      ),
+    } as never);
+
     await expect(
       resolveOptIn({
         identityNumber: BigInt(10_000),
@@ -683,6 +691,45 @@ describe("resolveOptIn where notifications need an app", () => {
         browser: Promise.resolve(undefined),
       }),
     ).resolves.toEqual({ screen: "skip", granted: true });
+  });
+
+  /**
+   * Consent alone used to answer this, which told an app yes while nothing reached the
+   * user: they allowed it and never finished installing, or allowed it before there was
+   * anything to install. Either way the install is what is still owed them.
+   */
+  it("asks an identity that allowed the app but has no app to deliver to", async () => {
+    vi.mocked(browserKeyActor).mockResolvedValue({
+      get_notification_app_status: vi.fn(() => Promise.resolve([])),
+    } as never);
+
+    await expect(
+      resolveOptIn({
+        identityNumber: BigInt(10_000),
+        origin: "https://app.example",
+        actor: actorGranting(true),
+        browser: Promise.resolve(undefined),
+      }),
+    ).resolves.toMatchObject({ screen: "enable", installFirst: true });
+  });
+
+  /** An app that claimed an entry and has not subscribed yet is linked but reaches
+   *  nothing, so the install is not finished. */
+  it("asks where the app is linked but not subscribed", async () => {
+    vi.mocked(browserKeyActor).mockResolvedValue({
+      get_notification_app_status: vi.fn(() =>
+        Promise.resolve([{ browser_id: 1, subscribed: false }]),
+      ),
+    } as never);
+
+    await expect(
+      resolveOptIn({
+        identityNumber: BigInt(10_000),
+        origin: "https://app.example",
+        actor: actorGranting(true),
+        browser: Promise.resolve(undefined),
+      }),
+    ).resolves.toMatchObject({ screen: "enable", installFirst: true });
   });
 
   /** Answering sends the user through the install rather than raising a prompt, and a

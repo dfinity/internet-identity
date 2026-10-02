@@ -121,6 +121,34 @@ const isRegisteredHere = async (
 const deliversHere = (state: DeviceNotificationState): boolean =>
   state.permission === "granted" && state.registered;
 
+/**
+ * Whether a Home Screen app this browser installed can be delivered to.
+ *
+ * The app has an entry of its own, so `get_webpush_subscription_status` cannot see it:
+ * that answers for the caller, and the caller here is the browser. This is the read that
+ * tells an install that finished from one that was never done.
+ *
+ * `false` where the canister could not be asked, which is the same answer a browser that
+ * has linked nothing gets: either way there is an install to offer.
+ */
+export const notificationAppDelivers = async (
+  identityNumber: bigint,
+): Promise<boolean> => {
+  try {
+    const actor = await browserKeyActor(identityNumber);
+    const [status] = await actor.get_notification_app_status({
+      anchor_number: identityNumber,
+    });
+    return status?.subscribed === true;
+  } catch (error) {
+    if (error instanceof UnregisteredBrowserError) {
+      return false;
+    }
+    console.error(error);
+    return false;
+  }
+};
+
 /** iOS has no notifications yet: Safari delivers them only to a Home Screen app, and
  *  that is not built. Nothing is offered there and no app is told otherwise. */
 export const notificationsUnavailableHere = (): boolean => {
@@ -206,14 +234,16 @@ export const resolveOptIn = async ({
         }
       : await readDeviceState(identityNumber, browserState);
   recordPermission(state.permission);
-  // Where the answer is a Home Screen app, this browser cannot read whether the app is
-  // linked and subscribed: `get_webpush_subscription_status` reports the caller's own
-  // row, and the app has an entry of its own. So what is asked turns on consent alone.
-  // An identity that has allowed this app is not asked again, and one that has not is
-  // sent through the install.
+  // Where the answer is a Home Screen app, delivery is the app's and not this
+  // browser's, so it is read from the entry this browser linked. Both halves still
+  // have to hold: the identity allowed the app, and an app exists that can be
+  // delivered to. Consent alone would tell an app yes while nothing reached the user,
+  // and would never offer the install to an identity that allowed notifications before
+  // any of this existed.
   const installFirst = notificationsNeedInstallHere();
   if (installFirst) {
-    return consented
+    const delivers = await notificationAppDelivers(identityNumber);
+    return consented && delivers
       ? { screen: "skip", granted: true }
       : { screen: "enable", state, consented, installFirst };
   }

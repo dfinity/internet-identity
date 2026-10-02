@@ -1340,6 +1340,53 @@ mod browser_tests {
         assert_eq!(anchor.browsers().len(), 2);
     }
 
+    /// The installing browser cannot see the app's own row, so this is how it learns the
+    /// install finished.
+    #[test]
+    fn a_browser_finds_the_app_it_linked() {
+        let mut anchor = anchor();
+        let (parent, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        assert!(anchor.linked_notification_app(parent).is_none());
+
+        let app = anchor
+            .link_notification_app(parent, browser_key(9), 2_000)
+            .unwrap();
+
+        assert_eq!(
+            anchor.linked_notification_app(parent).map(|entry| entry.id),
+            Some(app)
+        );
+        // And nothing yet to deliver to: claiming an entry is not subscribing.
+        assert!(anchor
+            .linked_notification_app(parent)
+            .is_some_and(|entry| entry.webpush_subscription.is_none()));
+    }
+
+    /// One browser must not learn what another installed, so the lookup is by the entry
+    /// that linked it rather than by anchor.
+    #[test]
+    fn a_browser_does_not_find_another_browsers_app() {
+        let mut anchor = anchor();
+        let (first, _) = anchor
+            .resolve_browser(browser_key(1), successor_key(1), description("one"), 1_000)
+            .unwrap();
+        let (second, _) = anchor
+            .resolve_browser(browser_key(2), successor_key(2), description("two"), 1_000)
+            .unwrap();
+        anchor
+            .link_notification_app(first, browser_key(9), 2_000)
+            .unwrap();
+
+        assert!(anchor.linked_notification_app(second).is_none());
+    }
+
     /// It is reached the way every other entry is, which is what lets it set and read its
     /// own subscription with no session and no delegation.
     #[test]
