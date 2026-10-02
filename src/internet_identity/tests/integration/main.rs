@@ -8,6 +8,7 @@ mod accounts;
 mod activity_stats;
 mod aggregation_stats;
 mod anchor_management;
+mod applications;
 mod archive_integration;
 mod attributes;
 mod config;

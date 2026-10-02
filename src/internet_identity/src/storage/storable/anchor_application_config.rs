@@ -12,6 +12,8 @@ pub struct AnchorApplicationConfig {
     pub default_account_number: Option<StorableAccountNumber>, // None is the unreserved synthetic account
     #[n(1)]
     pub notifications_consented_at_ns: Option<Timestamp>, // None if the app may not notify
+    #[n(2)]
+    pub last_notified_at_ns: Option<Timestamp>, // None if the app never reached a browser
 }
 
 impl Storable for AnchorApplicationConfig {
@@ -26,4 +28,36 @@ impl Storable for AnchorApplicationConfig {
     }
 
     const BOUND: Bound = Bound::Unbounded;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_roundtrip_through_storable() {
+        let config = AnchorApplicationConfig {
+            default_account_number: None,
+            notifications_consented_at_ns: Some(1),
+            last_notified_at_ns: Some(2),
+        };
+        assert_eq!(
+            AnchorApplicationConfig::from_bytes(config.to_bytes()),
+            config
+        );
+    }
+
+    /// Configs written before `last_notified_at_ns` existed are CBOR maps without key 2,
+    /// and decode as an app that never notified.
+    #[test]
+    fn should_decode_config_without_last_notified() {
+        let mut buffer = Vec::new();
+        let mut encoder = minicbor::Encoder::new(&mut buffer);
+        encoder.map(1).unwrap();
+        encoder.u8(1).unwrap().u64(7).unwrap();
+
+        let decoded = AnchorApplicationConfig::from_bytes(Cow::Borrowed(&buffer));
+        assert_eq!(decoded.notifications_consented_at_ns, Some(7));
+        assert_eq!(decoded.last_notified_at_ns, None);
+    }
 }

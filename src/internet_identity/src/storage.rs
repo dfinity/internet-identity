@@ -2814,6 +2814,44 @@ impl<M: Memory + Clone> Storage<M> {
             .collect()
     }
 
+    /// Every app this identity has signed in to: its origin, the latest sign-in to any of
+    /// the identity's accounts there, and what the identity configured for it.
+    ///
+    /// Only where some account was used. Granting consent, naming an account and choosing
+    /// a default each store a list at an app the identity may never have signed in to,
+    /// and a tombstone holds no account at all.
+    pub fn list_applications(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> Vec<(FrontendHostname, Timestamp, AnchorApplicationConfig)> {
+        self.stable_account_reference_list_memory
+            .range(
+                (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
+            )
+            .filter_map(|((_, application_number), list)| {
+                let last_used = Vec::<AccountReference>::from(list)
+                    .iter()
+                    .filter_map(|reference| reference.last_used)
+                    .max()?;
+                // Illegal, as `account_state` explains, and skipped for the same reason:
+                // one bad list must not hide the identity's other apps.
+                let Some(application) = self.stable_application_memory.get(&application_number)
+                else {
+                    ic_cdk::println!(
+                        "ERROR: account reference list invariant violated: identity \
+                         {anchor_number} holds a list for application {application_number}, \
+                         which is not stored."
+                    );
+                    return None;
+                };
+                let config = self
+                    .anchor_application_config(anchor_number, application_number)
+                    .unwrap_or_default();
+                Some((application.origin, last_used, config))
+            })
+            .collect()
+    }
+
     fn anchor_application_config(
         &self,
         anchor_number: AnchorNumber,
@@ -2821,6 +2859,25 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Option<AnchorApplicationConfig> {
         self.stable_anchor_application_config_memory
             .get(&(anchor_number, application_number))
+    }
+
+    /// Notes that the app reached one of the identity's browsers at `now`.
+    ///
+    /// Stamps a config the identity already holds and never starts one: an app that may
+    /// notify always has one, and a row written here, outside the account-state write,
+    /// would be one nothing collects.
+    pub fn record_notified(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        now: Timestamp,
+    ) {
+        let key = (anchor_number, application_number);
+        if let Some(mut config) = self.stable_anchor_application_config_memory.get(&key) {
+            config.last_notified_at_ns = Some(now);
+            self.stable_anchor_application_config_memory
+                .insert(key, config);
+        }
     }
 
     /// What this identity has configured for the app at `origin`, or `None` where it has

@@ -125,6 +125,32 @@ export type AppSessionError = {
     'NoSuchSession' : null
   };
 /**
+ * An app the identity has signed in to, for the user's own list of their apps. Only
+ * apps some account was used at: consent, a named account or a chosen default can each
+ * be stored at an app the identity never signed in to.
+ */
+export interface ApplicationInfo {
+  /**
+   * The origin the app's identity is derived for: what its accounts and its
+   * notification consent are stored under.
+   */
+  'origin' : FrontendHostname,
+  /**
+   * Whether the app may notify the identity: it holds consent, and this deployment
+   * notifies for it, as notification_consent_granted answers.
+   */
+  'notifications_allowed' : boolean,
+  /**
+   * When the app last had a notification queued for one of the identity's browsers,
+   * or null where it never has.
+   */
+  'last_notified' : [] | [Timestamp],
+  /**
+   * The latest sign-in to any of the identity's accounts at the app.
+   */
+  'last_used' : Timestamp,
+}
+/**
  * Configuration parameters related to the archive.
  */
 export interface ArchiveConfig {
@@ -1320,6 +1346,9 @@ export type KeyType = { 'platform' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null } |
   { 'browser_storage_key' : null };
+export type ListApplicationsError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
+export interface ListApplicationsRequest { 'anchor_number' : UserNumber }
 export type ListAvailableAttributesError = {
     'AuthorizationError' : Principal
   } |
@@ -2673,6 +2702,15 @@ export interface _SERVICE {
    * ================
    */
   'init_salt' : ActorMethod<[], undefined>,
+  /**
+   * Every app the identity holds accounts at, so the user can see where they have
+   * signed in. Authorized by the identity's own access methods.
+   */
+  'list_applications' : ActorMethod<
+    [ListApplicationsRequest],
+    { 'Ok' : Array<ApplicationInfo> } |
+      { 'Err' : ListApplicationsError }
+  >,
   'list_available_attributes' : ActorMethod<
     [ListAvailableAttributesRequest],
     { 'Ok' : ListAvailableAttributesResponse } |

@@ -690,6 +690,33 @@ pub enum GetAccountsError {
     Unauthorized(Principal),
 }
 
+/// An app the identity has signed in to, for the user's own list of their apps.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ApplicationInfo {
+    /// The origin the app's identity is derived for: what its accounts and its
+    /// notification consent are stored under.
+    pub origin: FrontendHostname,
+    /// The latest sign-in to any of the identity's accounts at the app.
+    pub last_used: Timestamp,
+    /// Whether the app may notify the identity: it holds consent, and this deployment
+    /// notifies for it.
+    pub notifications_allowed: bool,
+    /// When the app last had a notification queued for one of the identity's browsers,
+    /// or `None` where it never has.
+    pub last_notified: Option<Timestamp>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ListApplicationsRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ListApplicationsError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+}
+
 #[derive(CandidType, Deserialize)]
 pub struct PrepareAccountDelegation {
     pub user_key: UserKey,

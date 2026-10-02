@@ -22,9 +22,9 @@ use ic_cdk::caller;
 use internet_identity_interface::{
     archive::types::{Operation, Private},
     internet_identity::types::{
-        AccountInfo, AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, Delegation,
-        FrontendHostname, GetAccountError, GetDefaultAccountError, SessionKey,
-        SetDefaultAccountError, SignedDelegation, Timestamp, UpdateAccountError,
+        AccountInfo, AccountNumber, AccountUpdate, AnchorNumber, ApplicationInfo,
+        CreateAccountError, Delegation, FrontendHostname, GetAccountError, GetDefaultAccountError,
+        SessionKey, SetDefaultAccountError, SignedDelegation, Timestamp, UpdateAccountError,
     },
 };
 #[cfg(test)]
@@ -36,6 +36,22 @@ pub fn get_accounts_for_origin(
     origin: &FrontendHostname,
 ) -> Vec<Account> {
     storage_borrow(|storage| storage.list_accounts(anchor_number, origin))
+}
+
+/// The apps the identity has signed in to, for its own list of them. An app is allowed to
+/// notify only where it holds consent and this deployment notifies for it, as
+/// `notification_consent_granted` answers.
+pub fn list_applications(anchor_number: AnchorNumber) -> Vec<ApplicationInfo> {
+    storage_borrow(|storage| storage.list_applications(anchor_number))
+        .into_iter()
+        .map(|(origin, last_used, config)| ApplicationInfo {
+            notifications_allowed: config.notifications_consented_at_ns.is_some()
+                && crate::notifications::notifies_for(&origin),
+            last_notified: config.last_notified_at_ns,
+            origin,
+            last_used,
+        })
+        .collect()
 }
 
 /// Helper function to read an account, unlike `storage.read_account` this returns

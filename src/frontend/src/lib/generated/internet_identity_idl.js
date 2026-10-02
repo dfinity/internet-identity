@@ -778,6 +778,17 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
+  const ListApplicationsRequest = IDL.Record({ 'anchor_number' : UserNumber });
+  const ApplicationInfo = IDL.Record({
+    'origin' : FrontendHostname,
+    'notifications_allowed' : IDL.Bool,
+    'last_notified' : IDL.Opt(Timestamp),
+    'last_used' : Timestamp,
+  });
+  const ListApplicationsError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const ListAvailableAttributesRequest = IDL.Record({
     'attributes' : IDL.Opt(IDL.Vec(IDL.Text)),
     'identity_number' : IdentityNumber,
@@ -1469,6 +1480,16 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'init_salt' : IDL.Func([], [], []),
+    'list_applications' : IDL.Func(
+        [ListApplicationsRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Vec(ApplicationInfo),
+            'Err' : ListApplicationsError,
+          }),
+        ],
+        ['query'],
+      ),
     'list_available_attributes' : IDL.Func(
         [ListAvailableAttributesRequest],
         [

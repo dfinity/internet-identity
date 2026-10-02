@@ -9,7 +9,11 @@ vi.mock("./pushSubscription", () => ({
 }));
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { allowApp, enableNotifications } from "./enableNotifications";
+import {
+  allowApp,
+  disallowApp,
+  enableNotifications,
+} from "./enableNotifications";
 import { ensureRegisteredDevice } from "./subscribeDevice";
 import { requestNotificationPermission } from "./pushSubscription";
 
@@ -53,6 +57,35 @@ describe("granting consent", () => {
 
     await expect(
       allowApp({ identityNumber: IDENTITY, origin: ORIGIN, actor }),
+    ).rejects.toThrow();
+  });
+});
+
+describe("withdrawing consent", () => {
+  it("revokes for the app in one call", async () => {
+    const revoke = vi.fn(() => Promise.resolve(ok));
+    const actor = {
+      notification_revoke_consent: revoke,
+    } as unknown as ActorSubclass<_SERVICE>;
+
+    await disallowApp({ identityNumber: IDENTITY, origin: ORIGIN, actor });
+
+    expect(revoke).toHaveBeenCalledTimes(1);
+    expect(revoke).toHaveBeenCalledWith({
+      anchor_number: IDENTITY,
+      origin: ORIGIN,
+    });
+  });
+
+  it("reports a refusal rather than swallowing it", async () => {
+    const actor = {
+      notification_revoke_consent: vi.fn(() =>
+        Promise.resolve({ Err: { InternalCanisterError: "not enabled" } }),
+      ),
+    } as unknown as ActorSubclass<_SERVICE>;
+
+    await expect(
+      disallowApp({ identityNumber: IDENTITY, origin: ORIGIN, actor }),
     ).rejects.toThrow();
   });
 });

@@ -42,9 +42,9 @@ export const enableNotifications = async ({
 };
 
 /**
- * Records consent for an app without touching the subscription. For a browser
- * that is already subscribed and only needs to allow one more app, so there is
- * no permission prompt and no new endpoint.
+ * Records consent for an app without touching any subscription, so there is no
+ * permission prompt and no new endpoint. Consent belongs to the identity, so it
+ * reaches every browser already registered for notifications.
  */
 export const allowApp = ({
   identityNumber,
@@ -55,6 +55,21 @@ export const allowApp = ({
   origin: string;
   actor: ActorSubclass<_SERVICE>;
 }): Promise<void> => grantConsent({ identityNumber, origin, actor });
+
+/**
+ * Withdraws an app's consent, which also drops what it has queued for every browser.
+ * The subscription stays: it belongs to the browser, and the identity's other apps
+ * still reach it.
+ */
+export const disallowApp = ({
+  identityNumber,
+  origin,
+  actor,
+}: GrantArgs): Promise<void> =>
+  actor
+    .notification_revoke_consent({ anchor_number: identityNumber, origin })
+    .then(throwCanisterError)
+    .then(() => undefined);
 
 /** Records consent for the app. The canister mints the application it hangs off. */
 const grantConsent = ({

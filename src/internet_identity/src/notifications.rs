@@ -26,7 +26,7 @@ use internet_identity_interface::internet_identity::types::{
     Timestamp,
 };
 pub use validation::{
-    notifications_enabled, ValidatedGetNextNotificationRequest,
+    notifications_enabled, notifies_for, ValidatedGetNextNotificationRequest,
     ValidatedGetNotificationDelegationRequest, ValidatedNotificationConsentGrantedRequest,
     ValidatedNotificationGrantConsentRequest, ValidatedNotificationRevokeConsentRequest,
     ValidatedPrepareNotificationDelegationRequest, ValidatedRemoveNotificationRequest,

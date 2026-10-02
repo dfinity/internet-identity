@@ -583,6 +583,17 @@ fn get_delegation(
     .unwrap_or(GetDelegationResponse::NoSuchDelegation)
 }
 
+/// A query, as `get_accounts` is: the list is for the user to read, and nothing is
+/// decided on it. Asks for the identity's own access methods, as `identity_info` does.
+#[query]
+fn list_applications(
+    request: ListApplicationsRequest,
+) -> Result<Vec<ApplicationInfo>, ListApplicationsError> {
+    check_authorization(request.anchor_number)
+        .map_err(|err| ListApplicationsError::Unauthorized(err.principal))?;
+    Ok(account_management::list_applications(request.anchor_number))
+}
+
 #[query]
 fn get_accounts(
     anchor_number: AnchorNumber,
