@@ -778,6 +778,20 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
+  const LinkNotificationAppRequest = IDL.Record({
+    'signature' : IDL.Vec(IDL.Nat8),
+    'app_key' : PublicKey,
+    'anchor_number' : UserNumber,
+    'expires_at_ns' : IDL.Nat64,
+  });
+  const LinkNotificationAppError = IDL.Variant({
+    'InvalidLinkToken' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'CallerIsNotTheApp' : IDL.Principal,
+    'LinkTokenExpired' : IDL.Null,
+    'AlreadyLinked' : IDL.Null,
+    'KeyAlreadyInUse' : IDL.Null,
+  });
   const ListApplicationsRequest = IDL.Record({ 'anchor_number' : UserNumber });
   const ApplicationInfo = IDL.Record({
     'origin' : FrontendHostname,
@@ -1480,6 +1494,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'init_salt' : IDL.Func([], [], []),
+    'link_notification_app' : IDL.Func(
+        [LinkNotificationAppRequest],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : LinkNotificationAppError })],
+        [],
+      ),
     'list_applications' : IDL.Func(
         [ListApplicationsRequest],
         [

@@ -1837,6 +1837,30 @@ type RemoveWebPushSubscriptionError = variant {
     InternalCanisterError : text;
 };
 
+// Claims the entry a Home Screen app carries notifications under. Authorized by the
+// token rather than by the caller being a browser this identity knows: the app has just
+// generated its key and no entry holds it yet.
+type LinkNotificationAppRequest = record {
+    anchor_number : UserNumber;
+    app_key : PublicKey;               // the app's own key; the caller must be its principal
+    expires_at_ns : nat64;             // when the installing browser's signature stops counting
+    signature : blob;                  // over the anchor number and that expiry
+};
+
+type LinkNotificationAppError = variant {
+    // No browser of this identity signed this token, or the one that did has rotated
+    // its key past it since.
+    InvalidLinkToken;
+    LinkTokenExpired;
+    // The caller is not the key it asks to have linked.
+    CallerIsNotTheApp : principal;
+    // One app per browser is one per device, and it is what keeps a token still inside
+    // its expiry from being spent twice.
+    AlreadyLinked;
+    KeyAlreadyInUse;
+    InternalCanisterError : text;
+};
+
 type GetWebPushSubscriptionStatusRequest = record {
     anchor_number : UserNumber;
 };
@@ -2475,6 +2499,9 @@ service : (opt InternetIdentityInit) -> {
     // Called by the identity, so one browser can silence another.
     remove_webpush_subscription : (RemoveWebPushSubscriptionRequest) -> (variant { Ok; Err : RemoveWebPushSubscriptionError });
     get_webpush_subscription_status : (GetWebPushSubscriptionStatusRequest) -> (opt WebPushSubscriptionStatus) query;
+    // Called by a Home Screen app on first launch, signed with the key it just generated,
+    // spending a token the browser that installed it signed.
+    link_notification_app : (LinkNotificationAppRequest) -> (variant { Ok; Err : LinkNotificationAppError });
 
     // Called by an app's backend canister for the origin it names.
     app_send_notification : (SendNotificationArg) -> (variant { Ok : SendNotificationResponse; Err : SendNotificationError });

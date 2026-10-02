@@ -1346,6 +1346,40 @@ export type KeyType = { 'platform' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null } |
   { 'browser_storage_key' : null };
+export type LinkNotificationAppError = {
+    /**
+     * No browser of this identity signed this token, or the one that did has rotated
+     * its key past it since.
+     */
+    'InvalidLinkToken' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  {
+    /**
+     * The caller is not the key it asks to have linked.
+     */
+    'CallerIsNotTheApp' : Principal
+  } |
+  { 'LinkTokenExpired' : null } |
+  {
+    /**
+     * One app per browser is one per device, and it is what keeps a token still inside
+     * its expiry from being spent twice.
+     */
+    'AlreadyLinked' : null
+  } |
+  { 'KeyAlreadyInUse' : null };
+/**
+ * Claims the entry a Home Screen app carries notifications under. Authorized by the
+ * token rather than by the caller being a browser this identity knows: the app has just
+ * generated its key and no entry holds it yet.
+ */
+export interface LinkNotificationAppRequest {
+  'signature' : Uint8Array | number[],
+  'app_key' : PublicKey,
+  'anchor_number' : UserNumber,
+  'expires_at_ns' : bigint,
+}
 export type ListApplicationsError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface ListApplicationsRequest { 'anchor_number' : UserNumber }
@@ -2702,6 +2736,15 @@ export interface _SERVICE {
    * ================
    */
   'init_salt' : ActorMethod<[], undefined>,
+  /**
+   * Called by a Home Screen app on first launch, signed with the key it just generated,
+   * spending a token the browser that installed it signed.
+   */
+  'link_notification_app' : ActorMethod<
+    [LinkNotificationAppRequest],
+    { 'Ok' : null } |
+      { 'Err' : LinkNotificationAppError }
+  >,
   /**
    * Every app the identity holds accounts at, so the user can see where they have
    * signed in. Authorized by the identity's own access methods.
