@@ -128,6 +128,31 @@ export const notificationsUnavailableHere = (): boolean => {
   return "Ios" in os || "Ipados" in os;
 };
 
+/**
+ * Whether notifications here have to go through a Home Screen app first.
+ *
+ * iOS delivers web push only to an installed app, so Safari cannot subscribe and
+ * answering here means sending the user through the install instead of raising a
+ * prompt. The Home Screen app itself runs standalone and is served the same page, so
+ * it is excluded: inside it, notifications are ordinary.
+ */
+export const notificationsNeedInstallHere = (): boolean => {
+  if (!notificationsUnavailableHere()) {
+    return false;
+  }
+  const legacy = (navigator as { standalone?: boolean }).standalone;
+  if (legacy === true) {
+    return false;
+  }
+  // Asked of the document, which not every context this module loads in has: the
+  // service worker imports from here and has no `window` at all.
+  const display =
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(display-mode: standalone)").matches
+      : false;
+  return !display;
+};
+
 export type OptInScreen = "enable" | "skip";
 
 /** Nothing to ask, so the answer is already known, or the question and what answering
@@ -138,6 +163,10 @@ export type OptInResolution =
       screen: "enable";
       state: DeviceNotificationState;
       consented: boolean;
+      /** Allow sends the user through the Home Screen install rather than raising a
+       *  prompt, because this browser has no way to subscribe. The screen is the same
+       *  one either way; only what answering it does differs. */
+      installFirst: boolean;
     };
 
 /**
@@ -177,10 +206,22 @@ export const resolveOptIn = async ({
         }
       : await readDeviceState(identityNumber, browserState);
   recordPermission(state.permission);
+  // Where the answer is a Home Screen app, this browser cannot read whether the app is
+  // linked and subscribed: `get_webpush_subscription_status` reports the caller's own
+  // row, and the app has an entry of its own. So what is asked turns on consent alone.
+  // An identity that has allowed this app is not asked again, and one that has not is
+  // sent through the install.
+  const installFirst = notificationsNeedInstallHere();
+  if (installFirst) {
+    return consented
+      ? { screen: "skip", granted: true }
+      : { screen: "enable", state, consented, installFirst };
+  }
+
   const screen = resolveOptInScreen(state, consented);
   return screen === "skip"
     ? { screen, granted: consented && deliversHere(state) }
-    : { screen, state, consented };
+    : { screen, state, consented, installFirst };
 };
 
 /**

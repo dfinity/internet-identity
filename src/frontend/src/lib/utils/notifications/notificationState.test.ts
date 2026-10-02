@@ -21,6 +21,7 @@ vi.mock("./pushSubscription", () => ({
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import {
+  notificationsNeedInstallHere,
   notificationsUnavailableHere,
   readBrowserPushState,
   readDeviceState,
@@ -145,6 +146,13 @@ describe("readBrowserPushState and readDeviceState", () => {
     // Call counts are what the "reads no further" cases assert on, and the
     // implementations below are set after, so clearing leaves them in place.
     vi.clearAllMocks();
+    // Stated rather than inherited: `clearAllMocks` keeps implementations, so a case
+    // that set this to iOS leaves every later one resolving for iOS, where the answer
+    // is the Home Screen install instead of a prompt.
+    vi.mocked(browserAndSystem).mockReturnValue({
+      os: { Macos: null },
+      brand: { Chrome: null },
+    });
     vi.stubGlobal("Notification", { permission: "granted" });
     vi.mocked(isPushSupported).mockReturnValue(true);
     vi.mocked(currentDeviceSubscription).mockResolvedValue({
@@ -289,7 +297,12 @@ describe("resolveOptIn", () => {
         actor: actorGranting(false),
         browser: readBrowserPushState(),
       }),
-    ).resolves.toEqual({ screen: "enable", state: ready, consented: false });
+    ).resolves.toEqual({
+      screen: "enable",
+      state: ready,
+      consented: false,
+      installFirst: false,
+    });
   });
 
   /** A browser that could not be read is not a browser with nothing to ask. The
@@ -576,5 +589,117 @@ describe("watchNotificationPermission", () => {
     await vi.advanceTimersByTimeAsync(1_000);
 
     expect(onAllowed).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("notificationsNeedInstallHere", () => {
+  beforeEach(() => {
+    vi.mocked(browserAndSystem).mockReturnValue({
+      os: { Ios: null },
+      brand: { Safari: null },
+    });
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("is true in a browser tab on iOS, where this browser cannot subscribe", () => {
+    expect(notificationsNeedInstallHere()).toBe(true);
+  });
+
+  /** The installed app is served this same page, and inside it notifications are
+   *  ordinary: it is the thing the install was for. */
+  it("is false in the installed app, which iOS reports the old way", () => {
+    vi.stubGlobal("navigator", { ...navigator, standalone: true });
+
+    expect(notificationsNeedInstallHere()).toBe(false);
+  });
+
+  it("is false in the installed app, which newer iOS reports as a display mode", () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+
+    expect(notificationsNeedInstallHere()).toBe(false);
+  });
+
+  it("is false where notifications need no app at all", () => {
+    vi.mocked(browserAndSystem).mockReturnValue({
+      os: { Macos: null },
+      brand: { Safari: null },
+    });
+
+    expect(notificationsNeedInstallHere()).toBe(false);
+  });
+
+  /** Not every context this module loads in is a document: the service worker imports
+   *  from here and has no `window`. */
+  it("answers without a matchMedia to ask", () => {
+    vi.stubGlobal("matchMedia", undefined);
+
+    expect(notificationsNeedInstallHere()).toBe(true);
+  });
+});
+
+describe("resolveOptIn where notifications need an app", () => {
+  const actorGranting = (granted: boolean) =>
+    ({
+      notification_consent_granted: vi.fn(() => Promise.resolve(granted)),
+    }) as unknown as Parameters<typeof resolveOptIn>[0]["actor"];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(browserAndSystem).mockReturnValue({
+      os: { Ios: null },
+      brand: { Safari: null },
+    });
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    vi.stubGlobal("Notification", { permission: "default" });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** This browser cannot read whether the app is linked and subscribed, so what is
+   *  asked turns on consent alone. */
+  it("asks an identity that has not allowed this app", async () => {
+    await expect(
+      resolveOptIn({
+        identityNumber: BigInt(10_000),
+        origin: "https://app.example",
+        actor: actorGranting(false),
+        browser: Promise.resolve(undefined),
+      }),
+    ).resolves.toMatchObject({ screen: "enable", installFirst: true });
+  });
+
+  it("does not ask an identity that has allowed it before", async () => {
+    await expect(
+      resolveOptIn({
+        identityNumber: BigInt(10_000),
+        origin: "https://app.example",
+        actor: actorGranting(true),
+        browser: Promise.resolve(undefined),
+      }),
+    ).resolves.toEqual({ screen: "skip", granted: true });
+  });
+
+  /** Answering sends the user through the install rather than raising a prompt, and a
+   *  browser that cannot subscribe must not turn that into nothing to ask. */
+  it("asks even where this browser reports it cannot subscribe", async () => {
+    // Read, not defaulted: a resolution handed no browser state assumes support, so
+    // passing `undefined` here would never reach the unsupported case at all.
+    await expect(
+      resolveOptIn({
+        identityNumber: BigInt(10_000),
+        origin: "https://app.example",
+        actor: actorGranting(false),
+        browser: Promise.resolve({
+          supported: false,
+          permission: "default" as NotificationPermission,
+        }),
+      }),
+    ).resolves.toMatchObject({ screen: "enable", installFirst: true });
   });
 });
