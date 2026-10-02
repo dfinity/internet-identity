@@ -29,20 +29,32 @@
     /** The app, with the permission still to ask for. iOS raises the prompt only from
      *  a gesture, so there is a button and not a call on mount. */
     | { kind: "ask" }
+    /** Another app on this device already receives them, so this one has nothing to
+     *  do. Not a failure: the first one works. */
+    | { kind: "already-covered" }
     /** The app, with the permission refused. Only iOS Settings can lift it. */
     | { kind: "blocked" }
     | { kind: "ready"; identityNumber: bigint }
     | { kind: "refused"; reason: string };
 
   let screen = $state<Screen>({ kind: "working" });
+  /** Read on mount, because this page is rendered at build time where there is no
+   *  document to ask. */
+  let host = $state("");
 
-  const settle = (outcome: LinkOutcome): Screen =>
-    outcome.status === "linked"
-      ? { kind: "ready", identityNumber: outcome.identityNumber }
-      : { kind: "refused", reason: outcome.reason };
+  const settle = (outcome: LinkOutcome): Screen => {
+    if (outcome.status === "linked") {
+      return { kind: "ready", identityNumber: outcome.identityNumber };
+    }
+    if (outcome.status === "already-linked") {
+      return { kind: "already-covered" };
+    }
+    return { kind: "refused", reason: outcome.reason };
+  };
 
   onMount(() => {
     void (async () => {
+      host = window.location.host;
       if (!isStandalone()) {
         screen = { kind: "install" };
         return;
@@ -185,7 +197,7 @@
           <p class="text-text-tertiary mb-5 text-base">
             <Trans>Follow these steps to get notifications:</Trans>
           </p>
-          <InstallSteps host={window.location.host} />
+          <InstallSteps {host} />
 
           <div class="mt-7 flex flex-col gap-2.5">
             <button
@@ -256,6 +268,21 @@
           <p class="text-text-tertiary text-base">
             <Trans>
               You can close this. Notifications from your apps will arrive here.
+            </Trans>
+          </p>
+        </div>
+      {:else if screen.kind === "already-covered"}
+        <div class="flex min-w-0 flex-1 flex-col items-stretch justify-end">
+          <FeaturedIcon size="lg" class="mb-4 self-start">
+            <BellIcon class="size-6" aria-hidden="true" />
+          </FeaturedIcon>
+          <h1 class="text-text-primary mb-3 text-2xl font-medium">
+            {$t`Already set up`}
+          </h1>
+          <p class="text-text-tertiary text-base">
+            <Trans>
+              This device already receives your notifications through another
+              copy of this app. You can remove this one from your Home Screen.
             </Trans>
           </p>
         </div>
