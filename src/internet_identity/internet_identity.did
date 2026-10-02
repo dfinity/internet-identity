@@ -1872,9 +1872,6 @@ type LinkNotificationAppError = variant {
     LinkTokenExpired;
     // The caller is not the key it asks to have linked.
     CallerIsNotTheApp : principal;
-    // One app per browser is one per device, and it is what keeps a token still inside
-    // its expiry from being spent twice.
-    AlreadyLinked;
     KeyAlreadyInUse;
     InternalCanisterError : text;
 };

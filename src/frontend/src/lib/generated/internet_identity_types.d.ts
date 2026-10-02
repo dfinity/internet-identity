@@ -1379,13 +1379,6 @@ export type LinkNotificationAppError = {
     'CallerIsNotTheApp' : Principal
   } |
   { 'LinkTokenExpired' : null } |
-  {
-    /**
-     * One app per browser is one per device, and it is what keeps a token still inside
-     * its expiry from being spent twice.
-     */
-    'AlreadyLinked' : null
-  } |
   { 'KeyAlreadyInUse' : null };
 /**
  * Claims the entry a Home Screen app carries notifications under. Authorized by the

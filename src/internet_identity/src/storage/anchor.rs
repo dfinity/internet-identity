@@ -87,8 +87,6 @@ pub enum BrowserError {
     /// it here would turn that key into a session, which is the one thing linking it must
     /// never be able to grant.
     NotificationAppKey,
-    /// This browser already has a notification app linked.
-    AlreadyLinked,
 }
 
 /// A browser this anchor has signed in from, as it described itself when it registered.
@@ -921,16 +919,14 @@ impl Anchor {
             return Err(BrowserError::NotificationAppKey);
         }
         let description = parent_browser.description.clone();
-        // One app per browser, which is one per device. It is also what stops a link
-        // token being spent twice while it is still inside its expiry, so nothing has to
-        // be stored to make the token single-use.
-        if self
-            .browsers
-            .iter()
-            .any(|browser| browser.linked_from_browser == Some(parent))
-        {
-            return Err(BrowserError::AlreadyLinked);
-        }
+        // One app per browser, replacing whatever it had. Refusing the second instead
+        // leaves a user who deletes the app from their Home Screen unable to install it
+        // again, ever: iOS destroys its storage and its key with it, while the entry
+        // here survives naming a key nothing holds. The browser presenting an unexpired
+        // token it signed is entitled to say where its notifications go, and the newest
+        // install is the answer it is giving.
+        self.browsers
+            .retain(|browser| browser.linked_from_browser != Some(parent));
 
         let id = self.next_browser_id;
         self.next_browser_id = self.next_browser_id.saturating_add(1);

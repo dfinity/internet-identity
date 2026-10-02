@@ -1113,10 +1113,6 @@ pub enum LinkNotificationAppError {
     LinkTokenExpired,
     /// The caller is not the key it asks to have linked.
     CallerIsNotTheApp(Principal),
-    /// The browser that signed the token already has an app linked. One per browser is
-    /// one per device, and it is what keeps a token that is still inside its expiry
-    /// from being spent twice.
-    AlreadyLinked,
     /// The key is one some browser of this identity already holds.
     KeyAlreadyInUse,
     InternalCanisterError(String),

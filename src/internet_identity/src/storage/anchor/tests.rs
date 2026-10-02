@@ -1433,6 +1433,69 @@ mod browser_tests {
         );
     }
 
+    /// Deleting the app from the Home Screen destroys its storage and its key with it,
+    /// while the entry here survives naming a key nothing holds. Refusing the next claim
+    /// would leave that user unable to install it again, ever.
+    #[test]
+    fn linking_again_replaces_the_app_a_browser_had() {
+        let mut anchor = anchor();
+        let (parent, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        let first = anchor
+            .link_notification_app(parent, browser_key(9), 2_000)
+            .unwrap();
+
+        let second = anchor
+            .link_notification_app(parent, browser_key(8), 3_000)
+            .unwrap();
+
+        assert_ne!(second, first);
+        // One app, the newest, and the key of the one that is gone reaches nothing.
+        assert_eq!(
+            anchor.linked_notification_app(parent).map(|entry| entry.id),
+            Some(second)
+        );
+        assert!(anchor.browsers().iter().all(|entry| entry.id != first));
+        assert_eq!(
+            anchor.browser_by_principal(Principal::self_authenticating(browser_key(9))),
+            None
+        );
+    }
+
+    /// Replacing one browser's app leaves another browser's alone, which is what keeps a
+    /// second device working.
+    #[test]
+    fn linking_again_leaves_another_browsers_app_alone() {
+        let mut anchor = anchor();
+        let (first, _) = anchor
+            .resolve_browser(browser_key(1), successor_key(1), description("one"), 1_000)
+            .unwrap();
+        let (second, _) = anchor
+            .resolve_browser(browser_key(2), successor_key(2), description("two"), 1_000)
+            .unwrap();
+        let kept = anchor
+            .link_notification_app(first, browser_key(9), 2_000)
+            .unwrap();
+        anchor
+            .link_notification_app(second, browser_key(8), 2_000)
+            .unwrap();
+
+        anchor
+            .link_notification_app(second, browser_key(7), 3_000)
+            .unwrap();
+
+        assert_eq!(
+            anchor.linked_notification_app(first).map(|entry| entry.id),
+            Some(kept)
+        );
+    }
+
     /// A key another entry already holds is refused, as it is for a successor: otherwise
     /// linking could be used to take over a browser's entry.
     #[test]
