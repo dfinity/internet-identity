@@ -148,7 +148,6 @@ beforeEach(async () => {
     installFirst: false,
   });
   vi.mocked(readGranted).mockResolvedValue(true);
-  vi.mocked(notificationsUnavailableHere).mockReturnValue(false);
   notificationConsentStore.clear();
   (PUSH_NOTIFICATIONS as unknown as Writable<boolean>).set(true);
   const { authorizationPromptStore, authorizedStore } =
@@ -409,26 +408,115 @@ describe("handleNotificationConsentRequest", () => {
     expect(readBrowserPushState).toHaveBeenCalledTimes(3);
   });
 
-  /** iOS delivers notifications only to a Home Screen app, which is not built, so
-   *  nothing is offered there. The method exists, so this is an answer and not a
-   *  refusal: the app is told plainly that it may not notify here. */
-  it("answers no on iOS without opening a screen", async () => {
+  /**
+   * iOS delivers notifications only to a Home Screen app, so answering there means
+   * sending the user through the install. The screen opens like any other, and what
+   * the app is told comes from the screen rather than from the canister: the app has
+   * an entry of its own and has not been opened yet, so there is nothing to read.
+   */
+  /**
+   * Pinned against the browser, not against the resolution: this handler used to
+   * answer no and return before resolving anything on iOS, and every test that asked
+   * about the install mocked the resolution instead, so the whole path was dead and
+   * the suite agreed with itself. Asserting from "this browser is an iPhone" is what
+   * makes a gate in front of the resolver fail here.
+   */
+  it("resolves rather than answering for itself on a browser that needs an app", async () => {
     vi.mocked(notificationsUnavailableHere).mockReturnValue(true);
-    const opened = vi.fn();
-    const unsubscribe = notificationConsentStore.subscribe((context) => {
-      if (context !== undefined) {
-        opened();
-      }
+
+    const channel = {
+      origin: ORIGIN,
+      send: () => Promise.resolve(),
+    } as unknown as Channel;
+    const running = handleNotificationConsentRequest(channel, () => {})({
+      jsonrpc: "2.0",
+      id: 1,
+      method: NOTIFICATION_CONSENT_METHOD,
+      params: {},
+    } as unknown as JsonRequest);
+
+    await waitForStore(notificationConsentStore);
+    expect(resolveOptIn).toHaveBeenCalledTimes(1);
+
+    notificationConsentStore.settle({ installStarted: true });
+    await running;
+  });
+
+  it("opens the install ask where notifications need an app", async () => {
+    vi.mocked(resolveOptIn).mockResolvedValue({
+      screen: "enable",
+      state: {} as never,
+      consented: false,
+      installFirst: true,
     });
 
-    const { sent, errors } = await run({ settle: false });
+    const channel = {
+      origin: ORIGIN,
+      send: () => Promise.resolve(),
+    } as unknown as Channel;
+    const running = handleNotificationConsentRequest(channel, () => {})({
+      jsonrpc: "2.0",
+      id: 1,
+      method: NOTIFICATION_CONSENT_METHOD,
+      params: {},
+    } as unknown as JsonRequest);
 
-    unsubscribe();
-    expect(opened).not.toHaveBeenCalled();
-    expect(sent[0].result).toEqual({ granted: false });
-    expect(errors).toEqual([]);
-    expect(resolveOptIn).not.toHaveBeenCalled();
+    const opened = await waitForStore(notificationConsentStore);
+    expect(opened.installFirst).toBe(true);
+
+    notificationConsentStore.settle({ installStarted: true });
+    await running;
+
+    // Answered from the screen, not read back: there is no row for the app yet.
     expect(readGranted).not.toHaveBeenCalled();
+  });
+
+  /** The install having started is the whole answer, so the app is told yes without
+   *  the canister being asked. */
+  it("tells the app yes once the install has started", async () => {
+    vi.mocked(resolveOptIn).mockResolvedValue({
+      screen: "enable",
+      state: {} as never,
+      consented: false,
+      installFirst: true,
+    });
+    const sent: Record<string, unknown>[] = [];
+    const channel = {
+      origin: ORIGIN,
+      send: (message: Record<string, unknown>) => {
+        sent.push(message);
+        return Promise.resolve();
+      },
+    } as unknown as Channel;
+    const running = handleNotificationConsentRequest(channel, () => {})({
+      jsonrpc: "2.0",
+      id: 1,
+      method: NOTIFICATION_CONSENT_METHOD,
+      params: {},
+    } as unknown as JsonRequest);
+
+    await waitForStore(notificationConsentStore);
+    notificationConsentStore.settle({ installStarted: true });
+    await running;
+
+    expect(sent[0].result).toEqual({ granted: true });
+  });
+
+  /** Putting the install off is a no, and the canister is still the source of that:
+   *  an identity that had already allowed the app elsewhere keeps its yes. */
+  it("reads the answer back where the install was not started", async () => {
+    vi.mocked(resolveOptIn).mockResolvedValue({
+      screen: "enable",
+      state: {} as never,
+      consented: false,
+      installFirst: true,
+    });
+    vi.mocked(readGranted).mockResolvedValue(false);
+
+    const { sent } = await run();
+
+    expect(readGranted).toHaveBeenCalledTimes(1);
+    expect(sent[0].result).toEqual({ granted: false });
   });
 
   it("reports what the canister recorded", async () => {

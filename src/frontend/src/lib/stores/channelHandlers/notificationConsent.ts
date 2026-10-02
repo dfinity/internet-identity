@@ -16,7 +16,6 @@ import {
   notificationConsentStore,
 } from "$lib/stores/notificationConsent.store";
 import {
-  notificationsUnavailableHere,
   readBrowserPushState,
   readGranted,
   resolveOptIn,
@@ -150,18 +149,6 @@ export const handleNotificationConsentRequest =
         const effectiveOrigin = remapToLegacyDomain(
           params.icrc95DerivationOrigin ?? channel.origin,
         );
-
-        // No notifications on iOS yet, so nothing is offered and the app is told
-        // plainly that it may not notify here rather than being refused outright:
-        // the method exists, this browser just has no answer but no.
-        if (notificationsUnavailableHere()) {
-          await channel.send({
-            jsonrpc: "2.0",
-            id: requestId,
-            result: { granted: false },
-          });
-          return;
-        }
 
         // The canister refuses an origin it does not notify for, so asking this
         // user to allow notifications could only ever end in an error.
