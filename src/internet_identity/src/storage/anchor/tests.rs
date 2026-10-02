@@ -1309,6 +1309,124 @@ mod browser_tests {
         ByteBuf::from(key)
     }
 
+    /// A Home Screen app cannot reach the key of the browser that installed it, so it
+    /// gets an entry of its own. What it must never get is a way in.
+    #[test]
+    fn a_linked_notification_app_cannot_sign_in() {
+        let mut anchor = anchor();
+        let (parent, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        let app = anchor
+            .link_notification_app(parent, browser_key(9), 2_000)
+            .unwrap();
+
+        // Presented as the key to advance from, which is how its own calls are authorized.
+        assert_eq!(
+            anchor.resolve_browser(browser_key(9), successor_key(9), description("x"), 3_000),
+            Err(BrowserError::NotificationAppKey)
+        );
+        // And as a successor, so neither slot is a way round the first answer.
+        assert_eq!(
+            anchor.resolve_browser(browser_key(9), browser_key(9), description("x"), 3_000),
+            Err(BrowserError::SuccessorMatchesCurrent)
+        );
+        assert_ne!(app, parent);
+        assert_eq!(anchor.browsers().len(), 2);
+    }
+
+    /// It is reached the way every other entry is, which is what lets it set and read its
+    /// own subscription with no session and no delegation.
+    #[test]
+    fn a_linked_notification_app_is_found_by_its_own_key() {
+        let mut anchor = anchor();
+        let (parent, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        let app = anchor
+            .link_notification_app(parent, browser_key(9), 2_000)
+            .unwrap();
+
+        assert_eq!(
+            anchor.browser_by_principal(Principal::self_authenticating(browser_key(9))),
+            Some(app)
+        );
+    }
+
+    /// One deep by construction: a linked app has no authority to link anything, so a
+    /// chain of them cannot be built.
+    #[test]
+    fn a_linked_notification_app_cannot_link_another() {
+        let mut anchor = anchor();
+        let (parent, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        let app = anchor
+            .link_notification_app(parent, browser_key(9), 2_000)
+            .unwrap();
+
+        assert_eq!(
+            anchor.link_notification_app(app, browser_key(8), 3_000),
+            Err(BrowserError::NotificationAppKey)
+        );
+    }
+
+    /// A key another entry already holds is refused, as it is for a successor: otherwise
+    /// linking could be used to take over a browser's entry.
+    #[test]
+    fn linking_refuses_a_key_already_in_use() {
+        let mut anchor = anchor();
+        let (parent, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+
+        assert_eq!(
+            anchor.link_notification_app(parent, successor_key(1), 2_000),
+            Err(BrowserError::SuccessorAlreadyInUse)
+        );
+    }
+
+    #[test]
+    fn a_linked_notification_app_takes_the_installing_browser_description() {
+        let mut anchor = anchor();
+        let (parent, _) = anchor
+            .resolve_browser(
+                browser_key(1),
+                successor_key(1),
+                description("Safari on iPhone"),
+                1_000,
+            )
+            .unwrap();
+        anchor
+            .link_notification_app(parent, browser_key(9), 2_000)
+            .unwrap();
+
+        let app = &anchor.browsers()[1];
+        assert_eq!(app.description, description("Safari on iPhone"));
+        assert_eq!(app.linked_from_browser, Some(parent));
+        assert_eq!(app.created_at, 2_000);
+    }
+
     #[test]
     fn an_unseen_key_registers_a_new_device() {
         let mut anchor = anchor();
