@@ -180,6 +180,10 @@ fn should_report_which_apps_may_notify() -> Result<(), RejectResponse> {
             .collect::<Vec<_>>(),
         vec![(NOTIFYING, true), (QUIET, false)],
     );
+    // Allowed is not notified: nothing was sent yet.
+    assert!(applications(&env, canister_id, anchor)
+        .iter()
+        .all(|app| app.last_notified.is_none()));
     Ok(())
 }
 

@@ -44,8 +44,10 @@ pub fn get_accounts_for_origin(
 pub fn list_applications(anchor_number: AnchorNumber) -> Vec<ApplicationInfo> {
     storage_borrow(|storage| storage.list_applications(anchor_number))
         .into_iter()
-        .map(|(origin, last_used, consented)| ApplicationInfo {
-            notifications_allowed: consented && crate::notifications::notifies_for(&origin),
+        .map(|(origin, last_used, config)| ApplicationInfo {
+            notifications_allowed: config.notifications_consented_at_ns.is_some()
+                && crate::notifications::notifies_for(&origin),
+            last_notified: config.last_notified_at_ns,
             origin,
             last_used,
         })

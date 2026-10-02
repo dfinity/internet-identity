@@ -141,6 +141,11 @@ export interface ApplicationInfo {
    */
   'notifications_allowed' : boolean,
   /**
+   * When the app last had a notification queued for one of the identity's browsers,
+   * or null where it never has.
+   */
+  'last_notified' : [] | [Timestamp],
+  /**
    * The latest sign-in to any of the identity's accounts at the app.
    */
   'last_used' : Timestamp,

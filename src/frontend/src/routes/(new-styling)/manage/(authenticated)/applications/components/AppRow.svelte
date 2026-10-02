@@ -11,16 +11,24 @@
     origin: string;
     /** Already formatted: a relative time. */
     lastVisited: string;
-    /** Whether the app may notify, or `undefined` for an app this Internet Identity
-     *  does not notify for. */
-    allowed: boolean | undefined;
-    /** Keeps the notifications column, empty or not, so the rows line up. */
+    /** Whether the app may notify. An app this Internet Identity does not notify for
+     *  may not. */
+    allowed: boolean;
+    /** Already formatted: a relative time, or `undefined` where the app never has. */
+    lastNotified: string | undefined;
+    /** Off where this Internet Identity notifies for no app at all. */
     showNotifications: boolean;
     onOpen: () => void;
   }
 
-  const { origin, lastVisited, allowed, showNotifications, onOpen }: Props =
-    $props();
+  const {
+    origin,
+    lastVisited,
+    allowed,
+    lastNotified,
+    showNotifications,
+    onOpen,
+  }: Props = $props();
 
   const metadataStore = $derived(getAppMetadataStore(origin));
   const metadata = $derived($metadataStore);
@@ -57,26 +65,30 @@
       <span
         class="flex min-w-0 flex-col gap-1 @min-[560px]/apps:whitespace-nowrap"
       >
-        {#if allowed !== undefined}
-          <span class="text-text-tertiary text-xs font-semibold">
-            {$t`Notifications`}
-          </span>
+        <span class="text-text-tertiary text-xs font-semibold">
+          {$t`Notifications`}
+        </span>
+        <span
+          class={[
+            "flex items-center gap-1.5 text-xs",
+            allowed ? "text-text-primary" : "text-text-tertiary",
+          ]}
+        >
           <span
+            aria-hidden="true"
             class={[
-              "flex items-center gap-1.5 text-xs",
-              allowed ? "text-text-primary" : "text-text-tertiary",
+              "size-1.5 shrink-0 rounded-full",
+              allowed ? "bg-fg-success-primary" : "bg-fg-quaternary",
             ]}
-          >
-            <span
-              aria-hidden="true"
-              class={[
-                "size-1.5 shrink-0 rounded-full",
-                allowed ? "bg-fg-success-primary" : "bg-fg-quaternary",
-              ]}
-            ></span>
-            {allowed ? $t`Allowed` : $t`Not allowed`}
-          </span>
-        {/if}
+          ></span>
+          {#if !allowed}
+            {$t`Not allowed`}
+          {:else if lastNotified !== undefined}
+            {lastNotified}
+          {:else}
+            {$t`None yet`}
+          {/if}
+        </span>
       </span>
     {/if}
   </span>

@@ -16,13 +16,10 @@
      *  is nothing to switch, so the switch is left out. */
     canNotify: boolean;
     allowed: boolean;
-    /** Holds the switch: a save is in flight, or something it decides on is still
-     *  being read. */
-    busy: boolean;
     onAllowedChange: (allowed: boolean) => void;
   }
 
-  const { titleId, origin, canNotify, allowed, busy, onAllowedChange }: Props =
+  const { titleId, origin, canNotify, allowed, onAllowedChange }: Props =
     $props();
 
   const metadataStore = $derived(getAppMetadataStore(origin));
@@ -71,12 +68,9 @@
         </span>
       </div>
       <div class="flex h-6 shrink-0 items-center">
-        <!-- `onclick` rather than `onchange`, so the permission prompt that turning
-             it on can raise runs inside the user's gesture. -->
         <Toggle
           checked={allowed}
-          disabled={busy}
-          onclick={(event) => onAllowedChange(event.currentTarget.checked)}
+          onchange={(event) => onAllowedChange(event.currentTarget.checked)}
           aria-labelledby={switchId}
           aria-describedby={hintId}
         />

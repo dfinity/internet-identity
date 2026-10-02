@@ -782,6 +782,7 @@ export const idlFactory = ({ IDL }) => {
   const ApplicationInfo = IDL.Record({
     'origin' : FrontendHostname,
     'notifications_allowed' : IDL.Bool,
+    'last_notified' : IDL.Opt(Timestamp),
     'last_used' : Timestamp,
   });
   const ListApplicationsError = IDL.Variant({

@@ -701,6 +701,9 @@ pub struct ApplicationInfo {
     /// Whether the app may notify the identity: it holds consent, and this deployment
     /// notifies for it.
     pub notifications_allowed: bool,
+    /// When the app last had a notification queued for one of the identity's browsers,
+    /// or `None` where it never has.
+    pub last_notified: Option<Timestamp>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

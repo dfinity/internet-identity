@@ -2815,7 +2815,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Every app this identity has signed in to: its origin, the latest sign-in to any of
-    /// the identity's accounts there, and whether it holds consent to notify.
+    /// the identity's accounts there, and what the identity configured for it.
     ///
     /// Only where some account was used. Granting consent, naming an account and choosing
     /// a default each store a list at an app the identity may never have signed in to,
@@ -2823,7 +2823,7 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn list_applications(
         &self,
         anchor_number: AnchorNumber,
-    ) -> Vec<(FrontendHostname, Timestamp, bool)> {
+    ) -> Vec<(FrontendHostname, Timestamp, AnchorApplicationConfig)> {
         self.stable_account_reference_list_memory
             .range(
                 (anchor_number, ApplicationNumber::MIN)..=(anchor_number, ApplicationNumber::MAX),
@@ -2844,11 +2844,10 @@ impl<M: Memory + Clone> Storage<M> {
                     );
                     return None;
                 };
-                let consented = self
+                let config = self
                     .anchor_application_config(anchor_number, application_number)
-                    .and_then(|config| config.notifications_consented_at_ns)
-                    .is_some();
-                Some((application.origin, last_used, consented))
+                    .unwrap_or_default();
+                Some((application.origin, last_used, config))
             })
             .collect()
     }
@@ -2860,6 +2859,25 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Option<AnchorApplicationConfig> {
         self.stable_anchor_application_config_memory
             .get(&(anchor_number, application_number))
+    }
+
+    /// Notes that the app reached one of the identity's browsers at `now`.
+    ///
+    /// Stamps a config the identity already holds and never starts one: an app that may
+    /// notify always has one, and a row written here, outside the account-state write,
+    /// would be one nothing collects.
+    pub fn record_notified(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        now: Timestamp,
+    ) {
+        let key = (anchor_number, application_number);
+        if let Some(mut config) = self.stable_anchor_application_config_memory.get(&key) {
+            config.last_notified_at_ns = Some(now);
+            self.stable_anchor_application_config_memory
+                .insert(key, config);
+        }
     }
 
     /// What this identity has configured for the app at `origin`, or `None` where it has

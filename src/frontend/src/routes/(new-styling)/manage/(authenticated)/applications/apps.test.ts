@@ -8,7 +8,13 @@ const application = (
   origin: string,
   last_used: bigint,
   notifications_allowed = false,
-): ApplicationInfo => ({ origin, last_used, notifications_allowed });
+  last_notified?: bigint,
+): ApplicationInfo => ({
+  origin,
+  last_used,
+  notifications_allowed,
+  last_notified: last_notified !== undefined ? [last_notified] : [],
+});
 
 describe("appsFrom", () => {
   it("lists nothing for an identity with no applications", () => {
@@ -19,18 +25,25 @@ describe("appsFrom", () => {
     expect(
       appsFrom([
         application("https://older.example", millis(1_000)),
-        application("https://newer.example", millis(5_000), true),
+        application(
+          "https://newer.example",
+          millis(5_000),
+          true,
+          millis(3_000),
+        ),
       ]),
     ).toEqual([
       {
         origin: "https://newer.example",
         lastUsedMillis: 5_000,
         notificationsAllowed: true,
+        lastNotifiedMillis: 3_000,
       },
       {
         origin: "https://older.example",
         lastUsedMillis: 1_000,
         notificationsAllowed: false,
+        lastNotifiedMillis: undefined,
       },
     ]);
   });

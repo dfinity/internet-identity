@@ -1526,6 +1526,9 @@ type ApplicationInfo = record {
     // Whether the app may notify the identity: it holds consent, and this deployment
     // notifies for it, as notification_consent_granted answers.
     notifications_allowed : bool;
+    // When the app last had a notification queued for one of the identity's browsers,
+    // or null where it never has.
+    last_notified : opt Timestamp;
 };
 
 type ListApplicationsRequest = record {

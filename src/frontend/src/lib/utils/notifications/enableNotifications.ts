@@ -42,9 +42,9 @@ export const enableNotifications = async ({
 };
 
 /**
- * Records consent for an app without touching the subscription. For a browser
- * that is already subscribed and only needs to allow one more app, so there is
- * no permission prompt and no new endpoint.
+ * Records consent for an app without touching any subscription, so there is no
+ * permission prompt and no new endpoint. Consent belongs to the identity, so it
+ * reaches every browser already registered for notifications.
  */
 export const allowApp = ({
   identityNumber,
