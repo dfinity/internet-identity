@@ -1,23 +1,25 @@
-# Pinned sha256 hashes for the didc binaries listed in `.didc-release`.
+# Pinned sha256 hashes for the didc release archives listed in `.didc-release`.
 #
 # Kept in lockstep with `.didc-release` so the helper in
-# `scripts/didc-helpers.bash` can verify each downloaded binary before
-# executing it — without this, the download path is plain HTTPS-with-no-
-# integrity-check (caught by the ZeroPath static-analysis ruleset that
-# guards against unverified-binary-execution patterns).
+# `scripts/didc-helpers.bash` can verify each downloaded archive before
+# executing the binary inside it — without this, the download path is
+# plain HTTPS-with-no-integrity-check (caught by the ZeroPath static-
+# analysis ruleset that guards against unverified-binary-execution
+# patterns).
 #
-# When bumping `.didc-release`, refresh these too. The format is one
-# `<platform> <sha256>` pair per line (whitespace-separated, comments
-# allowed); platforms must match the asset suffix on the
-# dfinity/candid release page (linux64 / macos / arm32).
+# `scripts/update-deps/update-didc` refreshes these together with
+# `.didc-release`. The format is one `<target> <sha256>` pair per line
+# (whitespace-separated, comments allowed); targets must match the
+# `didc-<target>.tar.xz` asset names on the dfinity/candid release page.
 #
 # To recompute by hand:
 #   release=$(sed <.didc-release 's/#.*$//' | sed '/^$/d')
-#   for plat in linux64 macos arm32; do
-#     curl -sfL "https://github.com/dfinity/candid/releases/download/$release/didc-$plat" \
-#       | shasum -a 256 | awk -v p="$plat" '{print p, $1}'
+#   for target in aarch64-apple-darwin x86_64-apple-darwin aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu; do
+#     curl -sfL "https://github.com/dfinity/candid/releases/download/$release/didc-$target.tar.xz" \
+#       | shasum -a 256 | awk -v t="$target" '{print t, $1}'
 #   done
 
-linux64 32693c76d9c6fe0f273f2c1ebf7e48ba3c383e925e5afd17dd264a06aed9fbcc
-macos   e7c4f2450ea7eb7535a9fe8853102f6068b2787d6197f6a6587dd96c7f5110bb
-arm32   91303ee9e2ee59824deab45ab86949afcf3f283e8f0780e4665c10db973bbdf3
+aarch64-apple-darwin      1c3f117e4273cbb10670c44c34e70a58599ec180bc814fb6e3346609d330771f
+x86_64-apple-darwin       f279437b1322843d682c5afd2d2722e740559ef764fc655c9a31b559ee754dec
+aarch64-unknown-linux-gnu e081ab7b406232e82078a00891b883f50a121c6e9da1848aade6bc1d34d49fc5
+x86_64-unknown-linux-gnu  9990d2646a2b023df50c8765fd34e43951ba947303d3ce9d06590b2d58e89469
