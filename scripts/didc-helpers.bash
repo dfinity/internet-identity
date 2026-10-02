@@ -10,8 +10,8 @@
 #
 # The release archive and the binary extracted from it are cached under
 # `.icp/cache/didc/` (already gitignored as part of the `.icp/` tool
-# cache) keyed by release + target, so multiple checkouts on the same
-# machine share downloads.
+# cache) keyed by release + target, so repeated runs in the same
+# checkout reuse the download.
 #
 # Archives are sha256-verified against `.didc-checksums` before the
 # binary is extracted — a mismatch (or missing checksum entry)
@@ -131,8 +131,15 @@ ensure_pinned_didc() {
             echo "Error: failed to extract $member from $archive" >&2
             return 1
         fi
-        chmod +x "$bin.tmp"
-        mv "$bin.tmp" "$bin"
+        if ! mv "$bin.tmp" "$bin"; then
+            rm -f "$bin.tmp"
+            echo "Error: failed to install $bin" >&2
+            return 1
+        fi
+    fi
+    if ! chmod +x "$bin"; then
+        echo "Error: failed to make $bin executable" >&2
+        return 1
     fi
 
     PINNED_DIDC="$bin"
