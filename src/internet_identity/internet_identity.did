@@ -1837,6 +1837,18 @@ type RemoveWebPushSubscriptionError = variant {
     InternalCanisterError : text;
 };
 
+// Whether this browser has a notification app, and whether it can be delivered to. A
+// Home Screen app has an entry of its own, so the browser that installed it cannot see
+// it through get_webpush_subscription_status, which answers for the caller.
+type GetNotificationAppStatusRequest = record {
+    anchor_number : UserNumber;
+};
+
+type NotificationAppStatus = record {
+    browser_id : nat32;
+    subscribed : bool;                 // holds a push subscription, so is reachable
+};
+
 // Claims the entry a Home Screen app carries notifications under. Authorized by the
 // token rather than by the caller being a browser this identity knows: the app has just
 // generated its key and no entry holds it yet.
@@ -2502,6 +2514,8 @@ service : (opt InternetIdentityInit) -> {
     // Called by a Home Screen app on first launch, signed with the key it just generated,
     // spending a token the browser that installed it signed.
     link_notification_app : (LinkNotificationAppRequest) -> (variant { Ok; Err : LinkNotificationAppError });
+    // Called by the browser that installed the app, signed with its own browser key.
+    get_notification_app_status : (GetNotificationAppStatusRequest) -> (opt NotificationAppStatus) query;
 
     // Called by an app's backend canister for the origin it names.
     app_send_notification : (SendNotificationArg) -> (variant { Ok : SendNotificationResponse; Err : SendNotificationError });

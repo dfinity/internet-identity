@@ -606,6 +606,13 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
     'NoSuchCredentials' : IDL.Text,
   });
+  const GetNotificationAppStatusRequest = IDL.Record({
+    'anchor_number' : UserNumber,
+  });
+  const NotificationAppStatus = IDL.Record({
+    'browser_id' : IDL.Nat32,
+    'subscribed' : IDL.Bool,
+  });
   const GetNotificationDelegationRequest = IDL.Record({
     'session_key' : SessionKey,
     'origin' : FrontendHostname,
@@ -1415,6 +1422,11 @@ export const idlFactory = ({ IDL }) => {
     'get_mcp_registration_delegation' : IDL.Func(
         [UserNumber, SessionKey, PublicKey, Timestamp],
         [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : IDL.Text })],
+        ['query'],
+      ),
+    'get_notification_app_status' : IDL.Func(
+        [GetNotificationAppStatusRequest],
+        [IDL.Opt(NotificationAppStatus)],
         ['query'],
       ),
     'get_notification_delegation' : IDL.Func(

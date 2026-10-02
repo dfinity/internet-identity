@@ -3,6 +3,7 @@
   import BellIcon from "@lucide/svelte/icons/bell";
   import BellOffIcon from "@lucide/svelte/icons/bell-off";
   import SmartphoneIcon from "@lucide/svelte/icons/smartphone";
+  import SquarePlusIcon from "@lucide/svelte/icons/square-plus";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
@@ -11,6 +12,8 @@
   import { isStandalone } from "./standalone";
   import { decodeLinkToken } from "./linkToken";
   import { linkAndRegister, linkedIdentity, type LinkOutcome } from "./link";
+  import InstallSteps from "./installSteps/InstallSteps.svelte";
+  import { watchForInstall } from "./watchInstall";
 
   /** What this page is doing, which is settled on mount and not before: the answer
    *  depends on the document it is running in and on storage this partition holds. */
@@ -65,6 +68,19 @@
     })();
   });
 
+  // Only while the steps are up, and only for the identity whose token brought the user
+  // here: the tab goes when the app it is telling them to install has arrived.
+  $effect(() => {
+    if (screen.kind !== "install") {
+      return;
+    }
+    const token = decodeLinkToken(window.location.hash);
+    if (token === undefined) {
+      return;
+    }
+    return watchForInstall(token.identityNumber, () => window.close());
+  });
+
   const retryFromSettings = async () => {
     screen = { kind: "working" };
     const pushState = await readBrowserPushState();
@@ -107,9 +123,9 @@
           <div class="skeleton h-6 w-full rounded"></div>
         </div>
       {:else if screen.kind === "install"}
-        <div class="flex min-w-0 flex-col items-stretch">
+        <div class="flex min-w-0 flex-1 flex-col items-stretch justify-end">
           <FeaturedIcon size="lg" class="mb-4 self-start">
-            <SmartphoneIcon class="size-6" aria-hidden="true" />
+            <SquarePlusIcon class="size-6" aria-hidden="true" />
           </FeaturedIcon>
           <h1 class="text-text-primary mb-3 text-2xl font-medium">
             {$t`Add to Home Screen`}
@@ -117,6 +133,7 @@
           <p class="text-text-tertiary mb-5 text-base">
             <Trans>Follow these steps to get notifications:</Trans>
           </p>
+          <InstallSteps host={window.location.host} />
         </div>
       {:else if screen.kind === "blocked"}
         <div class="flex min-w-0 flex-col items-stretch">
@@ -180,7 +197,7 @@
               Sign in to an app from your browser and allow notifications.
             </Trans>
           </p>
-          <p class="text-text-quaternary text-sm">{screen.reason}</p>
+          <p class="text-text-tertiary text-sm">{screen.reason}</p>
         </div>
       {/if}
     </AuthPanel>

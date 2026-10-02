@@ -1067,6 +1067,24 @@ pub enum RemoveWebPushSubscriptionError {
     InternalCanisterError(String),
 }
 
+/// Asks whether this browser has a notification app that can be delivered to.
+///
+/// A Home Screen app has an entry of its own, so the browser that installed it cannot
+/// see it through `get_webpush_subscription_status`, which answers for the caller. This
+/// is how the browser learns the install finished and stops offering it.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct GetNotificationAppStatusRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct NotificationAppStatus {
+    pub browser_id: BrowserId,
+    /// Whether it holds a push subscription, which is what makes it reachable. An app
+    /// that claimed an entry and has not subscribed yet is linked but delivers nothing.
+    pub subscribed: bool,
+}
+
 /// Claims the entry a Home Screen app carries notifications under.
 ///
 /// Authorized by the token rather than by the caller being a browser this identity

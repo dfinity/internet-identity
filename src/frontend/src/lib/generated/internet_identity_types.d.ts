@@ -955,6 +955,14 @@ export interface GetNextNotificationRequest { 'anchor_number' : UserNumber }
 export interface GetNextNotificationResponse {
   'notification' : [] | [NotificationToShow],
 }
+/**
+ * Whether this browser has a notification app, and whether it can be delivered to. A
+ * Home Screen app has an entry of its own, so the browser that installed it cannot see
+ * it through get_webpush_subscription_status, which answers for the caller.
+ */
+export interface GetNotificationAppStatusRequest {
+  'anchor_number' : UserNumber,
+}
 export interface GetNotificationDelegationRequest {
   'session_key' : SessionKey,
   'origin' : FrontendHostname,
@@ -1483,6 +1491,10 @@ export interface Notification {
    * Null means II's default retention, which is also the ceiling.
    */
   'expires_at' : [] | [Timestamp],
+}
+export interface NotificationAppStatus {
+  'browser_id' : number,
+  'subscribed' : boolean,
 }
 export interface NotificationConsentGrantedRequest {
   'origin' : string,
@@ -2649,6 +2661,13 @@ export interface _SERVICE {
     [UserNumber, SessionKey, PublicKey, Timestamp],
     { 'Ok' : SignedDelegation } |
       { 'Err' : string }
+  >,
+  /**
+   * Called by the browser that installed the app, signed with its own browser key.
+   */
+  'get_notification_app_status' : ActorMethod<
+    [GetNotificationAppStatusRequest],
+    [] | [NotificationAppStatus]
   >,
   'get_notification_delegation' : ActorMethod<
     [GetNotificationDelegationRequest],

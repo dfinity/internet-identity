@@ -384,6 +384,27 @@ fn remove_webpush_subscription(
     notifications::webpush::remove_subscription(validated)
 }
 
+/// Whether this browser has a notification app, and whether it can be delivered to.
+///
+/// Authorized by the browser key the caller signs with, and answers only about what that
+/// browser linked: one browser cannot learn what another has installed. `None` for a
+/// browser that has linked nothing and for a caller that is no browser of this identity,
+/// so neither can be probed with it.
+#[query]
+fn get_notification_app_status(
+    request: GetNotificationAppStatusRequest,
+) -> Option<NotificationAppStatus> {
+    let Ok((anchor, browser_id)) = check_browser_authorization(request.anchor_number) else {
+        return None;
+    };
+    anchor
+        .linked_notification_app(browser_id)
+        .map(|app| NotificationAppStatus {
+            browser_id: app.id,
+            subscribed: app.webpush_subscription.is_some(),
+        })
+}
+
 /// Gives a Home Screen app the entry it carries notifications under.
 ///
 /// Authorized by the token the installing browser signed rather than by the caller being

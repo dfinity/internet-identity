@@ -874,6 +874,16 @@ impl Anchor {
         &self.browsers
     }
 
+    /// The notification app this browser linked, if it has one.
+    ///
+    /// Only ever asked about the caller's own entry, so one browser cannot learn what
+    /// another has installed.
+    pub fn linked_notification_app(&self, browser: BrowserId) -> Option<&Browser> {
+        self.browsers
+            .iter()
+            .find(|entry| entry.linked_from_browser == Some(browser))
+    }
+
     /// The browser a caller signing as `principal` is, if the identity is signed in
     /// from it.
     ///
