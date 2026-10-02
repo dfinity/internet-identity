@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { ArrowUpRightIcon } from "@lucide/svelte";
+  import { untrack } from "svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
   import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
   import { t } from "$lib/stores/locale.store";
@@ -15,12 +16,25 @@
     /** Whether this Internet Identity notifies for the app at all. Without it there
      *  is nothing to switch, so the switch is left out. */
     canNotify: boolean;
+    /** Whether the app may notify, as the canister holds it. */
     allowed: boolean;
-    onAllowedChange: (allowed: boolean) => void;
+    onSave: (allowed: boolean) => Promise<void>;
   }
 
-  const { titleId, origin, canNotify, allowed, onAllowedChange }: Props =
-    $props();
+  const { titleId, origin, canNotify, allowed, onSave }: Props = $props();
+
+  let draftAllowed = $state(untrack(() => allowed));
+  let isSaving = $state(false);
+  const hasChanges = $derived(draftAllowed !== allowed);
+
+  const handleSave = async () => {
+    isSaving = true;
+    try {
+      await onSave(draftAllowed);
+    } finally {
+      isSaving = false;
+    }
+  };
 
   const metadataStore = $derived(getAppMetadataStore(origin));
   const metadata = $derived($metadataStore);
@@ -69,8 +83,8 @@
       </div>
       <div class="flex h-6 shrink-0 items-center">
         <Toggle
-          checked={allowed}
-          onchange={(event) => onAllowedChange(event.currentTarget.checked)}
+          bind:checked={draftAllowed}
+          disabled={isSaving}
           aria-labelledby={switchId}
           aria-describedby={hintId}
         />
@@ -78,13 +92,16 @@
     </div>
   {/if}
 
-  <a
-    href={origin}
-    target="_blank"
-    rel="noopener noreferrer"
+  <button
+    onclick={handleSave}
+    disabled={!hasChanges || isSaving}
     class="btn btn-primary btn-xl mt-10 w-full"
   >
-    <span>{$t`Open ${name}`}</span>
-    <ArrowUpRightIcon class="size-5" />
-  </a>
+    {#if isSaving}
+      <ProgressRing />
+      <span>{$t`Saving changes...`}</span>
+    {:else}
+      <span>{$t`Save changes`}</span>
+    {/if}
+  </button>
 </div>

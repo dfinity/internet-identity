@@ -17,25 +17,18 @@
 
   const { data }: PageProps = $props();
 
-  // Overwritten as the user switches an app, so the switch shows at once. Loading the
-  // page again reads what the canister holds.
+  // Overwritten once a save succeeds. Loading the page again reads what the canister
+  // holds.
   let apps = $derived(appsFrom(data.applications));
 
   // Anywhere else the canister refuses the grant, so a switch there could only fail.
   const canNotify = (origin: string): boolean =>
     $PUSH_NOTIFICATIONS && notificationsEnabledFor(origin);
 
-  const showAllowed = (origin: string, allowed: boolean) => {
-    apps = apps.map((app) =>
-      app.origin === origin ? { ...app, notificationsAllowed: allowed } : app,
-    );
-  };
-
   // Consent belongs to the identity, so it reaches every browser it registered for
   // notifications, not only this one.
-  const setAllowed = async (origin: string, allowed: boolean) => {
+  const saveAllowed = async (origin: string, allowed: boolean) => {
     const { actor, identityNumber } = $authenticatedStore;
-    showAllowed(origin, allowed);
     try {
       await (allowed ? allowApp : disallowApp)({
         identityNumber,
@@ -43,15 +36,18 @@
         actor,
       });
     } catch (error) {
-      showAllowed(origin, !allowed);
       handleError(error);
+      return;
     }
+    apps = apps.map((app) =>
+      app.origin === origin ? { ...app, notificationsAllowed: allowed } : app,
+    );
+    selectedOrigin = undefined;
   };
 
   const allowedOf = (app: App): boolean =>
     canNotify(app.origin) && app.notificationsAllowed;
 
-  // By origin rather than a copy, so the dialog follows the switch.
   let selectedOrigin = $state<string | undefined>(undefined);
   const selected = $derived(
     apps.find(({ origin }) => origin === selectedOrigin),
@@ -89,7 +85,7 @@
             allowed={allowedOf(app)}
             lastNotifiedMillis={app.lastNotifiedMillis}
             showNotifications={$PUSH_NOTIFICATIONS}
-            onOpen={() => (selectedOrigin = app.origin)}
+            onManage={() => (selectedOrigin = app.origin)}
           />
         </li>
       {/each}
@@ -114,7 +110,7 @@
       origin={app.origin}
       canNotify={canNotify(app.origin)}
       allowed={allowedOf(app)}
-      onAllowedChange={(allowed) => void setAllowed(app.origin, allowed)}
+      onSave={(allowed) => saveAllowed(app.origin, allowed)}
     />
   </Dialog>
 {/if}

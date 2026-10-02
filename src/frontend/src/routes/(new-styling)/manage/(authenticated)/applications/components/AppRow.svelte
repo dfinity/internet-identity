@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronRightIcon } from "@lucide/svelte";
+  import { Settings2Icon } from "@lucide/svelte";
   import { getAppMetadataStore } from "$lib/stores/app-metadata.store";
   import { formatRelative, t } from "$lib/stores/locale.store";
   import { originLabel } from "$lib/utils/urlUtils";
@@ -18,7 +18,7 @@
     lastNotifiedMillis: number | undefined;
     /** Off where this Internet Identity notifies for no app at all. */
     showNotifications: boolean;
-    onOpen: () => void;
+    onManage: () => void;
   }
 
   const {
@@ -27,25 +27,32 @@
     allowed,
     lastNotifiedMillis,
     showNotifications,
-    onOpen,
+    onManage,
   }: Props = $props();
 
   const metadataStore = $derived(getAppMetadataStore(origin));
   const metadata = $derived($metadataStore);
   const label = $derived(originLabel(origin));
+  const name = $derived(metadata.name ?? label);
 </script>
 
-<!-- Switches on the card's width, not the page's, as the devices list does. -->
-<button
-  onclick={onOpen}
-  class="hover:bg-bg-primary_hover focus-visible:bg-bg-primary_hover grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 p-4 text-start outline-none @min-[560px]/apps:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+<!-- Switches on the card's width, not the page's, as the devices list does. The link's
+     hit area is stretched over the whole row, so the settings button sits above it
+     instead of inside it. -->
+<div
+  class="has-[a:hover]:bg-bg-primary_hover has-[a:focus-visible]:bg-bg-primary_hover relative grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 p-4 @min-[560px]/apps:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
 >
   <AppLogo logo={metadata.logo} size="md" />
 
   <span class="flex min-w-0 flex-col">
-    <span class="text-text-primary truncate text-sm font-semibold">
-      {metadata.name ?? label}
-    </span>
+    <a
+      href={origin}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="text-text-primary truncate text-sm font-semibold outline-none after:absolute after:inset-0"
+    >
+      {name}
+    </a>
     <span class="text-text-tertiary truncate text-sm">{label}</span>
   </span>
 
@@ -95,8 +102,11 @@
     {/if}
   </span>
 
-  <ChevronRightIcon
-    aria-hidden="true"
-    class="text-fg-tertiary col-start-3 row-start-1 size-5 @min-[560px]/apps:col-start-4 rtl:-scale-x-100"
-  />
-</button>
+  <button
+    onclick={onManage}
+    class="btn btn-tertiary btn-sm btn-icon relative col-start-3 row-start-1 @min-[560px]/apps:col-start-4"
+    aria-label={$t`Manage ${name}`}
+  >
+    <Settings2Icon class="size-5" />
+  </button>
+</div>
