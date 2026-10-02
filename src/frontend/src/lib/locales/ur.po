@@ -2303,7 +2303,7 @@ msgid "You control both devices."
 msgstr "آپ دونوں آلات کو کنٹرول کرتے ہیں۔"
 
 msgid "You have 1 new message."
-msgstr "آپ کے پاس 1 نیا پیغام ہے۔"
+msgstr "آپ کے پاس ۱ نیا پیغام ہے۔"
 
 msgid "You have reached the maximum number of passkeys"
 msgstr "آپ پاس کیز کی زیادہ سے زیادہ تعداد تک پہنچ چکے ہیں"
@@ -2360,7 +2360,7 @@ msgid "Your apps stay signed in and your identity is ready the next time you com
 msgstr "آپ کی ایپس سائن اِن رہتی ہیں اور اگلی بار جب آپ واپس آئیں تو آپ کی شناخت تیار ہے۔"
 
 msgid "Your event starts in 15 minutes."
-msgstr "آپ کا ایونٹ 15 منٹ میں شروع ہوتا ہے۔"
+msgstr "آپ کا ایونٹ ۱۵ منٹ میں شروع ہوتا ہے۔"
 
 msgid "Your local server tells you when it's ready to connect. Nothing to enter here."
 msgstr "آپ کا مقامی سرور آپ کو بتاتا ہے جب یہ کنیکٹ ہونے کے لیے تیار ہو۔ یہاں کچھ بھی درج کرنے کی ضرورت نہیں ہے۔"

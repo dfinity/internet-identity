@@ -1180,7 +1180,7 @@ msgid "No. Your face ID or fingerprint is only used to create or unlock your pas
 msgstr "Non. Votre Face ID ou votre empreinte digitale est uniquement utilisé pour créer ou déverrouiller votre passkey. Vos données biométriques ne sont jamais partagées avec Internet Identity ni avec les sites web ou applications que vous utilisez."
 
 msgid "None yet"
-msgstr "Aucun pour l'instant"
+msgstr "Aucune pour l'instant"
 
 msgid "Not activated"
 msgstr "Non activé"

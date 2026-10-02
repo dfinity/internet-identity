@@ -288,7 +288,7 @@ msgid "Apps you sign in to will show up here."
 msgstr "Застосунки, до яких ви входите, з'являться тут."
 
 msgid "Apps you've signed in to with this identity."
-msgstr "Застосунки, до яких ви увійшли з цією ідентичністю."
+msgstr "Застосунки, до яких ви увійшли з цим ідентифікатором."
 
 msgid "Are you sure?"
 msgstr "Ви впевнені?"
