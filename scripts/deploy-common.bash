@@ -508,8 +508,10 @@ check_be_reachable() {
         echo "  Error: $config_url returned an empty body" >&2
         rc=1
     elif ensure_pinned_didc 2>/dev/null; then
-        if ! "$PINNED_DIDC" decode "$(xxd -p "$tmp" | tr -d '\n')" >/dev/null 2>&1; then
-            echo "  Error: $config_url did not decode as Candid" >&2
+        local decode_err
+        if ! decode_err=$("$PINNED_DIDC" decode "$(xxd -p "$tmp" | tr -d '\n')" 2>&1 >/dev/null); then
+            echo "  Error: $config_url did not decode as Candid:" >&2
+            echo "         ${decode_err//$'\n'/$'\n'         }" >&2
             rc=1
         else
             echo "  OK — $config_url returns valid Candid (canister $expected_id)" >&2
