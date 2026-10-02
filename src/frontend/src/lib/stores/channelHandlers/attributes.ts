@@ -19,6 +19,7 @@ import {
   authorizedStore,
 } from "$lib/stores/authorization.store";
 import { getMetadataString } from "$lib/utils/openID";
+import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
 import { retryFor, throwCanisterError, waitForStore } from "$lib/utils/utils";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
@@ -28,6 +29,7 @@ import {
   attributeConsentResultStore,
   attributeConsentStore,
 } from "$lib/stores/attributeConsent.store";
+import { claimScreen } from "$lib/stores/pendingScreen.store";
 
 /** Extract the attribute name from a fully scoped key.
  *  e.g., "openid:https://accounts.google.com:email" → "email" */
@@ -107,6 +109,51 @@ const resolveKey = (
     key.endsWith(`:${requestedKey}`),
   );
   return [...unscopedRows, ...scopedRows].map((row) => decodeRow(row, true));
+};
+
+/** The `sso:<domain>` scopes the given groups carry, each once. */
+export const ssoDomainsOf = (groups: AttributeGroup[]): string[] => {
+  const domains: string[] = [];
+  for (const group of groups) {
+    for (const option of group.options) {
+      const scope = extractScope(option.key);
+      if (scope?.startsWith("sso:") !== true) {
+        continue;
+      }
+      const domain = scope.slice("sso:".length);
+      if (!domains.includes(domain)) {
+        domains.push(domain);
+      }
+    }
+  }
+  return domains;
+};
+
+/**
+ * The published name for each `sso:<domain>` in these groups, by domain.
+ *
+ * Resolved here rather than by the screen, because the screen is chosen once this
+ * context is in hand: a name discovered afterwards would be a row repainting, or a
+ * skeleton standing in for one. A domain that cannot be discovered is left out, and
+ * the row falls back to the bare domain.
+ */
+export const discoverSsoNames = async (
+  groups: AttributeGroup[],
+): Promise<Record<string, string>> => {
+  const names: Record<string, string> = {};
+  await Promise.all(
+    ssoDomainsOf(groups).map(async (domain) => {
+      try {
+        const { name } = await discoverSsoConfig(domain);
+        if (name !== undefined && name.length > 0) {
+          names[domain] = name;
+        }
+      } catch (error) {
+        console.error(`Failed to discover SSO name for ${domain}`, error);
+      }
+    }),
+  );
+  return names;
 };
 
 /**
@@ -276,6 +323,8 @@ type ConsentPipeline = {
   origin: string;
   unmappedOrigin: string;
   groups: AttributeGroup[];
+  /** The published name for each `sso:<domain>` the groups carry, by domain. */
+  ssoNames: Record<string, string>;
   recoveryAddresses: string[];
   verifiedAddresses: string[];
   openidAddresses: string[];
@@ -343,13 +392,15 @@ const resolveConsentPipeline = async (params: {
       .map((c) => getMetadataString(c.metadata, "email"))
       .filter((e): e is string => e !== undefined);
 
+    const groups = resolveAttributeGroups(requestedKeys, available);
     return {
       accountNumberPromise,
       authenticated,
       authorized,
       origin,
       unmappedOrigin,
-      groups: resolveAttributeGroups(requestedKeys, available),
+      groups,
+      ssoNames: await discoverSsoNames(groups),
       recoveryAddresses,
       verifiedAddresses,
       openidAddresses,
@@ -642,6 +693,7 @@ export const handleIcrc3ConsentAttributes =
 
     const requestedKeys = paramsResult.data.keys;
 
+    let releaseScreen: (() => void) | undefined;
     await serializeConsentRequest(async () => {
       try {
         // Bail out as soon as we know one of the 1-click handlers will take this request.
@@ -659,6 +711,11 @@ export const handleIcrc3ConsentAttributes =
         if (oneClickHandlerWillHandle) {
           return;
         }
+
+        // Held until this request has a screen of its own or nothing to show, so
+        // authorizing does not take the screen the user is on while the pipeline
+        // is still reading what this app may ask for.
+        releaseScreen = claimScreen();
 
         // Only unscoped email/verified_email; scoped keys are pinned to
         // a source that the inline verify wizard can't satisfy.
@@ -683,6 +740,7 @@ export const handleIcrc3ConsentAttributes =
           attributeConsentStore.setContext(
             pipelinePromise.then((pipeline) => ({
               groups: pipeline?.groups ?? [],
+              ssoNames: pipeline?.ssoNames ?? {},
               effectiveOrigin: pipeline?.origin ?? "",
               requestedKeys,
               recoveryAddresses: pipeline?.recoveryAddresses ?? [],
@@ -748,6 +806,7 @@ export const handleIcrc3ConsentAttributes =
           return;
         }
       } finally {
+        releaseScreen?.();
         // Always reset consent state so the next request on this channel
         // starts from a clean slate (no leftover context/result from us).
         attributeConsentStore.clear();

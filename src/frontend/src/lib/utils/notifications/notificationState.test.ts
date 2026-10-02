@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("./vapidKeyStore", () => ({ loadVapidKey: vi.fn() }));
 vi.mock("./notificationDiagnostics", () => ({
   wasDeclinedRecently: vi.fn(() => false),
+  recordPermission: vi.fn(),
+  recordFailure: vi.fn(),
 }));
 vi.mock("./browserActor", () => {
   class UnregisteredBrowserError extends Error {}
@@ -17,8 +19,11 @@ vi.mock("./pushSubscription", () => ({
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import {
+  readBrowserPushState,
   readDeviceState,
+  resolveOptIn,
   resolveOptInScreen,
+  type BrowserPushState,
   type DeviceNotificationState,
 } from "./notificationState";
 import { wasDeclinedRecently } from "./notificationDiagnostics";
@@ -113,7 +118,7 @@ describe("resolveOptInScreen", () => {
   });
 });
 
-describe("readDeviceState", () => {
+describe("readBrowserPushState and readDeviceState", () => {
   const ENDPOINT = "https://relay.example/held";
 
   /** A canister that reports a registration on `endpoint`, or none at all. */
@@ -129,7 +134,20 @@ describe("readDeviceState", () => {
     } as unknown as ActorSubclass<_SERVICE>);
   };
 
+  /** The two halves as the opt-in runs them: the browser probe, then this
+   *  identity's registration read against the endpoint it found. */
+  const deviceState = async () => {
+    const pushState = await readBrowserPushState();
+    if (pushState === undefined) {
+      throw new Error("the browser probe answered nothing");
+    }
+    return readDeviceState(IDENTITY, pushState);
+  };
+
   beforeEach(() => {
+    // Call counts are what the "reads no further" cases assert on, and the
+    // implementations below are set after, so clearing leaves them in place.
+    vi.clearAllMocks();
     vi.stubGlobal("Notification", { permission: "granted" });
     vi.mocked(isPushSupported).mockReturnValue(true);
     vi.mocked(currentDeviceSubscription).mockResolvedValue({
@@ -144,7 +162,7 @@ describe("readDeviceState", () => {
 
   it("is registered when the canister names the endpoint this browser holds", async () => {
     reporting(ENDPOINT);
-    await expect(readDeviceState(IDENTITY)).resolves.toMatchObject({
+    await expect(deviceState()).resolves.toMatchObject({
       subscribed: true,
       registered: true,
     });
@@ -156,7 +174,7 @@ describe("readDeviceState", () => {
    */
   it("is not registered when the canister names another endpoint", async () => {
     reporting("https://relay.example/someone-else");
-    await expect(readDeviceState(IDENTITY)).resolves.toMatchObject({
+    await expect(deviceState()).resolves.toMatchObject({
       subscribed: true,
       registered: false,
     });
@@ -164,7 +182,7 @@ describe("readDeviceState", () => {
 
   it("is not registered when the canister holds nothing for this identity", async () => {
     reporting();
-    await expect(readDeviceState(IDENTITY)).resolves.toMatchObject({
+    await expect(deviceState()).resolves.toMatchObject({
       subscribed: true,
       registered: false,
     });
@@ -174,9 +192,169 @@ describe("readDeviceState", () => {
     vi.mocked(browserKeyActor).mockRejectedValue(
       new UnregisteredBrowserError(),
     );
-    await expect(readDeviceState(IDENTITY)).resolves.toMatchObject({
+    await expect(deviceState()).resolves.toMatchObject({
       subscribed: true,
       registered: false,
     });
+  });
+
+  /** The endpoint the browser holds is only ours while we still hold its key:
+   *  anything else is another identity's re-subscribe. */
+  it("is not subscribed when the key we kept names another endpoint", async () => {
+    vi.mocked(loadVapidKey).mockResolvedValue({
+      endpoint: "https://relay.example/stale",
+      privateKey: {} as CryptoKey,
+      publicKeyRaw: new Uint8Array(),
+    });
+    await expect(readBrowserPushState()).resolves.toMatchObject({
+      endpoint: undefined,
+    });
+    await expect(deviceState()).resolves.toMatchObject({
+      subscribed: false,
+      registered: false,
+    });
+    expect(browserKeyActor).not.toHaveBeenCalled();
+  });
+
+  /** Nothing is on screen yet when this runs, so a failure has to be a value the
+   *  resolver can turn into a screen rather than a rejection with nowhere to go. */
+  it("answers nothing where the browser cannot be read", async () => {
+    vi.mocked(currentDeviceSubscription).mockRejectedValue(
+      new Error("no service worker here"),
+    );
+    await expect(readBrowserPushState()).resolves.toBeUndefined();
+  });
+
+  it("reads no further for a browser without push support", async () => {
+    vi.mocked(isPushSupported).mockReturnValue(false);
+    await expect(readBrowserPushState()).resolves.toEqual({
+      supported: false,
+      permission: "granted",
+    });
+    expect(currentDeviceSubscription).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveOptIn", () => {
+  const ENDPOINT = "https://relay.example/held";
+
+  const actorGranting = (granted: boolean) =>
+    ({
+      notification_consent_granted: vi.fn(() => Promise.resolve(granted)),
+    }) as unknown as ActorSubclass<_SERVICE>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    declined.mockReturnValue(false);
+    vi.stubGlobal("Notification", { permission: "granted" });
+    vi.mocked(isPushSupported).mockReturnValue(true);
+    vi.mocked(currentDeviceSubscription).mockResolvedValue({
+      endpoint: ENDPOINT,
+    } as PushSubscription);
+    vi.mocked(loadVapidKey).mockResolvedValue({
+      endpoint: ENDPOINT,
+      privateKey: {} as CryptoKey,
+      publicKeyRaw: new Uint8Array(),
+    });
+    vi.mocked(browserKeyActor).mockResolvedValue({
+      get_webpush_subscription_status: vi.fn(() =>
+        Promise.resolve([
+          { endpoint: ENDPOINT, pool_len: 30, issued_at_ns: BigInt(0) },
+        ]),
+      ),
+    } as unknown as ActorSubclass<_SERVICE>);
+  });
+
+  /** The skip answer is what the app is told, so it carries the consent this
+   *  already read instead of costing a second query for the same fact. */
+  it("answers from what it read where there is nothing to ask", async () => {
+    await expect(
+      resolveOptIn({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor: actorGranting(true),
+        browser: readBrowserPushState(),
+      }),
+    ).resolves.toEqual({ screen: "skip", consented: true });
+  });
+
+  it("asks this app for consent on a browser that is already set up", async () => {
+    await expect(
+      resolveOptIn({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor: actorGranting(false),
+        browser: readBrowserPushState(),
+      }),
+    ).resolves.toEqual({ screen: "allow-app" });
+  });
+
+  /** A browser that could not be read is not a browser with nothing to ask: the
+   *  user gets the screen they can retry from. */
+  it("offers the failed screen where the browser could not be read", async () => {
+    await expect(
+      resolveOptIn({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor: actorGranting(false),
+        browser: Promise.resolve(undefined),
+      }),
+    ).resolves.toEqual({ screen: "failed" });
+  });
+
+  it("offers the failed screen where the registration read throws", async () => {
+    vi.mocked(browserKeyActor).mockRejectedValue(new Error("query refused"));
+    await expect(
+      resolveOptIn({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor: actorGranting(false),
+        browser: readBrowserPushState(),
+      }),
+    ).resolves.toEqual({ screen: "failed" });
+  });
+
+  /** The app's consent and this browser's state need nothing from each other, so
+   *  whichever is slow must not hold up the other. A resolver that read the browser
+   *  first would never reach the query this one resolves on. */
+  it("reads the app's consent while the browser is still being read", async () => {
+    let release: (state: BrowserPushState | undefined) => void = () =>
+      undefined;
+    const browser = new Promise<BrowserPushState | undefined>((resolve) => {
+      release = resolve;
+    });
+    const actor = {
+      notification_consent_granted: vi.fn(() => {
+        release({ supported: true, permission: "granted", endpoint: ENDPOINT });
+        return Promise.resolve(false);
+      }),
+    } as unknown as ActorSubclass<_SERVICE>;
+
+    await expect(
+      resolveOptIn({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        browser,
+      }),
+    ).resolves.toEqual({ screen: "allow-app" });
+  });
+
+  /** A consent query that fails reads as "not allowed yet", which asks a question
+   *  the user can answer rather than dropping the request. */
+  it("treats an unreadable consent as no consent", async () => {
+    const actor = {
+      notification_consent_granted: vi.fn(() =>
+        Promise.reject(new Error("query refused")),
+      ),
+    } as unknown as ActorSubclass<_SERVICE>;
+    await expect(
+      resolveOptIn({
+        identityNumber: IDENTITY,
+        origin: ORIGIN,
+        actor,
+        browser: readBrowserPushState(),
+      }),
+    ).resolves.toEqual({ screen: "allow-app" });
   });
 });

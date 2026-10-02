@@ -15,6 +15,12 @@ import {
   notificationConsentSettledStore,
   notificationConsentStore,
 } from "$lib/stores/notificationConsent.store";
+import {
+  readBrowserPushState,
+  resolveOptIn,
+  type BrowserPushState,
+} from "$lib/utils/notifications/notificationState";
+import { claimScreen } from "$lib/stores/pendingScreen.store";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { remapToLegacyDomain } from "$lib/utils/urlUtils";
 import { waitForStore } from "$lib/utils/utils";
@@ -26,6 +32,17 @@ import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 
 export const NOTIFICATION_CONSENT_METHOD = "ii_notification_consent";
+
+/**
+ * Ceremonies that have run.
+ *
+ * A request probes this browser as soon as it is accepted, which is a head start and
+ * not a cache: a ceremony ahead of it in the queue can subscribe the browser its probe
+ * found without a subscription, and the screen would then ask for a device that is
+ * already set up. Counting them is what tells the two apart. Only a ceremony can come
+ * between a probe and its use, because the queue runs them one at a time.
+ */
+let ceremoniesRun = 0;
 
 const NotificationConsentParamsCodec = z.object({
   icrc95DerivationOrigin: z.optional(OriginSchema),
@@ -89,6 +106,17 @@ export const handleNotificationConsentRequest =
       return;
     }
 
+    // Started here rather than from the screen: it needs no identity, so it runs
+    // while this request waits its turn behind a sign-in instead of after one.
+    // Answers rather than rejects, so a request that returns below only drops it.
+    const browser = readBrowserPushState();
+
+    const probedAt = ceremoniesRun;
+
+    // Held from here until this request has answered for itself, so authorizing does
+    // not take the screen the user is on before we know whether we need it.
+    const releaseScreen = claimScreen();
+
     await serializeAuthorizationRequest(async () => {
       try {
         const params = parsed.data;
@@ -119,7 +147,11 @@ export const handleNotificationConsentRequest =
           return;
         }
 
-        const granted = await runConsentCeremony(effectiveOrigin);
+        const granted = await runConsentCeremony(
+          effectiveOrigin,
+          browser,
+          probedAt,
+        );
 
         await channel.send({
           jsonrpc: "2.0",
@@ -130,6 +162,7 @@ export const handleNotificationConsentRequest =
         console.error(error);
         onError("notification-consent-failed");
       } finally {
+        releaseScreen();
         notificationConsentStore.clear();
       }
     });
@@ -146,18 +179,53 @@ export const handleNotificationConsentRequest =
  */
 const runConsentCeremony = async (
   effectiveOrigin: string,
+  probedBrowser: Promise<BrowserPushState | undefined>,
+  probedAt: number,
 ): Promise<boolean> => {
+  // The probe stands only where no ceremony has run since it was taken. Read again
+  // rather than ask about a browser one of them may have set up in the meantime.
+  const browser =
+    probedAt === ceremoniesRun ? probedBrowser : readBrowserPushState();
+
   authorizationStore.setRequestOrigin(effectiveOrigin);
+  try {
+    return await askUntilSettled(effectiveOrigin, browser);
+  } finally {
+    // Whatever came of it, a ceremony that has run is one that may have subscribed
+    // this browser, so every probe taken before now is suspect.
+    ceremoniesRun += 1;
+  }
+};
+
+/** Opens the screen for each identity the user settles on, until one answers. */
+const askUntilSettled = async (
+  effectiveOrigin: string,
+  browser: Promise<BrowserPushState | undefined>,
+): Promise<boolean> => {
   for (;;) {
     // Awaited for its ordering and not its value: the user has to have chosen an
     // identity before a screen can ask them about notifying it.
     await waitForStore(authorizedStore);
     const authenticated = await waitForStore(authenticationStore);
 
+    // Resolved before the context is set, so the screen opens on the question it
+    // will ask. Nothing left to ask answers from what this already read, and puts
+    // no screen between the sign-in and the app.
+    const resolution = await resolveOptIn({
+      identityNumber: authenticated.identityNumber,
+      origin: effectiveOrigin,
+      actor: authenticated.actor,
+      browser,
+    });
+    if (resolution.screen === "skip") {
+      return resolution.consented;
+    }
+
     notificationConsentStore.setContext({
       effectiveOrigin,
       identityNumber: authenticated.identityNumber,
       actor: authenticated.actor,
+      screen: resolution.screen,
     });
 
     // The header keeps the identity switcher up for this screen, and switching

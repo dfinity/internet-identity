@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { METHOD_NOT_FOUND_ERROR_CODE } from "$lib/utils/transport/utils";
-import type { Writable } from "svelte/store";
+import { get, type Writable } from "svelte/store";
 
 const ORIGIN = "https://app.example.com";
 
@@ -26,6 +26,13 @@ vi.mock("$lib/state/featureFlags", async () => {
 vi.mock("$lib/utils/validateDerivationOrigin", () => ({
   validateDerivationOrigin: vi.fn(() => Promise.resolve({ result: "valid" })),
 }));
+/// The probe reads a service worker and an IndexedDB store this suite has neither
+/// of. What it resolves to is this suite's subject: whether a question opens a
+/// screen, and whether nothing to ask answers the app without one.
+vi.mock("$lib/utils/notifications/notificationState", () => ({
+  readBrowserPushState: vi.fn(() => Promise.resolve({})),
+  resolveOptIn: vi.fn(() => Promise.resolve({ screen: "first-time" })),
+}));
 vi.mock("$lib/stores/authentication.store", async () => {
   const { writable } = await import("svelte/store");
   return { authenticationStore: writable<unknown>(undefined) };
@@ -47,11 +54,19 @@ import {
   handleNotificationConsentRequest,
   NOTIFICATION_CONSENT_METHOD,
 } from "./notificationConsent";
-import { notificationConsentStore } from "$lib/stores/notificationConsent.store";
+import {
+  notificationConsentStore,
+  type NotificationConsentContext,
+} from "$lib/stores/notificationConsent.store";
 import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
 import { INTERACTION_REQUIRED_ERROR_CODE } from "$lib/utils/transport/utils";
+import { pendingScreenStore } from "$lib/stores/pendingScreen.store";
 import { waitForStore } from "$lib/utils/utils";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
+import {
+  readBrowserPushState,
+  resolveOptIn,
+} from "$lib/utils/notifications/notificationState";
 import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 
 const consentStatus = vi.fn(() => Promise.resolve(true));
@@ -115,6 +130,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   consentStatus.mockResolvedValue(true);
   vi.mocked(validateDerivationOrigin).mockResolvedValue({ result: "valid" });
+  vi.mocked(resolveOptIn).mockResolvedValue({ screen: "first-time" });
   notificationConsentStore.clear();
   (PUSH_NOTIFICATIONS as unknown as Writable<boolean>).set(true);
   const { authorizationPromptStore, authorizedStore } =
@@ -184,6 +200,115 @@ describe("handleNotificationConsentRequest", () => {
       origin: ORIGIN,
     });
     expect(sent[0].result).toEqual({ granted: true });
+  });
+
+  /** The screen existed only to work out there was nothing to ask. Resolving that
+   *  before the context is set is what keeps a spinner out of the sign-in. */
+  it("answers without a screen where there is nothing to ask", async () => {
+    vi.mocked(resolveOptIn).mockResolvedValue({
+      screen: "skip",
+      consented: true,
+    });
+    const opened = vi.fn();
+    const unsubscribe = notificationConsentStore.subscribe((context) => {
+      if (context !== undefined) {
+        opened();
+      }
+    });
+
+    const { sent, errors } = await run({ settle: false });
+
+    unsubscribe();
+    expect(opened).not.toHaveBeenCalled();
+    expect(sent[0].result).toEqual({ granted: true });
+    expect(errors).toEqual([]);
+    // The answer is the one the resolution already read, not a second query.
+    expect(consentStatus).not.toHaveBeenCalled();
+  });
+
+  it("opens the screen on the question it resolved", async () => {
+    vi.mocked(resolveOptIn).mockResolvedValue({ screen: "blocked" });
+    let opened: NotificationConsentContext | undefined;
+    const unsubscribe = notificationConsentStore.subscribe((context) => {
+      opened ??= context;
+    });
+
+    const { sent } = await run();
+
+    unsubscribe();
+    expect(opened?.screen).toBe("blocked");
+    expect(sent[0].result).toEqual({ granted: true });
+  });
+
+  /** Authorizing is what replaces the screen the user is on, so this request has to
+   *  own one from the moment it is accepted until it has answered: long enough that
+   *  the flow keeps their screen instead of passing through a half-built one. */
+  it("owns the screen from acceptance until it has answered", async () => {
+    const sent: Record<string, unknown>[] = [];
+    const channel = {
+      origin: ORIGIN,
+      send: (message: Record<string, unknown>) => {
+        sent.push(message);
+        return Promise.resolve();
+      },
+    } as unknown as Channel;
+    const running = handleNotificationConsentRequest(channel, () => {})({
+      jsonrpc: "2.0",
+      id: 1,
+      method: NOTIFICATION_CONSENT_METHOD,
+      params: {},
+    } as unknown as JsonRequest);
+
+    await waitForStore(notificationConsentStore);
+    expect(get(pendingScreenStore)).toBe(true);
+
+    notificationConsentStore.settle();
+    await running;
+
+    expect(get(pendingScreenStore)).toBe(false);
+  });
+
+  it("releases the screen for a request it refuses", async () => {
+    const { sent } = await run({
+      settle: false,
+      origin: "https://other.example",
+    });
+    expect(sent[0].error).toMatchObject({ code: METHOD_NOT_FOUND_ERROR_CODE });
+    expect(get(pendingScreenStore)).toBe(false);
+  });
+
+  /** The probe is taken when a request is accepted, so a ceremony that runs before
+   *  this one's turn can subscribe the browser it found bare. Asking from that
+   *  snapshot would offer to set up a device that is already set up. */
+  it("probes again where a ceremony ran between the probe and its turn", async () => {
+    const channel = {
+      origin: ORIGIN,
+      send: () => Promise.resolve(),
+    } as unknown as Channel;
+    const ask = (id: number) =>
+      handleNotificationConsentRequest(channel, () => {})({
+        jsonrpc: "2.0",
+        id,
+        method: NOTIFICATION_CONSENT_METHOD,
+        params: {},
+      } as unknown as JsonRequest);
+
+    // Both accepted, so both probe, before either holds the queue.
+    const first = ask(1);
+    const second = ask(2);
+    expect(readBrowserPushState).toHaveBeenCalledTimes(2);
+
+    // The first holds the queue. It reused its own probe, taken a moment earlier.
+    await waitForStore(notificationConsentStore);
+    notificationConsentStore.settle();
+    await first;
+    expect(readBrowserPushState).toHaveBeenCalledTimes(2);
+
+    // The second's turn, with its probe now predating a ceremony.
+    await waitForStore(notificationConsentStore);
+    notificationConsentStore.settle();
+    await second;
+    expect(readBrowserPushState).toHaveBeenCalledTimes(3);
   });
 
   it("reports what the canister recorded", async () => {
