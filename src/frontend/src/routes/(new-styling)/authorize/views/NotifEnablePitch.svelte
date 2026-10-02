@@ -45,7 +45,11 @@
   {/if}
 {/snippet}
 
-<div class="flex min-w-0 flex-col items-stretch">
+<!-- Fills the panel and sits at the bottom of it, which is where a mobile sign-in
+     screen sits in this flow. `max-sm:flex-1` stretches the panel on a phone, so a
+     block that does not grow into it leaves the gap under itself. On a wider screen
+     the panel is its content's height and there is nothing to push against. -->
+<div class="flex min-w-0 flex-1 flex-col items-stretch justify-end">
   <!-- Ported from the design. Hidden from assistive technology: the messages are
        made up, and a screen reader would read them ahead of the heading as though
        they were real. -->
