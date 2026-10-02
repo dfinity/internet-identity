@@ -344,12 +344,11 @@ type InternetIdentityInit = record {
     // set/clear pattern as `dnssec_config`: null keeps the previously stored
     // value, `opt null` clears it, `opt opt "https://..."` sets it.
     mcp_official_url : opt opt text;
-    // Server-side kill switch for the notifications feature. null / `opt false`
-    // (the default) disables every notification endpoint; `opt true` enables
-    // them. Omitting it on upgrade keeps the stored value.
-    // Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
-    // turns notifications off, and entries enable them for those origins only.
-    notifications_enabled_origins : opt vec text;
+    // Server-side switch for the notifications feature. `opt true` enables every
+    // notification endpoint, for any app; `opt false` disables them. Omitting it on
+    // upgrade keeps the stored value, and a canister that never stored one has them
+    // disabled.
+    notifications_enabled : opt bool;
 };
 
 // DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
@@ -1514,6 +1513,32 @@ type AccountUpdate = record {
     name : opt text;
 };
 
+// An app the identity has signed in to, for the user's own list of their apps. Only
+// apps some account was used at: consent, a named account or a chosen default can each
+// be stored at an app the identity never signed in to.
+type ApplicationInfo = record {
+    // The origin the app's identity is derived for: what its accounts and its
+    // notification consent are stored under.
+    origin : FrontendHostname;
+    // The latest sign-in to any of the identity's accounts at the app.
+    last_used : Timestamp;
+    // Whether the app may notify the identity: it holds consent, and this deployment
+    // notifies for it, as notification_consent_granted answers.
+    notifications_allowed : bool;
+    // When the app last had a notification queued for one of the identity's browsers,
+    // or null where it never has.
+    last_notified : opt Timestamp;
+};
+
+type ListApplicationsRequest = record {
+    anchor_number : UserNumber;
+};
+
+type ListApplicationsError = variant {
+    Unauthorized : principal;
+    InternalCanisterError : text;
+};
+
 type DummyAuthConfig = record {
     // Prompts user for a index value (0 - 255) when set to true,
     // this is used in e2e to have multiple dummy auth identities.
@@ -2227,6 +2252,10 @@ service : (opt InternetIdentityInit) -> {
         anchor_number : UserNumber,
         origin : FrontendHostname,
     ) -> (variant { Ok : vec AccountInfo; Err: GetAccountsError }) query;
+
+    // Every app the identity holds accounts at, so the user can see where they have
+    // signed in. Authorized by the identity's own access methods.
+    list_applications : (ListApplicationsRequest) -> (variant { Ok : vec ApplicationInfo; Err : ListApplicationsError }) query;
 
     create_account : (
         anchor_number : UserNumber,

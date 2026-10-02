@@ -247,6 +247,9 @@ pub(crate) fn plan_pass(max_posts: usize, now_ns: Timestamp) -> Vec<Delivery> {
 /// Queue the notification for every browser that can be woken, preparing a wake-up
 /// for each entry that needs one. A full queue's replaced entry already has one. The
 /// queues live on the anchor, so one write covers every browser.
+///
+/// Queued anywhere, the app has notified the identity, which is what its list of apps
+/// shows as last notified: from here on only that browser decides whether it is shown.
 fn fan_out_to_browsers(
     taken: &Taken<StorableOriginSha256, PendingNotification>,
     now_ns: Timestamp,
@@ -287,16 +290,27 @@ fn fan_out_to_browsers(
             return;
         }
         let mut to_post = Vec::new();
+        let mut queued_anywhere = false;
         for delivery in woken {
             let Some(queue) = anchor.notifications_mut(delivery.browser_id) else {
                 continue;
             };
+            queued_anywhere = true;
             if browser_queue::add(queue, queued.clone(), now_ns) == Added::Queued {
                 to_post.push(delivery);
             }
         }
         match storage.write(anchor) {
-            Ok(()) => out.extend(to_post),
+            Ok(()) => {
+                out.extend(to_post);
+                if queued_anywhere {
+                    storage.record_notified(
+                        pending.anchor_number,
+                        pending.application_number,
+                        now_ns,
+                    );
+                }
+            }
             Err(err) => ic_cdk::println!("Failed to queue a notification for its browsers: {err}"),
         }
     });
@@ -538,8 +552,11 @@ mod tests {
     use crate::notifications::webpush::fixtures::{
         anchor, anchor_with_browsers, setup, stored_subscription, subscribe,
     };
+    use crate::state::storage_borrow;
     use candid::Principal;
-    use internet_identity_interface::internet_identity::types::{AnchorNumber, BrowserId};
+    use internet_identity_interface::internet_identity::types::{
+        AnchorNumber, ApplicationNumber, BrowserId,
+    };
     use pretty_assertions::assert_eq;
 
     const APP: &str = "https://app.example";
@@ -562,13 +579,25 @@ mod tests {
         expires_at_ns: Timestamp,
         now_ns: Timestamp,
     ) {
+        submit_for(anchor_number, 1, notification_id, expires_at_ns, now_ns);
+    }
+
+    /// For a test that looks at the app the notification comes from, which has to be one
+    /// II holds.
+    fn submit_for(
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        notification_id: u64,
+        expires_at_ns: Timestamp,
+        now_ns: Timestamp,
+    ) {
         state::notification_backlog_mut(now_ns, |backlog| {
             backlog.admit(
                 StorableOriginSha256::from_origin(&APP.to_string()),
                 vec![PendingNotification {
                     recipient: Principal::from_slice(&anchor_number.to_be_bytes()),
                     anchor_number,
-                    application_number: 1,
+                    application_number,
                     account_number: Some(2),
                     sender: sender(),
                     notification_id,
@@ -925,12 +954,69 @@ mod tests {
         assert_eq!(left.last(), Some(&1_000));
     }
 
+    /// `APP` allowed to notify the identity, which gives the app a config to record
+    /// against. Returns the number II holds the app under.
+    fn allow_app(anchor_number: AnchorNumber) -> ApplicationNumber {
+        crate::notifications::write_consent(anchor_number, &APP.to_string(), Some(0), 0)
+            .expect("allowing the app");
+        storage_borrow(|storage| storage.lookup_application_number_with_origin(&APP.to_string()))
+            .expect("allowing the app stores it")
+    }
+
+    fn last_notified(anchor_number: AnchorNumber) -> Option<Timestamp> {
+        storage_borrow(|storage| {
+            storage.read_anchor_application_config(anchor_number, &APP.to_string())
+        })
+        .and_then(|config| config.last_notified_at_ns)
+    }
+
+    #[test]
+    fn queuing_for_a_browser_records_when_the_app_last_notified() {
+        setup();
+        let (recipient, _) = subscribed_recipient(2);
+        let app = allow_app(recipient);
+        submit_for(recipient, app, 7, 10 * SECOND_NS, 0);
+
+        plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+
+        assert_eq!(last_notified(recipient), Some(SECOND_NS));
+    }
+
+    #[test]
+    fn a_notification_that_reaches_no_browser_records_nothing() {
+        setup();
+        let (recipient, _) = anchor_with_browsers(1);
+        let app = allow_app(recipient);
+        submit_for(recipient, app, 7, 10 * SECOND_NS, 0);
+
+        plan_pass(MAX_POSTS_PER_PASS, SECOND_NS);
+
+        assert_eq!(last_notified(recipient), None);
+    }
+
+    /// A stamp starts no config of its own: only the account-state write reclaims one.
+    #[test]
+    fn an_app_with_no_config_is_left_without_one() {
+        setup();
+        let (recipient, _) = subscribed_recipient(1);
+        let app =
+            storage_borrow_mut(|storage| storage.sign_in_for_testing(recipient, &APP.to_string()));
+        submit_for(recipient, app, 7, 10 * SECOND_NS, 0);
+
+        assert!(!plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).is_empty());
+
+        assert!(storage_borrow(|storage| {
+            storage.read_anchor_application_config(recipient, &APP.to_string())
+        })
+        .is_none());
+    }
+
     #[test]
     fn a_pass_does_nothing_while_notifications_are_off() {
         setup();
         let (recipient, _) = subscribed_recipient(1);
         submit(recipient, 7, 10 * SECOND_NS);
-        crate::state::persistent_state_mut(|s| s.notifications_enabled_origins = None);
+        crate::state::persistent_state_mut(|s| s.notifications_enabled = None);
 
         assert!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).is_empty());
 

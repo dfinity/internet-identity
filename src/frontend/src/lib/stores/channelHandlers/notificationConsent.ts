@@ -15,17 +15,35 @@ import {
   notificationConsentSettledStore,
   notificationConsentStore,
 } from "$lib/stores/notificationConsent.store";
+import {
+  notificationsUnavailableHere,
+  readBrowserPushState,
+  readGranted,
+  resolveOptIn,
+  type BrowserPushState,
+} from "$lib/utils/notifications/notificationState";
+import { claimScreen } from "$lib/stores/pendingScreen.store";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { remapToLegacyDomain } from "$lib/utils/urlUtils";
 import { waitForStore } from "$lib/utils/utils";
 import { serializeAuthorizationRequest } from "$lib/stores/channelHandlers/serialize";
 import { get } from "svelte/store";
 import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
-import { notificationsEnabledFor } from "$lib/globals";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 
 export const NOTIFICATION_CONSENT_METHOD = "ii_notification_consent";
+
+/**
+ * Ceremonies that have run.
+ *
+ * A request probes this browser as soon as it is accepted, which is a head start and
+ * not a cache: a ceremony ahead of it in the queue can subscribe the browser its probe
+ * found without a subscription, and the screen would then ask for a device that is
+ * already set up. Counting them is what tells the two apart. Only a ceremony can come
+ * between a probe and its use, because the queue runs them one at a time.
+ */
+let ceremoniesRun = 0;
 
 const NotificationConsentParamsCodec = z.object({
   icrc95DerivationOrigin: z.optional(OriginSchema),
@@ -44,12 +62,28 @@ export const handleNotificationConsentRequest =
   async (request: JsonRequest) => {
     if (
       request.id === undefined ||
-      request.method !== NOTIFICATION_CONSENT_METHOD ||
-      !get(PUSH_NOTIFICATIONS)
+      request.method !== NOTIFICATION_CONSENT_METHOD
     ) {
       return;
     }
     const requestId = request.id;
+
+    // Answered rather than dropped. This deployment notifies for nothing at all, so
+    // the method is one it does not have, which is what the code says; an app that
+    // asked anyway gets that back instead of waiting on a reply that never comes.
+    // Ahead of the silent check, because a request that cannot be served is not a
+    // request that needed the user.
+    if (!get(PUSH_NOTIFICATIONS)) {
+      await channel.send({
+        jsonrpc: "2.0",
+        id: requestId,
+        error: {
+          code: METHOD_NOT_FOUND_ERROR_CODE,
+          message: "This Internet Identity does not send notifications",
+        },
+      });
+      return;
+    }
 
     const isSilent = get(authorizationPromptStore).prompt === "none";
 
@@ -89,6 +123,17 @@ export const handleNotificationConsentRequest =
       return;
     }
 
+    // Started here rather than from the screen: it needs no identity, so it runs
+    // while this request waits its turn behind a sign-in instead of after one.
+    // Answers rather than rejects, so a request that returns below only drops it.
+    const browser = readBrowserPushState();
+
+    const probedAt = ceremoniesRun;
+
+    // Held from here until this request has answered for itself, so authorizing does
+    // not take the screen the user is on before we know whether we need it.
+    const releaseScreen = claimScreen();
+
     await serializeAuthorizationRequest(async () => {
       try {
         const params = parsed.data;
@@ -105,21 +150,24 @@ export const handleNotificationConsentRequest =
           params.icrc95DerivationOrigin ?? channel.origin,
         );
 
-        // The canister refuses an origin it does not notify for, so asking this
-        // user to allow notifications could only ever end in an error.
-        if (!notificationsEnabledFor(effectiveOrigin)) {
+        // No notifications on iOS yet, so nothing is offered and the app is told
+        // plainly that it may not notify here rather than being refused outright:
+        // the method exists, this browser just has no answer but no.
+        if (notificationsUnavailableHere()) {
           await channel.send({
             jsonrpc: "2.0",
             id: requestId,
-            error: {
-              code: METHOD_NOT_FOUND_ERROR_CODE,
-              message: "This Internet Identity does not notify for this app",
-            },
+            result: { granted: false },
           });
           return;
         }
 
-        const granted = await runConsentCeremony(effectiveOrigin);
+        const granted = await runConsentCeremony(
+          effectiveOrigin,
+          browser,
+          probedAt,
+          releaseScreen,
+        );
 
         await channel.send({
           jsonrpc: "2.0",
@@ -130,6 +178,7 @@ export const handleNotificationConsentRequest =
         console.error(error);
         onError("notification-consent-failed");
       } finally {
+        releaseScreen();
         notificationConsentStore.clear();
       }
     });
@@ -146,18 +195,60 @@ export const handleNotificationConsentRequest =
  */
 const runConsentCeremony = async (
   effectiveOrigin: string,
+  probedBrowser: Promise<BrowserPushState | undefined>,
+  probedAt: number,
+  releaseScreen: () => void,
 ): Promise<boolean> => {
+  // The probe stands only where no ceremony has run since it was taken. Read again
+  // rather than ask about a browser one of them may have set up in the meantime.
+  const browser =
+    probedAt === ceremoniesRun ? probedBrowser : readBrowserPushState();
+
   authorizationStore.setRequestOrigin(effectiveOrigin);
+  try {
+    return await askUntilSettled(effectiveOrigin, browser, releaseScreen);
+  } finally {
+    // Whatever came of it, a ceremony that has run is one that may have subscribed
+    // this browser, so every probe taken before now is suspect.
+    ceremoniesRun += 1;
+  }
+};
+
+/** Opens the screen for each identity the user settles on, until one answers. */
+const askUntilSettled = async (
+  effectiveOrigin: string,
+  browser: Promise<BrowserPushState | undefined>,
+  /** Called as soon as this request will put nothing more on screen, which is
+   *  before the answer is read back: the redirect is what belongs on screen for
+   *  that, not the screen the user came from. */
+  releaseScreen: () => void,
+): Promise<boolean> => {
   for (;;) {
     // Awaited for its ordering and not its value: the user has to have chosen an
     // identity before a screen can ask them about notifying it.
     await waitForStore(authorizedStore);
     const authenticated = await waitForStore(authenticationStore);
 
+    // Resolved before the context is set, so the screen opens on the question it
+    // will ask. Nothing left to ask answers from what this already read, and puts
+    // no screen between the sign-in and the app.
+    const resolution = await resolveOptIn({
+      identityNumber: authenticated.identityNumber,
+      origin: effectiveOrigin,
+      actor: authenticated.actor,
+      browser,
+    });
+    if (resolution.screen === "skip") {
+      releaseScreen();
+      return resolution.granted;
+    }
+
     notificationConsentStore.setContext({
       effectiveOrigin,
       identityNumber: authenticated.identityNumber,
       actor: authenticated.actor,
+      device: resolution.state,
+      consented: resolution.consented,
     });
 
     // The header keeps the identity switcher up for this screen, and switching
@@ -176,10 +267,14 @@ const runConsentCeremony = async (
     if (outcome === "switched") {
       continue;
     }
+    releaseScreen();
 
-    return authenticated.actor.notification_consent_granted({
-      anchor_number: authenticated.identityNumber,
+    // What the app is told is read back rather than reported from the screen, and it
+    // is both halves: the consent this identity holds, and a browser that delivers.
+    return readGranted({
+      identityNumber: authenticated.identityNumber,
       origin: effectiveOrigin,
+      actor: authenticated.actor,
     });
   }
 };

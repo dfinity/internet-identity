@@ -73,7 +73,7 @@ export const idlFactory = ({ IDL }) => {
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'dnssec_config' : IDL.Opt(IDL.Opt(DnssecConfig)),
     'notifications_allow_insecure_endpoint' : IDL.Opt(IDL.Bool),
-    'notifications_enabled_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
+    'notifications_enabled' : IDL.Opt(IDL.Bool),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
@@ -778,6 +778,17 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
+  const ListApplicationsRequest = IDL.Record({ 'anchor_number' : UserNumber });
+  const ApplicationInfo = IDL.Record({
+    'origin' : FrontendHostname,
+    'notifications_allowed' : IDL.Bool,
+    'last_notified' : IDL.Opt(Timestamp),
+    'last_used' : Timestamp,
+  });
+  const ListApplicationsError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const ListAvailableAttributesRequest = IDL.Record({
     'attributes' : IDL.Opt(IDL.Vec(IDL.Text)),
     'identity_number' : IdentityNumber,
@@ -1469,6 +1480,16 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'init_salt' : IDL.Func([], [], []),
+    'list_applications' : IDL.Func(
+        [ListApplicationsRequest],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Vec(ApplicationInfo),
+            'Err' : ListApplicationsError,
+          }),
+        ],
+        ['query'],
+      ),
     'list_available_attributes' : IDL.Func(
         [ListAvailableAttributesRequest],
         [
@@ -1860,7 +1881,7 @@ export const init = ({ IDL }) => {
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'dnssec_config' : IDL.Opt(IDL.Opt(DnssecConfig)),
     'notifications_allow_insecure_endpoint' : IDL.Opt(IDL.Bool),
-    'notifications_enabled_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
+    'notifications_enabled' : IDL.Opt(IDL.Bool),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),

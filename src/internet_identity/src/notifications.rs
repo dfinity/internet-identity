@@ -143,16 +143,9 @@ mod tests {
     const NEVER: &str = "https://never.example";
     const VISITED: &str = "https://visited.example";
 
-    /// The three origins these tests use, so a request for any of them validates.
-    fn enable_origins() {
-        crate::state::persistent_state_mut(|s| {
-            s.notifications_enabled_origins = Some(
-                [APP, NEVER, VISITED]
-                    .iter()
-                    .map(|origin| origin.to_string())
-                    .collect(),
-            );
-        });
+    /// Turns notifications on, so a request for any origin validates.
+    fn enable_notifications() {
+        crate::state::persistent_state_mut(|s| s.notifications_enabled = Some(true));
     }
 
     /// Requests are built through `TryFrom`, which is the only way to make one, so the
@@ -202,7 +195,7 @@ mod tests {
     #[test]
     fn grant_then_revoke_consent_round_trips() {
         setup();
-        enable_origins();
+        enable_notifications();
         let anchor = anchor_at(APP);
 
         grant(anchor, APP, 1_000).unwrap();
@@ -217,7 +210,7 @@ mod tests {
     #[test]
     fn grants_at_an_app_the_identity_has_never_signed_in_at() {
         setup();
-        enable_origins();
+        enable_notifications();
         let anchor = anchor_at(VISITED);
 
         grant(anchor, NEVER, 1_000).unwrap();
@@ -230,7 +223,7 @@ mod tests {
     #[test]
     fn revoking_what_was_never_granted_succeeds() {
         setup();
-        enable_origins();
+        enable_notifications();
         let anchor = anchor_at(APP);
 
         assert!(revoke(anchor, APP).is_ok());
@@ -240,7 +233,7 @@ mod tests {
     /// Built through `TryFrom`, so the deferral tests hand the reply builder
     /// the same validated request a caller's call would.
     fn batch(notifications: Vec<Notification>) -> ValidatedSendNotificationArg {
-        enable_origins();
+        enable_notifications();
         internet_identity_interface::internet_identity::types::SendNotificationArg {
             origin: APP.to_string(),
             notifications,
@@ -298,7 +291,7 @@ mod tests {
     #[test]
     fn consent_leaves_the_default_account_alone() {
         setup();
-        enable_origins();
+        enable_notifications();
         let origin = APP.to_string();
         let anchor = anchor_at(APP);
 

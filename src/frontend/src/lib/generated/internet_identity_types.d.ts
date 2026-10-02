@@ -125,6 +125,32 @@ export type AppSessionError = {
     'NoSuchSession' : null
   };
 /**
+ * An app the identity has signed in to, for the user's own list of their apps. Only
+ * apps some account was used at: consent, a named account or a chosen default can each
+ * be stored at an app the identity never signed in to.
+ */
+export interface ApplicationInfo {
+  /**
+   * The origin the app's identity is derived for: what its accounts and its
+   * notification consent are stored under.
+   */
+  'origin' : FrontendHostname,
+  /**
+   * Whether the app may notify the identity: it holds consent, and this deployment
+   * notifies for it, as notification_consent_granted answers.
+   */
+  'notifications_allowed' : boolean,
+  /**
+   * When the app last had a notification queued for one of the identity's browsers,
+   * or null where it never has.
+   */
+  'last_notified' : [] | [Timestamp],
+  /**
+   * The latest sign-in to any of the identity's accounts at the app.
+   */
+  'last_used' : Timestamp,
+}
+/**
  * Configuration parameters related to the archive.
  */
 export interface ArchiveConfig {
@@ -1222,13 +1248,12 @@ export interface InternetIdentityInit {
    */
   'notifications_allow_insecure_endpoint' : [] | [boolean],
   /**
-   * Server-side kill switch for the notifications feature. null / `opt false`
-   * (the default) disables every notification endpoint; `opt true` enables
-   * them. Omitting it on upgrade keeps the stored value.
-   * Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
-   * turns notifications off, and entries enable them for those origins only.
+   * Server-side switch for the notifications feature. `opt true` enables every
+   * notification endpoint, for any app; `opt false` disables them. Omitting it on
+   * upgrade keeps the stored value, and a canister that never stored one has them
+   * disabled.
    */
-  'notifications_enabled_origins' : [] | [Array<string>],
+  'notifications_enabled' : [] | [boolean],
   /**
    * Configuration parameters related to the II archive.
    * Note: some parameters changes (like the polling interval) will only take effect after an archive deployment.
@@ -1320,6 +1345,9 @@ export type KeyType = { 'platform' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null } |
   { 'browser_storage_key' : null };
+export type ListApplicationsError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
+export interface ListApplicationsRequest { 'anchor_number' : UserNumber }
 export type ListAvailableAttributesError = {
     'AuthorizationError' : Principal
   } |
@@ -2673,6 +2701,15 @@ export interface _SERVICE {
    * ================
    */
   'init_salt' : ActorMethod<[], undefined>,
+  /**
+   * Every app the identity holds accounts at, so the user can see where they have
+   * signed in. Authorized by the identity's own access methods.
+   */
+  'list_applications' : ActorMethod<
+    [ListApplicationsRequest],
+    { 'Ok' : Array<ApplicationInfo> } |
+      { 'Err' : ListApplicationsError }
+  >,
   'list_available_attributes' : ActorMethod<
     [ListAvailableAttributesRequest],
     { 'Ok' : ListAvailableAttributesResponse } |

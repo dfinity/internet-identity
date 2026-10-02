@@ -177,8 +177,8 @@ export const EMAIL_RECOVERY_SETUP = createFeatureFlagStore(
 /// field, regardless of agent language.
 export const READ_ONLY_MODE = createFeatureFlagStore("READ_ONLY_MODE", false);
 
-// Web Push. Follows the backend: it refuses every notification endpoint unless an
-// origin is enabled for it, and offering the feature against a backend that refuses it
+// Web Push. Follows the backend: it refuses every notification endpoint unless
+// notifications are enabled, and offering the feature against a backend that refuses it
 // is worse than not offering it. A value set by hand still wins, so a deployment that
 // notifies can be tested with the feature off and the other way round.
 export const PUSH_NOTIFICATIONS = createFeatureFlagStore(

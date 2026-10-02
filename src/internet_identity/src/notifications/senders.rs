@@ -6,10 +6,9 @@
 //! { "senders": ["ryjl3-tyaaa-aaaaa-aaaba-cai"] }
 //! ```
 //!
-//! `notifications_enabled_origins` gates which origins are fetchable today but
-//! is a rollout gate, not the bound on outcalls: once it goes, any origin a
-//! caller names is fetchable, as with SSO discovery. What bounds them is the
-//! cache, [`SENDERS_OUTCALL_LIMIT`] and the failure backoff.
+//! While notifications are enabled, any origin a caller names is fetchable, as
+//! with SSO discovery. What bounds the outcalls is the cache,
+//! [`SENDERS_OUTCALL_LIMIT`] and the failure backoff.
 
 use crate::notifications::ValidatedSendNotificationArg;
 use crate::single_flight_cache::{
@@ -355,9 +354,7 @@ mod tests {
     }
 
     fn request(origin: &str) -> ValidatedSendNotificationArg {
-        crate::state::persistent_state_mut(|s| {
-            s.notifications_enabled_origins = Some(vec![origin.to_string()]);
-        });
+        crate::state::persistent_state_mut(|s| s.notifications_enabled = Some(true));
         internet_identity_interface::internet_identity::types::SendNotificationArg {
             origin: origin.to_string(),
             notifications: vec![],

@@ -6,13 +6,11 @@ runs:
     - name: Install didc
       shell: bash
       run: |
-        didc_release=$(sed <.didc-release 's/#.*$//' | sed '/^$/d')
+        # Same pinned + sha256-verified binary the deploy scripts use.
+        source scripts/didc-helpers.bash
+        ensure_pinned_didc
 
-        # Actual install
         mkdir -p ~/.local/bin
-        curl --location --silent --show-error \
-          https://github.com/dfinity/candid/releases/download/$didc_release/didc-linux64 \
-          -o ~/.local/bin/didc
-        chmod +x ~/.local/bin/didc
+        install -m 755 "$PINNED_DIDC" ~/.local/bin/didc
         ~/.local/bin/didc --version
         echo "$HOME/.local/bin" >> $GITHUB_PATH

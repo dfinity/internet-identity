@@ -255,11 +255,11 @@ mod tests {
         assert!(elsewhere.is_err(), "only a local relay, not any plain host");
     }
 
-    /// The channel is off until an operator enables an origin, and nothing may be
+    /// The channel is off until an operator enables notifications, and nothing may be
     /// written before then.
     #[test]
     fn refuses_every_request_while_the_channel_is_off() {
-        crate::state::persistent_state_mut(|s| s.notifications_enabled_origins = None);
+        crate::state::persistent_state_mut(|s| s.notifications_enabled = None);
 
         assert!(validate(request(ANCHOR, "https://relay.example/a", 0)).is_err());
         assert!(ValidatedRemoveWebPushSubscriptionRequest::try_from(

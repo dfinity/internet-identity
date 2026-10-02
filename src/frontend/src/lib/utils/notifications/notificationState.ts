@@ -2,11 +2,27 @@
 // Consent is per identity, the subscription is per browser, so the screen turns
 // on the combination: a first-timer gets the full pitch, an already-set-up
 // browser only needs the app's consent, a blocked browser gets guidance.
+//
+// Split in two around what each half needs: the browser's own capability and
+// subscription need no identity and are read as soon as a request arrives, while
+// the registration and the app's consent are read once an identity is chosen.
 
+import type { ActorSubclass } from "@icp-sdk/core/agent";
+import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { currentDeviceSubscription, isPushSupported } from "./pushSubscription";
 import { loadVapidKey } from "./vapidKeyStore";
-import { wasDeclinedRecently } from "./notificationDiagnostics";
+import { recordPermission } from "./notificationDiagnostics";
+import { browserAndSystem } from "$lib/utils/describeBrowser";
 import { browserKeyActor, UnregisteredBrowserError } from "./browserActor";
+
+/** What this browser can do, and what it is subscribed with. */
+export interface BrowserPushState {
+  supported: boolean;
+  permission: NotificationPermission;
+  /** The endpoint the browser and the signing key we kept agree on, or `undefined`
+   * where there is no live subscription to the key we hold. */
+  endpoint?: string;
+}
 
 export interface DeviceNotificationState {
   supported: boolean;
@@ -19,27 +35,53 @@ export interface DeviceNotificationState {
   registered: boolean;
 }
 
+/**
+ * This browser's push state, or `undefined` where it could not be read.
+ *
+ * Answers rather than throws, because the caller starts this before it has anything
+ * to show and a rejection there has no screen to land on. A state that reads as
+ * unsupported would quietly skip the opt-in instead, so a failure keeps its own value.
+ */
+export const readBrowserPushState = async (): Promise<
+  BrowserPushState | undefined
+> => {
+  try {
+    const supported = isPushSupported();
+    const permission =
+      typeof Notification !== "undefined" ? Notification.permission : "denied";
+    if (!supported) {
+      return { supported, permission };
+    }
+    const subscription = await currentDeviceSubscription();
+    const stored = await loadVapidKey();
+    const live =
+      subscription !== undefined &&
+      stored !== undefined &&
+      stored.endpoint === subscription.endpoint;
+    return {
+      supported,
+      permission,
+      endpoint: live ? stored.endpoint : undefined,
+    };
+  } catch (error) {
+    console.error(error);
+    return undefined;
+  }
+};
+
 export const readDeviceState = async (
   identityNumber: bigint,
+  browser: BrowserPushState,
 ): Promise<DeviceNotificationState> => {
-  const supported = isPushSupported();
-  const permission =
-    typeof Notification !== "undefined" ? Notification.permission : "denied";
-  if (!supported) {
+  const { supported, permission, endpoint } = browser;
+  if (!supported || endpoint === undefined) {
     return { supported, permission, subscribed: false, registered: false };
   }
-  const subscription = await currentDeviceSubscription();
-  const stored = await loadVapidKey();
-  const subscribed =
-    subscription !== undefined &&
-    stored !== undefined &&
-    stored.endpoint === subscription.endpoint;
   return {
     supported,
     permission,
-    subscribed,
-    registered:
-      subscribed && (await isRegisteredHere(identityNumber, stored.endpoint)),
+    subscribed: true,
+    registered: await isRegisteredHere(identityNumber, endpoint),
   };
 };
 
@@ -69,35 +111,176 @@ const isRegisteredHere = async (
   return status?.endpoint === endpoint;
 };
 
-export type OptInScreen =
-  "first-time" | "allow-app" | "new-device" | "blocked" | "skip";
+/**
+ * Whether notifications reach this identity in this browser right now.
+ *
+ * The permission as well as the registration: a permission reset to "default" leaves
+ * the rows in place while the browser shows nothing, so a registration alone is not
+ * delivery. `registered` already implies supported and subscribed.
+ */
+const deliversHere = (state: DeviceNotificationState): boolean =>
+  state.permission === "granted" && state.registered;
 
-/** Picks the opt-in screen for `origin` from device state and existing consent. */
+/** iOS has no notifications yet: Safari delivers them only to a Home Screen app, and
+ *  that is not built. Nothing is offered there and no app is told otherwise. */
+export const notificationsUnavailableHere = (): boolean => {
+  const { os } = browserAndSystem();
+  return "Ios" in os || "Ipados" in os;
+};
+
+export type OptInScreen = "enable" | "skip";
+
+/** Nothing to ask, so the answer is already known, or the question and what answering
+ *  it still has to do. */
+export type OptInResolution =
+  | { screen: "skip"; granted: boolean }
+  | {
+      screen: "enable";
+      state: DeviceNotificationState;
+      consented: boolean;
+    };
+
+/**
+ * Which screen this app and identity need.
+ *
+ * The app's consent and this browser's state are independent, so they are read at
+ * once; only the registration has to wait, since it is read against the endpoint the
+ * browser turns out to hold. A failure is left to the caller: it shows the same toast
+ * whenever it happens, and the screen it lands on is the one that asks.
+ */
+export const resolveOptIn = async ({
+  identityNumber,
+  origin,
+  actor,
+  browser,
+}: {
+  identityNumber: bigint;
+  origin: string;
+  actor: ActorSubclass<_SERVICE>;
+  browser: Promise<BrowserPushState | undefined>;
+}): Promise<OptInResolution> => {
+  const [consented, browserState] = await Promise.all([
+    actor
+      .notification_consent_granted({ anchor_number: identityNumber, origin })
+      .catch(() => false),
+    browser,
+  ]);
+  // A browser we could not read is not one with nothing to ask. Offer the question
+  // and let answering it read everything again.
+  const state =
+    browserState === undefined
+      ? {
+          supported: true,
+          permission: "default" as NotificationPermission,
+          subscribed: false,
+          registered: false,
+        }
+      : await readDeviceState(identityNumber, browserState);
+  recordPermission(state.permission);
+  const screen = resolveOptInScreen(state, consented);
+  return screen === "skip"
+    ? { screen, granted: consented && deliversHere(state) }
+    : { screen, state, consented };
+};
+
+/**
+ * What an app is told: this identity allowed it, and this browser delivers.
+ *
+ * Read again rather than carried over from the resolution, because the user has
+ * acted on the screen since.
+ */
+export const readGranted = async ({
+  identityNumber,
+  origin,
+  actor,
+}: {
+  identityNumber: bigint;
+  origin: string;
+  actor: ActorSubclass<_SERVICE>;
+}): Promise<boolean> => {
+  const browserState = await readBrowserPushState();
+  if (browserState === undefined) {
+    return false;
+  }
+  const [consented, state] = await Promise.all([
+    actor
+      .notification_consent_granted({ anchor_number: identityNumber, origin })
+      .catch(() => false),
+    readDeviceState(identityNumber, browserState),
+  ]);
+  return consented && deliversHere(state);
+};
+
+/** Picks the opt-in screen from device state and existing consent. */
 export const resolveOptInScreen = (
   state: DeviceNotificationState,
-  origin: string,
   allowed: boolean,
 ): OptInScreen => {
   if (!state.supported) {
     return "skip";
   }
-  if (state.permission === "granted" && state.registered && allowed) {
+  if (allowed && deliversHere(state)) {
     return "skip";
   }
-  if (wasDeclinedRecently(origin)) {
-    return "skip";
-  }
-  if (state.permission === "denied") {
-    return "blocked";
-  }
-  // Only where the browser can already deliver: this screen asks for the app's
-  // consent and nothing else, so a permission that was reset to "default" has to
-  // fall through to one that asks for it back.
-  if (state.permission === "granted" && state.registered && !allowed) {
-    return "allow-app";
-  }
-  if (!state.registered && allowed) {
-    return "new-device";
-  }
-  return "first-time";
+  // A refused permission is asked for here too. No prompt can lift a refusal, so
+  // answering leads to the unblock guidance rather than to a prompt, and the user
+  // reaches that guidance from the screen that explains why they are being asked.
+  return "enable";
 };
+
+/**
+ * Calls back once this browser's notification permission stops being refused.
+ *
+ * The unblock steps send the user into browser settings, and nothing in the page can
+ * raise the prompt again, so the screen waits for the setting itself to change rather
+ * than for the user to come back and press something.
+ *
+ * `PermissionStatus` reports the change where the browser delivers it, which is
+ * immediate and covers a toggle thrown in a site-settings bubble over the page. Not
+ * every browser delivers it for notifications, and a settings window on another
+ * screen may never return focus here, so the permission is also read on a timer.
+ *
+ * Returns the function that stops watching, which also runs before the callback.
+ */
+export const watchNotificationPermission = (
+  onAllowed: () => void,
+): (() => void) => {
+  if (typeof Notification === "undefined") {
+    return () => {};
+  }
+  let stopped = false;
+  let detach = () => {};
+
+  const check = () => {
+    if (stopped || Notification.permission === "denied") {
+      return;
+    }
+    stop();
+    onAllowed();
+  };
+
+  const timer = setInterval(check, PERMISSION_POLL_MS);
+
+  const stop = () => {
+    stopped = true;
+    clearInterval(timer);
+    detach();
+  };
+
+  void navigator.permissions
+    ?.query({ name: "notifications" as PermissionName })
+    .then((status) => {
+      if (stopped) {
+        return;
+      }
+      status.addEventListener("change", check);
+      detach = () => status.removeEventListener("change", check);
+    })
+    // Not every browser knows the `notifications` permission name, and the ones that
+    // do not reject the query. The timer covers them.
+    .catch(() => undefined);
+
+  return stop;
+};
+
+const PERMISSION_POLL_MS = 1000;

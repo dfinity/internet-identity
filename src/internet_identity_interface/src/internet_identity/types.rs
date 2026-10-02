@@ -358,7 +358,7 @@ pub struct InternetIdentityFrontendArgs {
 pub struct InternetIdentitySynchronizedConfig {
     pub openid_configs: Option<Vec<OpenIdConfig>>,
     pub mcp_official_url: Option<String>,
-    pub notifications_enabled_origins: Option<Vec<FrontendHostname>>,
+    pub notifications_enabled: Option<bool>,
 }
 
 /// Init arguments of II which can be supplied on install and upgrade.
@@ -425,9 +425,9 @@ pub struct InternetIdentityInit {
     /// (the deployment then has no official connector), `Some(Some(url))`
     /// points it at `url`.
     pub mcp_official_url: Option<Option<String>>,
-    /// Apps allowed to notify. Omitted on upgrade keeps the stored list, an empty list
-    /// turns notifications off, and entries enable them for those origins only.
-    pub notifications_enabled_origins: Option<Vec<FrontendHostname>>,
+    /// Server-side switch for the notifications feature, for every app at once.
+    /// Omitted on upgrade keeps the stored value; never stored means disabled.
+    pub notifications_enabled: Option<bool>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -688,6 +688,33 @@ impl From<AccountNameValidationError> for UpdateAccountError {
 pub enum GetAccountsError {
     InternalCanisterError(String),
     Unauthorized(Principal),
+}
+
+/// An app the identity has signed in to, for the user's own list of their apps.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ApplicationInfo {
+    /// The origin the app's identity is derived for: what its accounts and its
+    /// notification consent are stored under.
+    pub origin: FrontendHostname,
+    /// The latest sign-in to any of the identity's accounts at the app.
+    pub last_used: Timestamp,
+    /// Whether the app may notify the identity: it holds consent, and this deployment
+    /// notifies for it.
+    pub notifications_allowed: bool,
+    /// When the app last had a notification queued for one of the identity's browsers,
+    /// or `None` where it never has.
+    pub last_notified: Option<Timestamp>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ListApplicationsRequest {
+    pub anchor_number: AnchorNumber,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum ListApplicationsError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
 }
 
 #[derive(CandidType, Deserialize)]

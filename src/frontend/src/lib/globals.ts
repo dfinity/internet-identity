@@ -3,7 +3,7 @@ import { type _SERVICE } from "$lib/generated/internet_identity_types";
 import { type InternetIdentityFrontendInit } from "$lib/generated/internet_identity_frontend_types";
 import { readCanisterId } from "$lib/utils/init";
 import { Actor, ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
-import { inferHost, remapToLegacyDomain } from "$lib/utils/iiConnection";
+import { inferHost } from "$lib/utils/iiConnection";
 import type { AgentOptions } from "$lib/utils/notifications/workerConfig";
 import { idlFactory as internetIdentityIDL } from "$lib/generated/internet_identity_idl";
 import { init as internetIdentityFrontendInit } from "$lib/generated/internet_identity_frontend_idl";
@@ -24,7 +24,7 @@ const OpenIdEmailVerificationIDL = IDL.Variant({
 
 const backendCanisterConfigIDL = IDL.Record({
   mcp_official_url: IDL.Opt(IDL.Text),
-  notifications_enabled_origins: IDL.Opt(IDL.Vec(IDL.Text)),
+  notifications_enabled: IDL.Opt(IDL.Bool),
   openid_configs: IDL.Opt(
     IDL.Vec(
       IDL.Record({
@@ -61,25 +61,14 @@ export interface OpenIdConfig {
 export type BackendCanisterConfig = {
   openid_configs: [] | [OpenIdConfig[]];
   mcp_official_url: [] | [string];
-  /** The origins the backend notifies for. Absent from a canister older than
-   *  the field. */
-  notifications_enabled_origins: [] | [string[]];
+  /** Whether the backend notifies. Absent from a canister older than the field. */
+  notifications_enabled: [] | [boolean];
 };
 
-/** The origins this deployment notifies for, as the canister holds them: already
- *  folded onto the spelling consent is keyed by. */
-const notifyingOrigins = (): string[] =>
-  backendCanisterConfig?.notifications_enabled_origins[0] ?? [];
-
-/** Whether this deployment's backend notifies for any app at all. Its endpoints refuse
- *  every notification call otherwise, so there is nothing for the frontend to offer. */
+/** Whether this deployment's backend notifies. Its endpoints refuse every notification
+ *  call otherwise, so there is nothing for the frontend to offer. */
 export const notificationsEnabled = (): boolean =>
-  notifyingOrigins().length > 0;
-
-/** Whether it notifies for this app. An origin the canister does not hold is refused
- *  there, so asking its user to allow notifications could only ever end in an error. */
-export const notificationsEnabledFor = (origin: string): boolean =>
-  notifyingOrigins().includes(remapToLegacyDomain(origin));
+  backendCanisterConfig?.notifications_enabled[0] ?? false;
 
 export let canisterId: Principal;
 export let frontendCanisterConfig: InternetIdentityFrontendInit;

@@ -1,6 +1,7 @@
 import { type Readable, writable } from "svelte/store";
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import type { DeviceNotificationState } from "$lib/utils/notifications/notificationState";
 
 /** What the consent screen needs to run, once the user is authenticated. */
 export interface NotificationConsentContext {
@@ -8,6 +9,11 @@ export interface NotificationConsentContext {
   effectiveOrigin: string;
   identityNumber: bigint;
   actor: ActorSubclass<_SERVICE>;
+  /** This browser as the resolution found it, so answering the question only does
+   *  what is left to do. */
+  device: DeviceNotificationState;
+  /** Whether this app already holds consent from this identity. */
+  consented: boolean;
 }
 
 const contextInternal = writable<NotificationConsentContext | undefined>();

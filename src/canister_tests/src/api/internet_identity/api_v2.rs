@@ -372,6 +372,22 @@ pub fn get_accounts(
     .map(|(x,)| x)
 }
 
+pub fn list_applications(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+) -> Result<Result<Vec<ApplicationInfo>, ListApplicationsError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "list_applications",
+        (ListApplicationsRequest { anchor_number },),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn get_default_account(
     env: &PocketIc,
     canister_id: CanisterId,
