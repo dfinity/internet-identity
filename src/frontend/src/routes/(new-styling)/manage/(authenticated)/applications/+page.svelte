@@ -59,11 +59,7 @@
 <header class="flex flex-col gap-3">
   <h1 class="text-text-primary text-3xl font-medium">{$t`Applications`}</h1>
   <p class="text-text-tertiary text-base">
-    {#if $PUSH_NOTIFICATIONS}
-      <Trans>Apps you've signed in to. Choose which ones can notify you.</Trans>
-    {:else}
-      <Trans>Apps you've signed in to.</Trans>
-    {/if}
+    <Trans>Apps you've signed in to with this identity.</Trans>
   </p>
 </header>
 
