@@ -22,7 +22,8 @@
 
   // Consent belongs to the identity, so it reaches every browser it registered for
   // notifications, not only this one.
-  const saveAllowed = async (origin: string, allowed: boolean) => {
+  const saveAllowed = async (opened: Selection, allowed: boolean) => {
+    const { origin } = opened;
     const { actor, identityNumber } = $authenticatedStore;
     try {
       await (allowed ? allowApp : disallowApp)({
@@ -37,15 +38,20 @@
     apps = apps.map((app) =>
       app.origin === origin ? { ...app, notificationsAllowed: allowed } : app,
     );
-    selectedOrigin = undefined;
+    // The dialog can be dismissed while saving, and another one opened since.
+    if (selection === opened) {
+      selection = undefined;
+    }
   };
 
   const allowedOf = (app: App): boolean =>
     $PUSH_NOTIFICATIONS && app.notificationsAllowed;
 
-  let selectedOrigin = $state<string | undefined>(undefined);
+  // A new object each time a dialog opens, so a save answers only for its own.
+  type Selection = { origin: string };
+  let selection = $state.raw<Selection | undefined>(undefined);
   const selected = $derived(
-    apps.find(({ origin }) => origin === selectedOrigin),
+    apps.find(({ origin }) => origin === selection?.origin),
   );
   const dialogTitleId = $props.id();
 </script>
@@ -80,7 +86,7 @@
             allowed={allowedOf(app)}
             lastNotifiedMillis={app.lastNotifiedMillis}
             showNotifications={$PUSH_NOTIFICATIONS}
-            onManage={() => (selectedOrigin = app.origin)}
+            onManage={() => (selection = { origin: app.origin })}
           />
         </li>
       {/each}
@@ -94,10 +100,11 @@
   {/if}
 </div>
 
-{#if selected !== undefined}
+{#if selection !== undefined && selected !== undefined}
+  {@const opened = selection}
   {@const app = selected}
   <Dialog
-    onClose={() => (selectedOrigin = undefined)}
+    onClose={() => (selection = undefined)}
     aria-labelledby={dialogTitleId}
   >
     <AppDetails
@@ -105,7 +112,7 @@
       origin={app.origin}
       canNotify={$PUSH_NOTIFICATIONS}
       allowed={allowedOf(app)}
-      onSave={(allowed) => saveAllowed(app.origin, allowed)}
+      onSave={(allowed) => saveAllowed(opened, allowed)}
     />
   </Dialog>
 {/if}
