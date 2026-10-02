@@ -1,12 +1,22 @@
 <script lang="ts">
-  // The Home Screen, with the installed app ringed. Both routes end here.
-  import { t } from "$lib/stores/locale.store";
-  import Logo from "$lib/components/ui/Logo.svelte";
+  import type { Snippet } from "svelte";
   import Surface from "$lib/components/ui/browserMock/Surface.svelte";
   import ToolbarHighlight from "$lib/components/ui/browserMock/ToolbarHighlight.svelte";
 
-  /** The apps already there, drawn as blanks: six is what the design shows. */
-  const others = Array.from({ length: 6 });
+  const {
+    label,
+    blanks,
+    icon,
+  }: {
+    /** The ringed app's name, under its tile. */
+    label: string;
+    /** How many apps sit before it, drawn as blanks: the design shows six before the
+     *  installed app and four before Settings. */
+    blanks: number;
+    icon: Snippet;
+  } = $props();
+
+  const others = $derived(Array.from({ length: blanks }));
 </script>
 
 <Surface aria-hidden="true" class="text-text-primary px-3.5 pt-4 pb-3.5">
@@ -26,10 +36,10 @@
         <div
           class="bg-surface-light-200 dark:bg-surface-dark-700 text-text-primary flex h-10 w-10 items-center justify-center rounded-[10px]"
         >
-          <Logo width="24" height="12" class="shrink-0" />
+          {@render icon()}
         </div>
       </ToolbarHighlight>
-      <span class="text-[9px] whitespace-nowrap">{$t`Internet Identity`}</span>
+      <span class="text-[9px] whitespace-nowrap">{label}</span>
     </div>
   </div>
 </Surface>
