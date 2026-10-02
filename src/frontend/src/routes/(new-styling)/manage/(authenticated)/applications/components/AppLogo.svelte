@@ -19,8 +19,11 @@
 <span
   aria-hidden="true"
   class={[
-    "border-border-secondary flex shrink-0 items-center justify-center overflow-hidden border",
-    shown !== undefined ? "bg-white" : "bg-bg-primary text-fg-tertiary",
+    "flex shrink-0 items-center justify-center overflow-hidden",
+    // Only the globe needs a frame; a logo brings its own.
+    shown !== undefined
+      ? "bg-white"
+      : "border-border-secondary bg-bg-primary text-fg-tertiary border",
     { md: "size-10 rounded-lg", lg: "size-12 rounded-xl" }[size],
   ]}
 >
