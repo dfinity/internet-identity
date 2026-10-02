@@ -122,9 +122,6 @@ msgstr "1 week"
 msgid "10 minutes"
 msgstr "10 minuten"
 
-msgid "2m"
-msgstr "2 min"
-
 msgid "30 days"
 msgstr "30 dagen"
 
@@ -143,11 +140,11 @@ msgstr "Een lokaal programma"
 msgid "A local server picks a new port each time, so any program on this computer can ask to connect. Remove it when you're not using one."
 msgstr "Een lokale server kiest elke keer een nieuwe poort, zodat elk programma op deze computer kan vragen om verbinding te maken. Verwijder het als u er geen gebruikt."
 
-msgid "A marketplace"
-msgstr "Een marktplaats"
-
 msgid "About"
 msgstr "Over"
+
+msgid "About Safari"
+msgstr "Over Safari"
 
 msgid "Access"
 msgstr "Toegang"
@@ -239,8 +236,8 @@ msgstr "AI-toegang"
 msgid "All options"
 msgstr "Alle opties"
 
-msgid "Allow {app}"
-msgstr "{app} toestaan"
+msgid "Allow"
+msgstr "Toestaan"
 
 msgid "Allow access"
 msgstr "Toegang verlenen"
@@ -251,11 +248,14 @@ msgstr "CLI-toegang verlenen"
 msgid "Allow local programs to connect?"
 msgstr "Lokale programma's toestaan te verbinden?"
 
-msgid "Allow notifications for {host}."
-msgstr "Sta meldingen toe voor {host}."
+msgid "Allow notifications"
+msgstr "Meldingen toestaan"
 
 msgid "Allow to access this info"
 msgstr "Toegang tot deze informatie toestaan"
+
+msgid "Allowed"
+msgstr "Toegestaan"
 
 msgid "Allowing access"
 msgstr "Toegang verlenen"
@@ -280,6 +280,15 @@ msgstr "Elk lokaal programma kan verbinding maken"
 
 msgid "Any program on this computer can ask."
 msgstr "Elk programma op deze computer kan vragen."
+
+msgid "Applications"
+msgstr "Toepassingen"
+
+msgid "Apps you sign in to will show up here."
+msgstr "Apps waarbij u inlogt, worden hier weergegeven."
+
+msgid "Apps you've signed in to with this identity."
+msgstr "Apps waarbij u met deze identiteit hebt ingelogd."
 
 msgid "Are you sure?"
 msgstr "Weet u het zeker?"
@@ -323,8 +332,14 @@ msgstr "Terug naar inlogopties"
 msgid "Before you continue"
 msgstr "Voordat u doorgaat"
 
+msgid "Blocked"
+msgstr "Geblokkeerd"
+
 msgid "Body"
 msgstr "Berichttekst"
+
+msgid "Bookmarks"
+msgstr "Bladwijzers"
 
 msgid "Both are on the <0>{host}</0> domain."
 msgstr "Beide bevinden zich op het domein <0>{host}</0>."
@@ -334,6 +349,9 @@ msgstr "Browser geopend"
 
 msgid "By showing all options, you can choose how long your session lasts before signing in again and create more than one account for a single app (e.g. work, personal, or demo)."
 msgstr "Door alle opties te tonen, kunt u kiezen hoe lang uw sessie duurt voordat u opnieuw moet inloggen en kunt u meer dan één account aanmaken voor één app (bijv. werk, persoonlijk of demo)."
+
+msgid "Camera"
+msgstr "Camera"
 
 msgid "Can't find your identity?"
 msgstr "Kunt u uw identiteit niet vinden?"
@@ -389,17 +407,17 @@ msgstr "Kies welke gegevens u wilt delen"
 msgid "Clear all"
 msgstr "Alles wissen"
 
+msgid "Clear History…"
+msgstr "Geschiedenis wissen…"
+
+msgid "Clear the block"
+msgstr "Blokkering opheffen"
+
 msgid "CLI access"
 msgstr "CLI-toegang"
 
 msgid "CLI access not enabled"
 msgstr "CLI-toegang niet ingeschakeld"
-
-msgid "Click the lock icon in the address bar."
-msgstr "Klik op het slotpictogram in de adresbalk."
-
-msgid "Click the tune or lock icon at the left of the address bar."
-msgstr "Klik op het aanpassings- of slotpictogram links van de adresbalk."
 
 msgid "Click to reveal"
 msgstr "Klik om te tonen"
@@ -455,6 +473,9 @@ msgstr "Verbinding gesloten"
 msgid "Connection duration"
 msgstr "Verbindingsduur"
 
+msgid "Connection is secure"
+msgstr "Verbinding is veilig"
+
 msgid "Connector type"
 msgstr "Connectortype"
 
@@ -478,9 +499,6 @@ msgstr "Doorgaan met passkey"
 
 msgid "Continue with SSO"
 msgstr "Doorgaan met SSO"
-
-msgid "Continue without"
-msgstr "Doorgaan zonder"
 
 msgid "Copied"
 msgstr "Gekopieerd"
@@ -517,9 +535,6 @@ msgstr "Uw connector kon niet worden opgeslagen. Probeer het opnieuw."
 
 msgid "Couldn't sign this browser out"
 msgstr "Kon deze browser niet uitloggen"
-
-msgid "Couldn't turn on notifications"
-msgstr "Kon meldingen niet inschakelen"
 
 msgid "Couldn't validate MCP support"
 msgstr "MCP-ondersteuning kon niet worden gevalideerd"
@@ -602,8 +617,8 @@ msgstr "AI-toegang aanpassen"
 msgid "Default"
 msgstr "Standaard"
 
-msgid "Delivery routes through your identity. Revoke access anytime."
-msgstr "Bezorging verloopt via uw identiteit. Toegang op elk moment intrekken."
+msgid "Deny"
+msgstr "Weigeren"
 
 msgid "Deny all"
 msgstr "Alles weigeren"
@@ -665,12 +680,6 @@ msgstr "CLI-toegang inschakelen"
 msgid "Enable CLI access for this device, then try again."
 msgstr "Schakel CLI-toegang in voor dit apparaat en probeer het opnieuw."
 
-msgid "Enable notifications"
-msgstr "Meldingen inschakelen"
-
-msgid "Enable on this device"
-msgstr "Inschakelen op dit apparaat"
-
 msgid "Enabled on all devices"
 msgstr "Ingeschakeld op alle apparaten"
 
@@ -707,9 +716,6 @@ msgstr "Fout"
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Alles wat u moet weten over Internet Identity, uw veilige, privacyvriendelijke en gemakkelijke manier om in te loggen op Internet Computer-apps."
 
-msgid "Example"
-msgstr "Voorbeeld"
-
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Ervaar"
@@ -726,17 +732,17 @@ msgstr "Veelgestelde vragen"
 msgid "Featured apps"
 msgstr "Uitgelichte apps"
 
-msgid "Find {host} in the list and set it to Allow."
-msgstr "Zoek {host} in de lijst en stel het in op Toestaan."
-
-msgid "Find Notifications and switch it to Allow."
-msgstr "Zoek Meldingen en zet dit op Toestaan."
+msgid "File"
+msgstr "Bestand"
 
 msgid "First seen"
 msgstr "Voor het eerst gezien"
 
 msgid "First sign-in with {name}"
 msgstr "Eerste aanmelding met {name}"
+
+msgid "Follow these steps to turn them back on:"
+msgstr "Volg deze stappen om ze opnieuw in te schakelen:"
 
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 msgstr "Voorbeeld: gebruiker A logt in op Internet Identity met hun Google-account \"A@gmail.com\" en gebruikt vervolgens Internet Identity om te authenticeren in applicatie Z. Google zal nooit weten dat de gebruiker is geauthenticeerd in applicatie Z, alleen met Internet Identity. Bovendien zal applicatie Z nooit weten dat gebruiker A Google heeft gebruikt om hun Internet Identity-gebruiker te authenticeren."
@@ -768,14 +774,17 @@ msgstr "Volledige controle"
 msgid "Full ownership"
 msgstr "Volledig eigenaarschap"
 
+msgid "General"
+msgstr "Algemeen"
+
 msgid "Generating code..."
 msgstr "Code genereren..."
 
 msgid "Generating phrase..."
 msgstr "Herstelzin genereren..."
 
-msgid "Get {app} notifications on this device"
-msgstr "{app}-meldingen op dit apparaat ontvangen"
+msgid "Get notifications from this app when something needs your attention. You can turn them off anytime."
+msgstr "Ontvang meldingen van deze app wanneer iets uw aandacht vereist. U kunt ze op elk moment uitschakelen."
 
 msgid "Get started"
 msgstr "Aan de slag"
@@ -791,6 +800,9 @@ msgstr "Ga naar de app"
 
 msgid "Go to the app - (<0>{countdown}</0>)"
 msgstr "Ga naar de app - (<0>{countdown}</0>)"
+
+msgid "Go to Websites"
+msgstr "Ga naar Websites"
 
 msgid "Has not been used yet"
 msgstr "Nog niet gebruikt"
@@ -809,6 +821,9 @@ msgstr "Verborgen e-mailadres"
 
 msgid "Hide all"
 msgstr "Alles verbergen"
+
+msgid "History"
+msgstr "Geschiedenis"
 
 msgid "Hold for a few seconds. Release to cancel."
 msgstr "Ingedrukt houden gedurende enkele seconden. Loslaten om te annuleren."
@@ -836,9 +851,6 @@ msgstr "Hoe verhoudt Internet Identity zich tot andere Web3-authenticatietools?"
 
 msgid "How to stay secure"
 msgstr "Veilig blijven"
-
-msgid "How to unblock"
-msgstr "Hoe te deblokkeren"
 
 msgid "I acknowledge"
 msgstr "Ik erken dit"
@@ -914,9 +926,6 @@ msgstr "Onjuist. Probeer het opnieuw met de nieuwe code."
 
 msgid "Info you can choose to share when an app requests it. Never shared without your consent."
 msgstr "Informatie die u kunt kiezen te delen wanneer een app erom vraagt. Nooit gedeeld zonder uw toestemming."
-
-msgid "Instant activity alerts"
-msgstr "Directe activiteitsmeldingen"
 
 msgid "Interaction canceled. Please try again."
 msgstr "Interactie geannuleerd. Probeer het opnieuw."
@@ -1011,6 +1020,12 @@ msgstr "Taal"
 msgid "Last used"
 msgstr "Laatst gebruikt"
 
+msgid "Last visited"
+msgstr "Laatst bezocht"
+
+msgid "Last visited yesterday"
+msgstr "Gisteren voor het laatst bezocht"
+
 msgid "Learn how to open links in your browser"
 msgstr "Ontdek hoe u links in uw browser kunt openen"
 
@@ -1022,6 +1037,9 @@ msgstr "Verouderde identiteit"
 
 msgid "Let {app} notify you"
 msgstr "{app} toestaan u te informeren"
+
+msgid "Let {name} notify you."
+msgstr "Laat {name} u meldingen sturen."
 
 msgid "Let AI access your apps."
 msgstr "Geef AI toegang tot uw apps."
@@ -1049,9 +1067,6 @@ msgstr "Gekoppeld via een ander SSO-domein"
 
 msgid "Linking Internet Identity"
 msgstr "Internet Identity koppelen"
-
-msgid "Loading"
-msgstr "Laden"
 
 msgid "Loading permissions"
 msgstr "Machtigingen laden"
@@ -1086,6 +1101,9 @@ msgstr "Zorg ervoor dat de URL afkomstig is van een bron die u vertrouwt."
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Zorg ervoor dat u een nieuwe toegangsmethode toevoegt zodat u de volgende keer kunt inloggen, of reset uw herstelzin."
 
+msgid "Manage {name}"
+msgstr "{name} beheren"
+
 msgid "Manage how other tools connect to your identity."
 msgstr "Beheer hoe andere tools verbinding maken met uw identiteit."
 
@@ -1112,9 +1130,6 @@ msgstr "Maximale lengte is 32 tekens."
 
 msgid "Maximum length is 64 characters."
 msgstr "Maximale lengte is 64 tekens."
-
-msgid "Maybe later"
-msgstr "Misschien later"
 
 msgid "MCP server URL"
 msgstr "MCP-server-URL"
@@ -1143,6 +1158,9 @@ msgstr "Geef uw identiteit een naam"
 msgid "Name:"
 msgstr "Naam:"
 
+msgid "New message"
+msgstr "Nieuw bericht"
+
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Er worden geen gegevens gedeeld met Google, Microsoft of Apple over op welke applicaties u inlogt met Internet Identity."
 
@@ -1161,8 +1179,14 @@ msgstr "Geen herstelzin"
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "Nee. Uw Face ID of vingerafdruk wordt alleen gebruikt om uw passkey aan te maken of te ontgrendelen. Uw biometrische gegevens worden nooit gedeeld met Internet Identity of met websites of apps die u gebruikt."
 
+msgid "None yet"
+msgstr "Nog geen"
+
 msgid "Not activated"
 msgstr "Niet geactiveerd"
+
+msgid "Not allowed"
+msgstr "Niet toegestaan"
 
 msgid "Not connected yet"
 msgstr "Nog niet gekoppeld"
@@ -1176,11 +1200,23 @@ msgstr "Niet geüpgraded"
 msgid "Not verified"
 msgstr "Niet geverifieerd"
 
+msgid "Notification"
+msgstr "Melding"
+
 msgid "Notification setup failed"
 msgstr "Instellen van meldingen mislukt"
 
-msgid "Notifications are turned off for Internet Identity"
-msgstr "Meldingen zijn uitgeschakeld voor Internet Identity"
+msgid "Notifications"
+msgstr "Meldingen"
+
+msgid "Notifications are blocked"
+msgstr "Meldingen zijn geblokkeerd"
+
+msgid "Notifications blocked"
+msgstr "Meldingen geblokkeerd"
+
+msgid "Notifications unavailable"
+msgstr "Meldingen niet beschikbaar"
 
 msgid "now"
 msgstr "nu"
@@ -1224,11 +1260,14 @@ msgstr "Beheer openen"
 msgid "Open menu"
 msgstr "Menu openen"
 
-msgid "Open Permissions, then Notifications, then Allow."
-msgstr "Open Rechten, dan Meldingen, dan Toestaan."
+msgid "Open notification settings"
+msgstr "Meldingsinstellingen openen"
 
-msgid "Open Safari, then Settings, then Websites, then Notifications."
-msgstr "Open Safari, dan Instellingen, dan Websites, dan Meldingen."
+msgid "Open permissions"
+msgstr "Machtigingen openen"
+
+msgid "Open Safari settings"
+msgstr "Safari-instellingen openen"
 
 msgid "Open Settings"
 msgstr "Instellingen openen"
@@ -1236,8 +1275,11 @@ msgstr "Instellingen openen"
 msgid "Open Settings in a new tab to set your trusted MCP server."
 msgstr "Open Instellingen in een nieuw tabblad om uw vertrouwde MCP-server in te stellen."
 
-msgid "Open your browser's site settings for this page."
-msgstr "Open de site-instellingen van uw browser voor deze pagina."
+msgid "Open site permissions"
+msgstr "Sitemachtigingen openen"
+
+msgid "Open site settings"
+msgstr "Site-instellingen openen"
 
 msgid "Or sign in with another identity"
 msgstr "Of log in met een andere identiteit"
@@ -1284,6 +1326,9 @@ msgstr "Wachtwoordloos"
 msgid "Permissions"
 msgstr "Machtigingen"
 
+msgid "Permissions for {host}"
+msgstr "Machtigingen voor {host}"
+
 msgid "Pick a recovery method below to sign back in."
 msgstr "Kies hieronder een herstelmethode om opnieuw in te loggen."
 
@@ -1305,23 +1350,23 @@ msgstr "Log opnieuw in om door te gaan."
 msgid "Powered by"
 msgstr "Aangedreven door"
 
-msgid "Private by design"
-msgstr "Privacy by design"
+msgid "Privacy"
+msgstr "Privacy"
+
+msgid "Privacy Report…"
+msgstr "Privacyrapport…"
+
+msgid "Profiles"
+msgstr "Profielen"
 
 msgid "Questions only"
 msgstr "Alleen vragen"
-
-msgid "Reachable anytime"
-msgstr "Altijd bereikbaar"
 
 msgid "Reachable MCP server"
 msgstr "Bereikbare MCP-server"
 
 msgid "Real privacy"
 msgstr "Echte privacy"
-
-msgid "Receive alerts from the apps you approve, and stay on top of what matters."
-msgstr "Ontvang meldingen van de apps die u goedkeurt en blijf op de hoogte van wat belangrijk is."
 
 msgid "Recover"
 msgstr "Herstellen"
@@ -1359,17 +1404,14 @@ msgstr "Herstelzin geactiveerd"
 msgid "Recovery phrase set"
 msgstr "Herstelzin ingesteld"
 
-msgid "Reload the page and try again."
-msgstr "Ververs de pagina en probeer het opnieuw."
-
-msgid "Reload the page and turn notifications on again."
-msgstr "Ververs de pagina en schakel meldingen weer in."
-
 msgid "Remember"
 msgstr "Onthouden"
 
 msgid "Remember this browser?"
 msgstr "Deze browser onthouden?"
+
+msgid "Reminder"
+msgstr "Herinnering"
 
 msgid "Remote server"
 msgstr "Externe server"
@@ -1431,6 +1473,9 @@ msgstr "Vervangen"
 msgid "Replace it anytime"
 msgstr "Vervang het wanneer u wilt"
 
+msgid "Request approved"
+msgstr "Verzoek goedgekeurd"
+
 msgid "Requested by"
 msgstr "Aangevraagd door"
 
@@ -1461,9 +1506,6 @@ msgstr "Terug naar app"
 msgid "Return to application"
 msgstr "Terug naar applicatie"
 
-msgid "Return to this page and try again."
-msgstr "Ga terug naar deze pagina en probeer het opnieuw."
-
 msgid "Review {serverDisplayName}'s <0>Privacy Policy</0> and <1>Terms of Service</1>."
 msgstr "Lees het <0>Privacybeleid</0> en de <1>Servicevoorwaarden</1> van {serverDisplayName}."
 
@@ -1488,6 +1530,9 @@ msgstr "Voer een passkey-test uit om resultaten te zien"
 msgid "Runs on your own computer · Any port"
 msgstr "Wordt uitgevoerd op uw eigen computer · Elke poort"
 
+msgid "Safari Extensions…"
+msgstr "Safari-extensies…"
+
 msgid "Save changes"
 msgstr "Wijzigingen opslaan"
 
@@ -1503,14 +1548,26 @@ msgstr "Scan de bovenstaande QR-code met uw <0>nieuwe apparaat</0> of voer de UR
 msgid "Seamless access"
 msgstr "Naadloze toegang"
 
+msgid "Secure connection"
+msgstr "Beveiligde verbinding"
+
 msgid "Securely connecting your identity to the server."
 msgstr "Uw identiteit wordt veilig verbonden met de server."
 
 msgid "See where you're signed in to apps and sign out remotely."
 msgstr "Bekijk waar u bent ingelogd bij apps en log op afstand uit."
 
+msgid "Select <0>Blocked ×</0> to clear it."
+msgstr "Selecteer <0>Geblokkeerd ×</0> om het te wissen."
+
+msgid "Select <0>Notifications</0>, set {host} to <1>Allow</1>."
+msgstr "Selecteer <0>Meldingen</0>, stel {host} in op <1>Toestaan</1>."
+
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Selecteer <0>Openen in Safari</0> of <1>Openen in Chrome</1>."
+
+msgid "Select <0>Safari</0> › <1>Settings…</1> in the menu bar."
+msgstr "Selecteer <0>Safari</0> › <1>Instellingen…</1> in de menubalk."
 
 msgid "Select a passkey"
 msgstr "Selecteer een passkey"
@@ -1518,8 +1575,20 @@ msgstr "Selecteer een passkey"
 msgid "Select each word in the correct order:"
 msgstr "Selecteer elk woord in de juiste volgorde:"
 
+msgid "Select the <0>Websites</0> tab."
+msgstr "Selecteer het tabblad <0>Websites</0>."
+
+msgid "Select the highlighted <0>permissions</0> icon."
+msgstr "Selecteer het gemarkeerde pictogram <0>machtigingen</0>."
+
+msgid "Select the highlighted <0>site settings</0> icon."
+msgstr "Selecteer het gemarkeerde pictogram <0>site-instellingen</0>."
+
 msgid "Send an email from your inbox."
 msgstr "Stuur een e-mail vanuit uw inbox."
+
+msgid "Send notifications"
+msgstr "Meldingen verzenden"
 
 msgid "Send the email below to confirm."
 msgstr "Stuur de onderstaande e-mail om te bevestigen."
@@ -1548,6 +1617,9 @@ msgstr "Instellen…"
 msgid "Settings"
 msgstr "Instellingen"
 
+msgid "Settings…"
+msgstr "Instellingen…"
+
 msgid "Share {label}"
 msgstr "{label} delen"
 
@@ -1559,6 +1631,9 @@ msgstr "Alles tonen"
 
 msgid "Show all options"
 msgstr "Alle opties tonen"
+
+msgid "Show notifications"
+msgstr "Meldingen weergeven"
 
 msgid "Sign in"
 msgstr "Inloggen"
@@ -1666,12 +1741,6 @@ msgstr "Er klopt iets niet."
 msgid "Something went wrong"
 msgstr "Er is iets misgegaan"
 
-msgid "Something went wrong allowing this app. You can try again now, or allow it later in Settings."
-msgstr "Er is iets misgegaan bij het toestaan van deze app. U kunt het nu opnieuw proberen, of het later toestaan in Instellingen."
-
-msgid "Something went wrong setting up this device. You can try again now, or set it up later in Settings."
-msgstr "Er is iets misgegaan bij het instellen van dit apparaat. U kunt het nu opnieuw proberen, of het later instellen in Instellingen."
-
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Er is iets misgegaan bij het aanmaken van uw delegatie. Probeer het opnieuw; als het probleem aanhoudt, neem dan contact op met ondersteuning."
 
@@ -1768,14 +1837,26 @@ msgstr "Wisselen..."
 msgid "Taking you to the server to finish connecting…"
 msgstr "U wordt doorgestuurd naar de server om de verbinding te voltooien…"
 
+msgid "Tap <0>Blocked</0> to allow."
+msgstr "Tik op <0>Geblokkeerd</0> om toe te staan."
+
+msgid "Tap <0>Notifications</0>."
+msgstr "Tik op <0>Meldingen</0>."
+
+msgid "Tap <0>Permissions</0>."
+msgstr "Tik op <0>Machtigingen</0>."
+
 msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
 msgstr "Tik op de <0>adresbalk</0> en <1>open in browser</1>."
 
 msgid "Tap on the highlighted <0>back</0> button."
 msgstr "Tik op de gemarkeerde <0>terug</0>-knop."
 
-msgid "Tap the site-info icon to the left of the address bar."
-msgstr "Tik op het site-infopictogram links van de adresbalk."
+msgid "Tap the highlighted <0>shield</0> icon."
+msgstr "Tik op het gemarkeerde pictogram <0>schild</0>."
+
+msgid "Tap the highlighted <0>site settings</0> icon."
+msgstr "Tik op het gemarkeerde pictogram <0>site-instellingen</0>."
 
 msgid "Test passkey support"
 msgstr "Passkey-ondersteuning testen"
@@ -1864,9 +1945,6 @@ msgstr "Deze browser wordt niet ondersteund."
 msgid "This connection link is missing information or has been changed."
 msgstr "Deze verbindingslink ontbreekt informatie of is gewijzigd."
 
-msgid "This device is already set up for notifications. Allow this app to send them too."
-msgstr "Dit apparaat is al ingesteld voor meldingen. Sta ook deze app toe ze te versturen."
-
 msgid "This doesn't look like a valid email address."
 msgstr "Dit lijkt geen geldig e-mailadres te zijn."
 
@@ -1939,9 +2017,6 @@ msgstr "Om uw passkey te voltooien, volgt u de instructies op uw <0>nieuwe appar
 msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 msgstr "Om AI toe te staan vragen te stellen en acties uit te voeren in uw apps, voeg een <0>MCP-connector</0> toe die u vertrouwt."
 
-msgid "Transfers, replies and mentions the moment they happen."
-msgstr "Overdrachten, antwoorden en vermeldingen op het moment dat ze plaatsvinden."
-
 msgid "Trusted connector"
 msgstr "Vertrouwde connector"
 
@@ -1951,8 +2026,11 @@ msgstr "Probeer een ander adres"
 msgid "Try again"
 msgstr "Opnieuw proberen"
 
-msgid "Turn on notifications from {app}?"
-msgstr "Meldingen van {app} inschakelen?"
+msgid "Turn on <0>Notifications</0>."
+msgstr "Zet <0>Meldingen</0> aan."
+
+msgid "Turn on <0>Show notifications</0>."
+msgstr "Zet <0>Meldingen weergeven</0> aan."
 
 msgid "Type each word in the correct order:"
 msgstr "Typ elk woord in de juiste volgorde:"
@@ -1977,9 +2055,6 @@ msgstr "Instelling niet voltooid"
 
 msgid "Unable to connect"
 msgstr "Kon geen verbinding maken"
-
-msgid "Under Permissions, clear the \"Blocked\" setting for Send Notifications."
-msgstr "Verwijder onder Rechten de instelling \"Geblokkeerd\" voor Meldingen verzenden."
 
 msgid "Understanding Internet Identity"
 msgstr "Internet Identity uitgelegd"
@@ -2022,9 +2097,6 @@ msgstr "Ongeverifieerde oorsprong"
 
 msgid "Update recovery email"
 msgstr "Herstel-e-mailadres bijwerken"
-
-msgid "Updates reach your device without keeping the app open."
-msgstr "Updates bereiken uw apparaat zonder de app open te houden."
 
 msgid "Upgrade"
 msgstr "Upgrade"
@@ -2104,6 +2176,9 @@ msgstr "Verifiëren..."
 msgid "Verifying…"
 msgstr "Verifiëren…"
 
+msgid "View"
+msgstr "Weergeven"
+
 msgid "View your last used identities"
 msgstr "Bekijk uw laatst gebruikte identiteiten"
 
@@ -2127,6 +2202,9 @@ msgstr "We herkenden die activeringscode niet."
 
 msgid "We'll ask you to send an email from this inbox to confirm."
 msgstr "We vragen u een e-mail te sturen vanuit deze inbox ter bevestiging."
+
+msgid "Websites"
+msgstr "Websites"
 
 msgid "Welcome, <0>{name}</0>."
 msgstr "Welkom, <0>{name}</0>."
@@ -2179,9 +2257,6 @@ msgstr "Er is een onjuist domein ingesteld. Probeer het opnieuw."
 msgid "You <0>cannot</0> rename this once it is set."
 msgstr "U kunt dit <0>niet</0> hernoemen zodra het is ingesteld."
 
-msgid "You allowed this app on another device. Turn this device on to receive them here too."
-msgstr "U heeft deze app op een ander apparaat toegestaan. Schakel dit apparaat in om ze hier ook te ontvangen."
-
 msgid "You already have a {name} account linked"
 msgstr "U heeft al een {name}-account gekoppeld"
 
@@ -2226,6 +2301,9 @@ msgstr "U kunt deze nu gebruiken om te herstellen, maar controleer of u hem corr
 
 msgid "You control both devices."
 msgstr "U beheert beide apparaten."
+
+msgid "You have 1 new message."
+msgstr "U heeft 1 nieuw bericht."
 
 msgid "You have reached the maximum number of passkeys"
 msgstr "U heeft het maximum aantal passkeys bereikt"
@@ -2281,11 +2359,8 @@ msgstr "U heeft de limiet van {limit} geverifieerde e-mailadressen bereikt. Verw
 msgid "Your apps stay signed in and your identity is ready the next time you come back."
 msgstr "Uw apps blijven ingelogd en uw identiteit is klaar de volgende keer dat u terugkomt."
 
-msgid "Your browser is blocking notifications for this site, so this app can't reach you here. Turn them back on in your browser settings, then try again."
-msgstr "Uw browser blokkeert meldingen voor deze site, waardoor deze app u hier niet kan bereiken. Zet ze weer aan in uw browserinstellingen en probeer het opnieuw."
-
-msgid "Your item just sold."
-msgstr "Uw artikel is zojuist verkocht."
+msgid "Your event starts in 15 minutes."
+msgstr "Uw evenement begint over 15 minuten."
 
 msgid "Your local server tells you when it's ready to connect. Nothing to enter here."
 msgstr "Uw lokale server vertelt u wanneer hij klaar is om verbinding te maken. Hier hoeft u niets in te vullen."
@@ -2311,8 +2386,5 @@ msgstr "Uw herstelzin geeft volledige controle over uw identiteit. Deel deze noo
 msgid "Your recovery phrase is now active and can be reset anytime."
 msgstr "Uw herstelzin is nu actief en kan op elk moment worden gereset."
 
-msgid "Your transfer is confirmed."
-msgstr "Uw overdracht is bevestigd."
-
-msgid "Your wallet"
-msgstr "Uw portemonnee"
+msgid "Your request was approved."
+msgstr "Uw verzoek is goedgekeurd."
