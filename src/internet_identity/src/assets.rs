@@ -29,13 +29,8 @@ pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
         openid_configs: config.openid_configs.clone(),
         mcp_official_url: config.mcp_official_url.clone().flatten(),
         // `config` is rebuilt from the persistent state after the install argument was
-        // applied, so this is the list the endpoints themselves check against.
-        notifications_enabled_origins: Some(
-            config
-                .notifications_enabled_origins
-                .clone()
-                .unwrap_or_default(),
-        ),
+        // applied, so this is the value the endpoints themselves check.
+        notifications_enabled: Some(config.notifications_enabled.unwrap_or(false)),
     };
     let mut assets = vec![Asset {
         url_path: "/.config.did.bin".to_string(),

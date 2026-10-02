@@ -6,6 +6,7 @@
   import { t } from "$lib/stores/locale.store";
   import { originLabel } from "$lib/utils/urlUtils";
   import AppLogo from "./AppLogo.svelte";
+  import { appUrl } from "../apps";
 
   interface Props {
     /** For the app's name, which is what names the dialog. */
@@ -13,8 +14,8 @@
     /** The origin the app's identity is derived for: what its metadata is published
      *  on and its consent is keyed by. */
     origin: string;
-    /** Whether this Internet Identity notifies for the app at all. Without it there
-     *  is nothing to switch, so the switch is left out. */
+    /** Whether this Internet Identity notifies at all. Without it there is nothing to
+     *  switch, so the switch is left out. */
     canNotify: boolean;
     /** Whether the app may notify, as the canister holds it. */
     allowed: boolean;
@@ -38,7 +39,8 @@
 
   const metadataStore = $derived(getAppMetadataStore(origin));
   const metadata = $derived($metadataStore);
-  const label = $derived(originLabel(origin));
+  const url = $derived(appUrl(origin));
+  const label = $derived(originLabel(url));
   const name = $derived(metadata.name ?? label);
 
   const switchId = $props.id();
@@ -54,7 +56,7 @@
         {name}
       </h2>
       <a
-        href={origin}
+        href={url}
         target="_blank"
         rel="noopener noreferrer"
         class="text-text-tertiary self-start text-sm hover:underline focus-visible:underline"

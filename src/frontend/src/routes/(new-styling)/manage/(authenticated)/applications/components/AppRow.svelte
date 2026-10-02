@@ -4,6 +4,7 @@
   import { formatRelative, t } from "$lib/stores/locale.store";
   import { originLabel } from "$lib/utils/urlUtils";
   import AppLogo from "./AppLogo.svelte";
+  import { appUrl } from "../apps";
 
   interface Props {
     /** The origin the app's identity is derived for: what its metadata is published
@@ -11,8 +12,8 @@
     origin: string;
     /** The latest sign-in at the app, in milliseconds. */
     lastUsedMillis: number;
-    /** Whether the app may notify. An app this Internet Identity does not notify for
-     *  may not. */
+    /** Whether the app may notify. None may while this Internet Identity does not
+     *  notify. */
     allowed: boolean;
     /** When the app last notified, in milliseconds, or `undefined` where it never has. */
     lastNotifiedMillis: number | undefined;
@@ -32,7 +33,8 @@
 
   const metadataStore = $derived(getAppMetadataStore(origin));
   const metadata = $derived($metadataStore);
-  const label = $derived(originLabel(origin));
+  const url = $derived(appUrl(origin));
+  const label = $derived(originLabel(url));
   const name = $derived(metadata.name ?? label);
 </script>
 
@@ -46,7 +48,7 @@
 
   <span class="flex min-w-0 flex-col">
     <a
-      href={origin}
+      href={url}
       target="_blank"
       rel="noopener noreferrer"
       class="text-text-primary truncate text-sm font-semibold outline-none after:absolute after:inset-0"

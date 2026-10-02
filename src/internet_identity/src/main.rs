@@ -1044,7 +1044,7 @@ fn config() -> InternetIdentityInit {
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
         mcp_official_url: Some(persistent_state.mcp_official_url.clone()),
-        notifications_enabled_origins: persistent_state.notifications_enabled_origins.clone(),
+        notifications_enabled: persistent_state.notifications_enabled,
     })
 }
 
@@ -1215,10 +1215,9 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.mcp_official_url = mcp_official_url;
             })
         }
-        if let Some(notifications_enabled_origins) = arg.notifications_enabled_origins {
+        if let Some(notifications_enabled) = arg.notifications_enabled {
             state::persistent_state_mut(|persistent_state| {
-                persistent_state.notifications_enabled_origins =
-                    Some(notifications_enabled_origins);
+                persistent_state.notifications_enabled = Some(notifications_enabled);
             })
         }
     }

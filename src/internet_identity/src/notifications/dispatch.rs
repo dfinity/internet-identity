@@ -1016,7 +1016,7 @@ mod tests {
         setup();
         let (recipient, _) = subscribed_recipient(1);
         submit(recipient, 7, 10 * SECOND_NS);
-        crate::state::persistent_state_mut(|s| s.notifications_enabled_origins = None);
+        crate::state::persistent_state_mut(|s| s.notifications_enabled = None);
 
         assert!(plan_pass(MAX_POSTS_PER_PASS, SECOND_NS).is_empty());
 

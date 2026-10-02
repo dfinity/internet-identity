@@ -46,9 +46,7 @@ fn chrome_on_a_mac() -> BrowserDescription {
 /// request validates in.
 pub(crate) fn setup() {
     crate::notifications::test_setup();
-    crate::state::persistent_state_mut(|s| {
-        s.notifications_enabled_origins = Some(vec!["https://app.example".to_string()]);
-    });
+    crate::state::persistent_state_mut(|s| s.notifications_enabled = Some(true));
 }
 
 pub(crate) fn anchor(anchor_number: AnchorNumber) -> Anchor {

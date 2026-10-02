@@ -7,17 +7,17 @@ use canister_tests::api::internet_identity::notifications::{
 };
 use canister_tests::flows;
 use canister_tests::framework::{
-    arg_with_captcha_disabled, arg_with_notifications_enabled_for, env,
-    install_ii_canister_with_arg, principal_1, principal_2, upgrade_ii_canister, BrowserKey,
+    arg_with_captcha_disabled, arg_with_notifications_enabled, env, install_ii_canister_with_arg,
+    principal_1, principal_2, upgrade_ii_canister, upgrade_ii_canister_with_arg, BrowserKey,
     II_WASM,
 };
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, BrowserBrand, BrowserDescription, FormFactor, GetNextNotificationError,
-    GetNextNotificationRequest, GetNextNotificationResponse, NotificationGrantConsentError,
-    NotificationRevokeConsentError, NotificationToShow, OperatingSystem,
-    PrepareAccountSessionRequest, RemoveNotificationError, RemoveNotificationRequest,
-    RemoveNotificationResponse,
+    GetNextNotificationRequest, GetNextNotificationResponse, InternetIdentityInit,
+    NotificationGrantConsentError, NotificationRevokeConsentError, NotificationToShow,
+    OperatingSystem, PrepareAccountSessionRequest, RemoveNotificationError,
+    RemoveNotificationRequest, RemoveNotificationResponse,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -25,19 +25,11 @@ use serde_bytes::ByteBuf;
 const ORIGIN: &str = "https://some-dapp.com";
 const GATEWAY: &str = "https://abcde-aaaaa-aaaaa-aaaaa-cai.ic0.app";
 const UNREACHED: &str = "https://never-visited.example";
-/// Every origin the tests below expect to be notifiable. One that is not enabled is
-/// refused before anything else, which `should_refuse_an_origin_that_is_not_enabled`
-/// covers on its own.
-const ENABLED: &[&str] = &[ORIGIN, GATEWAY, UNREACHED];
-
-/// A canister notifying for `ENABLED`, and one anchor registered to `principal_1`
-/// which has signed in at `ORIGIN`.
+/// A canister that notifies, and one anchor registered to `principal_1` which has
+/// signed in at `ORIGIN`.
 fn install_with_anchor(env: &PocketIc) -> (CanisterId, AnchorNumber) {
-    let canister_id = install_ii_canister_with_arg(
-        env,
-        II_WASM.clone(),
-        arg_with_notifications_enabled_for(ENABLED),
-    );
+    let canister_id =
+        install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
     let anchor = flows::register_anchor(env, canister_id);
     sign_in_at(env, canister_id, anchor, ORIGIN, 1);
     (canister_id, anchor)
@@ -91,9 +83,10 @@ fn sign_in_at(
 }
 
 #[test]
-fn should_refuse_every_entry_point_while_no_origin_is_enabled() -> Result<(), RejectResponse> {
+fn should_refuse_every_entry_point_while_notifications_are_disabled() -> Result<(), RejectResponse>
+{
     let env = env();
-    // The default arg, which enables no origin.
+    // The default arg, which leaves notifications disabled.
     let canister_id =
         install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_captcha_disabled());
     let anchor = flows::register_anchor(&env, canister_id);
@@ -342,36 +335,39 @@ fn should_keep_consent_across_an_upgrade() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// The allowlist is what rolls the feature out app by app, so an origin left off it is
-/// refused even for an identity that has signed in there.
+/// The switch can be turned off again: consent held from before is then neither
+/// changed nor reported.
 #[test]
-fn should_refuse_an_origin_that_is_not_enabled() -> Result<(), RejectResponse> {
+fn should_refuse_consent_once_notifications_are_disabled() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_canister_with_arg(
+    let (canister_id, anchor) = install_with_anchor(&env);
+    grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?
+        .expect("consent refused");
+
+    upgrade_ii_canister_with_arg(
         &env,
+        canister_id,
         II_WASM.clone(),
-        arg_with_notifications_enabled_for(&[ORIGIN]),
-    );
-    let anchor = flows::register_anchor(&env, canister_id);
-    sign_in_at(&env, canister_id, anchor, ORIGIN, 1);
-    sign_in_at(&env, canister_id, anchor, "https://other-dapp.com", 2);
+        Some(InternetIdentityInit {
+            notifications_enabled: Some(false),
+            ..Default::default()
+        }),
+    )?;
 
     assert!(matches!(
-        grant_consent(
-            &env,
-            canister_id,
-            principal_1(),
-            anchor,
-            "https://other-dapp.com".into()
-        )?,
+        grant_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
         Err(NotificationGrantConsentError::InternalCanisterError(_))
+    ));
+    assert!(matches!(
+        revoke_consent(&env, canister_id, principal_1(), anchor, ORIGIN.into())?,
+        Err(NotificationRevokeConsentError::InternalCanisterError(_))
     ));
     assert!(!consent_granted(
         &env,
         canister_id,
         principal_1(),
         anchor,
-        "https://other-dapp.com".into()
+        ORIGIN.into()
     )?);
     Ok(())
 }
@@ -452,11 +448,8 @@ mod subscriptions {
     pub(super) fn install_with_browser(
         env: &PocketIc,
     ) -> (CanisterId, AnchorNumber, BrowserKey, BrowserId) {
-        let canister_id = install_ii_canister_with_arg(
-            env,
-            II_WASM.clone(),
-            arg_with_notifications_enabled_for(ENABLED),
-        );
+        let canister_id =
+            install_ii_canister_with_arg(env, II_WASM.clone(), arg_with_notifications_enabled());
         let anchor = flows::register_anchor(env, canister_id);
         let browser = BrowserKey::new(1);
         let browser_id = sign_browser_in(env, canister_id, anchor, &browser);
@@ -480,7 +473,7 @@ mod subscriptions {
     }
 
     #[test]
-    fn should_refuse_to_subscribe_while_no_origin_is_enabled() -> Result<(), RejectResponse> {
+    fn should_refuse_to_subscribe_while_notifications_are_disabled() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id =
             install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_captcha_disabled());
@@ -1109,37 +1102,28 @@ mod pull_delegation {
         Ok(())
     }
 
-    /// Notifications roll out app by app, and these two entry points are no
-    /// exception: an origin the operator left off the list mints nothing.
+    /// Turning notifications off mints nothing more for a browser that could before.
     #[test]
-    fn should_refuse_an_origin_that_is_not_enabled() -> Result<(), RejectResponse> {
+    fn should_refuse_once_notifications_are_disabled() -> Result<(), RejectResponse> {
         let env = env();
         let (canister_id, anchor, browser, _) = install_notifiable(&env);
         let caller = key_holder(&browser).principal();
-        let disabled = "https://not-enabled.example";
+        upgrade_ii_canister_with_arg(
+            &env,
+            canister_id,
+            II_WASM.clone(),
+            Some(InternetIdentityInit {
+                notifications_enabled: Some(false),
+                ..Default::default()
+            }),
+        )?;
 
         assert!(matches!(
-            prepare_notification_delegation(
-                &env,
-                canister_id,
-                caller,
-                PrepareNotificationDelegationRequest {
-                    origin: disabled.into(),
-                    ..prepare_request(anchor)
-                },
-            )?,
+            prepare_notification_delegation(&env, canister_id, caller, prepare_request(anchor))?,
             Err(NotificationDelegationError::InternalCanisterError(_))
         ));
         assert!(matches!(
-            get_notification_delegation(
-                &env,
-                canister_id,
-                caller,
-                GetNotificationDelegationRequest {
-                    origin: disabled.into(),
-                    ..get_request(anchor, 0)
-                },
-            )?,
+            get_notification_delegation(&env, canister_id, caller, get_request(anchor, 0))?,
             Err(NotificationDelegationError::InternalCanisterError(_))
         ));
         Ok(())

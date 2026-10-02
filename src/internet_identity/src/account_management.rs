@@ -39,14 +39,14 @@ pub fn get_accounts_for_origin(
 }
 
 /// The apps the identity has signed in to, for its own list of them. An app is allowed to
-/// notify only where it holds consent and this deployment notifies for it, as
+/// notify only where it holds consent and this deployment notifies, as
 /// `notification_consent_granted` answers.
 pub fn list_applications(anchor_number: AnchorNumber) -> Vec<ApplicationInfo> {
     storage_borrow(|storage| storage.list_applications(anchor_number))
         .into_iter()
         .map(|(origin, last_used, config)| ApplicationInfo {
             notifications_allowed: config.notifications_consented_at_ns.is_some()
-                && crate::notifications::notifies_for(&origin),
+                && crate::notifications::notifications_enabled(),
             last_notified: config.last_notified_at_ns,
             origin,
             last_used,

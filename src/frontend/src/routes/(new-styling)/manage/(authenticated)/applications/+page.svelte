@@ -1,7 +1,6 @@
 <script lang="ts">
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
-  import { notificationsEnabledFor } from "$lib/globals";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
@@ -20,10 +19,6 @@
   // Overwritten once a save succeeds. Loading the page again reads what the canister
   // holds.
   let apps = $derived(appsFrom(data.applications));
-
-  // Anywhere else the canister refuses the grant, so a switch there could only fail.
-  const canNotify = (origin: string): boolean =>
-    $PUSH_NOTIFICATIONS && notificationsEnabledFor(origin);
 
   // Consent belongs to the identity, so it reaches every browser it registered for
   // notifications, not only this one.
@@ -46,7 +41,7 @@
   };
 
   const allowedOf = (app: App): boolean =>
-    canNotify(app.origin) && app.notificationsAllowed;
+    $PUSH_NOTIFICATIONS && app.notificationsAllowed;
 
   let selectedOrigin = $state<string | undefined>(undefined);
   const selected = $derived(
@@ -108,7 +103,7 @@
     <AppDetails
       titleId={dialogTitleId}
       origin={app.origin}
-      canNotify={canNotify(app.origin)}
+      canNotify={$PUSH_NOTIFICATIONS}
       allowed={allowedOf(app)}
       onSave={(allowed) => saveAllowed(app.origin, allowed)}
     />
