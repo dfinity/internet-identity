@@ -95,6 +95,6 @@
 
   <ChevronRightIcon
     aria-hidden="true"
-    class="text-fg-tertiary col-start-3 row-span-2 row-start-1 size-5 @min-[560px]/apps:col-start-4 @min-[560px]/apps:row-span-1 rtl:-scale-x-100"
+    class="text-fg-tertiary col-start-3 row-start-1 size-5 @min-[560px]/apps:col-start-4 rtl:-scale-x-100"
   />
 </button>
