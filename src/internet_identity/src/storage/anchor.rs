@@ -1077,6 +1077,8 @@ impl Anchor {
                     created_at: browser.created_at,
                     last_used: browser.last_used,
                     session_count: browser.session_count,
+                    notifications_on: browser.webpush_subscription.is_some(),
+                    linked_from_browser: browser.linked_from_browser,
                 })
                 .collect(),
         )

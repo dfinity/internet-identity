@@ -15,7 +15,12 @@
  * Per identity, because an app is linked under one: another identity in this browser has
  * no app and is still owed the install.
  */
-import { createStore, get as idbGet, set as idbSet } from "idb-keyval";
+import {
+  createStore,
+  del as idbDel,
+  get as idbGet,
+  set as idbSet,
+} from "idb-keyval";
 
 const ALREADY_INSTALLED_STORE = createStore(
   "ii-notification-install",
@@ -46,5 +51,17 @@ export const saidAlreadyInstalled = async (
     );
   } catch {
     return false;
+  }
+};
+
+/** Forgets it, so the install is offered again. The way back from having said it by
+ *  mistake: turning the switch in settings off and on again clears this. */
+export const forgetAlreadyInstalled = async (
+  identityNumber: bigint,
+): Promise<void> => {
+  try {
+    await idbDel(identityNumber.toString(), ALREADY_INSTALLED_STORE);
+  } catch {
+    // Nothing to do: it stays said, and the switch is the way to say otherwise.
   }
 };
