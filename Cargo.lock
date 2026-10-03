@@ -448,9 +448,9 @@ dependencies = [
 
 [[package]]
 name = "candid"
-version = "0.10.35"
+version = "0.10.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cdba86ff862a2cc6b244f273a8713ffdf82b84254470e90bd029ee87c283f25"
+checksum = "a4dda5edb2bfa2d7703219ba0fd6ec712343fcd03867b76b87405feaa9aae7a0"
 dependencies = [
  "anyhow",
  "binrw",
@@ -471,9 +471,9 @@ dependencies = [
 
 [[package]]
 name = "candid_derive"
-version = "0.10.35"
+version = "0.10.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13501edc1f9c9f057d5d84171a13ee1fe4255705f9027a3fac64b5949cbdd170"
+checksum = "45e094bb111b7a9b70174aaa66f80f1a6751a2e66d2a99eef797c8ab6d0933d3"
 dependencies = [
  "lazy_static",
  "proc-macro2",
@@ -869,7 +869,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d162beedaa69905488a8da94f5ac3edb4dd4788b732fadb7bd120b2625c1976"
 dependencies = [
  "data-encoding",
- "syn 2.0.111",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -4074,6 +4074,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
+ "windows-sys 0.52.0",
  "windows-sys 0.59.0",
 ]
 
