@@ -33,9 +33,9 @@ export const handleError = (error: unknown) => {
   // §4.1.2.1 / 4.2.2.1). Surface the provider's own description so a
   // misconfigured OAuth/OpenID app (e.g. an Okta SSO set to
   // `response_types=[code]` only, or a botched direct-Google config)
-  // doesn't look like an II bug. The SSO view's `mapSubmitError` gives
-  // more specific guidance when the error hits inside `SignInWithSso`;
-  // this branch covers callers (direct-OpenID entry points) that route
+  // doesn't look like an II bug. `ssoErrorMessage` gives more specific
+  // guidance on the SSO wizard and the 1-click SSO page; this branch covers
+  // callers (direct-OpenID entry points) that route
   // through `handleError` instead. Wording is provider-agnostic here
   // because this path handles both SSO and direct providers.
   if (error instanceof OAuthProviderError) {

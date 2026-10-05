@@ -683,7 +683,7 @@ test.describe("Last used identities listed", () => {
       // Sign out and clear IdP cookies so the re-auth popup actually
       // shows the login UI rather than silently reusing the sign-up
       // session, then trigger the last-used SSO path. The popup opens
-      // synchronously to about:blank (so Safari doesn't block it), then
+      // synchronously to /sso-connecting (so Safari doesn't block it), then
       // discoverSsoConfig resolves and the popup navigates to the IdP.
       await managePage.signOut();
       await page.context().clearCookies();
