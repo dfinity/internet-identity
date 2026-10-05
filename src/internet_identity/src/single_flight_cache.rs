@@ -377,17 +377,22 @@ impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
                 if let Some(e) = self.entries.get_mut(key) {
                     // Stale-if-error: keep the value, which dies relative to
                     // the last success, at most `stale_if_error_for` after it
-                    // went stale; bump the throttle. For a value-less marker,
-                    // refresh life.
+                    // went stale; bump the throttle. A value past that point
+                    // is dropped and the entry becomes a failure marker, so the
+                    // backoff still holds.
                     e.retry_at = retry_at;
                     e.failures = failures;
-                    e.evict_at = if e.value.is_none() {
-                        now.saturating_add(self.fresh_for)
-                            .saturating_add(self.stale_if_error_for)
+                    let serve_until = e
+                        .evict_at
+                        .min(e.fresh_until.saturating_add(self.stale_if_error_for));
+                    if e.value.is_some() && serve_until > now {
+                        e.evict_at = serve_until;
                     } else {
-                        e.evict_at
-                            .min(e.fresh_until.saturating_add(self.stale_if_error_for))
-                    };
+                        e.value = None;
+                        e.evict_at = now
+                            .saturating_add(self.fresh_for)
+                            .saturating_add(self.stale_if_error_for);
+                    }
                 } else {
                     let evict_at = now
                         .saturating_add(self.fresh_for)
@@ -946,6 +951,9 @@ mod tests {
         let t2 = expect_fill(c.lookup(&"k", 500));
         c.complete_fill(&"k", t2, Err(()), 500);
         assert!(c.peek_value(&"k", 500).is_none());
+        // The failure still parks the key: no new fill until the backoff ends.
+        assert!(matches!(c.lookup(&"k", 501), Lookup::Pending));
+        assert!(matches!(c.lookup(&"k", 560), Lookup::StartFill(_, None)));
     }
 
     #[test]
