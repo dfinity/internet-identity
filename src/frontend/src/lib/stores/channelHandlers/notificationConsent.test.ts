@@ -68,6 +68,7 @@ import {
   resolveOptIn,
 } from "$lib/utils/notifications/notificationState";
 import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
+import { serializeSignInRequest } from "$lib/stores/channelHandlers/serialize";
 
 const consentStatus = vi.fn(() => Promise.resolve(true));
 
@@ -227,6 +228,62 @@ describe("handleNotificationConsentRequest", () => {
       actor: { notification_consent_granted: switchedStatus },
     });
     expect(sent[0].result).toEqual({ granted: true });
+  });
+
+  /** An app sends its sign-in and its consent request together, and consent can reach
+   *  II first. The sign-in carries the app's session duration and registers this
+   *  browser, which allowing needs, so it runs before the consent screen opens. */
+  it("hands its turn to a sign-in queued behind it", async () => {
+    const { authorizedStore } = await import("$lib/stores/authorization.store");
+    (authorizedStore as Writable<unknown>).set(undefined);
+    const order: string[] = [];
+    const unsubscribe = notificationConsentStore.subscribe((context) => {
+      if (context !== undefined) {
+        order.push("consent screen");
+      }
+    });
+
+    const consent = run();
+    await vi.waitFor(() => expect(setRequestOrigin).toHaveBeenCalled());
+    const signedIn = serializeSignInRequest(async () => {
+      order.push("sign-in");
+      await signIn();
+    });
+
+    const { sent } = await consent;
+    await signedIn;
+    unsubscribe();
+
+    expect(order).toEqual(["sign-in", "consent screen"]);
+    expect(sent[0].result).toEqual({ granted: true });
+  });
+
+  /** Signed in already, by a request that registered nothing, while the sign-in that
+   *  does is still waiting: the screen still waits for it. */
+  it("hands its turn to a waiting sign-in after the user has signed in", async () => {
+    const order: string[] = [];
+    const unsubscribe = notificationConsentStore.subscribe((context) => {
+      if (context !== undefined) {
+        order.push("consent screen");
+      }
+    });
+    let releaseBlocker = () => {};
+    const held = new Promise<void>((resolve) => (releaseBlocker = resolve));
+    const blocker = serializeSignInRequest(() => held);
+
+    const consent = run();
+    const signedIn = serializeSignInRequest(() => {
+      order.push("sign-in");
+      return Promise.resolve();
+    });
+    releaseBlocker();
+    await blocker;
+
+    await consent;
+    await signedIn;
+    unsubscribe();
+
+    expect(order).toEqual(["sign-in", "consent screen"]);
   });
 
   /** The screen existed only to work out there was nothing to ask. Resolving that

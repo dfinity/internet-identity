@@ -51,12 +51,13 @@ import {
   type SilentDenial,
 } from "$lib/stores/channelHandlers/silentReauth";
 import type { AccountSessionError } from "$lib/generated/internet_identity_types";
-import { serializeAuthorizationRequest } from "$lib/stores/channelHandlers/serialize";
+import { serializeSignInRequest } from "$lib/stores/channelHandlers/serialize";
 import {
   StaleBrowserKeyError,
   withBrowserProof,
 } from "$lib/stores/browser-key.store";
 import { describeBrowser } from "$lib/utils/describeBrowser";
+import { grantedTimeToLive } from "$lib/utils/sessionDuration";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 
@@ -228,7 +229,7 @@ export const handleSessionDelegationRequest =
       return;
     }
 
-    await serializeAuthorizationRequest(async () => {
+    await serializeSignInRequest(async () => {
       try {
         const params = parsed.data;
         const validation = await validateDerivationOrigin({
@@ -362,14 +363,11 @@ const createSession = async (
   // outlive that, so an SSO identity sends a duration even when the user picked none.
   const ssoSessionMaxAgeNs =
     "openid" in authMethod ? authMethod.openid.ssoSessionMaxAgeNs : undefined;
-  // What the user picked wins over what the app asked for; the app's value is the
-  // ceiling that applies when the picker offered nothing.
-  const requested = authorized.maxTimeToLive ?? requestedMaxTimeToLive;
-  const validFor =
-    ssoSessionMaxAgeNs !== undefined &&
-    (requested === undefined || requested > ssoSessionMaxAgeNs)
-      ? ssoSessionMaxAgeNs
-      : requested;
+  const validFor = grantedTimeToLive({
+    picked: authorized.maxTimeToLive,
+    requested: requestedMaxTimeToLive,
+    ssoSessionMaxAgeNs,
+  });
 
   const recordKey = { identityNumber, accountNumber, origin: effectiveOrigin };
 

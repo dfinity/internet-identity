@@ -99,6 +99,7 @@ const runCeremony = async (
   resumable?: boolean,
   extraParams: Record<string, unknown> = {},
   whileRunning?: () => Promise<void>,
+  picked?: bigint,
 ) => {
   const { authorizationPromptStore, authorizedStore } =
     await import("$lib/stores/authorization.store");
@@ -154,6 +155,7 @@ const runCeremony = async (
   (authorizedStore as unknown as Writable<unknown>).set({
     accountNumberPromise: Promise.resolve(undefined),
     accessLevel: "full-access",
+    maxTimeToLive: picked,
   });
 
   const { channel, sent } = channelWith();
@@ -659,6 +661,20 @@ describe("keeping a session for later", () => {
     expect(found, "this ceremony's prepare_account_session call").toBeDefined();
     return found as Record<string, unknown>;
   };
+
+  /// The picker can be shown before the app's request is known, when a consent request
+  /// opened the sign-in, and then offers the full 30 days.
+  it("never asks for longer than the app requested, whatever was picked", async () => {
+    const { sent, prepared } = await runCeremony(
+      true,
+      { maxTimeToLive: "3300000000000" },
+      undefined,
+      BigInt(30 * 24 * 3_600) * BigInt(1_000_000_000),
+    );
+
+    expect(sent).toHaveLength(1);
+    ourRequest(prepared, BigInt(3_300_000_000_000));
+  });
 
   it("carries the app's idle bound to the canister", async () => {
     const { sent, prepared } = await runCeremony(true, {

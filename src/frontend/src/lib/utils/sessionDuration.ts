@@ -94,3 +94,27 @@ export const sessionDurationCeilingSeconds = (
 /** Convert a duration in seconds to the nanoseconds the canister expects. */
 export const sessionDurationToNanos = (seconds: number): bigint =>
   BigInt(seconds) * NANOS_PER_SECOND;
+
+/**
+ * The session duration (nanoseconds) to ask the canister for: the shortest of
+ * the duration the user picked, the app's requested `maxTimeToLive` and an SSO
+ * organization's cap on its sign-ins. A pick never stretches past the app's
+ * request, even where the picker was shown before the request was known.
+ * `undefined` when none of them applies, which leaves the canister's default.
+ */
+export const grantedTimeToLive = ({
+  picked,
+  requested,
+  ssoSessionMaxAgeNs,
+}: {
+  picked: bigint | undefined;
+  requested: bigint | undefined;
+  ssoSessionMaxAgeNs: bigint | undefined;
+}): bigint | undefined =>
+  [picked, requested, ssoSessionMaxAgeNs].reduce<bigint | undefined>(
+    (shortest, limit) =>
+      limit === undefined || (shortest !== undefined && shortest <= limit)
+        ? shortest
+        : limit,
+    undefined,
+  );
