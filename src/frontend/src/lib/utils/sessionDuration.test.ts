@@ -169,6 +169,25 @@ describe("grantedTimeToLive", () => {
     ).toBe(hours(2));
   });
 
+  it("ignores a non-positive request, as the picker's ceiling does", () => {
+    for (const requested of [BigInt(0), BigInt(-1)]) {
+      expect(
+        grantedTimeToLive({
+          picked: hours(30 * 24),
+          requested,
+          ssoSessionMaxAgeNs: undefined,
+        }),
+      ).toBe(hours(30 * 24));
+      expect(
+        grantedTimeToLive({
+          picked: undefined,
+          requested,
+          ssoSessionMaxAgeNs: undefined,
+        }),
+      ).toBeUndefined();
+    }
+  });
+
   it("leaves the canister's default where nothing applies", () => {
     expect(
       grantedTimeToLive({

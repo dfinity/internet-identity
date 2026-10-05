@@ -286,6 +286,47 @@ describe("handleNotificationConsentRequest", () => {
     expect(order).toEqual(["sign-in", "consent screen"]);
   });
 
+  /** An app can ask for consent first and sign in later, so a sign-in can arrive with
+   *  the screen already up. Allowing needs the browser that sign-in registers, so the
+   *  screen steps aside for it and opens again once it has run. */
+  it("closes an open screen for a sign-in that arrives after it", async () => {
+    const sent: Record<string, unknown>[] = [];
+    const channel = {
+      origin: ORIGIN,
+      send: (message: Record<string, unknown>) => {
+        sent.push(message);
+        return Promise.resolve();
+      },
+    } as unknown as Channel;
+    const consent = handleNotificationConsentRequest(channel, () => {})({
+      jsonrpc: "2.0",
+      id: 1,
+      method: NOTIFICATION_CONSENT_METHOD,
+      params: {},
+    } as unknown as JsonRequest);
+    await waitForStore(notificationConsentStore);
+
+    const order: string[] = [];
+    const signedIn = serializeSignInRequest(() => {
+      order.push(
+        get(notificationConsentStore) === undefined
+          ? "sign-in, screen closed"
+          : "sign-in, screen open",
+      );
+      return Promise.resolve();
+    });
+    await signedIn;
+
+    await waitForStore(notificationConsentStore);
+    order.push("screen reopened");
+    notificationConsentStore.settle();
+    await consent;
+
+    expect(order).toEqual(["sign-in, screen closed", "screen reopened"]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].result).toEqual({ granted: true });
+  });
+
   /** The screen existed only to work out there was nothing to ask. Resolving that
    *  before the context is set is what keeps a spinner out of the sign-in. */
   it("answers without a screen where there is nothing to ask", async () => {

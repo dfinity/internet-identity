@@ -317,9 +317,18 @@ const askUntilSettled = async (
           ? ("switched" as const)
           : undefined,
       ),
+      // A sign-in that arrives while the screen waits still registers this browser
+      // for the allowing to land on, so the screen steps aside until it has.
+      waitForStore(signInWaitingStore, (waiting) =>
+        waiting ? ("yielded" as const) : undefined,
+      ),
     ]);
     if (outcome === "switched") {
       continue;
+    }
+    if (outcome === "yielded") {
+      notificationConsentStore.clear();
+      return "yielded";
     }
     releaseScreen();
 
