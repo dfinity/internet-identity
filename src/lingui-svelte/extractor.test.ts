@@ -428,6 +428,32 @@ describe("svelteExtractor", () => {
     });
 
     it.each([
+      {
+        case: "a parameter",
+        code: `${IMPORT}const f = (t: (s: TemplateStringsArray) => string) => t\`Shadowed\`;\nt\`Hello World\`;`,
+      },
+      {
+        case: "a block declaration",
+        code: `${IMPORT}{\n  const t = String.raw;\n  t\`Shadowed\`;\n}\nt\`Hello World\`;`,
+      },
+      {
+        case: "a parameter shadowing a renamed import",
+        code: 'import { t as translate } from "$lib/stores/locale.store";\nfunction f(translate: typeof String.raw) {\n  return translate`Shadowed`;\n}\ntranslate`Hello World`;',
+      },
+    ])("should skip a call to $case", async ({ code }) => {
+      const messages = await extractAll(code, MODULE_NAME);
+      expect(messages.map(({ message }) => message)).toEqual(["Hello World"]);
+    });
+
+    it("should extract a call inside a nested function", async () => {
+      const messages = await extractAll(
+        `${IMPORT}export const f = () => () => t\`Hello World\`;`,
+        MODULE_NAME,
+      );
+      expect(messages.map(({ message }) => message)).toEqual(["Hello World"]);
+    });
+
+    it.each([
       { case: "no import", code: "t`Hello World`;" },
       {
         case: "t from another module",

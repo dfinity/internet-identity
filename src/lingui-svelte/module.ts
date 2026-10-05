@@ -1,5 +1,7 @@
 import { Parser, type Program } from "acorn";
 import { tsPlugin } from "@sveltejs/acorn-typescript";
+import { analyze } from "eslint-scope";
+import type { Identifier, Program as EstreeProgram } from "estree";
 import { MessageFormats } from "./utils";
 
 const LOCALE_STORE = "$lib/stores/locale.store";
@@ -15,39 +17,54 @@ export const parseModule = (code: string): Program =>
     ecmaVersion: "latest",
     sourceType: "module",
     locations: true,
+    // Scope analysis reads `range`
+    ranges: true,
   });
 
 /**
- * The local names `t` and `plural` are imported under from the locale store,
- * or undefined when the module imports neither and has nothing to translate.
+ * Matches the identifiers that resolve to the `t` and `plural` bindings
+ * imported from the locale store, so a renamed import is followed and a
+ * parameter or declaration shadowing one is not. Undefined when the module
+ * imports neither and has nothing to translate.
  */
 export const findModuleFormats = (
   program: Program,
 ): MessageFormats | undefined => {
-  const formats: MessageFormats = { t: [], plural: [] };
-  for (const statement of program.body) {
-    if (
-      statement.type !== "ImportDeclaration" ||
-      statement.source.value !== LOCALE_STORE
-    ) {
-      continue;
-    }
-    for (const specifier of statement.specifiers) {
+  const references = {
+    t: new Set<Identifier>(),
+    plural: new Set<Identifier>(),
+  };
+  const scopeManager = analyze(program as unknown as EstreeProgram, {
+    ecmaVersion: 2022,
+    sourceType: "module",
+  });
+  const moduleScope = scopeManager.scopes.find(
+    (scope) => scope.type === "module",
+  );
+  for (const variable of moduleScope?.variables ?? []) {
+    for (const def of variable.defs) {
       if (
-        specifier.type !== "ImportSpecifier" ||
-        specifier.imported.type !== "Identifier"
+        def.type !== "ImportBinding" ||
+        def.parent.source.value !== LOCALE_STORE ||
+        def.node.type !== "ImportSpecifier" ||
+        def.node.imported.type !== "Identifier"
       ) {
         continue;
       }
-      if (specifier.imported.name === "t") {
-        formats.t.push(specifier.local.name);
+      const format = def.node.imported.name;
+      if (format !== "t" && format !== "plural") {
+        continue;
       }
-      if (specifier.imported.name === "plural") {
-        formats.plural.push(specifier.local.name);
+      for (const reference of variable.references) {
+        references[format].add(reference.identifier as Identifier);
       }
     }
   }
-  return formats.t.length > 0 || formats.plural.length > 0
-    ? formats
-    : undefined;
+  if (references.t.size === 0 && references.plural.size === 0) {
+    return undefined;
+  }
+  return {
+    t: (identifier) => references.t.has(identifier),
+    plural: (identifier) => references.plural.has(identifier),
+  };
 };

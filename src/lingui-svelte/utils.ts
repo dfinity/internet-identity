@@ -43,17 +43,18 @@ export interface FoundMessage extends Omit<ExtractedMessage, "origin"> {
 }
 
 /**
- * The names each message format is called by: `$t`/`$plural` store
- * subscriptions in a component, the imported `t`/`plural` in a module.
+ * Whether an identifier calls each message format: the `$t`/`$plural` store
+ * subscriptions in a component, the bindings imported as `t`/`plural` in a
+ * module.
  */
 export interface MessageFormats {
-  t: string[];
-  plural: string[];
+  t: (identifier: Identifier) => boolean;
+  plural: (identifier: Identifier) => boolean;
 }
 
 export const COMPONENT_FORMATS: MessageFormats = {
-  t: ["$t"],
-  plural: ["$plural"],
+  t: (identifier) => identifier.name === "$t",
+  plural: (identifier) => identifier.name === "$plural",
 };
 
 interface ResolvedMessage {
@@ -216,7 +217,7 @@ const resolveNestedMessage = (
   if (
     node.type === "TaggedTemplateExpression" &&
     node.tag.type === "Identifier" &&
-    ctx.formats.t.includes(node.tag.name)
+    ctx.formats.t(node.tag)
   ) {
     const resolved = processTemplateLiteral(node.quasi, ctx);
     if (hasNumericStartEnd(node)) {
@@ -229,9 +230,9 @@ const resolveNestedMessage = (
     return undefined;
   }
 
-  const resolved = ctx.formats.plural.includes(node.callee.name)
+  const resolved = ctx.formats.plural(node.callee)
     ? resolvePlural(node, ctx)
-    : ctx.formats.t.includes(node.callee.name)
+    : ctx.formats.t(node.callee)
       ? resolveDescriptor(node, ctx)?.resolved
       : undefined;
 
@@ -305,7 +306,7 @@ export const findTransInTaggedTemplate = (
   if (
     node.type !== "TaggedTemplateExpression" ||
     node.tag.type !== "Identifier" ||
-    !formats.t.includes(node.tag.name) ||
+    !formats.t(node.tag) ||
     !hasNumericStartEnd(node) ||
     node.quasi.loc == null
   ) {
@@ -334,7 +335,7 @@ export const findTransInCallExpression = (
   if (
     node.type !== "CallExpression" ||
     node.callee.type !== "Identifier" ||
-    !formats.t.includes(node.callee.name) ||
+    !formats.t(node.callee) ||
     !hasNumericStartEnd(node) ||
     !node.loc
   ) {
@@ -369,7 +370,7 @@ export const findPluralInCallExpression = (
   if (
     node.type !== "CallExpression" ||
     node.callee.type !== "Identifier" ||
-    !formats.plural.includes(node.callee.name) ||
+    !formats.plural(node.callee) ||
     !hasNumericStartEnd(node) ||
     !node.loc
   ) {

@@ -454,6 +454,26 @@ describe("sveltePreprocessor", () => {
       );
     });
 
+    it.each([
+      {
+        case: "a parameter",
+        source: `${IMPORT}t\`Hello World\`;\nconst f = (t: typeof String.raw) => t\`Shadowed\`;`,
+      },
+      {
+        case: "a block declaration",
+        source: `${IMPORT}t\`Hello World\`;\n{\n  const t = String.raw;\n  t\`Shadowed\`;\n}`,
+      },
+      {
+        case: "a parameter shadowing a renamed import",
+        source:
+          'import { t as translate } from "$lib/stores/locale.store";\ntranslate`Hello World`;\nconst f = (translate: typeof String.raw) => translate`Shadowed`;',
+      },
+    ])("should leave a call to $case alone", ({ source }) => {
+      const code = moduleTransform(true, source)?.code;
+      expect(code).toContain('({ id: "mY42CM" })');
+      expect(code).toContain("`Shadowed`");
+    });
+
     it("should leave a module without the import alone", () => {
       expect(moduleTransform(true, "t`Hello World`;")).toBeUndefined();
     });
