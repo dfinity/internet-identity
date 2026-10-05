@@ -13,7 +13,7 @@
   });
 </script>
 
-<div class="flex flex-col items-center gap-3 px-8 text-center">
+<div role="status" class="flex flex-col items-center gap-3 px-8 text-center">
   <ProgressRing class="size-8" />
   <p class="text-text-primary text-base font-medium">
     {$t`Connecting to your organization`}

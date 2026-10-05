@@ -9,6 +9,8 @@ import {
   extractIdTokenFromCallback,
   isOpenIdCancelError,
   OAuthProviderError,
+  requestWithPopup,
+  type RequestConfig,
 } from "./openID";
 import { OpenIdConfig } from "$lib/generated/internet_identity_types";
 import { backendCanisterConfig } from "$lib/globals";
@@ -565,5 +567,43 @@ describe("isOpenIdCancelError", () => {
 
   it("returns false for null", () => {
     expect(isOpenIdCancelError(null)).toBe(false);
+  });
+});
+
+describe("requestWithPopup", () => {
+  it("opens a deferred popup to /sso-connecting synchronously, then navigates the same window", async () => {
+    const popup = { closed: false, close: vi.fn(), location: { href: "" } };
+    const open = vi
+      .spyOn(window, "open")
+      .mockReturnValue(popup as unknown as Window);
+    let resolveConfig: (config: RequestConfig) => void = () => {};
+    const config = new Promise<RequestConfig>((resolve) => {
+      resolveConfig = resolve;
+    });
+
+    const result = requestWithPopup(config, { nonce: "nonce" });
+
+    expect(open).toHaveBeenCalledWith(
+      "/sso-connecting",
+      "_blank",
+      expect.any(String),
+    );
+    expect(popup.location.href).toBe("");
+
+    resolveConfig({
+      clientId: "client",
+      authURL: "https://idp.example/authorize",
+      authScope: "openid",
+    });
+    await vi.waitFor(() =>
+      expect(popup.location.href).toMatch(
+        /^https:\/\/idp\.example\/authorize\?/,
+      ),
+    );
+    expect(open).toHaveBeenCalledTimes(1);
+
+    popup.closed = true;
+    await expect(result).rejects.toBeInstanceOf(CallbackPopupClosedError);
+    open.mockRestore();
   });
 });
