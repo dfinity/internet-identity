@@ -43,11 +43,15 @@ export interface FoundMessage extends Omit<ExtractedMessage, "origin"> {
 }
 
 /**
- * The message formats a nested expression may resolve to. Only the resolver
- * consults this; each finder is handed the names it matches, so widening one
- * cannot widen another.
+ * The names each message format is called by: `$t`/`$plural` store
+ * subscriptions in a component, the imported `t`/`plural` in a module.
  */
-const NESTED_FORMATS = {
+export interface MessageFormats {
+  t: string[];
+  plural: string[];
+}
+
+export const COMPONENT_FORMATS: MessageFormats = {
   t: ["$t"],
   plural: ["$plural"],
 };
@@ -64,11 +68,13 @@ interface ResolvedMessage {
  * category reached.
  */
 interface ResolveContext {
+  formats: MessageFormats;
   positional: { next: number };
   consumed: Range[];
 }
 
-const createResolveContext = (): ResolveContext => ({
+const createResolveContext = (formats: MessageFormats): ResolveContext => ({
+  formats,
   positional: { next: 0 },
   consumed: [],
 });
@@ -210,7 +216,7 @@ const resolveNestedMessage = (
   if (
     node.type === "TaggedTemplateExpression" &&
     node.tag.type === "Identifier" &&
-    NESTED_FORMATS.t.includes(node.tag.name)
+    ctx.formats.t.includes(node.tag.name)
   ) {
     const resolved = processTemplateLiteral(node.quasi, ctx);
     if (hasNumericStartEnd(node)) {
@@ -223,9 +229,9 @@ const resolveNestedMessage = (
     return undefined;
   }
 
-  const resolved = NESTED_FORMATS.plural.includes(node.callee.name)
+  const resolved = ctx.formats.plural.includes(node.callee.name)
     ? resolvePlural(node, ctx)
-    : NESTED_FORMATS.t.includes(node.callee.name)
+    : ctx.formats.t.includes(node.callee.name)
       ? resolveDescriptor(node, ctx)?.resolved
       : undefined;
 
@@ -292,21 +298,21 @@ const resolveDescriptor = (
 };
 
 export const findTransInTaggedTemplate = (
-  tags: string[],
+  formats: MessageFormats,
   node: Node,
   onMessageFound: (msg: FoundMessage) => void,
 ) => {
   if (
     node.type !== "TaggedTemplateExpression" ||
     node.tag.type !== "Identifier" ||
-    !tags.includes(node.tag.name) ||
+    !formats.t.includes(node.tag.name) ||
     !hasNumericStartEnd(node) ||
     node.quasi.loc == null
   ) {
     return;
   }
 
-  const ctx = createResolveContext();
+  const ctx = createResolveContext(formats);
   const { message, values } = processTemplateLiteral(node.quasi, ctx);
 
   onMessageFound({
@@ -321,21 +327,21 @@ export const findTransInTaggedTemplate = (
 };
 
 export const findTransInCallExpression = (
-  tags: string[],
+  formats: MessageFormats,
   node: Node,
   onMessageFound: (msg: FoundMessage) => void,
 ) => {
   if (
     node.type !== "CallExpression" ||
     node.callee.type !== "Identifier" ||
-    !tags.includes(node.callee.name) ||
+    !formats.t.includes(node.callee.name) ||
     !hasNumericStartEnd(node) ||
     !node.loc
   ) {
     return;
   }
 
-  const ctx = createResolveContext();
+  const ctx = createResolveContext(formats);
   const descriptor = resolveDescriptor(node, ctx);
   if (!descriptor) return;
 
@@ -356,21 +362,21 @@ export const findTransInCallExpression = (
 };
 
 export const findPluralInCallExpression = (
-  tags: string[],
+  formats: MessageFormats,
   node: Node,
   onMessageFound: (msg: FoundMessage) => void,
 ) => {
   if (
     node.type !== "CallExpression" ||
     node.callee.type !== "Identifier" ||
-    !tags.includes(node.callee.name) ||
+    !formats.plural.includes(node.callee.name) ||
     !hasNumericStartEnd(node) ||
     !node.loc
   ) {
     return;
   }
 
-  const ctx = createResolveContext();
+  const ctx = createResolveContext(formats);
   const resolved = resolvePlural(node, ctx);
   if (!resolved) return;
 
@@ -507,7 +513,7 @@ export const findTransInComponent = (
     return;
   }
 
-  const ctx = createResolveContext();
+  const ctx = createResolveContext(COMPONENT_FORMATS);
   const nodes: Array<{ node: Range; content?: Range }> = [];
 
   // Helper to register a node and return its index

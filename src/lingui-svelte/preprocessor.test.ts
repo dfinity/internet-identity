@@ -1,5 +1,5 @@
 import { describe, expect } from "vitest";
-import { svelteTransform } from "./preprocessor";
+import { moduleTransform, svelteTransform } from "./preprocessor";
 
 describe("sveltePreprocessor", () => {
   describe("tagged template", () => {
@@ -423,5 +423,39 @@ describe("sveltePreprocessor", () => {
         expect(svelteTransform(false, source).code).not.toContain("one:");
       },
     );
+  });
+
+  describe("module", () => {
+    const IMPORT = 'import { t, plural } from "$lib/stores/locale.store";\n';
+
+    it("should transform a tagged template", () => {
+      const source = `${IMPORT}const greet = (name: string): string => t\`Hello \${name}\`;`;
+      expect(moduleTransform(true, source)?.code).toEqual(
+        `${IMPORT}const greet = (name: string): string => t({ id: "OVaF9k", values: { name } });`,
+      );
+      expect(moduleTransform(false, source)?.code).toEqual(
+        `${IMPORT}const greet = (name: string): string => t({ id: "OVaF9k", message: "Hello {name}", values: { name } });`,
+      );
+    });
+
+    it("should transform a plural", () => {
+      const source = `${IMPORT}plural(count, { one: "# browser", other: "# browsers" });`;
+      expect(moduleTransform(true, source)?.code).not.toContain("one:");
+      expect(moduleTransform(true, source)?.code).toMatch(
+        /^import .*\nplural\(\{ id: "[^"]+", values: \{ count \} \}\);$/,
+      );
+    });
+
+    it("should follow a renamed import", () => {
+      const source =
+        'import { t as translate } from "$lib/stores/locale.store";\ntranslate`Hello World`;';
+      expect(moduleTransform(true, source)?.code).toEqual(
+        'import { t as translate } from "$lib/stores/locale.store";\ntranslate({ id: "mY42CM" });',
+      );
+    });
+
+    it("should leave a module without the import alone", () => {
+      expect(moduleTransform(true, "t`Hello World`;")).toBeUndefined();
+    });
   });
 });
