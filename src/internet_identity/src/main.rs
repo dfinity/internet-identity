@@ -1890,9 +1890,9 @@ mod openid_api {
         }
     }
 
-    /// Drive the two-hop SSO discovery fetch for `domain`. The frontend calls
-    /// this when `get_sso_discovery_status` reads `Pending`, then keeps polling
-    /// the query until it returns `Resolved`.
+    /// Drive the two-hop SSO discovery fetch and the domain's JWKS fetch for
+    /// `domain`. The frontend calls this while `get_sso_discovery_status` reads
+    /// `Pending`, and once more when it returns `Resolved`.
     #[update]
     fn discover_sso(domain: String) {
         openid::discover_sso(&openid::canonical_discovery_domain(&domain))
