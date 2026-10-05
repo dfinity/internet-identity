@@ -6,7 +6,7 @@
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
   import { validateDomain, discoverSsoConfig } from "$lib/utils/ssoDiscovery";
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
-  import { ssoErrorMessage } from "$lib/utils/ssoErrorMessage";
+  import { ssoErrorMessage } from "./utils";
   import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
   import { t } from "$lib/stores/locale.store";
 

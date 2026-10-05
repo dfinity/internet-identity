@@ -3,7 +3,7 @@
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { t } from "$lib/stores/locale.store";
-  import { ssoErrorMessage } from "$lib/utils/ssoErrorMessage";
+  import { ssoErrorMessage } from "$lib/components/wizards/auth/views/utils";
 
   interface Props {
     error: unknown;
