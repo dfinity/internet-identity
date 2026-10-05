@@ -243,19 +243,19 @@ pub(super) fn validate_app_clients(
     Ok(app_clients)
 }
 
-/// The [`REQUESTED_SCOPES`] a provider advertises in `scopes_supported`, in
-/// its order; all of them when it advertises none.
+/// The [`REQUESTED_SCOPES`] a provider advertises in `scopes_supported`, each
+/// once and in its order; all of them when it advertises none.
 pub(super) fn requested_scopes(scopes_supported: Option<Vec<String>>) -> Vec<String> {
-    match scopes_supported.filter(|scopes| !scopes.is_empty()) {
-        // Collected from a borrow, so the result never reuses the advertised
-        // list's allocation.
-        Some(scopes) => scopes
-            .iter()
-            .filter(|scope| REQUESTED_SCOPES.contains(&scope.as_str()))
-            .cloned()
-            .collect(),
-        None => REQUESTED_SCOPES.iter().map(|s| (*s).to_string()).collect(),
+    let Some(scopes) = scopes_supported.filter(|scopes| !scopes.is_empty()) else {
+        return REQUESTED_SCOPES.iter().map(|s| (*s).to_string()).collect();
+    };
+    let mut requested: Vec<String> = Vec::new();
+    for scope in &scopes {
+        if REQUESTED_SCOPES.contains(&scope.as_str()) && !requested.contains(scope) {
+            requested.push(scope.clone());
+        }
     }
+    requested
 }
 
 impl DiscoveredConfig {
@@ -1303,6 +1303,18 @@ mod tests {
             requested_scopes(Some(vec!["phone".to_string()])),
             Vec::<String>::new()
         );
+    }
+
+    #[test]
+    fn requested_scopes_keeps_each_scope_once() {
+        let mut advertised = vec!["openid".to_string(); 10_000];
+        advertised.push("email".to_string());
+        advertised.push("openid".to_string());
+
+        let scopes = requested_scopes(Some(advertised));
+
+        assert_eq!(scopes, vec!["openid", "email"]);
+        assert!(scopes.capacity() <= REQUESTED_SCOPES.len() + 1);
     }
 
     #[test]

@@ -170,17 +170,25 @@ fn transform_certs(
     let certs: Certs =
         serde_json::from_slice(response.body.as_slice()).unwrap_or_else(|_| trap("Invalid JSON"));
 
-    let mut sorted_keys = certs.keys.clone();
-    sorted_keys.sort_by_key(|key| key.kid().unwrap_or_else(|| trap("Invalid JSON")).to_owned());
-
-    let body =
-        serde_json::to_vec(&Certs { keys: sorted_keys }).unwrap_or_else(|_| trap("Invalid JSON"));
+    let body = serde_json::to_vec(&Certs {
+        keys: keys_sorted_by_kid(certs.keys),
+    })
+    .unwrap_or_else(|_| trap("Invalid JSON"));
 
     HttpResponse {
         status: Nat::from(HTTP_STATUS_OK),
         headers: vec![],
         body,
     }
+}
+
+/// The keys that carry a `kid`, sorted by it so every replica's transform
+/// produces the same response. A key without a `kid` can't be matched to a JWT,
+/// so it is dropped rather than failing the whole key set.
+fn keys_sorted_by_kid(keys: Vec<Jwk>) -> Vec<Jwk> {
+    let mut keys: Vec<Jwk> = keys.into_iter().filter(|key| key.kid().is_some()).collect();
+    keys.sort_by(|a, b| a.kid().cmp(&b.kid()));
+    keys
 }
 
 #[cfg(test)]
@@ -270,6 +278,15 @@ mod tests {
 
         assert_eq!(kids(&kept), vec!["a", "b"]);
         assert_eq!(kept[0].alg(), None);
+    }
+
+    #[test]
+    fn transform_drops_keys_without_kid_and_sorts_by_kid() {
+        let no_kid = json!({ "kty": "RSA", "n": "n", "e": "AQAB" });
+
+        let sorted = keys_sorted_by_kid(vec![jwk(rsa("b")), jwk(no_kid), jwk(rsa("a"))]);
+
+        assert_eq!(kids(&sorted), vec!["a", "b"]);
     }
 
     #[test]
