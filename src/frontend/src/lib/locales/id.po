@@ -275,6 +275,9 @@ msgstr "Juga melakukan perubahan atas nama Anda."
 msgid "An account linked through SSO signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one."
 msgstr "Akun yang ditautkan melalui SSO masuk melalui domain yang digunakan untuk menautkannya. Akun ini ditautkan ke sebuah identitas, sehingga tidak dapat digunakan untuk membuat identitas baru."
 
+msgid "An internal error occurred"
+msgstr "Terjadi kesalahan internal"
+
 msgid "Any local program can connect"
 msgstr "Program lokal apa pun dapat terhubung"
 
@@ -302,6 +305,9 @@ msgstr "Karena Anda saat ini masuk dengan metode akses ini, Anda akan segera kel
 msgid "Ask questions and perform actions across your apps by chatting with AI."
 msgstr "Ajukan pertanyaan dan lakukan tindakan di seluruh aplikasi Anda dengan mengobrol bersama AI."
 
+msgid "Ask your administrator to check the provider's OAuth configuration."
+msgstr "Minta administrator Anda untuk memeriksa konfigurasi OAuth penyedia."
+
 msgid "Associate an email address with your Internet Identity"
 msgstr "Kaitkan alamat email dengan Internet Identity Anda"
 
@@ -314,8 +320,14 @@ msgstr "Mengautentikasi..."
 msgid "Authentication failed"
 msgstr "Autentikasi gagal"
 
+msgid "Authentication method not found"
+msgstr "Metode autentikasi tidak ditemukan"
+
 msgid "Authentication successful"
 msgstr "Autentikasi berhasil"
+
+msgid "Authorization invalid"
+msgstr "Otorisasi tidak valid"
 
 msgid "Authorize new device"
 msgstr "Otorisasi perangkat baru"
@@ -467,6 +479,9 @@ msgstr "Terhubung"
 msgid "Connecting {mcpServer}…"
 msgstr "Menghubungkan {mcpServer}…"
 
+msgid "Connecting to your organization"
+msgstr "Menghubungkan ke organisasi Anda"
+
 msgid "Connection closed"
 msgstr "Koneksi terputus"
 
@@ -517,6 +532,9 @@ msgstr "Salin alamat penerima"
 
 msgid "Copy subject"
 msgstr "Salin subjek"
+
+msgid "Couldn't connect to your organization"
+msgstr "Tidak dapat terhubung ke organisasi Anda"
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Tidak dapat memuat pengaturan SSO dari {domainInput}. Minta admin SSO Anda untuk memastikan bahwa /.well-known/ii-openid-configuration dapat diakses."
@@ -623,6 +641,9 @@ msgstr "Tolak"
 msgid "Deny all"
 msgstr "Tolak semua"
 
+msgid "Device registration closed"
+msgstr "Pendaftaran perangkat ditutup"
+
 msgid "Devices"
 msgstr "Perangkat"
 
@@ -719,6 +740,9 @@ msgstr "Semua yang perlu Anda ketahui tentang Internet Identity, cara yang priba
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Rasakan"
+
+msgid "Expired JWT"
+msgstr "JWT kedaluwarsa"
 
 msgid "Export JSON"
 msgstr "Ekspor JSON"
@@ -969,6 +993,9 @@ msgstr "Kode tidak valid. Silakan periksa dan coba lagi."
 msgid "Invalid domain"
 msgstr "Domain tidak valid"
 
+msgid "Invalid metadata. {0}"
+msgstr "Metadata tidak valid. {0}"
+
 msgid "Invalid recovery phrase"
 msgstr "Frasa pemulihan tidak valid"
 
@@ -989,6 +1016,9 @@ msgstr "Tampaknya ada permintaan autentikasi yang tidak valid."
 
 msgid "It seems like an invalid CLI authentication request was received."
 msgstr "Tampaknya permintaan autentikasi CLI yang tidak valid telah diterima."
+
+msgid "It seems like registration is unavailable at this moment"
+msgstr "Sepertinya pendaftaran tidak tersedia saat ini"
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba peramban lain; jika masalah berlanjut, hubungi dukungan."
@@ -1170,6 +1200,9 @@ msgstr "Belum ada email"
 msgid "No identity found"
 msgstr "Tidak ada identitas yang ditemukan"
 
+msgid "No more additional accounts can be created"
+msgstr "Tidak ada lagi akun tambahan yang dapat dibuat"
+
 msgid "No passkey tests yet"
 msgstr "Belum ada pengujian passkey"
 
@@ -1220,6 +1253,9 @@ msgstr "Notifikasi tidak tersedia"
 
 msgid "now"
 msgstr "sekarang"
+
+msgid "OAuth provider returned \"{0}\""
+msgstr "Penyedia OAuth mengembalikan \"{0}\""
 
 msgid "Official · Hosted by DFINITY"
 msgstr "Resmi · Di-hosting oleh DFINITY"
@@ -1280,6 +1316,9 @@ msgstr "Buka izin situs"
 
 msgid "Open site settings"
 msgstr "Buka pengaturan situs"
+
+msgid "Operation canceled"
+msgstr "Operasi dibatalkan"
 
 msgid "Or sign in with another identity"
 msgstr "Atau masuk dengan identitas lain"
@@ -1674,6 +1713,12 @@ msgstr "Masuk dengan passkey"
 msgid "Sign in with SSO"
 msgstr "Masuk dengan SSO"
 
+msgid "Sign in with the domain it is linked through: {registeredDomain}."
+msgstr "Masuk dengan domain yang digunakan untuk menautkannya: {registeredDomain}."
+
+msgid "Sign in with the domain it was originally linked through."
+msgstr "Masuk dengan domain yang awalnya digunakan untuk menautkannya."
+
 msgid "Sign in with your {displayName} account from any device."
 msgstr "Masuk dengan akun {displayName} Anda dari perangkat mana pun."
 
@@ -1740,6 +1785,12 @@ msgstr "Ada yang tidak sesuai."
 
 msgid "Something went wrong"
 msgstr "Terjadi kesalahan"
+
+msgid "Something went wrong during registration"
+msgstr "Terjadi kesalahan saat pendaftaran"
+
+msgid "Something went wrong during sign-in"
+msgstr "Terjadi kesalahan saat masuk"
 
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Terjadi kesalahan saat membuat delegasi Anda. Silakan coba lagi; jika masalah berlanjut, hubungi dukungan."
@@ -1888,6 +1939,9 @@ msgstr "Masuk CLI tidak dapat diselesaikan. Periksa CLI untuk detailnya."
 msgid "The CLI uses your account in this app."
 msgstr "CLI menggunakan akun Anda di aplikasi ini."
 
+msgid "The delegation could not be found — please try again."
+msgstr "Delegasi tidak dapat ditemukan — silakan coba lagi."
+
 msgid "The DNSSEC zone must use a current algorithm — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms aren't supported."
 msgstr "Zona DNSSEC harus menggunakan algoritma terkini — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, atau Ed25519. Algoritma SHA-1 yang sudah usang tidak didukung."
 
@@ -1897,11 +1951,20 @@ msgstr "Email harus berasal langsung dari alamat di atas. Alias dan penerus tida
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "Integrasi dengan Google, Microsoft, dan Apple menggunakan protokol autentikasi standar yang disebut OpenID. Ini adalah protokol yang sama yang digunakan aplikasi lain untuk masuk dengan Google."
 
+msgid "The interaction was canceled or timed out. Please try again."
+msgstr "Interaksi dibatalkan atau habis waktu. Silakan coba lagi."
+
+msgid "The JWT has expired — please try again in a few minutes."
+msgstr "JWT telah kedaluwarsa — silakan coba lagi dalam beberapa menit."
+
 msgid "The most reliable backup. Stored entirely by you, on paper. It does not depend on any account, service, or provider, and only you can use, lose, or replace it."
 msgstr "Cadangan paling andal. Disimpan sepenuhnya oleh Anda, di atas kertas. Tidak bergantung pada akun, layanan, atau penyedia mana pun, dan hanya Anda yang dapat menggunakannya, kehilangannya, atau menggantinya."
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr "Frasa dimasukkan dengan benar tetapi milik produk selain Internet Identity."
+
+msgid "There was an error verifying your account — please try again."
+msgstr "Terjadi kesalahan saat memverifikasi akun Anda — silakan coba lagi."
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Terjadi masalah saat menyambung ke aplikasi. Coba peramban lain; jika masalah berlanjut, hubungi pengembang."
@@ -1924,8 +1987,20 @@ msgstr "Akun {resolvedProviderName} ini sudah terhubung ke Internet Identity."
 msgid "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
 msgstr "Akun {resolvedProviderName} ini belum terhubung ke Internet Identity."
 
+msgid "This account has already been unlinked"
+msgstr "Akun ini sudah tidak ditautkan"
+
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "Akun ini sudah terhubung ke identitas Anda. Metode akses aktif Anda akan dialihkan ke akun ini."
+
+msgid "This account is already linked to another identity"
+msgstr "Akun ini sudah ditautkan ke identitas lain"
+
+msgid "This account is linked through a different SSO domain"
+msgstr "Akun ini ditautkan melalui domain SSO yang berbeda"
+
+msgid "This account isn't linked to an identity"
+msgstr "Akun ini tidak ditautkan ke identitas apa pun"
 
 msgid "this app"
 msgstr "aplikasi ini"
@@ -1959,6 +2034,9 @@ msgstr "Ini sudah menjadi email pemulihan Anda."
 
 msgid "This is now the default method used to authenticate moving forward on this device."
 msgstr "Ini sekarang menjadi metode default yang digunakan untuk autentikasi ke depan pada perangkat ini."
+
+msgid "This is taking longer than usual."
+msgstr "Ini memakan waktu lebih lama dari biasanya."
 
 msgid "This is the access method you're currently signed in with."
 msgstr "Ini adalah metode akses yang sedang Anda gunakan untuk masuk."
@@ -2017,6 +2095,9 @@ msgstr "Untuk menyelesaikan pengaturan passkey Anda, ikuti instruksi yang ditamp
 msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 msgstr "Untuk membiarkan AI mengajukan pertanyaan dan melakukan tindakan di seluruh aplikasi Anda, tambahkan <0>konektor MCP</0> yang Anda percaya."
 
+msgid "Too many attempts or time has expired."
+msgstr "Terlalu banyak percobaan atau waktu telah habis."
+
 msgid "Trusted connector"
 msgstr "Konektor tepercaya"
 
@@ -2062,8 +2143,17 @@ msgstr "Memahami Internet Identity"
 msgid "Undo"
 msgstr "Urungkan"
 
+msgid "Unexpected error"
+msgstr "Kesalahan tak terduga"
+
+msgid "Unhandled error"
+msgstr "Kesalahan tidak tertangani"
+
 msgid "Unknown"
 msgstr "Tidak diketahui"
+
+msgid "Unknown error"
+msgstr "Kesalahan tidak diketahui"
 
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience (no repeated signing) while still giving each session its own identity."
 msgstr "Tidak seperti banyak sistem autentikasi Web3 yang memerlukan penandatanganan manual untuk setiap tindakan, Internet Identity membuat sesi terautentikasi per aplikasi. Hal ini memberikan keamanan sekaligus kenyamanan (tidak ada penandatanganan berulang) sambil tetap memberikan identitas tersendiri pada setiap sesi."

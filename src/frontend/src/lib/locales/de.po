@@ -275,6 +275,9 @@ msgstr "Nimmt auch Änderungen in Ihrem Namen vor."
 msgid "An account linked through SSO signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one."
 msgstr "Ein über SSO verknüpftes Konto meldet sich über die Domain an, mit der es verknüpft wurde. Dieses Konto ist mit einer Identität verknüpft und kann daher nicht zur Erstellung einer neuen verwendet werden."
 
+msgid "An internal error occurred"
+msgstr "Ein interner Fehler ist aufgetreten"
+
 msgid "Any local program can connect"
 msgstr "Jedes lokale Programm kann sich verbinden"
 
@@ -302,6 +305,9 @@ msgstr "Da Sie derzeit mit dieser Zugriffsmethode angemeldet sind, werden Sie na
 msgid "Ask questions and perform actions across your apps by chatting with AI."
 msgstr "Stellen Sie Fragen und führen Sie Aktionen in Ihren Apps durch, indem Sie mit KI chatten."
 
+msgid "Ask your administrator to check the provider's OAuth configuration."
+msgstr "Bitten Sie Ihren Administrator, die OAuth-Konfiguration des Anbieters zu überprüfen."
+
 msgid "Associate an email address with your Internet Identity"
 msgstr "Eine E-Mail-Adresse mit Ihrer Internet Identity verknüpfen"
 
@@ -314,8 +320,14 @@ msgstr "Authentifizierung..."
 msgid "Authentication failed"
 msgstr "Authentifizierung fehlgeschlagen"
 
+msgid "Authentication method not found"
+msgstr "Authentifizierungsmethode nicht gefunden"
+
 msgid "Authentication successful"
 msgstr "Authentifizierung erfolgreich"
+
+msgid "Authorization invalid"
+msgstr "Autorisierung ungültig"
 
 msgid "Authorize new device"
 msgstr "Neues Gerät autorisieren"
@@ -467,6 +479,9 @@ msgstr "Verknüpft"
 msgid "Connecting {mcpServer}…"
 msgstr "{mcpServer} wird verbunden…"
 
+msgid "Connecting to your organization"
+msgstr "Verbindung mit Ihrer Organisation wird hergestellt"
+
 msgid "Connection closed"
 msgstr "Verbindung geschlossen"
 
@@ -517,6 +532,9 @@ msgstr "Empfängeradresse kopieren"
 
 msgid "Copy subject"
 msgstr "Betreff kopieren"
+
+msgid "Couldn't connect to your organization"
+msgstr "Verbindung mit Ihrer Organisation konnte nicht hergestellt werden"
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Die SSO-Einstellungen von {domainInput} konnten nicht geladen werden. Bitten Sie Ihren SSO-Administrator zu prüfen, ob /.well-known/ii-openid-configuration erreichbar ist."
@@ -623,6 +641,9 @@ msgstr "Ablehnen"
 msgid "Deny all"
 msgstr "Alle ablehnen"
 
+msgid "Device registration closed"
+msgstr "Geräteregistrierung geschlossen"
+
 msgid "Devices"
 msgstr "Geräte"
 
@@ -719,6 +740,9 @@ msgstr "Alles, was Sie über Internet Identity wissen müssen – Ihre private, 
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Erleben Sie"
+
+msgid "Expired JWT"
+msgstr "JWT abgelaufen"
 
 msgid "Export JSON"
 msgstr "JSON exportieren"
@@ -969,6 +993,9 @@ msgstr "Ungültiger Code. Bitte überprüfen und erneut versuchen."
 msgid "Invalid domain"
 msgstr "Ungültige Domain"
 
+msgid "Invalid metadata. {0}"
+msgstr "Ungültige Metadaten. {0}"
+
 msgid "Invalid recovery phrase"
 msgstr "Ungültige Wiederherstellungsphrase"
 
@@ -989,6 +1016,9 @@ msgstr "Es scheint, als wäre eine ungültige Authentifizierungsanfrage eingegan
 
 msgid "It seems like an invalid CLI authentication request was received."
 msgstr "Es scheint, dass eine ungültige CLI-Authentifizierungsanfrage empfangen wurde."
+
+msgid "It seems like registration is unavailable at this moment"
+msgstr "Es scheint, dass die Registrierung zurzeit nicht verfügbar ist"
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Die Verbindung zum Dienst konnte nicht hergestellt werden. Versuchen Sie einen anderen Browser; falls das Problem weiterhin besteht, kontaktieren Sie den Support."
@@ -1170,6 +1200,9 @@ msgstr "Noch keine E-Mail-Adressen"
 msgid "No identity found"
 msgstr "Keine Identität gefunden"
 
+msgid "No more additional accounts can be created"
+msgstr "Es können keine weiteren Konten mehr erstellt werden"
+
 msgid "No passkey tests yet"
 msgstr "Noch keine Passkey-Tests"
 
@@ -1220,6 +1253,9 @@ msgstr "Benachrichtigungen nicht verfügbar"
 
 msgid "now"
 msgstr "jetzt"
+
+msgid "OAuth provider returned \"{0}\""
+msgstr "OAuth-Anbieter hat \"{0}\" zurückgegeben"
 
 msgid "Official · Hosted by DFINITY"
 msgstr "Offiziell · Gehostet von DFINITY"
@@ -1280,6 +1316,9 @@ msgstr "Website-Berechtigungen öffnen"
 
 msgid "Open site settings"
 msgstr "Website-Einstellungen öffnen"
+
+msgid "Operation canceled"
+msgstr "Vorgang abgebrochen"
 
 msgid "Or sign in with another identity"
 msgstr "Oder mit einer anderen Identität anmelden"
@@ -1674,6 +1713,12 @@ msgstr "Mit Passkey anmelden"
 msgid "Sign in with SSO"
 msgstr "Mit SSO anmelden"
 
+msgid "Sign in with the domain it is linked through: {registeredDomain}."
+msgstr "Melden Sie sich über die Domain an, über die es verknüpft ist: {registeredDomain}."
+
+msgid "Sign in with the domain it was originally linked through."
+msgstr "Melden Sie sich über die Domain an, über die es ursprünglich verknüpft wurde."
+
 msgid "Sign in with your {displayName} account from any device."
 msgstr "Melden Sie sich von jedem Gerät aus mit Ihrem {displayName}-Konto an."
 
@@ -1740,6 +1785,12 @@ msgstr "Etwas stimmt nicht."
 
 msgid "Something went wrong"
 msgstr "Etwas ist schiefgelaufen"
+
+msgid "Something went wrong during registration"
+msgstr "Bei der Registrierung ist etwas schiefgelaufen"
+
+msgid "Something went wrong during sign-in"
+msgstr "Beim Anmelden ist etwas schiefgelaufen"
 
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Beim Erstellen Ihrer Delegation ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut; falls das Problem weiterhin besteht, kontaktieren Sie den Support."
@@ -1888,6 +1939,9 @@ msgstr "Die CLI-Anmeldung konnte nicht abgeschlossen werden. Überprüfen Sie da
 msgid "The CLI uses your account in this app."
 msgstr "Das CLI verwendet Ihr Konto in dieser App."
 
+msgid "The delegation could not be found — please try again."
+msgstr "Die Delegation konnte nicht gefunden werden — bitte versuchen Sie es erneut."
+
 msgid "The DNSSEC zone must use a current algorithm — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms aren't supported."
 msgstr "Die DNSSEC-Zone muss einen aktuellen Algorithmus verwenden – RSA/SHA-256, RSA/SHA-512, ECDSA P-256 oder Ed25519. Die veralteten SHA-1-Algorithmen werden nicht unterstützt."
 
@@ -1897,11 +1951,20 @@ msgstr "Die E-Mail muss direkt von der obigen Adresse stammen. Aliase und Weiter
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "Die Integration von Google, Microsoft und Apple verwendet ein standardisiertes Authentifizierungsprotokoll namens OpenID. Dies ist dasselbe Protokoll, das andere Anwendungen für die Anmeldung über Google nutzen."
 
+msgid "The interaction was canceled or timed out. Please try again."
+msgstr "Die Interaktion wurde abgebrochen oder das Zeitlimit überschritten. Bitte versuchen Sie es erneut."
+
+msgid "The JWT has expired — please try again in a few minutes."
+msgstr "Das JWT ist abgelaufen — bitte versuchen Sie es in einigen Minuten erneut."
+
 msgid "The most reliable backup. Stored entirely by you, on paper. It does not depend on any account, service, or provider, and only you can use, lose, or replace it."
 msgstr "Das zuverlässigste Backup. Vollständig von Ihnen auf Papier aufbewahrt. Es ist unabhängig von jedem Konto, Dienst oder Anbieter, und nur Sie können es verwenden, verlieren oder ersetzen."
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr "Die Phrase wurde korrekt eingegeben, gehört aber zu einem anderen Produkt als Internet Identity."
+
+msgid "There was an error verifying your account — please try again."
+msgstr "Bei der Überprüfung Ihres Kontos ist ein Fehler aufgetreten — bitte versuchen Sie es erneut."
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Beim Verbinden mit der Anwendung ist ein Problem aufgetreten. Versuchen Sie einen anderen Browser; wenn das Problem weiterhin besteht, kontaktieren Sie den Entwickler."
@@ -1924,8 +1987,20 @@ msgstr "Dieses {resolvedProviderName}-Konto ist bereits mit einer Internet Ident
 msgid "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
 msgstr "Dieses {resolvedProviderName}-Konto ist noch nicht mit einer Internet Identity verbunden."
 
+msgid "This account has already been unlinked"
+msgstr "Dieses Konto wurde bereits getrennt"
+
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "Dieses Konto ist bereits mit Ihrer Identität verknüpft. Ihre aktive Zugriffsmethode wird darauf umgestellt."
+
+msgid "This account is already linked to another identity"
+msgstr "Dieses Konto ist bereits mit einer anderen Identität verknüpft"
+
+msgid "This account is linked through a different SSO domain"
+msgstr "Dieses Konto ist über eine andere SSO-Domain verknüpft"
+
+msgid "This account isn't linked to an identity"
+msgstr "Dieses Konto ist nicht mit einer Identität verknüpft"
 
 msgid "this app"
 msgstr "diese App"
@@ -1959,6 +2034,9 @@ msgstr "Dies ist bereits Ihre Wiederherstellungs-E-Mail."
 
 msgid "This is now the default method used to authenticate moving forward on this device."
 msgstr "Dies ist nun die Standardmethode zur Authentifizierung auf diesem Gerät."
+
+msgid "This is taking longer than usual."
+msgstr "Dies dauert länger als gewöhnlich."
 
 msgid "This is the access method you're currently signed in with."
 msgstr "Dies ist die Zugriffsmethode, mit der Sie derzeit angemeldet sind."
@@ -2017,6 +2095,9 @@ msgstr "Um die Einrichtung Ihres Passkeys abzuschließen, folgen Sie den Anweisu
 msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 msgstr "Damit KI Fragen stellen und Aktionen in Ihren Apps durchführen kann, fügen Sie einen <0>MCP-Connector</0> hinzu, dem Sie vertrauen."
 
+msgid "Too many attempts or time has expired."
+msgstr "Zu viele Versuche oder die Zeit ist abgelaufen."
+
 msgid "Trusted connector"
 msgstr "Vertrauenswürdiger Connector"
 
@@ -2062,8 +2143,17 @@ msgstr "Internet Identity verstehen"
 msgid "Undo"
 msgstr "Rückgängig machen"
 
+msgid "Unexpected error"
+msgstr "Unerwarteter Fehler"
+
+msgid "Unhandled error"
+msgstr "Nicht behandelter Fehler"
+
 msgid "Unknown"
 msgstr "Unbekannt"
+
+msgid "Unknown error"
+msgstr "Unbekannter Fehler"
 
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience (no repeated signing) while still giving each session its own identity."
 msgstr "Im Gegensatz zu vielen Web3-Authentifizierungssystemen, die für jede Aktion eine manuelle Signierung erfordern, erstellt Internet Identity authentifizierte Sitzungen pro Anwendung. Dies bietet sowohl Sicherheit als auch Komfort (kein wiederholtes Signieren) und gibt dennoch jeder Sitzung eine eigene Identität."

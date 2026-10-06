@@ -275,6 +275,9 @@ msgstr "Также вносит изменения от вашего имени.
 msgid "An account linked through SSO signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one."
 msgstr "Аккаунт, привязанный через SSO, выполняет вход через домен, с которым он был связан. Этот аккаунт связан с учётной записью, поэтому его нельзя использовать для создания новой."
 
+msgid "An internal error occurred"
+msgstr "Произошла внутренняя ошибка"
+
 msgid "Any local program can connect"
 msgstr "Любая локальная программа может подключиться"
 
@@ -302,6 +305,9 @@ msgstr "Поскольку вы в данный момент вошли с по�
 msgid "Ask questions and perform actions across your apps by chatting with AI."
 msgstr "Задавайте вопросы и выполняйте действия в ваших приложениях через чат с AI."
 
+msgid "Ask your administrator to check the provider's OAuth configuration."
+msgstr "Попросите вашего администратора проверить конфигурацию OAuth провайдера."
+
 msgid "Associate an email address with your Internet Identity"
 msgstr "Привязать адрес электронной почты к вашей учётной записи Internet Identity"
 
@@ -314,8 +320,14 @@ msgstr "Аутентификация..."
 msgid "Authentication failed"
 msgstr "Ошибка аутентификации"
 
+msgid "Authentication method not found"
+msgstr "Метод аутентификации не найден"
+
 msgid "Authentication successful"
 msgstr "Аутентификация прошла успешно"
+
+msgid "Authorization invalid"
+msgstr "Авторизация недействительна"
 
 msgid "Authorize new device"
 msgstr "Авторизовать новое устройство"
@@ -467,6 +479,9 @@ msgstr "Подключён"
 msgid "Connecting {mcpServer}…"
 msgstr "Подключение {mcpServer}…"
 
+msgid "Connecting to your organization"
+msgstr "Подключение к вашей организации"
+
 msgid "Connection closed"
 msgstr "Соединение закрыто"
 
@@ -517,6 +532,9 @@ msgstr "Скопировать адрес получателя"
 
 msgid "Copy subject"
 msgstr "Скопировать тему"
+
+msgid "Couldn't connect to your organization"
+msgstr "Не удалось подключиться к вашей организации"
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Не удалось загрузить настройки SSO с {domainInput}. Попросите вашего администратора SSO убедиться, что /.well-known/ii-openid-configuration доступен."
@@ -623,6 +641,9 @@ msgstr "Запретить"
 msgid "Deny all"
 msgstr "Запретить всё"
 
+msgid "Device registration closed"
+msgstr "Регистрация устройства закрыта"
+
 msgid "Devices"
 msgstr "Устройства"
 
@@ -719,6 +740,9 @@ msgstr "Всё, что нужно знать об Internet Identity — ваше
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Ощутите"
+
+msgid "Expired JWT"
+msgstr "JWT истёк"
 
 msgid "Export JSON"
 msgstr "Экспортировать JSON"
@@ -969,6 +993,9 @@ msgstr "Неверный код. Пожалуйста, проверьте и п�
 msgid "Invalid domain"
 msgstr "Недопустимый домен"
 
+msgid "Invalid metadata. {0}"
+msgstr "Недействительные метаданные. {0}"
+
 msgid "Invalid recovery phrase"
 msgstr "Неверная резервная фраза"
 
@@ -989,6 +1016,9 @@ msgstr "Похоже, был получен недействительный з�
 
 msgid "It seems like an invalid CLI authentication request was received."
 msgstr "Похоже, был получен недействительный запрос аутентификации CLI."
+
+msgid "It seems like registration is unavailable at this moment"
+msgstr "Похоже, что регистрация сейчас недоступна"
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Похоже, не удалось установить соединение со службой. Попробуйте другой браузер; если проблема не устранена, обратитесь в службу поддержки."
@@ -1170,6 +1200,9 @@ msgstr "Email-адресов пока нет"
 msgid "No identity found"
 msgstr "Учётная запись не найдена"
 
+msgid "No more additional accounts can be created"
+msgstr "Больше невозможно создать дополнительные аккаунты"
+
 msgid "No passkey tests yet"
 msgstr "Тестов ключей доступа пока нет"
 
@@ -1220,6 +1253,9 @@ msgstr "Уведомления недоступны"
 
 msgid "now"
 msgstr "сейчас"
+
+msgid "OAuth provider returned \"{0}\""
+msgstr "OAuth-провайдер вернул \"{0}\""
 
 msgid "Official · Hosted by DFINITY"
 msgstr "Официальный · Размещён DFINITY"
@@ -1280,6 +1316,9 @@ msgstr "Открыть разрешения сайта"
 
 msgid "Open site settings"
 msgstr "Открыть настройки сайта"
+
+msgid "Operation canceled"
+msgstr "Операция отменена"
 
 msgid "Or sign in with another identity"
 msgstr "Или войдите с другой учётной записью"
@@ -1674,6 +1713,12 @@ msgstr "Войти с ключом доступа"
 msgid "Sign in with SSO"
 msgstr "Войти через SSO"
 
+msgid "Sign in with the domain it is linked through: {registeredDomain}."
+msgstr "Войдите через домен, через который привязан аккаунт: {registeredDomain}."
+
+msgid "Sign in with the domain it was originally linked through."
+msgstr "Войдите через домен, через который аккаунт был первоначально привязан."
+
 msgid "Sign in with your {displayName} account from any device."
 msgstr "Входите со своего аккаунта {displayName} с любого устройства."
 
@@ -1740,6 +1785,12 @@ msgstr "Что-то не так."
 
 msgid "Something went wrong"
 msgstr "Что-то пошло не так"
+
+msgid "Something went wrong during registration"
+msgstr "Что-то пошло не так во время регистрации"
+
+msgid "Something went wrong during sign-in"
+msgstr "Что-то пошло не так при входе"
 
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Что-то пошло не так при создании делегирования. Пожалуйста, попробуйте снова; если проблема сохраняется, обратитесь в службу поддержки."
@@ -1888,6 +1939,9 @@ msgstr "Вход через CLI не удалось завершить. Пров
 msgid "The CLI uses your account in this app."
 msgstr "CLI использует ваш аккаунт в этом приложении."
 
+msgid "The delegation could not be found — please try again."
+msgstr "Делегирование не найдено — пожалуйста, попробуйте снова."
+
 msgid "The DNSSEC zone must use a current algorithm — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms aren't supported."
 msgstr "Зона DNSSEC должна использовать актуальный алгоритм — RSA/SHA-256, RSA/SHA-512, ECDSA P-256 или Ed25519. Устаревшие алгоритмы SHA-1 не поддерживаются."
 
@@ -1897,11 +1951,20 @@ msgstr "Письмо должно быть отправлено непосред
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "Интеграция с Google, Microsoft и Apple использует стандартный протокол аутентификации OpenID. Это тот же протокол, который стоит за кнопками «Войти через Google» в других приложениях."
 
+msgid "The interaction was canceled or timed out. Please try again."
+msgstr "Взаимодействие было отменено или истекло время ожидания. Пожалуйста, попробуйте снова."
+
+msgid "The JWT has expired — please try again in a few minutes."
+msgstr "JWT истёк — пожалуйста, повторите попытку через несколько минут."
+
 msgid "The most reliable backup. Stored entirely by you, on paper. It does not depend on any account, service, or provider, and only you can use, lose, or replace it."
 msgstr "Самый надёжный способ резервного копирования. Хранится исключительно у вас, на бумаге. Не зависит ни от какого аккаунта, сервиса или провайдера, и только вы можете её использовать, потерять или заменить."
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr "Фраза была введена правильно, но принадлежит продукту, отличному от Internet Identity."
+
+msgid "There was an error verifying your account — please try again."
+msgstr "Произошла ошибка при проверке вашего аккаунта — пожалуйста, попробуйте снова."
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Возникла проблема с подключением к приложению. Попробуйте другой браузер; если проблема сохраняется, свяжитесь с разработчиком."
@@ -1924,8 +1987,20 @@ msgstr "Этот аккаунт {resolvedProviderName} уже подключён
 msgid "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
 msgstr "Этот аккаунт {resolvedProviderName} ещё не подключён к учётной записи Internet Identity."
 
+msgid "This account has already been unlinked"
+msgstr "Этот аккаунт уже отвязан"
+
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "Этот аккаунт уже прикреплён к вашей учётной записи. Ваш активный метод доступа будет переключён на него."
+
+msgid "This account is already linked to another identity"
+msgstr "Этот аккаунт уже привязан к другой учётной записи"
+
+msgid "This account is linked through a different SSO domain"
+msgstr "Этот аккаунт привязан через другой домен SSO"
+
+msgid "This account isn't linked to an identity"
+msgstr "Этот аккаунт не привязан ни к одной учётной записи"
 
 msgid "this app"
 msgstr "это приложение"
@@ -1959,6 +2034,9 @@ msgstr "Это уже ваш резервный email."
 
 msgid "This is now the default method used to authenticate moving forward on this device."
 msgstr "Теперь это метод по умолчанию для аутентификации на этом устройстве в дальнейшем."
+
+msgid "This is taking longer than usual."
+msgstr "Это занимает больше времени, чем обычно."
 
 msgid "This is the access method you're currently signed in with."
 msgstr "Это метод доступа, с помощью которого вы в данный момент вошли в систему."
@@ -2017,6 +2095,9 @@ msgstr "Чтобы завершить настройку вашего ключа
 msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 msgstr "Чтобы AI мог задавать вопросы и выполнять действия в ваших приложениях, добавьте доверенный <0>MCP коннектор</0>."
 
+msgid "Too many attempts or time has expired."
+msgstr "Слишком много попыток или время истекло."
+
 msgid "Trusted connector"
 msgstr "Доверенный коннектор"
 
@@ -2062,8 +2143,17 @@ msgstr "Знакомство с Internet Identity"
 msgid "Undo"
 msgstr "Отменить"
 
+msgid "Unexpected error"
+msgstr "Непредвиденная ошибка"
+
+msgid "Unhandled error"
+msgstr "Необработанная ошибка"
+
 msgid "Unknown"
 msgstr "Неизвестно"
+
+msgid "Unknown error"
+msgstr "Неизвестная ошибка"
 
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience (no repeated signing) while still giving each session its own identity."
 msgstr "В отличие от многих систем аутентификации Web3, требующих ручного подписания каждого действия, Internet Identity создаёт аутентифицированные сессии для каждого приложения. Это обеспечивает как безопасность, так и удобство (без повторного подписания), при этом каждой сессии присваивается собственный идентификатор."
