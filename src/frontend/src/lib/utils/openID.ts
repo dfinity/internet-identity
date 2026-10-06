@@ -65,7 +65,7 @@ const isCallbackPayload = (value: unknown): boolean =>
  * Accepts either:
  * - A `string` URL: navigated to immediately. Used by the synchronous flows
  *   where the redirect URL is known at click time.
- * - A `Promise<string>`: the popup is opened to `about:blank` first
+ * - A `Promise<string>`: the popup is opened to `/sso-connecting` first
  *   (synchronously, to consume the user-activation token before any
  *   `await` — Safari blocks `window.open` after an awaited Promise),
  *   then navigated once the URL resolves. Used for flows that need an
@@ -82,11 +82,11 @@ const redirectInPopup = (url: string | Promise<string>): Promise<unknown> => {
   const height = 600;
   const left = (window.innerWidth - width) / 2 + window.screenX;
   const top = (window.innerHeight - height) / 2 + window.screenY;
-  // For deferred URLs, open about:blank synchronously so we don't lose
-  // the user-activation token — same-origin (inherited), so we can later
-  // navigate via `redirectWindow.location.href = ...` even though we'll
-  // end up on a cross-origin IdP.
-  const initialUrl = typeof url === "string" ? url : "about:blank";
+  // For deferred URLs, open the same-origin loading page synchronously so we
+  // don't lose the user-activation token, then navigate it via
+  // `redirectWindow.location.href = ...` even though we'll end up on a
+  // cross-origin IdP.
+  const initialUrl = typeof url === "string" ? url : "/sso-connecting";
   const redirectWindow = window.open(
     initialUrl,
     "_blank",
@@ -237,7 +237,7 @@ export const isOpenIdCancelError = (error: unknown) => {
  *   • `access_denied` — the user clicked "deny" on the consent screen.
  *
  * Carrying `error` and `errorDescription` separately (rather than just a
- * pre-formatted message) lets `mapSubmitError` in the SSO view produce a
+ * pre-formatted message) lets `ssoErrorMessage` produce a
  * UI string that points the user at the right knob to turn, instead of a
  * generic "No token received" that looks like a bug in II.
  */
@@ -336,7 +336,7 @@ export const extractIdTokenFromCallback = (
  * - A `RequestConfig`: redirect URL is built synchronously and the popup
  *   navigates straight to the IdP. Used by the standard flows where the
  *   provider config is already in hand at click time.
- * - A `Promise<RequestConfig>`: popup is opened to `about:blank`
+ * - A `Promise<RequestConfig>`: popup is opened to `/sso-connecting`
  *   synchronously (so the user-activation token is consumed before any
  *   `await` — Safari blocks `window.open` after one), then navigated to
  *   the IdP once the config resolves. Used by callers that need an async

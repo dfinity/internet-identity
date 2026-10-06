@@ -24,6 +24,8 @@
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
 
   import RedirectAnimationView from "./views/RedirectAnimationView.svelte";
+  import SsoConnectErrorView from "./views/SsoConnectErrorView.svelte";
+  import SsoConnectingView from "$lib/components/views/SsoConnectingView.svelte";
   import UpgradeSuccessView from "./views/UpgradeSuccessView.svelte";
   import ContinueView from "./views/ContinueView.svelte";
   import type { AccessLevel } from "$lib/utils/accessLevel";
@@ -90,6 +92,7 @@
   // channel. The early exits below (and a failure in `resumeOpenId`) set this
   // back to `false`, which is what surfaces the regular fall-back UI.
   let openIdResumeProcessing = $state(data.flow === "openid-resume");
+  let ssoInitError = $state<{ cause: unknown }>();
   // Set when a 1-click SSO redemption hits the normal-login-required fail-safe.
   // Holds everything the dialog needs to run one normal (primary-client)
   // sign-in, then replay the stashed gated JWT and authorize.
@@ -487,9 +490,12 @@
     if (data.flow === "openid-init") {
       initiateOpenId(data.config);
     } else if (data.flow === "sso-init") {
-      // Discovery + redirect runs async; the page renders nothing while
-      // it's in flight (mirrors the openid-init render branch).
-      initiateSso(data.domain, data.derivationOrigin).catch(handleError);
+      initiateSso(data.domain, data.derivationOrigin).catch(
+        (error: unknown) => {
+          console.error("1-click SSO failed", error);
+          ssoInitError = { cause: error };
+        },
+      );
     } else if (data.flow === "openid-resume") {
       // resumeOpenId sets the flow once the JWT (and thus the issuer)
       // has been decoded.
@@ -620,8 +626,14 @@
   </div>
 {/snippet}
 
-{#if data.flow === "openid-init" || data.flow === "sso-init"}
-  <!-- OpenID/SSO init — nothing to render, onMount redirects to provider. -->
+{#if data.flow === "openid-init"}
+  <!-- OpenID init — nothing to render, onMount redirects to provider. -->
+{:else if data.flow === "sso-init"}
+  {#if ssoInitError !== undefined}
+    <SsoConnectErrorView error={ssoInitError.cause} domain={data.domain} />
+  {:else}
+    <SsoConnectingView />
+  {/if}
 {:else if $attributeConsentStore !== undefined && $attributeConsentResolvedStore && $attributeConsentResultStore === undefined && ($authorizedStore !== undefined || data.flow === "openid-resume")}
   <!-- Consent needed — what it asks about has been read, so it paints in full. -->
   {@render panelWrapper(attributeConsentContent)}
