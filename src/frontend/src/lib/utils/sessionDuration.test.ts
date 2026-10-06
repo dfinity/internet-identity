@@ -132,7 +132,7 @@ describe("grantedTimeToLive", () => {
   it("caps a pick at the app's request", () => {
     expect(
       grantedTimeToLive({
-        picked: hours(30 * 24),
+        authorized: hours(30 * 24),
         requested: hours(1),
         ssoSessionMaxAgeNs: undefined,
       }),
@@ -142,7 +142,7 @@ describe("grantedTimeToLive", () => {
   it("keeps a pick shorter than the app's request", () => {
     expect(
       grantedTimeToLive({
-        picked: hours(1),
+        authorized: hours(1),
         requested: hours(8),
         ssoSessionMaxAgeNs: undefined,
       }),
@@ -152,7 +152,7 @@ describe("grantedTimeToLive", () => {
   it("uses the app's request where nothing was picked", () => {
     expect(
       grantedTimeToLive({
-        picked: undefined,
+        authorized: undefined,
         requested: hours(8),
         ssoSessionMaxAgeNs: undefined,
       }),
@@ -162,7 +162,7 @@ describe("grantedTimeToLive", () => {
   it("caps everything at an SSO organization's limit", () => {
     expect(
       grantedTimeToLive({
-        picked: hours(24),
+        authorized: hours(24),
         requested: hours(8),
         ssoSessionMaxAgeNs: hours(2),
       }),
@@ -173,14 +173,14 @@ describe("grantedTimeToLive", () => {
     for (const requested of [BigInt(0), BigInt(-1)]) {
       expect(
         grantedTimeToLive({
-          picked: hours(30 * 24),
+          authorized: hours(30 * 24),
           requested,
           ssoSessionMaxAgeNs: undefined,
         }),
       ).toBe(hours(30 * 24));
       expect(
         grantedTimeToLive({
-          picked: undefined,
+          authorized: undefined,
           requested,
           ssoSessionMaxAgeNs: undefined,
         }),
@@ -191,7 +191,7 @@ describe("grantedTimeToLive", () => {
   it("leaves the canister's default where nothing applies", () => {
     expect(
       grantedTimeToLive({
-        picked: undefined,
+        authorized: undefined,
         requested: undefined,
         ssoSessionMaxAgeNs: undefined,
       }),

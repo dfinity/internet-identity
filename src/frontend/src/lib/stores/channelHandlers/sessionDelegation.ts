@@ -364,7 +364,7 @@ const createSession = async (
   const ssoSessionMaxAgeNs =
     "openid" in authMethod ? authMethod.openid.ssoSessionMaxAgeNs : undefined;
   const validFor = grantedTimeToLive({
-    picked: authorized.maxTimeToLive,
+    authorized: authorized.maxTimeToLive,
     requested: requestedMaxTimeToLive,
     ssoSessionMaxAgeNs,
   });

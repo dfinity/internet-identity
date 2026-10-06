@@ -105,16 +105,16 @@ export const sessionDurationToNanos = (seconds: number): bigint =>
  * them applies, which leaves the canister's default.
  */
 export const grantedTimeToLive = ({
-  picked,
+  authorized,
   requested,
   ssoSessionMaxAgeNs,
 }: {
-  picked: bigint | undefined;
+  authorized: bigint | undefined;
   requested: bigint | undefined;
   ssoSessionMaxAgeNs: bigint | undefined;
 }): bigint | undefined =>
   [
-    picked,
+    authorized,
     requested !== undefined && requested > BigInt(0) ? requested : undefined,
     ssoSessionMaxAgeNs,
   ].reduce<bigint | undefined>(

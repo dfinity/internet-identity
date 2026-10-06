@@ -99,7 +99,7 @@ const runCeremony = async (
   resumable?: boolean,
   extraParams: Record<string, unknown> = {},
   whileRunning?: () => Promise<void>,
-  picked?: bigint,
+  authorized?: bigint,
 ) => {
   const { authorizationPromptStore, authorizedStore } =
     await import("$lib/stores/authorization.store");
@@ -155,7 +155,7 @@ const runCeremony = async (
   (authorizedStore as unknown as Writable<unknown>).set({
     accountNumberPromise: Promise.resolve(undefined),
     accessLevel: "full-access",
-    maxTimeToLive: picked,
+    maxTimeToLive: authorized,
   });
 
   const { channel, sent } = channelWith();

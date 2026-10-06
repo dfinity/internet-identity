@@ -140,7 +140,7 @@ export const handleDelegationRequest =
         // delegation must not outlive that, so an SSO session sends a duration
         // even when neither the picker nor the app asked for one.
         const maxTimeToLive = grantedTimeToLive({
-          picked: authorized.maxTimeToLive,
+          authorized: authorized.maxTimeToLive,
           requested: params.maxTimeToLive,
           ssoSessionMaxAgeNs,
         });
