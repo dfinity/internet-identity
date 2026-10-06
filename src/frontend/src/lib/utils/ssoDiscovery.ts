@@ -172,11 +172,7 @@ export const discoverSsoConfig = async (
     if ("Resolved" in status) {
       // Not awaited: refreshes a stale result and fetches the domain's keys
       // while the user signs in at the IdP.
-      void anonymousActor
-        .discover_sso(validatedDomain)
-        .catch((error: unknown) =>
-          console.warn("SSO discovery refresh failed", error),
-        );
+      void anonymousActor.discover_sso(validatedDomain).catch(() => undefined);
       return toResult(status.Resolved);
     }
     // Re-check before the update: the query above may have spanned an abort,

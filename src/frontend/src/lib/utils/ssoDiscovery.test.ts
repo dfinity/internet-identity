@@ -144,20 +144,13 @@ describe("ssoDiscovery", () => {
       vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
         Resolved: DISCOVERY,
       });
-      const error = new Error("update failed");
-      vi.mocked(anonymousActor.discover_sso).mockRejectedValue(error);
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.mocked(anonymousActor.discover_sso).mockRejectedValue(
+        new Error("update failed"),
+      );
 
       const result = await discoverSsoConfig("dfinity.org");
 
       expect(result.domain).toBe("dfinity.org");
-      await vi.waitFor(() =>
-        expect(warn).toHaveBeenCalledWith(
-          "SSO discovery refresh failed",
-          error,
-        ),
-      );
-      warn.mockRestore();
     });
 
     it("passes the target origin and returns the per-app resolvedClientId", async () => {
