@@ -4,9 +4,12 @@ import { ExtractedMessage } from "@lingui/conf";
 
 const FILE_NAME = "test.svelte";
 
-const extractAll = async (code: string): Promise<ExtractedMessage[]> => {
+const extractAll = async (
+  code: string,
+  filename = FILE_NAME,
+): Promise<ExtractedMessage[]> => {
   const messages: ExtractedMessage[] = [];
-  await svelteExtractor.extract(FILE_NAME, code, (message) =>
+  await svelteExtractor.extract(filename, code, (message) =>
     messages.push(message),
   );
   return messages;
@@ -360,5 +363,108 @@ describe("svelteExtractor", () => {
         expect(await extractAll(code)).toEqual([]);
       },
     );
+  });
+
+  describe("module", () => {
+    const MODULE_NAME = "test.ts";
+    const IMPORT = 'import { t, plural } from "$lib/stores/locale.store";\n';
+
+    it.each([
+      { case: "a .ts module", filename: "error.ts", matches: true },
+      {
+        case: "a .svelte.ts module",
+        filename: "flow.svelte.ts",
+        matches: true,
+      },
+      { case: "a declaration file", filename: "types.d.ts", matches: false },
+    ])("should match $case: $matches", ({ filename, matches }) => {
+      expect(svelteExtractor.match(filename)).toBe(matches);
+    });
+
+    it("should extract a tagged template with its line and column", async () => {
+      const messages = await extractAll(
+        `${IMPORT}export const greet = (name: string): string => t\`Hello \${name}\`;`,
+        MODULE_NAME,
+      );
+      expect(messages).toEqual([
+        expect.objectContaining({
+          message: "Hello {name}",
+          origin: [MODULE_NAME, 2, 47],
+        }),
+      ]);
+    });
+
+    it("should give a message the same id as in a component", async () => {
+      const [fromModule] = await extractAll(
+        `${IMPORT}t\`Hello World\`;`,
+        MODULE_NAME,
+      );
+      const [fromComponent] = await extractAll("{$t`Hello World`}");
+      expect(fromModule.id).toEqual(fromComponent.id);
+    });
+
+    it("should extract a descriptor and a plural", async () => {
+      const messages = await extractAll(
+        `${IMPORT}t({ message: "Hello", context: "greeting" });\nplural(count, { one: "# browser", other: "# browsers" });`,
+        MODULE_NAME,
+      );
+      expect(
+        messages.map(({ message, context }) => ({ message, context })),
+      ).toEqual([
+        { message: "Hello", context: "greeting" },
+        {
+          message: "{count, plural, one {# browser} other {# browsers}}",
+          context: undefined,
+        },
+      ]);
+    });
+
+    it("should follow a renamed import", async () => {
+      const messages = await extractAll(
+        'import { t as translate } from "$lib/stores/locale.store";\ntranslate`Hello World`;\nt`Not a message`;',
+        MODULE_NAME,
+      );
+      expect(messages.map(({ message }) => message)).toEqual(["Hello World"]);
+    });
+
+    it.each([
+      {
+        case: "a parameter",
+        code: `${IMPORT}const f = (t: (s: TemplateStringsArray) => string) => t\`Shadowed\`;\nt\`Hello World\`;`,
+      },
+      {
+        case: "a block declaration",
+        code: `${IMPORT}{\n  const t = String.raw;\n  t\`Shadowed\`;\n}\nt\`Hello World\`;`,
+      },
+      {
+        case: "a parameter shadowing a renamed import",
+        code: 'import { t as translate } from "$lib/stores/locale.store";\nfunction f(translate: typeof String.raw) {\n  return translate`Shadowed`;\n}\ntranslate`Hello World`;',
+      },
+    ])("should skip a call to $case", async ({ code }) => {
+      const messages = await extractAll(code, MODULE_NAME);
+      expect(messages.map(({ message }) => message)).toEqual(["Hello World"]);
+    });
+
+    it("should extract a call inside a nested function", async () => {
+      const messages = await extractAll(
+        `${IMPORT}export const f = () => () => t\`Hello World\`;`,
+        MODULE_NAME,
+      );
+      expect(messages.map(({ message }) => message)).toEqual(["Hello World"]);
+    });
+
+    it.each([
+      { case: "no import", code: "t`Hello World`;" },
+      {
+        case: "t from another module",
+        code: 'import { t } from "./other";\nt`Hello World`;',
+      },
+      {
+        case: "the component syntax",
+        code: `${IMPORT}$t\`Hello World\`;`,
+      },
+    ])("should extract nothing with $case", async ({ code }) => {
+      expect(await extractAll(code, MODULE_NAME)).toEqual([]);
+    });
   });
 });
