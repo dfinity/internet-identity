@@ -1714,10 +1714,10 @@ msgid "Sign in with SSO"
 msgstr "Zaloguj się przez SSO"
 
 msgid "Sign in with the domain it is linked through: {registeredDomain}."
-msgstr "Zaloguj się przez domenę, z którą jest powiązana: {registeredDomain}."
+msgstr "Zaloguj się przez domenę, z którą jest powiązane: {registeredDomain}."
 
 msgid "Sign in with the domain it was originally linked through."
-msgstr "Zaloguj się przez domenę, przez którą była pierwotnie powiązana."
+msgstr "Zaloguj się przez domenę, przez którą było pierwotnie powiązane."
 
 msgid "Sign in with your {displayName} account from any device."
 msgstr "Zaloguj się przy użyciu swojego konta {displayName} z dowolnego urządzenia."

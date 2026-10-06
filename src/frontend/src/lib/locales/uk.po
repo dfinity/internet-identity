@@ -1714,10 +1714,10 @@ msgid "Sign in with SSO"
 msgstr "Увійти через SSO"
 
 msgid "Sign in with the domain it is linked through: {registeredDomain}."
-msgstr "Увійдіть через домен, через який пов'язано обліковий запис: {registeredDomain}."
+msgstr "Увійдіть через домен, через який пов'язаний обліковий запис: {registeredDomain}."
 
 msgid "Sign in with the domain it was originally linked through."
-msgstr "Увійдіть через домен, через який обліковий запис був спочатку пов'язано."
+msgstr "Увійдіть через домен, через який обліковий запис був спочатку пов'язаний."
 
 msgid "Sign in with your {displayName} account from any device."
 msgstr "Увійдіть зі своїм обліковим записом {displayName} з будь-якого пристрою."
