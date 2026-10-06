@@ -641,22 +641,12 @@ fn validate_discovery_document(
     })
 }
 
-/// The discovery cache fill. A resolved discovery also starts the JWKS fill for
-/// its `jwks_uri`, so the keys are fetched while the user signs in at the IdP
-/// rather than after.
-async fn discovery_fill(domain: String) -> FillOutcome<DiscoveredConfig, String> {
-    let outcome = discovery_outcome(domain).await;
-    if let FillOutcome::Ready(config) = &outcome {
-        single_flight_cache::get(&JWKS_CACHE, config.jwks_uri.clone());
-    }
-    outcome
-}
-
-/// Hop 1 (`ii-openid-configuration`) then hop 2 (the standard OIDC discovery
-/// document), with host self-assertion checks between them. Errors are
-/// surfaced as `Err` (the cache backs off and serves stale-if-error).
+/// The discovery cache fill: hop 1 (`ii-openid-configuration`) then hop 2 (the
+/// standard OIDC discovery document), with host self-assertion checks between
+/// them. Errors are surfaced as `Err` (the cache backs off and serves
+/// stale-if-error).
 #[cfg(not(test))]
-async fn discovery_outcome(domain: String) -> FillOutcome<DiscoveredConfig, String> {
+async fn discovery_fill(domain: String) -> FillOutcome<DiscoveredConfig, String> {
     // One outcall slot for the whole two-hop fetch. No slot → abandon: the cache
     // records nothing (no backoff) and the next poll retries once capacity frees.
     let Some(_permit) = crate::concurrency::acquire(&DISCOVERY_OUTCALL_LIMIT) else {
@@ -728,7 +718,7 @@ async fn jwks_fill(jwks_uri: String) -> FillOutcome<Vec<Jwk>, String> {
 
 // In test builds the fills read from injected state instead of doing outcalls.
 #[cfg(test)]
-async fn discovery_outcome(domain: String) -> FillOutcome<DiscoveredConfig, String> {
+async fn discovery_fill(domain: String) -> FillOutcome<DiscoveredConfig, String> {
     match tests::TEST_DISCOVERY.with_borrow(|m| m.get(&domain).cloned()) {
         Some(config) => FillOutcome::Ready(config),
         None => FillOutcome::Failed(format!("no test discovery for {domain}")),
@@ -1050,17 +1040,6 @@ mod tests {
         TEST_DISCOVERY.with_borrow_mut(|m| m.insert(domain.to_string(), config.clone()));
         TEST_JWKS.with_borrow_mut(|m| m.insert(config.jwks_uri.clone(), vec![]));
         config
-    }
-
-    #[test]
-    fn discovery_fill_also_fetches_the_jwks() {
-        reset();
-        let config = seed("example.org");
-
-        single_flight_cache::get(&DISCOVERY_CACHE, "example.org".to_string());
-        run_detached();
-
-        assert!(matches!(read_jwks(&config.jwks_uri), Cached::Ready(_)));
     }
 
     #[test]
