@@ -338,12 +338,13 @@ pub fn prefetch_sso(domain: Option<&str>) {
     }
 }
 
-/// Drive the SSO discovery fetch for `domain` (the discovery cache only). The
-/// sign-in initiation poll calls this from an update when [`get_sso_discovery_status`]
-/// reads `Pending`. A no-op for a disallowed domain (the query reports
-/// `NotAllowed`).
+/// Drive the SSO discovery and JWKS fetches for `domain` forward. The sign-in
+/// initiation calls this from an update while [`get_sso_discovery_status`]
+/// reads `Pending`, and once more when it resolves, so a stale discovery result
+/// and the domain's keys refresh while the user signs in at the IdP. A no-op
+/// for a disallowed domain (the query reports `NotAllowed`).
 pub fn discover_sso(domain: &str) {
-    sso::drive_discovery(domain);
+    sso::prefetch(domain);
 }
 
 /// Read the status of `domain`'s SSO discovery: the resolved config, or still

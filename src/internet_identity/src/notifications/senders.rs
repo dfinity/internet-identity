@@ -62,6 +62,7 @@ fn new_senders_cache() -> SendersCache {
         CacheConfig {
             fresh_for: FRESH_FOR_SECONDS,
             stale_for: STALE_FOR_SECONDS,
+            stale_if_error_for: STALE_FOR_SECONDS,
             max_entries: CACHE_MAX_ENTRIES,
             backoff: RetryBackoff::new(RETRY_BASE_SECONDS, RETRY_MULTIPLIER),
             abandon_fill_after: ABANDON_FILL_AFTER_SECONDS,
