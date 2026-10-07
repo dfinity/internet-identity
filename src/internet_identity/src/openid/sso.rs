@@ -428,7 +428,7 @@ pub fn validate_discovery_domain(domain: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// True if `domain` is a bare URL authority — a host and nothing else: no
+/// True if `domain` is a bare URL authority — a DNS name and nothing else: no
 /// scheme, userinfo, path, query, fragment, or port (a loopback host may carry
 /// one, for a local mock provider). It is
 /// parsed the same way it is later used (as the authority of an `https`
@@ -452,12 +452,30 @@ fn is_bare_authority(domain: &str) -> bool {
     let Some(host) = url.host_str() else {
         return false;
     };
+    if !crate::utils::is_loopback_host(host) && !is_dns_name(host) {
+        return false;
+    }
     let authority = match url.port() {
         Some(_) if !crate::utils::is_loopback_host(host) => return false,
         Some(port) => format!("{host}:{port}"),
         None => host.to_string(),
     };
     authority == domain.to_ascii_lowercase()
+}
+
+/// At least two labels, each 1 to 63 ASCII letters, digits, or hyphens, with no
+/// hyphen at either end.
+fn is_dns_name(host: &str) -> bool {
+    let labels: Vec<&str> = host.split('.').collect();
+    labels.len() >= 2
+        && labels.iter().all(|label| {
+            (1..=63).contains(&label.len())
+                && label
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+        })
 }
 
 /// `http` discovery is permitted only for a loopback host, and only when the
@@ -1225,6 +1243,7 @@ mod tests {
         assert!(allowed("example.com"));
         assert!(allowed("sub.example.com"));
         assert!(allowed("Example.COM"));
+        assert!(allowed("sso-2.example.com"));
         assert!(allowed("localhost:11107"));
         assert!(allowed("127.0.0.1:8080"));
 
@@ -1242,6 +1261,12 @@ mod tests {
             "example.com:443",       // redundant default port (normalized away)
             "example.com:8443",      // a port on a non-loopback host
             "exa mple.com",          // whitespace in host
+            "example",               // a single label
+            ".com",                  // empty label
+            "example..com",          // empty label
+            "-example.com",          // leading hyphen
+            "example-.com",          // trailing hyphen
+            "exa_mple.com",          // underscore
             "",                      // empty
         ] {
             assert!(!allowed(bad), "expected `{bad}` to be rejected");
@@ -1251,10 +1276,11 @@ mod tests {
     #[test]
     fn over_long_domain_is_rejected() {
         reset();
-        let at_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 4));
+        let labels = vec!["a".repeat(62); 4].join(".");
+        let at_cap = format!("{labels}.com");
         assert_eq!(at_cap.len(), MAX_DOMAIN_LENGTH);
         assert!(allowed(&at_cap));
-        let over_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 3));
+        let over_cap = format!("b{labels}.com");
         assert_eq!(over_cap.len(), MAX_DOMAIN_LENGTH + 1);
         assert!(!allowed(&over_cap));
     }
