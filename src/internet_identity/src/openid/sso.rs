@@ -52,6 +52,14 @@ pub(super) const MAX_APP_CLIENTS: usize = 100;
 /// Maximum length of an app_clients client_id.
 const MAX_APP_CLIENT_ID_LENGTH: usize = 255;
 
+/// Maximum length of an app_clients key (a cleartext origin or `hash:salt`).
+const MAX_APP_CLIENT_KEY_LENGTH: usize = 255;
+
+/// Total bytes of `app_clients` keys and client ids accepted from one
+/// well-known: room for `MAX_APP_CLIENTS` entries averaging 160 bytes, or for a
+/// few entries at the per-field maximums.
+const MAX_APP_CLIENTS_BYTES: usize = 16 * 1024;
+
 #[cfg(not(test))]
 use crate::state;
 
@@ -63,11 +71,15 @@ use crate::state;
 //
 // Discovery and JWKS are a single coupled flow (`domain → discovery cache →
 // jwks_uri → JWKS cache`): a verification needs *both* the domain's discovery
-// entry and its JWKS entry warm. So the two caches share one budget rather than
-// sizing independently — different caps would just leave one cache holding
-// entries the other can't back. The shared cap is bounded by the larger (JWKS)
-// entry (≤ `jwks::JWKS_MAX_RESPONSE_BYTES`, 32 KiB); every fill is also bounded
-// in bytes (see `DISCOVERY_MAX_RESPONSE_BYTES` and `jwks::JWKS_MAX_RESPONSE_BYTES`).
+// entry and its JWKS entry warm. So the two caches share one entry cap rather
+// than sizing independently — different caps would just leave one cache
+// holding entries the other can't back.
+//
+// Every retained field is bounded, so an entry's size is bounded regardless of
+// the response it was parsed from: a discovery entry holds at most ~2 KiB of
+// fixed fields plus its `app_clients` (`MAX_APP_CLIENTS_BYTES` and the vector
+// holding them), ~22 KiB in all; a JWKS entry holds at most
+// `jwks::JWKS_MAX_KEYS` keys reduced to what verification reads, ~24 KiB.
 
 /// Entry lifetime for both caches: discovery metadata and JWKS change
 /// infrequently, so an hour balances freshness against outcall volume.
@@ -77,35 +89,23 @@ const FRESH_FOR_SECONDS: u64 = 60 * 60;
 const STALE_FOR_SECONDS: u64 = 60 * 60;
 /// Shared LRU cap for both SSO caches — they back one coupled flow, so one
 /// budget keeps them coherent (this many domains cached end-to-end,
-/// discovery → keys). Worst-case memory is dominated by the JWKS cache at
-/// `jwks::JWKS_MAX_RESPONSE_BYTES` (32 KiB) per entry: 5k × 32 KiB ≈ 160 MB,
-/// plus ~10 MB of (much smaller) discovery entries ≈ ~170 MB — about 5-6 % of
-/// the ~3 GB Wasm heap, leaving the bulk for core II operations while keeping
-/// wide headroom so a flood of distinct domains can't evict the providers real
-/// users rely on.
+/// discovery → keys). Worst case 5k × (~22 KiB + ~24 KiB) ≈ 230 MB — about
+/// 7-8 % of the ~3 GB Wasm heap, leaving the bulk for core II operations while
+/// keeping wide headroom so a flood of distinct domains can't evict the
+/// providers real users rely on.
 const SSO_CACHE_MAX_ENTRIES: usize = 5_000;
 const RETRY_BASE_SECONDS: u64 = 60;
 const RETRY_MULTIPLIER: u64 = 2;
 const ABANDON_FILL_AFTER_SECONDS: u64 = 120;
 
 /// Response-size cap for the two discovery hops (`ii-openid-configuration` and
-/// the OIDC discovery document). Sized to fit up to `MAX_APP_CLIENTS`
-/// `origin -> client_id` entries (each key up to ~140 bytes when hashed) with
-/// headroom.
+/// the OIDC discovery document). Sized to fit `MAX_APP_CLIENTS_BYTES` of
+/// `app_clients` plus the JSON around them, with headroom.
 #[cfg(not(test))]
 const DISCOVERY_MAX_RESPONSE_BYTES: u64 = 64 * 1024;
-/// Cap on the number of `scopes_supported` stored per discovery entry. `scopes`
-/// is the only unbounded field in `DiscoveredConfig`; capping it keeps a
-/// discovery entry ~1-2 KB so its share of the shared budget stays small. II
-/// only needs `openid`/`email`/`profile`, so extra advertised scopes are
-/// irrelevant.
-#[cfg(not(test))]
-const DISCOVERY_MAX_SCOPES: usize = 32;
-
-/// Default scopes requested when a provider's discovery document doesn't
-/// advertise `scopes_supported`.
-#[cfg(not(test))]
-const DEFAULT_SCOPES: [&str; 3] = ["openid", "profile", "email"];
+/// The scopes II requests. A provider's `scopes_supported` is kept only as far
+/// as it lists these, and all of them are assumed when it advertises none.
+const REQUESTED_SCOPES: [&str; 3] = ["openid", "profile", "email"];
 
 /// Maximum length of the client_id from the well-known.
 #[cfg(not(test))]
@@ -116,6 +116,12 @@ const MAX_ISSUER_LENGTH: usize = 255;
 /// Maximum length of the jwks_uri from the OIDC configuration.
 #[cfg(not(test))]
 const MAX_JWKS_URI_LENGTH: usize = 255;
+/// Maximum length of the authorization_endpoint from the OIDC configuration.
+#[cfg(not(test))]
+const MAX_AUTHORIZATION_ENDPOINT_LENGTH: usize = 255;
+/// Maximum length of the stable_identifier_claim from the well-known.
+#[cfg(not(test))]
+const MAX_STABLE_IDENTIFIER_CLAIM_LENGTH: usize = 255;
 /// Maximum length of the display name from the well-known.
 #[cfg(not(test))]
 const MAX_SSO_NAME_LENGTH: usize = 255;
@@ -197,8 +203,8 @@ impl AppClientKey {
 pub(super) struct Forbidden;
 
 /// Parse the raw `app_clients` map, rejecting (never truncating) a map over
-/// `MAX_APP_CLIENTS` — truncation could silently drop a gated origin into the
-/// open fallback.
+/// `MAX_APP_CLIENTS` entries or `MAX_APP_CLIENTS_BYTES` — truncation could
+/// silently drop a gated origin into the open fallback.
 pub(super) fn validate_app_clients(
     entries: &std::collections::HashMap<String, String>,
 ) -> Result<Vec<AppClient>, String> {
@@ -208,20 +214,48 @@ pub(super) fn validate_app_clients(
             entries.len()
         ));
     }
-    entries
+    let bytes: usize = entries
         .iter()
-        .map(|(key, client_id)| {
-            if client_id.len() > MAX_APP_CLIENT_ID_LENGTH {
-                return Err(format!(
-                    "app_clients client_id exceeds the {MAX_APP_CLIENT_ID_LENGTH}-byte cap"
-                ));
-            }
-            Ok(AppClient {
-                key: AppClientKey::parse(key),
-                client_id: client_id.clone(),
-            })
-        })
-        .collect()
+        .map(|(key, client_id)| key.len() + client_id.len())
+        .sum();
+    if bytes > MAX_APP_CLIENTS_BYTES {
+        return Err(format!(
+            "app_clients exceeds the {MAX_APP_CLIENTS_BYTES}-byte cap ({bytes} bytes)"
+        ));
+    }
+    let mut app_clients = Vec::with_capacity(entries.len());
+    for (key, client_id) in entries {
+        if key.len() > MAX_APP_CLIENT_KEY_LENGTH {
+            return Err(format!(
+                "app_clients key exceeds the {MAX_APP_CLIENT_KEY_LENGTH}-byte cap"
+            ));
+        }
+        if client_id.len() > MAX_APP_CLIENT_ID_LENGTH {
+            return Err(format!(
+                "app_clients client_id exceeds the {MAX_APP_CLIENT_ID_LENGTH}-byte cap"
+            ));
+        }
+        app_clients.push(AppClient {
+            key: AppClientKey::parse(key),
+            client_id: client_id.clone(),
+        });
+    }
+    Ok(app_clients)
+}
+
+/// The [`REQUESTED_SCOPES`] a provider advertises in `scopes_supported`, each
+/// once and in its order; all of them when it advertises none.
+pub(super) fn requested_scopes(scopes_supported: Option<Vec<String>>) -> Vec<String> {
+    let Some(scopes) = scopes_supported.filter(|scopes| !scopes.is_empty()) else {
+        return REQUESTED_SCOPES.iter().map(|s| (*s).to_string()).collect();
+    };
+    let mut requested: Vec<String> = Vec::new();
+    for scope in &scopes {
+        if REQUESTED_SCOPES.contains(&scope.as_str()) && !requested.contains(scope) {
+            requested.push(scope.clone());
+        }
+    }
+    requested
 }
 
 impl DiscoveredConfig {
@@ -506,6 +540,15 @@ fn validate_ii_config(
     let openid_configuration = validate_discovery_url(config.openid_configuration)?;
     let app_clients = validate_app_clients(&config.app_clients)?;
     let session_max_age_ns = validate_session_max_age(config.session_max_age_seconds)?;
+    if config
+        .stable_identifier_claim
+        .as_ref()
+        .is_some_and(|claim| claim.len() > MAX_STABLE_IDENTIFIER_CLAIM_LENGTH)
+    {
+        return Err(format!(
+            "SSO stable_identifier_claim exceeds {MAX_STABLE_IDENTIFIER_CLAIM_LENGTH} bytes"
+        ));
+    }
     let stable_identifier_claim = config
         .stable_identifier_claim
         .filter(|claim| !claim.is_empty())
@@ -549,9 +592,9 @@ fn validate_session_max_age(seconds: Option<u64>) -> Result<u64, String> {
 }
 
 /// The hop-2 document once its URLs have been checked against each other and
-/// against the hop-1 URL, its lengths bounded and its scopes defaulted. Produced
-/// only by [`validate_discovery_document`], which consumes the raw
-/// [`DiscoveryDocument`].
+/// against the hop-1 URL, its lengths bounded and its scopes reduced to the
+/// ones II requests. Produced only by [`validate_discovery_document`], which
+/// consumes the raw [`DiscoveryDocument`].
 #[cfg(not(test))]
 struct ValidatedDiscoveryDocument {
     issuer: String,
@@ -562,8 +605,8 @@ struct ValidatedDiscoveryDocument {
 
 /// Validate the untrusted OIDC discovery document against the hop-1 document it
 /// was fetched from: bound its lengths, enforce the host relationships, and
-/// default its scopes. Takes the validated hop-1 document, so the URL the
-/// self-assertion checks compare against is itself already checked.
+/// keep the scopes II requests. Takes the validated hop-1 document, so the URL
+/// the self-assertion checks compare against is itself already checked.
 #[cfg(not(test))]
 fn validate_discovery_document(
     doc: DiscoveryDocument,
@@ -575,6 +618,11 @@ fn validate_discovery_document(
     }
     if doc.jwks_uri.len() > MAX_JWKS_URI_LENGTH {
         return Err(format!("SSO jwks_uri exceeds {MAX_JWKS_URI_LENGTH} bytes"));
+    }
+    if doc.authorization_endpoint.len() > MAX_AUTHORIZATION_ENDPOINT_LENGTH {
+        return Err(format!(
+            "SSO authorization_endpoint exceeds {MAX_AUTHORIZATION_ENDPOINT_LENGTH} bytes"
+        ));
     }
     // The discovered issuer's host must match the openid_configuration host
     // (standard OIDC self-assertion; defends against a compromised hop-1 that
@@ -588,18 +636,11 @@ fn validate_discovery_document(
     validate_same_host(&doc.issuer, &doc.authorization_endpoint)?;
     let authorization_endpoint = validate_discovery_url(doc.authorization_endpoint)?;
 
-    let mut scopes = doc
-        .scopes_supported
-        .filter(|scopes| !scopes.is_empty())
-        .unwrap_or_else(|| DEFAULT_SCOPES.iter().map(|s| (*s).to_string()).collect());
-    // Bound the only unbounded field stored per discovery entry.
-    scopes.truncate(DISCOVERY_MAX_SCOPES);
-
     Ok(ValidatedDiscoveryDocument {
         issuer: doc.issuer,
         jwks_uri,
         authorization_endpoint,
-        scopes,
+        scopes: requested_scopes(doc.scopes_supported),
     })
 }
 
@@ -1207,6 +1248,87 @@ mod tests {
             "a".repeat(MAX_APP_CLIENT_ID_LENGTH),
         );
         assert!(validate_app_clients(&entries).is_ok());
+    }
+
+    #[test]
+    fn app_clients_over_long_key_rejected() {
+        let mut entries = std::collections::HashMap::new();
+        entries.insert(
+            "a".repeat(MAX_APP_CLIENT_KEY_LENGTH + 1),
+            "client".to_string(),
+        );
+        assert!(validate_app_clients(&entries).is_err());
+
+        entries.clear();
+        entries.insert("a".repeat(MAX_APP_CLIENT_KEY_LENGTH), "client".to_string());
+        assert!(validate_app_clients(&entries).is_ok());
+    }
+
+    #[test]
+    fn app_clients_over_byte_budget_rejected() {
+        // Entries at both per-field maximums: 510 bytes each.
+        let entry = |i: usize| {
+            let key = format!("{i:03}{}", "k".repeat(MAX_APP_CLIENT_KEY_LENGTH - 3));
+            (key, "c".repeat(MAX_APP_CLIENT_ID_LENGTH))
+        };
+        let fitting =
+            MAX_APP_CLIENTS_BYTES / (MAX_APP_CLIENT_KEY_LENGTH + MAX_APP_CLIENT_ID_LENGTH);
+
+        let mut entries: std::collections::HashMap<_, _> = (0..fitting).map(entry).collect();
+        assert!(validate_app_clients(&entries).is_ok());
+
+        entries.extend([entry(fitting)]);
+        assert!(validate_app_clients(&entries).is_err());
+    }
+
+    #[test]
+    fn app_clients_allocation_matches_entry_count() {
+        let entries: std::collections::HashMap<_, _> = (0..MAX_APP_CLIENTS)
+            .map(|i| (format!("https://app{i}.com"), format!("client{i}")))
+            .collect();
+        let app_clients = validate_app_clients(&entries).unwrap();
+        assert_eq!(app_clients.capacity(), MAX_APP_CLIENTS);
+    }
+
+    #[test]
+    fn requested_scopes_keeps_only_scopes_ii_requests() {
+        let advertised = ["address", "email", "openid", "offline_access", "profile"]
+            .map(String::from)
+            .to_vec();
+        assert_eq!(
+            requested_scopes(Some(advertised)),
+            vec!["email", "openid", "profile"]
+        );
+        assert_eq!(
+            requested_scopes(Some(vec!["phone".to_string()])),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn requested_scopes_keeps_each_scope_once() {
+        let mut advertised = vec!["openid".to_string(); 10_000];
+        advertised.push("email".to_string());
+        advertised.push("openid".to_string());
+
+        let scopes = requested_scopes(Some(advertised));
+
+        assert_eq!(scopes, vec!["openid", "email"]);
+        assert!(scopes.capacity() <= REQUESTED_SCOPES.len() + 1);
+    }
+
+    #[test]
+    fn requested_scopes_defaults_when_none_advertised() {
+        assert_eq!(requested_scopes(None), REQUESTED_SCOPES.to_vec());
+        assert_eq!(requested_scopes(Some(vec![])), REQUESTED_SCOPES.to_vec());
+    }
+
+    #[test]
+    fn requested_scopes_drops_an_oversized_advertised_list() {
+        let advertised = vec![String::new(); 20_000];
+        let scopes = requested_scopes(Some(advertised));
+        assert!(scopes.is_empty());
+        assert_eq!(scopes.capacity(), 0);
     }
 
     #[test]
