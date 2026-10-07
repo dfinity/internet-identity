@@ -119,6 +119,7 @@ where
         CacheConfig {
             fresh_for,
             stale_for: DOH_STALE_SECS,
+            stale_if_error_for: DOH_STALE_SECS,
             max_entries: DOH_MAX_ENTRIES,
             backoff: RetryBackoff::new(DOH_RETRY_BASE_SECS, DOH_RETRY_MULTIPLIER),
             abandon_fill_after: DOH_ABANDON_FILL_AFTER_SECS,

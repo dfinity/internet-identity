@@ -743,10 +743,9 @@ test.describe("Authorize with IdP-side per-app gating", () => {
 
   // Same deny, reached via the 1-click `?sso=` path: discovery runs in the
   // popup's onMount and the gate refuses the origin, so the redemption throws
-  // before ever redirecting to the IdP. Unlike the manual wizard (which renders
-  // the tailored "not granted" copy), the 1-click path routes the throw through
-  // the generic error handler. What matters is that the gate can't be bypassed:
-  // the flow errors and the app is never reached.
+  // before ever redirecting to the IdP and the page shows the same "not
+  // granted" copy as the manual wizard. What matters is that the gate can't be
+  // bypassed: the flow errors and the app is never reached.
   test.describe("denied origin via 1-click ?sso=", () => {
     test.use({
       openIdConfig: {
@@ -771,9 +770,14 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       await page.getByRole("button", { name: "Sign In" }).click();
       const popup = await popupPromise;
       // Gate deny → the discovery throws `origin-denied`; no IdP redirect, no app.
-      await expect(popup.getByText(/origin-denied/i)).toBeVisible({
-        timeout: 30_000,
-      });
+      await expect(
+        popup.getByRole("heading", {
+          name: "Couldn't connect to your organization",
+        }),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(
+        popup.getByText(/hasn't granted this app access/i),
+      ).toBeVisible();
       await expect(
         popup.getByRole("heading", { name: "Sign-in" }),
       ).toBeHidden();

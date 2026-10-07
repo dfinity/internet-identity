@@ -3,14 +3,17 @@ import { Plugin } from "vite";
 import { walk, Node } from "estree-walker";
 import MagicString from "magic-string";
 import {
+  COMPONENT_FORMATS,
   findTransInCallExpression,
   findTransInTaggedTemplate,
   findPluralInCallExpression,
   FoundMessage,
   findTransInComponent,
   isWithinRanges,
+  MessageFormats,
   Range,
 } from "./utils";
+import { findModuleFormats, isModule, parseModule } from "./module";
 
 const overwriteCall = (
   isBuild: boolean,
@@ -87,9 +90,14 @@ const overwriteComponent = (
   magicString.overwrite(msg.start, msg.end, output);
 };
 
-export const svelteTransform = (isBuild: boolean, code: string) => {
+const transform = (
+  isBuild: boolean,
+  code: string,
+  ast: unknown,
+  formats: MessageFormats,
+  isComponent: boolean,
+) => {
   const magicString = new MagicString(code);
-  const ast = parse(code, { modern: true });
 
   // Collect top-down, so an enclosing message is seen before the message
   // formats nested in it and can declare their ranges already carried.
@@ -103,10 +111,12 @@ export const svelteTransform = (isBuild: boolean, code: string) => {
   walk(ast as unknown as Node, {
     enter(node) {
       if (isWithinRanges(node, consumed)) return;
-      findTransInTaggedTemplate(["$t"], node, collect(false));
-      findTransInCallExpression(["$t"], node, collect(false));
-      findPluralInCallExpression(["$plural"], node, collect(false));
-      findTransInComponent(["Trans"], node, collect(true));
+      findTransInTaggedTemplate(formats, node, collect(false));
+      findTransInCallExpression(formats, node, collect(false));
+      findPluralInCallExpression(formats, node, collect(false));
+      if (isComponent) {
+        findTransInComponent(["Trans"], node, collect(true));
+      }
     },
   });
 
@@ -127,6 +137,25 @@ export const svelteTransform = (isBuild: boolean, code: string) => {
   };
 };
 
+export const svelteTransform = (isBuild: boolean, code: string) =>
+  transform(
+    isBuild,
+    code,
+    parse(code, { modern: true }),
+    COMPONENT_FORMATS,
+    true,
+  );
+
+/** Undefined for a module that imports neither `t` nor `plural`. */
+export const moduleTransform = (isBuild: boolean, code: string) => {
+  const program = parseModule(code);
+  const formats = findModuleFormats(program);
+  if (formats === undefined) {
+    return undefined;
+  }
+  return transform(isBuild, code, program, formats, false);
+};
+
 export const sveltePreprocessor = (): Plugin => {
   let isBuild = false;
   return {
@@ -136,10 +165,12 @@ export const sveltePreprocessor = (): Plugin => {
       isBuild = config.command === "build";
     },
     transform(code, id) {
-      if (!id.endsWith(".svelte")) {
-        return;
+      if (id.endsWith(".svelte")) {
+        return svelteTransform(isBuild, code);
       }
-      return svelteTransform(isBuild, code);
+      if (isModule(id) && !id.includes("/node_modules/")) {
+        return moduleTransform(isBuild, code);
+      }
     },
   };
 };

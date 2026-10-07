@@ -4,13 +4,9 @@
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
-  import {
-    validateDomain,
-    discoverSsoConfig,
-    DomainNotConfiguredError,
-  } from "$lib/utils/ssoDiscovery";
+  import { validateDomain, discoverSsoConfig } from "$lib/utils/ssoDiscovery";
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
-  import { OAuthProviderError } from "$lib/utils/openID";
+  import { ssoErrorMessage } from "../utils";
   import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
   import { t } from "$lib/stores/locale.store";
 
@@ -86,52 +82,6 @@
   let lookupController: AbortController | undefined;
 
   /**
-   * Map caught errors to user-actionable copy, or `undefined` for
-   * "nothing useful to tell the user" — the caller will fall back to a
-   * generic message. Raw errors are always logged to the console so
-   * engineers have the full stack while end users see concise copy.
-   *
-   * Only branches that the user (or their SSO admin) can act on live
-   * here; provider-misconfiguration details (hostname mismatch, HTTPS,
-   * malformed discovery document) are dropped to the generic path —
-   * they're dev-facing and the console log is the right audience.
-   */
-  const mapSubmitError = (
-    e: unknown,
-    domainInput: string,
-  ): string | undefined => {
-    if (e instanceof DomainNotConfiguredError) {
-      if (e.reason === "origin-denied") {
-        // The org gated this dapp off, so no client can serve this origin.
-        return $t`Your organization hasn't granted this app access via ${domainInput}.`;
-      }
-      // `timeout`: discovery never resolved — a wrong domain, or an unreachable
-      // or failed discovery fetch (the canister keeps reporting `Pending` until
-      // we time out) — so point the SSO admin at the discovery endpoint.
-      return $t`Couldn't load SSO settings from ${domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable.`;
-    }
-    if (e instanceof OAuthProviderError) {
-      // `unsupported_response_type` = the SSO app is code-only; II needs
-      // the hybrid flow because it verifies JWTs canister-side with no
-      // token-endpoint exchange. Spell out the fix so the SSO admin can
-      // act on it directly.
-      if (e.error === "unsupported_response_type") {
-        return $t`${domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type "id_token code".`;
-      }
-      if (e.error === "access_denied") {
-        return $t`${domainInput}'s SSO denied the sign-in.`;
-      }
-      // Everything else: show the provider's own words if any, else the
-      // error code. Useful because these bubble straight from the IdP.
-      if (e.errorDescription !== undefined && e.errorDescription.length > 0) {
-        return $t`${domainInput}'s SSO returned "${e.error}": ${e.errorDescription}`;
-      }
-      return $t`${domainInput}'s SSO returned error "${e.error}".`;
-    }
-    return undefined;
-  };
-
-  /**
    * Set `error` from a thrown exception: always `console.error` the raw
    * error (so engineers can inspect the stack / non-Error values), then
    * surface a user-actionable message if we have one, or a generic
@@ -139,9 +89,7 @@
    */
   const setErrorFrom = (e: unknown, domainInput: string) => {
     console.error("SSO sign-in failed", e);
-    error =
-      mapSubmitError(e, domainInput) ??
-      $t`SSO sign-in for ${domainInput} failed. Please try again.`;
+    error = ssoErrorMessage(e, domainInput);
   };
 
   const invalidatePrepared = () => {

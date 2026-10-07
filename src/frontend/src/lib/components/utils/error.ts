@@ -17,14 +17,14 @@ import {
   AuthenticationV2Events,
   authenticationV2Funnel,
 } from "$lib/utils/analytics/authenticationV2Funnel";
+import { t } from "$lib/stores/locale.store";
 
 export const handleError = (error: unknown) => {
   // Handle browser errors
   if (isWebAuthnCancelError(error) || isOpenIdCancelError(error)) {
     toaster.info({
-      title: "Operation canceled",
-      description:
-        "The interaction was canceled or timed out. Please try again.",
+      title: t`Operation canceled`,
+      description: t`The interaction was canceled or timed out. Please try again.`,
     });
     return;
   }
@@ -33,19 +33,19 @@ export const handleError = (error: unknown) => {
   // §4.1.2.1 / 4.2.2.1). Surface the provider's own description so a
   // misconfigured OAuth/OpenID app (e.g. an Okta SSO set to
   // `response_types=[code]` only, or a botched direct-Google config)
-  // doesn't look like an II bug. The SSO view's `mapSubmitError` gives
-  // more specific guidance when the error hits inside `SignInWithSso`;
-  // this branch covers callers (direct-OpenID entry points) that route
+  // doesn't look like an II bug. `ssoErrorMessage` gives more specific
+  // guidance on the SSO wizard and the 1-click SSO page; this branch covers
+  // callers (direct-OpenID entry points) that route
   // through `handleError` instead. Wording is provider-agnostic here
   // because this path handles both SSO and direct providers.
   if (error instanceof OAuthProviderError) {
     toaster.error({
-      title: `OAuth provider returned "${error.error}"`,
+      title: t`OAuth provider returned "${error.error}"`,
       description:
         error.errorDescription !== undefined &&
         error.errorDescription.length > 0
           ? error.errorDescription
-          : "Ask your administrator to check the provider's OAuth configuration.",
+          : t`Ask your administrator to check the provider's OAuth configuration.`,
     });
     return;
   }
@@ -67,39 +67,38 @@ export const handleError = (error: unknown) => {
     switch (error.type) {
       case "RateLimitExceeded":
         toaster.error({
-          title: "It seems like registration is unavailable at this moment",
+          title: t`It seems like registration is unavailable at this moment`,
         });
         break;
       case "InvalidCaller":
       case "UnexpectedCall":
       case "NoRegistrationFlow":
         toaster.error({
-          title: "Something went wrong during registration",
+          title: t`Something went wrong during registration`,
         });
         break;
       case "InvalidAuthnMethod":
       case "StorageError":
         toaster.error({
-          title: "Something went wrong during registration",
+          title: t`Something went wrong during registration`,
           description: error.value(error.type),
         });
         break;
       case "AccountLimitReached":
         toaster.warning({
-          title: "Limit reached",
-          description: "No more additional accounts can be created",
+          title: t`Limit reached`,
+          description: t`No more additional accounts can be created`,
         });
         break;
       case "OpenIdCredentialAlreadyRegistered":
         toaster.error({
-          title: "This account is already linked to another identity",
+          title: t`This account is already linked to another identity`,
         });
         break;
       case "JwtVerificationFailed":
         toaster.error({
-          title: "Authorization invalid",
-          description:
-            "There was an error verifying your account — please try again.",
+          title: t`Authorization invalid`,
+          description: t`There was an error verifying your account — please try again.`,
         });
         // This is triggered also with errors from the dashboard.
         // Plausible Funnels filter by the user triggering specific events before.
@@ -110,9 +109,8 @@ export const handleError = (error: unknown) => {
         break;
       case "JwtExpired":
         toaster.error({
-          title: "Expired JWT",
-          description:
-            "The JWT has expired — please try again in a few minutes.",
+          title: t`Expired JWT`,
+          description: t`The JWT has expired — please try again in a few minutes.`,
         });
         // This is triggered also with errors from the dashboard.
         // Plausible Funnels filter by the user triggering specific events before.
@@ -123,20 +121,20 @@ export const handleError = (error: unknown) => {
         break;
       case "OpenIdCredentialNotFound":
         toaster.error({
-          title: "This account has already been unlinked",
+          title: t`This account has already been unlinked`,
         });
         break;
       case "NoSuchAnchor":
         // Normally handled up the stack (the auth flows turn it into the
         // "not connected yet" sign-up prompt); reaching here means it wasn't.
         toaster.error({
-          title: "This account isn't linked to an identity",
+          title: t`This account isn't linked to an identity`,
         });
         break;
       case "NoSuchDelegation":
         toaster.error({
-          title: "Something went wrong during sign-in",
-          description: "The delegation could not be found — please try again.",
+          title: t`Something went wrong during sign-in`,
+          description: t`The delegation could not be found — please try again.`,
         });
         break;
       case "SsoDomainMismatch": {
@@ -146,18 +144,18 @@ export const handleError = (error: unknown) => {
         const registeredDomain = error.value(error.type)
           .registered_sso_domain[0];
         toaster.error({
-          title: "This account is linked through a different SSO domain",
+          title: t`This account is linked through a different SSO domain`,
           description:
             registeredDomain !== undefined
-              ? `Sign in with the domain it is linked through: ${registeredDomain}.`
-              : "Sign in with the domain it was originally linked through.",
+              ? t`Sign in with the domain it is linked through: ${registeredDomain}.`
+              : t`Sign in with the domain it was originally linked through.`,
         });
         break;
       }
       case "RegistrationModeOff":
         toaster.error({
-          title: "Device registration closed",
-          description: "Too many attempts or time has expired.",
+          title: t`Device registration closed`,
+          description: t`Too many attempts or time has expired.`,
         });
         break;
       case "AlreadyInProgress":
@@ -165,19 +163,19 @@ export const handleError = (error: unknown) => {
       case "WrongCode":
         // Should be handled up the stack; reaching here means they weren't.
         toaster.error({
-          title: "Unhandled error",
+          title: t`Unhandled error`,
           description: error.type,
         });
         console.error(error);
         break;
       case "AuthnMethodNotFound":
         toaster.error({
-          title: "Authentication method not found",
+          title: t`Authentication method not found`,
         });
         break;
       case "InvalidMetadata":
         toaster.error({
-          title: `Invalid metadata. ${error.value(error.type)}`,
+          title: t`Invalid metadata. ${error.value(error.type)}`,
         });
         break;
       case "NameTooLong":
@@ -186,7 +184,7 @@ export const handleError = (error: unknown) => {
       case "SsoNormalLoginRequired":
         // Shouldn't have happened; reaching here means they weren't avoided.
         toaster.error({
-          title: "Unexpected error",
+          title: t`Unexpected error`,
           description: error.type,
         });
         console.error(error);
@@ -194,7 +192,7 @@ export const handleError = (error: unknown) => {
       case "InternalCanisterError":
         // Should never happen; reaching here means there's a technical issue.
         toaster.error({
-          title: "An internal error occurred",
+          title: t`An internal error occurred`,
           description: error.value(error.type),
         });
         console.error(error);
@@ -203,7 +201,7 @@ export const handleError = (error: unknown) => {
         // Should be avoided; reaching here means an error is missing above.
         void (error.type satisfies never);
         toaster.error({
-          title: "Unknown error",
+          title: t`Unknown error`,
           description: error.type,
         });
         console.error(error);
@@ -214,7 +212,7 @@ export const handleError = (error: unknown) => {
 
   // Handle unexpected errors
   toaster.error({
-    title: "Unexpected error",
+    title: t`Unexpected error`,
     description: error instanceof Error ? error.message : undefined,
   });
   console.error(error);
