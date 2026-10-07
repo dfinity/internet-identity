@@ -409,8 +409,8 @@ fn sso_allow_insecure_discovery() -> bool {
 }
 
 /// Validate a caller-supplied SSO discovery domain: it must be within the length
-/// cap and a bare URL authority (a host, optionally `host:port`, and nothing
-/// else). The bare-authority check is the security boundary — `domain` is
+/// cap and a bare URL authority (a host and nothing else; a loopback host may
+/// carry a port, for local development). The bare-authority check is the security boundary — `domain` is
 /// interpolated into a discovery URL (`{scheme}://{domain}/.well-known/...`), so
 /// inputs carrying userinfo (`evil.com@127.0.0.1`), a path, a query, or a
 /// fragment could otherwise change the effective request target.
@@ -428,8 +428,9 @@ pub fn validate_discovery_domain(domain: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// True if `domain` is a bare URL authority — a host, optionally `host:port`,
-/// and nothing else: no scheme, userinfo, path, query, or fragment. It is
+/// True if `domain` is a bare URL authority — a host and nothing else: no
+/// scheme, userinfo, path, query, fragment, or port (a loopback host may carry
+/// one, for a local mock provider). It is
 /// parsed the same way it is later used (as the authority of an `https`
 /// discovery URL) and required to round-trip exactly, so anything the URL
 /// parser would reinterpret — embedded userinfo/path/query/fragment, stripped
@@ -452,6 +453,7 @@ fn is_bare_authority(domain: &str) -> bool {
         return false;
     };
     let authority = match url.port() {
+        Some(_) if !crate::utils::is_loopback_host(host) => return false,
         Some(port) => format!("{host}:{port}"),
         None => host.to_string(),
     };
@@ -1194,7 +1196,7 @@ mod tests {
         // No allowlist: any bare-authority domain passes the discovery gate.
         assert!(allowed("not-allowed.com"));
         assert!(allowed("example.org"));
-        assert!(allowed("sub.example.com:8443"));
+        assert!(allowed("localhost:11107"));
     }
 
     #[test]
@@ -1218,12 +1220,13 @@ mod tests {
     fn non_authority_domain_is_rejected() {
         reset();
 
-        // Bare authorities pass: host, sub-host, and explicit (non-default)
-        // port, case-insensitively.
+        // Bare authorities pass: host and sub-host, case-insensitively, and a
+        // loopback host with a port (local mock providers).
         assert!(allowed("example.com"));
         assert!(allowed("sub.example.com"));
-        assert!(allowed("example.com:8443"));
         assert!(allowed("Example.COM"));
+        assert!(allowed("localhost:11107"));
+        assert!(allowed("127.0.0.1:8080"));
 
         // Anything that isn't a bare host[:port] is rejected even with the flag
         // on, so the caller-controlled value can't reshape the interpolated
@@ -1237,6 +1240,7 @@ mod tests {
             "example.com#frag",      // fragment
             "https://example.com",   // injected scheme
             "example.com:443",       // redundant default port (normalized away)
+            "example.com:8443",      // a port on a non-loopback host
             "exa mple.com",          // whitespace in host
             "",                      // empty
         ] {
