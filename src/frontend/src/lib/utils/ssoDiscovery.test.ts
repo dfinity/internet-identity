@@ -194,6 +194,18 @@ describe("ssoDiscovery", () => {
       }
     });
 
+    it("starts nothing for a lookup that was already aborted", async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        discoverSsoConfig("dfinity.org", controller.signal),
+      ).rejects.toThrow("SSO discovery aborted");
+
+      expect(anonymousActor.discover_sso).not.toHaveBeenCalled();
+      expect(anonymousActor.get_sso_discovery_status).not.toHaveBeenCalled();
+    });
+
     it("calls the update once, then polls only the query until it resolves", async () => {
       vi.useFakeTimers();
       vi.mocked(anonymousActor.get_sso_discovery_status)

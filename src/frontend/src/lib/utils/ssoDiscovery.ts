@@ -170,6 +170,9 @@ export const discoverSsoConfig = async (
   const validatedDomain = validateDomain(domain);
   const originArg: [] | [string] = origin !== undefined ? [origin] : [];
 
+  if (isAborted(signal)) {
+    throw new Error("SSO discovery aborted");
+  }
   // Not awaited: starts the fetch, or refreshes a stale result and fetches the
   // domain's keys while the user signs in at the IdP. The query reports progress.
   void anonymousActor.discover_sso(validatedDomain).catch(() => undefined);
