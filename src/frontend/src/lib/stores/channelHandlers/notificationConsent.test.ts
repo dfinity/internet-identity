@@ -68,6 +68,7 @@ import {
   resolveOptIn,
 } from "$lib/utils/notifications/notificationState";
 import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
+import { serializeSignInRequest } from "$lib/stores/channelHandlers/serialize";
 
 const consentStatus = vi.fn(() => Promise.resolve(true));
 
@@ -226,6 +227,103 @@ describe("handleNotificationConsentRequest", () => {
       origin: ORIGIN,
       actor: { notification_consent_granted: switchedStatus },
     });
+    expect(sent[0].result).toEqual({ granted: true });
+  });
+
+  /** An app sends its sign-in and its consent request together, and consent can reach
+   *  II first. The sign-in carries the app's session duration and registers this
+   *  browser, which allowing needs, so it runs before the consent screen opens. */
+  it("hands its turn to a sign-in queued behind it", async () => {
+    const { authorizedStore } = await import("$lib/stores/authorization.store");
+    (authorizedStore as Writable<unknown>).set(undefined);
+    const order: string[] = [];
+    const unsubscribe = notificationConsentStore.subscribe((context) => {
+      if (context !== undefined) {
+        order.push("consent screen");
+      }
+    });
+
+    const consent = run();
+    await vi.waitFor(() => expect(setRequestOrigin).toHaveBeenCalled());
+    const signedIn = serializeSignInRequest(async () => {
+      order.push("sign-in");
+      await signIn();
+    });
+
+    const { sent } = await consent;
+    await signedIn;
+    unsubscribe();
+
+    expect(order).toEqual(["sign-in", "consent screen"]);
+    expect(sent[0].result).toEqual({ granted: true });
+  });
+
+  /** Signed in already, by a request that registered nothing, while the sign-in that
+   *  does is still waiting: the screen still waits for it. */
+  it("hands its turn to a waiting sign-in after the user has signed in", async () => {
+    const order: string[] = [];
+    const unsubscribe = notificationConsentStore.subscribe((context) => {
+      if (context !== undefined) {
+        order.push("consent screen");
+      }
+    });
+    let releaseBlocker = () => {};
+    const held = new Promise<void>((resolve) => (releaseBlocker = resolve));
+    const blocker = serializeSignInRequest(() => held);
+
+    const consent = run();
+    const signedIn = serializeSignInRequest(() => {
+      order.push("sign-in");
+      return Promise.resolve();
+    });
+    releaseBlocker();
+    await blocker;
+
+    await consent;
+    await signedIn;
+    unsubscribe();
+
+    expect(order).toEqual(["sign-in", "consent screen"]);
+  });
+
+  /** An app can ask for consent first and sign in later, so a sign-in can arrive with
+   *  the screen already up. Allowing needs the browser that sign-in registers, so the
+   *  screen steps aside for it and opens again once it has run. */
+  it("closes an open screen for a sign-in that arrives after it", async () => {
+    const sent: Record<string, unknown>[] = [];
+    const channel = {
+      origin: ORIGIN,
+      send: (message: Record<string, unknown>) => {
+        sent.push(message);
+        return Promise.resolve();
+      },
+    } as unknown as Channel;
+    const consent = handleNotificationConsentRequest(channel, () => {})({
+      jsonrpc: "2.0",
+      id: 1,
+      method: NOTIFICATION_CONSENT_METHOD,
+      params: {},
+    } as unknown as JsonRequest);
+    await waitForStore(notificationConsentStore);
+
+    const order: string[] = [];
+    const signedIn = serializeSignInRequest(() => {
+      order.push(
+        get(notificationConsentStore) === undefined
+          ? "sign-in, screen closed"
+          : "sign-in, screen open",
+      );
+      return Promise.resolve();
+    });
+    await signedIn;
+
+    await waitForStore(notificationConsentStore);
+    order.push("screen reopened");
+    notificationConsentStore.settle();
+    await consent;
+
+    expect(order).toEqual(["sign-in, screen closed", "screen reopened"]);
+    expect(sent).toHaveLength(1);
     expect(sent[0].result).toEqual({ granted: true });
   });
 

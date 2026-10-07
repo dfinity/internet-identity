@@ -171,6 +171,9 @@ test.describe("Authorize with 1-click OpenID", () => {
         const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
         await signInWithOpenId(popup, openIdUsers[0].id);
         await closePromise;
+        // The popup closes once it hands back the token, before the credential is
+        // added; the dialog closes only once it has been.
+        await expect(page.getByRole("dialog")).toBeHidden();
         // Empty the last-used list so the assertion can only be satisfied by
         // the sign-in commit, and drop the IdP cookie so the linking session
         // isn't reused — otherwise the IdP auto-approves and skips its consent
@@ -392,6 +395,9 @@ test.describe("Authorize with 1-click OpenID", () => {
           const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
           await signInWithOpenId(popup, user.id);
           await closePromise;
+          // The popup closes once it hands back the token, before the credential is
+          // added; the dialog closes only once it has been.
+          await expect(page.getByRole("dialog")).toBeHidden();
         }
       },
     );

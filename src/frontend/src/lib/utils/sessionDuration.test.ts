@@ -1,5 +1,6 @@
 import {
   cappedSessionDurations,
+  grantedTimeToLive,
   MAX_SESSION_DURATION_SECONDS,
   sessionDurationBreakdown,
   sessionDurationCeilingSeconds,
@@ -122,5 +123,78 @@ describe("sessionDurationToNanos", () => {
       sessionDurationToNanos(8 * HOUR),
     );
     expect(seconds).toBe(8 * HOUR);
+  });
+});
+
+describe("grantedTimeToLive", () => {
+  const hours = (count: number) => BigInt(count * HOUR) * NANOS_PER_SECOND;
+
+  it("caps a pick at the app's request", () => {
+    expect(
+      grantedTimeToLive({
+        authorized: hours(30 * 24),
+        requested: hours(1),
+        ssoSessionMaxAgeNs: undefined,
+      }),
+    ).toBe(hours(1));
+  });
+
+  it("keeps a pick shorter than the app's request", () => {
+    expect(
+      grantedTimeToLive({
+        authorized: hours(1),
+        requested: hours(8),
+        ssoSessionMaxAgeNs: undefined,
+      }),
+    ).toBe(hours(1));
+  });
+
+  it("uses the app's request where nothing was picked", () => {
+    expect(
+      grantedTimeToLive({
+        authorized: undefined,
+        requested: hours(8),
+        ssoSessionMaxAgeNs: undefined,
+      }),
+    ).toBe(hours(8));
+  });
+
+  it("caps everything at an SSO organization's limit", () => {
+    expect(
+      grantedTimeToLive({
+        authorized: hours(24),
+        requested: hours(8),
+        ssoSessionMaxAgeNs: hours(2),
+      }),
+    ).toBe(hours(2));
+  });
+
+  it("ignores a non-positive request, as the picker's ceiling does", () => {
+    for (const requested of [BigInt(0), BigInt(-1)]) {
+      expect(
+        grantedTimeToLive({
+          authorized: hours(30 * 24),
+          requested,
+          ssoSessionMaxAgeNs: undefined,
+        }),
+      ).toBe(hours(30 * 24));
+      expect(
+        grantedTimeToLive({
+          authorized: undefined,
+          requested,
+          ssoSessionMaxAgeNs: undefined,
+        }),
+      ).toBeUndefined();
+    }
+  });
+
+  it("leaves the canister's default where nothing applies", () => {
+    expect(
+      grantedTimeToLive({
+        authorized: undefined,
+        requested: undefined,
+        ssoSessionMaxAgeNs: undefined,
+      }),
+    ).toBeUndefined();
   });
 });
