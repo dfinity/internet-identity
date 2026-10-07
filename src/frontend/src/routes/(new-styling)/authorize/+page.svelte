@@ -486,16 +486,19 @@
     directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToApp);
   };
 
+  const startSso = (domain: string, derivationOrigin?: string) => {
+    ssoInitError = undefined;
+    initiateSso(domain, derivationOrigin).catch((error: unknown) => {
+      console.error("1-click SSO failed", error);
+      ssoInitError = { cause: error };
+    });
+  };
+
   onMount(() => {
     if (data.flow === "openid-init") {
       initiateOpenId(data.config);
     } else if (data.flow === "sso-init") {
-      initiateSso(data.domain, data.derivationOrigin).catch(
-        (error: unknown) => {
-          console.error("1-click SSO failed", error);
-          ssoInitError = { cause: error };
-        },
-      );
+      startSso(data.domain, data.derivationOrigin);
     } else if (data.flow === "openid-resume") {
       // resumeOpenId sets the flow once the JWT (and thus the issuer)
       // has been decoded.
@@ -630,7 +633,11 @@
   <!-- OpenID init — nothing to render, onMount redirects to provider. -->
 {:else if data.flow === "sso-init"}
   {#if ssoInitError !== undefined}
-    <SsoConnectErrorView error={ssoInitError.cause} domain={data.domain} />
+    <SsoConnectErrorView
+      error={ssoInitError.cause}
+      domain={data.domain}
+      onRetry={() => startSso(data.domain, data.derivationOrigin)}
+    />
   {:else}
     <SsoConnectingView />
   {/if}

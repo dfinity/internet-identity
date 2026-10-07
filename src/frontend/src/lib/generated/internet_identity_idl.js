@@ -204,6 +204,11 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'NoSuchSender' : IDL.Null,
   });
+  const AppSsoDomainStatus = IDL.Variant({
+    'Available' : IDL.Record({ 'name' : IDL.Opt(IDL.Text) }),
+    'Unavailable' : IDL.Record({ 'retry_after' : IDL.Opt(Timestamp) }),
+    'Pending' : IDL.Null,
+  });
   const IdentityNumber = IDL.Nat64;
   const AuthnMethodProtection = IDL.Variant({
     'Protected' : IDL.Null,
@@ -642,6 +647,7 @@ export const idlFactory = ({ IDL }) => {
     'session_max_age_ns' : IDL.Nat64,
   });
   const SsoDiscoveryStatus = IDL.Variant({
+    'Failed' : IDL.Record({ 'retry_after' : IDL.Opt(Timestamp) }),
     'Resolved' : SsoDiscovery,
     'Pending' : IDL.Null,
   });
@@ -1126,6 +1132,12 @@ export const idlFactory = ({ IDL }) => {
           }),
         ],
         [],
+      ),
+    'app_sso_domain_check' : IDL.Func([IDL.Text], [], []),
+    'app_sso_domain_status' : IDL.Func(
+        [IDL.Text],
+        [AppSsoDomainStatus],
+        ['query'],
       ),
     'authn_method_add' : IDL.Func(
         [IdentityNumber, AuthnMethodData],

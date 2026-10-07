@@ -495,12 +495,23 @@ type SsoDiscovery = record {
     session_max_age_ns : nat64;
 };
 
-// Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
-// failed fetch isn't a distinct status — it reads as `Pending` and the frontend
-// times out — so the statuses are: resolved, or in flight.
+// Status of a domain's SSO discovery, read by `get_sso_discovery_status`.
+// `Failed.retry_after` is when II fetches the domain again (a retry before then
+// fails the same way), and is absent when no retry can help, such as a domain
+// that is not a bare authority.
 type SsoDiscoveryStatus = variant {
     Resolved : SsoDiscovery;
     Pending;
+    Failed : record { retry_after : opt Timestamp };
+};
+
+// Whether an organization domain can be used for SSO sign-in, read by
+// `app_sso_domain_status`. `name` is the organization's display name;
+// `retry_after` is as for `SsoDiscoveryStatus.Failed`.
+type AppSsoDomainStatus = variant {
+    Available : record { name : opt text };
+    Pending;
+    Unavailable : record { retry_after : opt Timestamp };
 };
 
 // Request for `get_sso_discovery_status`.
@@ -2117,17 +2128,23 @@ service : (opt InternetIdentityInit) -> {
     openid_prepare_delegation : (JWT, Salt, SessionKey, opt text) -> (variant { Ok : OpenIdPrepareDelegationResponse; Pending; Err : OpenIdDelegationError });
     openid_get_delegation : (JWT, Salt, SessionKey, Timestamp, opt text) -> (variant { Ok : SignedDelegation; Pending; Err : OpenIdDelegationError }) query;
 
-    // SSO discovery for the sign-in initiation flow. The frontend polls
-    // `get_sso_discovery_status` (query) and, while it reads `Pending`, drives the
-    // on-demand two-hop discovery fetch with `discover_sso` (update); once the
-    // fetch completes the query returns `Resolved` with the config. The frontend
-    // calls `discover_sso` once more on `Resolved`, which refreshes a stale
-    // result and fetches the domain's keys ahead of verification.
+    // SSO discovery for the sign-in initiation flow. The frontend calls
+    // `discover_sso` (update) once, which starts the two-hop discovery fetch and
+    // the domain's key fetch, or refreshes a stale result, then polls
+    // `get_sso_discovery_status` (query) until it reads `Resolved` or `Failed`.
     //
     // The optional second argument is the target dapp origin; when supplied,
     // `resolved_client_id` reports the client that origin must use (`null` = denied).
     discover_sso : (text) -> ();
     get_sso_discovery_status : (GetSsoDiscoveryStatusRequest) -> (SsoDiscoveryStatus) query;
+
+    // Whether an organization domain can be used for SSO sign-in, for apps that
+    // check a domain before sending the user into the flow. Call
+    // `app_sso_domain_check` (update) once to start the fetch, then poll
+    // `app_sso_domain_status` (query) until it reads `Available` or
+    // `Unavailable`.
+    app_sso_domain_check : (text) -> ();
+    app_sso_domain_status : (text) -> (AppSsoDomainStatus) query;
 
     // SSO sign-in path. Mints a delegation only if the JWT's `aud` matches the
     // client the target origin resolves to. `Pending` means the discovery/JWKS

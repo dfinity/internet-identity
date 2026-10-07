@@ -2,8 +2,9 @@
  * SSO discovery for organization-based sign-in.
  *
  * The canister resolves an organization domain to its OIDC configuration and
- * caches the result; this module validates the domain, drives that resolution
- * through `discover_sso` / `discover_sso_query`, and shapes it for the auth UI.
+ * caches the result; this module validates the domain, starts that resolution
+ * with `discover_sso`, reads it with `get_sso_discovery_status`, and shapes it
+ * for the auth UI.
  */
 import { anonymousActor } from "$lib/globals";
 import type { SsoDiscovery } from "$lib/generated/internet_identity_types";
@@ -41,16 +42,25 @@ export interface SsoDiscoveryResult {
 
 /**
  * Raised when a domain's SSO configuration can't be resolved: the origin is
- * gated off (`origin-denied`) or the resolution didn't complete in time
- * (`timeout`).
+ * gated off (`origin-denied`), the canister reports the resolution failed
+ * (`failed`), or it didn't complete in time (`timeout`).
  */
 export class DomainNotConfiguredError extends Error {
-  readonly reason: "timeout" | "origin-denied";
+  readonly reason: "timeout" | "origin-denied" | "failed";
+  /**
+   * For `failed`: when the canister fetches the domain again, so a retry before
+   * then fails the same way. Absent when no retry can help.
+   */
+  readonly retryAfter?: Date;
 
-  constructor(reason: "timeout" | "origin-denied") {
+  constructor(
+    reason: "timeout" | "origin-denied" | "failed",
+    retryAfter?: Date,
+  ) {
     super(`SSO discovery failed (${reason})`);
     this.name = "DomainNotConfiguredError";
     this.reason = reason;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -143,14 +153,14 @@ const toResult = (discovery: SsoDiscovery): SsoDiscoveryResult => {
 const isAborted = (signal?: AbortSignal): boolean => signal?.aborted === true;
 
 /**
- * Resolve a domain's SSO configuration. Validates the domain, then polls
- * `get_sso_discovery_status` (query); on `Pending` it drives the fetch with
- * `discover_sso` (update) and polls again. An optional `signal` cancels the poll
- * (the input debounce drops a stale lookup when the user keeps typing).
+ * Resolve a domain's SSO configuration. Validates the domain, calls
+ * `discover_sso` (update) once, then polls `get_sso_discovery_status` (query)
+ * until it resolves or fails. An optional `signal` cancels the poll (the input
+ * debounce drops a stale lookup when the user keeps typing).
  *
  * @throws {Error} when `domain` is invalid, or the lookup is aborted.
- * @throws {DomainNotConfiguredError} when the origin is denied (`origin-denied`)
- *   or the resolution times out.
+ * @throws {DomainNotConfiguredError} when the origin is denied (`origin-denied`),
+ *   the canister reports the resolution failed (`failed`), or it times out.
  */
 export const discoverSsoConfig = async (
   domain: string,
@@ -160,30 +170,32 @@ export const discoverSsoConfig = async (
   const validatedDomain = validateDomain(domain);
   const originArg: [] | [string] = origin !== undefined ? [origin] : [];
 
+  // Not awaited: starts the fetch, or refreshes a stale result and fetches the
+  // domain's keys while the user signs in at the IdP. The query reports progress.
+  void anonymousActor.discover_sso(validatedDomain).catch(() => undefined);
+
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
     if (isAborted(signal)) {
       throw new Error("SSO discovery aborted");
     }
-    // Read the discovery status via the cheap query.
     const status = await anonymousActor.get_sso_discovery_status({
       org_domain: validatedDomain,
       target_app_origin: originArg,
     });
     if ("Resolved" in status) {
-      // Not awaited: refreshes a stale result and fetches the domain's keys
-      // while the user signs in at the IdP.
-      void anonymousActor.discover_sso(validatedDomain).catch(() => undefined);
       return toResult(status.Resolved);
     }
-    // Re-check before the update: the query above may have spanned an abort,
-    // and we don't want to drive a fetch for a lookup the user already dropped.
-    if (isAborted(signal)) {
-      throw new Error("SSO discovery aborted");
+    if ("Failed" in status) {
+      const retryAfterNs = status.Failed.retry_after[0];
+      throw new DomainNotConfiguredError(
+        "failed",
+        retryAfterNs !== undefined
+          ? new Date(Number(retryAfterNs / BigInt(1_000_000)))
+          : undefined,
+      );
     }
-    // Pending — drive the fetch with an update, then poll again. The sleep is
-    // abortable so a mid-delay abort skips straight to the next iteration's
-    // check instead of firing another query.
-    await anonymousActor.discover_sso(validatedDomain);
+    // Pending. The sleep is abortable so a mid-delay abort skips straight to
+    // the next iteration's check instead of firing another query.
     await pollDelay(signal);
   }
 

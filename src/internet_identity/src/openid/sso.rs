@@ -338,6 +338,12 @@ pub(super) fn peek_discovery(domain: &str) -> Cached<DiscoveredConfig> {
     single_flight_cache::peek(&DISCOVERY_CACHE, &domain.to_ascii_lowercase())
 }
 
+/// When the discovery fetch for `domain` is retried, in absolute seconds, while
+/// it is parked after a failed fetch and has no value to serve. Peek-only.
+pub(super) fn discovery_retry_at(domain: &str) -> Option<u64> {
+    single_flight_cache::retry_at(&DISCOVERY_CACHE, &domain.to_ascii_lowercase())
+}
+
 /// Resolve an SSO domain into a verify descriptor + `jwks_uri` from the cached
 /// discovery result, cross-checking the JWT's issuer against the discovered
 /// issuer. Peek-only.
@@ -1040,6 +1046,103 @@ mod tests {
         TEST_DISCOVERY.with_borrow_mut(|m| m.insert(domain.to_string(), config.clone()));
         TEST_JWKS.with_borrow_mut(|m| m.insert(config.jwks_uri.clone(), vec![]));
         config
+    }
+
+    mod status {
+        use super::*;
+        use crate::openid::{app_sso_domain_status, get_sso_discovery_status};
+        use internet_identity_interface::internet_identity::types::{
+            AppSsoDomainStatus, SsoDiscoveryStatus,
+        };
+
+        const NOW_SECS: u64 = 1_700_000_000;
+
+        #[test]
+        fn malformed_domain_fails_without_retry() {
+            reset();
+            for domain in ["evil.com@127.0.0.1", "example.com/path", ""] {
+                assert_eq!(
+                    get_sso_discovery_status(domain, None),
+                    SsoDiscoveryStatus::Failed { retry_after: None }
+                );
+                assert_eq!(
+                    app_sso_domain_status(domain),
+                    AppSsoDomainStatus::Unavailable { retry_after: None }
+                );
+            }
+        }
+
+        #[test]
+        fn unfetched_domain_is_pending() {
+            reset();
+            assert_eq!(
+                get_sso_discovery_status("example.org", None),
+                SsoDiscoveryStatus::Pending
+            );
+            assert_eq!(
+                app_sso_domain_status("example.org"),
+                AppSsoDomainStatus::Pending
+            );
+        }
+
+        #[test]
+        fn resolved_domain_is_available_with_its_name() {
+            reset();
+            seed("example.org");
+            prefetch("example.org");
+            run_detached();
+            assert!(matches!(
+                get_sso_discovery_status("example.org", None),
+                SsoDiscoveryStatus::Resolved(_)
+            ));
+            assert_eq!(
+                app_sso_domain_status("example.org"),
+                AppSsoDomainStatus::Available {
+                    name: Some("Example".to_string())
+                }
+            );
+        }
+
+        #[test]
+        fn failed_fetch_fails_until_its_retry() {
+            reset();
+            prefetch("example.org"); // nothing seeded: the fill fails
+            run_detached();
+            let retry_after = Some((NOW_SECS + RETRY_BASE_SECONDS) * 1_000_000_000);
+            assert_eq!(
+                get_sso_discovery_status("example.org", None),
+                SsoDiscoveryStatus::Failed { retry_after }
+            );
+            assert_eq!(
+                app_sso_domain_status("example.org"),
+                AppSsoDomainStatus::Unavailable { retry_after }
+            );
+
+            // Once the backoff ends a retry is due, which reads as pending.
+            set_test_now(NOW_SECS + RETRY_BASE_SECONDS);
+            assert_eq!(
+                get_sso_discovery_status("example.org", None),
+                SsoDiscoveryStatus::Pending
+            );
+        }
+
+        #[test]
+        fn failed_refresh_keeps_a_cached_result_resolved() {
+            reset();
+            seed("example.org");
+            prefetch("example.org");
+            run_detached();
+            TEST_DISCOVERY.with_borrow_mut(|m| m.clear());
+
+            set_test_now(NOW_SECS + FRESH_FOR_SECONDS);
+            prefetch("example.org");
+            run_detached();
+
+            assert!(matches!(
+                get_sso_discovery_status("example.org", None),
+                SsoDiscoveryStatus::Resolved(_)
+            ));
+        }
     }
 
     #[test]
