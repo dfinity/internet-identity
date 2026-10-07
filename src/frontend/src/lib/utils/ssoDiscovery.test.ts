@@ -29,6 +29,7 @@ describe("ssoDiscovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+    vi.mocked(anonymousActor.discover_sso).mockResolvedValue(undefined);
   });
 
   describe("validateDomain", () => {
@@ -121,8 +122,35 @@ describe("ssoDiscovery", () => {
         org_domain: "dfinity.org",
         target_app_origin: [],
       });
-      // Already resolved, so no update was needed to drive a fetch.
-      expect(anonymousActor.discover_sso).not.toHaveBeenCalled();
+      // Resolved from the cache: one update refreshes it and the domain's keys.
+      expect(anonymousActor.discover_sso).toHaveBeenCalledTimes(1);
+      expect(anonymousActor.discover_sso).toHaveBeenCalledWith("dfinity.org");
+    });
+
+    it("resolves without waiting for the refresh update", async () => {
+      vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
+        Resolved: DISCOVERY,
+      });
+      vi.mocked(anonymousActor.discover_sso).mockReturnValue(
+        new Promise<undefined>(() => {}),
+      );
+
+      const result = await discoverSsoConfig("dfinity.org");
+
+      expect(result.domain).toBe("dfinity.org");
+    });
+
+    it("resolves when the refresh update fails", async () => {
+      vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
+        Resolved: DISCOVERY,
+      });
+      vi.mocked(anonymousActor.discover_sso).mockRejectedValue(
+        new Error("update failed"),
+      );
+
+      const result = await discoverSsoConfig("dfinity.org");
+
+      expect(result.domain).toBe("dfinity.org");
     });
 
     it("passes the target origin and returns the per-app resolvedClientId", async () => {
@@ -180,8 +208,8 @@ describe("ssoDiscovery", () => {
 
       const result = await promise;
       expect(result.domain).toBe("dfinity.org");
-      // Each Pending read drove the update.
-      expect(anonymousActor.discover_sso).toHaveBeenCalledTimes(2);
+      // Each Pending read drove the update, and the Resolved read refreshed once.
+      expect(anonymousActor.discover_sso).toHaveBeenCalledTimes(3);
     });
 
     it("stops polling when the abort signal is already aborted", async () => {

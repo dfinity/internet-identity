@@ -30,6 +30,8 @@
 //! - `fresh_until = filled_at + fresh_for` — fresh below it, stale above.
 //! - `stale_for` — extra window a stale value is still served as a fallback.
 //! - `evict_at = fresh_until + stale_for` — hard deadline; dropped at/after it.
+//! - `stale_if_error_for` — once a refresh fails, `evict_at` is pulled in to
+//!   `fresh_until + stale_if_error_for` if that is sooner.
 //! - `retry_at` — a failed fill parks the key until here, capped by `evict_at`.
 //!
 //! ## What a `get` resolves to
@@ -105,11 +107,16 @@ pub struct CacheConfig {
     /// window skip the fill entirely; longer means fewer fills (more
     /// available) but staler values.
     pub fresh_for: u64,
-    /// Extra window a value is served past `fresh_for` once a refresh has
-    /// failed (stale-if-error) — serves the last-good value through a
-    /// transient fill failure instead of failing the caller. `0` disables
-    /// stale-serving (every miss past `fresh_for` must refill).
+    /// Extra window a value is kept and served past `fresh_for`: immediately
+    /// while a refresh runs (stale-while-revalidate), and through a failed
+    /// refresh within `stale_if_error_for`. `0` disables stale-serving (every
+    /// miss past `fresh_for` must refill).
     pub stale_for: u64,
+    /// How long past `fresh_for` a value may still be served once a refresh
+    /// has failed (stale-if-error); never longer than `stale_for`. Also the
+    /// extra lifetime of a failure marker for a key with no value, after which
+    /// its backoff resets.
+    pub stale_if_error_for: u64,
     /// Hard cap on cached keys; over it the least-recently-used is evicted.
     /// Bounds heap for an unbounded key space.
     pub max_entries: usize,
@@ -189,6 +196,7 @@ pub struct SingleFlightCache<K, V, E> {
     access_clock: u64,
     fresh_for: u64,
     stale_for: u64,
+    stale_if_error_for: u64,
     max_entries: usize,
     backoff: RetryBackoff,
     abandon_fill_after: u64,
@@ -241,6 +249,7 @@ impl<K, V, E> SingleFlightCache<K, V, E> {
             access_clock: 0,
             fresh_for: config.fresh_for,
             stale_for: config.stale_for,
+            stale_if_error_for: config.stale_if_error_for,
             max_entries: config.max_entries.max(1),
             backoff: config.backoff,
             abandon_fill_after: config.abandon_fill_after,
@@ -366,20 +375,28 @@ impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
                     .saturating_add(1);
                 let retry_at = now.saturating_add(self.backoff.delay_secs(failures));
                 if let Some(e) = self.entries.get_mut(key) {
-                    // Stale-if-error: keep the value and its `evict_at` (it
-                    // dies relative to the last success); just bump the
-                    // throttle. For a value-less marker, refresh life.
+                    // Stale-if-error: keep the value, which dies relative to
+                    // the last success, at most `stale_if_error_for` after it
+                    // went stale; bump the throttle. A value past that point
+                    // is dropped and the entry becomes a failure marker, so the
+                    // backoff still holds.
                     e.retry_at = retry_at;
                     e.failures = failures;
-                    if e.value.is_none() {
+                    let serve_until = e
+                        .evict_at
+                        .min(e.fresh_until.saturating_add(self.stale_if_error_for));
+                    if e.value.is_some() && serve_until > now {
+                        e.evict_at = serve_until;
+                    } else {
+                        e.value = None;
                         e.evict_at = now
                             .saturating_add(self.fresh_for)
-                            .saturating_add(self.stale_for);
+                            .saturating_add(self.stale_if_error_for);
                     }
                 } else {
                     let evict_at = now
                         .saturating_add(self.fresh_for)
-                        .saturating_add(self.stale_for);
+                        .saturating_add(self.stale_if_error_for);
                     self.upsert(
                         key,
                         Entry {
@@ -759,6 +776,7 @@ mod tests {
         CacheConfig {
             fresh_for: 0,
             stale_for: 0,
+            stale_if_error_for: 0,
             max_entries: usize::MAX,
             backoff: RetryBackoff::new(60, 2),
             abandon_fill_after: 120,
@@ -792,6 +810,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 50,
+            stale_if_error_for: 50,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -812,6 +831,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 50,
+            stale_if_error_for: 50,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -821,6 +841,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 50,
+            stale_if_error_for: 50,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -832,6 +853,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 50,
+            stale_if_error_for: 50,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -854,6 +876,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 1000,
+            stale_if_error_for: 1000,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -867,6 +890,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 1000,
+            stale_if_error_for: 1000,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -880,10 +904,77 @@ mod tests {
     }
 
     #[test]
+    fn stale_value_is_served_while_revalidating_past_stale_if_error_for() {
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 1000,
+            stale_if_error_for: 50,
+            ..base_config()
+        });
+        let t = expect_fill(c.lookup(&"k", 0));
+        c.complete_fill(&"k", t, Ok("good"), 0);
+        // Long past `fresh_until + stale_if_error_for`, still within `stale_for`.
+        assert!(matches!(
+            c.lookup(&"k", 500),
+            Lookup::StartFill(_, Some("good"))
+        ));
+        assert!(matches!(c.lookup(&"k", 501), Lookup::Ready("good")));
+    }
+
+    #[test]
+    fn failed_refresh_serves_stale_only_within_stale_if_error_for() {
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 1000,
+            stale_if_error_for: 50,
+            ..base_config()
+        });
+        let t = expect_fill(c.lookup(&"k", 0));
+        c.complete_fill(&"k", t, Ok("good"), 0);
+        let t2 = expect_fill(c.lookup(&"k", 120));
+        c.complete_fill(&"k", t2, Err(()), 120);
+        // Served until `fresh_until + stale_if_error_for` = 150, then gone.
+        assert!(matches!(c.lookup(&"k", 149), Lookup::Ready("good")));
+        assert!(matches!(c.lookup(&"k", 150), Lookup::StartFill(_, None)));
+    }
+
+    #[test]
+    fn failed_refresh_past_stale_if_error_for_drops_the_value() {
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 1000,
+            stale_if_error_for: 50,
+            ..base_config()
+        });
+        let t = expect_fill(c.lookup(&"k", 0));
+        c.complete_fill(&"k", t, Ok("good"), 0);
+        let t2 = expect_fill(c.lookup(&"k", 500));
+        c.complete_fill(&"k", t2, Err(()), 500);
+        assert!(c.peek_value(&"k", 500).is_none());
+        // The failure still parks the key: no new fill until the backoff ends.
+        assert!(matches!(c.lookup(&"k", 501), Lookup::Pending));
+        assert!(matches!(c.lookup(&"k", 560), Lookup::StartFill(_, None)));
+    }
+
+    #[test]
+    fn failure_marker_lives_for_stale_if_error_for() {
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 1000,
+            stale_if_error_for: 50,
+            ..base_config()
+        });
+        let t = expect_fill(c.lookup(&"k", 0));
+        c.complete_fill(&"k", t, Err(()), 0);
+        assert_eq!(c.entries.get("k").map(|e| e.evict_at), Some(150));
+    }
+
+    #[test]
     fn cold_failure_pending_then_retries() {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 1000,
+            stale_if_error_for: 1000,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -897,6 +988,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 1000,
             stale_for: 100_000,
+            stale_if_error_for: 100_000,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -1048,6 +1140,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 100,
+            stale_if_error_for: 100,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"stale", 0));
@@ -1084,6 +1177,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 0,
+            stale_if_error_for: 0,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -1135,6 +1229,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 0,
+            stale_if_error_for: 0,
             ..base_config()
         });
         for k in ["a", "b", "c"] {
@@ -1157,6 +1252,7 @@ mod tests {
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 0,
+            stale_if_error_for: 0,
             ..base_config()
         });
         let t = expect_fill(c.lookup(&"k", 0));
@@ -1181,6 +1277,7 @@ mod tests {
         CacheConfig {
             fresh_for: 100,
             stale_for: 50,
+            stale_if_error_for: 50,
             ..base_config()
         }
     }

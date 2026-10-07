@@ -2120,7 +2120,9 @@ service : (opt InternetIdentityInit) -> {
     // SSO discovery for the sign-in initiation flow. The frontend polls
     // `get_sso_discovery_status` (query) and, while it reads `Pending`, drives the
     // on-demand two-hop discovery fetch with `discover_sso` (update); once the
-    // fetch completes the query returns `Resolved` with the config.
+    // fetch completes the query returns `Resolved` with the config. The frontend
+    // calls `discover_sso` once more on `Resolved`, which refreshes a stale
+    // result and fetches the domain's keys ahead of verification.
     //
     // The optional second argument is the target dapp origin; when supplied,
     // `resolved_client_id` reports the client that origin must use (`null` = denied).

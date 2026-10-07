@@ -81,12 +81,19 @@ use crate::state;
 // holding them), ~22 KiB in all; a JWKS entry holds at most
 // `jwks::JWKS_MAX_KEYS` keys reduced to what verification reads, ~24 KiB.
 
-/// Entry lifetime for both caches: discovery metadata and JWKS change
+/// Freshness for both caches: discovery metadata and JWKS change
 /// infrequently, so an hour balances freshness against outcall volume.
 const FRESH_FOR_SECONDS: u64 = 60 * 60;
-/// Stale-if-error window: serve the last-good value through a transient fill
-/// failure for up to this long past freshness before failing the caller.
-const STALE_FOR_SECONDS: u64 = 60 * 60;
+/// How long a discovery result is kept past freshness. A sign-in through a
+/// domain seen in this window starts from the cached result while it refreshes,
+/// instead of waiting on the two-hop fetch.
+const DISCOVERY_STALE_FOR_SECONDS: u64 = 7 * 24 * 60 * 60;
+/// How long a key set is kept past freshness. Short, so a provider's key
+/// rotation is picked up within this window.
+const JWKS_STALE_FOR_SECONDS: u64 = 60 * 60;
+/// How long past freshness either cache keeps serving its last-good value once
+/// a refresh has failed, before failing the caller.
+const STALE_IF_ERROR_FOR_SECONDS: u64 = 60 * 60;
 /// Shared LRU cap for both SSO caches — they back one coupled flow, so one
 /// budget keeps them coherent (this many domains cached end-to-end,
 /// discovery → keys). Worst case 5k × (~22 KiB + ~24 KiB) ≈ 230 MB — about
@@ -284,22 +291,23 @@ thread_local! {
     static JWKS_CACHE: RefCell<JwksCache> = RefCell::new(new_jwks_cache());
 }
 
-fn cache_config(max_entries: usize) -> CacheConfig {
+fn cache_config(stale_for: u64) -> CacheConfig {
     CacheConfig {
         fresh_for: FRESH_FOR_SECONDS,
-        stale_for: STALE_FOR_SECONDS,
-        max_entries,
+        stale_for,
+        stale_if_error_for: STALE_IF_ERROR_FOR_SECONDS,
+        max_entries: SSO_CACHE_MAX_ENTRIES,
         backoff: RetryBackoff::new(RETRY_BASE_SECONDS, RETRY_MULTIPLIER),
         abandon_fill_after: ABANDON_FILL_AFTER_SECONDS,
     }
 }
 
 fn new_discovery_cache() -> DiscoveryCache {
-    SingleFlightCache::new(discovery_fill, cache_config(SSO_CACHE_MAX_ENTRIES))
+    SingleFlightCache::new(discovery_fill, cache_config(DISCOVERY_STALE_FOR_SECONDS))
 }
 
 fn new_jwks_cache() -> JwksCache {
-    SingleFlightCache::new(jwks_fill, cache_config(SSO_CACHE_MAX_ENTRIES))
+    SingleFlightCache::new(jwks_fill, cache_config(JWKS_STALE_FOR_SECONDS))
 }
 
 // ---------------------------------------------------------------------------
@@ -319,17 +327,6 @@ pub(super) fn prefetch(domain: &str) {
     }
     if let Cached::Ready(discovery_config) = single_flight_cache::get(&DISCOVERY_CACHE, domain) {
         single_flight_cache::get(&JWKS_CACHE, discovery_config.jwks_uri);
-    }
-}
-
-/// Drive the discovery fetch for `domain` (the discovery cache only — JWKS is a
-/// verify-time concern). For the sign-in initiation poll, where the frontend
-/// hits this from a query that read no value yet. A no-op for a disallowed
-/// domain.
-pub(super) fn drive_discovery(domain: &str) {
-    let domain = domain.to_ascii_lowercase();
-    if validate_discovery_domain(&domain).is_ok() {
-        single_flight_cache::get(&DISCOVERY_CACHE, domain);
     }
 }
 
@@ -1036,6 +1033,56 @@ mod tests {
             &test_aud_claim()
         )
         .is_err());
+    }
+
+    fn seed(domain: &str) -> DiscoveredConfig {
+        let config = sample_config();
+        TEST_DISCOVERY.with_borrow_mut(|m| m.insert(domain.to_string(), config.clone()));
+        TEST_JWKS.with_borrow_mut(|m| m.insert(config.jwks_uri.clone(), vec![]));
+        config
+    }
+
+    #[test]
+    fn discover_sso_fetches_an_expired_jwks_for_a_cached_discovery() {
+        reset();
+        let config = seed("example.org");
+        prefetch("example.org");
+        run_detached();
+        set_test_now(1_700_000_000 + FRESH_FOR_SECONDS + JWKS_STALE_FOR_SECONDS);
+        assert!(matches!(read_jwks(&config.jwks_uri), Cached::Pending));
+
+        prefetch("example.org");
+        run_detached();
+
+        assert!(matches!(read_jwks(&config.jwks_uri), Cached::Ready(_)));
+    }
+
+    #[test]
+    fn discovery_outlives_the_jwks() {
+        reset();
+        let config = seed("example.org");
+        prefetch("example.org");
+        run_detached();
+
+        set_test_now(1_700_000_000 + FRESH_FOR_SECONDS + DISCOVERY_STALE_FOR_SECONDS - 1);
+
+        assert!(matches!(peek_discovery("example.org"), Cached::Ready(_)));
+        assert!(matches!(read_jwks(&config.jwks_uri), Cached::Pending));
+    }
+
+    #[test]
+    fn failed_discovery_refresh_stops_serving_an_old_result() {
+        reset();
+        seed("example.org");
+        prefetch("example.org");
+        run_detached();
+        TEST_DISCOVERY.with_borrow_mut(|m| m.clear());
+
+        set_test_now(1_700_000_000 + FRESH_FOR_SECONDS + 24 * 60 * 60);
+        prefetch("example.org");
+        run_detached();
+
+        assert!(matches!(peek_discovery("example.org"), Cached::Pending));
     }
 
     #[test]
