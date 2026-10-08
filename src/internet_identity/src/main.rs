@@ -1891,15 +1891,30 @@ mod openid_api {
     }
 
     /// Drive the two-hop SSO discovery fetch and the domain's JWKS fetch for
-    /// `domain`. The frontend calls this while `get_sso_discovery_status` reads
-    /// `Pending`, and once more when it returns `Resolved`.
+    /// `domain`. The frontend calls this once, then polls
+    /// `get_sso_discovery_status`.
     #[update]
     fn discover_sso(domain: String) {
         openid::discover_sso(&openid::canonical_discovery_domain(&domain))
     }
 
+    /// Start the fetches behind `app_sso_domain_status` for `domain`, or
+    /// refresh a stale result.
+    #[update]
+    fn app_sso_domain_check(domain: String) {
+        openid::discover_sso(&openid::canonical_discovery_domain(&domain))
+    }
+
+    /// Whether `domain` can be used for SSO sign-in.
+    #[query]
+    fn app_sso_domain_status(
+        domain: String,
+    ) -> internet_identity_interface::internet_identity::types::AppSsoDomainStatus {
+        openid::app_sso_domain_status(&openid::canonical_discovery_domain(&domain))
+    }
+
     /// Read the status of `org_domain`'s SSO discovery: `Resolved` with the
-    /// config, or `Pending` while the fetch is in flight.
+    /// config, `Pending` while the fetch is in flight, or `Failed`.
     ///
     /// With `target_app_origin`, the resolved `resolved_client_id` is the client
     /// that origin must use.

@@ -13,7 +13,7 @@ use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdDelegationError,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
+    AnchorNumber, AppSsoDomainStatus, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
     OpenIdEmailVerificationScheme, PublicKey, SessionKey, SignedDelegation, SsoDiscovery,
     SsoDiscoveryStatus, Timestamp, UserKey,
 };
@@ -339,23 +339,25 @@ pub fn prefetch_sso(domain: Option<&str>) {
 }
 
 /// Drive the SSO discovery and JWKS fetches for `domain` forward. The sign-in
-/// initiation calls this from an update while [`get_sso_discovery_status`]
-/// reads `Pending`, and once more when it resolves, so a stale discovery result
-/// and the domain's keys refresh while the user signs in at the IdP. A no-op
-/// for a disallowed domain (the query reports `NotAllowed`).
+/// initiation calls this once from an update before polling
+/// [`get_sso_discovery_status`], so a stale discovery result and the domain's
+/// keys refresh while the user signs in at the IdP. A no-op for a domain that
+/// is not a bare authority (the query reports `Failed` with no `retry_after`).
 pub fn discover_sso(domain: &str) {
     sso::prefetch(domain);
 }
 
-/// Read the status of `domain`'s SSO discovery: the resolved config, or still
-/// pending.
+/// Read the status of `domain`'s SSO discovery: the resolved config, still
+/// pending, or failed.
 ///
 /// With `origin`, `resolved_client_id` is that origin's client, or `None` when
 /// the origin is gated out.
 pub fn get_sso_discovery_status(domain: &str, origin: Option<&str>) -> SsoDiscoveryStatus {
-    // Peek-only: `Pending` until the fill (driven by `prefetch_sso`) resolves.
-    // A malformed domain never resolves (the fill rejects non-bare-authorities),
-    // so it simply reads `Pending` until the frontend times out.
+    if sso::validate_discovery_domain(domain).is_err() {
+        return SsoDiscoveryStatus::Failed { retry_after: None };
+    }
+    // Peek-only: a query cannot start the fetch, `discover_sso` does. A cached
+    // value wins over a failed refresh of it, which keeps serving it.
     match sso::peek_discovery(domain) {
         Cached::Ready(discovery_config) => {
             let resolved_client_id = match origin {
@@ -373,7 +375,26 @@ pub fn get_sso_discovery_status(domain: &str, origin: Option<&str>) -> SsoDiscov
                 session_max_age_ns: discovery_config.session_max_age_ns,
             })
         }
-        Cached::Pending => SsoDiscoveryStatus::Pending,
+        Cached::Pending => match sso::discovery_retry_at_ns(domain) {
+            Some(retry_at_ns) => SsoDiscoveryStatus::Failed {
+                retry_after: Some(retry_at_ns),
+            },
+            None => SsoDiscoveryStatus::Pending,
+        },
+    }
+}
+
+/// Whether `domain` can be used for SSO sign-in: [`get_sso_discovery_status`]
+/// without the configuration.
+pub fn app_sso_domain_status(domain: &str) -> AppSsoDomainStatus {
+    match get_sso_discovery_status(domain, None) {
+        SsoDiscoveryStatus::Resolved(discovery) => AppSsoDomainStatus::Available {
+            name: discovery.name,
+        },
+        SsoDiscoveryStatus::Pending => AppSsoDomainStatus::Pending,
+        SsoDiscoveryStatus::Failed { retry_after } => {
+            AppSsoDomainStatus::Unavailable { retry_after }
+        }
     }
 }
 

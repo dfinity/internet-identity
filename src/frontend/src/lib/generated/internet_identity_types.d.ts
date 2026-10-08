@@ -125,6 +125,14 @@ export type AppSessionError = {
     'NoSuchSession' : null
   };
 /**
+ * Whether an organization domain can be used for SSO sign-in, read by
+ * `app_sso_domain_status`. `name` is the organization's display name;
+ * `retry_after` is as for `SsoDiscoveryStatus.Failed`.
+ */
+export type AppSsoDomainStatus = { 'Available' : { 'name' : [] | [string] } } |
+  { 'Unavailable' : { 'retry_after' : [] | [Timestamp] } } |
+  { 'Pending' : null };
+/**
  * An app the identity has signed in to, for the user's own list of their apps. Only
  * apps some account was used at: consent, a named account or a chosen default can each
  * be stored at an app the identity never signed in to.
@@ -2114,11 +2122,15 @@ export interface SsoDiscovery {
   'session_max_age_ns' : bigint,
 }
 /**
- * Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
- * failed fetch isn't a distinct status — it reads as `Pending` and the frontend
- * times out — so the statuses are: resolved, or in flight.
+ * Status of a domain's SSO discovery, read by `get_sso_discovery_status`.
+ * `Failed.retry_after` is when II fetches the domain again (a retry before then
+ * fails the same way), and is absent when no retry can help, such as a domain
+ * that is not a bare authority.
  */
-export type SsoDiscoveryStatus = { 'Resolved' : SsoDiscovery } |
+export type SsoDiscoveryStatus = {
+    'Failed' : { 'retry_after' : [] | [Timestamp] }
+  } |
+  { 'Resolved' : SsoDiscovery } |
   { 'Pending' : null };
 /**
  * Request for `sso_get_delegation`.
@@ -2286,6 +2298,15 @@ export interface _SERVICE {
       { 'Err' : SendNotificationError }
   >,
   /**
+   * Whether an organization domain can be used for SSO sign-in, for apps that
+   * check a domain before sending the user into the flow. Call
+   * `app_sso_domain_check` (update) once to start the fetch, then poll
+   * `app_sso_domain_status` (query) until it reads `Available` or
+   * `Unavailable`.
+   */
+  'app_sso_domain_check' : ActorMethod<[string], undefined>,
+  'app_sso_domain_status' : ActorMethod<[string], AppSsoDomainStatus>,
+  /**
    * Adds a new authentication method to the identity.
    * Requires authentication.
    */
@@ -2436,12 +2457,10 @@ export interface _SERVICE {
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   /**
-   * SSO discovery for the sign-in initiation flow. The frontend polls
-   * `get_sso_discovery_status` (query) and, while it reads `Pending`, drives the
-   * on-demand two-hop discovery fetch with `discover_sso` (update); once the
-   * fetch completes the query returns `Resolved` with the config. The frontend
-   * calls `discover_sso` once more on `Resolved`, which refreshes a stale
-   * result and fetches the domain's keys ahead of verification.
+   * SSO discovery for the sign-in initiation flow. The frontend calls
+   * `discover_sso` (update) once, which starts the two-hop discovery fetch and
+   * the domain's key fetch, or refreshes a stale result, then polls
+   * `get_sso_discovery_status` (query) until it reads `Resolved` or `Failed`.
    * 
    * The optional second argument is the target dapp origin; when supplied,
    * `resolved_client_id` reports the client that origin must use (`null` = denied).

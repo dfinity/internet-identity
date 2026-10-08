@@ -194,13 +194,24 @@ describe("ssoDiscovery", () => {
       }
     });
 
-    it("drives the update while the query reads Pending, then resolves", async () => {
+    it("starts nothing for a lookup that was already aborted", async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        discoverSsoConfig("dfinity.org", controller.signal),
+      ).rejects.toThrow("SSO discovery aborted");
+
+      expect(anonymousActor.discover_sso).not.toHaveBeenCalled();
+      expect(anonymousActor.get_sso_discovery_status).not.toHaveBeenCalled();
+    });
+
+    it("calls the update once, then polls only the query until it resolves", async () => {
       vi.useFakeTimers();
       vi.mocked(anonymousActor.get_sso_discovery_status)
         .mockResolvedValueOnce({ Pending: null })
         .mockResolvedValueOnce({ Pending: null })
         .mockResolvedValueOnce({ Resolved: DISCOVERY });
-      vi.mocked(anonymousActor.discover_sso).mockResolvedValue(undefined);
 
       const promise = discoverSsoConfig("dfinity.org");
       await vi.advanceTimersByTimeAsync(500);
@@ -208,8 +219,42 @@ describe("ssoDiscovery", () => {
 
       const result = await promise;
       expect(result.domain).toBe("dfinity.org");
-      // Each Pending read drove the update, and the Resolved read refreshed once.
-      expect(anonymousActor.discover_sso).toHaveBeenCalledTimes(3);
+      expect(anonymousActor.discover_sso).toHaveBeenCalledTimes(1);
+      expect(anonymousActor.get_sso_discovery_status).toHaveBeenCalledTimes(3);
+    });
+
+    it("stops at once when the canister reports a failure, with its retry time", async () => {
+      const retryAfterMs = Date.UTC(2026, 9, 7, 12, 0, 0);
+      vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
+        Failed: { retry_after: [BigInt(retryAfterMs) * BigInt(1_000_000)] },
+      });
+
+      const error = await discoverSsoConfig("dfinity.org").catch(
+        (e: unknown) => e,
+      );
+
+      expect(error).toBeInstanceOf(DomainNotConfiguredError);
+      if (error instanceof DomainNotConfiguredError) {
+        expect(error.reason).toBe("failed");
+        expect(error.retryAfter).toEqual(new Date(retryAfterMs));
+      }
+      expect(anonymousActor.get_sso_discovery_status).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports no retry time when no retry can help", async () => {
+      vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
+        Failed: { retry_after: [] },
+      });
+
+      const error = await discoverSsoConfig("dfinity.org").catch(
+        (e: unknown) => e,
+      );
+
+      expect(error).toBeInstanceOf(DomainNotConfiguredError);
+      if (error instanceof DomainNotConfiguredError) {
+        expect(error.reason).toBe("failed");
+        expect(error.retryAfter).toBeUndefined();
+      }
     });
 
     it("stops polling when the abort signal is already aborted", async () => {

@@ -338,6 +338,13 @@ pub(super) fn peek_discovery(domain: &str) -> Cached<DiscoveredConfig> {
     single_flight_cache::peek(&DISCOVERY_CACHE, &domain.to_ascii_lowercase())
 }
 
+/// When the discovery fetch for `domain` is retried, in absolute nanoseconds,
+/// while it is parked after a failed fetch and has no value to serve. Peek-only.
+pub(super) fn discovery_retry_at_ns(domain: &str) -> Option<u64> {
+    single_flight_cache::retry_at(&DISCOVERY_CACHE, &domain.to_ascii_lowercase())
+        .map(|retry_at_secs| retry_at_secs.saturating_mul(1_000_000_000))
+}
+
 /// Resolve an SSO domain into a verify descriptor + `jwks_uri` from the cached
 /// discovery result, cross-checking the JWT's issuer against the discovered
 /// issuer. Peek-only.
@@ -403,8 +410,8 @@ fn sso_allow_insecure_discovery() -> bool {
 }
 
 /// Validate a caller-supplied SSO discovery domain: it must be within the length
-/// cap and a bare URL authority (a host, optionally `host:port`, and nothing
-/// else). The bare-authority check is the security boundary — `domain` is
+/// cap and a bare URL authority (a host and nothing else; a loopback host may
+/// carry a port, for local development). The bare-authority check is the security boundary — `domain` is
 /// interpolated into a discovery URL (`{scheme}://{domain}/.well-known/...`), so
 /// inputs carrying userinfo (`evil.com@127.0.0.1`), a path, a query, or a
 /// fragment could otherwise change the effective request target.
@@ -422,8 +429,9 @@ pub fn validate_discovery_domain(domain: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// True if `domain` is a bare URL authority — a host, optionally `host:port`,
-/// and nothing else: no scheme, userinfo, path, query, or fragment. It is
+/// True if `domain` is a bare URL authority — a DNS name and nothing else: no
+/// scheme, userinfo, path, query, fragment, or port (a loopback host may carry
+/// one, for a local mock provider). It is
 /// parsed the same way it is later used (as the authority of an `https`
 /// discovery URL) and required to round-trip exactly, so anything the URL
 /// parser would reinterpret — embedded userinfo/path/query/fragment, stripped
@@ -445,11 +453,22 @@ fn is_bare_authority(domain: &str) -> bool {
     let Some(host) = url.host_str() else {
         return false;
     };
+    if !crate::utils::is_loopback_host(host) && !is_dns_name(host) {
+        return false;
+    }
     let authority = match url.port() {
+        Some(_) if !crate::utils::is_loopback_host(host) => return false,
         Some(port) => format!("{host}:{port}"),
         None => host.to_string(),
     };
     authority == domain.to_ascii_lowercase()
+}
+
+/// At least two labels, and a valid DNS name by IDNA's strict rules: letters,
+/// digits, and hyphens only, no hyphen at either end of a label, and DNS
+/// label and name lengths.
+fn is_dns_name(host: &str) -> bool {
+    host.contains('.') && idna::domain_to_ascii_strict(host).is_ok_and(|ascii| ascii == host)
 }
 
 /// `http` discovery is permitted only for a loopback host, and only when the
@@ -1042,6 +1061,103 @@ mod tests {
         config
     }
 
+    mod status {
+        use super::*;
+        use crate::openid::{app_sso_domain_status, get_sso_discovery_status};
+        use internet_identity_interface::internet_identity::types::{
+            AppSsoDomainStatus, SsoDiscoveryStatus,
+        };
+
+        const NOW_SECS: u64 = 1_700_000_000;
+
+        #[test]
+        fn malformed_domain_fails_without_retry() {
+            reset();
+            for domain in ["evil.com@127.0.0.1", "example.com/path", ""] {
+                assert_eq!(
+                    get_sso_discovery_status(domain, None),
+                    SsoDiscoveryStatus::Failed { retry_after: None }
+                );
+                assert_eq!(
+                    app_sso_domain_status(domain),
+                    AppSsoDomainStatus::Unavailable { retry_after: None }
+                );
+            }
+        }
+
+        #[test]
+        fn unfetched_domain_is_pending() {
+            reset();
+            assert_eq!(
+                get_sso_discovery_status("example.org", None),
+                SsoDiscoveryStatus::Pending
+            );
+            assert_eq!(
+                app_sso_domain_status("example.org"),
+                AppSsoDomainStatus::Pending
+            );
+        }
+
+        #[test]
+        fn resolved_domain_is_available_with_its_name() {
+            reset();
+            seed("example.org");
+            prefetch("example.org");
+            run_detached();
+            assert!(matches!(
+                get_sso_discovery_status("example.org", None),
+                SsoDiscoveryStatus::Resolved(_)
+            ));
+            assert_eq!(
+                app_sso_domain_status("example.org"),
+                AppSsoDomainStatus::Available {
+                    name: Some("Example".to_string())
+                }
+            );
+        }
+
+        #[test]
+        fn failed_fetch_fails_until_its_retry() {
+            reset();
+            prefetch("example.org"); // nothing seeded: the fill fails
+            run_detached();
+            let retry_after = Some((NOW_SECS + RETRY_BASE_SECONDS) * 1_000_000_000);
+            assert_eq!(
+                get_sso_discovery_status("example.org", None),
+                SsoDiscoveryStatus::Failed { retry_after }
+            );
+            assert_eq!(
+                app_sso_domain_status("example.org"),
+                AppSsoDomainStatus::Unavailable { retry_after }
+            );
+
+            // Once the backoff ends a retry is due, which reads as pending.
+            set_test_now(NOW_SECS + RETRY_BASE_SECONDS);
+            assert_eq!(
+                get_sso_discovery_status("example.org", None),
+                SsoDiscoveryStatus::Pending
+            );
+        }
+
+        #[test]
+        fn failed_refresh_keeps_a_cached_result_resolved() {
+            reset();
+            seed("example.org");
+            prefetch("example.org");
+            run_detached();
+            TEST_DISCOVERY.with_borrow_mut(|m| m.clear());
+
+            set_test_now(NOW_SECS + FRESH_FOR_SECONDS);
+            prefetch("example.org");
+            run_detached();
+
+            assert!(matches!(
+                get_sso_discovery_status("example.org", None),
+                SsoDiscoveryStatus::Resolved(_)
+            ));
+        }
+    }
+
     #[test]
     fn discover_sso_fetches_an_expired_jwks_for_a_cached_discovery() {
         reset();
@@ -1091,7 +1207,7 @@ mod tests {
         // No allowlist: any bare-authority domain passes the discovery gate.
         assert!(allowed("not-allowed.com"));
         assert!(allowed("example.org"));
-        assert!(allowed("sub.example.com:8443"));
+        assert!(allowed("localhost:11107"));
     }
 
     #[test]
@@ -1115,12 +1231,15 @@ mod tests {
     fn non_authority_domain_is_rejected() {
         reset();
 
-        // Bare authorities pass: host, sub-host, and explicit (non-default)
-        // port, case-insensitively.
+        // Bare authorities pass: host and sub-host, case-insensitively, and a
+        // loopback host with a port (local mock providers).
         assert!(allowed("example.com"));
         assert!(allowed("sub.example.com"));
-        assert!(allowed("example.com:8443"));
         assert!(allowed("Example.COM"));
+        assert!(allowed("sso-2.example.com"));
+        assert!(allowed("xn--zrich-kva.example"));
+        assert!(allowed("localhost:11107"));
+        assert!(allowed("127.0.0.1:8080"));
 
         // Anything that isn't a bare host[:port] is rejected even with the flag
         // on, so the caller-controlled value can't reshape the interpolated
@@ -1134,7 +1253,15 @@ mod tests {
             "example.com#frag",      // fragment
             "https://example.com",   // injected scheme
             "example.com:443",       // redundant default port (normalized away)
+            "example.com:8443",      // a port on a non-loopback host
             "exa mple.com",          // whitespace in host
+            "example",               // a single label
+            ".com",                  // empty label
+            "example..com",          // empty label
+            "-example.com",          // leading hyphen
+            "example-.com",          // trailing hyphen
+            "exa_mple.com",          // underscore
+            "ab--cd.com",            // hyphens in the third and fourth places
             "",                      // empty
         ] {
             assert!(!allowed(bad), "expected `{bad}` to be rejected");
@@ -1144,10 +1271,14 @@ mod tests {
     #[test]
     fn over_long_domain_is_rejected() {
         reset();
-        let at_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 4));
-        assert_eq!(at_cap.len(), MAX_DOMAIN_LENGTH);
-        assert!(allowed(&at_cap));
-        let over_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 3));
+        // DNS allows at most 253 characters in a name.
+        let labels = vec!["a".repeat(62); 3].join(".");
+        let longest = format!("{labels}.{}.com", "a".repeat(60));
+        assert_eq!(longest.len(), 253);
+        assert!(allowed(&longest));
+        assert!(!allowed(&format!("b{longest}")));
+
+        let over_cap = format!("b{}.com", vec!["a".repeat(62); 4].join("."));
         assert_eq!(over_cap.len(), MAX_DOMAIN_LENGTH + 1);
         assert!(!allowed(&over_cap));
     }
