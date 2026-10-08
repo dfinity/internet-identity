@@ -275,6 +275,9 @@ msgstr "Also makes changes on your behalf."
 msgid "An account linked through SSO signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one."
 msgstr "An account linked through SSO signs in through the domain it was linked with. This account is linked to an identity, so it can't be used to create a new one."
 
+msgid "An internal error occurred"
+msgstr "An internal error occurred"
+
 msgid "Any local program can connect"
 msgstr "Any local program can connect"
 
@@ -302,6 +305,9 @@ msgstr "As you are currently signed in with this access method, you will be sign
 msgid "Ask questions and perform actions across your apps by chatting with AI."
 msgstr "Ask questions and perform actions across your apps by chatting with AI."
 
+msgid "Ask your administrator to check the provider's OAuth configuration."
+msgstr "Ask your administrator to check the provider's OAuth configuration."
+
 msgid "Associate an email address with your Internet Identity"
 msgstr "Associate an email address with your Internet Identity"
 
@@ -314,8 +320,14 @@ msgstr "Authenticating..."
 msgid "Authentication failed"
 msgstr "Authentication failed"
 
+msgid "Authentication method not found"
+msgstr "Authentication method not found"
+
 msgid "Authentication successful"
 msgstr "Authentication successful"
+
+msgid "Authorization invalid"
+msgstr "Authorization invalid"
 
 msgid "Authorize new device"
 msgstr "Authorize new device"
@@ -467,6 +479,9 @@ msgstr "Connected"
 msgid "Connecting {mcpServer}…"
 msgstr "Connecting {mcpServer}…"
 
+msgid "Connecting to your organization"
+msgstr "Connecting to your organization"
+
 msgid "Connection closed"
 msgstr "Connection closed"
 
@@ -517,6 +532,9 @@ msgstr "Copy recipient address"
 
 msgid "Copy subject"
 msgstr "Copy subject"
+
+msgid "Couldn't connect to your organization"
+msgstr "Couldn't connect to your organization"
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
@@ -623,6 +641,9 @@ msgstr "Deny"
 msgid "Deny all"
 msgstr "Deny all"
 
+msgid "Device registration closed"
+msgstr "Device registration closed"
+
 msgid "Devices"
 msgstr "Devices"
 
@@ -719,6 +740,9 @@ msgstr "Everything you need to know about Internet Identity, your private, secur
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Experience"
+
+msgid "Expired JWT"
+msgstr "Expired JWT"
 
 msgid "Export JSON"
 msgstr "Export JSON"
@@ -969,6 +993,9 @@ msgstr "Invalid code. Please check and try again."
 msgid "Invalid domain"
 msgstr "Invalid domain"
 
+msgid "Invalid metadata. {0}"
+msgstr "Invalid metadata. {0}"
+
 msgid "Invalid recovery phrase"
 msgstr "Invalid recovery phrase"
 
@@ -989,6 +1016,9 @@ msgstr "It seems like an invalid authentication request was received."
 
 msgid "It seems like an invalid CLI authentication request was received."
 msgstr "It seems like an invalid CLI authentication request was received."
+
+msgid "It seems like registration is unavailable at this moment"
+msgstr "It seems like registration is unavailable at this moment"
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
@@ -1170,6 +1200,9 @@ msgstr "No emails yet"
 msgid "No identity found"
 msgstr "No identity found"
 
+msgid "No more additional accounts can be created"
+msgstr "No more additional accounts can be created"
+
 msgid "No passkey tests yet"
 msgstr "No passkey tests yet"
 
@@ -1220,6 +1253,9 @@ msgstr "Notifications unavailable"
 
 msgid "now"
 msgstr "now"
+
+msgid "OAuth provider returned \"{0}\""
+msgstr "OAuth provider returned \"{0}\""
 
 msgid "Official · Hosted by DFINITY"
 msgstr "Official · Hosted by DFINITY"
@@ -1280,6 +1316,9 @@ msgstr "Open site permissions"
 
 msgid "Open site settings"
 msgstr "Open site settings"
+
+msgid "Operation canceled"
+msgstr "Operation canceled"
 
 msgid "Or sign in with another identity"
 msgstr "Or sign in with another identity"
@@ -1674,6 +1713,12 @@ msgstr "Sign in with passkey"
 msgid "Sign in with SSO"
 msgstr "Sign in with SSO"
 
+msgid "Sign in with the domain it is linked through: {registeredDomain}."
+msgstr "Sign in with the domain it is linked through: {registeredDomain}."
+
+msgid "Sign in with the domain it was originally linked through."
+msgstr "Sign in with the domain it was originally linked through."
+
 msgid "Sign in with your {displayName} account from any device."
 msgstr "Sign in with your {displayName} account from any device."
 
@@ -1740,6 +1785,12 @@ msgstr "Something is wrong."
 
 msgid "Something went wrong"
 msgstr "Something went wrong"
+
+msgid "Something went wrong during registration"
+msgstr "Something went wrong during registration"
+
+msgid "Something went wrong during sign-in"
+msgstr "Something went wrong during sign-in"
 
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
@@ -1888,6 +1939,9 @@ msgstr "The CLI sign-in couldn't be completed. Check the CLI for details."
 msgid "The CLI uses your account in this app."
 msgstr "The CLI uses your account in this app."
 
+msgid "The delegation could not be found — please try again."
+msgstr "The delegation could not be found — please try again."
+
 msgid "The DNSSEC zone must use a current algorithm — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms aren't supported."
 msgstr "The DNSSEC zone must use a current algorithm — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms aren't supported."
 
@@ -1897,11 +1951,20 @@ msgstr "The email needs to come from the address above directly. Aliases and for
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 
+msgid "The interaction was canceled or timed out. Please try again."
+msgstr "The interaction was canceled or timed out. Please try again."
+
+msgid "The JWT has expired — please try again in a few minutes."
+msgstr "The JWT has expired — please try again in a few minutes."
+
 msgid "The most reliable backup. Stored entirely by you, on paper. It does not depend on any account, service, or provider, and only you can use, lose, or replace it."
 msgstr "The most reliable backup. Stored entirely by you, on paper. It does not depend on any account, service, or provider, and only you can use, lose, or replace it."
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr "The phrase was entered correctly but belongs to a product other than Internet Identity."
+
+msgid "There was an error verifying your account — please try again."
+msgstr "There was an error verifying your account — please try again."
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
@@ -1924,8 +1987,20 @@ msgstr "This {resolvedProviderName} account is already connected to an Internet 
 msgid "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
 msgstr "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
 
+msgid "This account has already been unlinked"
+msgstr "This account has already been unlinked"
+
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "This account is already attached to your identity. Your active access method will be switched to it."
+
+msgid "This account is already linked to another identity"
+msgstr "This account is already linked to another identity"
+
+msgid "This account is linked through a different SSO domain"
+msgstr "This account is linked through a different SSO domain"
+
+msgid "This account isn't linked to an identity"
+msgstr "This account isn't linked to an identity"
 
 msgid "this app"
 msgstr "this app"
@@ -1959,6 +2034,9 @@ msgstr "This is already your recovery email."
 
 msgid "This is now the default method used to authenticate moving forward on this device."
 msgstr "This is now the default method used to authenticate moving forward on this device."
+
+msgid "This is taking longer than usual."
+msgstr "This is taking longer than usual."
 
 msgid "This is the access method you're currently signed in with."
 msgstr "This is the access method you're currently signed in with."
@@ -2017,6 +2095,9 @@ msgstr "To finish setting up your passkey, follow the instructions shown on your
 msgid "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 msgstr "To let AI ask questions and perform actions across your apps, add an <0>MCP connector</0> you trust."
 
+msgid "Too many attempts or time has expired."
+msgstr "Too many attempts or time has expired."
+
 msgid "Trusted connector"
 msgstr "Trusted connector"
 
@@ -2062,8 +2143,17 @@ msgstr "Understanding Internet Identity"
 msgid "Undo"
 msgstr "Undo"
 
+msgid "Unexpected error"
+msgstr "Unexpected error"
+
+msgid "Unhandled error"
+msgstr "Unhandled error"
+
 msgid "Unknown"
 msgstr "Unknown"
+
+msgid "Unknown error"
+msgstr "Unknown error"
 
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience (no repeated signing) while still giving each session its own identity."
 msgstr "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience (no repeated signing) while still giving each session its own identity."
