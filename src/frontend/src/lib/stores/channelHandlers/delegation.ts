@@ -26,7 +26,8 @@ import {
   attributeConsentStore,
 } from "$lib/stores/attributeConsent.store";
 import { get } from "svelte/store";
-import { serializeAuthorizationRequest } from "$lib/stores/channelHandlers/serialize";
+import { serializeSignInRequest } from "$lib/stores/channelHandlers/serialize";
+import { grantedTimeToLive } from "$lib/utils/sessionDuration";
 
 /**
  * ICRC-34: handle a delegation request from the relying party.
@@ -56,7 +57,7 @@ export const handleDelegationRequest =
       return;
     }
 
-    await serializeAuthorizationRequest(async () => {
+    await serializeSignInRequest(async () => {
       try {
         const params = result.data;
 
@@ -135,19 +136,14 @@ export const handleDelegationRequest =
         // omitted-arg default.
         const permissions = toPermissionsArg(authorized.accessLevel);
 
-        // Prefer the duration the user chose on the sign-in screen; it's already
-        // capped at the app's request. Flows without a picker (e.g. 1-click
-        // OpenID/SSO) fall back to the app's requested value. An SSO
-        // organization also caps how long its sign-ins stay valid, and the
+        // An SSO organization caps how long its sign-ins stay valid, and the
         // delegation must not outlive that, so an SSO session sends a duration
-        // even when neither the picker nor the app asked for one. The backend
-        // applies its own default only when nothing constrains it at all.
-        const requested = authorized.maxTimeToLive ?? params.maxTimeToLive;
-        const maxTimeToLive =
-          ssoSessionMaxAgeNs !== undefined &&
-          (requested === undefined || requested > ssoSessionMaxAgeNs)
-            ? ssoSessionMaxAgeNs
-            : requested;
+        // even when neither the picker nor the app asked for one.
+        const maxTimeToLive = grantedTimeToLive({
+          authorized: authorized.maxTimeToLive,
+          requested: params.maxTimeToLive,
+          ssoSessionMaxAgeNs,
+        });
 
         const { user_key, expiration } = await actor
           .prepare_account_delegation(

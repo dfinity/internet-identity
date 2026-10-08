@@ -244,6 +244,9 @@ test.describe("Authorize — explicit consent UI", () => {
           const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
           await signInWithOpenId(popup, user.id);
           await closePromise;
+          // The popup closes once it hands back the token, before the credential is
+          // added; the dialog closes only once it has been.
+          await expect(page.getByRole("dialog")).toBeHidden();
         }
       },
     );
@@ -477,6 +480,9 @@ test.describe("Authorize — explicit consent UI", () => {
           const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
           await signInWithOpenId(popup, user.id);
           await closePromise;
+          // The popup closes once it hands back the token, before the credential is
+          // added; the dialog closes only once it has been.
+          await expect(page.getByRole("dialog")).toBeHidden();
         }
       },
     );
