@@ -2256,6 +2256,7 @@ dependencies = [
  "ic-verifiable-credentials",
  "ic0 1.2.0",
  "identity_jose",
+ "idna",
  "include_dir",
  "internet_identity_interface",
  "lazy_static",

@@ -375,9 +375,9 @@ pub fn get_sso_discovery_status(domain: &str, origin: Option<&str>) -> SsoDiscov
                 session_max_age_ns: discovery_config.session_max_age_ns,
             })
         }
-        Cached::Pending => match sso::discovery_retry_at(domain) {
-            Some(retry_at_secs) => SsoDiscoveryStatus::Failed {
-                retry_after: Some(retry_at_secs.saturating_mul(1_000_000_000)),
+        Cached::Pending => match sso::discovery_retry_at_ns(domain) {
+            Some(retry_at_ns) => SsoDiscoveryStatus::Failed {
+                retry_after: Some(retry_at_ns),
             },
             None => SsoDiscoveryStatus::Pending,
         },

@@ -338,10 +338,11 @@ pub(super) fn peek_discovery(domain: &str) -> Cached<DiscoveredConfig> {
     single_flight_cache::peek(&DISCOVERY_CACHE, &domain.to_ascii_lowercase())
 }
 
-/// When the discovery fetch for `domain` is retried, in absolute seconds, while
-/// it is parked after a failed fetch and has no value to serve. Peek-only.
-pub(super) fn discovery_retry_at(domain: &str) -> Option<u64> {
+/// When the discovery fetch for `domain` is retried, in absolute nanoseconds,
+/// while it is parked after a failed fetch and has no value to serve. Peek-only.
+pub(super) fn discovery_retry_at_ns(domain: &str) -> Option<u64> {
     single_flight_cache::retry_at(&DISCOVERY_CACHE, &domain.to_ascii_lowercase())
+        .map(|retry_at_secs| retry_at_secs.saturating_mul(1_000_000_000))
 }
 
 /// Resolve an SSO domain into a verify descriptor + `jwks_uri` from the cached
@@ -463,19 +464,11 @@ fn is_bare_authority(domain: &str) -> bool {
     authority == domain.to_ascii_lowercase()
 }
 
-/// At least two labels, each 1 to 63 ASCII letters, digits, or hyphens, with no
-/// hyphen at either end.
+/// At least two labels, and a valid DNS name by IDNA's strict rules: letters,
+/// digits, and hyphens only, no hyphen at either end of a label, and DNS
+/// label and name lengths.
 fn is_dns_name(host: &str) -> bool {
-    let labels: Vec<&str> = host.split('.').collect();
-    labels.len() >= 2
-        && labels.iter().all(|label| {
-            (1..=63).contains(&label.len())
-                && label
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b == b'-')
-                && !label.starts_with('-')
-                && !label.ends_with('-')
-        })
+    host.contains('.') && idna::domain_to_ascii_strict(host).is_ok_and(|ascii| ascii == host)
 }
 
 /// `http` discovery is permitted only for a loopback host, and only when the
@@ -1244,6 +1237,7 @@ mod tests {
         assert!(allowed("sub.example.com"));
         assert!(allowed("Example.COM"));
         assert!(allowed("sso-2.example.com"));
+        assert!(allowed("xn--zrich-kva.example"));
         assert!(allowed("localhost:11107"));
         assert!(allowed("127.0.0.1:8080"));
 
@@ -1267,6 +1261,7 @@ mod tests {
             "-example.com",          // leading hyphen
             "example-.com",          // trailing hyphen
             "exa_mple.com",          // underscore
+            "ab--cd.com",            // hyphens in the third and fourth places
             "",                      // empty
         ] {
             assert!(!allowed(bad), "expected `{bad}` to be rejected");
@@ -1276,11 +1271,14 @@ mod tests {
     #[test]
     fn over_long_domain_is_rejected() {
         reset();
-        let labels = vec!["a".repeat(62); 4].join(".");
-        let at_cap = format!("{labels}.com");
-        assert_eq!(at_cap.len(), MAX_DOMAIN_LENGTH);
-        assert!(allowed(&at_cap));
-        let over_cap = format!("b{labels}.com");
+        // DNS allows at most 253 characters in a name.
+        let labels = vec!["a".repeat(62); 3].join(".");
+        let longest = format!("{labels}.{}.com", "a".repeat(60));
+        assert_eq!(longest.len(), 253);
+        assert!(allowed(&longest));
+        assert!(!allowed(&format!("b{longest}")));
+
+        let over_cap = format!("b{}.com", vec!["a".repeat(62); 4].join("."));
         assert_eq!(over_cap.len(), MAX_DOMAIN_LENGTH + 1);
         assert!(!allowed(&over_cap));
     }
