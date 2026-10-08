@@ -26,7 +26,10 @@ import { claimScreen } from "$lib/stores/pendingScreen.store";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { remapToLegacyDomain } from "$lib/utils/urlUtils";
 import { waitForStore } from "$lib/utils/utils";
-import { serializeAuthorizationRequest } from "$lib/stores/channelHandlers/serialize";
+import {
+  serializeAuthorizationRequest,
+  signInWaitingStore,
+} from "$lib/stores/channelHandlers/serialize";
 import { get } from "svelte/store";
 import { PUSH_NOTIFICATIONS } from "$lib/state/featureFlags";
 import { z } from "zod";
@@ -134,55 +137,91 @@ export const handleNotificationConsentRequest =
     // not take the screen the user is on before we know whether we need it.
     const releaseScreen = claimScreen();
 
-    await serializeAuthorizationRequest(async () => {
-      try {
-        const params = parsed.data;
-        const validation = await validateDerivationOrigin({
-          requestOrigin: channel.origin,
-          derivationOrigin: params.icrc95DerivationOrigin,
-        });
-        if (validation.result === "invalid") {
-          onError("unverified-origin");
-          return;
-        }
-
-        const effectiveOrigin = remapToLegacyDomain(
-          params.icrc95DerivationOrigin ?? channel.origin,
-        );
-
-        // No notifications on iOS yet, so nothing is offered and the app is told
-        // plainly that it may not notify here rather than being refused outright:
-        // the method exists, this browser just has no answer but no.
-        if (notificationsUnavailableHere()) {
-          await channel.send({
-            jsonrpc: "2.0",
-            id: requestId,
-            result: { granted: false },
-          });
-          return;
-        }
-
-        const granted = await runConsentCeremony(
-          effectiveOrigin,
+    // A sign-in queued behind this request is handed the turn, so the request is
+    // queued again until it has answered.
+    for (;;) {
+      const outcome = await serializeAuthorizationRequest(async () => {
+        const outcome = await answerConsent(
+          channel,
+          onError,
+          requestId,
+          parsed.data,
           browser,
           probedAt,
           releaseScreen,
         );
-
-        await channel.send({
-          jsonrpc: "2.0",
-          id: requestId,
-          result: { granted },
-        });
-      } catch (error) {
-        console.error(error);
-        onError("notification-consent-failed");
-      } finally {
-        releaseScreen();
-        notificationConsentStore.clear();
+        if (outcome === "answered") {
+          releaseScreen();
+          notificationConsentStore.clear();
+        }
+        return outcome;
+      });
+      if (outcome === "answered") {
+        return;
       }
-    });
+    }
   };
+
+/** Whether a turn answered the app, or handed the queue to a sign-in. */
+type TurnOutcome = "answered" | "yielded";
+
+const answerConsent = async (
+  channel: Channel,
+  onError: (error: ChannelError) => void,
+  requestId: NonNullable<JsonRequest["id"]>,
+  params: z.infer<typeof NotificationConsentParamsCodec>,
+  browser: Promise<BrowserPushState | undefined>,
+  probedAt: number,
+  releaseScreen: () => void,
+): Promise<TurnOutcome> => {
+  try {
+    const validation = await validateDerivationOrigin({
+      requestOrigin: channel.origin,
+      derivationOrigin: params.icrc95DerivationOrigin,
+    });
+    if (validation.result === "invalid") {
+      onError("unverified-origin");
+      return "answered";
+    }
+
+    const effectiveOrigin = remapToLegacyDomain(
+      params.icrc95DerivationOrigin ?? channel.origin,
+    );
+
+    // No notifications on iOS yet, so nothing is offered and the app is told
+    // plainly that it may not notify here rather than being refused outright:
+    // the method exists, this browser just has no answer but no.
+    if (notificationsUnavailableHere()) {
+      await channel.send({
+        jsonrpc: "2.0",
+        id: requestId,
+        result: { granted: false },
+      });
+      return "answered";
+    }
+
+    const granted = await runConsentCeremony(
+      effectiveOrigin,
+      browser,
+      probedAt,
+      releaseScreen,
+    );
+    if (granted === "yielded") {
+      return "yielded";
+    }
+
+    await channel.send({
+      jsonrpc: "2.0",
+      id: requestId,
+      result: { granted },
+    });
+    return "answered";
+  } catch (error) {
+    console.error(error);
+    onError("notification-consent-failed");
+    return "answered";
+  }
+};
 
 /**
  * Authenticates the identity, runs the consent screen, then asks the canister what was
@@ -198,7 +237,7 @@ const runConsentCeremony = async (
   probedBrowser: Promise<BrowserPushState | undefined>,
   probedAt: number,
   releaseScreen: () => void,
-): Promise<boolean> => {
+): Promise<boolean | "yielded"> => {
   // The probe stands only where no ceremony has run since it was taken. Read again
   // rather than ask about a browser one of them may have set up in the meantime.
   const browser =
@@ -222,11 +261,22 @@ const askUntilSettled = async (
    *  before the answer is read back: the redirect is what belongs on screen for
    *  that, not the screen the user came from. */
   releaseScreen: () => void,
-): Promise<boolean> => {
+): Promise<boolean | "yielded"> => {
   for (;;) {
     // Awaited for its ordering and not its value: the user has to have chosen an
-    // identity before a screen can ask them about notifying it.
-    await waitForStore(authorizedStore);
+    // identity before a screen can ask them about notifying it. A sign-in waiting
+    // behind this takes the turn instead: it carries the app's requested session
+    // duration for the screen the user signs in on, and it registers this browser,
+    // which allowing needs.
+    const turn = await Promise.race([
+      waitForStore(authorizedStore).then(() => "authorized" as const),
+      waitForStore(signInWaitingStore, (waiting) =>
+        waiting ? ("yielded" as const) : undefined,
+      ),
+    ]);
+    if (turn === "yielded" || get(signInWaitingStore)) {
+      return "yielded";
+    }
     const authenticated = await waitForStore(authenticationStore);
 
     // Resolved before the context is set, so the screen opens on the question it
@@ -241,6 +291,10 @@ const askUntilSettled = async (
     if (resolution.screen === "skip") {
       releaseScreen();
       return resolution.granted;
+    }
+    // Signed in already, but the sign-in that registers this browser has yet to run.
+    if (get(signInWaitingStore)) {
+      return "yielded";
     }
 
     notificationConsentStore.setContext({
@@ -263,9 +317,18 @@ const askUntilSettled = async (
           ? ("switched" as const)
           : undefined,
       ),
+      // A sign-in that arrives while the screen waits still registers this browser
+      // for the allowing to land on, so the screen steps aside until it has.
+      waitForStore(signInWaitingStore, (waiting) =>
+        waiting ? ("yielded" as const) : undefined,
+      ),
     ]);
     if (outcome === "switched") {
       continue;
+    }
+    if (outcome === "yielded") {
+      notificationConsentStore.clear();
+      return "yielded";
     }
     releaseScreen();
 

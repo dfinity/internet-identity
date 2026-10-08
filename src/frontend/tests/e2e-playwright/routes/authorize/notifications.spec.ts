@@ -277,4 +277,83 @@ test.describe("notification consent", () => {
 
     await testApp.expectMayNotify();
   });
+
+  /**
+   * An app that asks to notify as part of signing in sends both requests at once, and
+   * the consent request can reach Internet Identity first. The sign-in still has to run
+   * first: it carries the app's session duration, and it registers this browser, which
+   * allowing needs. Each scenario starts on a browser that has never signed in.
+   */
+  test.describe("asked together with the sign-in", () => {
+    const ONE_HOUR_MS = 3_600_000;
+    const ONE_HOUR_NS = BigInt(ONE_HOUR_MS) * BigInt(1_000_000);
+
+    test("an app is told yes on a browser signing in for the first time", async ({
+      context,
+      testApp,
+      identities,
+      signInWithIdentity,
+    }) => {
+      await armPushNotifications(context);
+      const authenticate = continueAs(
+        identities[0].identityNumber,
+        signInWithIdentity,
+      );
+
+      await testApp.open({ askToNotifyOnSignIn: true });
+      await testApp.signIn(async (authPage: Page) => {
+        await authenticate(authPage);
+        await authPage
+          .getByRole("button", { name: "Allow", exact: true })
+          .click();
+      });
+
+      await testApp.expectMayNotify();
+    });
+
+    test("the session lasts no longer than the app asked for", async ({
+      context,
+      testApp,
+      identities,
+      signInWithIdentity,
+    }) => {
+      await armPushNotifications(context);
+      const authenticate = continueAs(
+        identities[0].identityNumber,
+        signInWithIdentity,
+      );
+
+      await testApp.open({
+        askToNotifyOnSignIn: true,
+        maxTimeToLive: ONE_HOUR_NS,
+      });
+      await testApp.signIn(async (authPage: Page) => {
+        await authenticate(authPage);
+        await authPage.getByRole("button", { name: "Not now" }).click();
+      });
+
+      await testApp.expectSessionEndsWithin(ONE_HOUR_MS);
+    });
+
+    test("an app the user puts off is told no and still signed in", async ({
+      context,
+      testApp,
+      identities,
+      signInWithIdentity,
+    }) => {
+      await armPushNotifications(context);
+      const authenticate = continueAs(
+        identities[0].identityNumber,
+        signInWithIdentity,
+      );
+
+      await testApp.open({ askToNotifyOnSignIn: true });
+      await testApp.signIn(async (authPage: Page) => {
+        await authenticate(authPage);
+        await authPage.getByRole("button", { name: "Not now" }).click();
+      });
+
+      await testApp.expectMayNotNotify();
+    });
+  });
 });

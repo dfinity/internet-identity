@@ -72,6 +72,10 @@ export interface TestAppOptions {
   derivationOrigin?: string;
   /** Announces the session across the siblings of this domain. */
   cookieDomain?: string;
+  /** The longest session the app asks for, in nanoseconds. */
+  maxTimeToLive?: bigint;
+  /** Sends the notification consent request together with the sign-in. */
+  askToNotifyOnSignIn?: boolean;
 }
 
 export class TestApp {
@@ -86,6 +90,9 @@ export class TestApp {
   }
   private get account(): Locator {
     return this.page.locator("#sessionAccountPrincipal");
+  }
+  private get sessionExpiry(): Locator {
+    return this.page.locator("#sessionExpiry");
   }
   private get delegation(): Locator {
     return this.page.locator("#delegationExpiry");
@@ -151,6 +158,16 @@ export class TestApp {
         .fill(options.cookieDomain);
       await this.page.locator("#sessionCookieDomain").blur();
     }
+    if (options.maxTimeToLive !== undefined) {
+      await this.page
+        .locator("#maxTimeToLive")
+        .fill(options.maxTimeToLive.toString());
+    }
+    if (options.askToNotifyOnSignIn === true) {
+      await this.page
+        .getByRole("checkbox", { name: "Ask to notify after sign-in:" })
+        .check();
+    }
   }
 
   /** Closes this tab. */
@@ -192,6 +209,23 @@ export class TestApp {
   async expectSessionEnded(): Promise<void> {
     await expect(this.state).toHaveText(SESSION_ENDED, { timeout: ROUND_TRIP });
     await expect(this.delegation).toHaveText(NO_DELEGATION);
+  }
+
+  /** Fails unless the app's session ends within `ms` from now. */
+  async expectSessionEndsWithin(ms: number): Promise<void> {
+    const remaining = await this.sessionExpiry.innerText();
+    const units: Record<string, number> = {
+      d: 86_400_000,
+      h: 3_600_000,
+      m: 60_000,
+      s: 1_000,
+    };
+    const remainingMs = [...remaining.matchAll(/(\d+)([dhms])/g)].reduce(
+      (total, [, value, unit]) => total + Number(value) * units[unit],
+      0,
+    );
+    expect(remainingMs, `session ends in ${remaining}`).toBeGreaterThan(0);
+    expect(remainingMs, `session ends in ${remaining}`).toBeLessThanOrEqual(ms);
   }
 
   /** Fails unless the app is acting as some account. */
