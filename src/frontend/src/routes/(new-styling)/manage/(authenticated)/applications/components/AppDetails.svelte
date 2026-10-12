@@ -17,12 +17,21 @@
     canNotify: boolean;
     /** Whether the app may notify. */
     allowed: boolean;
+    /** Whether a permission change is in flight, which holds every other change back. */
+    saving: boolean;
     onToggle: (allowed: boolean) => void;
     onForget: () => void;
   }
 
-  const { titleId, origin, canNotify, allowed, onToggle, onForget }: Props =
-    $props();
+  const {
+    titleId,
+    origin,
+    canNotify,
+    allowed,
+    saving,
+    onToggle,
+    onForget,
+  }: Props = $props();
 
   const metadataStore = $derived(getAppMetadataStore(origin));
   const metadata = $derived($metadataStore);
@@ -74,6 +83,7 @@
         <div class="flex h-6 shrink-0 items-center">
           <Toggle
             checked={allowed}
+            disabled={saving}
             onchange={(event) => onToggle(event.currentTarget.checked)}
             aria-labelledby={switchId}
             aria-describedby={hintId}
@@ -92,6 +102,7 @@
       </div>
       <button
         onclick={onForget}
+        disabled={saving}
         class="btn btn-secondary btn-sm btn-danger shrink-0"
       >
         {$t`Forget`}

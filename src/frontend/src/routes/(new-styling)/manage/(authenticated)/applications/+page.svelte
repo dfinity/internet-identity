@@ -24,6 +24,13 @@
   // change settles and the page data is reloaded.
   let apps = $derived(appsFrom(data.applications));
 
+  // Set while a permission change is in flight, and cleared once the page data is
+  // reloaded, so a second change cannot race the first.
+  let saving = $derived.by(() => {
+    void data;
+    return false;
+  });
+
   const allowedOf = (app: App): boolean =>
     $PUSH_NOTIFICATIONS && app.notificationsAllowed;
 
@@ -32,6 +39,7 @@
   const saveAllowed = async (origin: string, allowed: boolean) => {
     const { actor, identityNumber } = $authenticatedStore;
     const previous = apps;
+    saving = true;
     apps = apps.map((app) =>
       app.origin === origin ? { ...app, notificationsAllowed: allowed } : app,
     );
@@ -199,6 +207,7 @@
       origin={app.origin}
       canNotify={$PUSH_NOTIFICATIONS}
       allowed={allowedOf(app)}
+      {saving}
       onToggle={(allowed) => saveAllowed(app.origin, allowed)}
       onForget={() => (forgetting = [app.origin])}
     />
